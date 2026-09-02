@@ -1,5 +1,6 @@
 import { Effect } from "effect"
-import { Agent, Prompt, Policy } from "generalist"
+import { Agent, Policy } from "generalist"
+import { Prompt } from "effect/unstable/ai"
 
 const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
 

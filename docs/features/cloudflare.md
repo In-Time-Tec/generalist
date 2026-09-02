@@ -7,7 +7,7 @@ Durable Object, and execute agent programs in fresh Worker Loader isolates.
 
 ```ts
 import { Effect, Schema } from "effect"
-import { WorkerContext, make } from "generalist/cloudflare/workers"
+import { WorkerContext, make } from "generalist/unstable/cloudflare/workers"
 
 const Bindings = Schema.Struct({ API_TOKEN: Schema.String })
 
@@ -87,8 +87,8 @@ execute({ requestId: "run-1:attempt-1", input: { value: 1 } })
 
 `make({ loader, compatibilityDate, capabilityBinding })` constructs the
 production `CodeExecutor` as a thin adapter over the Worker Loader Sandbox leaf.
-`generalist/sandbox` also exposes that leaf as `layerWorkerLoader`. Both paths
-use the same execution engine; there is no second loader path. Only relative
+`generalist/unstable/sandbox/worker-loader` exposes that leaf as
+`layerWorkerLoader`. Both paths use the same execution engine; there is no second loader path. Only relative
 imports inside the exact module graph are accepted. Each execution gets a fresh
 `v8-isolate`, bounded output, explicitly granted capabilities, and CPU,
 subrequest, deadline, and cancellation limits. Files, pause, resume, snapshot,

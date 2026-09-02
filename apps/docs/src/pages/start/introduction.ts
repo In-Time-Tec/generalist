@@ -26,7 +26,7 @@ export const introduction = definePage({
     bullets(
       "Process-local agents: CLIs, scripts, servers, and tests can run generalist without external infrastructure.",
       "Human-in-the-loop flows: approval-gated tools suspend the run as a typed error carrying a resume token.",
-      "Live chat: generalist/transport projects semantic Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model for the browser.",
+      "Live chat: generalist/unstable/transport projects semantic Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model for the browser.",
       "Deterministic CI: scripted models and test layers on every seam make agent behavior assertable.",
     ),
     h2("non-goals", "Non-goals"),

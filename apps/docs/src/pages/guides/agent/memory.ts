@@ -60,7 +60,7 @@ export const memory = definePage({
       " and an ",
       code("Ai.EmbeddingModel"),
       "; ",
-      code("generalist/ai/openai-embedding"),
+      code("generalist/providers/openai-embedding"),
       " supplies the latter:",
     ),
     codeBlock({ label: "semantic-recall.ts", source: semanticRecall }),

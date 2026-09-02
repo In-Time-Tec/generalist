@@ -1,5 +1,5 @@
 import { Context, Effect, Schema } from "effect"
-import { Tool, Toolkit } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 export interface DocsIndexService {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }

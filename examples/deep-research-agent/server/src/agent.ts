@@ -1,4 +1,5 @@
-import { Agent, LanguageModel, Tool, Policy } from "generalist"
+import { Agent, Policy } from "generalist"
+import { LanguageModel, Tool } from "effect/unstable/ai"
 import { WebSearch } from "./web-search"
 import { toolkit, webSearchTool } from "./tools"
 

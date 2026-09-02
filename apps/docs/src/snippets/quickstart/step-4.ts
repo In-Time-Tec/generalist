@@ -1,5 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, Permissions, Response, Tool, Toolkit } from "generalist"
+import { Agent, Approvals, Permissions } from "generalist"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",

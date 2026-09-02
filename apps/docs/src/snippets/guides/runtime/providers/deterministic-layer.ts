@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { layerModel as deterministicModel } from "generalist/ai/deterministic"
+import { layerModel as deterministicModel } from "generalist/providers/deterministic"
 
 const agent = Agent.make({ name: "keyless-agent" })
 

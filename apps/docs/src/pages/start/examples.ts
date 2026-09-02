@@ -57,7 +57,7 @@ export const examples = definePage({
           [code("mcp-agent")],
           [
             "An agent over a fake in-memory MCP client using the ",
-            code("generalist/mcp/tools"),
+            code("generalist/unstable/mcp/tools"),
             " adapter shape of a real connection",
           ],
           [code("bun --cwd examples/mcp-agent start")],

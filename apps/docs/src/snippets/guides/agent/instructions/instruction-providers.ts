@@ -1,14 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  Instructions,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Response,
-  ToolExecutor,
-} from "generalist"
+import { Agent, Approvals, Instructions, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 
 const persona = Instructions.fromText("persona", "You are the release-notes assistant.")
 

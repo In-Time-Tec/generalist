@@ -1,20 +1,9 @@
 import { Effect, Layer, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
-import {
-  Agent,
-  AgentManifest,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Pins,
-  Response,
-  Tool,
-  ToolExecutor,
-  Toolkit,
-} from "generalist"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { RunExecutor, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
-import { SSE, WebSocket } from "generalist/transport"
+import { SSE, WebSocket } from "generalist/unstable/transport"
 
 const searchTool = Tool.make("web_search", {
   description: "Search the web",

@@ -2,13 +2,13 @@ import { code, command, definePage, h2, lead, link, p, table } from "../../../pr
 
 export const transportReference = definePage({
   path: "/docs/reference/transport",
-  title: "generalist/transport",
+  title: "generalist/unstable/transport",
   navTitle: "transport",
   group: "Reference",
   description: "Runtime RunEvent wire codecs, SSE and WebSocket handlers, snapshots, and reconnecting clients.",
   content: [
     lead(
-      "generalist/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
+      "generalist/unstable/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
     ),
     command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("exports", "Exports map"),
@@ -59,7 +59,7 @@ export const transportReference = definePage({
       "See ",
       link("/docs/reference/runtime", "generalist/runtime"),
       " for Run ownership and ",
-      link("/docs/reference/foldkit", "generalist/foldkit"),
+      link("/docs/reference/foldkit", "generalist/unstable/foldkit"),
       " for the UI projection.",
     ),
   ],

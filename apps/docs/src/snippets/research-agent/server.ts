@@ -1,6 +1,6 @@
 import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
 import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
-import { SSE, WebSocket } from "generalist/transport"
+import { SSE, WebSocket } from "generalist/unstable/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { agent } from "./agent"

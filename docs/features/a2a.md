@@ -1,6 +1,6 @@
 # A2A
 
-`generalist/a2a` projects A2A v1 tasks onto authoritative Runtime runs.
+`generalist/unstable/a2a` projects A2A v1 tasks onto authoritative Runtime runs.
 The SDK handler stores no second task lifecycle.
 
 ## Usage
@@ -8,7 +8,7 @@ The SDK handler stores no second task lifecycle.
 ```ts
 import type { AgentCard } from "@a2a-js/sdk"
 import { Effect, Layer } from "effect"
-import { A2A } from "generalist/a2a"
+import { A2A } from "generalist/unstable/a2a"
 import { Address, Runtime } from "generalist/runtime"
 
 declare const card: AgentCard

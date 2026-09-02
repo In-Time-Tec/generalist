@@ -1,6 +1,6 @@
 # Host Generalist Runtime in Rivet Actors through the raw SDK
 
-Generalist provides `generalist/rivet/actors` over raw `rivetkit@2.3.10`. One Rivet Actor owns one Runtime partition, and
+Generalist provides `generalist/unstable/rivet` over raw `rivetkit@2.3.10`. One Rivet Actor owns one Runtime partition, and
 actor-local SQLite is the only mutable authority for Runs, operations, Sessions, events, claims, and activation rows.
 Rivet actions, schedules, cron, and wake delivery do not become a second execution lifecycle.
 
@@ -68,7 +68,7 @@ overlap proof before the adapter pin changes.
 
 ## Distribution and residual limit
 
-The package exposes only ESM `generalist/rivet/actors`. Raw RivetKit advertises CommonJS outputs, but that path is not part
+The package exposes only ESM `generalist/unstable/rivet`. Raw RivetKit advertises CommonJS outputs, but that path is not part
 of Generalist's support claim; clean Node and Bun ESM consumers are verified, and package smoke proves CommonJS resolution
 is blocked, the declaration dependency is installed, and only one Effect runtime exists.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { Prompt } from "generalist"
+import { Prompt } from "effect/unstable/ai"
 import { agent, policy } from "../src/agent"
 
 describe("deep-research-agent definition", () => {

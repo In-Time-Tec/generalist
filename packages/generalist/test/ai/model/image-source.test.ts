@@ -3,10 +3,10 @@ import { ModelRegistry } from "generalist"
 import { Cause, Config, Effect, Exit, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
-import { layer as anthropicLayer } from "generalist/ai/anthropic"
-import { layer as openAiLayer, layerOrDeterministic } from "generalist/ai/openai"
-import { layer as chatCompletionsLayer } from "generalist/ai/openai-chat-completions"
-import { layer as openRouterLayer } from "generalist/ai/openrouter"
+import { layer as anthropicLayer } from "generalist/providers/anthropic"
+import { layer as openAiLayer, layerOrDeterministic } from "generalist/providers/openai"
+import { layer as chatCompletionsLayer } from "generalist/providers/openai-chat-completions"
+import { layer as openRouterLayer } from "generalist/providers/openrouter"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const image = new TextEncoder().encode("image")

@@ -1,5 +1,6 @@
 import { Console, Effect, ManagedRuntime } from "effect"
-import { Prompt, Session } from "generalist"
+import { Session } from "generalist"
+import { Prompt } from "effect/unstable/ai"
 
 const message = (entry: Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
 

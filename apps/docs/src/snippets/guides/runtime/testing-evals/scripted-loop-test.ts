@@ -1,5 +1,6 @@
 import { Console, Effect, Equal, Layer, Schema } from "effect"
-import { Agent, Tool, Toolkit } from "generalist"
+import { Agent } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 import { TestModel } from "generalist/testing"
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))

@@ -1,35 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import {
-  AiError as EffectAiError,
-  Chat as EffectChat,
-  EmbeddingModel as EffectEmbeddingModel,
-  IdGenerator as EffectIdGenerator,
-  LanguageModel as EffectLanguageModel,
-  Model as EffectModel,
-  Prompt as EffectPrompt,
-  Response as EffectResponse,
-  Telemetry as EffectTelemetry,
-  Tokenizer as EffectTokenizer,
-  Tool as EffectTool,
-  Toolkit as EffectToolkit,
-} from "effect/unstable/ai"
-import {
-  ActiveModelResponse,
-  AiError,
-  Chat,
-  EmbeddingModel,
-  IdGenerator,
-  LanguageModel,
-  Model,
-  ModelTelemetry,
-  Prompt,
-  Response,
-  Telemetry,
-  Tokenizer,
-  Tool,
-  Toolkit,
-} from "../src/index"
+import { ActiveModelResponse, ModelTelemetry } from "../src/index"
 
 type FeatureEntry = readonly [subpath: string, load: () => Promise<object>, keys: ReadonlyArray<string>]
 
@@ -52,8 +23,6 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "ExecutableRegistration",
       "ExecutableResolver",
       "ExecutionState",
-      "ExternalChildPlacement",
-      "ExternalChildStore",
       "FanOut",
       "LocalScheduler",
       "Mailbox",
@@ -101,10 +70,10 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   ],
   [
     "transport",
-    () => import("../src/transport/index.js"),
-    ["Errors", "Replay", "RunClient", "SSE", "Snapshot", "WebSocket", "Wire"],
+    () => import("../src/unstable/transport/index.js"),
+    ["Chaos", "Errors", "Replay", "RunClient", "SSE", "Snapshot", "WebSocket", "Wire"],
   ],
-  ["mcp", () => import("../src/mcp/index.js"), ["MCPClient", "OAuth"]],
+  ["mcp", () => import("../src/unstable/mcp/index.js"), ["MCPClient", "OAuth"]],
   [
     "testing",
     () => import("../src/testing/index.js"),
@@ -130,9 +99,9 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
     () => import("../src/repl/bun/index.js"),
     ["BunKernelPool", "BunKernelSnapshotStore", "workerModule", "workerSupportModules"],
   ],
-  ["ag-ui", () => import("../src/interoperability/ag-ui/index.js"), ["AGUI", "Errors"]],
-  ["a2a", () => import("../src/interoperability/a2a/index.js"), ["A2A", "Content", "Errors", "Projection"]],
-  ["foldkit", () => import("../src/foldkit/index.js"), ["Chat", "Connection"]],
+  ["ag-ui", () => import("../src/unstable/ag-ui/index.js"), ["AGUI", "Errors"]],
+  ["a2a", () => import("../src/unstable/a2a/index.js"), ["A2A", "Content", "Errors", "Projection"]],
+  ["foldkit", () => import("../src/unstable/foldkit/index.js"), ["Chat", "Connection"]],
   [
     "memory",
     () => import("../src/memory/index.js"),
@@ -150,7 +119,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
 ]
 
 describe("generalist public surface", () => {
-  it.effect("keeps the frozen root namespace and Effect AI keys", () =>
+  it.effect("keeps the frozen root namespace", () =>
     Effect.gen(function* () {
       const module = yield* Effect.promise(() => import("../src/index.js"))
       expect(Object.keys(module).toSorted()).toEqual([
@@ -160,22 +129,16 @@ describe("generalist public surface", () => {
         "AgentManifest",
         "AgentProgram",
         "AgentTool",
-        "AiError",
         "Approvals",
-        "Chat",
         "CodeExecutor",
         "Compaction",
         "ContextOverflow",
         "DurableDriver",
-        "EmbeddingModel",
         "ExecutableManifest",
         "Guardrail",
         "Handoff",
-        "IdGenerator",
         "Instructions",
-        "LanguageModel",
         "Memory",
-        "Model",
         "ModelMiddleware",
         "ModelRegistry",
         "ModelResilience",
@@ -190,8 +153,6 @@ describe("generalist public surface", () => {
         "ProgramHandlers",
         "ProgramManifest",
         "ProgramRunner",
-        "Prompt",
-        "Response",
         "RunBudget",
         "RunId",
         "Session",
@@ -199,15 +160,11 @@ describe("generalist public surface", () => {
         "SessionSync",
         "SkillCatalog",
         "Steering",
-        "Telemetry",
-        "Tokenizer",
-        "Tool",
         "ToolAuthorization",
         "ToolContext",
         "ToolExecutor",
         "ToolOutput",
         "ToolPlacement",
-        "Toolkit",
         "withCacheBreakpoints",
       ])
     }),
@@ -221,21 +178,6 @@ describe("generalist public surface", () => {
       }
     }),
   )
-
-  it("re-exports Effect AI primitives by identity", () => {
-    expect(Tool).toBe(EffectTool)
-    expect(Toolkit).toBe(EffectToolkit)
-    expect(LanguageModel).toBe(EffectLanguageModel)
-    expect(Prompt).toBe(EffectPrompt)
-    expect(Response).toBe(EffectResponse)
-    expect(Chat).toBe(EffectChat)
-    expect(Tokenizer).toBe(EffectTokenizer)
-    expect(AiError).toBe(EffectAiError)
-    expect(EmbeddingModel).toBe(EffectEmbeddingModel)
-    expect(IdGenerator).toBe(EffectIdGenerator)
-    expect(Model).toBe(EffectModel)
-    expect(Telemetry).toBe(EffectTelemetry)
-  })
 
   it("exports only the read-only active response handle", () => {
     const handle = ActiveModelResponse.make()

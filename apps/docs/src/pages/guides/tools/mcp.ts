@@ -11,7 +11,7 @@ export const mcp = definePage({
     "Connect to an MCP server with MCPClient, expose its discovered tools as a Generalist toolkit, and proxy tool calls through the MCP executor.",
   content: [
     p(
-      code("generalist/mcp"),
+      code("generalist/unstable/mcp"),
       " connects to an MCP server, discovers its tools, and exposes one scoped ",
       code("connect"),
       " containing the toolkit the model sees and the executor layer that proxies calls to the same connection. The bridge keeps MCP SDK dependencies out of ",
@@ -23,9 +23,9 @@ export const mcp = definePage({
     p(
       code("MCPClient.layer"),
       " remains the lower-level client API for a raw MCP SDK transport. Construct Streamable HTTP transports with ",
-      code("generalist/mcp/client/http"),
+      code("generalist/unstable/mcp/client/http"),
       " in browsers and Workers, or opt into the Node/Bun-only ",
-      code("generalist/mcp/client/stdio"),
+      code("generalist/unstable/mcp/client/stdio"),
       ". The usual ",
       code("connect"),
       " API opens the connection, lists the tools once, and closes the client when its Effect scope ends. Discovered tool names are prefixed with the client name: a ",
@@ -40,8 +40,8 @@ export const mcp = definePage({
     table(
       ["Transport", "Fields"],
       [
-        [[code("generalist/mcp/client/http")], [code("make({ url, requestInit?, oauth? })"), "; Worker-safe"]],
-        [[code("generalist/mcp/client/stdio")], [code("make({ command, args?, env? })"), "; Node/Bun only"]],
+        [[code("generalist/unstable/mcp/client/http")], [code("make({ url, requestInit?, oauth? })"), "; Worker-safe"]],
+        [[code("generalist/unstable/mcp/client/stdio")], [code("make({ command, args?, env? })"), "; Node/Bun only"]],
       ],
     ),
     p(
@@ -88,7 +88,7 @@ export const mcp = definePage({
       "Local tools and MCP tools use the same executor seam, so start with ",
       link("/docs/guides/define-tools", "How to define tools and toolkits"),
       " if you have not built a toolkit before. The full interface is in ",
-      link("/docs/reference/mcp", "the generalist/mcp reference"),
+      link("/docs/reference/mcp", "the generalist/unstable/mcp reference"),
       ".",
     ),
   ],

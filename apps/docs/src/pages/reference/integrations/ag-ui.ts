@@ -2,14 +2,14 @@ import { code, command, definePage, h2, lead, link, p } from "../../../prose"
 
 export const agUiReference = definePage({
   path: "/docs/reference/ag-ui",
-  title: "generalist/ag-ui",
+  title: "generalist/unstable/ag-ui",
   navTitle: "ag-ui",
   group: "Reference",
   description: "AG-UI 0.0.57 event projection over authoritative Runtime runs.",
   content: [
-    lead("generalist/ag-ui projects canonical Runtime runs into AG-UI events."),
+    lead("generalist/unstable/ag-ui projects canonical Runtime runs into AG-UI events."),
     command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0 @ag-ui/core@0.0.57"),
-    p(code("generalist/ag-ui"), " is an import subpath. Runtime remains the persisted source of truth."),
+    p(code("generalist/unstable/ag-ui"), " is an import subpath. Runtime remains the persisted source of truth."),
     h2("service", "Service"),
     p(
       code("AGUI.layer({ address })"),

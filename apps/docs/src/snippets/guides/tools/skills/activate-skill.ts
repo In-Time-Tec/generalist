@@ -1,14 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Response,
-  SkillCatalog,
-  ToolExecutor,
-} from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions, SkillCatalog, ToolExecutor } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 
 const releaseNotesSkill: SkillCatalog.Skill = {
   name: "release-notes",

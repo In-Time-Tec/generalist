@@ -28,7 +28,7 @@ import {
   DeviceAuthorizationPresenter,
   StoreError,
   layer,
-} from "../../../../src/ai/provider/openai-account-auth.js"
+} from "../../../../src/unstable/providers/openai-account-auth.js"
 
 const digest = (_algorithm: string, data: Uint8Array) =>
   Effect.promise(() => globalThis.crypto.subtle.digest("SHA-256", data.slice()).then((x) => new Uint8Array(x)))
@@ -53,7 +53,9 @@ const tokens = (account?: string, user?: string) => ({
   refresh_token: "refresh-secret",
   expires_in: 3600,
 })
-type Disk = Schema.Schema.Type<typeof import("../../../../src/ai/provider/openai-account-auth.js").CredentialDisk>
+type Disk = Schema.Schema.Type<
+  typeof import("../../../../src/unstable/providers/openai-account-auth.js").CredentialDisk
+>
 const fingerprint = (account = "account-secret", user = "user-secret") =>
   account === "account-secret" && user === "user-secret"
     ? "-tORTwymPrvcfDjuXFED-owRjtjXqgQTMZE3uLEz620"

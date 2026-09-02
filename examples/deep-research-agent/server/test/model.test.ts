@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Prompt } from "generalist"
+import { LanguageModel, Prompt } from "effect/unstable/ai"
 import { layerOrDeterministic } from "../src/model"
 import { toolkit, toolkitLayer } from "../src/tools"
 import { testLayer } from "../src/web-search"

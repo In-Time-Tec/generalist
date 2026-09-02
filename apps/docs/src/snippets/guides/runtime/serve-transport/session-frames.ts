@@ -1,15 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import {
-  Agent,
-  AgentManifest,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Pins,
-  Response,
-  ToolExecutor,
-} from "generalist"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Cursor, ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })

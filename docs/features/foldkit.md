@@ -1,13 +1,13 @@
 # FoldKit
 
-`generalist/foldkit` turns transport connections and semantic `RunEvent`s into FoldKit subscriptions, commands, and a headless chat model. The adapter owns browser projection, not styled views or run execution.
+`generalist/unstable/foldkit` turns transport connections and semantic `RunEvent`s into FoldKit subscriptions, commands, and a headless chat model. The adapter owns browser projection, not styled views or run execution.
 
 ## Usage
 
 Embed `Chat.Model`, route its actions and commands through the parent, then provide the WebSocket connection Layer:
 
 ```ts
-import { Chat, Connection } from "generalist/foldkit"
+import { Chat, Connection } from "generalist/unstable/foldkit"
 import { Layer } from "effect"
 import { Socket } from "effect/unstable/socket"
 import { mapMessages } from "foldkit/command"

@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, Permissions, ToolExecutor } from "generalist"
-import { layerOrDeterministic } from "generalist/ai/openai"
+import { layerOrDeterministic } from "generalist/providers/openai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "release-notes" })

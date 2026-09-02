@@ -1,14 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  LanguageModel,
-  Memory,
-  ModelMiddleware,
-  Permissions,
-  Response,
-  ToolExecutor,
-} from "generalist"
+import { Agent, Approvals, Memory, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { WorkingMemory } from "generalist/memory"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]

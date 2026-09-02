@@ -1,7 +1,8 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool } from "generalist"
-import { MCPClient } from "generalist/mcp"
-import { layerToolkit, toolkit } from "generalist/mcp/tools"
+import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
+import { LanguageModel, Response, Tool } from "effect/unstable/ai"
+import { MCPClient } from "generalist/unstable/mcp"
+import { layerToolkit, toolkit } from "generalist/unstable/mcp/tools"
 const client: MCPClient.Service = {
   server: "local",
   tools: Effect.succeed([

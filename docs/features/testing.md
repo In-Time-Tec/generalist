@@ -58,19 +58,18 @@ The chaos Layers count only the boundary named by the helper. Invalid counts fai
 ```ts
 import { Effect, Layer } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
-import { Testing } from "generalist/testing"
-import { RunClient } from "generalist/transport"
+import { Chaos, RunClient } from "generalist/unstable/transport"
 import { MyDriver } from "my-generalist-driver"
 
 // Interrupt the active run after its third operation has been durably journaled.
-const interruptedRuntime = MyDriver.testLayer.pipe(Layer.provide(Testing.chaos.interruptAfter(3)))
+const interruptedRuntime = MyDriver.testLayer.pipe(Layer.provide(Chaos.layerInterruptAfter(3)))
 
 // Force RunClient's reconnect path after its second admitted event.
-const reconnectingClient = RunClient.layerWebSocket.pipe(Layer.provide(Testing.chaos.dropConnection(2)))
+const reconnectingClient = RunClient.layerWebSocket.pipe(Layer.provide(Chaos.layerDropConnection(2)))
 
 // The deterministic provider succeeds twice, fails the third request, then repeats.
 const modelProgram = LanguageModel.generateText({ prompt: "test" }).pipe(
-  Effect.provide(Testing.chaos.flakyModel({ failEvery: 3 })),
+  Effect.provide(Chaos.layerFlakyModel({ failEvery: 3 })),
 )
 ```
 

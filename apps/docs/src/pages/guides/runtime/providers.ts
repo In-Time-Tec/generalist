@@ -25,7 +25,7 @@ export const providers = definePage({
       "). Provide the model layer to a run with ",
       code("Effect.provide"),
       " — no registry, no selection strings. ",
-      code("generalist/ai/*"),
+      code("generalist/providers/*"),
       " leaves wrap the upstream ",
       code("@effect/ai-*"),
       " packages with failure classification, image-source handling, and tool-schema compilation baked in.",

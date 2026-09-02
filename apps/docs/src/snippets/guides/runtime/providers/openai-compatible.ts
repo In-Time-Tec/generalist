@@ -1,7 +1,7 @@
 import { Config, Layer } from "effect"
 import { ModelRegistry } from "generalist"
-import { layer as chatCompletionsLayer } from "generalist/ai/openai-chat-completions"
-import { layer as responsesLayer } from "generalist/ai/openai-responses"
+import { layer as chatCompletionsLayer } from "generalist/providers/openai-chat-completions"
+import { layer as responsesLayer } from "generalist/providers/openai-responses"
 import { HttpClient } from "effect/unstable/http"
 
 const responses = responsesLayer({

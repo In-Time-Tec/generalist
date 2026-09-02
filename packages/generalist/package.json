@@ -22,7 +22,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@smithy/types": "catalog:",
     "@standard-schema/spec": "catalog:",
-    "effect": "catalog:",
+    "effect": "4.0.0-rc.112",
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:peer",
     "rivetkit": "catalog:",
@@ -51,6 +51,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./approvals": {
+      "types": "./dist/core/policy/approvals.d.ts",
+      "import": "./dist/core/policy/approvals.js"
+    },
+    "./compaction": {
+      "types": "./dist/core/turn/compaction.d.ts",
+      "import": "./dist/core/turn/compaction.js"
+    },
+    "./permissions": {
+      "types": "./dist/core/policy/permissions.d.ts",
+      "import": "./dist/core/policy/permissions.js"
+    },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
@@ -62,26 +74,6 @@
     "./runtime/sql-driver": {
       "types": "./dist/runtime/sql-driver.d.ts",
       "import": "./dist/runtime/sql-driver.js"
-    },
-    "./mcp": {
-      "types": "./dist/mcp/index.d.ts",
-      "import": "./dist/mcp/index.js"
-    },
-    "./mcp/client": {
-      "types": "./dist/mcp/client.d.ts",
-      "import": "./dist/mcp/client.js"
-    },
-    "./mcp/client/http": {
-      "types": "./dist/mcp/client/http.d.ts",
-      "import": "./dist/mcp/client/http.js"
-    },
-    "./mcp/client/stdio": {
-      "types": "./dist/mcp/client/stdio.d.ts",
-      "import": "./dist/mcp/client/stdio.js"
-    },
-    "./mcp/oauth": {
-      "types": "./dist/mcp/oauth.d.ts",
-      "import": "./dist/mcp/oauth.js"
     },
     "./instructions": {
       "types": "./dist/instructions/index.d.ts",
@@ -95,13 +87,17 @@
       "types": "./dist/memory/index.d.ts",
       "import": "./dist/memory/index.js"
     },
-    "./transport": {
-      "types": "./dist/transport/index.d.ts",
-      "import": "./dist/transport/index.js"
+    "./repl": {
+      "types": "./dist/repl/index.d.ts",
+      "import": "./dist/repl/index.js"
     },
-    "./foldkit": {
-      "types": "./dist/foldkit/index.d.ts",
-      "import": "./dist/foldkit/index.js"
+    "./repl/bun": {
+      "types": "./dist/repl/bun/index.d.ts",
+      "import": "./dist/repl/bun/index.js"
+    },
+    "./sandbox": {
+      "types": "./dist/sandbox/index.d.ts",
+      "import": "./dist/sandbox/index.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
@@ -111,129 +107,49 @@
       "types": "./dist/testing/runtime-driver/index.d.ts",
       "import": "./dist/testing/runtime-driver/index.js"
     },
-    "./a2a": {
-      "types": "./dist/interoperability/a2a/index.d.ts",
-      "import": "./dist/interoperability/a2a/index.js"
-    },
-    "./ag-ui": {
-      "types": "./dist/interoperability/ag-ui/index.d.ts",
-      "import": "./dist/interoperability/ag-ui/index.js"
-    },
-    "./repl": {
-      "types": "./dist/repl/index.d.ts",
-      "import": "./dist/repl/index.js"
-    },
-    "./sandbox": {
-      "types": "./dist/sandbox/index.d.ts",
-      "import": "./dist/sandbox/index.js"
-    },
-    "./unstable/sandbox/e2b": {
-      "types": "./dist/unstable/sandbox/e2b/index.d.ts",
-      "import": "./dist/unstable/sandbox/e2b/index.js"
-    },
-    "./unstable/sandbox/cloudflare": {
-      "types": "./dist/unstable/sandbox/cloudflare/index.d.ts",
-      "import": "./dist/unstable/sandbox/cloudflare/index.js"
-    },
-    "./ai/model-catalog": {
+    "./providers/model-catalog": {
       "types": "./dist/ai/model-catalog.d.ts",
       "import": "./dist/ai/model-catalog.js"
     },
-    "./ai/model-route": {
-      "types": "./dist/ai/model/route.d.ts",
-      "import": "./dist/ai/model/route.js"
-    },
-    "./ai/openai": {
+    "./providers/openai": {
       "types": "./dist/ai/provider/openai.d.ts",
       "import": "./dist/ai/provider/openai.js"
     },
-    "./ai/openai-account-auth": {
-      "types": "./dist/ai/provider/openai-account-auth.d.ts",
-      "import": "./dist/ai/provider/openai-account-auth.js"
-    },
-    "./ai/openai-account-auth-http": {
-      "types": "./dist/ai/provider/openai-account-auth-http.d.ts",
-      "import": "./dist/ai/provider/openai-account-auth-http.js"
-    },
-    "./ai/anthropic": {
+    "./providers/anthropic": {
       "types": "./dist/ai/provider/anthropic.d.ts",
       "import": "./dist/ai/provider/anthropic.js"
     },
-    "./ai/amazon-bedrock": {
+    "./providers/amazon-bedrock": {
       "types": "./dist/ai/provider/amazon-bedrock/service.d.ts",
       "import": "./dist/ai/provider/amazon-bedrock/service.js"
     },
-    "./ai/openrouter": {
+    "./providers/openrouter": {
       "types": "./dist/ai/provider/openrouter.d.ts",
       "import": "./dist/ai/provider/openrouter.js"
     },
-    "./ai/openai-responses": {
+    "./providers/openai-responses": {
       "types": "./dist/ai/provider/openai-responses.d.ts",
       "import": "./dist/ai/provider/openai-responses.js"
     },
-    "./ai/openai-chat-completions": {
+    "./providers/openai-chat-completions": {
       "types": "./dist/ai/provider/openai-chat-completions.d.ts",
       "import": "./dist/ai/provider/openai-chat-completions.js"
     },
-    "./ai/deterministic": {
+    "./providers/deterministic": {
       "types": "./dist/ai/provider/deterministic.d.ts",
       "import": "./dist/ai/provider/deterministic.js"
     },
-    "./ai/openai-compatible": {
+    "./providers/openai-compatible": {
       "types": "./dist/ai/openai-compatible.d.ts",
       "import": "./dist/ai/openai-compatible.js"
     },
-    "./ai/openai-embedding": {
+    "./providers/openai-embedding": {
       "types": "./dist/ai/model/openai-embedding.d.ts",
       "import": "./dist/ai/model/openai-embedding.js"
     },
-    "./ai/openai-compatible-embedding": {
+    "./providers/openai-compatible-embedding": {
       "types": "./dist/ai/model/openai-compatible-embedding.d.ts",
       "import": "./dist/ai/model/openai-compatible-embedding.js"
-    },
-    "./mcp/tools": {
-      "types": "./dist/mcp/tools.d.ts",
-      "import": "./dist/mcp/tools.js"
-    },
-    "./repl/bun": {
-      "types": "./dist/repl/bun/index.d.ts",
-      "import": "./dist/repl/bun/index.js"
-    },
-    "./transport/run-client": {
-      "types": "./dist/transport/run-client.d.ts",
-      "import": "./dist/transport/run-client.js"
-    },
-    "./transport/errors": {
-      "types": "./dist/transport/errors.d.ts",
-      "import": "./dist/transport/errors.js"
-    },
-    "./transport/sse": {
-      "types": "./dist/transport/sse.d.ts",
-      "import": "./dist/transport/sse.js"
-    },
-    "./transport/websocket": {
-      "types": "./dist/transport/websocket.d.ts",
-      "import": "./dist/transport/websocket.js"
-    },
-    "./transport/wire": {
-      "types": "./dist/transport/wire.d.ts",
-      "import": "./dist/transport/wire.js"
-    },
-    "./transport/snapshot": {
-      "types": "./dist/transport/snapshot.d.ts",
-      "import": "./dist/transport/snapshot.js"
-    },
-    "./transport/replay": {
-      "types": "./dist/transport/replay.d.ts",
-      "import": "./dist/transport/replay.js"
-    },
-    "./runtime/external-child-placement": {
-      "types": "./dist/runtime/child/external/placement.d.ts",
-      "import": "./dist/runtime/child/external/placement.js"
-    },
-    "./runtime/external-child-store": {
-      "types": "./dist/runtime/child/external/store.d.ts",
-      "import": "./dist/runtime/child/external/store.js"
     },
     "./pg": {
       "types": "./dist/pg/index.d.ts",
@@ -243,21 +159,121 @@
       "types": "./dist/mysql/index.d.ts",
       "import": "./dist/mysql/index.js"
     },
-    "./cloudflare/workers": {
-      "types": "./dist/cloudflare/workers/index.d.ts",
-      "import": "./dist/cloudflare/workers/index.js"
+    "./unstable/runtime/external-child-placement": {
+      "types": "./dist/runtime/child/external/placement.d.ts",
+      "import": "./dist/runtime/child/external/placement.js"
     },
-    "./cloudflare/durable-objects": {
-      "types": "./dist/cloudflare/durable-objects/index.d.ts",
-      "import": "./dist/cloudflare/durable-objects/index.js"
+    "./unstable/runtime/external-child-store": {
+      "types": "./dist/runtime/child/external/store.d.ts",
+      "import": "./dist/runtime/child/external/store.js"
     },
-    "./cloudflare/dynamic-workers": {
-      "types": "./dist/cloudflare/dynamic-workers/index.d.ts",
-      "import": "./dist/cloudflare/dynamic-workers/index.js"
+    "./unstable/mcp": {
+      "types": "./dist/unstable/mcp/index.d.ts",
+      "import": "./dist/unstable/mcp/index.js"
     },
-    "./rivet/actors": {
-      "types": "./dist/rivet/actors/index.d.ts",
-      "import": "./dist/rivet/actors/index.js"
+    "./unstable/mcp/client": {
+      "types": "./dist/unstable/mcp/client.d.ts",
+      "import": "./dist/unstable/mcp/client.js"
+    },
+    "./unstable/mcp/client/http": {
+      "types": "./dist/unstable/mcp/client/http.d.ts",
+      "import": "./dist/unstable/mcp/client/http.js"
+    },
+    "./unstable/mcp/client/stdio": {
+      "types": "./dist/unstable/mcp/client/stdio.d.ts",
+      "import": "./dist/unstable/mcp/client/stdio.js"
+    },
+    "./unstable/mcp/oauth": {
+      "types": "./dist/unstable/mcp/oauth.d.ts",
+      "import": "./dist/unstable/mcp/oauth.js"
+    },
+    "./unstable/mcp/tools": {
+      "types": "./dist/unstable/mcp/tools.d.ts",
+      "import": "./dist/unstable/mcp/tools.js"
+    },
+    "./unstable/transport": {
+      "types": "./dist/unstable/transport/index.d.ts",
+      "import": "./dist/unstable/transport/index.js"
+    },
+    "./unstable/transport/run-client": {
+      "types": "./dist/unstable/transport/run-client.d.ts",
+      "import": "./dist/unstable/transport/run-client.js"
+    },
+    "./unstable/transport/errors": {
+      "types": "./dist/unstable/transport/errors.d.ts",
+      "import": "./dist/unstable/transport/errors.js"
+    },
+    "./unstable/transport/sse": {
+      "types": "./dist/unstable/transport/sse.d.ts",
+      "import": "./dist/unstable/transport/sse.js"
+    },
+    "./unstable/transport/websocket": {
+      "types": "./dist/unstable/transport/websocket.d.ts",
+      "import": "./dist/unstable/transport/websocket.js"
+    },
+    "./unstable/transport/wire": {
+      "types": "./dist/unstable/transport/wire.d.ts",
+      "import": "./dist/unstable/transport/wire.js"
+    },
+    "./unstable/transport/snapshot": {
+      "types": "./dist/unstable/transport/snapshot.d.ts",
+      "import": "./dist/unstable/transport/snapshot.js"
+    },
+    "./unstable/transport/replay": {
+      "types": "./dist/unstable/transport/replay.d.ts",
+      "import": "./dist/unstable/transport/replay.js"
+    },
+    "./unstable/foldkit": {
+      "types": "./dist/unstable/foldkit/index.d.ts",
+      "import": "./dist/unstable/foldkit/index.js"
+    },
+    "./unstable/a2a": {
+      "types": "./dist/unstable/a2a/index.d.ts",
+      "import": "./dist/unstable/a2a/index.js"
+    },
+    "./unstable/ag-ui": {
+      "types": "./dist/unstable/ag-ui/index.d.ts",
+      "import": "./dist/unstable/ag-ui/index.js"
+    },
+    "./unstable/providers/model-route": {
+      "types": "./dist/unstable/providers/model-route.d.ts",
+      "import": "./dist/unstable/providers/model-route.js"
+    },
+    "./unstable/providers/openai-account-auth": {
+      "types": "./dist/unstable/providers/openai-account-auth.d.ts",
+      "import": "./dist/unstable/providers/openai-account-auth.js"
+    },
+    "./unstable/providers/openai-account-auth-http": {
+      "types": "./dist/unstable/providers/openai-account-auth-http.d.ts",
+      "import": "./dist/unstable/providers/openai-account-auth-http.js"
+    },
+    "./unstable/sandbox/e2b": {
+      "types": "./dist/unstable/sandbox/e2b/index.d.ts",
+      "import": "./dist/unstable/sandbox/e2b/index.js"
+    },
+    "./unstable/sandbox/cloudflare": {
+      "types": "./dist/unstable/sandbox/cloudflare/index.d.ts",
+      "import": "./dist/unstable/sandbox/cloudflare/index.js"
+    },
+    "./unstable/sandbox/worker-loader": {
+      "types": "./dist/unstable/sandbox/worker-loader.d.ts",
+      "import": "./dist/unstable/sandbox/worker-loader.js"
+    },
+    "./unstable/cloudflare/workers": {
+      "types": "./dist/unstable/cloudflare/workers/index.d.ts",
+      "import": "./dist/unstable/cloudflare/workers/index.js"
+    },
+    "./unstable/cloudflare/durable-objects": {
+      "types": "./dist/unstable/cloudflare/durable-objects/index.d.ts",
+      "import": "./dist/unstable/cloudflare/durable-objects/index.js"
+    },
+    "./unstable/cloudflare/dynamic-workers": {
+      "types": "./dist/unstable/cloudflare/dynamic-workers/index.d.ts",
+      "import": "./dist/unstable/cloudflare/dynamic-workers/index.js"
+    },
+    "./unstable/rivet": {
+      "types": "./dist/unstable/rivet/actors/index.d.ts",
+      "import": "./dist/unstable/rivet/actors/index.js"
     }
   },
   "scripts": {

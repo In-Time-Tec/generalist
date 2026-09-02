@@ -6,7 +6,8 @@ Effect AI `Tool` and `Toolkit` values remain the schema and handler authority. G
 
 ```ts
 import { Effect, Layer, Schema } from "effect"
-import { Agent, Approvals, Permissions, Tool, Toolkit } from "generalist"
+import { Agent, Approvals, Permissions } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 const search = Tool.make("search_docs", {
   description: "Search documentation",
   parameters: Schema.Struct({ query: Schema.String }),

@@ -1,17 +1,17 @@
 import { code, command, definePage, h2, lead, link, p, table } from "../../../prose"
 export const mcpReference = definePage({
   path: "/docs/reference/mcp",
-  title: "generalist/mcp",
+  title: "generalist/unstable/mcp",
   navTitle: "mcp",
   group: "Reference",
   description: "MCPClient for discovering and calling MCP tools, plus the Generalist toolkit and executor adapters.",
   content: [
     lead(
-      "generalist/mcp connects Model Context Protocol servers to Generalist: MCPClient discovers and calls MCP tools, and the tools subpath adapts them into a toolkit and a ToolExecutor.",
+      "generalist/unstable/mcp connects Model Context Protocol servers to Generalist: MCPClient discovers and calls MCP tools, and the tools subpath adapts them into a toolkit and a ToolExecutor.",
     ),
     command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0 @modelcontextprotocol/sdk@1.29.0"),
     p(
-      code("generalist/mcp"),
+      code("generalist/unstable/mcp"),
       " is an import subpath and requires the optional peer ",
       code("@modelcontextprotocol/sdk"),
       ".",
@@ -70,7 +70,7 @@ export const mcpReference = definePage({
       ],
     ),
     p(
-      code("generalist/mcp/client/http"),
+      code("generalist/unstable/mcp/client/http"),
       " accepts ",
       code("requestInit"),
       " and OAuth at the process/request boundary. Resolve secret references and construct bearer headers there; never persist raw credentials in executable identity or registration configuration.",

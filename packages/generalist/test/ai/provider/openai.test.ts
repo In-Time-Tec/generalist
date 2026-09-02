@@ -3,7 +3,7 @@ import { Config, Effect, Layer, Redacted, Schedule, Schema, Stream } from "effec
 import { AiError, LanguageModel } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { ModelRegistry, ModelResilience } from "generalist"
-import { classifyFailure, layer, normalizeResponsesSSE } from "generalist/ai/openai"
+import { classifyFailure, layer, normalizeResponsesSSE } from "generalist/providers/openai"
 
 const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const encoder = new TextEncoder()

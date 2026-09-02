@@ -39,12 +39,12 @@ A leaf rejects another command kind with `Unsupported`; it never guesses how to 
 
 ## Shipped leaves
 
-| Leaf                                     | Isolation    | Commands           | Files         | Pause/resume  | Snapshot | Fork          | Enforced limits    | Billing model                                          |
-| ---------------------------------------- | ------------ | ------------------ | ------------- | ------------- | -------- | ------------- | ------------------ | ------------------------------------------------------ |
-| `layerBunKernel`                         | `process`    | `TypeScript`       | yes           | yes           | yes      | yes           | wall clock         | host process; no vendor billing claim                  |
-| `layerWorkerLoader`                      | `v8-isolate` | `JavaScriptModule` | `Unsupported` | `Unsupported` | no       | no            | CPU and wall clock | Workers request CPU and invocation duration            |
-| `generalist/unstable/sandbox/e2b`        | `microvm`    | `Process`          | yes           | yes           | yes      | yes           | wall clock         | per-second CPU/RAM while running; paused is not billed |
-| `generalist/unstable/sandbox/cloudflare` | `container`  | `Process`          | yes           | `Unsupported` | no       | `Unsupported` | wall clock         | Containers vCPU, memory, disk, egress, Worker, and DO  |
+| Leaf                                        | Isolation    | Commands           | Files         | Pause/resume  | Snapshot | Fork          | Enforced limits    | Billing model                                          |
+| ------------------------------------------- | ------------ | ------------------ | ------------- | ------------- | -------- | ------------- | ------------------ | ------------------------------------------------------ |
+| `layerBunKernel`                            | `process`    | `TypeScript`       | yes           | yes           | yes      | yes           | wall clock         | host process; no vendor billing claim                  |
+| `generalist/unstable/sandbox/worker-loader` | `v8-isolate` | `JavaScriptModule` | `Unsupported` | `Unsupported` | no       | no            | CPU and wall clock | Workers request CPU and invocation duration            |
+| `generalist/unstable/sandbox/e2b`           | `microvm`    | `Process`          | yes           | yes           | yes      | yes           | wall clock         | per-second CPU/RAM while running; paused is not billed |
+| `generalist/unstable/sandbox/cloudflare`    | `container`  | `Process`          | yes           | `Unsupported` | no       | `Unsupported` | wall clock         | Containers vCPU, memory, disk, egress, Worker, and DO  |
 
 `process` is a factual process boundary, not confinement. The Bun kernel is for trusted local code: it shares the host operating-system identity and its rooted Effect `FileSystem` is a path view, not a security boundary. It does not claim container or microVM isolation. CPU and per-sandbox memory bounds are unsupported because the Bun leaf cannot enforce them independently.
 

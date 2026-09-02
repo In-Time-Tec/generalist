@@ -1,14 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  Guardrail,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Response,
-  ToolExecutor,
-} from "generalist"
+import { Agent, Approvals, Guardrail, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 
 const blockInjection = Guardrail.validateInput((prompt) =>
   Effect.succeed(

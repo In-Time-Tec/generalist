@@ -1,15 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  Guardrail,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Prompt,
-  Response,
-  ToolExecutor,
-} from "generalist"
+import { Agent, Approvals, Guardrail, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 
 const lastUserText = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")

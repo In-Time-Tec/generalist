@@ -1,19 +1,8 @@
 import { expect, layer } from "@effect/vitest"
 import { Cause, Context, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import {
-  Agent,
-  AiError,
-  Compaction,
-  LanguageModel,
-  ModelRegistry,
-  ModelResilience,
-  Prompt,
-  Response,
-  Session,
-  Tool,
-  Toolkit,
-} from "generalist"
+import { Agent, Compaction, ModelRegistry, ModelResilience, Session } from "generalist"
+import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { TestModel } from "generalist/testing"
 import { allowAllAuthorization } from "../../authorization.js"
 

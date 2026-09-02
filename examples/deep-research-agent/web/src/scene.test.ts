@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { Chat } from "generalist/foldkit"
+import { Chat } from "generalist/unstable/foldkit"
 import { Option, Schema } from "effect"
 import { Scene } from "foldkit"
 import type { Html } from "foldkit/html"

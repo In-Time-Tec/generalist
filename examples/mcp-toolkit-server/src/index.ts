@@ -3,7 +3,7 @@ import { runMain } from "@effect/platform-bun/BunRuntime"
 import { Config, Effect, Layer, Schema } from "effect"
 import { McpProtocol, McpServer } from "effect/unstable/ai"
 import { HttpRouter } from "effect/unstable/http"
-import { Tool, Toolkit } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 
 const greeting = Tool.make("greeting", {
   description: "Create a greeting for a person",

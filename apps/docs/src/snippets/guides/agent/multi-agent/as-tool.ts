@@ -1,16 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import {
-  Agent,
-  AgentTool,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Response,
-  Tool,
-  ToolExecutor,
-  Toolkit,
-} from "generalist"
+import { Agent, AgentTool, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 
 const summarizer = Agent.make({
   name: "summarizer",

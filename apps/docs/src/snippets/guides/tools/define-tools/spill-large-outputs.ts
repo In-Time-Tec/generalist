@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, ToolOutput } from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions, ToolOutput } from "generalist"
+import { LanguageModel } from "effect/unstable/ai"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
 

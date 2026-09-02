@@ -1,5 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, ToolExecutor } from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 
 const dropReasoning: ModelMiddleware.Middleware = {
   transformPart: (part) => Effect.succeed(part.type === "reasoning-delta" ? Option.none() : Option.some(part)),

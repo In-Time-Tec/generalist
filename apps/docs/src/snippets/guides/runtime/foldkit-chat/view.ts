@@ -1,4 +1,4 @@
-import { Chat } from "generalist/foldkit"
+import { Chat } from "generalist/unstable/foldkit"
 import type { Document, Html } from "foldkit/html"
 import { html } from "@/lib/html"
 import { GotChatAction, type Message, type Model } from "./model"

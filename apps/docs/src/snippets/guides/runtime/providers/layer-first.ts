@@ -1,7 +1,7 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/ai/openai"
+import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/providers/openai"
 
 const agent = Agent.make({
   name: "assistant",

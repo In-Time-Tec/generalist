@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, Permissions, ToolExecutor } from "generalist"
-import { layerGoogleAIStudio } from "generalist/ai/openai-compatible"
+import { layerGoogleAIStudio } from "generalist/providers/openai-compatible"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "gemini-agent" })

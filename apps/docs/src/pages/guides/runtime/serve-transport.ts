@@ -16,7 +16,7 @@ export const serveTransport = definePage({
     p(
       code("generalist/runtime"),
       " owns run admission, execution, replay, waits, and cancellation. ",
-      code("generalist/transport"),
+      code("generalist/unstable/transport"),
       " only projects those Runtime-owned RunEvents through ",
       code("SSE.respond"),
       " and ",
@@ -117,7 +117,7 @@ export const serveTransport = definePage({
     ),
     p(
       "The wire contract is in ",
-      link("/docs/reference/transport", "the generalist/transport reference"),
+      link("/docs/reference/transport", "the generalist/unstable/transport reference"),
       ", and Runtime ownership is documented in ",
       link("/docs/reference/runtime", "the generalist/runtime reference"),
       ".",

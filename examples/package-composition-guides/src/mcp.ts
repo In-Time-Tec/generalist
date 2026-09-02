@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { MCPClient } from "generalist/mcp"
+import { MCPClient } from "generalist/unstable/mcp"
 
 const client: MCPClient.Service = {
   server: "local-docs",
