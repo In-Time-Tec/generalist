@@ -8,7 +8,7 @@ export const runtimeReference = definePage({
   description: "Addressable Run admission, canonical events, inspection, waits, stores, and workers.",
   content: [
     lead("generalist/runtime owns the authoritative lifecycle for addressable Generalist runs."),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     h2("surface", "Core surface"),
     table(
       ["Namespace", "Role"],

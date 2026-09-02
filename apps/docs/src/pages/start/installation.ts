@@ -1,15 +1,17 @@
 import { callout, code, codeBlock, definePage, h2, lead, link, p, table } from "../../prose"
-const bunInstall = `bun add effect@4.0.0-rc.112 generalist@0.45.0`
+import { packageVersion } from "../../package-manifest"
 
-const otherManagers = `npm install effect@4.0.0-rc.112 generalist@0.45.0
-pnpm add effect@4.0.0-rc.112 generalist@0.45.0`
+const bunInstall = `bun add effect@4.0.0-rc.112 generalist@${packageVersion}`
+
+const otherManagers = `npm install effect@4.0.0-rc.112 generalist@${packageVersion}
+pnpm add effect@4.0.0-rc.112 generalist@${packageVersion}`
 
 export const installation = definePage({
   path: "/docs/start/installation",
   title: "Installation",
   navTitle: "Installation",
   group: "Start",
-  description: "Install Generalist 0.45.0 with its exact Effect peer and only the adapter peers you use.",
+  description: `Install Generalist ${packageVersion} with its exact Effect peer and only the adapter peers you use.`,
   content: [
     lead(
       "Most projects install effect and generalist, then import exact generalist/* subpaths. PostgreSQL, MySQL, Cloudflare, and Rivet adapters are subpaths of the same package; you add only the optional peers for the subpaths you import.",
@@ -20,7 +22,7 @@ export const installation = definePage({
     callout(
       "warning",
       "Pin the Effect release candidate",
-      "Generalist 0.45.0 is built and tested against ",
+      `Generalist ${packageVersion} is built and tested against `,
       code("effect@4.0.0-rc.112"),
       ". The ",
       code("effect/unstable/ai"),
@@ -35,7 +37,7 @@ export const installation = definePage({
       [
         [
           [code("generalist")],
-          "0.45.0",
+          packageVersion,
           "Node 22+ and Bun 1.4+: agent loop, generic Runtime, exact feature import subpaths, and the pg, mysql, cloudflare, and rivet adapters",
         ],
       ],
@@ -96,7 +98,7 @@ export const installation = definePage({
       ],
     ),
     h2("effect-compatibility", "Effect compatibility"),
-    table(["Generalist release", "Tested Effect version"], [[[code("0.45.0")], [code("effect@4.0.0-rc.112")]]]),
+    table(["Generalist release", "Tested Effect version"], [[[code(packageVersion)], [code("effect@4.0.0-rc.112")]]]),
     p(code("generalist/unstable/foldkit"), " declares the exact tested optional peer ", code("foldkit@0.148.2"), "."),
     h2("api-stability", "API stability"),
     callout(

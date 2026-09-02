@@ -10,7 +10,7 @@ export const transportReference = definePage({
     lead(
       "generalist/unstable/transport exposes Runtime-owned runs over SSE and WebSocket without executing agents, persisting events, or inventing another lifecycle.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

@@ -9,6 +9,7 @@ import step5 from "virtual:source/src/snippets/quickstart/step-5.ts"
 import step5Expected from "virtual:source/src/snippets/quickstart/step-5.expected.txt"
 import evalSource from "virtual:source/src/snippets/quickstart/eval.ts"
 import evalExpected from "virtual:source/src/snippets/quickstart/eval.expected.txt"
+import { packageVersion } from "../../package-manifest"
 import { bullets, callout, code, codeBlock, definePage, h2, lead, link, p } from "../../prose"
 export const quickstart = definePage({
   path: "/docs/start/quickstart",
@@ -32,7 +33,7 @@ export const quickstart = definePage({
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     p(
       "The install summary lists ",
-      code("generalist@0.45.0"),
+      code(`generalist@${packageVersion}`),
       ". Provider leaves are subpaths of that package, not separate installs. npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",

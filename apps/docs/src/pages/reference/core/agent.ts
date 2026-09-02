@@ -9,7 +9,7 @@ export const coreAgentReference = definePage({
     lead(
       "The Agent namespace defines a typed agent value, process-local run and stream projections, a durable Runtime start, and every option and service a run consumes.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     h2("agent-make", "Agent.make"),
     p(
       "An ",
@@ -209,6 +209,35 @@ export const coreAgentReference = definePage({
       "; for deterministic runs in CI, see ",
       link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),
       ".",
+    ),
+    h2("agent-program-hosting", "Agent Program hosting"),
+    table(
+      ["Export", "Purpose", "Minimal use"],
+      [
+        [
+          [code("ProgramManifest")],
+          "Schema and canonical pin for sandboxed JavaScript source, codecs, allowed capabilities, and bounded resources",
+          [
+            code("ProgramManifest.make({ name, source, sandbox, input, output, capabilities, budget })"),
+            " returns the validated manifest and its content pin",
+          ],
+        ],
+        [
+          [code("ProgramCapabilities")],
+          "Host-owned encoded operations available only while sandboxed Program source is running",
+          [
+            code("yield* ProgramCapabilities.ProgramCapabilities"),
+            " resolves the service before calling ",
+            code("callTool"),
+            ", ",
+            code("callStep"),
+            ", ",
+            code("runAgent"),
+            ", or ",
+            code("log"),
+          ],
+        ],
+      ],
     ),
   ],
 })

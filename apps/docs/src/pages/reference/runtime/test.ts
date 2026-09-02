@@ -10,7 +10,7 @@ export const testReference = definePage({
     lead(
       "generalist/testing runs the real Generalist loop against scripted Effect AI responses and exports public adapter conformance suites, deterministic chaos helpers, and certification reporting.",
     ),
-    command("Install", "bun add -d effect@4.0.0-rc.112 generalist@0.45.0 @effect/vitest@4.0.0-rc.112 vitest@4.1.11"),
+    command("Install", "bun add -d effect@4.0.0-rc.112 generalist @effect/vitest@4.0.0-rc.112 vitest@4.1.11"),
     p(code("generalist/testing"), " is an import subpath, not a package."),
     h2("script", "Script responses"),
     table(
