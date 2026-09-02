@@ -1,17 +1,18 @@
-import { Effect, Function, Layer, Option, Schema } from "effect"
+import { Effect, Function, Layer, Option, Schema, type Types } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { ContextRevision } from "./compaction-context-revision.js"
 import { safeCutIndex } from "./compaction-cut.js"
 import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
 import { make as makeThresholdState } from "./compaction-threshold-state.js"
 import { estimatePromptTokens } from "./prompt-token-estimate.js"
-import { type Entry, buildContext } from "../context/session.js"
+import { buildContext } from "../context/session.js"
 import { make as makeSummaryModelProvider } from "../model/result/summary-model.js"
 import type { Success } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
 import {
   Compaction,
   CompactionError,
+  defaultKeepRecentTokens,
   microcompactResult,
   type Plan,
   type Request,
@@ -20,14 +21,14 @@ import {
   type Usage,
 } from "./compaction-service.js"
 
-export { Compaction, CompactionError, Result, withLifecycle } from "./compaction-service.js"
+export { Compaction, CompactionError, defaultKeepRecentTokens, Result, withLifecycle } from "./compaction-service.js"
 export type { MicrocompactResult, Plan, Request, Service, SummarizeResult, Usage } from "./compaction-service.js"
+export { cacheAware } from "./compaction-cache-aware.js"
+export type { Options as CacheAwareOptions } from "./compaction-cache-aware.js"
 export { layerTruncate, layerTruncateEstimated } from "./compaction-truncate.js"
 
 /** @experimental Default headroom kept for the next model response. */
 export const defaultReserveTokens = 16_384
-/** @experimental Default recent-session suffix target kept verbatim. */
-export const defaultKeepRecentTokens = 20_000
 /** @experimental Fixed prompt used for dedicated summary calls. */
 export const summaryTemplate = `Summarize the conversation so another agent can continue seamlessly.
 
@@ -59,8 +60,8 @@ export type AgentSummary = typeof AgentSummary.Type
 
 /** @experimental Compaction strategy: decide, cut, summarize. */
 export interface Strategy {
-  readonly shouldCompact: (usage: Usage) => boolean
-  readonly cut: (entries: ReadonlyArray<Entry>, keepRecentTokens: number) => Option.Option<Plan>
+  readonly shouldCompact: (input: { readonly tokens: number; readonly contextWindow: number }) => boolean
+  readonly cut: (prompt: Prompt.Prompt, keepRecentTokens: number) => Option.Option<Plan>
   readonly summarize: (
     plan: Plan,
     request: Request,
@@ -107,6 +108,13 @@ export interface StructuredSummaryOptions {
   readonly objectName?: string
   readonly summaryModel?: Layer.Layer<LanguageModel.LanguageModel>
   readonly summaryPrompt?: string
+}
+
+/** @experimental Options for model-backed text summaries. */
+export interface SummarizeWithModelOptions {
+  /** Closed model layer for summary calls; omit to use the ambient LanguageModel. */
+  readonly model?: Layer.Layer<LanguageModel.LanguageModel>
+  readonly prompt?: string
 }
 
 const serialized = (value: Prompt.Prompt["content"]): string => {
@@ -205,11 +213,8 @@ const checkpointMessage = (summary: string): Prompt.Message =>
 const summaryPrompt = (template: string, prompt: Prompt.Prompt): Prompt.Prompt =>
   Prompt.make(`${template}\n\nConversation to summarize:\n${serialized(prompt.content)}`)
 
-const systemMessages = (entries: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> =>
-  entries.flatMap((entry) => (entry._tag === "Message" && entry.message.role === "system" ? [entry.message] : []))
-
-const compactedHistory = (summary: string, head: ReadonlyArray<Entry>, recent: Prompt.Prompt): Prompt.Prompt =>
-  Prompt.concat(Prompt.fromMessages([...systemMessages(head), checkpointMessage(summary)]), recent)
+const compactedHistory = (summary: string, plan: Plan): Prompt.Prompt =>
+  Prompt.concat(Prompt.concat(plan.keep, Prompt.fromMessages([checkpointMessage(summary)])), plan.recent)
 
 const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
   contextTokens: Number.isFinite(usage.contextTokens) ? usage.contextTokens : 0,
@@ -220,36 +225,57 @@ const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
     options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : defaultReserveTokens),
 })
 
+const strategyInput = (usage: Usage): Parameters<Strategy["shouldCompact"]>[0] => ({
+  tokens: usage.contextTokens,
+  contextWindow: usage.contextWindow - usage.reserveTokens,
+})
+
+const summaryEffect = (
+  plan: Plan,
+  request: Request,
+  options: SummarizeWithModelOptions,
+): Effect.Effect<string, CompactionError, LanguageModel.LanguageModel> =>
+  Effect.gen(function* () {
+    const [compacted] =
+      request.toolOutputMaxBytes === undefined
+        ? ([plan.compact, false] as const)
+        : yield* microcompactPrompt(plan.compact, request.toolOutputMaxBytes)
+    const prompt = summaryPrompt(options.prompt ?? summaryTemplate, compacted)
+    const model = yield* summaryLanguageModel
+    return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
+      Effect.map((response) => response.text),
+      Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
+    )
+  })
+
+/** @experimental Summarize compacted context with an ambient or dedicated LanguageModel. */
+export const summarizeWithModel = (options: SummarizeWithModelOptions = {}): Strategy["summarize"] => {
+  const provideSummaryModel = options.model === undefined ? undefined : makeSummaryModelProvider(options.model)
+  return (plan, request) => {
+    const effect = summaryEffect(plan, request, options)
+    return provideSummaryModel === undefined ? effect : provideSummaryModel(effect)
+  }
+}
+
 /** @experimental The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
-  const provideSummaryModel =
-    options.summaryModel === undefined ? undefined : makeSummaryModelProvider(options.summaryModel)
+  const summarizeOptions: Types.Mutable<SummarizeWithModelOptions> = {}
+  if (options.summaryModel !== undefined) summarizeOptions.model = options.summaryModel
+  if (options.summaryPrompt !== undefined) summarizeOptions.prompt = options.summaryPrompt
   return {
-    shouldCompact: (usage) =>
-      Number.isFinite(usage.contextWindow) && usage.contextTokens > usage.contextWindow - usage.reserveTokens,
-    cut: (entries, keepRecentTokens) => {
-      const index = safeCutIndex(entries, keepRecentTokens)
-      if (index <= 0 || index >= entries.length) return Option.none()
-      const recent = entries.slice(index)
-      const first = recent[0]
-      return first === undefined ? Option.none() : Option.some({ head: entries.slice(0, index), recent })
-    },
-    summarize: (plan, request) => {
-      const effect = Effect.gen(function* () {
-        const head = buildContext(plan.head)
-        const [compactedHead] =
-          request.toolOutputMaxBytes === undefined
-            ? ([head, false] as const)
-            : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
-        const prompt = summaryPrompt(options.summaryPrompt ?? summaryTemplate, compactedHead)
-        const model = yield* summaryLanguageModel
-        return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
-          Effect.map((response) => response.text),
-          Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
-        )
+    shouldCompact: ({ tokens, contextWindow }) => Number.isFinite(contextWindow) && tokens > contextWindow,
+    cut: (prompt, keepRecentTokens) => {
+      const index = safeCutIndex(prompt.content, keepRecentTokens)
+      if (index <= 0 || index >= prompt.content.length) return Option.none()
+      const compact = prompt.content.slice(0, index)
+      const keep = compact.filter((message) => message.role === "system")
+      return Option.some({
+        keep: Prompt.fromMessages(keep),
+        compact: Prompt.fromMessages(compact),
+        recent: Prompt.fromMessages(prompt.content.slice(index)),
       })
-      return provideSummaryModel === undefined ? effect : provideSummaryModel(effect)
     },
+    summarize: summarizeWithModel(summarizeOptions),
   }
 }
 
@@ -290,11 +316,10 @@ export const structuredSummary = (options: StructuredSummaryOptions = {}): Strat
   return {
     summarize: (plan, request) => {
       const effect = Effect.gen(function* () {
-        const head = buildContext(plan.head)
         const [compactedHead] =
           request.toolOutputMaxBytes === undefined
-            ? ([head, false] as const)
-            : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
+            ? ([plan.compact, false] as const)
+            : yield* microcompactPrompt(plan.compact, request.toolOutputMaxBytes)
         const prompt = summaryPrompt(options.summaryPrompt ?? summaryTemplate, compactedHead)
         const model = yield* summaryLanguageModel
         return yield* model
@@ -325,11 +350,11 @@ export const make: {
     const thresholdId = (input: Request) => input.runId ?? input.sessionId
     return {
       willCompact: ({ usage, overflow }) =>
-        overflow || compactionStrategy.shouldCompact(normalizeUsage(usage, options)),
+        overflow || compactionStrategy.shouldCompact(strategyInput(normalizeUsage(usage, options))),
       maybeCompact: (input) =>
         Effect.suspend(() => {
           const usage = normalizeUsage(input.usage, options)
-          const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
+          const shouldCompact = input.overflow || compactionStrategy.shouldCompact(strategyInput(usage))
           if (!shouldCompact) {
             thresholds.clear(thresholdId(input))
             return Effect.succeed(Option.none<Result>())
@@ -378,8 +403,9 @@ const compact = (
       if (changed && fits(history, prompt, usage)) return Option.some(microcompactResult({ history, prompt }))
     }
 
+    const strategyPrompt = history.content.length === 0 ? buildContext(input.path ?? []) : history
     const plan = compactionStrategy.cut(
-      input.path ?? [],
+      strategyPrompt,
       compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? defaultKeepRecentTokens,
     )
     if (Option.isNone(plan))
@@ -395,30 +421,30 @@ const compact = (
       plan.value,
       toolOutputMaxBytes === undefined ? summaryRequest : { ...summaryRequest, toolOutputMaxBytes },
     )
-    const recent = buildContext(plan.value.recent)
     const [compactedRecent] =
       toolOutputMaxBytes === undefined
-        ? ([recent, false] as const)
-        : yield* microcompactPrompt(recent, toolOutputMaxBytes)
+        ? ([plan.value.recent, false] as const)
+        : yield* microcompactPrompt(plan.value.recent, toolOutputMaxBytes)
     return Option.some<Result>({
       _tag: "Summarize",
-      history: compactedHistory(summary, plan.value.head, compactedRecent),
+      history: compactedHistory(summary, { ...plan.value, recent: compactedRecent }),
       prompt,
       summary,
     })
   })
 
 /** @experimental Layer wiring the default or provided strategy. */
-export const layer: {
-  (providedStrategy?: Strategy): (options?: LayerOptions) => Layer.Layer<Compaction>
-  (options?: LayerOptions, providedStrategy?: Strategy): Layer.Layer<Compaction>
-} = Function.dual(
-  (args) => args.length !== 1 || !("shouldCompact" in args[0]),
-  (
-    options: LayerOptions = {},
-    providedStrategy: Strategy = options.strategy ?? defaultStrategy(options),
-  ): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options))),
-)
+export interface LayerConstructor {
+  (options?: LayerOptions): Layer.Layer<Compaction>
+  (providedStrategy: Strategy): Layer.Layer<Compaction>
+}
+
+/** @experimental Layer wiring the default or provided strategy. */
+export const layer: LayerConstructor = (input: LayerOptions | Strategy = {}): Layer.Layer<Compaction> => {
+  const options = "shouldCompact" in input ? {} : input
+  const providedStrategy = "shouldCompact" in input ? input : (input.strategy ?? defaultStrategy(input))
+  return Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options)))
+}
 
 /** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<Compaction> =>

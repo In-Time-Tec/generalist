@@ -46,6 +46,39 @@ describe("Replay", () => {
     )
   })
 
+  it.effect("replays a journaled compaction record", () => {
+    const compacted = {
+      ...event(0),
+      _tag: "CompactionApplied" as const,
+      deliveryId: "delivery-compaction-1",
+      turn: 2,
+      compactionId: "compaction-1",
+      checkpointId: "checkpoint-1",
+      kind: "summarize" as const,
+      appliedAt: 12,
+      commit: {
+        compactionId: "compaction-1",
+        checkpointId: "checkpoint-1",
+        summaryModelCallId: "summary-call-1",
+        contextTokensBefore: 120,
+        contextTokensAfter: 40,
+        entriesBefore: 8,
+        entriesAfter: 4,
+      },
+    }
+    return Effect.gen(function* () {
+      const result = yield* Replay.page({ runId: "run-1", limit: 1 })
+      expect(yield* Wire.observerCodec.decode(result.frames[0]!.data)).toEqual(compacted)
+    }).pipe(
+      Effect.provide(
+        runtimeLayer({
+          events: () => Stream.empty,
+          history: () => Effect.succeed([compacted]),
+        }),
+      ),
+    )
+  })
+
   it.effect("uses origin -1 and does not advance an empty page", () =>
     Effect.gen(function* () {
       const result = yield* Replay.page({ runId: "run-1", limit: 2 })
