@@ -121,7 +121,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
     "memo",
     () => import("../src/memo.js"),
-    ["Dependencies", "layerDependencies", "layerMemory", "layerSql", "models", "pure"],
+    ["Dependencies", "Store", "layerDependencies", "layerMemory", "layerSql", "models", "pure"],
   ],
 ]
 
