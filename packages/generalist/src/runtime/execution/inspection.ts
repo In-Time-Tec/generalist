@@ -1,4 +1,4 @@
-import { Effect, Equal, Function } from "effect"
+import { Effect, Equal, Function, Option } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import type { RunEvent } from "../run/event.js"
 import {
@@ -9,6 +9,15 @@ import {
   type RunOutcome,
 } from "../run.js"
 import type { Checkpoint, Inspection, TreeRunInspection } from "../tree.js"
+import {
+  extend as extendBudget,
+  inspect as inspectBudget,
+  make as makeBudget,
+  type Remaining,
+  type Spend,
+} from "../../core/durable/run-budget.js"
+import { cost as modelCost } from "../../ai/model-catalog.js"
+import { durationForEvents } from "../budget/state.js"
 
 export interface InspectionRun {
   readonly inspection: RunInspection
@@ -165,7 +174,9 @@ const recordModelAttempt = (
     projection.facts.push(fact)
   })
 
-const factsFor = (runs: ReadonlyArray<InspectionRun>): Effect.Effect<ReadonlyArray<RawUsageFact>, RuntimeUnavailable> =>
+const factsForRuns = (
+  runs: ReadonlyArray<{ readonly runId: string; readonly events: ReadonlyArray<RunEvent> }>,
+): Effect.Effect<ReadonlyArray<RawUsageFact>, RuntimeUnavailable> =>
   Effect.gen(function* () {
     const projection: FactProjection = {
       facts: [],
@@ -177,14 +188,83 @@ const factsFor = (runs: ReadonlyArray<InspectionRun>): Effect.Effect<ReadonlyArr
       const runProjection: RunFactProjection = { calls: new Map(), callsWithAttempts: new Set() }
       for (const event of run.events) {
         if (event._tag === "ModelCallStarted") {
-          yield* recordModelCall(run.inspection.runId, event, runProjection)
+          yield* recordModelCall(run.runId, event, runProjection)
           continue
         }
         if (event._tag !== "ModelAttemptCompleted" && event._tag !== "ModelAttemptFailed") continue
-        yield* recordModelAttempt(run.inspection.runId, event, projection, runProjection)
+        yield* recordModelAttempt(run.runId, event, projection, runProjection)
       }
     }
     return projection.facts
+  })
+
+const factsFor = (runs: ReadonlyArray<InspectionRun>) =>
+  factsForRuns(runs.map((run) => ({ runId: run.inspection.runId, events: run.events })))
+
+const factTokens = (fact: RawUsageFact): number => {
+  if (fact._tag === "Failed") {
+    return (
+      fact.providerUsage.totalTokens ?? (fact.providerUsage.inputTokens ?? 0) + (fact.providerUsage.outputTokens ?? 0)
+    )
+  }
+  return (fact.usage.inputTokens.total ?? 0) + (fact.usage.outputTokens.total ?? 0)
+}
+
+/** Project spend exclusively from canonical Run events. */
+export const spendForEvents = (events: ReadonlyArray<RunEvent>): Effect.Effect<Spend, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const accepted = events.find((event) => event._tag === "RunAccepted")
+    const usage = yield* factsForRuns([{ runId: accepted?.rootRunId ?? "", events }])
+    let usd: number | "unknown" = 0
+    for (const fact of usage) {
+      if (fact._tag === "Failed" || fact.provider === undefined || fact.model === undefined) {
+        usd = "unknown"
+        continue
+      }
+      const priced = yield* modelCost({ provider: fact.provider, model: fact.model }, fact.usage)
+      if (Option.isNone(priced)) usd = "unknown"
+      else if (usd !== "unknown") usd += priced.value
+    }
+    const duration = yield* durationForEvents(events)
+    const linked = new Set(events.filter((event) => event._tag === "ChildLinked").map((event) => event.childRunId))
+    for (const event of events) if (event._tag === "ChildSettled") linked.delete(event.childRunId)
+    const reservations = events.filter((event) => event._tag === "ChildLinked" && linked.has(event.childRunId))
+    const reserved = (dimension: "tokens" | "usd" | "duration" | "toolCalls") =>
+      reservations.reduce(
+        (total, event) => total + (event._tag === "ChildLinked" ? (event.budget?.[dimension] ?? 0) : 0),
+        0,
+      )
+    const settled = events.filter((event) => event._tag === "ChildSettled" && event.spend !== undefined)
+    const settledAmount = (dimension: "tokens" | "usd" | "duration" | "toolCalls" | "children") =>
+      settled.reduce((total, event) => {
+        if (event._tag !== "ChildSettled") return total
+        const value = event.spend?.[dimension]
+        return total + (value === undefined || value === "unknown" ? 0 : value)
+      }, 0)
+    const settledUnknownUsd = settled.some((event) => event._tag === "ChildSettled" && event.spend?.usd === "unknown")
+    const activeChildren = reservations.reduce(
+      (total, event) => total + (event._tag === "ChildLinked" ? 1 + (event.budget?.children ?? 0) : 0),
+      0,
+    )
+    return {
+      tokens: usage.reduce((total, fact) => total + factTokens(fact), 0) + reserved("tokens") + settledAmount("tokens"),
+      usd: usd === "unknown" || settledUnknownUsd ? "unknown" : usd + reserved("usd") + settledAmount("usd"),
+      duration: duration + reserved("duration") + settledAmount("duration"),
+      toolCalls:
+        events.filter((event) => event._tag === "ToolExecutionStarted").length +
+        reserved("toolCalls") +
+        settledAmount("toolCalls"),
+      children: activeChildren + settled.length + settledAmount("children"),
+    }
+  })
+
+/** Project remaining budget exclusively from canonical Run events. */
+export const budgetForEvents = (events: ReadonlyArray<RunEvent>): Effect.Effect<Remaining, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const accepted = events.find((event) => event._tag === "RunAccepted")
+    let budget = makeBudget(accepted?._tag === "RunAccepted" ? (accepted.budget ?? {}) : {})
+    for (const event of events) if (event._tag === "BudgetExtended") budget = extendBudget(budget, event.delta)
+    return inspectBudget(budget, yield* spendForEvents(events))
   })
 
 type CompactionTerminal = Extract<
@@ -319,6 +399,7 @@ export const projectRunSnapshot = (run: InspectionRun) =>
       cursor: run.inspection.lastSequence,
       turn,
       usage: yield* factsFor([run]),
+      budget: yield* budgetForEvents(run.events),
       compactions: yield* compactionsFor([run]),
     }
     return outcome === undefined ? snapshot : { ...snapshot, outcome }

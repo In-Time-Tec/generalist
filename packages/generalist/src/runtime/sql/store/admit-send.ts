@@ -63,6 +63,11 @@ export const nextId = (prefix: string): Effect.Effect<string> =>
   })
 
 type SendReceipt = { runId: string; messageId: string; acceptedSequence: number; duplicate: boolean }
+
+const acceptedPayload = (input: AdmitSendInput) => {
+  const event = { _tag: "RunAccepted" as const, messageId: input.message.id, address: input.message.to }
+  return input.budget === undefined ? event : { ...event, budget: input.budget }
+}
 type SendEffect = Effect.Effect<
   SendReceipt,
   | AddressNotFound
@@ -220,16 +225,7 @@ export const admitSend: {
       yield* persistRegistrations(input.registrations)
       yield* associateRegistrations(runId, input.registrations)
       const run = (yield* loadRun(runId))!
-      yield* appendEvent(
-        hub,
-        run,
-        {
-          _tag: "RunAccepted",
-          messageId: input.message.id,
-          address: input.message.to,
-        },
-        "queued",
-      )
+      yield* appendEvent(hub, run, acceptedPayload(input), "queued")
       if (options?.promote !== false && queue[0] === runId) {
         yield* promoteHead(hub, input.message.sessionId)
       }

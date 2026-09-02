@@ -73,7 +73,7 @@ describe("executable identity", () => {
           driverVersion: "1",
           executable: { executable, active: root },
           turn: 0,
-          budget: { allocation: { handoffs: 2 }, remaining: { handoffs: 1 }, depth: 0 },
+          budget: { allocation: { tokens: 2 }, remaining: { tokens: 1 } },
           state: {
             logicalOperationId: "run",
             sessionId: "session",
@@ -85,7 +85,7 @@ describe("executable identity", () => {
       )
       expect(checkpoint.executable?.active).toBe(child)
       expect(checkpoint.state).toMatchObject({ handoff: commit.state })
-      expect(checkpoint.budget.remaining.handoffs).toBe(1)
+      expect(checkpoint.budget.remaining.tokens).toBe(1)
     })
   })
 
@@ -105,7 +105,7 @@ describe("executable identity", () => {
       services: [],
       policy: { _tag: "Portable", policy: { _tag: "Recurs", count: 3 } },
       toolScheduling: { maxConcurrency: 1, parallelSafe: [] },
-      budget: { modelCalls: 4 },
+      budget: { tokens: 4 },
       children: [],
       ...overrides,
     })
@@ -132,7 +132,7 @@ describe("executable identity", () => {
           summaryPromptIdentity: "summary:v1",
         },
       }),
-      base({ budget: { modelCalls: 5 } }),
+      base({ budget: { tokens: 5 } }),
       base({ children: [{ selection: "delegate" }] }),
     ]
     for (const changed of dimensions) expect(changed.pin).not.toBe(original.pin)
@@ -248,13 +248,13 @@ describe("executable identity", () => {
       }),
     ).toThrow("policy snapshot")
     expect(() =>
-      AgentManifest.fromLiveAgent(Agent.make({ name: "budgeted", budget: { modelCalls: 2 } }), {
+      AgentManifest.fromLiveAgent(Agent.make({ name: "budgeted", budget: { tokens: 2 } }), {
         model,
         tools: [],
         skills: [],
         services: [],
         policy: { _tag: "Portable", policy: { _tag: "Forever" } },
-        budget: { modelCalls: 3 },
+        budget: { tokens: 3 },
         children: [],
       }),
     ).toThrow("Budget")
@@ -428,81 +428,60 @@ describe("executable identity", () => {
 
 describe("RunBudget", () => {
   it("rejects negative, fractional, and unsafe dimensions", () => {
-    for (const modelCalls of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
-      expect(() => RunBudget.make({ modelCalls })).toThrow()
+    for (const tokens of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => RunBudget.make({ tokens })).toThrow()
     }
-    expect(() => RunBudget.make({}, -1)).toThrow()
   })
 
   it("round-trips through JSON", () => {
-    const budget = RunBudget.make({ modelCalls: 4, toolCalls: 2, childRuns: 1, depth: 2 })
+    const budget = RunBudget.make({ tokens: 4, usd: 1, duration: "2 seconds", toolCalls: 2, children: 1 })
     expect(roundTrip(budget)).toEqual(budget)
   })
 
   it.effect("charges usage and fails on exhaustion", () =>
     Effect.gen(function* () {
-      const start = RunBudget.make({ modelCalls: 2 })
-      const once = yield* RunBudget.charge(start, { modelCalls: 1 })
-      expect(once.remaining.modelCalls).toBe(1)
-      const twice = yield* RunBudget.charge(once, { modelCalls: 1 })
-      expect(twice.remaining.modelCalls).toBe(0)
-      const error = yield* RunBudget.charge(twice, { modelCalls: 1 }).pipe(Effect.flip)
+      const start = RunBudget.make({ tokens: 2 })
+      const once = yield* RunBudget.charge(start, { tokens: 1 })
+      expect(once.remaining.tokens).toBe(1)
+      const twice = yield* RunBudget.charge(once, { tokens: 1 })
+      expect(twice.remaining.tokens).toBe(0)
+      const error = yield* RunBudget.charge(twice, { tokens: 1 }).pipe(Effect.flip)
       expect(error._tag).toBe("generalist/core/RunBudgetExhausted")
-      expect(error.dimension).toBe("modelCalls")
+      expect(error.budget).toBe("tokens")
     }),
   )
 
   it.effect("reserves child grants without widening", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.make({ modelCalls: 5, toolCalls: 4, childRuns: 2, depth: 2 })
-      const reserved = yield* RunBudget.reserveChild(parent, { modelCalls: 2, toolCalls: 1 })
-      expect(reserved.child.depth).toBe(1)
-      expect(reserved.child.remaining.modelCalls).toBe(2)
-      expect(reserved.parent.remaining.modelCalls).toBe(3)
-      expect(reserved.parent.remaining.childRuns).toBe(1)
-      const widen = yield* RunBudget.reserveChild(parent, { modelCalls: 6 }).pipe(Effect.flip)
-      expect(widen._tag).toBe("generalist/core/RunBudgetGrantWidened")
+      const parent = RunBudget.make({ tokens: 5, toolCalls: 4, children: 2 })
+      const reserved = yield* RunBudget.reserveChild(parent, { tokens: 2, toolCalls: 1 })
+      expect(reserved.child.remaining.tokens).toBe(2)
+      expect(reserved.parent.remaining.tokens).toBe(3)
+      expect(reserved.parent.remaining.children).toBe(1)
+      const widen = yield* RunBudget.reserveChild(parent, { tokens: 6 }).pipe(Effect.flip)
+      expect(widen._tag).toBe("generalist/core/RunBudgetExhausted")
     }),
   )
 
   it.effect("refunds unused child allocation to the parent", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.make({ modelCalls: 4, childRuns: 1, depth: 1 })
-      const reserved = yield* RunBudget.reserveChild(parent, { modelCalls: 3 })
-      const spent = yield* RunBudget.charge(reserved.child, { modelCalls: 1 })
+      const parent = RunBudget.make({ tokens: 4, children: 1 })
+      const reserved = yield* RunBudget.reserveChild(parent, { tokens: 3 })
+      const spent = yield* RunBudget.charge(reserved.child, { tokens: 1 })
       const refunded = RunBudget.refundUnused(reserved.parent, spent)
-      expect(refunded.remaining.modelCalls).toBe(3)
-    }),
-  )
-
-  it.effect("rejects child depth beyond allocation", () =>
-    Effect.gen(function* () {
-      const parent = RunBudget.make({ depth: 1, childRuns: 1 }, 1)
-      const error = yield* RunBudget.reserveChild(parent, { modelCalls: 1 }).pipe(Effect.flip)
-      expect(error._tag).toBe("generalist/core/RunBudgetExhausted")
-      expect(error.dimension).toBe("depth")
+      expect(refunded.remaining.tokens).toBe(3)
     }),
   )
 
   it.effect("narrows child grants and returns the difference", () =>
     Effect.gen(function* () {
-      const parent = RunBudget.make({ modelCalls: 5, childRuns: 1, depth: 2 })
-      const reserved = yield* RunBudget.reserveChild(parent, { modelCalls: 4 })
-      const narrowed = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { modelCalls: 2 })
-      expect(narrowed.child.allocation.modelCalls).toBe(2)
-      expect(narrowed.parent.remaining.modelCalls).toBe(3)
-      const widen = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { modelCalls: 5 }).pipe(Effect.flip)
-      expect(widen._tag).toBe("generalist/core/RunBudgetGrantWidened")
-    }),
-  )
-
-  it.effect("detects deadline expiry", () =>
-    Effect.gen(function* () {
-      const budget = RunBudget.make({ deadline: "2026-01-01T00:00:00.000Z" })
-      expect(RunBudget.isDeadlineExpired(budget, "2026-01-02T00:00:00.000Z")).toBe(true)
-      yield* RunBudget.assertNotExpired(budget, "2025-12-31T00:00:00.000Z")
-      const error = yield* RunBudget.assertNotExpired(budget, "2026-02-01T00:00:00.000Z").pipe(Effect.flip)
-      expect(error.dimension).toBe("deadline")
+      const parent = RunBudget.make({ tokens: 5, children: 1 })
+      const reserved = yield* RunBudget.reserveChild(parent, { tokens: 4 })
+      const narrowed = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { tokens: 2 })
+      expect(narrowed.child.allocation.tokens).toBe(2)
+      expect(narrowed.parent.remaining.tokens).toBe(3)
+      const widen = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { tokens: 5 }).pipe(Effect.flip)
+      expect(widen._tag).toBe("generalist/core/RunBudgetInvalid")
     }),
   )
 })
@@ -510,7 +489,7 @@ describe("RunBudget", () => {
 describe("DurableDriver tracer", () => {
   const input = {
     prompt: Prompt.make("hello"),
-    budget: RunBudget.make({ modelCalls: 3, toolCalls: 2 }),
+    budget: RunBudget.make({ tokens: 3, toolCalls: 2 }),
   }
 
   it("uses deterministic operation keys and input digests", () => {
@@ -603,19 +582,19 @@ describe("DurableDriver tracer", () => {
     }),
   )
 
-  it.effect("charges model and tool budgets through apply", () =>
+  it.effect("charges tool budgets through apply", () =>
     Effect.gen(function* () {
       const driver = DurableDriver.makeTracer([{ toolCalls: [{ name: "echo", params: {} }] }, { text: "ok" }])
       let checkpoint = yield* driver.initial({
         ...input,
-        budget: RunBudget.make({ modelCalls: 1, toolCalls: 1 }),
+        budget: RunBudget.make({ tokens: 1, toolCalls: 1 }),
       })
       yield* driver.decide(checkpoint)
       checkpoint = yield* DurableDriver.applyOperation(driver, checkpoint, {
         _tag: "Succeeded",
         value: {},
       })
-      expect(checkpoint.budget.remaining.modelCalls).toBe(0)
+      expect(checkpoint.budget.remaining.tokens).toBe(1)
       yield* driver.decide(checkpoint)
       checkpoint = yield* DurableDriver.applyOperation(driver, checkpoint, {
         _tag: "Succeeded",
@@ -769,8 +748,8 @@ describe("DurableDriver Agent.stream integration", () => {
   for (const kind of ["model", "structured-output"] as const) {
     it.effect(`reconciles a pending ${kind} without recharging its ordinal or budget`, () =>
       Effect.gen(function* () {
-        const allocated = RunBudget.make({ modelCalls: 3 })
-        const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
+        const allocated = RunBudget.make({ tokens: 3 })
+        const charged = yield* RunBudget.charge(allocated, { tokens: 1 })
         const logicalOperationId = `${kind}-replay`
         const input = { turn: 0, modelCallOrdinal: 0 }
         const pendingKey = `${logicalOperationId}:${kind}:0:0`
@@ -815,7 +794,7 @@ describe("DurableDriver Agent.stream integration", () => {
             Effect.die("replayed operation must not execute"),
           ),
         ).toBe("replayed")
-        expect((yield* interpreter.checkpoint).budget.remaining.modelCalls).toBe(2)
+        expect((yield* interpreter.checkpoint).budget.remaining.tokens).toBe(2)
 
         const nextKey = `${logicalOperationId}:${kind}:0:1`
         yield* interpreter.run(
@@ -830,7 +809,7 @@ describe("DurableDriver Agent.stream integration", () => {
           Effect.void,
         )
         expect(scheduled).toEqual([pendingKey, nextKey])
-        expect((yield* interpreter.checkpoint).budget.remaining.modelCalls).toBe(1)
+        expect((yield* interpreter.checkpoint).budget.remaining.tokens).toBe(2)
       }),
     )
   }
@@ -850,7 +829,7 @@ describe("DurableDriver Agent.stream integration", () => {
         initial: {
           driverVersion: DurableDriver.currentDriverVersion,
           turn: 0,
-          budget: RunBudget.make({ modelCalls: 2 }),
+          budget: RunBudget.make({ tokens: 2 }),
           state: {
             logicalOperationId,
             sessionId: logicalOperationId,
@@ -1895,8 +1874,8 @@ describe("DurableDriver Agent.stream integration", () => {
     Effect.gen(function* () {
       const logicalOperationId = "stream-replay"
       const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
-      const allocated = RunBudget.make({ modelCalls: 3 })
-      const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
+      const allocated = RunBudget.make({ tokens: 3 })
+      const charged = yield* RunBudget.charge(allocated, { tokens: 1 })
       const pendingSpec = {
         kind: "model" as const,
         key: `${logicalOperationId}:model:0:0`,
@@ -1952,7 +1931,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const replayedCheckpoint = yield* interpreter.checkpoint
       expect(replayedCheckpoint.state).not.toHaveProperty("pending")
       expect(replayedCheckpoint.state).toMatchObject({ modelCallOrdinal: 1 })
-      expect(replayedCheckpoint.budget.remaining.modelCalls).toBe(2)
+      expect(replayedCheckpoint.budget.remaining.tokens).toBe(2)
       expect(providerDispatches).toBe(0)
 
       const nextSpec = {
@@ -1970,7 +1949,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const nextCheckpoint = yield* interpreter.checkpoint
       expect(nextCheckpoint.state).not.toHaveProperty("pending")
       expect(nextCheckpoint.state).toMatchObject({ modelCallOrdinal: 2 })
-      expect(nextCheckpoint.budget.remaining.modelCalls).toBe(1)
+      expect(nextCheckpoint.budget.remaining.tokens).toBe(2)
       expect(scheduled).toEqual([pendingSpec.key, nextSpec.key])
       expect(providerDispatches).toBe(1)
     }),

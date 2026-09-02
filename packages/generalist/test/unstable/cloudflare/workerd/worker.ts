@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer, Schema, Stream } from "effect"
-import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { Prompt, Response as AiResponse, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Permissions } from "generalist"
 import { decodeConfig as decodeOpenRouterConfig } from "generalist/providers/openrouter"
 import { TestModel } from "generalist/testing"
@@ -147,11 +147,18 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
   )
   const denied = yield* Agent.run(planner, "Buy the service.").pipe(Effect.provideContext(deniedServices), Effect.exit)
 
-  const exhaustedFixture = yield* TestModel.make([TestModel.text("must not execute")])
+  const exhaustedFixture = yield* TestModel.make([
+    TestModel.turn([TestModel.text("usage exceeds budget")], {
+      usage: AiResponse.Usage.make({
+        inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
+        outputTokens: { total: 1, text: 1, reasoning: undefined },
+      }),
+    }),
+  ])
   const exhaustedServices = yield* Layer.build(exhaustedFixture.layer)
   const exhausted = yield* Agent.run(
-    Agent.make({ name: "workerd-budget", budget: { modelCalls: 0 } }),
-    "This model call is outside the budget.",
+    Agent.make({ name: "workerd-budget", budget: { tokens: 0 } }),
+    "This model call exhausts the budget.",
   ).pipe(Effect.provideContext(exhaustedServices), Effect.exit)
   const exhaustedRequests = yield* exhaustedFixture.requests
   const openRouterConfig = yield* decodeOpenRouterConfig({})
@@ -226,6 +233,7 @@ const replayRuntime: Runtime.Service = {
   registerAgentName: unusedEffect,
   resolveOperation: unusedEffect,
   inspect: unusedEffect,
+  extendBudget: unusedEffect,
   fanOut: unusedEffect,
   inspectFanOut: unusedEffect,
   awaitFanOut: unusedEffect,

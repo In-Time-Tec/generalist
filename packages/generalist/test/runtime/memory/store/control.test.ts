@@ -307,7 +307,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
           driverVersion: "1",
           executable: claim.executableRef,
           turn: 0,
-          budget: { allocation: {}, remaining: {}, depth: 0 },
+          budget: { allocation: {}, remaining: {} },
           state: {},
         },
       })

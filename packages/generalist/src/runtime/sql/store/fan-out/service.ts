@@ -31,6 +31,7 @@ import {
   clearLeaseOnOwnerRelease,
   insertRun,
   loadRun,
+  loadEventsAfter,
   nowIso,
 } from "../statements.js"
 import { enforceChildAdmission } from "../admit-send.js"
@@ -42,6 +43,9 @@ import { Prompt } from "effect/unstable/ai"
 import { activeChildCount, promoteChildCapacity } from "../child/capacity.js"
 import { FanOutJoinResolution } from "./join.js"
 import { transitionRunWait } from "../wait-transition.js"
+import { budgetForEvents } from "../../../execution/inspection.js"
+import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
+import { split } from "../../../budget/state.js"
 type FanOutEffect = Effect.Effect<
   FanOutReceipt,
   | ChildSelectionMissing
@@ -52,6 +56,7 @@ type FanOutEffect = Effect.Effect<
   | RuntimeUnavailable
   | import("../../../errors.js").ChildDepthExceeded
   | import("../../../errors.js").ChildLimitExceeded
+  | Exhausted
   | SqlError,
   SqlClient.SqlClient
 >
@@ -124,6 +129,11 @@ export const admitFanOut: {
     })
     yield* validateParent
     yield* enforceChildAdmission(parent, members.length)
+    const available = yield* budgetForEvents(yield* loadEventsAfter(parent.runId, -1))
+    if (available.children !== undefined && available.children < members.length) {
+      return yield* Exhausted.make({ budget: "children", requested: members.length, remaining: available.children })
+    }
+    const memberBudget = split(members.length)(childGrant(available, members.length))
     const concurrency = Math.min(input.concurrency ?? members.length, members.length, parent.treePolicy.maxSubagents)
     const readyCount = Math.min(
       concurrency,
@@ -197,12 +207,18 @@ export const admitFanOut: {
         childDepth: parent.depth + 1,
         readiness,
         key: member.key,
+        budget: memberBudget,
       } satisfies AppendPartial
       if (member.label !== undefined) Object.assign(linked, { label: member.label })
       if (member.origin !== undefined) Object.assign(linked, { origin: member.origin })
       yield* defaultAppendEvent(hub, currentParent, linked)
       const child = (yield* loadRun(member.childRunId))!
-      yield* defaultAppendEvent(hub, child, { _tag: "RunAccepted", messageId: message.id, address }, "queued")
+      yield* defaultAppendEvent(
+        hub,
+        child,
+        { _tag: "RunAccepted", messageId: message.id, address, budget: memberBudget },
+        "queued",
+      )
     }
     const currentParent = (yield* loadRun(parent.runId))!
     yield* defaultAppendEvent(hub, currentParent, {

@@ -25,6 +25,9 @@ import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.j
 import { resolveChild } from "../../../executable/manifest-internal.js"
 import { narrow } from "../../../executable/registration.js"
 import { activeChildCount } from "../child/capacity.js"
+import { budgetForEvents } from "../../../execution/inspection.js"
+import { childGrant, Exhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
+import { split } from "../../../budget/state.js"
 const fanOutAdmittedEvent = (input: {
   readonly fanOutId: string
   readonly memberCount: number
@@ -42,6 +45,7 @@ type AdmissionFailure =
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
+  | Exhausted
 
 interface AdmissionPlan {
   readonly depth: number
@@ -147,6 +151,7 @@ const addMember = (
   input: AdmitFanOutInput,
   depth: number,
   readyCount: number,
+  budget: BudgetLimits,
 ): Effect.Effect<readonly [FanOutMemberResult, MemoryState], RuntimeUnavailable> =>
   Effect.gen(function* () {
     const ready = member.ordinal < readyCount
@@ -194,7 +199,7 @@ const addMember = (
       return yield* RuntimeUnavailable.make({ message: `parent Run ${parent.runId} missing` })
     runs.set(member.childRunId, child)
     runs.set(parent.runId, { ...currentParent, children: [...currentParent.children, member.childRunId] })
-    const linkedDetails = linkedDetailsFor(member, readiness)
+    const linkedDetails = { ...linkedDetailsFor(member, readiness), budget }
     const [, linked] = yield* appendLifecycle(
       { ...state, runs },
       parent.runId,
@@ -207,7 +212,12 @@ const addMember = (
         linkedDetails,
       ),
     )
-    const [, accepted] = yield* appendLifecycle(linked, member.childRunId, acceptedEvent(address, message.id), "queued")
+    const [, accepted] = yield* appendLifecycle(
+      linked,
+      member.childRunId,
+      acceptedEvent({ address, messageId: message.id, budget }),
+      "queued",
+    )
     const result = memberResultFor(member, depth, readiness, ready ? "running" : "pending")
     return [result, accepted]
   })
@@ -226,6 +236,7 @@ export const admitFanOut: {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
+    | Exhausted
   >
   (
     state: MemoryState,
@@ -240,6 +251,7 @@ export const admitFanOut: {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
+    | Exhausted
   >
 } = Function.dual(2, (state: MemoryState, input: AdmitFanOutInput) =>
   Effect.gen(function* () {
@@ -273,10 +285,15 @@ export const admitFanOut: {
       ]
     }
     const { concurrency, depth, readyCount } = yield* validateParent(state, parent, members, input.concurrency)
+    const available = yield* budgetForEvents(parent.events)
+    if (available.children !== undefined && available.children < members.length) {
+      return yield* Exhausted.make({ budget: "children", requested: members.length, remaining: available.children })
+    }
+    const memberBudget = split(members.length)(childGrant(available, members.length))
     let next: MemoryState = state
     const memberResults: Array<FanOutMemberResult> = []
     for (const member of members) {
-      const [memberResult, memberState] = yield* addMember(next, parent, member, input, depth, readyCount)
+      const [memberResult, memberState] = yield* addMember(next, parent, member, input, depth, readyCount, memberBudget)
       memberResults.push(memberResult)
       next = memberState
     }

@@ -7,6 +7,7 @@ export interface TurnInfo {
   readonly turn: number // 0-based count of completed model turns so far
   readonly history: Prompt.Prompt
   readonly pendingToolResults: ReadonlyArray<Response.ToolResultPart<string, unknown, unknown>>
+  readonly budget: import("../durable/run-budget.js").BudgetLimits
 }
 
 /** Per-turn overrides applied when a policy continues. */

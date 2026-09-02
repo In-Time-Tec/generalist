@@ -91,6 +91,7 @@ export const afterTurnFor = <
     readonly turn: number
     readonly history: Prompt.Prompt
     readonly pendingToolResults: ReadonlyArray<PendingToolResult>
+    readonly budget: import("../../durable/run-budget.js").BudgetLimits
   }) => Effect.Effect<Decision, PolicyError | HandoffRequirementsMissing, R>
   readonly takeFollowUp: () => Effect.Effect<ReadonlyArray<Input>>
   readonly takeSteering: () => Effect.Effect<ReadonlyArray<Input>>
@@ -146,6 +147,7 @@ export const afterTurnFor = <
         turn: turn + 1,
         history: transcript,
         pendingToolResults: pending,
+        budget: current.budget.remaining,
       })
       if (!isPolicyDecision(evaluated)) {
         return yield* PolicyError.make({

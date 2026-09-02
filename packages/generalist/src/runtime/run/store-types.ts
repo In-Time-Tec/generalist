@@ -23,6 +23,7 @@ import type { ExecutableRegistration } from "../executable/registration.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { InitialFanOutInput } from "../child/fan-out-internal.js"
 import type { SessionStore as SessionService } from "../../core/context/session.js"
+import type { BudgetLimits } from "../../core/durable/run-budget.js"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
@@ -34,6 +35,7 @@ export interface AdmitSendInput {
   readonly registrations: ReadonlyArray<ExecutableRegistration>
   readonly runId?: string
   readonly treePolicy?: TreePolicy
+  readonly budget?: BudgetLimits
 }
 
 export interface AdmitStartInput extends AdmitSendInput {

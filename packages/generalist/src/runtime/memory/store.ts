@@ -14,6 +14,7 @@ import type { LayerOptions } from "../service.js"
 import { emptyState, idempotencyKey, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn, admitStart } from "./store/admit.js"
 import { activateRoot, activationOf } from "./store/activate.js"
+import { extendBudget } from "./store/control/budget.js"
 import { admitProgramChild, admitProgramChildrenAndSuspend } from "./store/child/admit-program-child.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store/control.js"
 import { respondApproval } from "./store/approval.js"
@@ -156,6 +157,7 @@ const makeStoreServices = (options: LayerOptions) =>
         }),
       admitStart: (input, startOptions) => modifyState((state) => admitStart(state, input, startOptions)),
       activate: (input) => modifyState((state) => activateRoot(state, input.runId)),
+      extendBudget: (runId, delta) => modifyState((state) => extendBudget(state, runId, delta)),
       admitSpawn: (input) => modifyState((state) => admitSpawn(state, input)),
       admitProgramChild: (input) => fencedModify(input, (state) => admitProgramChild(state, input)),
       admitProgramChildAndSuspend: (input) =>

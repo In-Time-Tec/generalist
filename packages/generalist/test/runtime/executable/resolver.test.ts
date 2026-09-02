@@ -9,7 +9,7 @@ import { closedTestAgent, pinnedTestExecutable, unusedModel } from "../run/ident
 describe("ExecutableResolver.makeStatic", () => {
   it.effect("resolves only a live Agent attested by the persisted active manifest", () =>
     Effect.gen(function* () {
-      const agent = Agent.make({ name: "attested", budget: { modelCalls: 2 } })
+      const agent = Agent.make({ name: "attested", budget: { tokens: 2 } })
       const executable = pinnedTestExecutable(agent)
       const resolver = yield* ExecutableResolver.makeStatic([{ executable, agent: closedTestAgent(agent) }])
 
@@ -25,13 +25,13 @@ describe("ExecutableResolver.makeStatic", () => {
 
   it.effect("rejects a live Agent whose identity differs from the persisted manifest", () =>
     Effect.gen(function* () {
-      const persisted = Agent.make({ name: "agent", instructions: "persisted", budget: { modelCalls: 2 } })
+      const persisted = Agent.make({ name: "agent", instructions: "persisted", budget: { tokens: 2 } })
       const executable = pinnedTestExecutable(persisted)
 
       const identity = yield* ExecutableResolver.makeStatic([
         {
           executable,
-          agent: closedTestAgent(Agent.make({ name: "agent", instructions: "different", budget: { modelCalls: 2 } })),
+          agent: closedTestAgent(Agent.make({ name: "agent", instructions: "different", budget: { tokens: 2 } })),
         },
       ]).pipe(Effect.flip)
       expect(identity.message).toMatch(/does not match/)
@@ -45,7 +45,7 @@ describe("ExecutableResolver.makeStatic", () => {
       const withUnexpectedTool = Agent.make({
         name: "agent",
         instructions: "persisted",
-        budget: { modelCalls: 2 },
+        budget: { tokens: 2 },
         tools: [unexpectedTool],
       })
       const tools = yield* ExecutableResolver.makeStatic([

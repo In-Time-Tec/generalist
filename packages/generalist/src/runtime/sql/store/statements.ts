@@ -19,6 +19,7 @@ import {
 } from "../codec/codecs.js"
 import type { EventHub } from "../subscribers.js"
 import type { DecodedRun, EventRow, RunRow, WaitRow } from "../codec/rows.js"
+import { spendForEvents } from "../../execution/inspection.js"
 import { WaitResolution, type RunWait } from "../../run/wait.js"
 import { decodeReason } from "../../run/wait-internal.js"
 import {
@@ -408,6 +409,7 @@ export const settleParent: {
         _tag: "ChildSettled",
         childRunId: child.runId,
         terminalEventId,
+        spend: yield* spendForEvents(yield* loadEventsAfter(child.runId, -1)),
       })
     }
     const { reconcileFanOut } = yield* Effect.promise(() => import("./fan-out/service.js"))

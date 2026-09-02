@@ -38,7 +38,7 @@ type SummaryFailure = typeof SummaryFailure.Type
 const summary = (failure: SummaryFailure): string | undefined => {
   if (Schema.is(Exhausted)(failure)) {
     const remaining = failure.remaining === undefined ? "unavailable" : failure.remaining
-    return `Run budget exhausted for ${failure.dimension}: requested ${failure.requested}, remaining ${remaining}`
+    return `Run budget exhausted for ${failure.budget}: requested ${failure.requested}, remaining ${remaining}`
   }
   if (Schema.is(ResumeMismatch)(failure)) {
     return `Agent resume ${failure.reason} for waits ${failure.received.waits.map((wait) => wait.waitId).join(", ")}`

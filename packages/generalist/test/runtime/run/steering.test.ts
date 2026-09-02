@@ -493,9 +493,8 @@ it.live("rolls back every SQLite steering lifecycle boundary atomically", () => 
 it.live("atomically persists steering consumption and model scheduling before SQLite dispatch", () => {
   const filename = tempDbPath("runtime-steering-scheduled-reopen")
   const budget = {
-    allocation: { modelCalls: 4, toolCalls: 4 },
-    remaining: { modelCalls: 3, toolCalls: 4 },
-    depth: 0,
+    allocation: { tokens: 4, toolCalls: 4 },
+    remaining: { tokens: 3, toolCalls: 4 },
   }
   const checkpoint = {
     driverVersion: "1",

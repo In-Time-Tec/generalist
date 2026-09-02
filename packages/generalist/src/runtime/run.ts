@@ -26,6 +26,7 @@ import {
 } from "./execution/state.js"
 import { TreePolicy } from "./tree/policy.js"
 import { ChildReadiness } from "./child/readiness.js"
+import { Remaining as RemainingBudget, type Remaining } from "../core/durable/run-budget.js"
 
 export const ExecutionResult = ExecutionResultSchema
 export type ExecutionResult = ExecutionResultType
@@ -288,6 +289,7 @@ export interface RunSnapshot {
   readonly turn: number
   readonly outcome?: RunOutcome
   readonly usage: ReadonlyArray<RawUsageFact>
+  readonly budget: Remaining
   readonly compactions: ReadonlyArray<CompactionInspection>
 }
 
@@ -306,6 +308,7 @@ export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   outcome: Schema.optionalKey(RunOutcome),
   usage: Schema.Array(RawUsageFact),
+  budget: RemainingBudget,
   compactions: Schema.Array(CompactionInspection),
 })
 

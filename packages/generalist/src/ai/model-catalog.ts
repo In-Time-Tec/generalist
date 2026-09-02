@@ -1,8 +1,18 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
+import type { Response } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 
 /** Conservative context window used when model metadata is unavailable. */
 export const conservativeContextWindow = 32_768
+
+/** Non-negative US dollars computed from catalog prices. */
+export const Usd = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
+export type Usd = typeof Usd.Type
+
+export interface Selection {
+  readonly provider: string
+  readonly model: string
+}
 
 export interface Metadata {
   readonly provider: string
@@ -25,15 +35,10 @@ export class NotFound extends ActionableTaggedError<NotFound>()("generalist/ai/M
 }) {}
 
 export interface Service {
-  readonly find: (selection: {
-    readonly provider: string
-    readonly model: string
-  }) => Effect.Effect<Metadata | undefined>
-  readonly get: (selection: { readonly provider: string; readonly model: string }) => Effect.Effect<Metadata, NotFound>
-  readonly contextWindow: (selection: {
-    readonly provider: string
-    readonly model: string
-  }) => Effect.Effect<Option.Option<number>>
+  readonly find: (selection: Selection) => Effect.Effect<Metadata | undefined>
+  readonly get: (selection: Selection) => Effect.Effect<Metadata, NotFound>
+  readonly contextWindow: (selection: Selection) => Effect.Effect<Option.Option<number>>
+  readonly cost: (selection: Selection, usage: Response.Usage) => Effect.Effect<Option.Option<Usd>>
   readonly list: Effect.Effect<ReadonlyArray<Metadata>>
 }
 
@@ -106,6 +111,22 @@ export const bundled: ReadonlyArray<Metadata> = [
 const metadataKey = (input: { readonly provider: string; readonly model: string }) =>
   JSON.stringify([input.provider, input.model])
 
+const tokenCount = (value: number | undefined): number => value ?? 0
+
+const costFor = (metadata: Metadata | undefined, usage: Response.Usage): Option.Option<Usd> => {
+  const pricing = metadata?.pricing
+  if (pricing?.inputPerMTok === undefined || pricing.outputPerMTok === undefined) return Option.none()
+  const cacheRead = tokenCount(usage.inputTokens.cacheRead)
+  const cacheWrite = tokenCount(usage.inputTokens.cacheWrite)
+  const uncached =
+    usage.inputTokens.uncached ?? Math.max(0, tokenCount(usage.inputTokens.total) - cacheRead - cacheWrite)
+  const input = uncached * pricing.inputPerMTok
+  const read = cacheRead * (pricing.cacheReadPerMTok ?? pricing.inputPerMTok)
+  const write = cacheWrite * (pricing.cacheWritePerMTok ?? pricing.inputPerMTok)
+  const output = tokenCount(usage.outputTokens.total) * pricing.outputPerMTok
+  return Option.some((input + read + write + output) / 1_000_000)
+}
+
 const mergeEntries = (base: ReadonlyArray<Metadata>, overrides: ReadonlyArray<Metadata>): ReadonlyArray<Metadata> => {
   const order: Array<string> = []
   const byKey = new Map<string, Metadata>()
@@ -148,11 +169,13 @@ const make = (entries: ReadonlyArray<Metadata>): Service => {
         `ModelCatalog has no context window for ${selection.provider}/${selection.model}; compaction will use the conservative ${conservativeContextWindow}-token default`,
       ).pipe(Effect.as(Option.none()))
     })
+  const cost: Service["cost"] = (selection, usage) => Effect.succeed(costFor(byKey.get(metadataKey(selection)), usage))
 
   return {
     find,
     get,
     contextWindow,
+    cost,
     list: Effect.succeed(entries),
   }
 }
@@ -190,6 +213,15 @@ export const contextWindow = Effect.fn("ModelCatalog.contextWindow.call")(functi
   return yield* Option.match(catalog, {
     onNone: () => defaultCatalog.contextWindow(selection),
     onSome: (service) => service.contextWindow(selection),
+  })
+})
+
+/** Compute catalog cost, using the bundled snapshot when no catalog service is provided. */
+export const cost = Effect.fn("ModelCatalog.cost.call")(function* (selection: Selection, usage: Response.Usage) {
+  const catalog = yield* Effect.serviceOption(ModelCatalog)
+  return yield* Option.match(catalog, {
+    onNone: () => defaultCatalog.cost(selection, usage),
+    onSome: (service) => service.cost(selection, usage),
   })
 })
 

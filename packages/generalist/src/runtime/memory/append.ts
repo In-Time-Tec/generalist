@@ -1,6 +1,7 @@
 import { DateTime, Effect, Function, Option, Types } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
+import type { BudgetLimits } from "../../core/durable/run-budget.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
@@ -245,18 +246,18 @@ export const appendAgentEvent: {
   appendEvent(state, runId, (base) => ({ ...base, ...event })),
 )
 
-export const acceptedEvent: {
-  (messageId: string): (address: Address) => Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>
-  (address: Address, messageId: string): Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>
-} = Function.dual(
-  2,
-  (address: Address, messageId: string) =>
-    ({
-      _tag: "RunAccepted" as const,
-      messageId,
-      address,
-    }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>,
-)
+export const acceptedEvent = (input: {
+  readonly address: Address
+  readonly messageId: string
+  readonly budget?: BudgetLimits | undefined
+}) => {
+  const event = {
+    _tag: "RunAccepted" as const,
+    messageId: input.messageId,
+    address: input.address,
+  }
+  return input.budget === undefined ? event : { ...event, budget: input.budget }
+}
 
 export const attemptStartedEvent = (attempt: number) =>
   ({
@@ -295,7 +296,7 @@ export const makeUnknown = (operationId: string) =>
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
 
 type ChildLinked = Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
-type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin">
+type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin" | "budget">
 
 export const childLinkedEvent: {
   (
@@ -351,23 +352,18 @@ export const childReadinessChangedEvent: {
     }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>,
 )
 
-export const childSettledEvent: {
-  (
-    terminalEventId: string,
-  ): (childRunId: string) => Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>
-  (
-    childRunId: string,
-    terminalEventId: string,
-  ): Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>
-} = Function.dual(
-  2,
-  (childRunId: string, terminalEventId: string) =>
-    ({
-      _tag: "ChildSettled" as const,
-      childRunId,
-      terminalEventId,
-    }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>,
-)
+export const childSettledEvent = (input: {
+  readonly childRunId: string
+  readonly terminalEventId: string
+  readonly spend?: import("../../core/durable/run-budget.js").Spend
+}) => {
+  const event = {
+    _tag: "ChildSettled" as const,
+    childRunId: input.childRunId,
+    terminalEventId: input.terminalEventId,
+  }
+  return input.spend === undefined ? event : { ...event, spend: input.spend }
+}
 
 export const makeFanOutAdmitted = (input: {
   readonly fanOutId: string

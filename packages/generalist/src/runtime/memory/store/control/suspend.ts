@@ -146,7 +146,15 @@ export const suspend: {
     })
     const withRun = { ...state, runs: suspendedRuns(state, run, executableRef, input) }
     const inserted = yield* insertWaits(withRun, run.runId, input.waits)
-    const waiting = yield* appendWaits(inserted.state, run.runId, inserted.inserted)
+    let waiting: MemoryState = yield* appendWaits(inserted.state, run.runId, inserted.inserted)
+    if (input.suspension._tag === "BudgetExhausted") {
+      ;[, waiting] = yield* appendLifecycle(
+        waiting,
+        run.runId,
+        { _tag: "BudgetSuspended", budget: input.suspension.budget },
+        "waiting",
+      )
+    }
     const withChildren = yield* reconcileChildren(waiting, run.runId, suspensionTokens(input.suspension))
     return yield* reconcileGroups(withChildren, run.runId, input.suspension)
   }),

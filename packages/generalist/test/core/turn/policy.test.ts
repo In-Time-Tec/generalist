@@ -54,9 +54,9 @@ describe("Policy snapshots", () => {
         }),
       ]
       const infos = [
-        { turn: 0, history: Prompt.empty, pendingToolResults: [] },
-        { turn: 9, history: Prompt.empty, pendingToolResults: pending },
-        { turn: 10_000, history: Prompt.empty, pendingToolResults: pending },
+        { turn: 0, history: Prompt.empty, pendingToolResults: [], budget: {} },
+        { turn: 9, history: Prompt.empty, pendingToolResults: pending, budget: {} },
+        { turn: 10_000, history: Prompt.empty, pendingToolResults: pending, budget: {} },
       ]
       for (const info of infos) {
         expect(yield* Policy.forever.decide(info)).toEqual(Policy.decision.continue())
@@ -104,7 +104,7 @@ describe("Policy snapshots", () => {
 
   it.effect("classifies non-finite recurrence stops as policy reasons", () =>
     Effect.gen(function* () {
-      const info = { turn: 0, history: Prompt.empty, pendingToolResults: [] }
+      const info = { turn: 0, history: Prompt.empty, pendingToolResults: [], budget: {} }
 
       expect(yield* Policy.recurs(Number.NaN).decide(info)).toEqual(
         Policy.decision.stop({ _tag: "Policy", detail: "Non-finite recurrence count stopped: NaN" }),
@@ -140,7 +140,9 @@ describe("Policy snapshots", () => {
     const policy = Policy.make(() => Effect.fail(failure))
 
     return Effect.gen(function* () {
-      const actual = yield* Effect.flip(policy.decide({ turn: 1, history: Prompt.empty, pendingToolResults: [] }))
+      const actual = yield* Effect.flip(
+        policy.decide({ turn: 1, history: Prompt.empty, pendingToolResults: [], budget: {} }),
+      )
       expect(actual).toBe(failure)
       expect(actual.cause).toEqual({ code: "offline" })
     })
@@ -164,7 +166,7 @@ describe("Policy snapshots", () => {
       }),
     )
     const combined = Policy.both(first, second)
-    const evaluated = combined.decide({ turn: 1, history: Prompt.empty, pendingToolResults: [] })
+    const evaluated = combined.decide({ turn: 1, history: Prompt.empty, pendingToolResults: [], budget: {} })
     const leftProof: LeftPolicyService extends EffectServices<typeof evaluated> ? true : false = true
     const rightProof: RightPolicyService extends EffectServices<typeof evaluated> ? true : false = true
 

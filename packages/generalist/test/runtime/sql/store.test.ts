@@ -459,7 +459,7 @@ it.live("persists a handoff checkpoint and active pin atomically across reopen",
     driverVersion: "1",
     executable: researcherRef.ref,
     turn: 1,
-    budget: { allocation: {}, remaining: {}, depth: 0 },
+    budget: { allocation: {}, remaining: {} },
     state: {},
   } as const
   const admit = Effect.gen(function* () {
@@ -520,7 +520,7 @@ it.live("atomically imports SQLite handoff projections with exact retry and dive
     driverVersion: "1" as const,
     executable: researcherRef.ref,
     turn: 1,
-    budget: { allocation: {}, remaining: {}, depth: 0 },
+    budget: { allocation: {}, remaining: {} },
     state: {},
   }
   const commit = Schema.decodeSync(Handoff.Commit)({
@@ -928,7 +928,7 @@ it.live("persists only complete atomic failure, unknown, and suspension states a
     driverVersion: "1" as const,
     executable: assistantRef.ref,
     turn: 2,
-    budget: { allocation: {}, remaining: {}, depth: 0 },
+    budget: { allocation: {}, remaining: {} },
     state: { committed: true },
   }
   const write = Effect.gen(function* () {

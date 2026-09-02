@@ -33,6 +33,7 @@ import {
 } from "./group.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
+import { Exhausted } from "../../core/durable/run-budget.js"
 
 export * from "./group.js"
 
@@ -75,6 +76,9 @@ const success = <Result>(result: Result): Outcome => ({ _tag: "Success", result,
 const ErrorMessage = Schema.Struct({ message: Schema.String })
 
 const domainFailure = <Error>(error: Error): Outcome => {
+  if (Schema.is(Exhausted)(error)) {
+    return { _tag: "DomainFailure", failure: error, encodedFailure: Schema.encodeSync(Exhausted)(error) }
+  }
   const decoded = Schema.decodeUnknownOption(ErrorMessage)(error)
   const failure =
     Schema.is(ChildDepthExceeded)(error) || Schema.is(ChildLimitExceeded)(error)

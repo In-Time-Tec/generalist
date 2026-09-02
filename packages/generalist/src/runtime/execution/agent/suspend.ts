@@ -1,5 +1,6 @@
-import { DateTime, Effect } from "effect"
-import type { AgentSuspended } from "../../../core/agent/event.js"
+import { DateTime, Effect, Schema } from "effect"
+import { AgentSuspended } from "../../../core/agent/event.js"
+import type { ExecutionSuspension } from "../state.js"
 import type { Service as CodeMode } from "../../code-mode.js"
 import type { Service as Operations } from "../../operation/nested-operations.js"
 import type { ExecutionClaim, Service as RunStore } from "../../run/store.js"
@@ -12,7 +13,7 @@ export const suspend = (input: {
   readonly store: RunStore
   readonly nested: Operations
   readonly codeMode?: CodeMode
-  readonly suspension: AgentSuspended
+  readonly suspension: ExecutionSuspension
 }) =>
   Effect.gen(function* () {
     const openedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
@@ -22,7 +23,8 @@ export const suspend = (input: {
       latest.checkpoint === undefined ? undefined : { checkpoint: latest.checkpoint },
       latest.continuation === undefined ? undefined : { continuation: latest.continuation },
     )
-    const waits = yield* Effect.forEach(input.suspension.waits, (wait) =>
+    const authoredWaits = Schema.is(AgentSuspended)(input.suspension) ? input.suspension.waits : []
+    const waits = yield* Effect.forEach(authoredWaits, (wait) =>
       input.nested.waitFor(wait).pipe(
         Effect.map(
           (nestedWait) =>
@@ -42,7 +44,11 @@ export const suspend = (input: {
       ),
     )
     const openedWaits = waits.map((wait) => ({ ...wait, status: "open" as const, openedAt }))
-    if (input.codeMode !== undefined && input.suspension.waits.some((wait) => wait.call.name === "code_mode")) {
+    if (
+      input.codeMode !== undefined &&
+      Schema.is(AgentSuspended)(input.suspension) &&
+      input.suspension.waits.some((wait) => wait.call.name === "code_mode")
+    ) {
       return yield* input.codeMode.admitSuspension({
         suspension: input.suspension,
         openedAt,

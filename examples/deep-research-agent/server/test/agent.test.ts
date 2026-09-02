@@ -10,11 +10,13 @@ describe("deep-research-agent definition", () => {
         turn: 6,
         history: Prompt.empty,
         pendingToolResults: [],
+        budget: {},
       })
       const stopDecision = yield* policy.decide({
         turn: 7,
         history: Prompt.empty,
         pendingToolResults: [],
+        budget: {},
       })
 
       expect(agent.name).toBe("deep-research-agent")

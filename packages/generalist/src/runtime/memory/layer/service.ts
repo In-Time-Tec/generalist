@@ -1,4 +1,5 @@
 import { Clock, Effect, Layer, Option, Ref, Stream } from "effect"
+/* eslint-disable max-lines -- the memory Runtime layer implements one service contract */
 import {
   AddressNotFound,
   ChildSelectionMissing,
@@ -48,6 +49,7 @@ import { awaitSessionTerminal } from "../../session/lifecycle.js"
 import { make as makeAgentStart } from "./agent-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
 import { messageDigestInput, messageDraft } from "./message.js"
+import { Invalid as BudgetInvalid, make as makeBudget } from "../../../core/durable/run-budget.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
@@ -282,6 +284,7 @@ const makeRuntimeWith = (
           initialChildren: initialChildren.map(normalizeInitialChild),
           initialFanOuts: initialFanOuts.map(normalizeInitialFanOut),
         }
+        if (input.budget !== undefined) admission.budget = input.budget.allocation
         if (input.runId !== undefined) admission.runId = input.runId
         return yield* store.admitStart(admission, { activate })
       })
@@ -469,10 +472,24 @@ const makeRuntimeWith = (
       directory: (runId) => reachable({ store, policy, runId }),
       registerAgentName: store.registerAgentName,
       resolveOperation: store.resolveOperation,
+      extendBudget: (runId, delta) =>
+        Effect.try({
+          try: () => makeBudget(delta).allocation,
+          catch: (error) =>
+            BudgetInvalid.make({ message: String(error), hint: "Use finite non-negative budget values" }),
+        }).pipe(Effect.flatMap((normalized) => store.extendBudget(runId, normalized))),
       inspect: (runId) =>
-        store
-          .snapshot(runId)
-          .pipe(Effect.map((snapshot) => ({ ...snapshot.run, turn: snapshot.turn, usage: snapshot.usage }))),
+        Effect.all([store.snapshot(runId), store.loadExecution(runId)]).pipe(
+          Effect.map(([snapshot, execution]) => {
+            const inspection = {
+              ...snapshot.run,
+              turn: snapshot.turn,
+              usage: snapshot.usage,
+              budget: snapshot.budget,
+            }
+            return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
+          }),
+        ),
       fanOut: (input) =>
         Effect.gen(function* () {
           return yield* store.admitFanOut(yield* normalizeFanOut(input.parentRunId, input))

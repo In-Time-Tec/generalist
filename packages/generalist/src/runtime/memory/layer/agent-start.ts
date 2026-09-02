@@ -16,6 +16,7 @@ import type {
   StartReceipt,
 } from "../../service.js"
 import { normalizePrompt } from "../prompt.js"
+import { make as makeBudget } from "../../../core/durable/run-budget.js"
 
 const decodeEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event: RunEvent) => {
   if (event._tag !== "RunCompleted") return Effect.succeed<StartEvent<OutputCodec["Type"]>>(event)
@@ -88,6 +89,7 @@ export const make = (options: {
           sessionId,
           idempotencyKey: startKey,
           prompt: initialPrompt,
+          budget: startOptions?.budget ?? makeBudget(agent.budget ?? {}),
         },
         true,
       )

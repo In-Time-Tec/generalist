@@ -15,6 +15,7 @@ import {
   CodeExecutor,
   Session,
   Handoff,
+  RunBudget,
   ToolContext,
   ToolExecutor,
 } from "../../../src/index.js"
@@ -1699,7 +1700,7 @@ describe("RunExecutor", () => {
   })
 
   it.effect("preserves structured run-budget exhaustion details", () => {
-    const agent = Agent.make({ name: "budget-exhausted", budget: { modelCalls: 0 } })
+    const agent = Agent.make({ name: "budget-exhausted", budget: { tokens: 0 } })
     const ref = testExecutable(agent, "budget-exhausted-v1")
     const address = Address.make("agent:budget-exhausted")
     const runtimeLayer = Runtime.layerMemory({
@@ -1715,26 +1716,20 @@ describe("RunExecutor", () => {
       const runtime = yield* Runtime.Runtime
       const host = yield* RunExecutor.RunExecutor
       const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: address,
+      const receipt = yield* runtime.startExecution({
+        executable: ref,
+        registrations: registrationsFor(ref),
         sessionId: "session:budget-exhausted",
         idempotencyKey: "message:budget-exhausted",
         prompt: "run",
+        budget: RunBudget.make({ tokens: 0 }),
       })
       yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "budget" }))
       const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
-      const failed = history.find((event) => event._tag === "RunFailed")
-      expect(failed?._tag).toBe("RunFailed")
-      if (failed?._tag !== "RunFailed") return expect.unreachable()
-      expect(failed.error).toMatchObject({
-        _tag: "generalist/runtime/AgentExecutionFailure",
-        message: yield* Schema.decodeEffect(Schema.String)(failed.error.message).pipe(Effect.orDie),
-        failure: {
-          _tag: "generalist/core/RunBudgetExhausted",
-          dimension: "modelCalls",
-          requested: 1,
-          remaining: 0,
-        },
+      expect(history.some((event) => event._tag === "RunFailed")).toBe(false)
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
+        status: "waiting",
+        suspension: { _tag: "BudgetExhausted", budget: "tokens" },
       })
     }).pipe(scopedWith(runtimeLayer))
   })
@@ -1744,7 +1739,7 @@ describe("RunExecutor", () => {
     const agent = Agent.make({
       name: "token-overrun",
       toolkit: Toolkit.make(waitTool),
-      budget: { modelCalls: 1, toolCalls: 1, totalTokens: 5 },
+      budget: { tokens: 5, toolCalls: 1 },
     })
     const ref = testExecutable(agent, "token-overrun-v1")
     const address = Address.make("agent:token-overrun")
@@ -1798,39 +1793,36 @@ describe("RunExecutor", () => {
       const runtime = yield* Runtime.Runtime
       const host = yield* RunExecutor.RunExecutor
       const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: address,
+      const receipt = yield* runtime.startExecution({
+        executable: ref,
+        registrations: registrationsFor(ref),
         sessionId: "session:token-overrun",
         idempotencyKey: "message:token-overrun",
         prompt: "run",
+        budget: RunBudget.make({ tokens: 5, toolCalls: 1 }),
       })
       yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "token-overrun" }))
 
       const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
       const committed = history.filter((event) => event._tag === "ModelResponseCommitted")
-      const failed = history.find((event) => event._tag === "RunFailed")
       expect(toolExecutions).toBe(0)
       expect(committed).toHaveLength(1)
       expect(committed[0]).toMatchObject({ budgetCharge: 10 })
-      expect(failed?._tag).toBe("RunFailed")
-      if (failed?._tag !== "RunFailed" || committed[0]?._tag !== "ModelResponseCommitted") {
+      expect(history.some((event) => event._tag === "RunFailed")).toBe(false)
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
+        status: "waiting",
+        suspension: { _tag: "BudgetExhausted", budget: "tokens" },
+      })
+      if (committed[0]?._tag !== "ModelResponseCommitted") {
         return expect.unreachable()
       }
-      expect(failed.error).toMatchObject({
-        failure: {
-          _tag: "generalist/core/RunBudgetExhausted",
-          dimension: "totalTokens",
-          requested: 10,
-          remaining: 5,
-        },
-      })
 
       const execution = yield* store.loadExecution(receipt.runId)
       expect(execution.checkpoint !== undefined && "driverVersion" in execution.checkpoint).toBe(true)
       if (execution.checkpoint === undefined || !("driverVersion" in execution.checkpoint)) {
         return expect.unreachable()
       }
-      expect(execution.checkpoint.budget.remaining.totalTokens).toBe(0)
+      expect(execution.checkpoint.budget.remaining.tokens).toBe(0)
       expect(execution.checkpoint.state).toHaveProperty("postCommitFailure")
       const operation = yield* store.getOperationByKey({
         runId: receipt.runId,
@@ -1851,7 +1843,7 @@ describe("RunExecutor", () => {
       const responses = path.filter((entry) => entry._tag === "ModelResponse")
       expect(responses).toHaveLength(1)
       expect(responses[0]?.id).toBe(committed[0].sessionEntryId)
-      expect(path.at(-1)).toMatchObject({ _tag: "Message", parentId: committed[0].sessionEntryId })
+      expect(path.at(-1)).toMatchObject({ _tag: "ModelResponse", id: committed[0].sessionEntryId })
     }).pipe(scopedWith(runtimeLayer))
   })
 
@@ -2467,7 +2459,7 @@ describe("RunExecutor", () => {
         driverVersion: "1" as const,
         executable: researcherRef.ref,
         turn: 1,
-        budget: { allocation: {}, remaining: {}, depth: 0 },
+        budget: { allocation: {}, remaining: {} },
         state: {},
       }
       yield* store.completeOperation({
@@ -2540,7 +2532,7 @@ describe("RunExecutor", () => {
         driverVersion: "1" as const,
         executable: researcherRef.ref,
         turn: 1,
-        budget: { allocation: {}, remaining: {}, depth: 0 },
+        budget: { allocation: {}, remaining: {} },
         state: {},
       }
       const completion = {
@@ -2613,7 +2605,7 @@ describe("RunExecutor", () => {
         driverVersion: "1" as const,
         executable: assistantRef.ref,
         turn: 2,
-        budget: { allocation: {}, remaining: {}, depth: 0 },
+        budget: { allocation: {}, remaining: {} },
         state: { committed: true },
       }
       for (const outcome of [{ _tag: "Failed" as const, error: { message: "failed" } }, { _tag: "Unknown" as const }]) {
@@ -3304,7 +3296,7 @@ describe("RunExecutor", () => {
           driverVersion: "1",
           executable: researcherRef.ref,
           turn: 1,
-          budget: { allocation: {}, remaining: {}, depth: 0 },
+          budget: { allocation: {}, remaining: {} },
           state: {},
         },
       })

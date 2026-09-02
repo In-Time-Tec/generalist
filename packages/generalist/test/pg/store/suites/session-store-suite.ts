@@ -277,7 +277,7 @@ describePostgres("PostgreSQL Session authority", () => {
           driverVersion: "1" as const,
           executable: assistantRef.ref,
           turn: 1,
-          budget: { allocation: {}, remaining: {}, depth: 0 },
+          budget: { allocation: {}, remaining: {} },
           state: { committed: true },
         }
         const continuation = {
@@ -508,7 +508,7 @@ describePostgres("PostgreSQL Session authority", () => {
         driverVersion: "1" as const,
         executable: researcherRef.ref,
         turn: 1,
-        budget: { allocation: {}, remaining: {}, depth: 0 },
+        budget: { allocation: {}, remaining: {} },
         state: {},
       }
       const commit: Handoff.Commit = {

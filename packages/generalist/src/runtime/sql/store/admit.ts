@@ -21,7 +21,7 @@ import type { SpawnInput } from "../../service.js"
 import { make as makeMessage, type Message } from "../../messaging/message.js"
 import { decodePinnedExecutable, decodeSqlInteger } from "../codec/codecs.js"
 import type { RunRow } from "../codec/rows.js"
-import { appendEvent, insertRun, loadRun, nowIso } from "./statements.js"
+import { appendEvent, insertRun, loadEventsAfter, loadRun, nowIso } from "./statements.js"
 import { enforceChildAdmission, nextId } from "./admit-send.js"
 import type { EventHub } from "../subscribers.js"
 import { associateRegistrations, loadRegistrations, persistRegistrations } from "../executable/registrations.js"
@@ -30,6 +30,8 @@ import { make as makeAddress } from "../../address.js"
 import { admitInitialFanOuts } from "./fan-out/initial-services.js"
 import { normalize as normalizeTreePolicy } from "../../tree/policy.js"
 import { readinessForAdmission } from "./child/capacity.js"
+import { budgetForEvents } from "../../execution/inspection.js"
+import { childGrant, Exhausted } from "../../../core/durable/run-budget.js"
 
 type SendReceipt = { runId: string; messageId: string; acceptedSequence: number; duplicate: boolean }
 type StartReceipt = SendReceipt & {
@@ -228,7 +230,12 @@ export const admitStart: {
       yield* appendEvent(
         hub,
         loaded,
-        { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
+        {
+          _tag: "RunAccepted",
+          messageId: input.message.id,
+          address: input.message.to,
+          ...Object.assign({}, input.budget === undefined ? undefined : { budget: input.budget }),
+        },
         "queued",
       )
       if (input.initialChildren.length === 0 && options?.activate !== false) {
@@ -321,6 +328,11 @@ export const admitSpawn: {
     }
     const runId = yield* nextId("run")
     yield* enforceChildAdmission(parent, 1)
+    const parentBudget = yield* budgetForEvents(yield* loadEventsAfter(parent.runId, -1))
+    if (parentBudget.children === 0) {
+      return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
+    }
+    const childBudget = childGrant(parentBudget, 1)
     const childReadiness = yield* readinessForAdmission(parent)
     yield* insertRun({
       runId,
@@ -351,6 +363,7 @@ export const admitSpawn: {
       prompt: input.message.prompt,
       childDepth: parent.depth + 1,
       readiness: childReadiness,
+      budget: childBudget,
     }
     if (input.label !== undefined) Object.assign(linked, { label: input.label })
     if (input.origin !== undefined) Object.assign(linked, { origin: input.origin })
@@ -363,6 +376,7 @@ export const admitSpawn: {
         _tag: "RunAccepted",
         messageId: input.message.id,
         address: input.message.to,
+        budget: childBudget,
       },
       "queued",
     )
@@ -424,6 +438,11 @@ export const admitProgramChild: {
       return yield* RunIdConflict.make({ runId: input.childRunId, existingRunId: byId[0].run_id })
     }
     yield* enforceChildAdmission(parent, 1)
+    const parentBudget = yield* budgetForEvents(yield* loadEventsAfter(parent.runId, -1))
+    if (parentBudget.children === 0) {
+      return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
+    }
+    const childBudget = childGrant(parentBudget, 1)
     const childReadiness = yield* readinessForAdmission(parent)
     yield* insertRun({
       runId: input.childRunId,
@@ -454,12 +473,13 @@ export const admitProgramChild: {
       prompt: input.message.prompt,
       childDepth: parent.depth + 1,
       readiness: childReadiness,
+      budget: childBudget,
     })
     const child = (yield* loadRun(input.childRunId))!
     yield* appendEvent(
       hub,
       child,
-      { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
+      { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to, budget: childBudget },
       "queued",
     )
     return { runId: input.childRunId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }

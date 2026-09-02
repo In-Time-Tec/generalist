@@ -1285,7 +1285,7 @@ describePostgres("PostgreSQL run store", () => {
           driverVersion: "1" as const,
           executable: assistantRef.ref,
           turn: 1,
-          budget: { allocation: {}, remaining: {}, depth: 0 },
+          budget: { allocation: {}, remaining: {} },
           state: {},
         }
         const staleFiber = yield* Effect.forkScoped(
@@ -1372,7 +1372,7 @@ describePostgres("PostgreSQL run store", () => {
           driverVersion: "1" as const,
           executable: assistantRef.ref,
           turn: 1,
-          budget: { allocation: {}, remaining: {}, depth: 0 },
+          budget: { allocation: {}, remaining: {} },
           state: { dialect: "postgres" },
         }
         for (const outcome of [

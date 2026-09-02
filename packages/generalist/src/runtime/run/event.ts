@@ -25,6 +25,7 @@ import {
 import { FanOutJoin, FanOutRemainder } from "../child/fan-out.js"
 import { FanOutMemberOrigin, type FanOutMemberOrigin as FanOutOrigin } from "../child/fan-out-internal.js"
 import { ChildReadiness } from "../child/readiness.js"
+import { BudgetLimits, Dimension, Spend } from "../../core/durable/run-budget.js"
 
 export type { AgentLoopEvent, ExecutionResult }
 
@@ -61,6 +62,12 @@ export type RunAccepted = RunEventBase & {
   readonly _tag: "RunAccepted"
   readonly messageId: string
   readonly address: Address
+  readonly budget?: BudgetLimits
+}
+export type BudgetExtended = RunEventBase & { readonly _tag: "BudgetExtended"; readonly delta: BudgetLimits }
+export type BudgetSuspended = RunEventBase & {
+  readonly _tag: "BudgetSuspended"
+  readonly budget: import("../../core/durable/run-budget.js").Dimension
 }
 export type RunAttemptStarted = RunEventBase & {
   readonly _tag: "RunAttemptStarted"
@@ -115,6 +122,7 @@ export type ChildLinked = RunEventBase & {
   readonly key?: string
   readonly label?: string
   readonly origin?: FanOutOrigin
+  readonly budget?: BudgetLimits
 }
 export type ChildReadinessChanged = RunEventBase & {
   readonly _tag: "ChildReadinessChanged"
@@ -125,6 +133,7 @@ export type ChildSettled = RunEventBase & {
   readonly _tag: "ChildSettled"
   readonly childRunId: string
   readonly terminalEventId: string
+  readonly spend?: Spend
 }
 export type FanOutAdmitted = RunEventBase & {
   readonly _tag: "FanOutAdmitted"
@@ -173,6 +182,8 @@ type ProgramLog = RunEventBase & {
 
 export type LifecycleEvent =
   | RunAccepted
+  | BudgetExtended
+  | BudgetSuspended
   | RunAttemptStarted
   | RunWaiting
   | RunResumed
@@ -195,6 +206,8 @@ export type RunEvent = (RunEventBase & DurableAgentLoopEvent) | LifecycleEvent
 
 export const LifecycleTag = Schema.Literals([
   "RunAccepted",
+  "BudgetExtended",
+  "BudgetSuspended",
   "RunAttemptStarted",
   "RunWaiting",
   "RunResumed",
@@ -392,7 +405,13 @@ const AgentLoopEventSchema = Schema.Union([
   ModelTelemetryEventSchema,
 ])
 const LifecycleEventSchema = Schema.Union([
-  Schema.TaggedStruct("RunAccepted", { messageId: Schema.String, address: Address }),
+  Schema.TaggedStruct("RunAccepted", {
+    messageId: Schema.String,
+    address: Address,
+    budget: Schema.optionalKey(BudgetLimits),
+  }),
+  Schema.TaggedStruct("BudgetExtended", { delta: BudgetLimits }),
+  Schema.TaggedStruct("BudgetSuspended", { budget: Dimension }),
   Schema.TaggedStruct("RunAttemptStarted", { attempt: Schema.Finite }),
   Schema.TaggedStruct("RunWaiting", { wait: RunWait }),
   Schema.TaggedStruct("RunResumed", { waitId: Schema.String, resolution: WaitResolution }),
@@ -422,9 +441,14 @@ const LifecycleEventSchema = Schema.Union([
     key: Schema.optionalKey(Schema.String),
     label: Schema.optionalKey(Schema.String),
     origin: Schema.optionalKey(FanOutMemberOrigin),
+    budget: Schema.optionalKey(BudgetLimits),
   }),
   Schema.TaggedStruct("ChildReadinessChanged", { childRunId: RunId, readiness: ChildReadiness }),
-  Schema.TaggedStruct("ChildSettled", { childRunId: RunId, terminalEventId: Schema.String }),
+  Schema.TaggedStruct("ChildSettled", {
+    childRunId: RunId,
+    terminalEventId: Schema.String,
+    spend: Schema.optionalKey(Spend),
+  }),
   Schema.TaggedStruct("FanOutAdmitted", {
     fanOutId: Schema.String,
     memberCount: Schema.Finite,

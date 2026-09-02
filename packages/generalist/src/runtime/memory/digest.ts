@@ -44,6 +44,7 @@ export const startDigest = (input: AdmitStartInput): string =>
   digest([
     messageDigest(input.message),
     input.treePolicy ?? defaultTreePolicy,
+    input.budget ?? null,
     input.initialChildren.map((child) => ({
       invocationId: child.invocationId,
       idempotencyKey: child.idempotencyKey,

@@ -40,7 +40,7 @@ const AgentConformanceResponse = Schema.Struct({
   denied: Schema.Literal(true),
   deniedExecutions: Schema.Literal(0),
   budgetExhausted: Schema.Literal(true),
-  budgetModelRequests: Schema.Literal(0),
+  budgetModelRequests: Schema.Literal(1),
   openRouterBundled: Schema.Literal(true),
 })
 
@@ -200,7 +200,7 @@ const worker :Workerd.Worker = (
             denied: true,
             deniedExecutions: 0,
             budgetExhausted: true,
-            budgetModelRequests: 0,
+            budgetModelRequests: 1,
             openRouterBundled: true,
           })
 

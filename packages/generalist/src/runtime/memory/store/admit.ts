@@ -32,6 +32,8 @@ import { admitFanOut } from "./fan-out/service.js"
 import { normalize as normalizeTreePolicy } from "../../tree/policy.js"
 import { readinessForAdmission } from "./child/capacity.js"
 import { receiptAdmission } from "./admission/receipt.js"
+import { budgetForEvents } from "../../execution/inspection.js"
+import { childGrant, Exhausted } from "../../../core/durable/run-budget.js"
 
 const { duplicateReceipt, fanOutAdmission, newRunId, startReceipt } = receiptAdmission
 
@@ -171,7 +173,7 @@ export const admitSend: {
       const [, acceptedState] = yield* appendLifecycle(
         next,
         runId,
-        acceptedEvent(input.message.to, input.message.id),
+        acceptedEvent({ address: input.message.to, messageId: input.message.id, budget: input.budget }),
         "queued",
       )
       next = acceptedState
@@ -315,6 +317,7 @@ type AdmitSpawnResult = Effect.Effect<
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
+  | Exhausted
 >
 
 export const admitSpawn: {
@@ -396,6 +399,11 @@ export const admitSpawn: {
         })
       }
       const childReadiness = readinessForAdmission(withId, parent)
+      const parentBudget = yield* budgetForEvents(parent.events)
+      if (parentBudget.children === 0) {
+        return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
+      }
+      const childBudget = childGrant(parentBudget, 1)
       const child: StoredRun = {
         runId,
         status: "queued",
@@ -431,6 +439,7 @@ export const admitSpawn: {
         parent.runId,
         childLinkedEvent(runId, input.invocationId, input.selection, input.message.prompt, parent.depth + 1, {
           ...childDetails(childReadiness, input),
+          budget: childBudget,
         }),
       )
       next = linked
@@ -438,7 +447,7 @@ export const admitSpawn: {
       const [, accepted] = yield* appendLifecycle(
         next,
         runId,
-        acceptedEvent(input.message.to, input.message.id),
+        acceptedEvent({ address: input.message.to, messageId: input.message.id, budget: childBudget }),
         "queued",
       )
       next = accepted

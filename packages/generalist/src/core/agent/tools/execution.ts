@@ -27,6 +27,7 @@ import { operationKey as makeOperationKey } from "../../durable/driver/interpret
 import { handoffDispatch } from "../handoff/tool-execution.js"
 import { updateCall } from "./checkpoint.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
+import { Exhausted } from "../../durable/run-budget.js"
 
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly options: RunOptions
@@ -91,6 +92,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       case "Success":
         return completionEvent(successResult(call, outcome))
       case "DomainFailure":
+        if (Schema.is(Exhausted)(outcome.failure)) return Effect.fail(outcome.failure)
         return completionEvent(domainFailureResult(call, outcome))
       case "Suspend":
         return Effect.gen(function* () {
@@ -272,11 +274,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
             ...invocation,
             emit,
           }
-          const toolContext = ToolContext.of(
-            options.budget?.deadline === undefined
-              ? contextBase
-              : { ...contextBase, deadline: options.budget.deadline },
-          )
+          const toolContext = ToolContext.of(contextBase)
           const handoffExecution = handoffFor(request, registry)
           const skillActivation = isSkillActivationCall(call, registry)
           const requestExecutor =
