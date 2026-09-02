@@ -1,5 +1,5 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context, typescript/no-unsafe-return -- Agent.Any intentionally hides invariant Agent parameters at the heterogeneous Host registry boundary; the distributive AgentDefinition/AgentServices types restore each configured Agent's exact contract. */
-import { Effect, Option, Schema, Stream, Types } from "effect"
+import { Effect, Filter, Option, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import {
@@ -263,8 +263,7 @@ const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService =
   })
 }
 
-const ToolName = Schema.Struct({ name: Schema.String })
-const toolName = (tool: Tool.Any): string => Schema.decodeSync(ToolName)(tool).name
+const toolName = (tool: Tool.Any): string => tool.name
 
 interface PluginContributions {
   readonly tools: ReadonlyArray<Tool.Any>
@@ -451,12 +450,9 @@ const create = <
         subscribe: (sessionId, cursor) => {
           const input: Types.Mutable<{ readonly sessionId: string; readonly cursor?: Cursor }> = { sessionId }
           if (cursor !== undefined) input.cursor = cursor
-          return runtime.sessionEvents(input).pipe(
-            Stream.flatMap((entry) => {
-              const event = projectedEvent(sessionId, entry)
-              return Option.isSome(event) ? Stream.succeed(event.value) : Stream.empty
-            }),
-          )
+          return runtime
+            .sessionEvents(input)
+            .pipe(Stream.filterMap(Filter.fromPredicateOption((entry) => projectedEvent(sessionId, entry))))
         },
       },
     }
