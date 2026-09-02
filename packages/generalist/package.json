@@ -123,6 +123,10 @@
       "types": "./dist/repl/index.d.ts",
       "import": "./dist/repl/index.js"
     },
+    "./sandbox": {
+      "types": "./dist/sandbox/index.d.ts",
+      "import": "./dist/sandbox/index.js"
+    },
     "./ai/model-catalog": {
       "types": "./dist/ai/model-catalog.d.ts",
       "import": "./dist/ai/model-catalog.js"

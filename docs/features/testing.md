@@ -39,6 +39,18 @@ Testing.ruleStore({ layer: MyRuleStore.layerTest })
 
 `memory` checks remember/recall, key isolation, whole-key deletion, and deletion by implementation-owned item id. `ruleStore` checks concurrent retention and replacement of an existing pattern. Each test gets a fresh Layer build.
 
+Sandbox leaves declare their factual isolation label and run supported and unsupported operations through the same suite:
+
+```ts
+Testing.sandbox({
+  name: "My Sandbox",
+  isolation: "container",
+  layer: MySandbox.layer,
+})
+```
+
+The suite checks command round-trip and streaming, files, pause/resume retention, snapshot/fork isolation, limit enforcement, and typed `Unsupported` failures. It never treats an absent capability as a skipped test.
+
 ## Inject deterministic failures
 
 The chaos Layers count only the boundary named by the helper. Invalid counts fail immediately with `TypeError`.
@@ -80,7 +92,7 @@ const writeCertification = Testing.report.write({
 Effect.runPromise(writeCertification.pipe(Effect.provide(MyDriver.platformLayer)))
 ```
 
-The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; memory and rule-store entries use `memory` and `ruleStore`.
+The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; Sandbox entries use `sandbox:<provider-name>`; memory and rule-store entries use `memory` and `ruleStore`.
 
 ## Scripted model fixtures
 

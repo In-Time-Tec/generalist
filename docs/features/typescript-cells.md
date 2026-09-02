@@ -1,14 +1,15 @@
 # TypeScript cells
 
-A Session owns one persistent, ordered TypeScript namespace behind the single `typescript` tool. `generalist/repl` defines the contract; `generalist/repl/bun` runs it in a trusted-local Bun child process.
+A Session owns one persistent, ordered TypeScript namespace behind the single `typescript` tool. `generalist/repl` defines the cell protocol, `CellTool` adapts it to `Sandbox`, and the Bun Sandbox leaf runs it in a trusted-local child process.
 
 ## Usage
 
 ```ts
-import { Duration, Layer } from "effect"
+import { Duration, Layer, Path } from "effect"
 import { layer as bunServices } from "@effect/platform-bun/BunServices"
 import { CellTool, KernelProfile } from "generalist/repl"
 import { BunKernelPool, BunKernelSnapshotStore, workerModule } from "generalist/repl/bun"
+import * as Sandbox from "generalist/sandbox"
 
 const profile = KernelProfile.make({
   provider: "bun-local",
@@ -20,12 +21,17 @@ const profile = KernelProfile.make({
   workspace: { root: "/workspace/agent", dataRoot: "/workspace/data" },
   limits: { sourceBytes: CellTool.maxSourceBytes, cellDeadlineMillis: 120_000 },
 })
+const platform = Layer.merge(bunServices, Path.layer)
+const snapshots = BunKernelSnapshotStore.layer({ dataRoot: "/workspace/data" }).pipe(Layer.provide(platform))
 // prettier-ignore
 const pool = BunKernelPool.layer({ profile, runtimeCommand: "bun", workerModule,
   startTimeoutMillis: 20_000, interruptGraceMillis: 250, maxConcurrentBoots: 4,
   idleTimeToLive: Duration.minutes(5), environment: {} }).pipe(
-  Layer.provide(BunKernelSnapshotStore.layer({ dataRoot: "/workspace/data" })), Layer.provide(bunServices))
-export const cells = CellTool.layer.pipe(Layer.provide(pool))
+  Layer.provide(snapshots), Layer.provide(platform))
+const provider = Sandbox.layerBunKernel({ image: "bun:1.2.20", workspaceRoot: "/workspace/agent" }).pipe(
+  Layer.provide(Layer.mergeAll(pool, snapshots, platform)),
+)
+export const cells = CellTool.layer.pipe(Layer.provide(provider))
 // The model calls: typescript({ code: "const total = 20 + 22; total" })
 ```
 
@@ -36,7 +42,8 @@ Agent tool call
 └── typescript({ code: "const total = 20 + 22; total" })
     └── CellTool.route
         ├── decode bounded { code: string }
-        └── KernelPool.execute(sessionId, cellId, code)
+        └── SandboxProvider.acquire({ key: sessionId })
+            └── Sandbox.start(TypeScript(cellId, code))
             ├── admit one cell for this Session
             ├── acquire/reuse Bun child kernel
             ├── emit KernelReady(sequence: 0, epoch: 0)
@@ -48,7 +55,7 @@ Agent tool call
 
 ```text
 RI  Parameters { code: "const total = 20 + 22; total" }
-    │ CellTool.route -> KernelPool.execute
+    │ CellTool.route -> Sandbox.start(TypeScript)
     ▼
     CellEvent stream: KernelReady(0), Result(1, "42")
     │ ToolContext.emit + await execution.result
@@ -56,7 +63,7 @@ RI  Parameters { code: "const total = 20 + 22; total" }
 RO  CellResult { value: "42", stdout: "", stderr: "", epoch: 0 }
 ```
 
-`KernelPool` has five Session-keyed operations: `execute`, `inspect`, `interrupt`, `restart`, and `close`. Provider creation, pause, resume, networking, and billing remain inside explicit host-provided Layers.
+`CellTool.layer` captures only `SandboxProvider`; Runtime supplies `ToolContext` for each call so cell events and the committed snapshot ID enter that run's journal. `KernelPool` remains the Bun leaf's lower-level Session lifecycle port with `execute`, `inspect`, `interrupt`, `restart`, and `close`.
 
 ## Recovery state
 
@@ -68,6 +75,8 @@ restart-only  no prior kernel state continued
 ```
 
 `Inspection.recovery` and `Restart.recovery` report the recovery that happened, not a profile capability. Bun retains its trusted-local child-process boundary, persistent workspace, and best-effort namespace snapshots; it does not acquire hosted networking or billing behavior.
+
+After each successful cell, `CellTool` asks a snapshot-capable Sandbox for an immutable image and emits `SandboxSnapshot` progress with its `SnapshotId`. A reopened durable host forks that image before continuing; earlier cells remain journal history and are not executed again.
 
 ## Failure paths
 
@@ -108,13 +117,15 @@ typescript({ code: "throw new Error('bad row')" })
 - Idle pause is allowed only without an admitted cell. `close` deletes live and paused hosted resources; failed deletion remains visible and retryable until absence is proven.
 - Kernel state is working memory, never authority. Operations, events, Session entries, and children are truth; restart reports exactly restored and dropped names.
 - Bun's filesystem is persistent and its namespace restoration is best-effort; live handles and unsupported bindings can be dropped.
+- Bun's `process` isolation label is factual, not a security boundary; trusted cell code shares the host operating-system identity.
 - `TestKernel` provides in-memory pool, snapshot-store, and resource-authority implementations.
 - `KernelProviderConformance.kernelProviderConformance` checks shared lifecycle behavior and deterministic remote two-host, generation, reconnect, uncertainty, pause, and cleanup behavior.
 - Deterministic conformance cannot prove vendor microVM isolation or billing cleanup; hosted adapters still require live provider gates.
-- `CodeExecutor` is a separate boundary: each Agent Program is a fresh stateless evaluation and never owns the Session's ordered REPL namespace.
+- `CodeExecutor` and `CellTool` are separate adapters over `Sandbox`: Agent Programs use fresh module evaluation, while cells use the Session's ordered namespace.
 
 ## Related
 
 - Source: `packages/generalist/src/repl/...`
+- Sandbox contract: `sandbox.md`
 - Site: `/docs/guides/typescript-cells`, `/docs/reference/repl`, `/docs/learn/kernel-boundaries`
 - Decisions/tradeoffs: `../decisions/kernel-child-process.md`, `../decisions/kernel-frame-channel.md`, `../decisions/kernel-profile-pin.md`, `../decisions/kernel-state-is-not-authority.md`, `../decisions/e2b-kernel-pool-rejected.md`

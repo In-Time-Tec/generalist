@@ -75,7 +75,8 @@ hibernation; each socket serializes concurrent commands and flushes.
 
 ```text
 execute({ requestId: "run-1:attempt-1", input: { value: 1 } })
-├── admit declared guarantees; validate source digest and imports
+├── CodeExecutor adapter → SandboxProvider.acquire(CPU, wall-clock)
+├── Sandbox.exec(JavaScriptModule) → validate source digest and imports
 ├── loader.load(WorkerCode)
 │   ├── fresh isolate; globalOutbound: null
 │   ├── cpuMs: 50; subRequests: 3
@@ -85,10 +86,14 @@ execute({ requestId: "run-1:attempt-1", input: { value: 1 } })
 ```
 
 `make({ loader, compatibilityDate, capabilityBinding })` constructs the
-production `CodeExecutor`. Only relative imports inside the exact module graph
-are accepted. Each execution gets a fresh isolate, bounded output, explicitly
-granted capabilities, and CPU, subrequest, deadline, and cancellation limits.
-`makeUnavailable(message)` returns a typed `SandboxUnavailable` boundary.
+production `CodeExecutor` as a thin adapter over the Worker Loader Sandbox leaf.
+`generalist/sandbox` also exposes that leaf as `layerWorkerLoader`. Both paths
+use the same execution engine; there is no second loader path. Only relative
+imports inside the exact module graph are accepted. Each execution gets a fresh
+`v8-isolate`, bounded output, explicitly granted capabilities, and CPU,
+subrequest, deadline, and cancellation limits. Files, pause, resume, snapshot,
+and fork return typed `Unsupported` errors. `makeUnavailable(message)` returns a
+typed `SandboxUnavailable` boundary.
 
 ## Invariants
 
@@ -101,6 +106,8 @@ granted capabilities, and CPU, subrequest, deadline, and cancellation limits.
 - Socket close or error does not cancel a run; only a valid `Cancel` command does.
 - Source rejects bare, computed, CommonJS, missing, escaping, and case-conflicting imports.
 - Dynamic Worker outbound networking is disabled with `globalOutbound: null`.
+- `v8-isolate` is an honest runtime boundary, not a container or microVM claim.
+- Worker CPU limits count active execution; wall-clock deadlines also count waits on host capabilities and I/O.
 - Cancellation, deadline, and Effect interruption stop the invocation and fence later host callbacks.
 - Loader diagnostics are credential-redacted and truncated before becoming typed failures.
 
