@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.0
+
+- Add `generalist/hooks`, also exported as `Hooks` from the root. `Hooks.layer([...])` provides an ordered list of typed lifecycle interceptors built with `onRunStart`, `onTurnStart`, `onModelCall`, `onToolCall`, `onToolResult`, `onApprovalRequest`, `onCompaction`, `onChildStart`, `onChildEnd`, `onSteer`, and `onRunEnd`; each hook returns `Continue()`, `Block({ reason })`, `Replace(value)`, `AddContext(prompt)`, or `Ask()` (or `void` for Continue) for the decisions its boundary allows. Prompt boundaries fail the Run with a typed `AgentError` when blocked; a blocked ToolCall skips authorization and dispatch and becomes a journaled tool failure the model sees on its next turn; `Ask` forces the configured Approvals path. `ModelCall` runs after configured `ModelMiddleware`. With a durable driver, every decision is appended to the existing `LoopDriverState` checkpoint before the next hook runs, so recovery replays recorded decisions without invoking hooks again. A hook that fails or defects surfaces as `HookFailed { event, cause, hint }`. `Generalist.plugin({ hooks })` adds plugin declarations after ambient ones. Omitting `Hooks` or providing `Hooks.layerIdentity` is an empty chain. (#348)
+
 ## 0.53.0
 
 - Add Modal and agentOS sandbox providers under `generalist/unstable/sandbox/modal` and `generalist/unstable/sandbox/agentos`, completing the hosted sandbox set. Modal takes `{ tokenId, tokenSecret, app, image }`, reports `container` isolation, and supports Process, files, filesystem snapshot/fork, and wall-clock limits through the official `modal` SDK; agentOS takes `{ endpoint, token, actor? }`, reports `v8-isolate` isolation, and supports Process, files, CPU, and wall-clock limits through `@rivet-dev/agentos`. Both SDKs are optional peer dependencies (`modal@0.10.0`, `@rivet-dev/agentos@0.2.19`) loaded only by their own entry point; unsupported operations return typed `Unsupported`. (#369)
