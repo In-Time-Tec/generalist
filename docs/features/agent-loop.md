@@ -118,7 +118,8 @@ terminal unstructured turn
 - Every loop model call emits call, attempt, retry, and compaction lifecycle events; one `modelCallId` spans attempts, while `modelAttemptId` and zero-based `attempt` identify each invocation and `ModelPart`.
 - Purposes are `conversation`, `structured-output`, or `compaction-summary`; `ModelPart` is process-local, while Runtime stores normalized completion or terminal interruption.
 - Effect Clock timestamps mark actual lifecycle boundaries; events stay causal and flush at the next boundary or stream end; external interruption withholds in-flight telemetry from that consumer.
-- Completed attempts require `finish`, usage, `usageAt`, and finish reason; non-empty provider metadata is unchanged, provider-specific usage/cost is preserved, and absent IDs/model/tier/metadata mean unknown, not zero.
+- Instrumented streams discard empty `text-delta` parts before model middleware and `ModelPart` publication. `ModelAttemptFirstOutput { kind: "text" }` marks the first non-empty `text` or `text-delta`; `text-start` is lifecycle, not visible output.
+- Completed attempts require `finish`, usage, `usageAt`, and finish reason; provider-specific usage/cost is preserved, normalization diagnostics may be added under `generalist` metadata, and absent IDs/model/tier/metadata mean unknown, not zero.
 - Failure categories are bounded and provider-neutral; attempt/call failures include classification, and output-blocked retries preserve attempt classification while the call reports `terminal`.
 - Delivery IDs are stable through checkpoint/replay; an optional sink receives immutable ordered `{ sessionId, events }` batches with backpressure before live emission.
 - Successful sink delivery acknowledges exactly its batch; typed failure neither acknowledges nor emits it, interruption stays interruption, ambiguous failure requires sink reconciliation, and Session reconciles only an exact checkpointed batch.

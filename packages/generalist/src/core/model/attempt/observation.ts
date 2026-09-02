@@ -111,10 +111,10 @@ export const firstOutputKind = (part: Response.AnyPart): FirstOutputKind | undef
     case "reasoning-delta":
     case "reasoning":
       return "reasoning"
-    case "text-start":
     case "text-delta":
+      return part.delta.length === 0 ? undefined : "text"
     case "text":
-      return "text"
+      return part.text.length === 0 ? undefined : "text"
     case "tool-params-start":
     case "tool-call":
       return "tool-call"

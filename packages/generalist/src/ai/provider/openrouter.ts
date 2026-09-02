@@ -1,5 +1,6 @@
 import { Generated, OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
 import { classify } from "../../core/model/result/context-overflow.js"
+import { adapt } from "../../core/model/middleware.js"
 import {
   type FailureClassifier,
   type ModelRegistry,
@@ -14,6 +15,7 @@ import {
   LanguageModel,
   Model,
   OpenAiStructuredOutput,
+  Response,
   Tool,
 } from "effect/unstable/ai"
 import { Sse } from "effect/unstable/encoding"
@@ -184,18 +186,94 @@ const resolveOpenRouterFailure = ({ error, metadata: partMetadata, method }: Fai
   return make(openRouterReason(status, message, metadata))
 }
 
-const openRouterLanguageModelLayer = (input: Options) =>
-  Layer.suspend(() =>
-    layerModelFailures(
-      layerImageSources(
-        OpenRouterLanguageModel.layer({
-          model: input.model,
-          config: input.config ?? {},
-        }),
+const nonNegative = (value: number | undefined): number | undefined =>
+  value === undefined ? undefined : Math.max(0, value)
+
+const withinTotal = (value: number | undefined, total: number | undefined): number | undefined => {
+  const normalized = nonNegative(value)
+  if (normalized === undefined || total === undefined) return normalized
+  return Math.min(normalized, total)
+}
+
+const normalizeOpenRouterUsage = (usage: Response.Usage) => {
+  const inputTotal = nonNegative(usage.inputTokens.total)
+  const cacheRead = withinTotal(usage.inputTokens.cacheRead, inputTotal)
+  const inputUncached =
+    inputTotal !== undefined && cacheRead !== undefined
+      ? inputTotal - cacheRead
+      : withinTotal(usage.inputTokens.uncached, inputTotal)
+  const cacheWrite = nonNegative(usage.inputTokens.cacheWrite)
+  const outputTotal = nonNegative(usage.outputTokens.total)
+  const reasoning = withinTotal(usage.outputTokens.reasoning, outputTotal)
+  const text =
+    outputTotal !== undefined && reasoning !== undefined
+      ? outputTotal - reasoning
+      : withinTotal(usage.outputTokens.text, outputTotal)
+  const normalized = Response.Usage.make({
+    inputTokens: { uncached: inputUncached, total: inputTotal, cacheRead, cacheWrite },
+    outputTokens: { total: outputTotal, text, reasoning },
+  })
+  const inconsistent =
+    inputUncached !== usage.inputTokens.uncached ||
+    inputTotal !== usage.inputTokens.total ||
+    cacheRead !== usage.inputTokens.cacheRead ||
+    cacheWrite !== usage.inputTokens.cacheWrite ||
+    outputTotal !== usage.outputTokens.total ||
+    text !== usage.outputTokens.text ||
+    reasoning !== usage.outputTokens.reasoning
+  return { normalized, inconsistent }
+}
+
+const normalizeOpenRouterFinishPart = (part: Response.FinishPart): Response.FinishPart => {
+  const { normalized, inconsistent } = normalizeOpenRouterUsage(part.usage)
+  if (!inconsistent) return part
+  return Response.makePart("finish", {
+    reason: part.reason,
+    usage: normalized,
+    response: part.response,
+    metadata: { ...part.metadata, generalist: { usageInconsistent: true } },
+  })
+}
+
+const normalizeOpenRouterPart = <Tools extends Record<string, Tool.Any>, EncodedToolParameters extends boolean>(
+  part: Response.Part<Tools, EncodedToolParameters>,
+): Response.Part<Tools, EncodedToolParameters> => (part.type === "finish" ? normalizeOpenRouterFinishPart(part) : part)
+
+const normalizeOpenRouterStreamPart = <Tools extends Record<string, Tool.Any>, EncodedToolParameters extends boolean>(
+  part: Response.StreamPart<Tools, EncodedToolParameters>,
+): Response.StreamPart<Tools, EncodedToolParameters> =>
+  part.type === "finish" ? normalizeOpenRouterFinishPart(part) : part
+
+const normalizeOpenRouterModel = (model: LanguageModel.Service): LanguageModel.Service =>
+  adapt(model, {
+    generateText: (_options, invoke) =>
+      Effect.map(
+        invoke(),
+        (response) => new LanguageModel.GenerateTextResponse(response.content.map(normalizeOpenRouterPart)),
       ),
-      resolveOpenRouterFailure,
-    ),
-  )
+    generateObject: (_options, invoke) =>
+      Effect.map(
+        invoke(),
+        (response) =>
+          new LanguageModel.GenerateObjectResponse(response.value, response.content.map(normalizeOpenRouterPart)),
+      ),
+    streamText: (_options, invoke) => Stream.map(invoke(), normalizeOpenRouterStreamPart),
+  })
+
+const openRouterLanguageModelLayer = (input: Options) =>
+  Layer.suspend(() => {
+    const provider = layerImageSources(
+      OpenRouterLanguageModel.layer({
+        model: input.model,
+        config: input.config ?? {},
+      }),
+    )
+    const normalized = Layer.effect(
+      LanguageModel.LanguageModel,
+      Effect.map(LanguageModel.LanguageModel, normalizeOpenRouterModel),
+    ).pipe(Layer.provide(provider))
+    return layerModelFailures(normalized, resolveOpenRouterFailure)
+  })
 
 /** Model layer over `OpenRouterClient`; provide it to a run with `Effect.provide`. */
 export const layerModel = (
