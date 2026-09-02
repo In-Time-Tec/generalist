@@ -80,6 +80,7 @@ export type AdmitChildError =
   | RunNotFound
   | RunTerminal
   | RuntimeUnavailable
+  | import("../../core/durable/run-budget.js").Exhausted
 export type ChildLookupError = ChildParentageInvalid | RunNotFound | RuntimeUnavailable
 
 export interface Service {

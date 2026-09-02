@@ -3,6 +3,7 @@ import { AgentSuspended } from "../../core/agent/event.js"
 import { ProgramSuspended } from "../../core/program/capabilities.js"
 import { DriverCheckpoint } from "../../core/durable/driver.js"
 import { UnknownAgent } from "../errors.js"
+import { BudgetExhausted } from "../../core/durable/run-budget.js"
 
 export const SessionCursor = Schema.Struct({
   sessionId: Schema.String,
@@ -41,9 +42,10 @@ export const ExecutionCheckpoint = Schema.Union([DriverCheckpoint, ProgramCheckp
 export type ExecutionCheckpoint = typeof ExecutionCheckpoint.Type
 
 /** Executable-neutral persisted suspension state. */
-export type ExecutionSuspension = AgentSuspended | ProgramSuspended | UnknownAgent
+export type ExecutionSuspension = AgentSuspended | ProgramSuspended | UnknownAgent | BudgetExhausted
 export const ExecutionSuspension: Schema.Codec<ExecutionSuspension, unknown> = Schema.Union([
   AgentSuspended,
   ProgramSuspended,
   UnknownAgent,
+  BudgetExhausted,
 ])

@@ -26,7 +26,7 @@ const interpreter = DurableDriver.layerTest({
   initial: {
     driverVersion: DurableDriver.currentDriverVersion,
     turn: 0,
-    budget: { allocation: {}, remaining: {}, depth: 0 },
+    budget: { allocation: {}, remaining: {} },
     state: {
       logicalOperationId: "run:child-origin",
       sessionId,

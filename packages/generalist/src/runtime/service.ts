@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the Runtime service keeps one public contract */
 import { Context, Effect, Schema, Stream, type Duration } from "effect"
 import type { Entry as SessionEntry } from "../core/context/session.js"
 import { Prompt, type Tool } from "effect/unstable/ai"
@@ -72,6 +73,7 @@ import type { Event as ModelPreviewEvent } from "./execution/model-response/prev
 import type { RunActivationProjection } from "./run/activation.js"
 import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
 import type { RuntimeHostSessions } from "./session/host.js"
+import type { RunBudget, Remaining as RemainingBudget, Input as BudgetDelta } from "../core/durable/run-budget.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -123,6 +125,7 @@ export interface StartExecutionInput {
   readonly causationId?: string
   readonly correlationId?: string
   readonly metadata?: Metadata
+  readonly budget?: RunBudget
   readonly initialChildren?: ReadonlyArray<InitialChildInput>
   readonly initialFanOuts?: ReadonlyArray<InitialFanOutInput>
 }
@@ -155,6 +158,7 @@ export interface StartReceipt extends RunReceipt {
 export interface StartOptions {
   readonly sessionId?: string
   readonly idempotencyKey?: string
+  readonly budget?: RunBudget
 }
 
 type StartedAgentResult<Output> = Omit<AgentExecutionResult, "output"> & { readonly output: Output }
@@ -179,6 +183,8 @@ export interface RunHandle<Output> {
 export interface RuntimeInspection extends RunInspection {
   readonly turn: number
   readonly usage: ReadonlyArray<RawUsageFact>
+  readonly budget: RemainingBudget
+  readonly suspension?: import("./execution/state.js").ExecutionSuspension
 }
 
 export interface SpawnInput {
@@ -322,6 +328,7 @@ export type StartExecutionError =
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
   | RuntimeUnavailable
+  | import("../core/durable/run-budget.js").Exhausted
 /** Typed Agent start failures before a Run handle exists. */
 export type StartError = StartExecutionError | UnknownAgent | AgentError
 /** Exact-root staged admission failures. */
@@ -336,6 +343,7 @@ export type SpawnError =
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
+  | import("../core/durable/run-budget.js").Exhausted
 export type SendMessageError =
   | AddressNotFound
   | AddressInvalid
@@ -373,6 +381,7 @@ export type SteerError =
   | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
+export type ExtendBudgetError = InspectError | import("../core/durable/run-budget.js").Invalid
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable
 export type ResolveModelResponseError = SessionEntryError
 export type FanOutError =
@@ -385,6 +394,7 @@ export type FanOutError =
   | FanOutRemainderUnsupported
   | ChildSelectionMissing
   | RuntimeUnavailable
+  | import("../core/durable/run-budget.js").Exhausted
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
@@ -484,6 +494,8 @@ export interface Service extends RuntimeHostSessions {
   readonly registerAgentName: (input: RegisterAgentNameInput) => Effect.Effect<DirectoryEntry, RegisterAgentNameError>
   readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
   readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, InspectError>
+  /** Primitive used by the operator API to journal a budget top-up and resume budget suspension. */
+  readonly extendBudget: (runId: string, delta: BudgetDelta) => Effect.Effect<void, ExtendBudgetError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, InspectFanOutError>
   readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>

@@ -7,7 +7,7 @@ import {
   type BudgetLimits,
   type RunBudget,
   Exhausted,
-  type GrantWidened,
+  type Invalid,
 } from "../run-budget.js"
 import { CurrentModelCallOrdinal } from "../operation-context.js"
 import { LoopDriverState } from "../loop-driver-state.js"
@@ -90,7 +90,7 @@ export interface Service {
   ) => Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay>
   readonly chargeUsage: (usage: BudgetLimits) => Effect.Effect<void, DriverError | Exhausted>
   readonly setBudget: (budget: RunBudget) => Effect.Effect<void, DriverError>
-  readonly reserveChild: (grant: BudgetLimits) => Effect.Effect<RunBudget, DriverError | Exhausted | GrantWidened>
+  readonly reserveChild: (grant: BudgetLimits) => Effect.Effect<RunBudget, DriverError | Exhausted | Invalid>
   readonly refundChild: (child: RunBudget) => Effect.Effect<void, DriverError>
   readonly setHandoffState: (state: ControlState) => Effect.Effect<void, DriverError | DriverStateInvalid>
 }

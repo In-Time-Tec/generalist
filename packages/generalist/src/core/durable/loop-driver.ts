@@ -62,13 +62,13 @@ export const applyCommit: {
 
 const chargeForKind = (budget: RunBudget, kind: DriverOperationKind): Effect.Effect<RunBudget, Exhausted> => {
   if (kind === "model" || kind === "structured-output") {
-    return charge(budget, { modelCalls: 1 })
+    return Effect.succeed(budget)
   }
   if (kind === "tool") {
     return charge(budget, { toolCalls: 1 })
   }
   if (kind === "handoff") {
-    return charge(budget, { handoffs: 1 })
+    return Effect.succeed(budget)
   }
   return Effect.succeed(budget)
 }
@@ -176,7 +176,9 @@ const applySucceededOutcome = (
       })
     }
     const settled = settleModelTokens(budget, outcome.value.budgetCharge)
-    if (settled.exhausted !== undefined) nextState = { ...nextState, postCommitFailure: settled.exhausted }
+    if (settled.exhausted !== undefined) {
+      nextState = { ...nextState, pending, postCommitFailure: settled.exhausted }
+    }
     return encodeCheckpoint(checkpoint, nextState, settled.budget)
   })
 

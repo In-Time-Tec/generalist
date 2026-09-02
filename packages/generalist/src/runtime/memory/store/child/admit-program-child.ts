@@ -18,6 +18,8 @@ import { idempotencyKey, type MemoryState, type StoredRun } from "../../state.js
 import { readinessForAdmission } from "./capacity.js"
 import { suspend } from "../control/suspend.js"
 import { revokeSession } from "../execution.js"
+import { budgetForEvents } from "../../../execution/inspection.js"
+import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
 
 type AdmitProgramChildResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
@@ -28,6 +30,7 @@ type AdmitProgramChildResult = Effect.Effect<
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
+  | Exhausted
 >
 
 export const admitProgramChild: {
@@ -100,6 +103,11 @@ export const admitProgramChild: {
       })
     }
     const childReadiness = readinessForAdmission(state, parent)
+    const parentBudget = yield* budgetForEvents(parent.events)
+    if (parentBudget.children === 0) {
+      return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
+    }
+    const childBudget = childGrant(parentBudget, 1)
     const child: StoredRun = {
       runId: input.childRunId,
       status: "queued",
@@ -137,14 +145,14 @@ export const admitProgramChild: {
         input.executableRef.active,
         input.message.prompt,
         parent.depth + 1,
-        { readiness: childReadiness },
+        { readiness: childReadiness, budget: childBudget },
       ),
     )
     next = linked
     const [, accepted] = yield* appendLifecycle(
       next,
       child.runId,
-      acceptedEvent(input.message.to, input.message.id),
+      acceptedEvent({ address: input.message.to, messageId: input.message.id, budget: childBudget }),
       "queued",
     )
     next = accepted
@@ -165,6 +173,7 @@ type AdmitChildrenResult = Effect.Effect<
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
+  | Exhausted
 >
 
 /** Atomically admit one authored child batch and persist the parent's aggregate suspension. */

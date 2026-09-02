@@ -75,7 +75,7 @@ const cancelMember = (
       const [, settled] = yield* appendLifecycle(
         readinessChanged,
         parent.runId,
-        childSettledEvent(run.runId, cancelledRunEvent.eventId),
+        childSettledEvent({ childRunId: run.runId, terminalEventId: cancelledRunEvent.eventId }),
       )
       next = settled
     }

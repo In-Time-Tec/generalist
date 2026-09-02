@@ -54,6 +54,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
           cursor: 2,
           turn: 0,
           usage: [],
+          budget: {},
           compactions: [],
         }),
       history: ({ cursor }) =>
@@ -99,7 +100,9 @@ export const runtimeLayer = (implementation: Partial<Runtime.Service> = {}): Lay
           waits: [],
           turn: 0,
           usage: [],
+          budget: {},
         }),
+      extendBudget: () => Effect.die("unused extendBudget"),
       fanOut: () => Effect.die("unused fanOut"),
       inspectFanOut: () => Effect.die("unused inspectFanOut"),
       awaitFanOut: () => Effect.die("unused awaitFanOut"),

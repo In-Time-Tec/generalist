@@ -16,7 +16,7 @@ const checkpoint = (executable: ExecutableRef) => ({
   driverVersion: "1" as const,
   executable,
   turn: 0,
-  budget: { allocation: {}, remaining: {}, depth: 0 },
+  budget: { allocation: {}, remaining: {} },
   state: {},
 })
 

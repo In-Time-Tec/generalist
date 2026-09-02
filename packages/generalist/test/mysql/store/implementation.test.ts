@@ -929,7 +929,7 @@ describeMysql("mysql run store", () => {
           driverVersion: "1" as const,
           executable: assistantRef.ref,
           turn: 1,
-          budget: { allocation: {}, remaining: {}, depth: 0 },
+          budget: { allocation: {}, remaining: {} },
           state: { dialect: "mysql" },
         }
         yield* store.completeOperation({

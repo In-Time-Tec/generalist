@@ -164,6 +164,14 @@ export const suspend: {
     `
     const inserted = yield* persistWaits(run.runId, input.waits, opened)
     yield* appendWaits(hub, run, inserted, opened)
+    if (input.suspension._tag === "BudgetExhausted") {
+      yield* appendEvent(
+        hub,
+        (yield* loadRun(run.runId))!,
+        { _tag: "BudgetSuspended", budget: input.suspension.budget },
+        "waiting",
+      )
+    }
     yield* reconcileChildren(hub, run.runId, suspensionTokens(input.suspension))
     yield* reconcileGroups(hub, run.runId, input.suspension)
     yield* sql`

@@ -27,7 +27,7 @@ const interpreter = (sessionId: string, journal: DurableDriver.Journal) =>
     initial: {
       driverVersion: DurableDriver.currentDriverVersion,
       turn: 0,
-      budget: { allocation: {}, remaining: {}, depth: 0 },
+      budget: { allocation: {}, remaining: {} },
       state: {
         logicalOperationId: "run:send-operation",
         sessionId,

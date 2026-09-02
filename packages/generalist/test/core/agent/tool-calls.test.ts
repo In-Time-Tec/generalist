@@ -162,7 +162,7 @@ it.effect("applies the ordinary bounded-output outcome before completion", () =>
   }).pipe(Effect.provide(Layer.mergeAll(allowAllAuthorization, handlers, executor)))
 })
 
-it.effect("enforces authorization, deadline, and tool-call budget before handler entry", () => {
+it.effect("enforces authorization and tool-call budget before handler entry", () => {
   let handlerCalls = 0
   const echo = Tool.make("echo", { parameters: Schema.Struct({ text: Schema.String }), success: Schema.String })
   const toolkit = Toolkit.make(echo)
@@ -194,15 +194,7 @@ it.effect("enforces authorization, deadline, and tool-call budget before handler
         Effect.provide(Permissions.layerAllowAll),
       ),
     )
-    expect(exhausted).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted", dimension: "toolCalls" })
-    expect(handlerCalls).toBe(0)
-
-    const expired = yield* Effect.flip(
-      Stream.runDrain(
-        Agent.streamToolCalls(agent, { ...options, budget: { deadline: "1900-01-01T00:00:00.000Z" } }),
-      ).pipe(Effect.provide(Permissions.layerAllowAll)),
-    )
-    expect(expired).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted", dimension: "deadline" })
+    expect(exhausted).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted", budget: "toolCalls" })
     expect(handlerCalls).toBe(0)
   }).pipe(
     Effect.provide(

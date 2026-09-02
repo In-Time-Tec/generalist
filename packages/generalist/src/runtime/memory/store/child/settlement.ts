@@ -7,6 +7,7 @@ import { appendLifecycle, childReadinessChangedEvent, childSettledEvent, resumed
 import { openRunWaits, type MemoryState, type StoredRun } from "../../state.js"
 import { admitChildSettlement } from "../directory.js"
 import { closeWait } from "../control/wait.js"
+import { spendForEvents } from "../../../execution/inspection.js"
 
 const isChildTerminalEvent = (
   event: RunEvent,
@@ -115,7 +116,7 @@ export const settleParentChild: {
     const [, linked] = yield* appendLifecycle(
       readinessChanged,
       parent.runId,
-      childSettledEvent(child.runId, terminalEventId),
+      childSettledEvent({ childRunId: child.runId, terminalEventId, spend: yield* spendForEvents(child.events) }),
     )
     const currentParent = linked.runs.get(parent.runId)
     const reconciled =

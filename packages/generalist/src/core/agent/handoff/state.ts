@@ -225,9 +225,7 @@ export const maxHandoffs: {
   (agent: AnyAgent): (options: RunOptions) => number | undefined
   (options: RunOptions, agent: AnyAgent): number | undefined
 } = Function.dual(2, (options: RunOptions, agent: AnyAgent): number | undefined => {
-  const run = options.budget?.handoffs
-  const agentDefault = agent.budget?.handoffs
-  if (run === undefined) return agentDefault
-  if (agentDefault === undefined) return run
-  return Math.min(run, agentDefault)
+  void options
+  void agent
+  return undefined
 })

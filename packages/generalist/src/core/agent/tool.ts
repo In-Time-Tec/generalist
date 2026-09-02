@@ -15,7 +15,7 @@ import {
 import { PolicyError as TurnPolicyError } from "../turn/policy.js"
 
 import { DriverInterpreter } from "../durable/driver/interpreter.js"
-import { Exhausted, GrantWidened, type RunBudget } from "../durable/run-budget.js"
+import { Exhausted, Invalid as BudgetInvalid, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "./tool/registration.js"
 
 export { RegistrationError }
@@ -135,10 +135,10 @@ const errorMessage = (error: typeof Schema.Unknown.Type): string => {
     return `turn policy failed: ${error.message}`
   }
   if (Schema.is(Exhausted)(error)) {
-    return `run budget exhausted (${error.dimension})`
+    return `run budget exhausted (${error.budget})`
   }
-  if (Schema.is(GrantWidened)(error)) {
-    return `child budget grant widened (${error.dimension})`
+  if (Schema.is(BudgetInvalid)(error)) {
+    return `child budget grant invalid (${error.message})`
   }
   if (Schema.is(MiddlewareViolation)(error)) {
     return `middleware violation on turn ${error.turn}: ${error.detail}`
@@ -326,7 +326,9 @@ export const asTool: {
           .reserveChild(grant)
           .pipe(
             Effect.mapError((error) =>
-              Schema.is(Exhausted)(error) || Schema.is(GrantWidened)(error) ? errorMessage(error) : errorMessage(error),
+              Schema.is(Exhausted)(error) || Schema.is(BudgetInvalid)(error)
+                ? errorMessage(error)
+                : errorMessage(error),
             ),
           )
         const result = yield* runChild({ inheritedBudget: childBudget }).pipe(

@@ -1,9 +1,9 @@
-import { DateTime, Effect, Ref, Schema, Semaphore } from "effect"
+import { Effect, Ref, Schema, Semaphore } from "effect"
 import { updateCall, type ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { chargeScheduled, withPending } from "../loop-driver.js"
 import { LoopDriverState, type PendingOperation } from "../loop-driver-state.js"
 import { OperationTurn } from "../operation-turn.js"
-import { assertNotExpired, Exhausted } from "../run-budget.js"
+import { Exhausted } from "../run-budget.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
 import type { DriverCheckpoint, DriverOperation, OperationOutcome } from "./contract.js"
 import { fromInput as operationFrom, type OperationSpec } from "./operation.js"
@@ -53,8 +53,6 @@ const scheduleBatchTool = (
     const entry = batch.calls[callIndex]!
     const operationTurn = yield* OperationTurn.resolve(before.turn, spec.turn)
     if (entry.state._tag === "Ready" && entry.state.stage === "execution") {
-      const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-      yield* assertNotExpired(before.budget, nowIso)
       scheduled = yield* chargeScheduled(before, spec.kind)
       const toolBatch = updateCall(batch, {
         callIndex,
@@ -107,8 +105,6 @@ const scheduleNew = (
   spec: AnyOperationSpec,
 ): Effect.Effect<ScheduledOperation, DriverError | DriverStateInvalid | Exhausted> =>
   Effect.gen(function* () {
-    const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-    yield* assertNotExpired(before.budget, nowIso)
     const charged = yield* chargeScheduled(before, spec.kind)
     const operationTurn = yield* OperationTurn.resolve(charged.turn, spec.turn)
     const { turn: _turn, success: _success, failure: _failure, applyCheckpoint: _applyCheckpoint, ...pending } = spec

@@ -1,6 +1,7 @@
 import { Cause, Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { AgentSuspended } from "../../../core/agent/event.js"
+import { BudgetExhausted, Exhausted } from "../../../core/durable/run-budget.js"
 import { DriverCheckpoint } from "../../../core/durable/driver.js"
 import { RunTerminal } from "../../errors.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
@@ -38,9 +39,14 @@ export const continuationForOperation = (input: {
 export const runTerminalReason = (reason: Cause.Reason<unknown> | undefined): boolean =>
   reason !== undefined && Cause.isFailReason(reason) && Schema.is(RunTerminal)(reason.error)
 
-export const suspendedReason = (reason: Cause.Reason<unknown> | undefined): AgentSuspended | undefined => {
+export const suspendedReason = (
+  reason: Cause.Reason<unknown> | undefined,
+): AgentSuspended | BudgetExhausted | undefined => {
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(AgentSuspended)(reason.error).pipe(Option.getOrUndefined)
+  const agent = Schema.decodeUnknownOption(AgentSuspended)(reason.error).pipe(Option.getOrUndefined)
+  if (agent !== undefined) return agent
+  const budget = Schema.decodeUnknownOption(Exhausted)(reason.error).pipe(Option.getOrUndefined)
+  return budget === undefined ? undefined : { _tag: "BudgetExhausted", budget: budget.budget }
 }
 
 export const driverCheckpoint = (value: ExecutionCheckpoint | undefined): DriverCheckpoint | undefined =>

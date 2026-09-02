@@ -15,7 +15,7 @@ import { pinnedTestExecutable } from "../runtime/run/identity.js"
 
 const runId = "run:trajectory:golden"
 const sessionId = "session:trajectory:golden"
-const executable = pinnedTestExecutable(Agent.make({ name: "golden-agent", budget: { totalTokens: 100 } }))
+const executable = pinnedTestExecutable(Agent.make({ name: "golden-agent", budget: { tokens: 100 } }))
 const usage = Response.Usage.make({
   inputTokens: { total: 4 },
   outputTokens: { total: 2 },
@@ -107,6 +107,7 @@ const snapshot: RunSnapshot = {
       usage,
     },
   ],
+  budget: { tokens: 94 },
   compactions: [],
 }
 const inputEntry = {
@@ -129,7 +130,7 @@ it.effect("projects a recorded journal to stable JSON", () =>
       {
         "agent": "golden-agent",
         "budget": {
-          "totalTokens": 100,
+          "tokens": 100,
         },
         "input": {
           "content": [

@@ -110,14 +110,11 @@ const waitOperation = (checkpoint: DriverCheckpoint, wait: { readonly waitId: st
     replayPolicy: "pure",
   })
 
-const chargeModel = (budget: RunBudget): Effect.Effect<RunBudget, DriverError> =>
-  charge(budget, { modelCalls: 1 }).pipe(
-    Effect.mapError((error) => DriverError.make({ message: `Run budget exhausted: ${error.dimension}`, cause: error })),
-  )
+const chargeModel = (budget: RunBudget): Effect.Effect<RunBudget, DriverError> => Effect.succeed(budget)
 
 const chargeTool = (budget: RunBudget): Effect.Effect<RunBudget, DriverError> =>
   charge(budget, { toolCalls: 1 }).pipe(
-    Effect.mapError((error) => DriverError.make({ message: `Run budget exhausted: ${error.dimension}`, cause: error })),
+    Effect.mapError((error) => DriverError.make({ message: `Run budget exhausted: ${error.budget}`, cause: error })),
   )
 
 const currentStep = (state: TracerState) => state.script[state.modelIndex]

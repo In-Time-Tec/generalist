@@ -82,6 +82,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     registerAgentName: () => unused(),
     resolveOperation: () => unused(),
     inspect: () => unused(),
+    extendBudget: () => unused(),
     fanOut: () => unused(),
     inspectFanOut: () => unused(),
     awaitFanOut: () => unused(),
@@ -195,6 +196,7 @@ describe("AGUI", () => {
       cursor: 3,
       turn: 0,
       usage: [],
+      budget: {},
       compactions: [],
     }
     const runtime = mockRuntime({
@@ -253,6 +255,7 @@ describe("AGUI", () => {
       cursor: 8,
       turn: 0,
       usage: [],
+      budget: {},
       compactions: [],
     }
     const runtime = mockRuntime({
@@ -300,6 +303,7 @@ describe("AGUI", () => {
       cursor: 12,
       turn: 0,
       usage: [],
+      budget: {},
       compactions: [],
     }
     const runtime = mockRuntime({

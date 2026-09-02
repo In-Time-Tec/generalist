@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- durable execution remains one scoped ownership path */
 import { Cause, Context, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
@@ -45,6 +46,8 @@ import {
 import { suspend as suspendAgent } from "./agent/suspend.js"
 import { make as makeRegisteredResolution } from "./agent/registered-resolution.js"
 import type { Service } from "./run-executor.js"
+import { requireRunAvailable } from "../budget/state.js"
+import { prepare as prepareBudget } from "../budget/suspend.js"
 const makeFor = (
   agents: RegisteredAgents,
 ): Effect.Effect<Service, never, RunStore | ActiveExecutions | ExecutableResolver> =>
@@ -129,6 +132,7 @@ const makeFor = (
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
                 const nested = yield* makeOperations({ claim, claimed, store })
+                const budgetContext = { runId, claim, store, nested, codeMode }
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
                 const boundSession = yield* sessionBinding({ store, claim })
                 const baseContext = Context.mergeAll(
@@ -149,6 +153,8 @@ const makeFor = (
                     resume = false,
                   ): Effect.Effect<void> =>
                     Effect.gen(function* () {
+                      const budget = yield* prepareBudget({ ...budgetContext, checkpoint: initialCheckpoint })
+                      if (budget === undefined) return
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
                       const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
                       const activeContinuation = yield* Ref.make(continuation)
@@ -200,6 +206,7 @@ const makeFor = (
                       const journal: Journal = {
                         onScheduled: (operation, checkpoint) =>
                           Effect.gen(function* () {
+                            yield* requireRunAvailable(runId)(store)
                             const [steeringEntryIds, steeringPrompt, steeringEvents] =
                               operation.kind === "model"
                                 ? yield* Effect.all([
@@ -338,10 +345,10 @@ const makeFor = (
                         attempt: yield* executionRetry.attempt,
                         prompt,
                         resume,
-                        budget: resolved.agent.budget ?? {},
+                        budget: budget.remaining,
                       }
                       if (history !== undefined) runOptionsInput.history = history
-                      if (initialCheckpoint !== undefined) runOptionsInput.checkpoint = initialCheckpoint
+                      if (budget.checkpoint !== undefined) runOptionsInput.checkpoint = budget.checkpoint
                       if (continuation !== undefined) runOptionsInput.continuation = continuation
                       if (turnStart !== undefined) runOptionsInput.turnStart = turnStart
                       if (resolved.runOptions?.compaction !== undefined) {
@@ -360,6 +367,7 @@ const makeFor = (
                             return yield* preview.discard
                           }
                           if (event._tag === "Completed") {
+                            yield* requireRunAvailable(runId)(store)
                             const output = yield* Schema.encodeEffect(hostedAgent.output)(event.output).pipe(
                               Effect.mapError((error) =>
                                 AgentError.make({

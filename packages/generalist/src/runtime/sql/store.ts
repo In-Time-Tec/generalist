@@ -6,6 +6,7 @@ import { CursorExpired, RunNotFound } from "../errors.js"
 import { RunStore, type Service as RunStoreService } from "../run/store.js"
 import { SchemaMigrationFailed } from "./errors.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store/admit.js"
+import { extendBudget } from "./store/budget/index.js"
 import { activateRoot } from "./store/activate.js"
 import {
   cancel,
@@ -203,6 +204,7 @@ const makeSqlStoreServices = <DriverError>(
             locks.run(input.runId),
             transactionHub.touchRun(input.runId).pipe(Effect.andThen(activateRoot(transactionHub, input.runId))),
           ),
+        extendBudget: (runId, delta) => locked(locks.run(runId), extendBudget(transactionHub, runId, delta)),
         admitSpawn: (input) => locked(locks.spawn(input.parentRunId), admitSpawn(transactionHub, input)),
         admitProgramChild: (input) => fenced(input, admitProgramChild(transactionHub, input)),
         admitProgramChildAndSuspend: (input) =>
