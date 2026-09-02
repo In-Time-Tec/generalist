@@ -8,6 +8,10 @@ export interface Success {
   readonly _tag: "Success"
   readonly result: BoundaryValue
   readonly encodedResult: BoundaryValue
+  readonly memoized?: {
+    readonly fromRun: string
+    readonly fromOperation: string
+  }
 }
 
 export interface DomainFailure {
@@ -39,6 +43,12 @@ export const Outcome = Schema.Union([
     result: Schema.Unknown,
     encodedResult: Schema.Unknown,
     outputPaths: Schema.optionalKey(Schema.Array(Schema.String)),
+    memoized: Schema.optionalKey(
+      Schema.Struct({
+        fromRun: Schema.String,
+        fromOperation: Schema.String,
+      }),
+    ),
   }),
   Schema.Struct({ _tag: Schema.tag("DomainFailure"), failure: Schema.Unknown, encodedFailure: Schema.Unknown }),
   Schema.Struct({ _tag: Schema.tag("Suspend"), token: Schema.String }),

@@ -17,6 +17,7 @@ export * as ExecutableManifest from "./core/durable/manifest/executable-manifest
 export * as Guardrail from "./core/policy/guardrail.js"
 export * as Handoff from "./core/policy/handoff.js"
 export * as Instructions from "./instructions/index.js"
+export * as Memo from "./memo.js"
 export * as Memory from "./core/context/memory.js"
 export * as ModelMiddleware from "./core/model/middleware.js"
 export * as ModelRegistry from "./core/model/registry.js"

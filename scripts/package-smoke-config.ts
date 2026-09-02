@@ -60,6 +60,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/runtime/sql-driver", runtimes: nodeAndBun },
       { specifier: "generalist/instructions", runtimes: nodeAndBun, exports: ["load"] },
       { specifier: "generalist/instructions/skills", runtimes: nodeAndBun },
+      { specifier: "generalist/memo", runtimes: nodeAndBun, exports: ["pure", "layerMemory", "layerSql"] },
       { specifier: "generalist/unstable/transport", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/transport/errors", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/transport/replay", runtimes: nodeAndBun },
@@ -230,6 +231,7 @@ export const workerSafePackageExports = [
   "generalist/runtime/sql-driver",
   "generalist/sandbox",
   "generalist/eval",
+  "generalist/memo",
   "generalist/trajectory",
 ] as const
 
@@ -262,6 +264,7 @@ export const exactPackageExports = [
   "./host",
   "./instructions",
   "./instructions/skills",
+  "./memo",
   "./memory",
   "./mysql",
   "./permissions",

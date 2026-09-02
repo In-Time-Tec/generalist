@@ -4,7 +4,12 @@ import type { DomainFailure, Success } from "../../tools/tool-executor.js"
 
 export type AnyToolCall = Response.ToolCallPart<string, unknown>
 
-export type PendingToolResult = Response.ToolResultPart<string, unknown, unknown>
+export type PendingToolResult = Response.ToolResultPart<string, unknown, unknown> & {
+  readonly memoized?: {
+    readonly fromRun: string
+    readonly fromOperation: string
+  }
+}
 
 export interface ToolCallIdState {
   readonly nextIndex: number
@@ -13,19 +18,18 @@ export interface ToolCallIdState {
 export const successResult: {
   (outcome: Success): (call: AnyToolCall) => PendingToolResult
   (call: AnyToolCall, outcome: Success): PendingToolResult
-} = Function.dual(
-  2,
-  (call: AnyToolCall, outcome: Success): PendingToolResult =>
-    Response.toolResultPart({
-      id: call.id,
-      name: call.name,
-      isFailure: false,
-      result: outcome.result,
-      encodedResult: outcome.encodedResult,
-      providerExecuted: false,
-      preliminary: false,
-    }),
-)
+} = Function.dual(2, (call: AnyToolCall, outcome: Success): PendingToolResult => {
+  const result: PendingToolResult = Response.toolResultPart({
+    id: call.id,
+    name: call.name,
+    isFailure: false,
+    result: outcome.result,
+    encodedResult: outcome.encodedResult,
+    providerExecuted: false,
+    preliminary: false,
+  })
+  return outcome.memoized === undefined ? result : Object.assign(result, { memoized: outcome.memoized })
+})
 export const domainFailureResult: {
   (outcome: DomainFailure): (call: AnyToolCall) => PendingToolResult
   (call: AnyToolCall, outcome: DomainFailure): PendingToolResult

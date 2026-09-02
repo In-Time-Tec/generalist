@@ -251,6 +251,7 @@ const ToolResult = Schema.Struct({
   preliminary: Schema.Boolean,
   "~effect/ai/Content/Part": PartTag,
   metadata: Response.ProviderMetadata,
+  memoized: Schema.optionalKey(Schema.Struct({ fromRun: Schema.String, fromOperation: Schema.String })),
 })
 const Usage = Schema.Struct({
   inputTokens: Schema.Struct({
@@ -493,7 +494,6 @@ export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareC
         (base, payload) => Object.assign({}, base, payload),
       ),
 )
-
 export const eventIdFor: {
   (sequence: number): (runId: string) => string
   (runId: string, sequence: number): string

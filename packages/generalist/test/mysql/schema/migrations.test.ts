@@ -40,6 +40,7 @@ const tables = [
   "generalist_runs",
   "generalist_host_sessions",
   "generalist_lanes",
+  "generalist_memo_entries",
   "generalist_permission_rules",
   "generalist_runtime_locks",
   "generalist_sql_migrations",

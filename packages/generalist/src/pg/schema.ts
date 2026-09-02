@@ -332,6 +332,13 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   created_at TEXT NOT NULL,
   PRIMARY KEY (scope, pattern)
 )`,
+  `CREATE TABLE IF NOT EXISTS generalist_memo_entries (
+  memo_key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  from_run TEXT NOT NULL,
+  from_operation TEXT NOT NULL,
+  expires_at_millis BIGINT NOT NULL
+)`,
 ]
 
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(

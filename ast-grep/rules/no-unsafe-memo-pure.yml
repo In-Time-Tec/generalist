@@ -1,0 +1,27 @@
+id: no-unsafe-memo-pure
+language: TypeScript
+severity: error
+message: Memo.pure is only for side-effect-free handlers; do not use it in a module whose handler uses Sandbox, SQL writes, or non-GET HTTP calls.
+note: This is a best-effort module-level rule. It catches direct, named boundary use but cannot prove purity through aliases or transitive services.
+rule:
+  all:
+    - pattern: Memo.pure($$$ARGS)
+    - inside:
+        kind: program
+        has:
+          any:
+            - pattern: yield* Sandbox
+            - pattern: $CLIENT.post($$$ARGS)
+            - pattern: $CLIENT.put($$$ARGS)
+            - pattern: $CLIENT.patch($$$ARGS)
+            - pattern: $CLIENT.del($$$ARGS)
+            - pattern: $CLIENT.delete($$$ARGS)
+            - all:
+                - pattern: $SQL`$$$QUERY`
+                - regex: "(?i)\\b(INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE)\\b"
+          stopBy: end
+        stopBy: end
+files:
+  - "packages/*/src/**/*.ts"
+  - "apps/**/*.ts"
+  - "examples/**/*.ts"

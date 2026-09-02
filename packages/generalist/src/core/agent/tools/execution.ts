@@ -28,7 +28,7 @@ import { handoffDispatch } from "../handoff/tool-execution.js"
 import { updateCall } from "./checkpoint.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
 import { Exhausted } from "../../durable/run-budget.js"
-
+import { memoizeRegistered } from "../../memo/tool.js"
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly options: RunOptions
   readonly state: AgentRunState
@@ -48,7 +48,6 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly progressPolicy: ProgressOverflowPolicy
   readonly skillError: (turn: number, error: SkillCatalogError) => AgentError
 }
-
 export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR = AgentR, AuthorizationR = AgentR>(
   inputContext: ToolExecutionContext<T, AgentR, PolicyR, AuthorizationR>,
 ) => {
@@ -74,7 +73,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     outcome._tag === "Success"
       ? bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes ?? 50 * 1024 })
       : Effect.succeed(outcome)
-
   const outcomeEvent = (
     turn: number,
     toolCallBatch: Request["toolCallBatch"],
@@ -116,9 +114,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         })
     }
   }
-
   const activateSkillOutcome = makeActivateSkillOutcome({ skillRuntime, toolState, skillError })
-
   const activeAgentName = (): Effect.Effect<string> =>
     handoffState === undefined
       ? Effect.succeed(agent.name)
@@ -230,7 +226,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         ),
       )
   }
-
   const handoffFor = (request: Request, registry: Registry) => {
     if (handoffState === undefined || get(registry, request.call.name)?.dispatch !== "Handoff") return undefined
     return handoffDispatch(request, registry, {
@@ -287,15 +282,24 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
           const invocationPath =
             handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-          const executionBase = executionFor(
-            turn,
-            call,
-            request,
+          const executionBase = memoizeRegistered({
             registry,
-            handoffExecution,
-            requestExecutor,
+            name: call.name,
             skillActivation,
-          ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome)))
+            handoff: handoffExecution !== undefined,
+            params: call.params,
+            run: options.invocation?.runId ?? sessionId,
+            operation: durableOperationKey,
+            execute: executionFor(
+              turn,
+              call,
+              request,
+              registry,
+              handoffExecution,
+              requestExecutor,
+              skillActivation,
+            ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome))),
+          })
           const execution = intercept(
             {
               kind: "tool",
