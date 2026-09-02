@@ -143,13 +143,14 @@ describe("deep-research-agent Generalist transport e2e", () => {
               : undefined
           const completedTool = all.find((event) => event._tag === "ToolExecutionCompleted")
           const completed = all.find((event) => event._tag === "RunCompleted")
+          const approvalId = `runtime-approval:${encodeURIComponent(receipt.runId)}:approval:search-1`
 
           expect(waiting.wait).toMatchObject({
-            waitId: "approval:search-1",
+            waitId: approvalId,
             reason: {
               _tag: "Approval",
               request: {
-                approvalId: "approval:search-1",
+                approvalId,
                 operation: "search-1",
                 capability: "web_search",
                 input: { query: "What makes Generalist agent framework standalone?" },
@@ -159,7 +160,7 @@ describe("deep-research-agent Generalist transport e2e", () => {
           expect(approvalRequested).toMatchObject({
             _tag: "ApprovalRequested",
             request: {
-              approvalId: "approval:search-1",
+              approvalId,
               operation: "search-1",
               capability: "web_search",
               input: { query: "What makes Generalist agent framework standalone?" },
