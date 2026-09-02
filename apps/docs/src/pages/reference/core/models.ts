@@ -9,7 +9,7 @@ export const coreModelsReference = definePage({
     lead(
       "Four namespaces of generalist cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     h2("model-registry", "ModelRegistry"),
     p(
       "A registry of named model registrations. ",
@@ -109,7 +109,7 @@ export const coreModelsReference = definePage({
       code(
         '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; invalidToolCallCorrectionLimit: number; streamIdleTimeout?: Duration.Input }',
       ),
-      "; only transient-classified errors retry. Invalid-tool correction limits are safe integers from 0 through 2, and generic InvalidOutputError values never enter that correction path. Direct custom models using correction with schema-backed tools attach their provider-exact compiler through ModelRegistry.withToolJsonSchemaCompiler. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock register compilers; OpenRouter rejects schema-backed correction before transport because its pinned adapter cannot preserve the permissive projection's compiled request schema.",
+      "; only transient-classified errors retry. Invalid-tool correction limits are safe integers from 0 through 2, and generic InvalidOutputError values never enter that correction path. Direct custom models using correction with schema-backed tools attach their provider-exact compiler through ModelRegistry.withToolJsonSchemaCompiler. Every built-in provider registers a compiler. OpenRouter's toolJsonSchemaCompiler(model) uses the Anthropic transformer for Anthropic and Claude model IDs, the OpenAI transformer for OpenAI, GPT, o1, o3, and o4 IDs, and Effect AI's default transformer for other routes. A schema that the selected transformer cannot compile fails before transport with UnsupportedSchemaError; a compiled schema is still subject to the selected OpenRouter model and upstream provider's tool support.",
     ),
     table(
       ["Export", "Notes"],
@@ -154,6 +154,33 @@ export const coreModelsReference = definePage({
           ],
         ],
         [[code("layerTest(implementation)")], "Layer from an explicit service"],
+      ],
+    ),
+    h2("model-boundary-exports", "Model boundary exports"),
+    p("These package-root exports support provider adapters, custom model hosts, and direct stream observation."),
+    table(
+      ["Export", "Purpose", "Minimal use"],
+      [
+        [
+          [code("ContextOverflow")],
+          "Provider-neutral classification of context-window errors for reactive compaction",
+          [code("ContextOverflow.classify(error)"), " returns ", code('"context-overflow" | "other"')],
+        ],
+        [
+          [code("ModelStreamTermination")],
+          "Rejects an idle stream or a clean end without a terminal finish part while preserving emitted-output evidence",
+          [code("stream.pipe(ModelStreamTermination.requireTerminal({ turn, provider, model, toPart }))")],
+        ],
+        [
+          [code("ModelToolCallValidation")],
+          "Projects model-facing tool schemas and validates returned calls against the original Effect schemas",
+          [code("ModelToolCallValidation.projectToolkit(toolkit, compiler)")],
+        ],
+        [
+          [code("withCacheBreakpoints")],
+          "Adds transient Anthropic and Bedrock cache markers to one outgoing conversation prompt without persisting them",
+          [code('withCacheBreakpoints(prompt, "conversation", idleMillis)')],
+        ],
       ],
     ),
     h2("guardrail", "Guardrail"),

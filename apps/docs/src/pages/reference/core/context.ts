@@ -9,7 +9,7 @@ export const coreContextReference = definePage({
     lead(
       "Seven namespaces of generalist shape what the model sees and how a conversation persists. All are optional seams discovered per run; absent means default behavior.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     h2("instructions", "Instructions"),
     p(
       "An ordered registry of instruction ",
@@ -162,6 +162,17 @@ export const coreContextReference = definePage({
       "; stale leaves and reused checkpoint identities fail with ",
       code("SessionConflict"),
       ". Exact checkpoints append idempotently before their stored projection is applied to Chat.",
+    ),
+    h2("session-sync", "SessionSync"),
+    p(
+      code("SessionSync"),
+      " is the package-root host seam for comparing a durable Session projection with live Chat history without logging content. Use ",
+      code("SessionSync.coalesceAdjacentText(message)"),
+      " before provider encoding, ",
+      code("SessionSync.equivalentMessages(left, right)"),
+      " for representation-neutral comparison, and ",
+      code("SessionSync.diagnose({ sessionId, durableEntryTags, projection, transcript })"),
+      " to produce bounded counts, roles, part types, and digests for a mismatch.",
     ),
     h2("compaction", "Compaction"),
     p(

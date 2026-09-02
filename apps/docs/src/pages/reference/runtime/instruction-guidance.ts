@@ -10,7 +10,7 @@ export const instructionGuidanceReference = definePage({
     lead(
       "generalist/instructions is the generic engine for versioned instructions an agent may refine and a host may pin into a later Execution. It owns entry identity, versions, atomic proposals, rollback, scope overlay, bounded prompt overviews, and snapshot identity. Store locations, scope policy, and refine flows stay host-owned.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     p(code("generalist/instructions"), " is an import subpath, not a package."),
     h2("entries", "Entry kinds"),
     p(

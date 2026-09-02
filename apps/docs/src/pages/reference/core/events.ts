@@ -9,7 +9,7 @@ export const coreEventsReference = definePage({
     lead(
       "AgentEvent is the process-local observation surface of the core loop. Runtime keeps the semantic execution facts from that stream, adds durable lifecycle facts, and deliberately excludes raw provider fragments.",
     ),
-    command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
+    command("Install", "bun add effect@4.0.0-rc.112 generalist"),
     h2("model-output", "Model output has two observation levels"),
     table(
       ["Event", "Fields", "Contract"],
@@ -122,6 +122,32 @@ export const coreEventsReference = definePage({
       " values, preserving ",
       code("undefined"),
       " when neither side reports a field.",
+    ),
+    h2("model-observation-exports", "Model observation exports"),
+    table(
+      ["Export", "Purpose", "Minimal use"],
+      [
+        [
+          [code("ActiveModelResponse")],
+          "Read-only access for a host to the authoritative partial semantic response of the current model attempt",
+          [
+            code("const active = yield* ActiveModelResponse.ActiveModelResponse"),
+            "; then read ",
+            code("yield* active.snapshot"),
+            " during interruption handling",
+          ],
+        ],
+        [
+          [code("ModelTelemetry")],
+          "Schemas for model call, attempt, retry, fallback, and compaction lifecycle events",
+          [
+            code("Schema.decodeUnknown(ModelTelemetry.Event)(input)"),
+            " decodes an event; ",
+            code("ModelTelemetry.classifyFailureCategory(error)"),
+            " assigns its bounded category",
+          ],
+        ],
+      ],
     ),
     h2("error-classes", "Error classes"),
     p("Expected failures are Schema tagged error classes under ", code("generalist/"), ". Key loop failures include:"),

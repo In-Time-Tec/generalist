@@ -8,6 +8,14 @@ import openaiOrDeterministic from "virtual:source/src/snippets/guides/runtime/pr
 import openaiCompatible from "virtual:source/src/snippets/guides/runtime/providers/openai-compatible.ts"
 import openrouter from "virtual:source/src/snippets/guides/runtime/providers/openrouter.ts"
 import { callout, code, codeBlock, command, definePage, h2, link, p, table } from "../../../prose"
+
+const openRouterTsconfig = `{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true
+  }
+}`
+
 export const providers = definePage({
   path: "/docs/guides/providers",
   title: "How to provide model providers",
@@ -30,7 +38,7 @@ export const providers = definePage({
       code("@effect/ai-*"),
       " packages with failure classification, image-source handling, and tool-schema compilation baked in.",
     ),
-    command("OpenAI profile", "bun add effect@4.0.0-rc.112 generalist@0.45.1 @effect/ai-openai@4.0.0-rc.112"),
+    command("OpenAI profile", "bun add effect@4.0.0-rc.112 generalist @effect/ai-openai@4.0.0-rc.112"),
     p(
       "Install only the peer for each provider leaf you import. Anthropic uses ",
       code("@effect/ai-anthropic@4.0.0-rc.112"),
@@ -38,6 +46,8 @@ export const providers = definePage({
       code("@effect/ai-openai@4.0.0-rc.112"),
       "; OpenAI Chat Completions, compatible presets, and compatible embedding use ",
       code("@effect/ai-openai-compat@4.0.0-rc.112"),
+      ". OpenRouter uses ",
+      code("@effect/ai-openrouter@4.0.0-rc.112"),
       ". Amazon Bedrock uses ",
       code("@aws-sdk/client-bedrock-runtime@3.859.0"),
       ", ",
@@ -46,6 +56,21 @@ export const providers = definePage({
       code("@smithy/types@4.3.1"),
       " and is tested as a Node 22+ profile. The deterministic, model-catalog, and model-route leaves need no provider peer.",
     ),
+    callout(
+      "warning",
+      "OpenRouter and strict TypeScript consumers",
+      "The exact ",
+      code("@effect/ai-openrouter@4.0.0-rc.112"),
+      " peer emits TS2411 errors from its generated declarations under TypeScript 7.0.2 when dependency declarations are checked. Until the upstream declarations are corrected, set ",
+      code('"skipLibCheck": true'),
+      " in the consumer tsconfig. Generalist's own declarations remain checked; this skips declaration checking inside dependencies. No matching Effect issue existed when this guide was updated; see the ",
+      link(
+        "https://github.com/Effect-TS/effect/issues?q=is%3Aissue+ai-openrouter+TS2411",
+        "upstream Effect issue search",
+      ),
+      ".",
+    ),
+    codeBlock({ label: "tsconfig.json", language: "json", source: openRouterTsconfig }),
     h2("provide-a-model", "1. Provide a model layer to a run"),
     p(
       "Every provider exports ",
