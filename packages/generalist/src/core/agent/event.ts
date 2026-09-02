@@ -1,5 +1,5 @@
 import { Function, Schema } from "effect"
-import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { AiError, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 import type { CompletedModelResponse } from "../model/response/builder.js"
 import { Diagnostics as SessionSyncDiagnostics } from "../context/session-sync.js"
@@ -219,14 +219,44 @@ export type Event<Output = unknown> =
   | Completed<Output>
   | ModelTelemetryEvent
 
+const defaultAgentErrorHint =
+  "Inspect the cause and diagnostics, correct the failing boundary, and run the Agent again."
+
+const agentErrorHint = (cause: unknown): string => {
+  if (!AiError.isAiError(cause)) return defaultAgentErrorHint
+  if (cause.reason._tag === "AuthenticationError") {
+    return "Check the selected provider's API key configuration name and provide the correct credential."
+  }
+  if (
+    cause.reason._tag === "InvalidRequestError" &&
+    (cause.reason.parameter === "model" || /\bmodel\b/i.test(cause.reason.description ?? ""))
+  ) {
+    return "Check the model ID against the selected provider's model catalog, then select a supported ID."
+  }
+  return defaultAgentErrorHint
+}
+
 /** The loop failed. `turn` is the 0-based turn that failed. */
 export class AgentError extends ActionableTaggedError<AgentError>()("generalist/core/AgentError", {
   message: Schema.String,
   turn: Schema.Finite,
   cause: Schema.optionalKey(Schema.Defect()),
   diagnostics: Schema.optionalKey(SessionSyncDiagnostics),
-  hint: errorHint("Inspect the cause and diagnostics, correct the failing boundary, and run the Agent again."),
-}) {}
+  hint: errorHint(defaultAgentErrorHint),
+}) {
+  static override make(
+    props: {
+      readonly message: string
+      readonly turn: number
+      readonly cause?: unknown
+      readonly diagnostics?: SessionSyncDiagnostics
+      readonly hint?: string
+    },
+    options?: Schema.MakeOptions,
+  ): AgentError {
+    return super.make({ ...props, hint: props.hint ?? agentErrorHint(props.cause) }, options)
+  }
+}
 
 /** The model's terminal value did not satisfy the Agent output Schema. */
 export class InvalidOutput extends ActionableTaggedError<InvalidOutput>()("generalist/core/InvalidOutput", {

@@ -80,8 +80,9 @@ Only an idempotent `remote` placement helper opts in automatically to bounded in
 ```text
 tool call
 ├── declared handler failure -> DomainFailure -> model
-├── decode/handler/route/placement/authorization fault
+├── decode/route/placement/authorization fault
 │   └── FrameworkFailure (typed Effect error channel)
+├── handler defect -> preserved defect (raw Cause)
 ├── permission Deny / approval Denied -> PermissionDenied
 └── approval Pending -> Suspend(token) -> durable wait
 ```

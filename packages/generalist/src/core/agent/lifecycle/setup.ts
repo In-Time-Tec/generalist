@@ -217,7 +217,14 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
       const model = yield* Effect.serviceOption(LanguageModel.LanguageModel).pipe(
         Effect.flatMap(
           Option.match({
-            onNone: () => AgentError.make({ message: "Agent requires LanguageModel in context", turn: 0 }),
+            onNone: () =>
+              AgentError.make({
+                message: "Agent requires LanguageModel in context",
+                turn: 0,
+                hint:
+                  "Provide a provider layer from generalist/providers/*, then select it with ModelRegistry.withModel " +
+                  "before running the Agent.",
+              }),
             onSome: Effect.succeed,
           }),
         ),
