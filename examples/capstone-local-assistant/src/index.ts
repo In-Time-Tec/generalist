@@ -107,9 +107,11 @@ const program = Effect.gen(function* () {
   const skills = yield* source.all
   const result = yield* ModelRegistry.withModel(
     { provider: "deterministic", model: "capstone" },
-    Agent.generate(agent, { prompt: "Use the research skill before answering.", memory: { key } }),
+    Agent.run(agent, "Use the research skill before answering.", {
+      memory: { key },
+    }),
   )
-  yield* Console.log(`skills=${skills.length} chatEntries=${renderedChat.entries.length} text=${result.text}`)
+  yield* Console.log(`skills=${skills.length} chatEntries=${renderedChat.entries.length} text=${result}`)
   yield* Effect.succeed(filesystemSkillLayer)
 })
 

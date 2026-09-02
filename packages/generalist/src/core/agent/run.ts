@@ -40,12 +40,19 @@ import { LoopDriverState } from "../durable/loop-driver-state.js"
 import type { RunInbox } from "../turn/steering-inbox.js"
 const errorMessage = String
 const { insertRecalledItems, steeringDrainedEvent } = RunSupport
-const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
-  agent: Agent<Tools, R>,
+const streamInternalImpl = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  PolicyServices extends R,
+  AuthorizationServices extends R,
+  StructuredOutputSchema extends ObjectSchema,
+  OutputValue,
+>(
+  agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
   options: RunOptions,
-  structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+  structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
   inbox: RunInbox,
-): RunStream<Tools, StructuredOutputSchema, R> =>
+): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices> =>
   Stream.unwrap(
     Effect.gen(function* () {
       const setup = yield* setupRun(agent, options)
@@ -423,8 +430,13 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
               rememberTurn,
             }
             return handoffStateRef === undefined
-              ? makeRunLoop<Tools, R, StructuredOutputSchema>(loopContext)
-              : makeRunLoop<Tools, R, StructuredOutputSchema>({ ...loopContext, handoffStateRef })
+              ? makeRunLoop<Tools, R, PolicyServices, AuthorizationServices, StructuredOutputSchema, OutputValue>(
+                  loopContext,
+                )
+              : makeRunLoop<Tools, R, PolicyServices, AuthorizationServices, StructuredOutputSchema, OutputValue>({
+                  ...loopContext,
+                  handoffStateRef,
+                })
           }),
         ),
       ).pipe(Stream.provideContext(interpreterServices))
@@ -435,15 +447,31 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
     }),
   )
 export const streamInternal: {
-  <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    StructuredOutputSchema extends ObjectSchema,
+    OutputValue,
+  >(
     options: RunOptions,
-    structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+    structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
     inbox: RunInbox,
-  ): (agent: Agent<Tools, R>) => RunStream<Tools, StructuredOutputSchema, R>
-  <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, R>,
+  ): (
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
+  ) => RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices>
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    StructuredOutputSchema extends ObjectSchema,
+    OutputValue,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
     options: RunOptions,
-    structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+    structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
     inbox: RunInbox,
-  ): RunStream<Tools, StructuredOutputSchema, R>
+  ): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices>
 } = Function.dual(4, streamInternalImpl)

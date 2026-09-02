@@ -209,7 +209,7 @@ export const coreToolsReference = definePage({
         [[code("parameters")], [code("Schema.Struct({ prompt: Schema.String })")]],
         [[code("success")], [code("Schema.String")]],
         [[code("toPrompt")], [code("(params) => params.prompt")]],
-        [[code("fromResult")], [code("(result) => result.text")]],
+        [[code("fromResult")], [code("(output) => output")]],
       ],
     ),
     p(

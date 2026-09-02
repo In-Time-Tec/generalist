@@ -12,6 +12,8 @@ export type SessionCursor = typeof SessionCursor.Type
 /** @experimental Terminal value produced by an Agent execution. */
 export const AgentExecutionResult = Schema.Struct({
   text: Schema.String,
+  // Results persisted before Agent-owned output schemas have text only; every new hosted Agent completion writes output.
+  output: Schema.optionalKey(Schema.Unknown),
   turns: Schema.Finite,
   session: SessionCursor,
 })

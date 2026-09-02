@@ -3,7 +3,7 @@ import { ProgramExecutionResult } from "../../runtime/execution/state.js"
 import type { RunInspection } from "../../runtime/run.js"
 import type { RunCompleted, RunEvent } from "../../runtime/run/event.js"
 import type { Service as RuntimeService } from "../../runtime/service.js"
-import { Effect, Function, Schema } from "effect"
+import { Effect, Function, Predicate, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
 
 const textPart = (text: string): Part => ({
@@ -77,15 +77,13 @@ const statusFrom = (run: RunInspection, events: ReadonlyArray<RunEvent>, context
   }
 }
 
-const artifactFrom = (event: RunCompleted, events: ReadonlyArray<RunEvent>): Artifact => {
-  const structured = events.findLast((candidate) => candidate._tag === "StructuredOutput")
+const artifactFrom = (event: RunCompleted): Artifact => {
   let parts: Array<Part>
-  if (structured?._tag === "StructuredOutput") {
-    parts = [dataPart(Schema.decodeUnknownSync(Schema.Json)(structured.value))]
-  } else if (Schema.is(ProgramExecutionResult)(event.result)) {
+  if (Schema.is(ProgramExecutionResult)(event.result)) {
     parts = [dataPart(Schema.decodeUnknownSync(Schema.Json)(event.result.value))]
   } else {
-    parts = [textPart(event.result.text)]
+    const output = event.result.output ?? event.result.text
+    parts = Predicate.isString(output) ? [textPart(output)] : [dataPart(Schema.decodeUnknownSync(Schema.Json)(output))]
   }
   return {
     artifactId: `${event.eventId}:result`,
@@ -113,7 +111,7 @@ export const fromRuntime: {
         id: taskId,
         contextId,
         status: statusFrom(snapshot.run, events, contextId),
-        artifacts: completed === undefined ? [] : [artifactFrom(completed, events)],
+        artifacts: completed === undefined ? [] : [artifactFrom(completed)],
         history: [],
         metadata: { generalistCursor: snapshot.cursor },
       }
@@ -166,10 +164,4 @@ export const statusFromEvent: {
 })
 
 /** @experimental Build the completion artifact update for a Runtime completion. */
-export const artifactFromEvent: {
-  (event: RunCompleted, preceding: ReadonlyArray<RunEvent>): Artifact
-  (preceding: ReadonlyArray<RunEvent>): (event: RunCompleted) => Artifact
-} = Function.dual(
-  2,
-  (event: RunCompleted, preceding: ReadonlyArray<RunEvent>): Artifact => artifactFrom(event, preceding),
-)
+export const artifactFromEvent = (event: RunCompleted): Artifact => artifactFrom(event)

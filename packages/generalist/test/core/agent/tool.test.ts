@@ -997,7 +997,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "domain-failure-agent", toolkit }), { prompt: "fail" }),
+          Agent.stream(Agent.make({ name: "domain-failure-agent", toolkit }), "fail"),
         )
         const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
 
@@ -1042,7 +1042,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const childTool = AgentTool.asTool(child, { name: "ask_child" })
         const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child!) })
 
-        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const events = yield* Stream.runCollect(Agent.stream(parent, "parent task"))
 
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe("child answer")
@@ -1086,7 +1086,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ),
       Effect.gen(function* () {
         const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child!) })
-        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const events = yield* Stream.runCollect(Agent.stream(parent, "parent task"))
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe(
           "child-on-own-model",
@@ -1178,7 +1178,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const childTool = AgentTool.asTool(child, { name: "ask_reviewer" })
         const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_reviewer!) })
 
-        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const events = yield* Stream.runCollect(Agent.stream(parent, "parent task"))
 
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         expect(toolCompleted?._tag).toBe("ToolExecutionCompleted")
@@ -1212,7 +1212,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           AgentTool.asTool(Agent.make({ name: "callback-child" }), {
             name: "ask_callback",
             toPrompt: () => "callback prompt",
-            fromResult: (result) => `mapped:${result.text}`,
+            fromResult: (result) => `mapped:${result}`,
           }),
         ).pipe(Layer.provide(parentModel)),
         Approvals.layerAutoApprove,
@@ -1222,10 +1222,10 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const childTool = AgentTool.asTool(Agent.make({ name: "callback-child" }), {
           name: "ask_callback",
           toPrompt: () => "callback prompt",
-          fromResult: (result) => `mapped:${result.text}`,
+          fromResult: (result) => `mapped:${result}`,
         })
         const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_callback!) })
-        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const events = yield* Stream.runCollect(Agent.stream(parent, "parent task"))
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe(
           "mapped:callback answer",
@@ -1254,7 +1254,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             parameters: Schema.Struct({ question: Schema.String }),
             success: Schema.Struct({ answer: Schema.String }),
             toPrompt: (params) => params.question,
-            fromResult: (result) => ({ answer: result.text }),
+            fromResult: (result) => ({ answer: result }),
           }),
         ).pipe(Layer.provide(parentModel)),
         Approvals.layerAutoApprove,
@@ -1267,11 +1267,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           parameters: Schema.Struct({ question: Schema.String }),
           success: Schema.Struct({ answer: Schema.String }),
           toPrompt: (params) => params.question,
-          fromResult: (result) => ({ answer: result.text }),
+          fromResult: (result) => ({ answer: result }),
         })
         const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_custom!) })
 
-        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const events = yield* Stream.runCollect(Agent.stream(parent, "parent task"))
 
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toEqual({

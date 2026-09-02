@@ -35,7 +35,9 @@ import { setupPromptContext } from "./resume.js"
 import type { ModelSource } from "../model-turn/model-source.js"
 
 /** @internal Resolve the configured authorization policy; absent policy is a typed error, never an implicit allow-all. */
-export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
+export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(
+  agent: Agent<T, R, P, A, Schema.Top, Schema.Top>,
+) =>
   Effect.gen(function* () {
     if (agent.authorization !== undefined) return agent.authorization
     const configured = yield* Effect.serviceOption(ToolAuthorizer)
@@ -65,7 +67,10 @@ export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>
     })
   })
 
-const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
+const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A extends R>(
+  agent: Agent<T, R, P, A, Schema.Top, Schema.Top>,
+  options: RunOptions,
+) =>
   Effect.gen(function* () {
     const { resume, compactionService, activeSession, resumeChat, validatedResume } = yield* setupSession(options)
     const { staticCandidates, staticRegistry, staticToolkit } = yield* setupStaticTools(agent)
@@ -309,8 +314,15 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       chat,
     }
   })
-type SetupEffect<T extends Record<string, Tool.Any>, R> = ReturnType<typeof setupRunImpl<T, R>>
+type SetupEffect<T extends Record<string, Tool.Any>, R, P extends R, A extends R> = ReturnType<
+  typeof setupRunImpl<T, R, P, A>
+>
 export const setupRun: {
-  <T extends Record<string, Tool.Any>, R>(options: RunOptions): (agent: Agent<T, R>) => SetupEffect<T, R>
-  <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions): SetupEffect<T, R>
+  <T extends Record<string, Tool.Any>, R, P extends R, A extends R>(
+    options: RunOptions,
+  ): (agent: Agent<T, R, P, A, Schema.Top, Schema.Top>) => SetupEffect<T, R, P, A>
+  <T extends Record<string, Tool.Any>, R, P extends R, A extends R>(
+    agent: Agent<T, R, P, A, Schema.Top, Schema.Top>,
+    options: RunOptions,
+  ): SetupEffect<T, R, P, A>
 } = Function.dual(2, setupRunImpl)

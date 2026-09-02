@@ -171,9 +171,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+        const result = yield* Agent.run(agent, "live prompt", {
+          memory: { key },
+        })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(modelPrompt?.content.map(messageText)).toEqual([
           "system instructions",
           "remembered context",
@@ -211,9 +213,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+        const result = yield* Agent.run(agent, "live prompt", {
+          memory: { key },
+        })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(modelPrompt?.content.map(messageText)).toEqual(["live prompt"])
       }),
     ] as const
@@ -256,7 +260,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+        const failure = yield* Effect.flip(
+          Agent.run(agent, "live prompt", {
+            memory: { key },
+          }),
+        )
 
         expect(failure._tag).toBe("generalist/core/MiddlewareViolation")
         expect(modelCalls).toBe(0)
@@ -311,7 +319,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+        const failure = yield* Effect.flip(
+          Agent.run(agent, "live prompt", {
+            memory: { key },
+          }),
+        )
 
         expect(failure._tag).toBe("generalist/core/MiddlewareViolation")
         expect(modelCalls).toBe(0)
@@ -356,7 +368,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+        const failure = yield* Effect.flip(
+          Agent.run(agent, "live prompt", {
+            memory: { key },
+          }),
+        )
 
         expect(failure._tag).toBe("generalist/core/MiddlewareViolation")
         expect(modelCalls).toBe(0)
@@ -388,9 +404,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "authored secret", memory: { key } })
+        const result = yield* Agent.run(agent, "authored secret", {
+          memory: { key },
+        })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(modelPrompt?.content.map(messageText)).toEqual(["recalled MASK", "authored MASK"])
         expect(remembered?.transcript.content.map(messageText)).toEqual(["authored MASK", "done"])
       }),
@@ -426,9 +444,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "use a tool", memory: { key } })
+        const result = yield* Agent.run(agent, "use a tool", {
+          memory: { key },
+        })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(recalls).toBe(1)
         expect(remembers.map((input) => ({ turn: input.turn, terminal: input.terminal }))).toEqual([
           { turn: 0, terminal: false },
@@ -475,8 +495,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const suspension = yield* Agent.stream(agent, {
-          prompt: "authored before suspension",
+        const suspension = yield* Agent.stream(agent, "authored before suspension", {
           memory: { key },
         }).pipe(
           Stream.tap((event) =>
@@ -491,8 +510,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           return yield* Effect.die("missing memory suspension checkpoint")
         }
         recalls = 0
-        const result = yield* Agent.generate(agent, {
-          prompt: "ignored on resume",
+        const result = yield* Agent.run(agent, "ignored on resume", {
           history: checkpoint,
           memory: { key },
           resume: {
@@ -506,7 +524,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(recalls).toBe(0)
         expect(remembers.length).toBe(2)
         for (const remembered of remembers) {
@@ -534,7 +552,13 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "wait", memory: { key } })))
+        const failure = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(agent, "wait", {
+              memory: { key },
+            }),
+          ),
+        )
 
         expect(failure._tag).toBe("generalist/core/AgentSuspended")
         expect(remembers).toEqual([])
@@ -577,7 +601,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       ),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(
-          Agent.stream(agent, { prompt: "authored before wait", memory: { key } }).pipe(
+          Agent.stream(agent, "authored before wait", {
+            memory: { key },
+          }).pipe(
             Stream.tap((event) =>
               Effect.sync(() => {
                 if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -592,8 +618,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         expect(remembers).toEqual([])
         if (failure._tag !== "generalist/core/AgentSuspended" || checkpoint === undefined) return expect.unreachable()
 
-        const result = yield* Agent.generate(agent, {
-          prompt: "ignored on resume",
+        const result = yield* Agent.run(agent, "ignored on resume", {
           history: checkpoint,
           memory: { key },
           resume: {
@@ -607,7 +632,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(remembers.length).toBe(2)
         const rememberedText = remembers.map((input) => input.transcript.content.map(messageText))
         expect(rememberedText[0]).toContain("authored before wait")
@@ -664,9 +689,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "authored context", memory: { key } })
+        const result = yield* Agent.run(agent, "authored context", {
+          memory: { key },
+        })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(remembers.length).toBe(2)
         const terminal = remembers[1]
         expect(terminal?.transcript.content.map(messageText)).toContain("authored context")
@@ -721,7 +748,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+        const failure = yield* Effect.flip(
+          Agent.run(agent, "live prompt", {
+            memory: { key },
+          }),
+        )
 
         expect(failure._tag).toBe("generalist/core/MiddlewareViolation")
         expect(modelCalls).toBe(0)
@@ -765,7 +796,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+        const failure = yield* Effect.flip(
+          Agent.run(agent, "live prompt", {
+            memory: { key },
+          }),
+        )
 
         expect(failure._tag).toBe("generalist/core/MiddlewareViolation")
         expect(modelCalls).toBe(0)
@@ -821,9 +856,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+        const result = yield* Agent.run(agent, "live prompt", {
+          memory: { key },
+        })
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(modelPrompt?.content[0]?.options).toEqual({
           "generalist/memory": { origin: "memoryRecall" },
         })
@@ -896,8 +933,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, {
-          prompt: "live prompt",
+        const result = yield* Agent.run(agent, "live prompt", {
           sessionId: "session-compaction-isolation",
           memory: { key },
         })
@@ -908,7 +944,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           ),
         )
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(modelCalls).toBe(2)
         expect(memoryTranscript.content.map(messageText)).toContain("live prompt")
         expect(memoryTranscript.content.map(messageText)).not.toContain("corrupted authored context")
@@ -980,8 +1016,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const result = yield* Agent.generate(agent, {
-          prompt: "use opaque values",
+        const result = yield* Agent.run(agent, "use opaque values", {
           sessionId: "session-opaque-compaction",
           memory: { key },
         })
@@ -993,7 +1028,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         )
         const prompts = [terminalPrompt, retained].filter((prompt): prompt is Prompt.Prompt => prompt !== undefined)
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(prompts).toHaveLength(2)
         for (const prompt of prompts) {
           const parts = prompt.content.flatMap(messageParts)
@@ -1066,7 +1101,10 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       ),
       Effect.gen(function* () {
         const sessionId = "session-existing-compaction"
-        const first = yield* Agent.generate(agent, { prompt: "first authored", sessionId, memory: { key } })
+        const first = yield* Agent.run(agent, "first authored", {
+          sessionId,
+          memory: { key },
+        })
         const projected = yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
             Effect.flatMap((session) =>
@@ -1086,13 +1124,12 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           Prompt.makeMessage("assistant", { content: [textPart("first done")] }),
         ])
 
-        expect(first.text).toBe("first done")
+        expect(first).toBe("first done")
         // The checkpoint stores conversation only; the system message stays derived per run.
         expect(projected.content).toHaveLength(1)
         expect(projected.content.every((message) => message.role !== "system")).toBe(true)
 
-        const second = yield* Agent.generate(agent, {
-          prompt: "second authored",
+        const second = yield* Agent.run(agent, "second authored", {
           sessionId,
           history: resumedHistory,
           memory: { key },
@@ -1105,7 +1142,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         )
         const retainedText = retained.content.map(messageText)
 
-        expect(second.text).toBe("second done")
+        expect(second).toBe("second done")
         expect(retainedText.filter((text) => text === "first done")).toHaveLength(1)
         expect(retainedText.filter((text) => text === "second authored")).toHaveLength(1)
         expect(retainedText).not.toContain("recalled context")
@@ -1140,8 +1177,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           ),
         )
 
-        const result = yield* Agent.generate(agent, {
-          prompt: "new authored content",
+        const result = yield* Agent.run(agent, "new authored content", {
           sessionId,
           history: Prompt.fromMessages([repeated, repeated]),
           memory: { key },
@@ -1154,7 +1190,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           ),
         )
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         expect(retainedText.filter((text) => text === "same authored content")).toHaveLength(2)
         expect(retainedText.filter((text) => text === "new authored content")).toHaveLength(1)
       }),
@@ -1184,7 +1220,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "hello", memory: { key } }))
+        const failure = yield* Effect.flip(
+          Agent.run(agent, "hello", {
+            memory: { key },
+          }),
+        )
 
         expect(failure._tag).toBe("generalist/core/AgentError")
         if (failure._tag === "generalist/core/AgentError") {
@@ -1216,7 +1256,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       ),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(
-          Agent.stream(agent, { prompt: "hello", memory: { key } }).pipe(
+          Agent.stream(agent, "hello", {
+            memory: { key },
+          }).pipe(
             Stream.tap((event) =>
               Effect.sync(() => {
                 events.push(event._tag)

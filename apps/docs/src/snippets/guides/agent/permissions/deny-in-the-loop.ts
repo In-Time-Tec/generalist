@@ -32,8 +32,8 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, { prompt: "Drop the users table." })
-  yield* Console.log(result.text)
+  const result = yield* Agent.run(agent, "Drop the users table.")
+  yield* Console.log(result)
 }).pipe(
   Effect.catchTag("generalist/core/FrameworkFailure", (failure) =>
     Console.log(`${failure.tool} ${failure.stage}: ${failure.message}`),

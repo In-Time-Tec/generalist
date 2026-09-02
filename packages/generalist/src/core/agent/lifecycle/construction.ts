@@ -27,7 +27,9 @@ export const progressOverflowPolicySchema = Schema.Union([
 type StaticDeclaration = { readonly origin: import("../event.js").ToolOrigin; readonly tool: Tool.Any }
 
 /** @internal Validate and assemble the immutable tools declared by an Agent. */
-export const setupStaticTools = <T extends Record<string, Tool.Any>, R, P, A>(agent: Agent<T, R, P, A>) =>
+export const setupStaticTools = <T extends Record<string, Tool.Any>, R, P, A>(
+  agent: Agent<T, R, P, A, Schema.Top, Schema.Top>,
+) =>
   Effect.gen(function* () {
     const declarations: ReadonlyArray<StaticDeclaration> =
       agent.toolDeclarations ??

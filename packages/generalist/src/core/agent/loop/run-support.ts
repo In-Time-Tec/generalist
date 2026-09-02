@@ -6,12 +6,12 @@ import type { Input } from "../../turn/steering.js"
 import { StopReason } from "../../turn/policy.js"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { RunError } from "../service.js"
-import type { ObjectSchema, SchemaServicesD, StaticToolServices } from "./context.js"
+import type { ObjectSchema, SchemaServicesD, SchemaServicesE, StaticToolServices } from "./context.js"
 
 export type RunStream<Tools extends Record<string, Tool.Any>, S extends ObjectSchema, R> = Stream.Stream<
   Event,
   RunError,
-  R | StaticToolServices<Tools> | SchemaServicesD<S>
+  R | StaticToolServices<Tools> | SchemaServicesD<S> | SchemaServicesE<S>
 >
 
 export const suspensionApplicationIdentity = (suspension: AgentSuspended): string =>

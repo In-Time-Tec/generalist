@@ -60,7 +60,7 @@ Terminalization records a disposition for every remaining durable entry.
 ## Invariants
 
 - Each process-local inbox has one Run ID, one loop-owned consumer, and producer-only controls.
-- `Agent.stream` and `Agent.generate` use the handle path without exposing its controls.
+- `Agent.stream` and `Agent.run` use the handle path without exposing its controls.
 - Session ID is conversation identity; it never selects an inbox.
 - Core has no global Run registry.
 - Inline children and fan-out members allocate fresh Run inboxes.

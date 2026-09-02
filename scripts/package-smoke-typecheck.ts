@@ -75,7 +75,7 @@ const memoryAgent = Agent.make({
 type MemoryAgentRequirements = Assert<
   Equal<Agent.Requirements<typeof memoryAgent>, LanguageModel.LanguageModel | Memory.Memory>
 >
-const memoryRun = Agent.stream(memoryAgent, { prompt: "hello" })
+const memoryRun = Agent.stream(memoryAgent, "hello")
 type MemoryRunRequirements = Assert<
   Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >

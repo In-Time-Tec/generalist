@@ -44,6 +44,10 @@ import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"
 import { withProviderFinish, withProviderFinishContent } from "../provider-finish"
+import { layerModel as deterministicModel } from "../../../src/ai/provider/deterministic"
+import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
+import { registrationsFor } from "../../runtime/execution/fixtures"
+import { pinnedTestExecutable } from "../../runtime/run/identity"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type StreamServices<T> = T extends Stream.Stream<unknown, unknown, infer R> ? R : never
@@ -84,40 +88,18 @@ const selectedMemoryRequiredAgent = Agent.make({
 })
 const widenedOptions: Agent.MakeOptions = { name: "widened-required" }
 const widenedRequiredAgent = Agent.make(widenedOptions)
-const memoryRequiredRun = Agent.generate(memoryRequiredAgent, { prompt: "hello" })
-const runMemoryRequired = Agent.generate(plainRequiredAgent, {
-  prompt: "hello",
+const memoryRequiredRun = Agent.run(memoryRequiredAgent, "hello")
+const runMemoryRequired = Agent.run(plainRequiredAgent, "hello", {
   memory: { key: { agent: "plain-required", subject: "memory-subject" } },
 })
 
 const structuredOutputSchema = Schema.Struct({ value: Schema.String })
-const plainStreamRequired = Agent.stream(plainRequiredAgent, { prompt: "hello" })
-const plainGenerateRequired = Agent.generate(plainRequiredAgent, { prompt: "hello" })
-const decodingRequired = Agent.stream(plainRequiredAgent, {
-  prompt: "hello",
-  output: { schema: structuredOutputSchema },
-})
-const decodingGenerated = Agent.generate(plainRequiredAgent, {
-  prompt: "hello",
-  output: { schema: structuredOutputSchema },
-})
-interface OptionalOutputOptions {
-  readonly prompt: string
-  readonly output?: { readonly schema: typeof structuredOutputSchema }
-}
-const optionalOutputOptions: OptionalOutputOptions = {
-  prompt: "hello",
-  output: { schema: structuredOutputSchema },
-}
-const optionalOutputRequired = Agent.stream(plainRequiredAgent, optionalOutputOptions)
-const optionalOutputGenerated = Agent.generate(plainRequiredAgent, optionalOutputOptions)
-type TextOrOutputOptions =
-  | { readonly prompt: string }
-  | { readonly prompt: string; readonly output: { readonly schema: typeof structuredOutputSchema } }
-const generateTextOrOutput = (options: TextOrOutputOptions) => Agent.generate(plainRequiredAgent, options)
-const curriedOutputRequired = Agent.generate({ prompt: "hello", output: { schema: structuredOutputSchema } })(
-  plainRequiredAgent,
-)
+const structuredAgent = Agent.make({ name: "structured-required", output: structuredOutputSchema })
+const plainStreamRequired = Agent.stream(plainRequiredAgent, "hello")
+const plainRunRequired = Agent.run(plainRequiredAgent, "hello")
+const decodingRequired = Agent.stream(structuredAgent, "hello")
+const decodingRun = Agent.run(structuredAgent, "hello")
+const curriedOutputRequired = Agent.run("hello")(structuredAgent)
 
 class ModelDependency extends Context.Service<ModelDependency, { readonly value: string }>()(
   "generalist/test/core/agent/service.test/ModelDependency",
@@ -135,9 +117,7 @@ const dependentModelLayer = Layer.effect(
     ),
   ),
 )
-const runBoundaryModelProvided = Agent.stream(memoryRequiredAgent, { prompt: "hello" }).pipe(
-  Stream.provide(dependentModelLayer),
-)
+const runBoundaryModelProvided = Agent.stream(memoryRequiredAgent, "hello").pipe(Stream.provide(dependentModelLayer))
 
 const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<Equal<Agent.Requirements<typeof plainRequiredAgent>, LanguageModel.LanguageModel>>,
@@ -161,27 +141,14 @@ const agentRequirementProofs: ReadonlyArray<true> = [
     Equal<EffectRequirements<typeof runMemoryRequired>, LanguageModel.LanguageModel | Memory.Memory>
   >,
   true satisfies Assert<Equal<StreamRequirements<typeof plainStreamRequired>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<Equal<EffectRequirements<typeof plainGenerateRequired>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<Equal<EffectSuccess<typeof plainGenerateRequired>, Agent.Result>>,
+  true satisfies Assert<Equal<EffectRequirements<typeof plainRunRequired>, LanguageModel.LanguageModel>>,
+  true satisfies Assert<Equal<EffectSuccess<typeof plainRunRequired>, string>>,
   true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency>>,
   true satisfies Assert<Equal<StreamRequirements<typeof decodingRequired>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<Equal<EffectRequirements<typeof decodingGenerated>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<Equal<EffectSuccess<typeof decodingGenerated>, Agent.ObjectResult<{ readonly value: string }>>>,
-  true satisfies Assert<Equal<StreamRequirements<typeof optionalOutputRequired>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<Equal<EffectRequirements<typeof optionalOutputGenerated>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<
-    Equal<EffectSuccess<typeof optionalOutputGenerated>, Agent.Result | Agent.ObjectResult<{ readonly value: string }>>
-  >,
-  true satisfies Assert<
-    Equal<
-      EffectSuccess<ReturnType<typeof generateTextOrOutput>>,
-      Agent.Result | Agent.ObjectResult<{ readonly value: string }>
-    >
-  >,
+  true satisfies Assert<Equal<EffectRequirements<typeof decodingRun>, LanguageModel.LanguageModel>>,
+  true satisfies Assert<Equal<EffectSuccess<typeof decodingRun>, { readonly value: string }>>,
   true satisfies Assert<Equal<EffectRequirements<typeof curriedOutputRequired>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<
-    Equal<EffectSuccess<typeof curriedOutputRequired>, Agent.ObjectResult<{ readonly value: string }>>
-  >,
+  true satisfies Assert<Equal<EffectSuccess<typeof curriedOutputRequired>, { readonly value: string }>>,
   true satisfies Assert<
     Equal<
       IsAssignable<
@@ -539,6 +506,77 @@ const retryTransientModelError = ModelResilience.layer({
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
 })
 
+const typedStartOutput = Schema.Struct({ answer: Schema.Finite })
+const typedStartAgent = Agent.make({
+  name: "typed-start",
+  input: Schema.Struct({ question: Schema.String }),
+  output: typedStartOutput,
+})
+const typedStartExecutable = pinnedTestExecutable(typedStartAgent, "typed-start-v1")
+const nullStartAgent = Agent.make({ name: "null-start", output: Schema.Null })
+const nullStartExecutable = pinnedTestExecutable(nullStartAgent, "null-start-v1")
+const typedStartResolver = ExecutableResolver.layerStatic([
+  {
+    executable: typedStartExecutable,
+    agent: Agent.close(typedStartAgent, deterministicModel({ response: '{"output":{"answer":42}}' })),
+  },
+  {
+    executable: nullStartExecutable,
+    agent: Agent.close(nullStartAgent, deterministicModel({ response: '{"output":null}' })),
+  },
+]).pipe(Layer.orDie)
+const typedStartRuntime = Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(typedStartResolver))
+
+layer(typedStartRuntime)("Agent.start", (it) => {
+  it.effect("starts a registered Agent and decodes its durable completion", () =>
+    Effect.gen(function* () {
+      const handle = yield* Agent.start(
+        typedStartAgent,
+        { question: "answer" },
+        {
+          executable: typedStartExecutable,
+          registrations: registrationsFor(typedStartExecutable),
+          sessionId: "typed-start-session",
+          idempotencyKey: "typed-start-key",
+        },
+      )
+      const store = yield* RunStore.RunStore
+      const host = yield* RunExecutor.RunExecutor
+      const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: "typed-start-test" })
+      yield* host.execute(claim)
+      const events = yield* Stream.runCollect(handle.events)
+      const completed = events.find((event) => event._tag === "RunCompleted")
+
+      expect(completed?._tag).toBe("RunCompleted")
+      if (completed?._tag === "RunCompleted" && "output" in completed.result) {
+        expect(completed.result.output).toEqual({ answer: 42 })
+      }
+    }),
+  )
+
+  it.effect("preserves a valid null durable output instead of falling back to text", () =>
+    Effect.gen(function* () {
+      const handle = yield* Agent.start(nullStartAgent, "answer", {
+        executable: nullStartExecutable,
+        registrations: registrationsFor(nullStartExecutable),
+        sessionId: "null-start-session",
+        idempotencyKey: "null-start-key",
+      })
+      const store = yield* RunStore.RunStore
+      const host = yield* RunExecutor.RunExecutor
+      const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: "null-start-test" })
+      yield* host.execute(claim)
+      const events = yield* Stream.runCollect(handle.events)
+      const completed = events.find((event) => event._tag === "RunCompleted")
+
+      expect(completed?._tag).toBe("RunCompleted")
+      if (completed?._tag === "RunCompleted" && "output" in completed.result) {
+        expect(completed.result.output).toBeNull()
+      }
+    }),
+  )
+})
+
 layer(unusedToolHandlerLayer)("Agent", (it) => {
   expect(agentRequirementProofs.every(Boolean)).toBe(true)
   expect(toolkitRequirementProof).toBe(true)
@@ -575,7 +613,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
       )
       const agent = Agent.make({ name: "scoped-model-agent" })
-      const run = Stream.runDrain(Agent.stream(agent, { prompt: "wait" }).pipe(Stream.provide(providedModelLayer)))
+      const run = Stream.runDrain(Agent.stream(agent, "wait").pipe(Stream.provide(providedModelLayer)))
 
       expect(acquisitions).toBe(0)
       const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
@@ -648,8 +686,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       }),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "invalid-context-agent" })
-        const failure = yield* Agent.stream(agent, {
-          prompt: "continue",
+        const failure = yield* Agent.stream(agent, "continue", {
           history: Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })]),
         }).pipe(Stream.runDrain, Effect.flip)
 
@@ -680,7 +717,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "collision-agent", tools: [echoTool, duplicateEcho] })
 
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "hello")))
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
@@ -725,7 +762,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "prototype-agent", tools: [prototypeTool] })
 
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "call prototype" }))
+        yield* Stream.runDrain(Agent.stream(agent, "call prototype"))
 
         expect(advertisedTools).toEqual(["__proto__"])
         expect(executorCalls).toBe(1)
@@ -745,7 +782,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "duplicate-prototype-agent", tools: [first, second] })
 
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "hello")))
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
@@ -778,7 +815,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reserved-agent", tools: [reserved] })
 
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "hello")))
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
@@ -812,7 +849,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         for (const toolOutputMaxBytes of invalidValues) {
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "hello", toolOutputMaxBytes })),
+            Stream.runDrain(
+              Agent.stream(agent, "hello", {
+                toolOutputMaxBytes,
+              }),
+            ),
           )
 
           expect(failure._tag).toBe("generalist/core/AgentError")
@@ -843,7 +884,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         for (const modelCallOrdinalStart of invalidValues) {
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "hello", modelCallOrdinalStart })),
+            Stream.runDrain(
+              Agent.stream(agent, "hello", {
+                modelCallOrdinalStart,
+              }),
+            ),
           )
 
           expect(failure._tag).toBe("generalist/core/AgentError")
@@ -874,7 +919,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         for (const capacity of invalidValues) {
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "hello", toolProgress: { _tag: "Backpressure", capacity } })),
+            Stream.runDrain(
+              Agent.stream(agent, "hello", {
+                toolProgress: { _tag: "Backpressure", capacity },
+              }),
+            ),
           )
 
           expect(failure._tag).toBe("generalist/core/AgentError")
@@ -906,7 +955,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             name: "invalid-tool-scheduling-agent",
             toolScheduling: { maxConcurrency, parallelSafe: [] },
           })
-          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "hello")))
           expect(failure._tag === "generalist/core/AgentError" && failure.message).toBe(
             "Agent.toolScheduling.maxConcurrency must be a positive safe integer",
           )
@@ -917,7 +966,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             toolkit: Toolkit.make(echoTool),
             toolScheduling: { maxConcurrency: 2, parallelSafe },
           })
-          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "hello")))
           expect(failure._tag).toBe("generalist/core/AgentError")
         }
         expect(modelCalls).toBe(0)
@@ -943,7 +992,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         for (const contextWindow of invalidValues) {
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "hello", compaction: { contextWindow } })),
+            Stream.runDrain(
+              Agent.stream(agent, "hello", {
+                compaction: { contextWindow },
+              }),
+            ),
           )
 
           expect(failure._tag).toBe("generalist/core/AgentError")
@@ -972,7 +1025,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "invalid-reserve-agent" })
         for (const reserveTokens of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "hello", compaction: { reserveTokens } })),
+            Stream.runDrain(
+              Agent.stream(agent, "hello", {
+                compaction: { reserveTokens },
+              }),
+            ),
           )
           expect(failure._tag === "generalist/core/AgentError" && failure.message).toBe(
             "RunOptions.compaction.reserveTokens must be a non-negative safe integer",
@@ -1009,7 +1066,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             instructions: "Always mention relay input when you answer.",
           })
 
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "relay input" }))
+          const events = yield* Stream.runCollect(Agent.stream(agent, "relay input"))
 
           expect(events.map((event) => event._tag)).toEqual([
             "TurnStarted",
@@ -1053,9 +1110,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "minimal-agent", instructions: "Answer directly." })
 
-          const result = yield* Agent.generate(agent, { prompt: "hello" })
+          const result = yield* Agent.run(agent, "hello")
 
-          expect(result.text).toBe("minimal done")
+          expect(result).toBe("minimal done")
         }),
       ] as const,
   )
@@ -1082,9 +1139,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             model: { provider: "test", model: "agent-default" },
           })
 
-          const result = yield* Agent.generate(agent, { prompt: "hello" })
+          const result = yield* Agent.run(agent, "hello")
 
-          expect(result.text).toBe("registry done")
+          expect(result).toBe("registry done")
         }),
       ] as const,
   )
@@ -1111,7 +1168,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               assertLive.pipe(
                 Effect.andThen(Deferred.succeed(structuredEntered, undefined)),
                 Effect.andThen(Deferred.await(structuredGate)),
-                Effect.as([{ type: "text" as const, text: '{"ok":true}' }]),
+                Effect.as([{ type: "text" as const, text: '{"output":{"ok":true}}' }]),
               ),
           })
           return { lifetime, model }
@@ -1139,10 +1196,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "scoped-structured-agent", model: selection })
-        const agentFiber = yield* Effect.forkChild(
-          Agent.generate(agent, { prompt: "make object", output: { schema: objectSchema } }),
-        )
+        const agent = Agent.make({ name: "scoped-structured-agent", output: objectSchema, model: selection })
+        const agentFiber = yield* Effect.forkChild(Agent.run(agent, "make object"))
         yield* Deferred.await(structuredEntered)
 
         let competitorEntered = false
@@ -1161,8 +1216,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const result = yield* Fiber.join(agentFiber)
         yield* Fiber.join(competitor)
 
-        expect(result.text).toBe("normal answer")
-        expect(result.value).toEqual({ ok: true })
+        expect(result).toEqual({ ok: true })
         expect(competitorEntered).toBe(true)
         expect(acquired).toBe(1)
         expect(released).toBe(0)
@@ -1198,11 +1252,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "memory-default-agent", memory: key })
 
-        const result = yield* Agent.generate(agent, { prompt: "live prompt" })
+        const result = yield* Agent.run(agent, "live prompt")
 
         expect(recalled).toBe(true)
         expect(rememberedKey).toEqual(key)
-        expect(result.text).toBe("saw memory")
+        expect(result).toBe("saw memory")
       }),
     ] as const
   })
@@ -1233,7 +1287,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "toolkit-handler-agent", toolkit })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use echo" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use echo"))
 
         expect(handled).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
@@ -1282,7 +1336,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "snapshot-agent", toolkit })
 
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "run snapshot" }))
+        yield* Stream.runCollect(Agent.stream(agent, "run snapshot"))
 
         expect(originalCalls).toBe(1)
       }),
@@ -1327,7 +1381,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "tool-executor-override-agent", toolkit })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use echo" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use echo"))
 
         expect(toolkitHandlerCalls).toBe(0)
         expect(executorCalls).toBe(1)
@@ -1358,7 +1412,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "missing-approvals-agent", toolkit: Toolkit.make(gatedTool) })
 
-        const error = yield* Stream.runDrain(Agent.stream(agent, { prompt: "use gated" })).pipe(Effect.flip)
+        const error = yield* Stream.runDrain(Agent.stream(agent, "use gated")).pipe(Effect.flip)
 
         expect(calls).toBe(0)
         expect(handled).toBe(false)
@@ -1384,7 +1438,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-agent", instructions: "fallback instructions" })
 
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello" }))
+        yield* Stream.runDrain(Agent.stream(agent, "hello"))
 
         expect(capturedSystem).toBe("first\n\nsecond")
       }),
@@ -1407,7 +1461,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "instructions-system-agent", instructions: "fallback instructions" })
 
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello", system: "override" }))
+        yield* Stream.runDrain(
+          Agent.stream(agent, "hello", {
+            system: "override",
+          }),
+        )
 
         expect(capturedSystem).toBe("override")
       }),
@@ -1433,8 +1491,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "instructions-history-agent", instructions: "fallback instructions" })
 
         yield* Stream.runDrain(
-          Agent.stream(agent, {
-            prompt: "new input",
+          Agent.stream(agent, "new input", {
             history: [
               { role: "system", content: "history system" },
               { role: "user", content: [{ type: "text", text: "earlier" }] },
@@ -1465,7 +1522,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "empty-instructions-agent", instructions: "fallback instructions" })
 
-        yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello" }))
+        yield* Stream.runDrain(Agent.stream(agent, "hello"))
 
         expect(capturedSystem).toBe("fallback instructions")
       }),
@@ -1523,7 +1580,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "skill-agent", instructions: "base instructions" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "review this" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "review this"))
         const activation = events.find(
           (event) => event._tag === "ToolExecutionCompleted" && event.call.name === "activate_skill",
         )
@@ -1617,8 +1674,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }
         const agent = Agent.make({ name: "replayed-skill-agent" })
 
-        const events = yield* Agent.stream(agent, {
-          prompt: "replay activation",
+        const events = yield* Agent.stream(agent, "replay activation", {
           logicalOperationId: "replayed-skill-run",
         }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, journal))
 
@@ -1659,7 +1715,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "static-skill-agent", toolkit: Toolkit.make(echoTool) })
 
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "activate" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "activate")))
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
@@ -1707,7 +1763,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(
-          Stream.runDrain(Agent.stream(Agent.make({ name: "skill-skill-agent" }), { prompt: "activate both" })),
+          Stream.runDrain(Agent.stream(Agent.make({ name: "skill-skill-agent" }), "activate both")),
         )
 
         expect(failure).toEqual(
@@ -1754,10 +1810,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "concurrent-skill-agent" })
         yield* Effect.all(
-          [
-            Stream.runDrain(Agent.stream(agent, { prompt: "activation run" })),
-            Stream.runDrain(Agent.stream(agent, { prompt: "plain run" })),
-          ],
+          [Stream.runDrain(Agent.stream(agent, "activation run")), Stream.runDrain(Agent.stream(agent, "plain run"))],
           { concurrency: 2 },
         )
 
@@ -1796,9 +1849,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const failure = yield* Agent.stream(Agent.make({ name: "same-turn-agent" }), {
-          prompt: "activate and call",
-        }).pipe(Stream.runDrain, Effect.flip)
+        const failure = yield* Agent.stream(Agent.make({ name: "same-turn-agent" }), "activate and call").pipe(
+          Stream.runDrain,
+          Effect.flip,
+        )
 
         expect(failure._tag).toBe("generalist/core/AgentError")
         expect(executorCalls).toBe(0)
@@ -1845,7 +1899,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resumable-skill-agent" })
-        const failure = yield* Agent.stream(agent, { prompt: "activate resumable", toolOutputMaxBytes: 256 }).pipe(
+        const failure = yield* Agent.stream(agent, "activate resumable", {
+          toolOutputMaxBytes: 256,
+        }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") suspendedTranscript = event.transcript
@@ -1864,8 +1920,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(persisted).not.toContain(skillBody)
 
         const resumed = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: suspendedTranscript,
             resume: {
               suspension: failure,
@@ -1899,9 +1954,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-skills-agent", instructions: "plain instructions" })
 
-        const result = yield* Agent.generate(agent, { prompt: "hello" })
+        const result = yield* Agent.run(agent, "hello")
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         if (capturedPrompt === undefined) return yield* Effect.die("model did not capture prompt")
         const expectedMessages = yield* Schema.decodeUnknownEffect(Schema.Array(Prompt.Message))(
           Json.parse(
@@ -1929,9 +1984,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "empty-system-agent", instructions: "" })
 
-        const result = yield* Agent.generate(agent, { prompt: "hello" })
+        const result = yield* Agent.run(agent, "hello")
 
-        expect(result.text).toBe("done")
+        expect(result).toBe("done")
         if (capturedPrompt === undefined) return yield* Effect.die("model did not capture prompt")
         const expectedMessages = yield* Schema.decodeUnknownEffect(Schema.Array(Prompt.Message))(
           Json.parse(
@@ -1955,7 +2010,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "usage-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "report usage" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "report usage"))
 
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
@@ -2009,7 +2064,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(echoTool),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use the echo tool"))
 
         expect(calls).toBe(2)
         expect(secondCallSawToolResult).toBe(true)
@@ -2046,7 +2101,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "narration-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "explore" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "explore"))
 
         expect(calls).toBe(2)
         const completed = events.at(-1)
@@ -2082,7 +2137,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "cut-report-agent", toolkit: Toolkit.make(echoTool) })
         const events: Array<AgentEvent.Event> = []
 
-        const failure = yield* Agent.stream(agent, { prompt: "explore" }).pipe(
+        const failure = yield* Agent.stream(agent, "explore").pipe(
           Stream.tap((event) => Effect.sync(() => events.push(event))),
           Stream.runDrain,
           Effect.flip,
@@ -2124,7 +2179,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "answered-report-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "explore" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "explore"))
 
         const completed = events.find((event) => event._tag === "Completed")
         expect(completed?._tag).toBe("Completed")
@@ -2153,7 +2208,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "silent-first-turn-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "explore" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "explore"))
 
         expect(calls).toBe(2)
         const completed = events.find((event) => event._tag === "Completed")
@@ -2177,7 +2232,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           const agent = Agent.make({ name: "cut-before-output-agent" })
           const events: Array<AgentEvent.Event> = []
 
-          const failure = yield* Agent.stream(agent, { prompt: "answer" }).pipe(
+          const failure = yield* Agent.stream(agent, "answer").pipe(
             Stream.tap((event) => Effect.sync(() => events.push(event))),
             Stream.runDrain,
             Effect.flip,
@@ -2210,7 +2265,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "retried-attempt-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "answer" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "answer"))
 
         expect(attempts).toBe(2)
         const completed = events.find((event) => event._tag === "Completed")
@@ -2237,7 +2292,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         started = currentStarted
         const agent = Agent.make({ name: "interrupted-without-output-agent" })
         const events: Array<AgentEvent.Event> = []
-        const fiber = yield* Agent.stream(agent, { prompt: "never answers" }).pipe(
+        const fiber = yield* Agent.stream(agent, "never answers").pipe(
           Stream.tap((event) => Effect.sync(() => events.push(event))),
           Stream.runDrain,
           Effect.forkChild({ startImmediately: true }),
@@ -2276,7 +2331,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "authorize" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "authorize"))
 
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
       }),
@@ -2317,7 +2372,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "context-agent", toolkit: Toolkit.make(echoTool) })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "use the context tool", sessionId: "session-1" }),
+          Agent.stream(agent, "use the context tool", {
+            sessionId: "session-1",
+          }),
         )
 
         const tags = events.map((event) => event._tag)
@@ -2375,8 +2432,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "backpressure-agent", toolkit: Toolkit.make(echoTool) })
-        const run = Agent.stream(agent, {
-          prompt: "use the tool",
+        const run = Agent.stream(agent, "use the tool", {
           toolProgress: { _tag: "Backpressure", capacity: 1 },
         }).pipe(
           Stream.runForEach((event) =>
@@ -2440,7 +2496,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "default-progress-agent", toolkit: Toolkit.make(echoTool) })
-        const fiber = yield* Agent.stream(agent, { prompt: "use the tool" }).pipe(
+        const fiber = yield* Agent.stream(agent, "use the tool").pipe(
           Stream.runForEach((event) =>
             event._tag !== "ToolProgress" || event.message !== "0"
               ? Effect.void
@@ -2498,7 +2554,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             consumerStarted = yield* Deferred.make<void>()
             producerFinished = yield* Deferred.make<void>()
             releaseConsumer = yield* Deferred.make<void>()
-            const fiber = yield* Agent.stream(agent, { prompt: "use the tool", toolProgress: policy }).pipe(
+            const fiber = yield* Agent.stream(agent, "use the tool", {
+              toolProgress: policy,
+            }).pipe(
               Stream.tap((event) =>
                 event._tag !== "ToolProgress" || event.message !== "one"
                   ? Effect.void
@@ -2566,8 +2624,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "fail-progress-agent", toolkit: Toolkit.make(echoTool) })
-        const fiber = yield* Agent.stream(agent, {
-          prompt: "use the tool",
+        const fiber = yield* Agent.stream(agent, "use the tool", {
           toolProgress: { _tag: "Fail", capacity: 1 },
         }).pipe(
           Stream.tap((event) =>
@@ -2628,8 +2685,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "progress-failure-agent", toolkit: Toolkit.make(echoTool) })
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "use the tool",
+          Agent.stream(agent, "use the tool", {
             toolProgress: { _tag: "Backpressure", capacity: 1 },
           }),
         )
@@ -2690,8 +2746,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "abandoned-progress-agent", toolkit: Toolkit.make(echoTool) })
 
-        yield* Agent.stream(agent, {
-          prompt: "use the tool",
+        yield* Agent.stream(agent, "use the tool", {
           toolProgress: { _tag: "Backpressure", capacity: 1 },
         }).pipe(
           Stream.tap((event) =>
@@ -2750,7 +2805,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "toolkit-context-agent", toolkit })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "use handler", sessionId: "session-toolkit" }),
+          Agent.stream(agent, "use handler", {
+            sessionId: "session-toolkit",
+          }),
         )
 
         expect(handlerSessionId).toBe("session-toolkit")
@@ -2785,7 +2842,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "gated-session-agent", toolkit: Toolkit.make(gatedTool) })
 
         const failure = yield* Effect.flip(
-          Stream.runDrain(Agent.stream(agent, { prompt: "needs approval", sessionId: "session-approval" })),
+          Stream.runDrain(
+            Agent.stream(agent, "needs approval", {
+              sessionId: "session-approval",
+            }),
+          ),
         )
 
         expect(approvalSessionId).toBe("session-approval")
@@ -2816,7 +2877,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         approval = yield* Deferred.make<Approvals.Resolution>()
         const requested = yield* Deferred.make<AgentEvent.ApprovalRequest>()
         const agent = Agent.make({ name: "blocking-approval-agent", toolkit: Toolkit.make(gatedTool) })
-        const fiber = yield* Stream.runForEach(Agent.stream(agent, { prompt: "wait for approval" }), (event) =>
+        const fiber = yield* Stream.runForEach(Agent.stream(agent, "wait for approval"), (event) =>
           event._tag === "ApprovalRequested"
             ? Deferred.succeed(requested, event.request).pipe(Effect.asVoid)
             : Effect.void,
@@ -2857,9 +2918,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "needs permission" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+          Stream.runForEach(Agent.stream(agent, "needs permission"), (event) => Effect.sync(() => events.push(event))),
         )
 
         expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
@@ -2892,9 +2951,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "needs approval" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+          Stream.runForEach(Agent.stream(agent, "needs approval"), (event) => Effect.sync(() => events.push(event))),
         )
 
         expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
@@ -2920,7 +2977,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "permission-ask-agent", toolkit: Toolkit.make(gatedTool) })
 
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "needs permission" }), (event) =>
+          Stream.runForEach(Agent.stream(agent, "needs permission"), (event) =>
             Effect.sync(() => {
               events.push(event)
             }),
@@ -2973,9 +3030,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "ask then approve" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+          Stream.runForEach(Agent.stream(agent, "ask then approve"), (event) => Effect.sync(() => events.push(event))),
         )
 
         expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
@@ -3017,9 +3072,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "permission-always-agent", toolkit: Toolkit.make(gatedTool) })
         const events: Array<AgentEvent.Event> = []
 
-        yield* Stream.runForEach(Agent.stream(agent, { prompt: "ask always" }), (event) =>
-          Effect.sync(() => events.push(event)),
-        )
+        yield* Stream.runForEach(Agent.stream(agent, "ask always"), (event) => Effect.sync(() => events.push(event)))
 
         expect(remembered).toEqual([{ pattern: "gated", level: "allow" }])
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
@@ -3070,7 +3123,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "remembered-always-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "remember approval" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "remember approval"))
 
         expect(asks).toBe(1)
         expect(executions).toBe(2)
@@ -3119,7 +3172,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "default-rule-store-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "remember" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "remember"))
 
         expect(resolutions).toBe(1)
         expect(executions).toBe(2)
@@ -3176,9 +3229,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const events: Array<AgentEvent.Event> = []
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "use active tools" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+          Stream.runForEach(Agent.stream(agent, "use active tools"), (event) => Effect.sync(() => events.push(event))),
         )
 
         expect(Schema.is(AgentEvent.MiddlewareViolation)(failure)).toBe(true)
@@ -3232,9 +3283,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const events: Array<AgentEvent.Event> = []
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "review" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+          Stream.runForEach(Agent.stream(agent, "review"), (event) => Effect.sync(() => events.push(event))),
         )
 
         expect(Schema.is(AgentEvent.MiddlewareViolation)(failure)).toBe(true)
@@ -3261,7 +3310,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-steering-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "complete"))
 
         expect(calls).toBe(1)
         expect(events.map((event) => event._tag)).toEqual([
@@ -3305,9 +3354,17 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "session-epoch-agent", instructions: "fallback" })
         const sessionId = "session-epoch"
 
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one", sessionId }))
+        yield* Stream.runCollect(
+          Agent.stream(agent, "one", {
+            sessionId,
+          }),
+        )
         guidance = "GUIDANCE TWO"
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two", sessionId }))
+        yield* Stream.runCollect(
+          Agent.stream(agent, "two", {
+            sessionId,
+          }),
+        )
 
         expect(prompts[0]).toContain("GUIDANCE ONE")
         // A continued Session renders current guidance instead of the epoch captured on run one.
@@ -3341,13 +3398,22 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const sessionId = "session-continuity"
 
         yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "first question", system: "stable instructions", sessionId }),
+          Agent.stream(agent, "first question", {
+            system: "stable instructions",
+            sessionId,
+          }),
         )
         yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "second question", system: "stable instructions", sessionId }),
+          Agent.stream(agent, "second question", {
+            system: "stable instructions",
+            sessionId,
+          }),
         )
         yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "third question", system: "stable instructions", sessionId }),
+          Agent.stream(agent, "third question", {
+            system: "stable instructions",
+            sessionId,
+          }),
         )
 
         expect(prompts).toHaveLength(3)
@@ -3392,8 +3458,18 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "session-instructions-agent" })
         const sessionId = "session-instructions"
 
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one", system: "ORIGINAL GUIDANCE", sessionId }))
-        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two", system: "EDITED GUIDANCE", sessionId }))
+        yield* Stream.runCollect(
+          Agent.stream(agent, "one", {
+            system: "ORIGINAL GUIDANCE",
+            sessionId,
+          }),
+        )
+        yield* Stream.runCollect(
+          Agent.stream(agent, "two", {
+            system: "EDITED GUIDANCE",
+            sessionId,
+          }),
+        )
 
         expect(prompts[1]).toContain("EDITED GUIDANCE")
         expect(prompts[1]).not.toContain("ORIGINAL GUIDANCE")
@@ -3419,7 +3495,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "no-compaction-agent" })
         const sessionId = "no-compaction"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete", sessionId }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, "complete", {
+            sessionId,
+          }),
+        )
 
         expect(calls).toBe(1)
         expect(events.map((event) => event._tag)).toEqual([
@@ -3484,9 +3564,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "no-compaction-measurement-agent" })
+        const agent = Agent.make({ name: "no-compaction-measurement-agent", input: Schema.Any })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, prompt))
 
         expect(calls).toBe(1)
         expect(tokenizerCalls).toBe(0)
@@ -3520,7 +3600,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "prepopulated-session-agent" })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "next", history: Prompt.fromMessages([seed]), sessionId }),
+          Agent.stream(agent, "next", {
+            history: Prompt.fromMessages([seed]),
+            sessionId,
+          }),
         )
         const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         const seedEntries = path.filter(
@@ -3560,7 +3643,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "proactive-compaction-agent" })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "original prompt", compaction: { contextWindow: 10 } }),
+          Agent.stream(agent, "original prompt", {
+            compaction: { contextWindow: 10 },
+          }),
         )
 
         expect(prompt).toContain("compacted history")
@@ -3617,7 +3702,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "current-prompt-compaction-agent", toolkit: Toolkit.make(echoTool) })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "short", compaction: { contextWindow: 200 } }),
+          Agent.stream(agent, "short", {
+            compaction: { contextWindow: 200 },
+          }),
         )
 
         expect(streamCalls).toBe(2)
@@ -3662,7 +3749,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "post-compaction-measurement-agent", toolkit: Toolkit.make(echoTool) })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "x".repeat(800), compaction: { contextWindow: 10_000 } }),
+          Agent.stream(agent, "x".repeat(800), {
+            compaction: { contextWindow: 10_000 },
+          }),
         )
 
         expect(streamCalls).toBe(2)
@@ -3701,10 +3790,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "reported-context-agent", toolkit: Toolkit.make(echoTool) }), {
-            prompt: "small prompt",
-            compaction: { contextWindow: 100_000 },
-          }),
+          Agent.stream(
+            Agent.make({ name: "reported-context-agent", toolkit: Toolkit.make(echoTool) }),
+            "small prompt",
+            {
+              compaction: { contextWindow: 100_000 },
+            },
+          ),
         )
 
         expect(streamCalls).toBe(2)
@@ -3755,10 +3847,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "replacement-without-usage-agent", toolkit: Toolkit.make(echoTool) }), {
-            prompt: "original prompt",
-            compaction: { contextWindow: 100_000 },
-          }),
+          Agent.stream(
+            Agent.make({ name: "replacement-without-usage-agent", toolkit: Toolkit.make(echoTool) }),
+            "original prompt",
+            {
+              compaction: { contextWindow: 100_000 },
+            },
+          ),
         )
 
         expect(streamCalls).toBe(3)
@@ -3821,10 +3916,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "stale-baseline-threshold-agent", toolkit: Toolkit.make(echoTool) }), {
-            prompt: "a".repeat(4_000),
-            compaction: { contextWindow: 100_000 },
-          }),
+          Agent.stream(
+            Agent.make({ name: "stale-baseline-threshold-agent", toolkit: Toolkit.make(echoTool) }),
+            "a".repeat(4_000),
+            {
+              compaction: { contextWindow: 100_000 },
+            },
+          ),
         )
 
         expect(streamCalls).toBe(3)
@@ -3873,7 +3971,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "default-compaction-agent", toolkit: Toolkit.make(echoTool) })
         const sessionId = "default-compaction"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context", sessionId }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, "old context", {
+            sessionId,
+          }),
+        )
         const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
 
         expect(streamCalls).toBe(2)
@@ -3918,7 +4020,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const sessionId = "system-compaction"
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "old context", system: "You are a careful test agent", sessionId }),
+          Agent.stream(agent, "old context", {
+            system: "You are a careful test agent",
+            sessionId,
+          }),
         )
         const completed = events.at(-1)
 
@@ -3981,7 +4086,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "mixed-checkpoint-agent", toolkit: Toolkit.make(echoTool) })
         const sessionId = "mixed-checkpoint"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start mixed checkpoints", sessionId }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, "start mixed checkpoints", {
+            sessionId,
+          }),
+        )
         const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
         const checkpoints = path.filter((entry) => entry._tag === "Compaction")
         const completed = events.at(-1)
@@ -4022,8 +4131,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const sessionId = "truncate-checkpoint"
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "truncate-checkpoint-agent" }), {
-            prompt: "newest prompt",
+          Agent.stream(Agent.make({ name: "truncate-checkpoint-agent" }), "newest prompt", {
             history: Prompt.fromMessages([
               Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "old prompt" })] }),
             ]),
@@ -4087,8 +4195,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const sessionId = "orphan-checkpoint"
-        const failure = yield* Agent.stream(Agent.make({ name: "orphan-checkpoint-agent" }), {
-          prompt: "invalid",
+        const failure = yield* Agent.stream(Agent.make({ name: "orphan-checkpoint-agent" }), "invalid", {
           sessionId,
         }).pipe(Stream.runDrain, Effect.flip)
 
@@ -4144,8 +4251,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const sessionId = "duplicate-tool-checkpoint"
-        const failure = yield* Agent.stream(Agent.make({ name: "duplicate-tool-checkpoint-agent" }), {
-          prompt: "invalid",
+        const failure = yield* Agent.stream(Agent.make({ name: "duplicate-tool-checkpoint-agent" }), "invalid", {
           sessionId,
         }).pipe(Stream.runDrain, Effect.flip)
         const path = yield* Effect.scoped(Session.acquire(sessionId).pipe(Effect.flatMap((session) => session.path())))
@@ -4205,8 +4311,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const sessionId = "provider-checkpoint"
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "provider-checkpoint-agent" }), {
-            prompt: "compact provider exchange",
+          Agent.stream(Agent.make({ name: "provider-checkpoint-agent" }), "compact provider exchange", {
             sessionId,
           }),
         )
@@ -4254,9 +4359,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
 
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "structural-session-agent" }), {
+          Agent.stream(Agent.make({ name: "structural-session-agent" }), "continue", {
             history: Prompt.fromMessages([toolMessage({ second: 2, first: 1 })]),
-            prompt: "continue",
             sessionId,
           }),
         )
@@ -4306,7 +4410,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reserve-compaction-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "old context"))
 
         expect(streamCalls).toBe(2)
         expect(summaryCalls).toBe(0)
@@ -4353,7 +4457,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "reactive-compaction-agent", model: overflowSelection })
         const sessionId = "reactive-compaction"
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large", sessionId }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, "too large", {
+            sessionId,
+          }),
+        )
 
         expect(calls).toBe(2)
         expect(overflowRequests).toBe(1)
@@ -4410,7 +4518,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "fallback-overflow-agent", model: overflowSelection })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "too large"))
 
         expect(calls).toBe(2)
         expect(overflowRequests).toBe(1)
@@ -4462,7 +4570,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "error-part-overflow-agent", model: overflowSelection })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "too large"))
 
         expect(calls).toBe(2)
         expect(overflowRequests).toBe(1)
@@ -4497,7 +4605,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reactive-compaction-fail-agent", model: overflowSelection })
 
-        const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "too large" })))
+        const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "too large")))
 
         expect(calls).toBe(2)
         expect(error._tag).toBe("generalist/core/AgentError")
@@ -4528,7 +4636,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "partial-overflow-agent", model: overflowSelection })
 
-        const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "partial" })))
+        const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "partial")))
 
         expect(calls).toBe(1)
         expect(error._tag).toBe("generalist/core/AgentError")
@@ -4571,7 +4679,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(echoTool),
         })
 
-        yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "tools" })))
+        yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "tools")))
 
         expect(calls).toBe(1)
         expect(executions).toBeLessThanOrEqual(1)
@@ -4600,7 +4708,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "unchanged-overflow-agent", model: overflowSelection })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "unchanged" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "unchanged")))
 
         expect(calls).toBe(1)
         expect(failure._tag).toBe("generalist/core/AgentError")
@@ -4629,7 +4737,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-overflow-agent", model: overflowSelection })
 
-        yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "too large" })))
+        yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "too large")))
 
         expect(calls).toBe(1)
       }),
@@ -4908,25 +5016,26 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             calls += 1
             return Stream.make(textDelta(`turn ${calls}`))
           },
-          () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+          () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }]),
         ),
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "follow-up-structured-agent" })
-        const run = yield* Agent.allocateRun(agent, { prompt: "start", output: { schema: objectSchema } })
+        const agent = Agent.make({ name: "follow-up-structured-agent", output: objectSchema })
+        const run = yield* Agent.allocateRun(agent, { prompt: "start" })
         yield* run.followUp({ prompt: "follow before object" })
 
         const events = yield* Stream.runCollect(run.events)
 
         expect(calls).toBe(2)
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(2)
-        const structured = events.find((event) => event._tag === "StructuredOutput")
-        if (structured?._tag === "StructuredOutput") expect(structured.turn).toBe(2)
         const completed = events.at(-1)
-        if (completed?._tag === "Completed") expect(completed.turns).toBe(3)
+        if (completed?._tag === "Completed") {
+          expect(completed.turns).toBe(3)
+          expect(completed.output).toEqual({ ok: true })
+        }
       }).pipe(Effect.scoped),
     ] as const
   })
@@ -4953,7 +5062,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                 yield* Deferred.succeed(structuredStarted, undefined)
                 yield* Deferred.await(releaseStructured)
               }
-              return [{ type: "text" as const, text: '{"ok":true}' }]
+              return [{ type: "text" as const, text: '{"output":{"ok":true}}' }]
             }),
         ),
         unusedExecutor,
@@ -4964,8 +5073,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Effect.gen(function* () {
           structuredStarted = yield* Deferred.make<void>()
           releaseStructured = yield* Deferred.make<void>()
-          const agent = Agent.make({ name: "structured-completion-steering-agent" })
-          const run = yield* Agent.allocateRun(agent, { prompt: "start", output: { schema: objectSchema } })
+          const agent = Agent.make({ name: "structured-completion-steering-agent", output: objectSchema })
+          const run = yield* Agent.allocateRun(agent, { prompt: "start" })
           const fiber = yield* Stream.runCollect(run.events).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(structuredStarted)
           yield* run.followUp({ prompt: "late follow-up" })
@@ -4975,7 +5084,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
           expect(streamCalls).toBe(2)
           expect(structuredCalls).toBe(2)
-          expect(events.filter((event) => event._tag === "StructuredOutput")).toHaveLength(1)
           expect(events.filter((event) => event._tag === "Completed")).toHaveLength(1)
           expect(events.filter((event) => event._tag === "SteeringDrained" && event.queue === "followUp")).toHaveLength(
             1,
@@ -5048,7 +5156,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           name: "interrupt-waiting-approval-agent",
           toolkit: Toolkit.make(waitingApprovalTool),
         })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "needs approval")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -5093,7 +5201,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "tool-orphan-agent", toolkit: Toolkit.make(echoTool) })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "run the tool" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "run the tool")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -5142,7 +5250,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "tool-prompt-agent", toolkit: Toolkit.make(echoTool) })
         const fiber = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "run the tool", toolProgress: { _tag: "Backpressure", capacity: 1 } }),
+          Agent.stream(agent, "run the tool", {
+            toolProgress: { _tag: "Backpressure", capacity: 1 },
+          }),
         ).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(started)
@@ -5192,7 +5302,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "tool-wedge-agent", toolkit: Toolkit.make(echoTool) })
         const fiber = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "run the tool", toolProgress: { _tag: "Backpressure", capacity: 1 } }),
+          Agent.stream(agent, "run the tool", {
+            toolProgress: { _tag: "Backpressure", capacity: 1 },
+          }),
         ).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(started)
@@ -5245,7 +5357,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "approval-orphan-agent", toolkit: Toolkit.make(orphanApprovalTool) })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "needs approval")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -5281,7 +5393,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const currentStarted = yield* Deferred.make<void>()
         started = currentStarted
         const agent = Agent.make({ name: "external-interrupt-model-stream-agent" })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "never emit" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "never emit")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -5324,7 +5436,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           name: "interrupt-approval-agent",
           toolkit: Toolkit.make(interruptibleApprovalTool),
         })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "needs approval")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -5353,7 +5465,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const currentStarted = yield* Deferred.make<void>()
         started = currentStarted
         const agent = Agent.make({ name: "interrupt-model-stream-agent" })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "never emit" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "never emit")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -5399,7 +5511,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "abort-agent", toolkit: Toolkit.make(echoTool) })
-        const run = Stream.runDrain(Agent.stream(agent, { prompt: "abort the tool" }))
+        const run = Stream.runDrain(Agent.stream(agent, "abort the tool"))
 
         const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
@@ -5460,7 +5572,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           onCheckpoint: () => Effect.void,
         }
 
-        const events = yield* Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session" }).pipe(
+        const events = yield* Agent.stream(agent, "use big tool", {
+          sessionId: "spill-session",
+        }).pipe(
           Stream.tap((event) =>
             event._tag === "ToolExecutionCompleted"
               ? Effect.sync(() => {
@@ -5571,8 +5685,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "checkpoint both tools",
+          Agent.stream(agent, "checkpoint both tools", {
             memory: { key: { agent: "tool-result-checkpoint-agent", subject: "issue-67" } },
             sessionId: "tool-result-checkpoint",
           }),
@@ -5631,7 +5744,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         yield* Stream.runDrain(
-          Agent.stream(Agent.make({ name: "serial-tools", toolkit: Toolkit.make(echoTool) }), { prompt: "run" }),
+          Agent.stream(Agent.make({ name: "serial-tools", toolkit: Toolkit.make(echoTool) }), "run"),
         )
         expect(maximum).toBe(1)
       }),
@@ -5698,7 +5811,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(echoTool),
           toolScheduling: { maxConcurrency: 3, parallelSafe: ["echo"] },
         })
-        const fiber = yield* Stream.runCollect(Agent.stream(agent, { prompt: "run" })).pipe(Effect.forkChild)
+        const fiber = yield* Stream.runCollect(Agent.stream(agent, "run")).pipe(Effect.forkChild)
         yield* Deferred.await(allStarted)
         expect(maximum).toBe(3)
         yield* Deferred.succeed(releases.get("concurrent-third")!, undefined)
@@ -5813,7 +5926,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(echoTool, gatedTool),
           toolScheduling: { maxConcurrency: 2, parallelSafe: ["echo"] },
         })
-        const fiber = yield* Agent.stream(agent, { prompt: "run" }).pipe(
+        const fiber = yield* Agent.stream(agent, "run").pipe(
           Stream.tap((event) =>
             event._tag === "ToolProgress" && event.message === "live"
               ? Deferred.succeed(progressObserved!, undefined)
@@ -5877,7 +5990,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "multi-usage-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use the echo tool"))
 
         const turnCompleted = events.filter((event) => event._tag === "TurnCompleted")
         expect(turnCompleted).toHaveLength(2)
@@ -5898,13 +6011,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "emits StructuredOutput immediately before Completed", () => {
+  ItLayer.make(it, "ends with Completed carrying the typed output", () => {
     const structuredUsage = usage({ total: 3 }, { total: 1, text: 1 })
     return [
       Layer.mergeAll(
         modelLayer(
           () => Stream.make(textDelta("normal answer")),
-          () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
+          () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }, finishPart("stop", structuredUsage)]),
         ),
         Session.layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
@@ -5913,12 +6026,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-agent" })
+        const agent = Agent.make({ name: "structured-agent", output: objectSchema })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "make object",
-            output: { schema: objectSchema },
+          Agent.stream(agent, "make object", {
             sessionId: "structured-output",
           }),
         )
@@ -5939,20 +6050,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           "ModelAttemptFirstOutput",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
-          "StructuredOutput",
           "Completed",
         ])
-        const structuredIndex = events.findIndex((event) => event._tag === "StructuredOutput")
-        expect(structuredIndex).toBe(events.length - 2)
-        const structured = events[structuredIndex]
-        if (structured?._tag === "StructuredOutput") {
-          expect(structured.turn).toBe(1)
-          expect(structured.value).toEqual({ ok: true })
-          expect(structured.content.some((part) => part.type === "finish")).toBe(true)
-        }
         const completed = events.at(-1)
         if (completed?._tag === "Completed") {
           expect(completed.text).toBe("normal answer")
+          expect(completed.output).toEqual({ ok: true })
           expect(completed.turns).toBe(2)
           expect(completed.usage).toEqual(structuredUsage)
           expect(Json.stringify(completed.transcript.content)).toContain(Agent.defaultObjectPrompt)
@@ -5973,18 +6076,16 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Layer.mergeAll(
         modelLayer(
           () => Stream.fromIterable([textDelta("normal answer"), finishPart("length", streamedUsage)]),
-          () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
+          () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }, finishPart("stop", structuredUsage)]),
         ),
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-span-agent" })
+        const agent = Agent.make({ name: "structured-span-agent", output: objectSchema })
 
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }),
-        ).pipe(Effect.withTracer(tracer))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "make object")).pipe(Effect.withTracer(tracer))
 
         const runSpan = spans.find((span) => span.name === "Generalist.Agent.run")
         const turnSpans = spans.filter((span) => span.name === "Generalist.Agent.turn")
@@ -6015,7 +6116,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           "ModelAttemptFirstOutput",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
-          "StructuredOutput",
           "Completed",
         ])
         const completed = events.at(-1)
@@ -6036,7 +6136,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           () => Stream.fromIterable([textDelta("normal answer"), finishPart("stop", streamedUsage)]),
           () => {
             structuredCalled = true
-            return Effect.succeed([{ type: "text", text: '{"ok":true}' }])
+            return Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }])
           },
         ),
         unusedExecutor,
@@ -6044,9 +6144,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-lazy-span-agent" })
+        const agent = Agent.make({ name: "structured-lazy-span-agent", output: objectSchema })
 
-        const events = yield* Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }).pipe(
+        const events = yield* Agent.stream(agent, "make object").pipe(
           Stream.take(10),
           Stream.runCollect,
           Effect.withTracer(tracer),
@@ -6074,29 +6174,24 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(
     it,
-    "generate returns the typed structured value when schema is set",
+    "run returns the typed structured value declared by the agent",
     () =>
       [
         Layer.mergeAll(
           modelLayer(
             () => Stream.make(textDelta("normal answer")),
-            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+            () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }]),
           ),
           unusedExecutor,
           Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
-          const agent = Agent.make({ name: "generate-object-agent" })
+          const agent = Agent.make({ name: "run-object-agent", output: objectSchema })
 
-          const result = yield* Agent.generate(agent, {
-            prompt: "make typed object",
-            output: { schema: objectSchema },
-          })
+          const result = yield* Agent.run(agent, "make typed object")
 
-          expect(result.text).toBe("normal answer")
-          expect(result.turns).toBe(2)
-          expect(result.value).toEqual({ ok: true })
+          expect(result).toEqual({ ok: true })
         }),
       ] as const,
   )
@@ -6118,7 +6213,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
           (options) => {
             structuredPrompt = Json.stringify(options.prompt.content)
-            return Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)])
+            return Effect.succeed([
+              { type: "text", text: '{"output":{"ok":true}}' },
+              finishPart("stop", structuredUsage),
+            ])
           },
         ),
         echoExecutor,
@@ -6126,11 +6224,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-tool-agent", toolkit: Toolkit.make(echoTool) })
+        const agent = Agent.make({
+          name: "structured-tool-agent",
+          output: objectSchema,
+          toolkit: Toolkit.make(echoTool),
+        })
 
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "use tool", output: { schema: objectSchema } }),
-        ).pipe(Effect.withTracer(tracer))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use tool")).pipe(Effect.withTracer(tracer))
 
         expect(streamCalls).toBe(2)
         expect(structuredPrompt).toContain("from model")
@@ -6162,7 +6262,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           "ModelAttemptFirstOutput",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
-          "StructuredOutput",
           "Completed",
         ])
         const runSpan = spans.find((span) => span.name === "Generalist.Agent.run")
@@ -6170,14 +6269,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(turnSpans.map((span) => span.attributes.get("generalist.turn"))).toEqual([0, 1, 2])
         expect(runSpan).toBeDefined()
         expect(turnSpans.every((span) => Option.getOrUndefined(span.parent) === runSpan)).toBe(true)
-        const structured = events.find((event) => event._tag === "StructuredOutput")
-        if (structured?._tag === "StructuredOutput") {
-          expect(structured.turn).toBe(2)
-          expect(structured.content.some((part) => part.type === "finish")).toBe(true)
-        }
         const completed = events.at(-1)
         if (completed?._tag === "Completed") {
           expect(completed.text).toBe("after tool")
+          expect(completed.output).toEqual({ ok: true })
           expect(completed.turns).toBe(3)
           expect(completed.usage).toEqual(structuredUsage)
         }
@@ -6185,31 +6280,28 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "fails AgentError at the structured turn when schema decoding fails", () => {
+  ItLayer.make(it, "fails InvalidOutput when the model output does not satisfy the agent schema", () => {
     const { spans, tracer } = testTracer()
     return [
       Layer.mergeAll(
         modelLayer(
           () => Stream.make(textDelta("normal answer")),
-          () => Effect.succeed([{ type: "text", text: '{"ok":"nope"}' }]),
+          () => Effect.succeed([{ type: "text", text: '{"output":{"ok":"nope"}}' }]),
         ),
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-decode-agent" })
+        const agent = Agent.make({ name: "structured-decode-agent", output: objectSchema })
 
         const failure = yield* Effect.flip(
-          Stream.runCollect(Agent.stream(agent, { prompt: "bad object", output: { schema: objectSchema } })).pipe(
-            Effect.withTracer(tracer),
-          ),
+          Stream.runCollect(Agent.stream(agent, "bad object")).pipe(Effect.withTracer(tracer)),
         )
 
-        expect(failure._tag).toBe("generalist/core/AgentError")
-        if (failure._tag === "generalist/core/AgentError") {
-          expect(failure.turn).toBe(1)
-          expect(AiError.isAiError(failure.cause)).toBe(true)
+        expect(failure._tag).toBe("generalist/core/InvalidOutput")
+        if (failure._tag === "generalist/core/InvalidOutput") {
+          expect(failure.issues).not.toHaveLength(0)
         }
         const structuredSpan = spans.find(
           (span) => span.name === "Generalist.Agent.turn" && span.attributes.get("generalist.turn") === 1,
@@ -6238,11 +6330,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "structured-defect-agent" })
+        const agent = Agent.make({ name: "structured-defect-agent", output: objectSchema })
 
-        const exit = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "defect object", output: { schema: objectSchema } }),
-        ).pipe(Effect.withTracer(tracer), Effect.exit)
+        const exit = yield* Stream.runDrain(Agent.stream(agent, "defect object")).pipe(
+          Effect.withTracer(tracer),
+          Effect.exit,
+        )
 
         expect(Exit.isFailure(exit)).toBe(true)
         if (Exit.isFailure(exit)) expect(Cause.hasDies(exit.cause)).toBe(true)
@@ -6278,10 +6371,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         structuredStarted = yield* Deferred.make<void>()
-        const agent = Agent.make({ name: "structured-interrupt-agent" })
-        const fiber = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "interrupt object", output: { schema: objectSchema } }),
-        ).pipe(Effect.withTracer(tracer), Effect.forkChild)
+        const agent = Agent.make({ name: "structured-interrupt-agent", output: objectSchema })
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "interrupt object")).pipe(
+          Effect.withTracer(tracer),
+          Effect.forkChild,
+        )
 
         yield* Deferred.await(structuredStarted)
         yield* Fiber.interrupt(fiber)
@@ -6321,7 +6415,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             sawResumedToolResult = sawResumedToolResult || Json.stringify(options.prompt.content).includes("resumed")
             return Stream.make(textDelta("after resume"))
           },
-          () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+          () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }]),
         ),
         ToolExecutor.layerTest({
           execute: () => {
@@ -6335,8 +6429,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "resume-structured-agent", toolkit: Toolkit.make(echoTool) })
-        const suspension = yield* Agent.stream(agent, { prompt: "suspend before structured output" }).pipe(
+        const agent = Agent.make({
+          name: "resume-structured-agent",
+          output: objectSchema,
+          toolkit: Toolkit.make(echoTool),
+        })
+        const suspension = yield* Agent.stream(agent, "suspend before structured output").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -6350,14 +6448,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpoint,
             resume: {
               suspension,
               resolutions: [toolResultResolution(suspension, "tool-call-resume-structured", "resumed")],
             },
-            output: { schema: objectSchema },
           }),
         ).pipe(Effect.withTracer(tracer))
 
@@ -6381,7 +6477,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           "ModelAttemptFirstOutput",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
-          "StructuredOutput",
           "Completed",
         ])
         const runSpan = spans.find((span) => span.name === "Generalist.Agent.run")
@@ -6389,11 +6484,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(turnSpans.map((span) => span.attributes.get("generalist.turn"))).toEqual([0, 1, 2])
         expect(runSpan).toBeDefined()
         expect(turnSpans.every((span) => Option.getOrUndefined(span.parent) === runSpan)).toBe(true)
-        const structured = events.find((event) => event._tag === "StructuredOutput")
-        if (structured?._tag === "StructuredOutput") expect(structured.turn).toBe(2)
         const completed = events.at(-1)
         if (completed?._tag === "Completed") {
           expect(completed.text).toBe("after resume")
+          expect(completed.output).toEqual({ ok: true })
           expect(completed.turns).toBe(3)
         }
       }),
@@ -6410,7 +6504,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             structuredCalls += 1
             return structuredCalls === 1
               ? Effect.fail(transientModelError)
-              : Effect.succeed([{ type: "text", text: '{"ok":true}' }])
+              : Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }])
           },
         ),
         unusedExecutor,
@@ -6419,24 +6513,17 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "resilient-structured-agent" })
+        const agent = Agent.make({ name: "resilient-structured-agent", output: objectSchema })
 
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "retry object", output: { schema: objectSchema } }),
-        )
+        const events = yield* Stream.runCollect(Agent.stream(agent, "retry object"))
 
         expect(structuredCalls).toBe(2)
-        const structured = events.find((event) => event._tag === "StructuredOutput")
-        if (structured?._tag === "StructuredOutput") {
-          expect(structured.value).toEqual({ ok: true })
+        const completed = events.at(-1)
+        if (completed?._tag === "Completed") {
+          expect(completed.output).toEqual({ ok: true })
           const successfulAttempt = events.findLast((event) => event._tag === "ModelAttemptCompleted")
           const structuredCall = events.findLast((event) => event._tag === "ModelCallStarted")
-          expect(structured.modelCallId).toBe(
-            successfulAttempt?._tag === "ModelAttemptCompleted" ? successfulAttempt.modelCallId : undefined,
-          )
-          expect(structured.modelAttemptId).toBe(
-            successfulAttempt?._tag === "ModelAttemptCompleted" ? successfulAttempt.modelAttemptId : undefined,
-          )
+          expect(successfulAttempt?._tag).toBe("ModelAttemptCompleted")
           expect(structuredCall?._tag === "ModelCallStarted" && structuredCall.purpose).toBe("structured-output")
         }
       }),
@@ -6462,11 +6549,15 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedModelLayer,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
+        const agent = Agent.make({
+          name: "terminal-structured-overflow-agent",
+          output: objectSchema,
+          model: overflowSelection,
+        })
         const seen: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
-          Agent.stream(agent, { prompt: "large object", output: { schema: objectSchema } }).pipe(
+          Agent.stream(agent, "large object").pipe(
             Stream.tap((event) => Effect.sync(() => seen.push(event))),
             Stream.runDrain,
           ),
@@ -6475,7 +6566,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(structuredCalls).toBe(1)
         expect(failure._tag).toBe("generalist/core/AgentError")
         if (failure._tag === "generalist/core/AgentError") expect(failure.cause).toBe(overflow)
-        expect(seen.some((event) => event._tag === "StructuredOutput")).toBe(false)
+        expect(seen.some((event) => event._tag === "Completed")).toBe(false)
       }),
     ] as const
   })
@@ -6494,7 +6585,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "error-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "relay input" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "relay input")))
 
         expect(failure._tag).toBe("generalist/core/AgentError")
         expect(failure._tag === "generalist/core/AgentError" && failure.message).toContain("stream exploded")
@@ -6522,7 +6613,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "channel-error-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "relay input" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "relay input")))
 
         expect(failure._tag).toBe("generalist/core/AgentError")
         expect(failure._tag === "generalist/core/AgentError" && failure.message).toContain("stream channel exploded")
@@ -6544,7 +6635,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events: Array<AgentEvent.Event> = []
         const agent = Agent.make({ name: "defective-model-agent" })
 
-        const exit = yield* Agent.stream(agent, { prompt: "relay input" }).pipe(
+        const exit = yield* Agent.stream(agent, "relay input").pipe(
           Stream.runForEach((event) => Effect.sync(() => events.push(event))),
           Effect.exit,
         )
@@ -6577,7 +6668,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events: Array<AgentEvent.Event> = []
         const agent = Agent.make({ name: "compound-model-agent" })
 
-        const exit = yield* Agent.stream(agent, { prompt: "relay input" }).pipe(
+        const exit = yield* Agent.stream(agent, "relay input").pipe(
           Stream.runForEach((event) => Effect.sync(() => events.push(event))),
           Effect.exit,
         )
@@ -6604,7 +6695,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-model-retry-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "retry disabled" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "retry disabled")))
 
         expect(calls).toBe(1)
         expect(failure._tag).toBe("generalist/core/AgentError")
@@ -6629,7 +6720,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-retry-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "retry model" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "retry model"))
 
         expect(calls).toBe(2)
         const completed = events.at(-1)
@@ -6661,7 +6752,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-terminal-failure-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "terminal model" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "terminal model")))
 
         expect(calls).toBe(1)
         expect(classifications).toBe(1)
@@ -6687,7 +6778,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-partial-failure-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "partial model" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "partial model")))
 
         expect(calls).toBe(1)
         expect(failure._tag).toBe("generalist/core/AgentError")
@@ -6714,7 +6805,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-in-band-error-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "in-band error" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "in-band error"))
 
         expect(calls).toBe(2)
         const completed = events.at(-1)
@@ -6762,7 +6853,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           policy: Policy.make(() => Effect.succeed(Policy.decision.continue({ model: overrideModel }))),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool then override" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use tool then override"))
 
         expect(ambientCalls).toBe(1)
         expect(overrideCalls).toBe(2)
@@ -6793,7 +6884,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           policy: Policy.recurs(0),
         })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "loop forever" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "loop forever")))
 
         expect(calls).toBe(1)
         expect(failure._tag).toBe("generalist/core/TurnLimitExceeded")
@@ -6826,7 +6917,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         policy: Policy.recurs(0),
         toolScheduling: { maxConcurrency: 2, parallelSafe: ["echo"] },
       })
-      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "call twice" })))
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "call twice")))
       expect(failure._tag).toBe("generalist/core/TurnLimitExceeded")
       if (failure._tag === "generalist/core/TurnLimitExceeded") {
         expect(failure.pending).toEqual([
@@ -6862,7 +6953,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         > = true
         expect(requirementProof).toBe(true)
 
-        const events = yield* Stream.runCollect(Agent.stream(defaultPolicyAgent, { prompt: "loop until done" }))
+        const events = yield* Stream.runCollect(Agent.stream(defaultPolicyAgent, "loop until done"))
 
         expect(calls).toBe(13)
         const completed = events.at(-1)
@@ -6887,7 +6978,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "natural-completion-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "answer once" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "answer once"))
 
         expect(calls).toBe(1)
         const completed = events.at(-1)
@@ -6917,7 +7008,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const currentDeepTurns = yield* Deferred.make<void>()
         deepTurns = currentDeepTurns
         const agent = Agent.make({ name: "interrupt-forever-agent", toolkit: Toolkit.make(echoTool) })
-        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "loop forever" })).pipe(
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, "loop forever")).pipe(
           Effect.forkChild({ startImmediately: true }),
         )
 
@@ -6957,7 +7048,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
         )
         const agent = Agent.make({ name: "budget-policy-agent", toolkit: Toolkit.make(echoTool), policy })
-        const run = Agent.stream(agent, { prompt: "use budget" })
+        const run = Agent.stream(agent, "use budget")
         const requirementProof: Budget extends StreamServices<typeof run> ? true : false = true
 
         const failure = yield* Effect.flip(Stream.runCollect(run))
@@ -6999,7 +7090,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             toolkit: Toolkit.make(echoTool),
             policy: Policy.make(() => Effect.succeed(Policy.decision.stop(reason))),
           })
-          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "stop" })))
+          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "stop")))
           expect(failure._tag).toBe("generalist/core/PolicyStopped")
           if (failure._tag === "generalist/core/PolicyStopped") expect(failure.reason).toEqual(reason)
         }
@@ -7027,7 +7118,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           policy: Policy.make(() => Effect.fail(policyFailure)),
         })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use policy" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "use policy")))
 
         expect(failure).toBe(policyFailure)
         expect(failure.cause).toBe(policyCause)
@@ -7048,7 +7139,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "stale-policy-agent", toolkit: Toolkit.make(echoTool), policy })
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use stale policy" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "use stale policy")))
         expect(failure._tag).toBe("generalist/core/TurnPolicyError")
         if (failure._tag === "generalist/core/TurnPolicyError") {
           expect(failure.message).toContain("Stop decisions must include a reason")
@@ -7084,7 +7175,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use the echo tool"))
 
         expect(secondCallSawInjectedSystem).toBe(true)
         expect(events.at(-1)?._tag).toBe("Completed")
@@ -7120,7 +7211,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           policy: Policy.make(() => Effect.succeed(Policy.decision.continue({ activeTools: [] }))),
         })
 
-        const failure = yield* Agent.stream(agent, { prompt: "use then hide echo" }).pipe(Stream.runDrain, Effect.flip)
+        const failure = yield* Agent.stream(agent, "use then hide echo").pipe(Stream.runDrain, Effect.flip)
 
         expect(failure._tag).toBe("generalist/core/AgentError")
         expect(secondTurnTools).toEqual([])
@@ -7148,7 +7239,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             toolkit: Toolkit.make(echoTool),
           })
 
-          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "wait please" })))
+          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "wait please")))
 
           expect(failure._tag).toBe("generalist/core/AgentSuspended")
           if (failure._tag === "generalist/core/AgentSuspended") {
@@ -7201,7 +7292,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "provider-metadata-resume-agent", toolkit: Toolkit.make(echoTool) })
-        const suspension = yield* Agent.stream(agent, { prompt: "wait" }).pipe(
+        const suspension = yield* Agent.stream(agent, "wait").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7223,8 +7314,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ).toEqual(metadata)
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpoint,
             resume: {
               suspension,
@@ -7263,7 +7353,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "tool-wait-denial-agent", toolkit: Toolkit.make(echoTool) })
-        const suspension = yield* Agent.stream(agent, { prompt: "wait" }).pipe(
+        const suspension = yield* Agent.stream(agent, "wait").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7275,8 +7365,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (suspension._tag !== "generalist/core/AgentSuspended" || checkpoint === undefined) {
           return yield* Effect.die("missing tool-wait suspension")
         }
-        const failure = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const failure = yield* Agent.stream(agent, "ignored", {
           history: checkpoint,
           resume: {
             suspension,
@@ -7374,7 +7463,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(echoTool),
           toolScheduling: { maxConcurrency: 2, parallelSafe: ["echo"] },
         })
-        const first = Agent.stream(agent, { prompt: "run ordinary and child tools" }).pipe(
+        const first = Agent.stream(agent, "run ordinary and child tools").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") suspendedTranscript = event.transcript
@@ -7400,8 +7489,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(checkpoint).not.toContain("later complete")
 
         const resumed = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: suspendedTranscript,
             resume: {
               suspension,
@@ -7463,7 +7551,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolScheduling: { maxConcurrency: 3, parallelSafe: ["echo"] },
         })
         const sessionId = "concurrent-delegation"
-        const suspension = yield* Agent.stream(agent, { prompt: "delegate concurrently", sessionId }).pipe(
+        const suspension = yield* Agent.stream(agent, "delegate concurrently", {
+          sessionId,
+        }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7480,8 +7570,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(modelCalls).toBe(1)
 
         let checkpointAfterFirst: Prompt.Prompt | undefined
-        const afterFirst = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const afterFirst = yield* Agent.stream(agent, "ignored", {
           history: checkpoint,
           resume: {
             suspension,
@@ -7512,8 +7601,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(modelCalls).toBe(1)
 
         let checkpointAfterThird: Prompt.Prompt = checkpointAfterFirst
-        const afterThird = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const afterThird = yield* Agent.stream(agent, "ignored", {
           history: checkpointAfterFirst,
           resume: {
             suspension: afterFirst,
@@ -7546,8 +7634,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(modelCalls).toBe(1)
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpointAfterThird,
             resume: {
               suspension: afterThird,
@@ -7627,7 +7714,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(gatedTool, echoTool, exclusiveTool),
           toolScheduling: { maxConcurrency: 3, parallelSafe: ["gated", "echo"] },
         })
-        const first = yield* Agent.stream(agent, { prompt: "run mixed waits" }).pipe(
+        const first = yield* Agent.stream(agent, "run mixed waits").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7649,8 +7736,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         let checkpointAfterPartial: Prompt.Prompt | undefined
         const approvalFirst = first.waits.find((wait) => wait.call.id === "approval-first")!
-        const afterPartial = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const afterPartial = yield* Agent.stream(agent, "ignored", {
           history: checkpoint,
           resume: {
             suspension: first,
@@ -7684,8 +7770,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const approvalThird = afterPartial.waits[0]!
         const completed = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpointAfterPartial,
             resume: {
               suspension: afterPartial,
@@ -7728,7 +7813,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "bound-resume-token-agent", toolkit: Toolkit.make(echoTool) })
-        const suspension = yield* Agent.stream(agent, { prompt: "suspend" }).pipe(
+        const suspension = yield* Agent.stream(agent, "suspend").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7745,8 +7830,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           checkpoint: suspension.checkpoint,
           waits: suspension.waits.map((wait, index) => (index === 0 ? { ...wait, token: "fabricated-token" } : wait)),
         })
-        const mismatch = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const mismatch = yield* Agent.stream(agent, "ignored", {
           history: checkpoint,
           resume: {
             suspension: received,
@@ -7791,7 +7875,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "authorization-resume-agent", toolkit: Toolkit.make(gatedTool) })
-        const failure = yield* Agent.stream(agent, { prompt: "suspend authorization" }).pipe(
+        const failure = yield* Agent.stream(agent, "suspend authorization").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7805,8 +7889,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpoint,
             resume: {
               suspension: failure,
@@ -7849,7 +7932,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           name: "substituted-resume-agent",
           toolkit: Toolkit.make(echoTool),
         })
-        const suspension = yield* Agent.stream(agent, { prompt: "suspend" }).pipe(
+        const suspension = yield* Agent.stream(agent, "suspend").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7879,8 +7962,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
         ]
         for (const received of mismatches) {
-          const failure = yield* Agent.stream(agent, {
-            prompt: "ignored",
+          const failure = yield* Agent.stream(agent, "ignored", {
             history: checkpoint,
             resume: { suspension: received },
           }).pipe(Stream.runDrain, Effect.flip)
@@ -7912,8 +7994,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const staleCall = toolCallPart("stale-call", "echo", { text: "stale" })
         const received = suspendedCall(staleCall, "stale-token")
         const agent = Agent.make({ name: "missing-resume-agent", toolkit: Toolkit.make(echoTool) })
-        const failure = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const failure = yield* Agent.stream(agent, "ignored", {
           history: [{ role: "user", content: [{ type: "text", text: "completed" }] }],
           resume: { suspension: received },
         }).pipe(Stream.runDrain, Effect.flip)
@@ -7945,7 +8026,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             authorization: { authorize: () => Effect.succeed({ _tag: "Suspend" as const, token: "custom-token" }) },
           })
 
-          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "suspend" })))
+          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "suspend")))
 
           expect(failure._tag).toBe("generalist/core/AgentSuspended")
           if (failure._tag !== "generalist/core/AgentSuspended") return expect.unreachable()
@@ -7971,7 +8052,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "bound-resume-agent", toolkit: Toolkit.make(gatedTool) })
-        const failure = yield* Agent.stream(agent, { prompt: "suspend" }).pipe(
+        const failure = yield* Agent.stream(agent, "suspend").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -7986,8 +8067,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const resumeFailure = yield* Effect.flip(
           Stream.runDrain(
-            Agent.stream(agent, {
-              prompt: "ignored",
+            Agent.stream(agent, "ignored", {
               history: checkpoint,
               resume: {
                 suspension: replaceSuspension(failure, {
@@ -8050,7 +8130,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resumable-skill-agent", policy })
-        const failure = yield* Agent.stream(agent, { prompt: "review" }).pipe(
+        const failure = yield* Agent.stream(agent, "review").pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -8062,8 +8142,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (failure._tag !== "generalist/core/AgentSuspended" || checkpoint === undefined) return expect.unreachable()
 
         yield* Stream.runDrain(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpoint,
             resume: {
               suspension: failure,
@@ -8102,7 +8181,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             toolkit: Toolkit.make(gatedTool),
           })
 
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider already handled it" }))
+          const events = yield* Stream.runCollect(Agent.stream(agent, "provider already handled it"))
 
           expect(events.map((event) => event._tag)).toEqual([
             "TurnStarted",
@@ -8167,12 +8246,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reused-provider-call-agent", toolkit: Toolkit.make(gatedTool) })
-        const first = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider call" }))
+        const first = yield* Stream.runCollect(Agent.stream(agent, "provider call"))
         const firstTurn = first.find((event) => event._tag === "TurnCompleted")
         if (firstTurn?._tag !== "TurnCompleted") return expect.unreachable()
 
         let checkpoint: Prompt.Prompt | undefined
-        const suspended = yield* Agent.stream(agent, { prompt: "framework call", history: firstTurn.transcript }).pipe(
+        const suspended = yield* Agent.stream(agent, "framework call", {
+          history: firstTurn.transcript,
+        }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
               if (event._tag === "TurnCompleted") checkpoint = event.transcript
@@ -8186,8 +8267,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }
 
         const resumed = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored",
+          Agent.stream(agent, "ignored", {
             history: checkpoint,
             resume: {
               suspension: suspended,
@@ -8198,8 +8278,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const resumedTurn = resumed.find((event) => event._tag === "TurnCompleted")
         if (resumedTurn?._tag !== "TurnCompleted") return expect.unreachable()
-        const duplicate = yield* Agent.stream(agent, {
-          prompt: "ignored",
+        const duplicate = yield* Agent.stream(agent, "ignored", {
           history: resumedTurn.transcript,
           resume: { suspension: suspended },
         }).pipe(Stream.runDrain, Effect.flip)
@@ -8254,7 +8333,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "dynamic-approval-agent", toolkit: Toolkit.make(dynamicTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "safe amount" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "safe amount"))
 
         expect(executed).toBe(1)
         expect(sawParams).toEqual({ amount: 10 })
@@ -8299,9 +8378,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "large amount" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+          Stream.runForEach(Agent.stream(agent, "large amount"), (event) => Effect.sync(() => events.push(event))),
         )
 
         expect(approvals).toBe(1)
@@ -8362,7 +8439,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const events: Array<AgentEvent.Event> = []
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "needs approval fail closed" }), (event) =>
+          Stream.runForEach(Agent.stream(agent, "needs approval fail closed"), (event) =>
             Effect.sync(() => events.push(event)),
           ),
         )
@@ -8397,7 +8474,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(gatedTool),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use the gated tool"))
 
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
@@ -8430,7 +8507,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const events: Array<AgentEvent.Event> = []
         const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "use the gated tool" }), (event) =>
+          Stream.runForEach(Agent.stream(agent, "use the gated tool"), (event) =>
             Effect.sync(() => events.push(event)),
           ),
         )
@@ -8464,7 +8541,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             toolkit: Toolkit.make(gatedTool),
           })
 
-          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" })))
+          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "use the gated tool")))
 
           expect(failure._tag).toBe("generalist/core/AgentSuspended")
           if (failure._tag === "generalist/core/AgentSuspended") {
@@ -8497,7 +8574,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(echoTool),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use the echo tool"))
 
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
         expect(events.at(-1)?._tag).toBe("Completed")
@@ -8527,8 +8604,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         },
       }
       const events = yield* Stream.runCollect(
-        Agent.stream(agent, {
-          prompt: "continue",
+        Agent.stream(agent, "continue", {
           logicalOperationId: "operation:restored",
           executableRef: executable.ref,
           driverCheckpoint: checkpoint,
@@ -8579,8 +8655,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           onCompleted: () => Effect.void,
           onCheckpoint: () => Effect.void,
         }
-        yield* Agent.stream(agent, {
-          prompt: "continue",
+        yield* Agent.stream(agent, "continue", {
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           modelCallOrdinalStart: 40,
@@ -8610,8 +8685,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               safeCheckpoint = checkpoint
             }),
         }
-        const events = yield* Agent.stream(agent, {
-          prompt: Prompt.empty,
+        const events = yield* Agent.stream(agent, "", {
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: pending!,
@@ -8645,8 +8719,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           onCompleted: () => Effect.void,
           onCheckpoint: () => Effect.void,
         }
-        const overrideEvents = yield* Agent.stream(agent, {
-          prompt: Prompt.empty,
+        const overrideEvents = yield* Agent.stream(agent, "", {
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: safeCheckpoint!,
@@ -8688,8 +8761,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "telemetry-agent", toolkit: Toolkit.make(echoTool) })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "use the echo tool",
+          Agent.stream(agent, "use the echo tool", {
             logicalOperationId: "operation:telemetry-offset",
             modelCallOrdinalStart: 7,
           }),
@@ -8743,7 +8815,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "delivery-agent" }), { prompt: "go", sessionId: "delivery-session" }),
+          Agent.stream(Agent.make({ name: "delivery-agent" }), "go", {
+            sessionId: "delivery-session",
+          }),
         )
         const live = events.filter((event): event is ModelTelemetry.Event => "deliveryId" in event)
         const delivered = batches.flat()
@@ -8782,7 +8856,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const seen: Array<AgentEvent.Event> = []
         const failure = yield* Effect.flip(
           Stream.runDrain(
-            Agent.stream(Agent.make({ name: "delivery-failure-agent" }), { prompt: "go" }).pipe(
+            Agent.stream(Agent.make({ name: "delivery-failure-agent" }), "go").pipe(
               Stream.tap((event) => Effect.sync(() => seen.push(event))),
             ),
           ),
@@ -8822,7 +8896,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const seen: Array<AgentEvent.Event> = []
         const fiber = yield* Stream.runDrain(
-          Agent.stream(Agent.make({ name: "hanging-delivery-agent" }), { prompt: "go" }).pipe(
+          Agent.stream(Agent.make({ name: "hanging-delivery-agent" }), "go").pipe(
             Stream.tap((event) => Effect.sync(() => seen.push(event))),
           ),
         ).pipe(Effect.forkChild)
@@ -8853,7 +8927,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "retry-telemetry-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "retry stream" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "retry stream"))
 
         const attemptsStarted = events.filter((event) => event._tag === "ModelAttemptStarted")
         const attemptFailed = events.filter((event) => event._tag === "ModelAttemptFailed")
@@ -8881,18 +8955,16 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Layer.mergeAll(
           modelLayer(
             () => Stream.make(textDelta("normal answer")),
-            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+            () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }]),
           ),
           unusedExecutor,
           Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
-          const agent = Agent.make({ name: "structured-telemetry-agent" })
+          const agent = Agent.make({ name: "structured-telemetry-agent", output: objectSchema })
 
-          const events = yield* Stream.runCollect(
-            Agent.stream(agent, { prompt: "object", output: { schema: objectSchema } }),
-          )
+          const events = yield* Stream.runCollect(Agent.stream(agent, "object"))
 
           const purposes = events
             .filter((event) => event._tag === "ModelCallStarted")
@@ -8924,7 +8996,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         const failure = yield* Effect.flip(
           Stream.runDrain(
-            Agent.stream(agent, { prompt: "fail" }).pipe(
+            Agent.stream(agent, "fail").pipe(
               Stream.tap((event) =>
                 Effect.sync(() => {
                   seen.push(event)
@@ -8955,7 +9027,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       )
       const agent = Agent.make({ name: "telemetry-interrupt-agent" })
       const seen: Array<AgentEvent.Event> = []
-      const run = Agent.stream(agent, { prompt: "hang" }).pipe(
+      const run = Agent.stream(agent, "hang").pipe(
         Stream.provide(providedModelLayer),
         Stream.tap((event) =>
           Effect.sync(() => {
@@ -9009,7 +9081,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ])
 
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "inline-image-compaction-agent" }), { prompt }),
+          Agent.stream(Agent.make({ name: "inline-image-compaction-agent", input: Schema.Any }), prompt),
         )
 
         expect(calls).toBe(1)
@@ -9046,7 +9118,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "compaction-telemetry-agent", toolkit: Toolkit.make(echoTool) })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "old context", sessionId: "compaction-telemetry" }),
+          Agent.stream(agent, "old context", {
+            sessionId: "compaction-telemetry",
+          }),
         )
 
         const compactionStarted = events.filter((event) => event._tag === "CompactionStarted")
@@ -9128,10 +9202,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "durable-compaction-agent", toolkit: Toolkit.make(echoTool) }), {
-            prompt: "old context",
-            sessionId: "durable-compaction",
-          }),
+          Agent.stream(
+            Agent.make({ name: "durable-compaction-agent", toolkit: Toolkit.make(echoTool) }),
+            "old context",
+            {
+              sessionId: "durable-compaction",
+            },
+          ),
         )
         const checkpoint = prepared.find((item) => item.compactionCommit?.summaryModelCallId !== undefined)
         expect(checkpoint).toBeDefined()
@@ -9233,8 +9310,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(Agent.make({ name: "microcompact-commit-agent", toolkit: Toolkit.make(echoTool) }), {
-            prompt: "compact",
+          Agent.stream(Agent.make({ name: "microcompact-commit-agent", toolkit: Toolkit.make(echoTool) }), "compact", {
             sessionId: "microcompact-commit",
           }),
         )
@@ -9272,9 +9348,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ),
     Effect.gen(function* () {
       const seen: Array<AgentEvent.Event> = []
-      const failure = yield* Agent.stream(Agent.make({ name: "failed-compaction-work-agent" }), {
-        prompt: "compact",
-      }).pipe(
+      const failure = yield* Agent.stream(Agent.make({ name: "failed-compaction-work-agent" }), "compact").pipe(
         Stream.tap((event) => Effect.sync(() => seen.push(event))),
         Stream.runDrain,
         Effect.flip,
@@ -9327,7 +9401,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const seen: Array<AgentEvent.Event> = []
         const failure = yield* Agent.stream(
           Agent.make({ name: "failed-compaction-checkpoint-agent", toolkit: Toolkit.make(echoTool) }),
-          { prompt: "compact", sessionId: "failed-compaction-checkpoint" },
+          "compact",
+          { sessionId: "failed-compaction-checkpoint" },
         ).pipe(
           Stream.tap((event) => Effect.sync(() => seen.push(event))),
           Stream.runDrain,
@@ -9374,7 +9449,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "tool-owned-model-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "use the echo tool"))
 
         const callsStarted = events.filter((event) => event._tag === "ModelCallStarted")
         const attemptsStarted = events.filter((event) => event._tag === "ModelAttemptStarted")
@@ -9397,7 +9472,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       const outerCell: ModelTelemetry.SummaryCallCell = { current: undefined }
 
       const events = yield* Stream.runCollect(
-        Agent.stream(agent, { prompt: "nested run inside a summarizer" }).pipe(
+        Agent.stream(agent, "nested run inside a summarizer").pipe(
           Stream.provideService(ModelTelemetry.CurrentPurpose, "compaction-summary"),
           Stream.provideService(ModelTelemetry.CurrentCompactionId, "outer-compaction"),
           Stream.provideService(ModelTelemetry.CurrentSummaryCall, outerCell),

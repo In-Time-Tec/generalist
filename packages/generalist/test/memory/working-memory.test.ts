@@ -89,7 +89,9 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
       })
       const agent = Agent.make({ name: key.agent })
       const run = (input: string) =>
-        Agent.generate(agent, { prompt: input, memory: { key } }).pipe(
+        Agent.run(agent, input, {
+          memory: { key },
+        }).pipe(
           Effect.provideService(LanguageModel.LanguageModel, model),
           Effect.provideService(Memory.Memory, Memory.Memory.of(memory)),
         )
@@ -223,9 +225,9 @@ layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }
           ),
       })
       const agent = Agent.make({ name: key.agent })
-      const run = Agent.generate(agent, { prompt: "repeated", memory: { key } }).pipe(
-        Effect.provideService(LanguageModel.LanguageModel, model),
-      )
+      const run = Agent.run(agent, "repeated", {
+        memory: { key },
+      }).pipe(Effect.provideService(LanguageModel.LanguageModel, model))
 
       yield* run
       yield* run

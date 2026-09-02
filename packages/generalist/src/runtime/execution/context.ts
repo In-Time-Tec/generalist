@@ -22,15 +22,20 @@ export const selectToolExecutor: {
  * @experimental Build the Run-scoped context that hosts one resolved Agent. The resolver environment is built once
  * for the Run, Runtime child tools wrap Code Mode and the resolved executor without replacing either.
  */
-export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: {
-  readonly agent: Agent<Tools, R>
-  readonly environment: Layer.Layer<ClosedServices<Tools, R>>
+export const hostContext = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  InputSchema extends import("effect").Schema.Top,
+  OutputSchema extends import("effect").Schema.Top,
+>(options: {
+  readonly agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>
+  readonly environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>
   readonly store: RunStoreService
   readonly codeMode: CodeModeService | undefined
   readonly nested: Operations
 }): Effect.Effect<
-  | Context.Context<ClosedServices<Tools, R> | ChildRuns | OperationsService>
-  | Context.Context<ClosedServices<Tools, R> | ChildRuns | OperationsService | ToolExecutor>,
+  | Context.Context<ClosedServices<Tools, R, InputSchema, OutputSchema> | ChildRuns | OperationsService>
+  | Context.Context<ClosedServices<Tools, R, InputSchema, OutputSchema> | ChildRuns | OperationsService | ToolExecutor>,
   never,
   Scope.Scope
 > =>

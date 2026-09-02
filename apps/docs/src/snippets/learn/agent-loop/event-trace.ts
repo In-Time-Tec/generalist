@@ -67,7 +67,7 @@ const layers = Layer.mergeAll(
 const describe = (event: AgentEvent.Event): string =>
   event._tag === "Completed" ? `Completed after ${event.turns} turns` : `turn ${event.turn} ${event._tag}`
 
-const program = Agent.stream(agent, { prompt: "What does Policy do?" }).pipe(
+const program = Agent.stream(agent, "What does Policy do?").pipe(
   Stream.filter((event) => event._tag !== "ModelPart"),
   Stream.runForEach((event) => Console.log(describe(event))),
 )

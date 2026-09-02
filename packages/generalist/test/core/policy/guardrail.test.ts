@@ -66,9 +66,9 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "guardrail-allow-agent" })
 
-        const result = yield* Agent.generate(agent, { prompt: "allowed" })
+        const result = yield* Agent.run(agent, "allowed")
 
-        expect(result.text).toBe("ok")
+        expect(result).toBe("ok")
         expect(modelCalled).toBe(true)
         expect(seenContext).toEqual({ agentName: "guardrail-allow-agent", turn: 0 })
       }),
@@ -91,7 +91,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "guardrail-block-agent" })
 
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "blocked" }))
+        const failure = yield* Effect.flip(Agent.run(agent, "blocked"))
 
         expect(modelCalled).toBe(false)
         expect(failure._tag).toBe("generalist/core/AgentError")
@@ -119,7 +119,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "redact-input-agent" })
 
-        yield* Agent.generate(agent, { prompt: "secret 123-45-6789" })
+        yield* Agent.run(agent, "secret 123-45-6789")
 
         expect(seenPrompt).not.toContain("123-45-6789")
         expect(seenPrompt).toContain("[redacted]")
@@ -217,7 +217,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "redact-output-agent" })
 
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+          const events = yield* Stream.runCollect(Agent.stream(agent, "hello"))
 
           const modelPart = events.find((event) => event._tag === "ModelPart")
           expect(modelPart?._tag === "ModelPart" && modelPart.part.type === "text-delta" && modelPart.part.delta).toBe(
@@ -247,7 +247,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "filter-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, "hello"))
 
         const deltas = events.filter((event) => event._tag === "ModelPart" && event.part.type === "text-delta")
         expect(deltas).toHaveLength(1)
@@ -281,7 +281,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
         const agent = Agent.make({ name: "filter-tool-agent", toolkit: Toolkit.make(echoTool) })
         const events: Array<AgentEvent.Event> = []
 
-        const failure = yield* Agent.stream(agent, { prompt: "use tool" }).pipe(
+        const failure = yield* Agent.stream(agent, "use tool").pipe(
           Stream.tap((event) => Effect.sync(() => events.push(event))),
           Stream.runDrain,
           Effect.flip,
@@ -323,9 +323,9 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "ordered-guardrails-agent" })
 
-        const result = yield* Agent.generate(agent, { prompt: "secret" })
+        const result = yield* Agent.run(agent, "secret")
 
-        expect(result.text).toBe("ok")
+        expect(result).toBe("ok")
         expect(modelCalled).toBe(true)
       }),
     ] as const

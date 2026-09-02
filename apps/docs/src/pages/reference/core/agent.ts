@@ -4,19 +4,18 @@ export const coreAgentReference = definePage({
   title: "Agent and run functions",
   navTitle: "Agent",
   group: "Reference",
-  description:
-    "Agent.make, allocateRun, stream and generate functions, truthful requirements, RunError, Resume, and Result.",
+  description: "Typed Agent.make input/output, run, stream, start, truthful requirements, RunError, and Resume.",
   content: [
     lead(
-      "The Agent namespace of generalist defines an opaque agent value, scoped Run handles, stream and generate projections, and every option and service a Run consumes.",
+      "The Agent namespace defines a typed agent value, process-local run and stream projections, a durable Runtime start, and every option and service a run consumes.",
     ),
     command("Install", "bun add effect@4.0.0-rc.112 generalist@0.45.0"),
     h2("agent-make", "Agent.make"),
     p(
       "An ",
-      code("Agent<Tools, R>"),
+      code("Agent<Tools, R, ..., InputSchema, OutputSchema>"),
       " is a plain value ",
-      code("{ name, instructions?, toolkit, policy, model?, memory?, metadata? }"),
+      code("{ name, input, output, instructions?, toolkit, policy, model?, memory?, metadata? }"),
       ", not a service. ",
       code("Agent.make(options)"),
       " fills defaults:",
@@ -25,6 +24,8 @@ export const coreAgentReference = definePage({
       ["Option", "Type", "Default"],
       [
         [[code("name")], [code("string")], "required"],
+        [[code("input")], [code("Schema")], [code("Schema.String")]],
+        [[code("output")], [code("Schema")], [code("Schema.String")]],
         [[code("instructions")], [code("string")], "none"],
         [[code("toolkit")], [code("Ai.Toolkit.Toolkit<Tools>")], [code("Ai.Toolkit.empty")]],
         [[code("policy")], [code("Policy.Policy")], [code("Policy.defaultPolicy")]],
@@ -62,9 +63,9 @@ export const coreAgentReference = definePage({
       " field is the only agent-level model default. For a registry-free run, omit it and provide a concrete ",
       code("LanguageModel"),
       " layer at the ",
-      code("Agent.stream"),
+      code("Agent.run"),
       " or ",
-      code("Agent.generate"),
+      code("Agent.stream"),
       " run boundary, where the layer requirements and scoped lifetime remain visible.",
     ),
     h2("run-functions", "Run functions"),
@@ -75,20 +76,25 @@ export const coreAgentReference = definePage({
           [code("Agent.allocateRun")],
           [
             code(
-              "(agent: Agent<Tools, R>, options: O) => Effect<RunHandle<Tools, R, O>, Steering.PolicyInvalid, Scope>",
+              "(agent: Agent<..., I, O>, options: RunOptions) => Effect<RunHandle<Event<O.Type>, ...>, Steering.PolicyInvalid, Scope>",
             ),
           ],
           "Allocates one Run ID, event stream, and producer-only steer/followUp capability before lazy execution",
         ],
         [
           [code("Agent.stream")],
-          [code("(agent: Agent<Tools, R>, options: O) => Stream<AgentEvent.Event, RunError, RunRequirements<R, O>>")],
-          "Streams text or schema-validated output; output is selected by options",
+          [code("(agent: Agent<..., I, O>, input: I.Type, options?) => Stream<Event<O.Type>, RunError, ...>")],
+          "Streams the loop and ends with Completed carrying the decoded output",
         ],
         [
-          [code("Agent.generate")],
-          [code("(agent: Agent<Tools, R>, options: O) => Effect<RunResult<O>, RunError, RunRequirements<R, O>>")],
-          "Folds the same run; required output returns ObjectResult, while optional or union output produces the corresponding result union",
+          [code("Agent.run")],
+          [code("(agent: Agent<..., I, O>, input: I.Type, options?) => Effect<O.Type, RunError, ...>")],
+          "Folds the same stream to its schema-decoded output; supports data-last use",
+        ],
+        [
+          [code("Agent.start")],
+          [code("(agent, input, options) => Effect<RunHandle, StartError, Runtime>")],
+          "Starts an already-registered durable executable through Runtime",
         ],
       ],
     ),
@@ -96,11 +102,6 @@ export const coreAgentReference = definePage({
     table(
       ["Field", "Type", "Notes"],
       [
-        [
-          [code("prompt")],
-          [code("Ai.Prompt.RawInput")],
-          ["User input for the first turn; ignored when ", code("resume"), " is set"],
-        ],
         [
           [code("history")],
           [code("Ai.Prompt.RawInput"), " (optional)"],
@@ -141,16 +142,6 @@ export const coreAgentReference = definePage({
           [code("Memory.Key"), " (optional)"],
           ["Consult the Memory service for this run, overriding ", code("agent.memory"), " when present"],
         ],
-        [
-          [code("output")],
-          [code("{ schema: S; name?: string; prompt?: Ai.Prompt.RawInput }"), " (optional)"],
-          [
-            "Adds one terminal structured-output turn; name defaults to ",
-            code('"output"'),
-            " and prompt defaults to ",
-            code("Agent.defaultObjectPrompt"),
-          ],
-        ],
       ],
     ),
     h2("run-services", "Requirements"),
@@ -174,7 +165,8 @@ export const coreAgentReference = definePage({
         [[code("ModelRegistry.ModelRegistry")], ["When the agent has a ", code("model"), " default"]],
         [[code("Ai.Tool.HandlersFor<Tools>")], ["When local toolkit handlers execute in-process"]],
         [[code("Memory.Memory")], ["When agent or run configuration selects a memory key"]],
-        [[code('S["DecodingServices"]')], ["When RunOptions.output.schema is set"]],
+        [[code('Input["EncodingServices"]')], ["When the Agent input schema needs services"]],
+        [[code('Output["DecodingServices"]')], ["When the Agent output schema needs services"]],
         [[code("ToolExecutor.ToolExecutor")], ["Optional override for remote, client, MCP, sandbox, or durable tools"]],
         [[code("Approvals.Approvals")], ["Ambient optional approval behavior"]],
         [[code("ModelMiddleware.ModelMiddleware")], ["Ambient optional model input/output middleware"]],
@@ -184,7 +176,7 @@ export const coreAgentReference = definePage({
     p(
       "The error channel of every run function is the union ",
       code(
-        "AgentError | AgentSuspended | ResumeMismatch | Error | PolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflow | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
+        "AgentError | InvalidOutput | AgentSuspended | ResumeMismatch | Error | PolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflow | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
       ),
       ". Field shapes are tabulated in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),
@@ -201,12 +193,12 @@ export const coreAgentReference = definePage({
       code("RunOptions.resume"),
       "; the run verifies it against the authoritative checkpoint before executing the unresolved call.",
     ),
-    h2("result", "Result"),
+    h2("result", "Typed result"),
     table(
       ["Type", "Shape"],
       [
-        [[code("Result")], [code("{ text: string; turns: number; transcript: Ai.Prompt.Prompt }")]],
-        [[code("ObjectResult<A>")], [code("Result"), " plus ", code("{ value: A }")]],
+        [[code("Agent.run(agent, input)")], [code("Effect<Agent.Output<typeof agent>, ...>")]],
+        [[code("Completed<A>")], [code("{ output: A; text: string; turns: number; transcript: Prompt }")]],
       ],
     ),
     p(

@@ -60,7 +60,7 @@ export const coreEventsReference = definePage({
     ),
     h2("loop-events", "Loop and telemetry events"),
     p(
-      "The rest of the union describes turn boundaries, tool execution and progress, approvals, steering, handoffs, structured output, completion, and model-call telemetry. Every event carries its stable correlation fields; ",
+      "The rest of the union describes turn boundaries, tool execution and progress, approvals, steering, handoffs, typed completion, and model-call telemetry. Every event carries its stable correlation fields; ",
       code("turn"),
       " is 0-based wherever present.",
     ),
@@ -69,8 +69,8 @@ export const coreEventsReference = definePage({
       [
         [
           "Turns and results",
-          [code("TurnStarted"), ", ", code("TurnCompleted"), ", ", code("StructuredOutput"), ", ", code("Completed")],
-          "Frame turns, expose transcripts, and report terminal values",
+          [code("TurnStarted"), ", ", code("TurnCompleted"), ", ", code("Completed")],
+          "Frame turns, expose transcripts, and report the typed terminal output",
         ],
         [
           "Tools and approvals",
@@ -123,6 +123,7 @@ export const coreEventsReference = definePage({
       ["Error", "Raised when"],
       [
         [[code("AgentError")], "The loop fails and preserves its 0-based turn and cause"],
+        [[code("InvalidOutput")], "The terminal model value does not satisfy the Agent output schema"],
         [[code("RunEndedWithoutOutput")], "A terminal model turn leaves no committed assistant answer"],
         [
           [code("TurnLimitExceeded"), " / ", code("PolicyStopped")],

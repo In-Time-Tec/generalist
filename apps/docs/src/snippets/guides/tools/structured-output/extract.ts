@@ -3,22 +3,19 @@ import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response
 
 const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 
-const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
+const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data.", output: invoiceSchema })
 
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
     streamText: () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
-    generateText: () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
+    generateText: () => Effect.succeed([{ type: "text", text: '{"output":{"total":42,"currency":"USD"}}' }]),
   }),
 )
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, {
-    prompt: "Invoice total is 42 USD.",
-    output: { schema: invoiceSchema },
-  })
-  yield* Console.log(`${result.value.total} ${result.value.currency}`)
+  const result = yield* Agent.run(agent, "Invoice total is 42 USD.")
+  yield* Console.log(`${result.total} ${result.currency}`)
 })
 
 const runtimeLayer = Layer.mergeAll(

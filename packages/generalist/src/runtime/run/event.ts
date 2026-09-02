@@ -389,15 +389,6 @@ const AgentLoopEventSchema = Schema.Union([
     finishReason: Schema.optionalKey(Response.FinishReason),
     ...optionalMetadata,
   }),
-  Schema.TaggedStruct("StructuredOutput", {
-    turn: Schema.Finite,
-    modelCallId: Schema.String,
-    modelAttemptId: Schema.String,
-    attempt: Schema.Finite,
-    value: Schema.Unknown,
-    content: Schema.Array(Part),
-    ...optionalMetadata,
-  }),
   ModelTelemetryEventSchema,
 ])
 const LifecycleEventSchema = Schema.Union([

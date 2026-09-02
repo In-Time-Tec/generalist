@@ -32,7 +32,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly options: RunOptions
   readonly state: AgentRunState
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
-  readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR>
+  readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR, Schema.Top, Schema.Top>
   readonly staticToolkit: Toolkit.Toolkit<T>
   readonly chat: Chat.Service
   readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>

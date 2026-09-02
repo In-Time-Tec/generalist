@@ -27,7 +27,7 @@ const program = Effect.gen(function* () {
 ## What runs
 
 ```text
-Agent.generate() / Agent.stream()
+Agent.run() / Agent.stream()
 └── DurableDriver.layerForRun()          one interpreter per Run
     ├── model/tool/memory/... boundary
     │   ├── driver.decide(checkpoint)    -> Execute(operation)

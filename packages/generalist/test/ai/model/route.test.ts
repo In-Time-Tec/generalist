@@ -71,18 +71,17 @@ const provideScoped = <A, E, R, A2, E2, R2>(
   Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
 const run = (route: Route, resilience: ModelResilience.Policy = ModelResilience.none) =>
-  Stream.runCollect(Agent.stream(Agent.make({ name: "route", model: route.selection }), { prompt: "go" })).pipe(
-    (effect) =>
-      provideScoped(
-        Layer.mergeAll(
-          ModelRegistry.layer([Effect.succeed(route.registration)]),
-          ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool") }),
-          Approvals.layerAutoApprove,
-          ModelMiddleware.layerIdentity,
-          ModelResilience.layerTest(resilience).pipe(Layer.orDie),
-        ),
-        effect,
+  Stream.runCollect(Agent.stream(Agent.make({ name: "route", model: route.selection }), "go")).pipe((effect) =>
+    provideScoped(
+      Layer.mergeAll(
+        ModelRegistry.layer([Effect.succeed(route.registration)]),
+        ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool") }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        ModelResilience.layerTest(resilience).pipe(Layer.orDie),
       ),
+      effect,
+    ),
   )
 
 describe("ordered model route", () => {

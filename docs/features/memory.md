@@ -16,8 +16,8 @@ const agent = Agent.make({ name: "support-agent", memory: { agent: "support-agen
 
 const program = Effect.gen(function* () {
   // RunOptions.memory.key overrides agent.memory.
-  yield* Agent.generate(agent, { prompt: "Ada prefers dark mode.", memory: { key } })
-  return yield* Agent.generate(agent, { prompt: "What does Ada prefer?", memory: { key } })
+  yield* Agent.run(agent, "Ada prefers dark mode.", { memory: { key } })
+  return yield* Agent.run(agent, "What does Ada prefer?", { memory: { key } })
 }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 8 })))
 ```
 
@@ -27,7 +27,7 @@ The application also provides its language-model layer. Both runs select
 ## What runs
 
 ```text
-Agent.generate("What does Ada prefer?")
+Agent.run("What does Ada prefer?")
 ├── select key: RunOptions.memory.key
 ├── Memory.recall({ key, turn: 0, prompt })
 ├── insert one recalled user message

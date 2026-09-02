@@ -75,6 +75,7 @@ const planSchema = Schema.Struct({
 const planner = Agent.make({
   name: "workerd-planner",
   instructions: "Use read-only lookup, then return the structured plan.",
+  output: planSchema,
   toolkit: plannerToolkit,
   budget: {
     modelCalls: 3,
@@ -102,7 +103,7 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
   const successFixture = yield* TestModel.make([
     TestModel.toolCall("lookup", { query: "Boise provider" }, { id: "lookup-1" }),
     TestModel.text("I found one provider."),
-    TestModel.object({ objective: "Arrange service", facts: ["Provider serves Boise"] }),
+    TestModel.object({ output: { objective: "Arrange service", facts: ["Provider serves Boise"] } }),
   ])
   const successLayer = Layer.mergeAll(
     successFixture.layer,
@@ -122,10 +123,9 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
     Approvals.layerDenyAll,
   )
   const successServices = yield* Layer.build(successLayer)
-  const planned = yield* Agent.generate(planner, {
-    prompt: "Find a provider and propose a plan.",
-    output: { schema: planSchema },
-  }).pipe(Effect.provideContext(successServices))
+  const planned = yield* Agent.run(planner, "Find a provider and propose a plan.").pipe(
+    Effect.provideContext(successServices),
+  )
 
   const deniedFixture = yield* TestModel.make([
     TestModel.toolCall("purchase", { item: "unapproved service" }, { id: "purchase-1" }),
@@ -145,22 +145,20 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
       Approvals.layerDenyAll,
     ),
   )
-  const denied = yield* Agent.generate(planner, { prompt: "Buy the service." }).pipe(
-    Effect.provideContext(deniedServices),
-    Effect.exit,
-  )
+  const denied = yield* Agent.run(planner, "Buy the service.").pipe(Effect.provideContext(deniedServices), Effect.exit)
 
   const exhaustedFixture = yield* TestModel.make([TestModel.text("must not execute")])
   const exhaustedServices = yield* Layer.build(exhaustedFixture.layer)
-  const exhausted = yield* Agent.generate(Agent.make({ name: "workerd-budget", budget: { modelCalls: 0 } }), {
-    prompt: "This model call is outside the budget.",
-  }).pipe(Effect.provideContext(exhaustedServices), Effect.exit)
+  const exhausted = yield* Agent.run(
+    Agent.make({ name: "workerd-budget", budget: { modelCalls: 0 } }),
+    "This model call is outside the budget.",
+  ).pipe(Effect.provideContext(exhaustedServices), Effect.exit)
   const exhaustedRequests = yield* exhaustedFixture.requests
   const openRouterConfig = yield* decodeOpenRouterConfig({})
 
   return Response.json({
-    objective: planned.value.objective,
-    facts: planned.value.facts,
+    objective: planned.objective,
+    facts: planned.facts,
     lookupExecutions,
     denied: Exit.isFailure(denied),
     deniedExecutions,

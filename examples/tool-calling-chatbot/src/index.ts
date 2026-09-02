@@ -38,8 +38,8 @@ const agent = Agent.make({
 let calls = 0
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, { prompt: "Should I bring a jacket in Boise?" })
-  yield* Console.log(result.text)
+  const result = yield* Agent.run(agent, "Should I bring a jacket in Boise?")
+  yield* Console.log(result)
 })
 
 const runtimeLayer = Layer.mergeAll(

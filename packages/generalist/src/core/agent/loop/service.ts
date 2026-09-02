@@ -1,6 +1,6 @@
 import { Cause, Effect, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
-import { AgentError, AgentSuspended, type Event, type StructuredOutput, DuplicateToolCallId } from "../event.js"
+import { AgentError, AgentSuspended, type Event, InvalidOutput, DuplicateToolCallId } from "../event.js"
 import {
   CurrentCompactionId,
   CurrentInstrumentation,
@@ -17,7 +17,14 @@ import { pendingResult, projectableResults } from "../tools/checkpoint.js"
 import type { RunError } from "../service.js"
 import type { Input } from "../../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "../message.js"
-import type { LoopServices, ObjectSchema, RunLoopContext, StructuredRunConfig, TurnServices } from "./context.js"
+import {
+  type LoopServices,
+  type ObjectSchema,
+  requiredField,
+  type RunLoopContext,
+  type StructuredRunConfig,
+  type TurnServices,
+} from "./context.js"
 import { select } from "../../tools/tool-registry.js"
 import {
   checkpoint as driverCheckpoint,
@@ -36,15 +43,7 @@ import { afterTurnFor } from "./after-turn.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
-interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<T, E, RD, RE> {
-  readonly "~type.optionality": "required"
-  readonly "~type.mutability": "readonly"
-  readonly "~encoded.optionality": "required"
-  readonly "~encoded.mutability": "readonly"
-}
-const requiredField = <T, E, RD, RE>(schema: Schema.Codec<T, E, RD, RE>): RequiredFieldCodec<T, E, RD, RE> =>
-  Schema.make<RequiredFieldCodec<T, E, RD, RE>>(schema.ast, { schema })
-const StructuredOutputError = Schema.Union([AgentError, AiError.AiError, LanguageModelNotRegistered])
+const StructuredOutputError = Schema.Union([AgentError, InvalidOutput, AiError.AiError, LanguageModelNotRegistered])
 const structuredResponseSchema = <S extends ObjectSchema>(
   schema: S,
 ): Schema.Codec<
@@ -59,9 +58,12 @@ const hasClosedPolicy = (agent: ActiveAgent): agent is ClosedPolicyAgent =>
 export const make = <
   Tools extends Record<string, Tool.Any>,
   R,
+  PolicyServices extends R,
+  AuthorizationServices extends R,
   StructuredOutputSchema extends ObjectSchema = ObjectSchema,
+  OutputValue = never,
 >(
-  context: RunLoopContext<Tools, R, StructuredOutputSchema>,
+  context: RunLoopContext<Tools, R, PolicyServices, AuthorizationServices, StructuredOutputSchema, OutputValue>,
 ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
   const {
     agent,
@@ -83,7 +85,6 @@ export const make = <
     applyCompactionResult,
     deliverPending,
     flushTelemetry,
-    telemetryIdentity,
     checkpointSuspended,
     pendingResults,
     toolCallEvents,
@@ -92,7 +93,7 @@ export const make = <
   } = context
   const structuredFinalEvents = (
     structuredTurn: number,
-    config: StructuredRunConfig<StructuredOutputSchema>,
+    config: StructuredRunConfig<StructuredOutputSchema, OutputValue>,
     onPending: (input: { readonly prompt: Prompt.RawInput }) => void,
   ): Stream.Stream<Event, RunError, TurnServices<R, StructuredOutputSchema>> =>
     Stream.fromEffect(
@@ -127,8 +128,18 @@ export const make = <
             withModelTelemetry(structuredTurn, "structured-output"),
             withAgentModel,
             Effect.catchCause(
-              (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
+              (
+                cause,
+              ): Effect.Effect<never, AgentError | InvalidOutput | AiError.AiError | LanguageModelNotRegistered> => {
                 const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+                if (
+                  reason !== undefined &&
+                  Cause.isFailReason(reason) &&
+                  AiError.isAiError(reason.error) &&
+                  reason.error.reason._tag === "StructuredOutputError"
+                ) {
+                  return Effect.fail(InvalidOutput.make({ issues: [reason.error.reason.description] }))
+                }
                 return reason !== undefined && Cause.isFailReason(reason)
                   ? Effect.fail(
                       AgentError.make({
@@ -165,10 +176,6 @@ export const make = <
           return part
         })
         yield* captureStructuredUsage(content)
-        const structuredIdentity = telemetryIdentity.current
-        if (structuredIdentity === undefined) {
-          return yield* Effect.die(new globalThis.Error("Structured output model attempt identity is missing"))
-        }
         const transcript = Prompt.concat(Prompt.concat(history, transformedPrompt), Prompt.fromResponseParts(content))
         yield* applyCompactionResult(
           structuredTurn,
@@ -176,16 +183,9 @@ export const make = <
           (yield* syncSession(structuredTurn, history)).at(-1)?.id ?? null,
           "structured-output",
         )
-        const structuredOutput: StructuredOutput = {
-          _tag: "StructuredOutput",
-          turn: structuredTurn,
-          ...structuredIdentity,
-          value: response.value,
-          content,
-        }
         const completion = yield* inbox.complete
         if (completion._tag === "Closed") {
-          return [structuredOutput, terminalCompletedEvent(state, structuredTurn, transcript)]
+          return [terminalCompletedEvent(state, structuredTurn, transcript, config.output(response.value))]
         }
         onPending({ prompt: promptFromSteeringInputs(completion.inputs) })
         return [

@@ -19,33 +19,34 @@ const deterministicFinish = Response.makePart("finish", {
   response: undefined,
 })
 
-const deterministicModelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () =>
-      Effect.succeed([
-        { type: "text", text: "deterministic response" },
-        { type: "finish", reason: "stop", usage: deterministicUsage, response: undefined },
-      ]),
-    streamText: () =>
-      Stream.make(
-        Response.makePart("text-delta", { id: "text", delta: "deterministic response" }),
-        deterministicFinish,
-      ),
-  }),
-)
+const deterministicModelLayer = (response: string) =>
+  Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () =>
+        Effect.succeed([
+          { type: "text", text: response },
+          { type: "finish", reason: "stop", usage: deterministicUsage, response: undefined },
+        ]),
+      streamText: () =>
+        Stream.make(Response.makePart("text-delta", { id: "text", delta: response }), deterministicFinish),
+    }),
+  )
 
 /** @experimental */
 export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model?: string
+  /** Scripted text returned by both streaming and non-streaming calls. */
+  readonly response?: string
 }
 
 const deterministicRegistrationOptions = (input: Options) => {
+  const response = input.response ?? "deterministic response"
   const required = {
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
-    layer: deterministicModelLayer,
+    layer: deterministicModelLayer(response),
     isAvailabilityFailure: () => false,
   } as const
   const registered =
@@ -55,7 +56,11 @@ const deterministicRegistrationOptions = (input: Options) => {
 
 /** @experimental Scripted model layer for tests and CI; provide it to a run with `Effect.provide`. */
 export const layerModel = (input: Options = {}): Model.Model<string, LanguageModel.LanguageModel, never> =>
-  Model.make(input.provider ?? "deterministic", input.model ?? "deterministic", deterministicModelLayer)
+  Model.make(
+    input.provider ?? "deterministic",
+    input.model ?? "deterministic",
+    deterministicModelLayer(input.response ?? "deterministic response"),
+  )
 
 /** @experimental */
 export const registration = (input: Options = {}): Effect.Effect<Registration, never, never> =>

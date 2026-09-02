@@ -10,15 +10,13 @@ const applicationLayer = Layer.mergeAll(
 const agent = Agent.make({ name: "assistant", instructions: "Answer concisely." })
 
 const program = Effect.gen(function* () {
-  yield* Agent.generate(agent, {
-    prompt: "My name is Ada.",
+  yield* Agent.run(agent, "My name is Ada.", {
     sessionId: "user-42",
   })
-  const result = yield* Agent.generate(agent, {
-    prompt: "What is my name?",
+  const result = yield* Agent.run(agent, "What is my name?", {
     sessionId: "user-42",
   })
-  yield* Console.log(result.text)
+  yield* Console.log(result)
 })
 
 const runtime = ManagedRuntime.make(applicationLayer)

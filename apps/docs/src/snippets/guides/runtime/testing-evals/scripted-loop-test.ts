@@ -40,11 +40,11 @@ const program = Effect.gen(function* () {
           ),
         ),
       ),
-      (services) => Agent.generate(agent, { prompt: "Where is order 42?" }).pipe(Effect.provideContext(services)),
+      (services) => Agent.run(agent, "Where is order 42?").pipe(Effect.provideContext(services)),
     ),
   )
-  if (result.text !== "Order 42 shipped yesterday.") {
-    return yield* Effect.die(`unexpected answer: ${result.text}`)
+  if (result !== "Order 42 shipped yesterday.") {
+    return yield* Effect.die(`unexpected answer: ${result}`)
   }
   if (!Equal.equals(executedCalls, [{ orderId: "42" }])) {
     return yield* Effect.die(`unexpected tool params: ${encodeJson(executedCalls)}`)

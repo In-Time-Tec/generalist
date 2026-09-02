@@ -7,10 +7,10 @@ const agent = Agent.make({ name: "eval-agent" })
 const program = Effect.gen(function* () {
   const result = yield* ModelRegistry.withModel(
     { provider: "deterministic", model: "local" },
-    Agent.generate(agent, { prompt: "Say the deterministic answer." }),
+    Agent.run(agent, "Say the deterministic answer."),
   )
-  if (result.text !== "deterministic response") {
-    return yield* Effect.die(`Unexpected eval output: ${result.text}`)
+  if (result !== "deterministic response") {
+    return yield* Effect.die(`Unexpected eval output: ${result}`)
   }
   yield* Console.log("eval passed")
 })

@@ -46,8 +46,8 @@ const supervisor = Handoff.supervisor({
   specialists: [billing],
 })
 
-const program = Agent.generate(supervisor.agent, { prompt: "I want a refund for order 42." }).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
+const program = Agent.run(supervisor.agent, "I want a refund for order 42.").pipe(
+  Effect.flatMap((result) => Console.log(result)),
 )
 
 const handlerLayer = supervisor.agent.toolkit.toLayer(

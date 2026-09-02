@@ -66,12 +66,10 @@ describe("memory SessionDirectory binding", () => {
 
         yield* Effect.all(
           [
-            Agent.generate(Agent.make({ name: "alice-agent" }), {
-              prompt: "alice next",
+            Agent.run(Agent.make({ name: "alice-agent" }), "alice next", {
               sessionId: "alice",
             }),
-            Agent.generate(Agent.make({ name: "bob-agent" }), {
-              prompt: "bob next",
+            Agent.run(Agent.make({ name: "bob-agent" }), "bob next", {
               sessionId: "bob",
             }),
           ],
@@ -138,16 +136,16 @@ describe("memory SessionDirectory binding", () => {
         queuedStarted = yield* Deferred.make<void>()
         otherStarted = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "linear-session-agent" })
-        const first = yield* Agent.generate(agent, { prompt: "hold first", sessionId: "shared" }).pipe(
-          Effect.forkChild({ startImmediately: true }),
-        )
+        const first = yield* Agent.run(agent, "hold first", {
+          sessionId: "shared",
+        }).pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(firstStarted)
-        const queued = yield* Agent.generate(agent, { prompt: "queued prompt", sessionId: "shared" }).pipe(
-          Effect.forkChild({ startImmediately: true }),
-        )
-        const other = yield* Agent.generate(agent, { prompt: "other prompt", sessionId: "other" }).pipe(
-          Effect.forkChild({ startImmediately: true }),
-        )
+        const queued = yield* Agent.run(agent, "queued prompt", {
+          sessionId: "shared",
+        }).pipe(Effect.forkChild({ startImmediately: true }))
+        const other = yield* Agent.run(agent, "other prompt", {
+          sessionId: "other",
+        }).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(otherStarted)
         yield* Fiber.join(other)
@@ -180,9 +178,9 @@ describe("memory SessionDirectory binding", () => {
     return provideScoped(
       layer,
       Effect.gen(function* () {
-        const result = yield* Agent.generate(Agent.make({ name: "ephemeral-agent" }), { prompt: "no session" })
+        const result = yield* Agent.run(Agent.make({ name: "ephemeral-agent" }), "no session")
 
-        expect(result.text).toBe("ephemeral")
+        expect(result).toBe("ephemeral")
         expect(acquisitions).toBe(0)
       }),
     )
@@ -207,8 +205,7 @@ describe("memory SessionDirectory binding", () => {
     return provideScoped(
       layer,
       Effect.gen(function* () {
-        const failure = yield* Agent.generate(Agent.make({ name: "nested-agent" }), {
-          prompt: "nested",
+        const failure = yield* Agent.run(Agent.make({ name: "nested-agent" }), "nested", {
           sessionId: "parent",
         }).pipe(Effect.flip)
 

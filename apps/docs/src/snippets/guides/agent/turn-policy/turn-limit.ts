@@ -47,7 +47,7 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  const failure = yield* Agent.generate(agent, { prompt: "Keep looking things up." }).pipe(Effect.flip)
+  const failure = yield* Agent.run(agent, "Keep looking things up.").pipe(Effect.flip)
   if (!Schema.is(AgentEvent.TurnLimitExceeded)(failure)) {
     return yield* Effect.die("expected the policy to stop the run")
   }

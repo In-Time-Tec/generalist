@@ -22,7 +22,7 @@ const compactionLayer = Compaction.layer({
   ]),
 })
 
-export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
+export const run: Effect.Effect<string, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
   Effect.flatMap(
     Layer.build(
       Layer.mergeAll(
@@ -35,8 +35,7 @@ export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.Lang
       ),
     ),
     (services) =>
-      Agent.generate(agent, {
-        prompt: "Continue the migration plan.",
+      Agent.run(agent, "Continue the migration plan.", {
         compaction: { contextWindow: 128_000 },
       }).pipe(Effect.provideContext(services)),
   ),

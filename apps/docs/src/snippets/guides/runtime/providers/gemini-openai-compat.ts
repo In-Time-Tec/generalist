@@ -12,8 +12,8 @@ const providerLayer = layerGoogleAIStudio({
 
 const program = ModelRegistry.withModel(
   { provider: "google", model: "gemini-2.0-flash" },
-  Agent.generate(agent, { prompt: "Summarize the Effect Layer type in one sentence." }),
-).pipe(Effect.flatMap((result) => Console.log(result.text)))
+  Agent.run(agent, "Summarize the Effect Layer type in one sentence."),
+).pipe(Effect.flatMap((result) => Console.log(result)))
 
 const runtimeLayer = Layer.mergeAll(
   providerLayer,

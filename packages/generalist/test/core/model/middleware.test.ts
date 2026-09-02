@@ -114,9 +114,9 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "identity-agent" })
 
-          const result = yield* Agent.generate(agent, { prompt: "hello" })
+          const result = yield* Agent.run(agent, "hello")
 
-          expect(result.text).toBe("plain output")
+          expect(result).toBe("plain output")
         }),
       ] as const,
   )
@@ -141,7 +141,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "prompt-agent", toolkit: Toolkit.make(echoTool) })
 
-        yield* Agent.generate(agent, { prompt: "use the echo tool" })
+        yield* Agent.run(agent, "use the echo tool")
 
         // Two turns ran: turn 0 (tool-call) and turn 1 (final text).
         expect(prompts).toHaveLength(2)
@@ -166,7 +166,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "uppercase-agent" })
 
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+          const events = yield* Stream.runCollect(Agent.stream(agent, "hello"))
 
           const completed = events.at(-1)
           expect(completed?._tag === "Completed" && completed.text).toBe("HELLO WORLD")
@@ -242,8 +242,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "authority-agent", toolkit: Toolkit.make(echoTool) })
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "start",
+          Agent.stream(agent, "start", {
             sessionId: "session-authority",
             memory: { key: memoryKey },
           }),
@@ -335,8 +334,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "duplicate-id-agent", toolkit: Toolkit.make(gatedEchoTool) })
         const events: Array<AgentEvent.Event> = []
-        const outcome = yield* Agent.stream(agent, {
-          prompt: "call three times",
+        const outcome = yield* Agent.stream(agent, "call three times", {
           sessionId: "duplicate-id",
         }).pipe(
           Stream.runForEach((event) =>
@@ -414,7 +412,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         const agent = Agent.make({ name: "non-adjacent-agent", toolkit: Toolkit.make(gatedEchoTool) })
         const events: Array<AgentEvent.Event> = []
         const failure = yield* Effect.flip(
-          Agent.stream(agent, { prompt: "call tools" }).pipe(
+          Agent.stream(agent, "call tools").pipe(
             Stream.runForEach((event) =>
               Effect.sync(() => {
                 events.push(event)
@@ -467,7 +465,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "local-duplicate-agent", toolkit })
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "call locally" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, "call locally")))
 
         expect(failure._tag).toBe("generalist/core/DuplicateToolCallId")
         expect(handled).toEqual([])
@@ -525,8 +523,8 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "id-scope-agent", toolkit: Toolkit.make(echoTool) })
 
-        yield* Agent.generate(agent, { prompt: "first run" })
-        yield* Agent.generate(agent, { prompt: "second run" })
+        yield* Agent.run(agent, "first run")
+        yield* Agent.run(agent, "second run")
 
         expect(dispatched).toEqual(["safe-one", "safe-two", "safe-one", "safe-one"])
       }),
@@ -594,26 +592,42 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
           )
 
         exitMode = "typed"
-        const typed = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "typed", sessionId: "typed" })))
+        const typed = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(agent, "typed", {
+              sessionId: "typed",
+            }),
+          ),
+        )
         expect(typed._tag).toBe("generalist/core/AgentError")
         yield* assertNotStored("typed")
 
         exitMode = "defect"
         const defect = yield* Effect.exit(
-          Stream.runDrain(Agent.stream(agent, { prompt: "defect", sessionId: "defect" })),
+          Stream.runDrain(
+            Agent.stream(agent, "defect", {
+              sessionId: "defect",
+            }),
+          ),
         )
         expect(Exit.hasDies(defect)).toBe(true)
         yield* assertNotStored("defect")
 
         exitMode = "interrupt"
         const interrupt = yield* Effect.exit(
-          Stream.runDrain(Agent.stream(agent, { prompt: "interrupt", sessionId: "interrupt" })),
+          Stream.runDrain(
+            Agent.stream(agent, "interrupt", {
+              sessionId: "interrupt",
+            }),
+          ),
         )
         expect(Exit.hasInterrupts(interrupt)).toBe(true)
         yield* assertNotStored("interrupt")
 
         exitMode = "early"
-        yield* Agent.stream(agent, { prompt: "early", sessionId: "early" }).pipe(
+        yield* Agent.stream(agent, "early", {
+          sessionId: "early",
+        }).pipe(
           Stream.filter((event) => event._tag === "ModelPart"),
           Stream.take(1),
           Stream.runDrain,
@@ -638,7 +652,11 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         ),
         Effect.gen(function* () {
           const agent = Agent.make({ name: "response-authority-agent" })
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "complete", sessionId: "complete" }))
+          yield* Stream.runDrain(
+            Agent.stream(agent, "complete", {
+              sessionId: "complete",
+            }),
+          )
           const history = yield* Effect.scoped(
             Session.acquire("complete").pipe(
               Effect.flatMap((session) => session.path()),
@@ -668,7 +686,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
           const agent = Agent.make({ name: "drop-agent" })
           const events: Array<AgentEvent.Event> = []
 
-          const failure = yield* Agent.stream(agent, { prompt: "hello" }).pipe(
+          const failure = yield* Agent.stream(agent, "hello").pipe(
             Stream.tap((event) => Effect.sync(() => events.push(event))),
             Stream.runDrain,
             Effect.flip,
@@ -702,7 +720,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "ordering-agent" })
 
-        yield* Agent.generate(agent, { prompt: "hello" })
+        yield* Agent.run(agent, "hello")
 
         const aIndex = seen.indexOf("first")
         const bIndex = seen.indexOf("second")
@@ -727,7 +745,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "guard-agent", toolkit: Toolkit.make(echoTool) })
 
-          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" })))
+          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "use the echo tool")))
 
           expect(failure._tag).toBe("generalist/core/MiddlewareViolation")
           if (failure._tag === "generalist/core/MiddlewareViolation") {
@@ -754,7 +772,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "failing-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "hello" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, "hello")))
 
         expect(modelCalled).toBe(false)
         expect(failure._tag).toBe("generalist/core/AgentError")

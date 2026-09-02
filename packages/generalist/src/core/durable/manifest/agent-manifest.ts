@@ -272,9 +272,9 @@ export const fromLiveAgent: {
     readonly programAuthority?: ProgramAuthority
     readonly budget: BudgetLimits
     readonly children: ReadonlyArray<ChildSelection>
-  }): (agent: Agent<Tools, R, PolicyServices, AuthorizationServices>) => PinnedAgent
+  }): (agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>) => PinnedAgent
   <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
-    agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
     identity: {
       readonly model: ModelPin
       readonly tools: ReadonlyArray<NamedCapability>
@@ -290,7 +290,7 @@ export const fromLiveAgent: {
 } = Function.dual(
   2,
   <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
-    agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
     identity: {
       readonly model: ModelPin
       readonly tools: ReadonlyArray<NamedCapability>

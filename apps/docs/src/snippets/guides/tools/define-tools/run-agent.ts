@@ -37,8 +37,8 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, { prompt: "Where are toolkits documented?" })
-  yield* Console.log(result.text)
+  const result = yield* Agent.run(agent, "Where are toolkits documented?")
+  yield* Console.log(result)
 })
 
 const runtime = ManagedRuntime.make(Layer.mergeAll(modelLayer, docsToolLayer))

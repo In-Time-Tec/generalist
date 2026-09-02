@@ -28,9 +28,13 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  yield* Agent.generate(agent, { prompt: "Ada prefers dark mode.", memory: { key } })
-  const second = yield* Agent.generate(agent, { prompt: "What do you remember about Ada?", memory: { key } })
-  yield* Console.log(second.text)
+  yield* Agent.run(agent, "Ada prefers dark mode.", {
+    memory: { key },
+  })
+  const second = yield* Agent.run(agent, "What do you remember about Ada?", {
+    memory: { key },
+  })
+  yield* Console.log(second)
 })
 
 const runtimeLayer = Layer.mergeAll(

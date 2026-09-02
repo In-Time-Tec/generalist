@@ -6,8 +6,8 @@ const agent = Agent.make({ name: "keyless-agent" })
 
 const program = ModelRegistry.withModel(
   { provider: "deterministic", model: "local" },
-  Agent.generate(agent, { prompt: "Say the deterministic answer." }),
-).pipe(Effect.flatMap((result) => Console.log(result.text)))
+  Agent.run(agent, "Say the deterministic answer."),
+).pipe(Effect.flatMap((result) => Console.log(result)))
 
 const runtimeLayer = Layer.mergeAll(
   deterministicLayer({ model: "local" }),

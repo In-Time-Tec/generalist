@@ -11,8 +11,13 @@ import type { Agent, RunOptions } from "../service.js"
 import { appendInstructionFragment, errorMessage } from "./construction.js"
 
 /** @internal Resolve skills and the authoritative system instructions for this run. */
-export const setupPromptContext = <T extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(args: {
-  readonly agent: Agent<T, R>
+export const setupPromptContext = <
+  T extends Record<string, import("effect/unstable/ai").Tool.Any>,
+  R,
+  P extends R,
+  A extends R,
+>(args: {
+  readonly agent: Agent<T, R, P, A, Schema.Top, Schema.Top>
   readonly options: RunOptions
   readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly resumeChat: import("effect/unstable/ai").Chat.Service | undefined

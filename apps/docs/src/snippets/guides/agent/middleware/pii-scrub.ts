@@ -42,8 +42,8 @@ const middlewareLayer = ModelMiddleware.layer([
   Guardrail.redactOutput({ pattern: /[\w.-]+@[\w.-]+\.\w+/g, replacement: "[email]" }),
 ])
 
-const program = Agent.generate(agent, { prompt: "My SSN is 123-45-6789, please update my record." }).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
+const program = Agent.run(agent, "My SSN is 123-45-6789, please update my record.").pipe(
+  Effect.flatMap((result) => Console.log(result)),
 )
 
 const runtimeLayer = Layer.mergeAll(

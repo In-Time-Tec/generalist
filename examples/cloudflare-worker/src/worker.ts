@@ -17,6 +17,7 @@ const planSchema = Schema.Struct({
 const planner = Agent.make({
   name: "planner",
   instructions: "Use lookup, then return the structured plan.",
+  output: planSchema,
   toolkit,
   budget: {
     modelCalls: 3,
@@ -30,7 +31,7 @@ const runPlanner = Effect.fn("CloudflareWorker.runPlanner")(function* () {
   const fixture = yield* TestModel.make([
     TestModel.toolCall("lookup", { query: "Boise provider" }, { id: "lookup-1" }),
     TestModel.text("I found one provider."),
-    TestModel.object({ objective: "Arrange service", facts: ["Provider serves Boise"] }),
+    TestModel.object({ output: { objective: "Arrange service", facts: ["Provider serves Boise"] } }),
   ])
   const layer = Layer.mergeAll(
     fixture.layer,
@@ -39,15 +40,12 @@ const runPlanner = Effect.fn("CloudflareWorker.runPlanner")(function* () {
     Approvals.layerDenyAll,
   )
   const services = yield* Layer.build(layer)
-  return yield* Agent.generate(planner, {
-    prompt: "Find a provider and propose a plan.",
-    output: { schema: planSchema },
-  }).pipe(Effect.provideContext(services))
+  return yield* Agent.run(planner, "Find a provider and propose a plan.").pipe(Effect.provideContext(services))
 })
 
 export default make<Readonly<Record<string, string>>, never>(() =>
   runPlanner().pipe(
-    Effect.map((result) => Response.json(result.value)),
+    Effect.map((result) => Response.json(result)),
     Effect.orDie,
   ),
 )

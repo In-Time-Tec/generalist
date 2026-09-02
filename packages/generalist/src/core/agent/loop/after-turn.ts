@@ -34,8 +34,15 @@ const takeTerminalCompletion = (
   )
 }
 
-const withoutPending = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(input: {
-  readonly context: RunLoopContext<Tools, R, StructuredOutputSchema>
+const withoutPending = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  P extends R,
+  A extends R,
+  StructuredOutputSchema extends ObjectSchema,
+  OutputValue,
+>(input: {
+  readonly context: RunLoopContext<Tools, R, P, A, StructuredOutputSchema, OutputValue>
   readonly turn: number
   readonly transcript: Prompt.Prompt
   readonly completed: Event
@@ -65,7 +72,7 @@ const withoutPending = <Tools extends Record<string, Tool.Any>, R, StructuredOut
   return {
     events: Stream.fromIterable<Event>([
       input.completed,
-      terminalCompletedEvent(input.context.state, input.turn, input.transcript),
+      terminalCompletedEvent(input.context.state, input.turn, input.transcript, input.context.state.text),
     ]),
   }
 }
@@ -74,9 +81,12 @@ const withoutPending = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 export const afterTurnFor = <
   Tools extends Record<string, Tool.Any>,
   R,
+  P extends R,
+  A extends R,
   StructuredOutputSchema extends ObjectSchema,
+  OutputValue,
 >(input: {
-  readonly context: RunLoopContext<Tools, R, StructuredOutputSchema>
+  readonly context: RunLoopContext<Tools, R, P, A, StructuredOutputSchema, OutputValue>
   readonly decidePolicy: (input: {
     readonly turn: number
     readonly history: Prompt.Prompt

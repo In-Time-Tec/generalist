@@ -165,7 +165,7 @@ describe("OpenRouter public flow", () => {
           name: "openrouter-metadata",
           model: { provider: "openrouter", model: "requested/model" },
         }),
-        { prompt: "prompt-secret" },
+        "prompt-secret",
       ).pipe(
         Stream.provide(
           layer({ model: "requested/model", apiKey }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client))),
@@ -255,7 +255,7 @@ describe("OpenRouter public flow", () => {
 
     return Effect.gen(function* () {
       const config = yield* decodeConfig({ provider: { only: ["Anthropic"], require_parameters: true } })
-      const events = yield* Agent.stream(agent, { prompt: "use lookup" }).pipe(
+      const events = yield* Agent.stream(agent, "use lookup").pipe(
         Stream.provide(
           Layer.mergeAll(
             allowAllAuthorization,

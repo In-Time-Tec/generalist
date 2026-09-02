@@ -3,7 +3,7 @@ import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response
 
 const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 
-const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
+const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data.", output: invoiceSchema })
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
@@ -18,22 +18,15 @@ const modelLayer = Layer.effect(
         Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." }),
         Response.makePart("finish", { reason: "stop", usage, response: undefined }),
       ),
-    generateText: () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
+    generateText: () => Effect.succeed([{ type: "text", text: '{"output":{"total":42,"currency":"USD"}}' }]),
   }),
 )
 
-const program = Agent.stream(agent, {
-  prompt: "Invoice total is 42 USD.",
-  output: {
-    schema: invoiceSchema,
-    name: "invoice",
-    prompt: "Return the invoice as JSON matching the schema.",
-  },
-}).pipe(
+const program = Agent.stream(agent, "Invoice total is 42 USD.").pipe(
   Stream.filter((event) => event._tag !== "ModelPart"),
   Stream.runForEach((event) =>
-    event._tag === "StructuredOutput"
-      ? Console.log(`${event._tag}: ${JSON.stringify(event.value)}`)
+    event._tag === "Completed"
+      ? Console.log(`${event._tag}: ${JSON.stringify(event.output)}`)
       : Console.log(event._tag),
   ),
 )

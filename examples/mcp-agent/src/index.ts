@@ -61,8 +61,8 @@ const runtimeLayer = Layer.mergeAll(
 const program = Effect.gen(function* () {
   const mcpToolkit = yield* toolkit(client)
   const agent = Agent.make({ name: "mcp-agent", toolkit: mcpToolkit })
-  const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" })
-  yield* Console.log(result.text)
+  const result = yield* Agent.run(agent, "Find the setup docs")
+  yield* Console.log(result)
 })
 
 const runtime = ManagedRuntime.make(runtimeLayer)

@@ -16,19 +16,21 @@ export const unusedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effec
 export const closedTestAgent = (agent: Agent.Agent): Agent.Closed =>
   Agent.close(agent, Layer.mergeAll(allowAllAuthorization, unusedModel))
 
+type TestAgent<Tools extends Record<string, Tool.Any>, R, P, A> = Agent.Agent<Tools, R, P, A, Schema.Top, Schema.Top>
+
 export function testExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
-  agent: Agent.Agent<Tools, R, P, A>,
+  agent: TestAgent<Tools, R, P, A>,
   revision?: string,
 ): ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef
 export function testExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
   revision?: string,
-): (agent: Agent.Agent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef
+): (agent: TestAgent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef
 export function testExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
-  agentOrRevision?: Agent.Agent<Tools, R, P, A> | string,
+  agentOrRevision?: TestAgent<Tools, R, P, A> | string,
   maybeRevision?: string,
 ):
   | (ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef)
-  | ((agent: Agent.Agent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef) {
+  | ((agent: TestAgent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef) {
   if (agentOrRevision === undefined || Schema.is(Schema.String)(agentOrRevision)) {
     return (agent) => testExecutable(agent, agentOrRevision)
   }
@@ -37,16 +39,16 @@ export function testExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
 }
 
 export function pinnedTestExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
-  agent: Agent.Agent<Tools, R, P, A>,
+  agent: TestAgent<Tools, R, P, A>,
   revision?: string,
 ): ExecutableManifest.PinnedExecutable
 export function pinnedTestExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
   revision?: string,
-): (agent: Agent.Agent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable
+): (agent: TestAgent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable
 export function pinnedTestExecutable<Tools extends Record<string, Tool.Any>, R, P, A>(
-  agentOrRevision?: Agent.Agent<Tools, R, P, A> | string,
+  agentOrRevision?: TestAgent<Tools, R, P, A> | string,
   maybeRevision?: string,
-): ExecutableManifest.PinnedExecutable | ((agent: Agent.Agent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable) {
+): ExecutableManifest.PinnedExecutable | ((agent: TestAgent<Tools, R, P, A>) => ExecutableManifest.PinnedExecutable) {
   if (agentOrRevision === undefined || Schema.is(Schema.String)(agentOrRevision)) {
     return (agent) => pinnedTestExecutable(agent, agentOrRevision)
   }
@@ -55,19 +57,19 @@ export function pinnedTestExecutable<Tools extends Record<string, Tool.Any>, R, 
 }
 
 export function pinnedTestAgent<Tools extends Record<string, Tool.Any>, R, P, A>(
-  agent: Agent.Agent<Tools, R, P, A>,
+  agent: TestAgent<Tools, R, P, A>,
   revision?: string,
   children?: ReadonlyArray<AgentManifest.ChildSelection>,
 ): AgentManifest.PinnedAgent
 export function pinnedTestAgent<Tools extends Record<string, Tool.Any>, R, P, A>(
   revision?: string,
   children?: ReadonlyArray<AgentManifest.ChildSelection>,
-): (agent: Agent.Agent<Tools, R, P, A>) => AgentManifest.PinnedAgent
+): (agent: TestAgent<Tools, R, P, A>) => AgentManifest.PinnedAgent
 export function pinnedTestAgent<Tools extends Record<string, Tool.Any>, R, P, A>(
-  agentOrRevision?: Agent.Agent<Tools, R, P, A> | string,
+  agentOrRevision?: TestAgent<Tools, R, P, A> | string,
   maybeRevision?: string | ReadonlyArray<AgentManifest.ChildSelection>,
   maybeChildren?: ReadonlyArray<AgentManifest.ChildSelection>,
-): AgentManifest.PinnedAgent | ((agent: Agent.Agent<Tools, R, P, A>) => AgentManifest.PinnedAgent) {
+): AgentManifest.PinnedAgent | ((agent: TestAgent<Tools, R, P, A>) => AgentManifest.PinnedAgent) {
   if (agentOrRevision === undefined || Schema.is(Schema.String)(agentOrRevision)) {
     const revision = agentOrRevision
     const children =

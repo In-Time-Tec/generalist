@@ -50,8 +50,8 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, { prompt: "Draft release notes for 0.2.0." })
-  yield* Console.log(result.text)
+  const result = yield* Agent.run(agent, "Draft release notes for 0.2.0.")
+  yield* Console.log(result)
 })
 
 const runtimeLayer = Layer.mergeAll(

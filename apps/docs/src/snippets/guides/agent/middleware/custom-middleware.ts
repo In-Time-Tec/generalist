@@ -26,7 +26,7 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "Favorite color?" }))
+  const events = yield* Stream.runCollect(Agent.stream(agent, "Favorite color?"))
   const partTypes = events
     .filter((event) => event._tag === "ModelResponseCommitted")
     .flatMap((event) => event.response.content.map((part) => part.type))

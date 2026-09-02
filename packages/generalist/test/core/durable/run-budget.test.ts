@@ -1,7 +1,7 @@
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { DateTime, Deferred, Effect, Layer, Option, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import type { DriverCheckpoint } from "../../../src/core/durable/driver/contract.js"
 import {
   Agent,
@@ -125,7 +125,9 @@ describe("RunBudget Agent.stream integration", () => {
     layer(baseLayers(capture.journalLayer))("charges each model attempt in a tool retry turn", (it) => {
       it.effect("charges each model attempt", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, { prompt: "retry", logicalOperationId: "retry-run" }).pipe(Stream.runDrain)
+          yield* Agent.stream(agent, "retry", {
+            logicalOperationId: "retry-run",
+          }).pipe(Stream.runDrain)
           expect(capture.scheduled.filter((operation) => operation.kind === "model").length).toBe(2)
           expect(capture.lastCheckpoint?.budget.remaining.modelCalls).toBe(0)
         }),
@@ -154,7 +156,7 @@ describe("RunBudget Agent.stream integration", () => {
     )("fails typed at schedule boundary when model calls are exhausted", (it) => {
       it.effect("fails when model calls are exhausted", () =>
         Effect.gen(function* () {
-          const error = yield* Stream.runDrain(Agent.stream(agent, { prompt: "hi" })).pipe(Effect.flip)
+          const error = yield* Stream.runDrain(Agent.stream(agent, "hi")).pipe(Effect.flip)
           expect(error._tag).toBe("generalist/core/RunBudgetExhausted")
           if (error._tag === "generalist/core/RunBudgetExhausted") {
             expect(error.dimension).toBe("modelCalls")
@@ -175,7 +177,7 @@ describe("RunBudget Agent.stream integration", () => {
     layer(baseLayers(capture.journalLayer))("fails typed when tool calls are exhausted before execution", (it) => {
       it.effect("fails when tool calls are exhausted", () =>
         Effect.gen(function* () {
-          const error = yield* Stream.runDrain(Agent.stream(agent, { prompt: "tool" })).pipe(Effect.flip)
+          const error = yield* Stream.runDrain(Agent.stream(agent, "tool")).pipe(Effect.flip)
           expect(error._tag).toBe("generalist/core/RunBudgetExhausted")
           if (error._tag === "generalist/core/RunBudgetExhausted") {
             expect(error.dimension).toBe("toolCalls")
@@ -214,7 +216,7 @@ describe("RunBudget Agent.stream integration", () => {
     )("charges reported token usage after model finish", (it) => {
       it.effect("charges reported token usage", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, { prompt: "tokens" }).pipe(Stream.runDrain)
+          yield* Agent.stream(agent, "tokens").pipe(Stream.runDrain)
           expect(capture.lastCheckpoint?.budget.remaining.totalTokens).toBe(5)
           expect(capture.completedCheckpoints.at(-1)?.budget.remaining.totalTokens).toBe(5)
           expect(capture.checkpointWrites).toEqual([])
@@ -266,7 +268,7 @@ describe("RunBudget Agent.stream integration", () => {
     )("charges reported failed-attempt and terminal usage in one model commit", (it) => {
       it.effect("charges every reported attempt exactly once", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, { prompt: "retry tokens" }).pipe(Stream.runDrain)
+          yield* Agent.stream(agent, "retry tokens").pipe(Stream.runDrain)
           expect(calls).toBe(2)
           expect(capture.completedCheckpoints.at(-1)?.budget.remaining.totalTokens).toBe(74)
           expect(capture.checkpointWrites).toEqual([])
@@ -319,8 +321,7 @@ describe("RunBudget Agent.stream integration", () => {
       it.effect("stops before tool execution", () =>
         Effect.gen(function* () {
           const observed = new Array<AgentEvent.Event>()
-          const failure = yield* Agent.stream(agent, {
-            prompt: "overrun",
+          const failure = yield* Agent.stream(agent, "overrun", {
             sessionId: "token-overrun-session",
           }).pipe(
             Stream.runForEach((event) => Effect.sync(() => void observed.push(event))),
@@ -360,7 +361,7 @@ describe("RunBudget Agent.stream integration", () => {
         Effect.gen(function* () {
           yield* TestClock.setTime(DateTime.toEpochMillis(DateTime.makeUnsafe("2026-06-01T00:00:00.000Z")))
           yield* TestClock.adjust("2 seconds")
-          const error = yield* Stream.runDrain(Agent.stream(agent, { prompt: "late" })).pipe(Effect.flip)
+          const error = yield* Stream.runDrain(Agent.stream(agent, "late")).pipe(Effect.flip)
           expect(error._tag).toBe("generalist/core/RunBudgetExhausted")
           if (error._tag === "generalist/core/RunBudgetExhausted") {
             expect(error.dimension).toBe("deadline")
@@ -393,7 +394,9 @@ describe("RunBudget Agent.stream integration", () => {
     )("narrows per-run budget below agent default", (it) => {
       it.effect("narrows the per-run budget", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, { prompt: "narrow", budget: { modelCalls: 1 } }).pipe(Stream.runDrain)
+          yield* Agent.stream(agent, "narrow", {
+            budget: { modelCalls: 1 },
+          }).pipe(Stream.runDrain)
           expect(capture.lastCheckpoint?.budget.allocation.modelCalls).toBe(1)
           expect(capture.lastCheckpoint?.budget.remaining.modelCalls).toBe(0)
         }),
@@ -458,7 +461,9 @@ describe("RunBudget Agent.stream integration", () => {
     )("reserves and refunds child agent-tool budget without widening", (it) => {
       it.effect("reserves and refunds child agent-tool budget without widening", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(parent, { prompt: "child", logicalOperationId: "parent-child" }).pipe(Stream.runDrain)
+          yield* Agent.stream(parent, "child", {
+            logicalOperationId: "parent-child",
+          }).pipe(Stream.runDrain)
           expect(modelCalls).toBeGreaterThanOrEqual(2)
           expect(capture.lastCheckpoint?.budget.remaining.modelCalls).toBeGreaterThanOrEqual(0)
         }),
@@ -514,7 +519,7 @@ describe("RunBudget Agent.stream integration", () => {
     )("auto-approves gated tools only with explicit layerAutoApprove", (it) => {
       it.effect("auto-approves gated tools", () =>
         Effect.gen(function* () {
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "gated" }))
+          const events = yield* Stream.runCollect(Agent.stream(agent, "gated"))
           expect(handled).toBe(true)
           expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
           expect(events.at(-1)?._tag).toBe("Completed")
@@ -546,8 +551,7 @@ describe("RunBudget Agent.stream integration", () => {
     )("records session sync operation keys", (it) => {
       it.effect("records session sync operation keys", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, {
-            prompt: "sync",
+          yield* Agent.stream(agent, "sync", {
             logicalOperationId: "logical-sync",
             sessionId: "session-sync",
           }).pipe(Stream.runDrain)
@@ -569,7 +573,7 @@ describe("RunBudget Agent.stream integration", () => {
     layer(baseLayers(capture.journalLayer))("preserves AgentEvent ordering when budget limits apply", (it) => {
       it.effect("preserves AgentEvent ordering", () =>
         Effect.gen(function* () {
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "order" }))
+          const events = yield* Stream.runCollect(Agent.stream(agent, "order"))
           const tags = events.map((event) => event._tag)
           const started = tags.indexOf("ToolExecutionStarted")
           const completed = tags.indexOf("ToolExecutionCompleted")
@@ -602,8 +606,7 @@ describe("RunBudget Agent.stream integration", () => {
       it.effect("rejects a stale suspension token", () =>
         Effect.gen(function* () {
           const error = yield* Stream.runDrain(
-            Agent.stream(agent, {
-              prompt: Prompt.make("stale"),
+            Agent.stream(agent, "", {
               resume: {
                 suspension: suspension({
                   waitId: "call-stale",

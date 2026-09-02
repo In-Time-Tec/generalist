@@ -27,7 +27,7 @@ const children = [
 ]
 
 const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
-  Effect.flatMap((results) => Console.log(results.map((result) => result.text).join("\n"))),
+  Effect.flatMap((results) => Console.log(results.join("\n"))),
 )
 
 const runtimeLayer = Layer.mergeAll(

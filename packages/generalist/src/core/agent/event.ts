@@ -166,23 +166,12 @@ export interface TurnCompleted {
   readonly metadata?: Metadata
 }
 
-/** @experimental Terminal structured turn produced a schema-validated value. */
-export interface StructuredOutput {
-  readonly _tag: "StructuredOutput"
-  readonly turn: number
-  readonly modelCallId: string
-  readonly modelAttemptId: string
-  readonly attempt: number
-  readonly value: unknown
-  readonly content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>
-  readonly metadata?: Metadata
-}
-
 /** @experimental Terminal event: the run finished without suspension. */
-export interface Completed {
+export interface Completed<Output = unknown> {
   readonly _tag: "Completed"
   readonly turns: number
   readonly text: string
+  readonly output: Output
   readonly transcript: Prompt.Prompt
   readonly usage?: Response.Usage
   readonly metadata?: Metadata
@@ -214,7 +203,7 @@ export const addUsage: {
 )
 
 /** @experimental Closed union of Generalist loop events. */
-export type Event =
+export type Event<Output = unknown> =
   | TurnStarted
   | ModelPart
   | ModelResponseCommitted
@@ -228,8 +217,7 @@ export type Event =
   | ApprovalRequested
   | SteeringDrained
   | TurnCompleted
-  | StructuredOutput
-  | Completed
+  | Completed<Output>
   | ModelTelemetryEvent
 
 /** @experimental The loop failed. `turn` is the 0-based turn that failed. */
@@ -238,6 +226,11 @@ export class AgentError extends Schema.TaggedError<AgentError>()("generalist/cor
   turn: Schema.Finite,
   cause: Schema.optionalKey(Schema.Defect()),
   diagnostics: Schema.optionalKey(SessionSyncDiagnostics),
+}) {}
+
+/** @experimental The model's terminal value did not satisfy the Agent output Schema. */
+export class InvalidOutput extends Schema.TaggedError<InvalidOutput>()("generalist/core/InvalidOutput", {
+  issues: Schema.Array(Schema.String),
 }) {}
 
 /** @experimental The turn policy declined another turn while tool results were still pending. */

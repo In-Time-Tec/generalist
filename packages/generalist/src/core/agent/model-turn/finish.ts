@@ -51,14 +51,14 @@ export const turnCompletedEvent: {
 )
 
 export const terminalCompletedEvent: {
-  (turn: number, transcript: Prompt.Prompt): (state: AgentRunState) => Completed
-  (state: AgentRunState, turn: number, transcript: Prompt.Prompt): Completed
+  <Output>(turn: number, transcript: Prompt.Prompt, output: Output): (state: AgentRunState) => Completed<Output>
+  <Output>(state: AgentRunState, turn: number, transcript: Prompt.Prompt, output: Output): Completed<Output>
 } = Function.dual(
-  3,
-  (state: AgentRunState, turn: number, transcript: Prompt.Prompt): Completed =>
+  4,
+  <Output>(state: AgentRunState, turn: number, transcript: Prompt.Prompt, output: Output): Completed<Output> =>
     state.usage === undefined
-      ? { _tag: "Completed", turns: turn + 1, text: state.text, transcript }
-      : { _tag: "Completed", turns: turn + 1, text: state.text, transcript, usage: state.usage },
+      ? { _tag: "Completed", turns: turn + 1, text: state.text, output, transcript }
+      : { _tag: "Completed", turns: turn + 1, text: state.text, output, transcript, usage: state.usage },
 )
 
 const safeTokenSum = (left: number, right: number): number => Math.min(left + right, Number.MAX_SAFE_INTEGER)

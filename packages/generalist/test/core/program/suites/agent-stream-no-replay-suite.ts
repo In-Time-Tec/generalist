@@ -121,7 +121,7 @@ const runAgent = (
   middleware: Layer.Layer<ModelMiddleware.ModelMiddleware> = ModelMiddleware.layerIdentity,
 ) =>
   Stream.runCollect(
-    Agent.stream(agent, { prompt: "no replay" }).pipe(
+    Agent.stream(agent, "no replay").pipe(
       Stream.provide(Layer.mergeAll(allowAllAuthorization, model, policy.pipe(Layer.orDie), middleware, toolLayer)),
     ),
   )
@@ -186,7 +186,7 @@ describe("agent model stream replay safety", () => {
   it.effect("never corrects generic malformed output when no toolkit is present", () =>
     Effect.gen(function* () {
       const model = scriptedModel([Stream.fail(malformedOutput), healthy], true)
-      const failure = yield* Agent.stream(noToolAgent, { prompt: "malformed" }).pipe(
+      const failure = yield* Agent.stream(noToolAgent, "malformed").pipe(
         Stream.provide(
           Layer.mergeAll(
             allowAllAuthorization,

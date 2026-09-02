@@ -1,77 +1,70 @@
 # Structured output
 
-`RunOptions.output` adds one schema-decoded terminal model turn after the ordinary agent loop settles. The run keeps its accumulated text and transcript while returning a typed `value`.
+An Agent owns its input and output schemas. `Agent.run` encodes the input, runs the ordinary model/tool loop, and returns the value decoded through the Agent's output schema. Both schemas default to `Schema.String`.
 
 ## Usage
 
 ```ts
-import { Effect, Schema } from "effect"
+import { Schema } from "effect"
 import { Agent } from "generalist"
 
-const Answer = Schema.Struct({ city: Schema.String, temperatureC: Schema.Number })
-const weather = Agent.make({ name: "weather" })
+const WeatherInput = Schema.Struct({ city: Schema.String })
+const WeatherOutput = Schema.Struct({ city: Schema.String, temperatureC: Schema.Number })
 
-const program = Agent.generate(weather, {
-  prompt: "What is the weather in Paris?",
-  output: {
-    schema: Answer,
-    name: "weather_answer",
-    prompt: "Return the city and temperature.",
-  },
-}).pipe(Effect.map((result) => result.value))
-// program succeeds with { city: "Paris", temperatureC: 21 }
+const weather = Agent.make({
+  name: "weather",
+  input: WeatherInput,
+  output: WeatherOutput,
+  instructions: "Look up the weather, then return the requested fields.",
+})
+
+const program = Agent.run(weather, { city: "Paris" })
+// Effect<{ city: string; temperatureC: number }, Agent.RunError, ...>
 ```
 
 ## What runs
 
 ```text
-Agent.generate(weather, output: Answer)
-└── ordinary loop
-    ├── turn 0: model and tools → text "It is 21°C."
-    └── loop settles
-        └── turn 1: generateObject (purpose: structured-output)
-            ├── prompt: completed transcript + output.prompt
-            ├── schema: Answer; toolChoice: "none"
-            ├── decode → { city: "Paris", temperatureC: 21 }
-            ├── StructuredOutput(turn: 1, value: {...})
-            └── Completed(turns: 2, text: "It is 21°C.")
+Agent.run(weather, { city: "Paris" })
+├── encode input with WeatherInput
+├── ordinary loop
+│   ├── turn 0: model and tools
+│   └── loop settles
+└── terminal output turn (purpose: structured-output)
+    ├── provider-native structured output, or the provider's submit-tool fallback
+    ├── decode with WeatherOutput
+    └── Completed { output: { city: "Paris", temperatureC: 21 } }
 ```
+
+Callers choose neither provider mechanism nor a per-run output option. The framework uses the configured provider's structured-output path and exposes only the decoded value.
 
 ## Failure paths
 
 ```text
-ordinary loop settles
-├── output absent + no committed text
-│   └── RunEndedWithoutOutput
-└── output present
-    └── terminal model call
-        ├── model/schema/persistence failure → AgentError(turn: 1)
-        ├── replay content decode failure → DriverStateInvalid
-        └── defect or interruption → preserved cause
-```
+input encode fails
+└── AgentError
 
-`RunEndedWithoutOutput` records the provider finish reason when available, plus observed provider text and reasoning character counts. A structured run judges success by the schema value instead, so `Completed.text` may be empty.
+terminal output turn
+├── model or persistence failure → AgentError
+├── schema decode failure → InvalidOutput { issues }
+├── replay content failure → DriverStateInvalid
+└── defect or interruption → preserved cause
+```
 
 ## Invariants
 
-- The API is exposed through the `Agent` namespace from `generalist`.
-- `output.schema` is an Effect Schema object codec; `Agent.generate` returns its decoded type as `ObjectResult.value`.
-- `output.name` defaults to `"output"`.
-- `output.prompt` defaults to `"Return the final structured output for the task above."`.
-- The terminal call receives the completed transcript plus the output prompt and cannot call tools.
-- Exactly one terminal structured value is exposed after the ordinary loop and queued follow-up input settle.
-- Follow-up input queued before the terminal call runs another ordinary turn first.
-- Follow-up input accepted while the terminal call finishes invalidates that value, emits no `StructuredOutput` for it, runs the follow-up, and requests a new terminal value.
+- `Agent.make` stores `input` and `output`; each defaults to `Schema.String`.
+- The static Agent type carries both schemas. `Agent.run` returns `output.Type`, and `Agent.stream` ends with `Completed<output.Type>`.
+- Default string Agents return the completed assistant text without a separate output turn.
+- A non-string output runs one terminal structured-output turn after ordinary loop turns and queued follow-up input settle.
+- The terminal turn receives the completed transcript plus `Agent.defaultObjectPrompt` and cannot call application tools.
+- Follow-up input accepted while the terminal call finishes invalidates that candidate, runs the follow-up, and requests a new terminal value.
 - The terminal turn is lazy and starts only when its stream is consumed.
-- Schema decoding happens before `StructuredOutput` is emitted.
-- `StructuredOutput` carries `turn`, `modelCallId`, `modelAttemptId`, `attempt`, decoded `value`, normalized response `content`, and optional `metadata`.
-- On success, `StructuredOutput` is immediately before `Completed`; both are required by `Agent.generate`.
+- Schema decoding completes before `Completed` is emitted. Invalid data fails with `InvalidOutput`; no terminal event is emitted.
+- `Completed.output` is the only terminal typed-value event. There is no parallel `StructuredOutput` event.
 - The terminal prompt and response are included in the completed transcript.
 - Structured-call usage contributes to total usage, and the terminal turn counts toward `Completed.turns`.
-- A plain run requires committed assistant text; a structured run may complete with empty accumulated text.
-- Terminal model or schema failures emit neither `StructuredOutput` nor `Completed`.
 - Model resilience applies to the terminal call according to its error classification.
-- Encoding terminal response content for durable persistence fails with `AgentError`; decoding it during replay fails with `DriverStateInvalid`.
 
 ## Related
 

@@ -26,8 +26,7 @@ const support = Agent.make({
 const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
 const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi)) // any OpenAI model id
 
-const program = Agent.generate(support, {
-  prompt: "How do I rotate my API key?",
+const program = Agent.run(support, "How do I rotate my API key?", {
   memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
   compaction: { contextWindow: 200_000 }, // old turns compress, never drop
 })

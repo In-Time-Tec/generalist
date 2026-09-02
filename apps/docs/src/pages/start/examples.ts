@@ -28,14 +28,14 @@ export const examples = definePage({
           [code("eval-in-ci")],
           [
             "A deterministic no-credential smoke eval over ",
-            code("Agent.generate"),
+            code("Agent.run"),
             " using the ModelRegistry.withModel pattern",
           ],
           [code("bun --cwd examples/eval-in-ci start")],
         ],
         [
           [code("structured-extraction")],
-          ["An offline ", code("Agent.generate"), " run that validates terminal model output with Effect Schema"],
+          ["An offline ", code("Agent.run"), " call that validates terminal model output with Effect Schema"],
           [code("bun --cwd examples/structured-extraction start")],
         ],
         [

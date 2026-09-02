@@ -50,14 +50,15 @@ const layers = Layer.mergeAll(
 )
 
 const program = Effect.gen(function* () {
-  const first = yield* Agent.generate(agent, { prompt: "What is the weather in Boise?" })
-  yield* Console.log(first.text)
+  const events = yield* Agent.stream(agent, "What is the weather in Boise?").pipe(Stream.runCollect)
+  const first = Array.from(events).findLast((event) => event._tag === "Completed")
+  if (first?._tag !== "Completed") return yield* Effect.die("expected a completed run")
+  yield* Console.log(first.output)
   yield* Console.log(first.transcript.content.map((message) => message.role).join(" "))
-  const second = yield* Agent.generate(agent, {
-    prompt: "Which city did I ask about?",
+  const second = yield* Agent.run(agent, "Which city did I ask about?", {
     history: first.transcript,
   })
-  yield* Console.log(second.text)
+  yield* Console.log(second)
 })
 
 const runtime = ManagedRuntime.make(layers)

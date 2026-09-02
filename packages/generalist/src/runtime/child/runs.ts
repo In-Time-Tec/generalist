@@ -288,9 +288,14 @@ export const make = (store: RunStoreService): Service => {
 }
 
 /** @experimental Route Runtime-owned child tools and preserve every resolved upstream handler. */
-const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
-  readonly agent: Agent<Tools, R>
-  readonly environment: Layer.Layer<ClosedServices<Tools, R>>
+const makeExecutor = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  InputSchema extends Schema.Top,
+  OutputSchema extends Schema.Top,
+>(options: {
+  readonly agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>
+  readonly environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>
   readonly implementation: Service
   readonly upstream: Option.Option<ToolExecutorService>
 }): ToolExecutorService => {

@@ -12,10 +12,10 @@ const registryLayer = ModelRegistry.layerMerged([
 ])
 
 const runWith = (selection: ModelRegistry.ModelSelection) =>
-  ModelRegistry.withModel(selection, Agent.generate(agent, { prompt: "Summarize the incident." }))
+  ModelRegistry.withModel(selection, Agent.run(agent, "Summarize the incident."))
 
 const program = runWith({ provider: "anthropic", model: "claude-sonnet-4-5" }).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
+  Effect.flatMap((result) => Console.log(result)),
 )
 
 const runtimeLayer = Layer.mergeAll(

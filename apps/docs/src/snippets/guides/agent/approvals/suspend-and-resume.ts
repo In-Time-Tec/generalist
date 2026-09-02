@@ -72,7 +72,7 @@ const program = Effect.gen(function* () {
   let transcript = Prompt.empty
   const failure = yield* Effect.scoped(
     Effect.flatMap(Layer.build(pendingLayers), (services) =>
-      Agent.stream(agent, { prompt }).pipe(
+      Agent.stream(agent, prompt).pipe(
         Stream.runForEach((event) =>
           Effect.sync(() => {
             if (event._tag === "TurnCompleted") transcript = event.transcript
@@ -92,8 +92,7 @@ const program = Effect.gen(function* () {
   yield* Console.log(`suspended reason=${wait.reason} tool=${wait.call.name} token=${wait.token}`)
   const resumed = yield* Effect.scoped(
     Effect.flatMap(Layer.build(approvedLayers), (services) =>
-      Agent.generate(agent, {
-        prompt,
+      Agent.run(agent, prompt, {
         history: transcript,
         resume: {
           suspension: failure,
@@ -102,7 +101,7 @@ const program = Effect.gen(function* () {
       }).pipe(Effect.provideContext(services)),
     ),
   )
-  yield* Console.log(resumed.text)
+  yield* Console.log(resumed)
 })
 
 await Effect.runPromise(program)

@@ -10,5 +10,4 @@ ModelCallStarted
 ModelAttemptStarted
 ModelAttemptFirstOutput
 ModelCallCompleted
-StructuredOutput: {"total":42,"currency":"USD"}
-Completed
+Completed: {"total":42,"currency":"USD"}

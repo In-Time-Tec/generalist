@@ -15,7 +15,7 @@ const instructions = Instructions.layer([
 ])
 const skills = FileSystemCatalog.layer({ cwd: "." }).pipe(Layer.provide(BunServices.layer))
 const agent = Agent.make({ name: "reviewer", instructions: "Fallback." })
-const program = Agent.generate(agent, { prompt: "Review this change." })
+const program = Agent.run(agent, "Review this change.")
 // Merge these with the runtime's model, executor, approval, and middleware layers.
 const featureLayers = Layer.merge(instructions, skills)
 const runnable = program.pipe(Effect.provide(featureLayers))
@@ -24,7 +24,7 @@ const runnable = program.pipe(Effect.provide(featureLayers))
 ## What runs
 
 ```text
-Agent.generate("Review this change.")
+Agent.run("Review this change.")
 └── run setup
     ├── Instructions.render({ agentName: "reviewer", turn: 0 })
     │   ├── persona.render() -> "You are a code reviewer."

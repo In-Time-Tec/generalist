@@ -9,13 +9,12 @@ import { Effect, Stream } from "effect"
 import * as Agent from "generalist"
 
 Effect.gen(function* () {
-  const suspended = yield* Agent.stream(agent, { prompt: "deploy" }).pipe(Stream.runDrain, Effect.flip)
+  const suspended = yield* Agent.stream(agent, "deploy").pipe(Stream.runDrain, Effect.flip)
   if (suspended._tag !== "generalist/core/AgentSuspended") return yield* Effect.fail(suspended)
 
   // Persist this exact value and the transcript captured from TurnCompleted.
   const wait = suspended.waits[0]!
-  yield* Agent.stream(agent, {
-    prompt: "ignored",
+  yield* Agent.stream(agent, "ignored", {
     history: transcript,
     resume: {
       suspension: suspended,
@@ -30,13 +29,13 @@ Effect.gen(function* () {
 ## What runs
 
 ```text
-Agent.stream(agent, { prompt: "deploy" })
+Agent.stream(agent, "deploy")
 └── model authors tool calls
     └── approval returns Pending / executor returns Suspend
         ├── settle admitted sibling calls into checkpoint states
         └── fail with AgentSuspended { reason: "approval" | "tool-wait" }
 
-Agent.stream(agent, { history, resume })
+Agent.stream(agent, "ignored", { history, resume })
 ├── rebuild transcript from Session or supplied history
 ├── validate suspension + resolutions against checkpoint
 ├── advance only the resolved waits

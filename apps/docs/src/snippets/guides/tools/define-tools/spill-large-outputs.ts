@@ -5,7 +5,7 @@ import { toolkit } from "./search-tool"
 
 const agent = Agent.make({ name: "docs-assistant", toolkit })
 
-export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
+export const run: Effect.Effect<string, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
   Effect.flatMap(
     Layer.build(
       Layer.mergeAll(
@@ -17,8 +17,7 @@ export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.Lang
       ),
     ),
     (services) =>
-      Agent.generate(agent, {
-        prompt: "Summarize every page that mentions layers.",
+      Agent.run(agent, "Summarize every page that mentions layers.", {
         toolOutputMaxBytes: 16_384,
       }).pipe(Effect.provideContext(services)),
   ),
