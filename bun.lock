@@ -196,6 +196,18 @@
         "typescript": "catalog:",
       },
     },
+    "examples/package-catalog": {
+      "name": "generalist-example-package-catalog",
+      "dependencies": {
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/package-composition-guides": {
       "name": "generalist-example-package-composition-guides",
       "dependencies": {
@@ -206,6 +218,13 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",
+      },
+    },
+    "examples/packages/generalist-skills-example": {
+      "name": "@in-time-tec/generalist-skills-example",
+      "version": "1.0.0",
+      "peerDependencies": {
+        "effect": "^4.0.0-rc.112",
       },
     },
     "examples/structured-extraction": {
@@ -232,7 +251,7 @@
     },
     "packages/generalist": {
       "name": "generalist",
-      "version": "0.46.0",
+      "version": "0.48.0",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
@@ -651,6 +670,8 @@
     "@img/sharp-win32-ia32": ["@img/sharp-win32-ia32@0.35.2", "", { "os": "win32", "cpu": "ia32" }, "sha512-YYEhx9PImCC7T0tI8JDMi4DB9LwLCXCU5OWNYEXAxh5Q1ShKkyC6byxzoBJ3gEFDnH2lQckWuDe70G7mB2XJog=="],
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.2", "", { "os": "win32", "cpu": "x64" }, "sha512-imoOyBcoM/iiUr4J6VPpCNjPnjvP/Gks95898yB8YqoGGYmHYbOyCuNv9FMhFgtaiHFGbHW8bxKqRV6VjtXThQ=="],
+
+    "@in-time-tec/generalist-skills-example": ["@in-time-tec/generalist-skills-example@workspace:examples/packages/generalist-skills-example"],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 
@@ -1281,6 +1302,8 @@
     "generalist-example-memory-chat": ["generalist-example-memory-chat@workspace:examples/memory-chat"],
 
     "generalist-example-multi-agent": ["generalist-example-multi-agent@workspace:examples/multi-agent"],
+
+    "generalist-example-package-catalog": ["generalist-example-package-catalog@workspace:examples/package-catalog"],
 
     "generalist-example-package-composition-guides": ["generalist-example-package-composition-guides@workspace:examples/package-composition-guides"],
 
