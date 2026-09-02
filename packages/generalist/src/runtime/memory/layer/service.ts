@@ -47,7 +47,7 @@ import { defaultBounds, digest as messageDigest, promptBytes } from "../../messa
 import { defaultTreePolicy } from "../../tree/policy.js"
 import { isTerminal, type RunInspection } from "../../run.js"
 import { explain as explainRecovery, verify as verifyRecovery } from "../../execution/recovery/operator.js"
-import { resolve as resolveDurableApproval } from "../../../approvals.js"
+import { resolveWith as resolveDurableApproval } from "../../operation/approval.js"
 import { awaitSessionTerminal } from "../../session/lifecycle.js"
 import { make as makeAgentStart } from "./agent-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
@@ -362,7 +362,7 @@ const makeRuntimeWith = (
               : { _tag: "Failed", error: resolution.error },
         }),
       resolveApproval: (token, decision, operatorIdentity) =>
-        resolveDurableApproval(token, decision, { operator: operatorIdentity }),
+        Effect.suspend(() => resolveDurableApproval(service, token, decision, { operator: operatorIdentity })),
       extendBudget: (runId, delta, operatorIdentity) =>
         Effect.gen(function* () {
           const explanation = yield* operatorExplain(runId)
@@ -377,7 +377,7 @@ const makeRuntimeWith = (
           yield* store.extendBudgetRecovery({ runId, delta: normalized, operator: operatorIdentity })
         }),
     }
-    return Runtime.of({
+    const service: RuntimeService = {
       operator,
       register: agentStart.register,
       start: agentStart.start,
@@ -580,7 +580,8 @@ const makeRuntimeWith = (
         }),
       inspectFanOut: store.inspectFanOut,
       awaitFanOut,
-    })
+    }
+    return Runtime.of(service)
   })
 
 export const makeRuntime = (options: LayerOptions) => makeRuntimeWith(options, makeRegisteredAgents())

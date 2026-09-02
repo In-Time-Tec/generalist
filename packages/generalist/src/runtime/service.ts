@@ -67,7 +67,10 @@ import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
 import type { FanOutInput, FanOutMemberOrigin, InitialFanOutInput } from "./child/fan-out-internal.js"
 import type { ResolveOperationInput } from "./operation/resolution.js"
 import type { SteeringReceipt } from "./run/steering.js"
-import type { RespondInput as RespondApprovalInput } from "./operation/approval.js"
+import type {
+  RespondInput as RespondApprovalInput,
+  ResolveError as ResolveDurableApprovalError,
+} from "./operation/approval.js"
 import type { ExecutableRegistration } from "./executable/registration.js"
 import type { Notification as ChildSettlementNotification } from "./child/settlement.js"
 import type { Event as ModelPreviewEvent } from "./execution/model-response/preview.js"
@@ -88,7 +91,6 @@ import type {
   UnknownResolution,
   Verification as RecoveryVerification,
 } from "./execution/recovery/operator.js"
-import type { ResolveError as ResolveDurableApprovalError } from "../approvals.js"
 
 export type { FanOutInput, FanOutMemberInput, InitialFanOutInput } from "./child/fan-out-internal.js"
 
@@ -433,7 +435,7 @@ export interface OperatorService {
     token: string,
     decision: ResolveApprovalDecision,
     operator: string,
-  ) => Effect.Effect<void, OperatorApprovalError, Runtime | RuleStore>
+  ) => Effect.Effect<void, OperatorApprovalError, RuleStore>
   readonly extendBudget: (
     runId: string,
     delta: BudgetDelta,
