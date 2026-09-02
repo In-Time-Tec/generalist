@@ -23,7 +23,7 @@ import type { TurnOverrides } from "../../turn/policy.js"
 import { wrapDriverAttempt } from "./driver.js"
 import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "../../model/operation.js"
 import { captureFinishPart, captureStructuredUsage, modelBudgetCharge } from "./finish.js"
-import { classifyOtherFailure, isToolNameCollision, providerOutput, singleFailure } from "./parts.js"
+import { classifyOtherFailure, isPassThroughFailure, providerOutput, singleFailure } from "./parts.js"
 import { projectCommittedResponse } from "./commit.js"
 import { attemptResponse, replayMessages } from "./response.js"
 import { make as makeActiveTurn } from "./active.js"
@@ -77,7 +77,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     identity: Pick<AttemptCompleted, "modelCallId" | "modelAttemptId" | "attempt">,
   ): Stream.Stream<Event, RunError> => {
     if (part.type === "error") {
-      if (isToolNameCollision(part.error)) return Stream.fail(part.error)
+      if (isPassThroughFailure(part.error)) return Stream.fail(part.error)
       return Stream.fail(AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }))
     }
     const modelPart = Stream.fromIterable<Event>([
@@ -302,7 +302,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                       Stream.mapEffect((part) =>
                         part.type === "error"
                           ? Effect.fail(
-                              isToolNameCollision(part.error)
+                              isPassThroughFailure(part.error)
                                 ? part.error
                                 : AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }),
                             )
@@ -324,7 +324,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                           if (Option.isNone(error)) return Stream.failCause(cause)
                           if (
                             Schema.is(AgentError)(error.value) ||
-                            isToolNameCollision(error.value) ||
+                            isPassThroughFailure(error.value) ||
                             isInvalidToolCallParameters(error.value)
                           ) {
                             return Stream.fail(error.value)

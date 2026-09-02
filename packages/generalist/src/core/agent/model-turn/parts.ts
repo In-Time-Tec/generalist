@@ -1,6 +1,7 @@
 import { Cause, Option, Schema } from "effect"
 import { Response, Tool } from "effect/unstable/ai"
 import { classify as classifyContextOverflow } from "../../model/result/context-overflow.js"
+import { Exhausted } from "../../durable/run-budget.js"
 import { ToolNameCollision } from "../event.js"
 
 export const providerOutput = {
@@ -17,6 +18,8 @@ export const providerOutput = {
 export const classifyOtherFailure = <E>(error: E) => classifyContextOverflow(error)
 
 export const isToolNameCollision = Schema.is(ToolNameCollision)
+
+export const isPassThroughFailure = Schema.is(Schema.Union([ToolNameCollision, Exhausted]))
 
 export const singleFailure = (cause: Cause.Cause<unknown>): Option.Option<unknown> => {
   const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
