@@ -448,7 +448,8 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
       registerApprovalSuspend({
         options,
         capability: options.capabilities["approval-suspend"],
-        provide: (use) => provide(options, use),
+        prepare: (effect) => prepare(options, effect),
+        open: (use) => provideLayer(options.layer, use),
       })
     }
   })

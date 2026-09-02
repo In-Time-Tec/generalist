@@ -455,25 +455,27 @@ export type SqlRuntimeServices = Runtime | RunStore | RunClaims | RunExecutor
 export const layerSqlRuntime = (input: {
   readonly options: SqlStoreOptions
   readonly driver: SqlRuntimeDriver<SqlDriverStoreError>
-}): Layer.Layer<SqlRuntimeServices, SqlDriverStoreError, SqlClient.SqlClient | ExecutableResolver> => {
-  const services = Layer.effectContext(
-    makeSqlStoreServices(input.options, input.driver).pipe(
-      Effect.flatMap(({ claims, runStore }) =>
-        claims === undefined
-          ? SchemaMigrationFailed.make({
-              source: input.options.source ?? input.driver.backend,
-              message: `${input.driver.backend} SQL driver did not provide claims`,
-            })
-          : Effect.succeed(Context.make(RunStore, runStore).pipe(Context.add(RunClaims, claims))),
+}): Layer.Layer<SqlRuntimeServices, SqlDriverStoreError, SqlClient.SqlClient | ExecutableResolver> =>
+  // Registrations belong to one built Runtime, so the map is created per build rather than per Layer value.
+  Layer.suspend(() => {
+    const services = Layer.effectContext(
+      makeSqlStoreServices(input.options, input.driver).pipe(
+        Effect.flatMap(({ claims, runStore }) =>
+          claims === undefined
+            ? SchemaMigrationFailed.make({
+                source: input.options.source ?? input.driver.backend,
+                message: `${input.driver.backend} SQL driver did not provide claims`,
+              })
+            : Effect.succeed(Context.make(RunStore, runStore).pipe(Context.add(RunClaims, claims))),
+        ),
       ),
-    ),
-  )
-  const agents = makeRegisteredAgents()
-  const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
-  const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
-  return Layer.mergeAll(runtime, host, services)
-}
+    )
+    const agents = makeRegisteredAgents()
+    const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
+    const runtime = runtimeLayer(agents)(input.options).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    return Layer.mergeAll(runtime, host, services)
+  })
 
 export const makeSqliteRunStore = (
   options: SqliteStoreOptions,

@@ -7,7 +7,8 @@ import { layerAllowAll, layerRuleStoreMemory, RuleStore } from "../../core/polic
 import { Runtime } from "../../runtime/service.js"
 import type { ApprovalSuspendCapability, Options, Services } from "./contract.js"
 
-type Provide<LayerError> = <A, E>(use: (services: Services) => Effect.Effect<A, E>) => Effect.Effect<A, E | LayerError>
+type Prepare = <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<A, E>
+type Open<LayerError> = <A, E>(use: (services: Services) => Effect.Effect<A, E>) => Effect.Effect<A, E | LayerError>
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -23,9 +24,12 @@ const slug = (value: string): string => value.replace(/[^A-Za-z0-9]+/g, "-").toL
 export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
   readonly options: Options<LayerError, ClaimsLayerError>
   readonly capability: ApprovalSuspendCapability
-  readonly provide: Provide<LayerError>
+  /** Runs driver setup once around the whole scenario. */
+  readonly prepare: Prepare
+  /** Builds one fresh driver Layer over the same store without repeating setup. */
+  readonly open: Open<LayerError>
 }): void => {
-  const { capability, options, provide } = input
+  const { capability, open, options, prepare } = input
   it.effect("suspends for durable approval, recovers, and dispatches the tool exactly once", () => {
     const notifications: Array<DurableRequest> = []
     let modelCalls = 0
@@ -107,10 +111,16 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
         })
         return { runId: handle.runId, token: notifications[0]!.token }
       })
-    const recover = (services: Services, suspended: { readonly runId: string; readonly token: string }) =>
+    const recover = (
+      services: Services,
+      suspended: { readonly runId: string; readonly token: string },
+      rebuilt: boolean,
+    ) =>
       Effect.gen(function* () {
         if (services.executor === undefined)
           return yield* Effect.die(`${options.name} approval recovery requires RunExecutor`)
+        // Registrations live in the Runtime instance, so a rebuilt Runtime registers before recovering.
+        if (rebuilt) yield* register(services.runtime)
         yield* resolveApproval(suspended.token, {
           _tag: "Approved",
           remember: { pattern: "approval_write:*", level: "allow" },
@@ -139,14 +149,18 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
       })
 
     if (capability.recovery === "rebuild") {
-      return Effect.gen(function* () {
-        const suspended = yield* provide(start)
-        yield* provide((services) => recover(services, suspended))
-      }).pipe(Effect.orDie)
+      return prepare(
+        Effect.gen(function* () {
+          const suspended = yield* open(start)
+          yield* open((services) => recover(services, suspended, true))
+        }).pipe(Effect.orDie),
+      )
     }
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- LayerError is selected by each driver and is terminated below at the test boundary.
-    return provide((services) => Effect.flatMap(start(services), (suspended) => recover(services, suspended))).pipe(
-      Effect.orDie,
+    return prepare(
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- LayerError is selected by each driver and is terminated below at the test boundary.
+      open((services) => Effect.flatMap(start(services), (suspended) => recover(services, suspended, false))).pipe(
+        Effect.orDie,
+      ),
     )
   })
 }

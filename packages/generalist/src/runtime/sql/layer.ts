@@ -23,15 +23,19 @@ export const layerSqlite = (
   Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler,
   SqliteStoreError,
   ExecutableResolver
-> => {
-  const client = layer({ filename: options.filename })
-  const store = layerSqliteStore({ ...options, source: options.source ?? options.filename }).pipe(Layer.provide(client))
-  const agents = makeRegisteredAgents()
-  const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
-  const runtime = runtimeLayer(agents)(options).pipe(Layer.provide(dependencies))
-  const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
-  const scheduler = localSchedulerLayer({ workerId: "sqlite", ...options.scheduler }).pipe(
-    Layer.provide(Layer.merge(dependencies, host)),
-  )
-  return Layer.mergeAll(runtime, host, store, scheduler)
-}
+> =>
+  // Registrations belong to one built Runtime, so the map is created per build rather than per Layer value.
+  Layer.suspend(() => {
+    const client = layer({ filename: options.filename })
+    const store = layerSqliteStore({ ...options, source: options.source ?? options.filename }).pipe(
+      Layer.provide(client),
+    )
+    const agents = makeRegisteredAgents()
+    const dependencies = Layer.mergeAll(store, activeExecutionsLayer, modelPreviewLayer)
+    const runtime = runtimeLayer(agents)(options).pipe(Layer.provide(dependencies))
+    const host = runExecutorLayer(agents).pipe(Layer.provide(dependencies))
+    const scheduler = localSchedulerLayer({ workerId: "sqlite", ...options.scheduler }).pipe(
+      Layer.provide(Layer.merge(dependencies, host)),
+    )
+    return Layer.mergeAll(runtime, host, store, scheduler)
+  })
