@@ -5,7 +5,7 @@ import { RunNotFound } from "../../src/runtime/errors.js"
 describe("actionable errors", () => {
   it("supplies hints to constructors and old encoded values", () => {
     const constructed = RunNotFound.make({ runId: "run-17" })
-    const decoded = Schema.decodeUnknownSync(RunNotFound)({
+    const decoded = Schema.decodeSync(RunNotFound)({
       _tag: "generalist/runtime/RunNotFound",
       runId: "run-17",
     })

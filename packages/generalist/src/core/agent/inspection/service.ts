@@ -1,7 +1,7 @@
 import { Clock, Context, Effect, Layer, Option, Ref, Schema, Stream } from "effect"
-import type { RunId } from "../durable/run-id.js"
-import { ActionableTaggedError, errorHint } from "../error-hint.js"
-import type { Event } from "./event.js"
+import type { RunId } from "../../durable/run-id.js"
+import { ActionableTaggedError, errorHint } from "../../error-hint.js"
+import type { Event } from "../event.js"
 
 /** Process-local token totals reported by completed model turns. */
 export interface Usage {
@@ -34,7 +34,9 @@ export interface Service {
   readonly publish: (runId: RunId, event: Event) => Effect.Effect<void>
 }
 
-export class Inspector extends Context.Service<Inspector, Service>()("generalist/core/agent/inspector/Inspector") {
+export class Inspector extends Context.Service<Inspector, Service>()(
+  "generalist/core/agent/inspection/service/Inspector",
+) {
   static get layerMemory(): Layer.Layer<Inspector> {
     return layerMemory
   }
@@ -137,6 +139,7 @@ export const layerTest = (implementation: Service): Layer.Layer<Inspector> =>
   Layer.succeed(Inspector, Inspector.of(implementation))
 
 /** @internal Publish a Run stream when an Inspector is present without adding a service requirement. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- this internal adapter is called in direct style once.
 export const observe = <A extends Event, E, R>(runId: RunId, events: Stream.Stream<A, E, R>): Stream.Stream<A, E, R> =>
   Stream.unwrap(
     Effect.serviceOption(Inspector).pipe(

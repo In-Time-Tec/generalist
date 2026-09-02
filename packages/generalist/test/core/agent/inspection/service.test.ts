@@ -1,9 +1,10 @@
+/* oxlint-disable effecttsgo/strict-effect-provide -- each test is a test-host Layer composition root. */
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Permissions } from "../../../src/index"
-import { TestModel } from "../../../src/testing/index"
+import { Agent, Approvals, Permissions } from "../../../../src/index"
+import { TestModel } from "../../../../src/testing/index"
 
 const reportedUsage = (inputTokens: number, outputTokens: number) =>
   Response.Usage.make({

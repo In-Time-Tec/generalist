@@ -8,7 +8,7 @@ import type { InboxFull, Input as SteeringInput, PolicyInvalid, RunClosed } from
 import { streamInternal } from "../run.js"
 import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js"
 import { AgentError, type Event, InvalidOutput } from "../event.js"
-import { observe } from "../inspector.js"
+import { observe } from "../inspection/service.js"
 import { requiredField, type StructuredRunConfig } from "../loop/context.js"
 
 /** Default prompt for the terminal structured-output turn. */

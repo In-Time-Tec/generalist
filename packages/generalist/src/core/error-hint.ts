@@ -1,3 +1,4 @@
+/* oxlint-disable anti-slop/no-chained-type-assertions, anti-slop/no-object-parameters, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, typescript/no-unsafe-type-assertion -- This internal adapter preserves Schema.TaggedError's overloaded public type while extending its generated Error class. */
 import { Effect, Schema } from "effect"
 
 /** @internal Required error hint with backwards-compatible decoding and constructor defaults. */

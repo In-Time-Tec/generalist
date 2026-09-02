@@ -51,7 +51,7 @@ export {
   type Service as InspectorService,
   type Snapshot as InspectionSnapshot,
   type Usage as InspectionUsage,
-} from "./inspector.js"
+} from "./inspection/service.js"
 export { streamToolCalls } from "./tool-calls.js"
 export { defaultObjectPrompt, type RunHandle }
 /** Allocate one scoped Run and its producer handle before consuming its event stream. */
