@@ -2,6 +2,7 @@ import { Effect, Function, Schema, Stream, Types } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { buildContext, type Entry as SessionEntry } from "../core/context/session.js"
 import { BudgetLimits } from "../core/durable/run-budget.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { CompactionInspection, RawUsageFact, RunId, type RunSnapshot } from "../runtime/run.js"
 import { CompletedModelResponse } from "../runtime/run/event.js"
 import type { InspectError, EventsError, Service as RuntimeService, SessionEntryError } from "../runtime/service.js"
@@ -44,11 +45,14 @@ export const JsonlRecord = Schema.Struct({
 })
 export type JsonlRecord = typeof JsonlRecord.Type
 
-export class ProjectionFailed extends Schema.TaggedError<ProjectionFailed>()("generalist/trajectory/ProjectionFailed", {
-  runId: Schema.String,
-  message: Schema.String,
-  hint: Schema.String,
-}) {}
+export class ProjectionFailed extends ActionableTaggedError<ProjectionFailed>()(
+  "generalist/trajectory/ProjectionFailed",
+  {
+    runId: Schema.String,
+    message: Schema.String,
+    hint: errorHint("Project Agent Runs that have at least one committed model turn."),
+  },
+) {}
 
 export type FromJournalError = InspectError | EventsError | SessionEntryError | ProjectionFailed
 

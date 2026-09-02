@@ -1,6 +1,7 @@
 import { Console, Effect, Function, Option, Schema, Types } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../core/agent/lifecycle/definition.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { ModelCatalog, bundled, type Metadata as ModelMetadata } from "../ai/model-catalog.js"
 import { Runtime } from "../runtime/service.js"
 import { fromJournal, type Trajectory } from "../trajectory/index.js"
@@ -210,11 +211,11 @@ export interface SuiteOptions {
   readonly concurrency: number
 }
 
-export class InvalidSuiteOptions extends Schema.TaggedError<InvalidSuiteOptions>()(
+export class InvalidSuiteOptions extends ActionableTaggedError<InvalidSuiteOptions>()(
   "generalist/eval/InvalidSuiteOptions",
   {
     message: Schema.String,
-    hint: Schema.String,
+    hint: errorHint("Set concurrency to an integer greater than zero."),
   },
 ) {}
 
@@ -303,10 +304,7 @@ export const runSuite: RunSuite = Function.dual(
   > =>
     Effect.gen(function* () {
       if (!Number.isSafeInteger(options.concurrency) || options.concurrency < 1) {
-        return yield* InvalidSuiteOptions.make({
-          message: "concurrency must be a positive safe integer",
-          hint: "Set concurrency to an integer greater than zero.",
-        })
+        return yield* InvalidSuiteOptions.make({ message: "concurrency must be a positive safe integer" })
       }
       const runtime = yield* Runtime
       yield* runtime.register(agent)
