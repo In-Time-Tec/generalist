@@ -97,6 +97,8 @@ Effect.runPromise(writeCertification.pipe(Effect.provide(MyDriver.platformLayer)
 
 The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; Sandbox entries use `sandbox:<provider-name>`; memory and rule-store entries use `memory` and `ruleStore`.
 
+The repository's Vitest reporter writes passing runtime-driver suites to the committed `docs/features/hosts-report.json`, preserving prior evidence for database suites skipped because their URL is unset. `scripts/render-hosts.ts` turns that report into `docs/features/hosts.md`; `bun run test` fails when the generated page has drifted.
+
 ## Scripted model fixtures
 
 ```ts

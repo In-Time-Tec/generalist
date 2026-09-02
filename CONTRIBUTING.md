@@ -25,6 +25,10 @@ Imports under `generalist/*` are stable and follow semantic versioning. Imports 
 | `generalist/sandbox`                                                                       | `generalist/unstable/transport/*`                    |
 | `generalist/testing` and `generalist/testing/runtime-driver`                               |                                                      |
 
-Stable modules must not import modules under `src/unstable`. A service can move to the stable tier only when it provides its production `layer`, a deterministic `layerTest`, and a reusable conformance suite exported from `generalist/testing`. Promotion also requires complete public documentation and a maintainer review of the resulting semver commitment.
+Stable modules must not import modules under `src/unstable`. A service can move to the stable tier only when it provides its production `layer`, a deterministic `layerTest`, and a reusable conformance suite exported from `generalist/testing`. Promotion also requires complete public documentation, a maintainer review of the resulting semver commitment, and all of the following:
+
+- The host passes every capability in its shared conformance suite.
+- Its host dependency is no longer beta.
+- It has shipped for two releases without a breaking change.
 
 The tested Effect cohort is exactly `effect@4.0.0-rc.112`, matching the package peer dependency, workspace catalog, and frozen `bun.lock`. CI intentionally tests that one locked cohort. A minimum/current two-version matrix is deferred until the repository can represent both installations reproducibly with committed lockfile evidence; checks must not replace `bun install --frozen-lockfile` with an unfrozen install.
