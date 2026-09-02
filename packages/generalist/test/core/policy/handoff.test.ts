@@ -115,10 +115,10 @@ layer(Layer.empty)("Handoff", (it) => {
     expect(lookupHandoffToolMeta(second.tool)?.specialist).toBe("second")
   })
 
-  ItLayer.make(it, "builds a supervisor that same-run handoffs to specialists", () => {
+  ItLayer.make(it, "keeps a Session synchronized across same-run handoff to a specialist with instructions", () => {
     let supervisorCalls = 0
     let mathCalls = 0
-    const mathTarget = Handoff.target(Agent.make({ name: "math" }))
+    const mathTarget = Handoff.target(Agent.make({ name: "math", instructions: "Solve the requested math problem." }))
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
@@ -152,9 +152,14 @@ layer(Layer.empty)("Handoff", (it) => {
         expect(started?._tag === "ToolExecutionStarted" && started.call.name).toBe("handoff_to_math")
         expect(mathCalls).toBe(1)
         const completed = events.at(-1)
-        expect(completed?._tag === "Completed" && completed.text).toBe("42")
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag !== "Completed") return
+        expect(completed.text).toBe("42")
         const path = yield* Effect.scoped(
           Session.acquire("session-handoff-1").pipe(Effect.flatMap((session) => session.path())),
+        )
+        expect(Session.buildContext(path).content).toEqual(
+          completed.transcript.content.filter((message) => message.role !== "system"),
         )
         const handoffs = path.filter((entry) => entry._tag === "Handoff")
         expect(handoffs).toHaveLength(1)
