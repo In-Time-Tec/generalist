@@ -313,9 +313,11 @@ const compactionsFor = (
 export const projectRunSnapshot = (run: InspectionRun) =>
   Effect.gen(function* () {
     const outcome = yield* outcomeFor(run)
+    const turn = run.events.reduce((latest, event) => ("turn" in event && event.turn > latest ? event.turn : latest), 0)
     const snapshot = {
       run: run.inspection,
       cursor: run.inspection.lastSequence,
+      turn,
       usage: yield* factsFor([run]),
       compactions: yield* compactionsFor([run]),
     }

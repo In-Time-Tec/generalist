@@ -9,10 +9,8 @@ import { RunClient, Wire } from "generalist/unstable/transport"
 
 const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
 
-const RunReceipt = Schema.Struct({
+const StartResponse = Schema.Struct({
   runId: Schema.String,
-  duplicate: Schema.Boolean,
-  acceptedSequence: Schema.Int,
 })
 
 class TransportTestError extends Schema.TaggedError<TransportTestError>()("TransportTestError", {
@@ -25,14 +23,17 @@ const postJson = (url: string, body: Schema.Json) =>
 const admitRun = (
   baseUrl: string,
   attempts: number,
-): Effect.Effect<typeof RunReceipt.Type, HttpClientError.HttpClientError | Schema.SchemaError, HttpClient.HttpClient> =>
+): Effect.Effect<
+  typeof StartResponse.Type,
+  HttpClientError.HttpClientError | Schema.SchemaError,
+  HttpClient.HttpClient
+> =>
   postJson(`${baseUrl}/runs`, {
-    runId: "deep-research-e2e-run",
     sessionId: "deep-research-e2e-session",
     idempotencyKey: "question-1",
     prompt: "What makes Generalist agent framework standalone?",
   }).pipe(
-    Effect.flatMap(HttpClientResponse.schemaBodyJson(RunReceipt)),
+    Effect.flatMap(HttpClientResponse.schemaBodyJson(StartResponse)),
     Effect.catch((error) =>
       attempts <= 0
         ? Effect.fail(error)
@@ -143,7 +144,6 @@ describe("deep-research-agent Generalist transport e2e", () => {
           const completedTool = all.find((event) => event._tag === "ToolExecutionCompleted")
           const completed = all.find((event) => event._tag === "RunCompleted")
 
-          expect(receipt.duplicate).toBe(false)
           expect(waiting.wait).toMatchObject({
             waitId: "approval:search-1",
             reason: {

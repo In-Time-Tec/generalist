@@ -1,40 +1,40 @@
 # Runtime
 
-The Runtime turns a pinned executable and prompt into an addressable `Run`, then makes the store's journal, cursor, and claim the authority for execution and recovery. Memory and SQLite host their own scheduler; SQL adapters expose the same state machine to fenced workers.
+The Runtime registers typed Agents by unique name and turns an Agent value plus typed input into an addressable `Run`. The store's journal, cursor, and claim remain the authority for execution and recovery. Memory and SQLite host their own scheduler; SQL adapters expose the same state machine to fenced workers.
 
 ## Usage
 
 ```ts
 import { Effect, Layer } from "effect"
+import { Agent } from "generalist"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 
-declare const executable: Runtime.StartInput["executable"]
-declare const registrations: Runtime.StartInput["registrations"]
+const agent = Agent.make({ name: "build-explainer" })
+declare const agentServices: Layer.Layer<Agent.Requirements<typeof agent>>
 declare const resolverLayer: Layer.Layer<ExecutableResolver.ExecutableResolver>
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.start({
-    executable,
-    registrations,
+  yield* runtime.register(agent)
+  const handle = yield* runtime.start(agent, "Explain the failed build", {
     sessionId: "session:42",
     idempotencyKey: "answer:1",
-    prompt: "Explain the failed build",
   })
-  return yield* runtime.inspect(receipt.runId)
+  return yield* handle.await
 })
 
-const memory = Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(resolverLayer))
+const memory = Layer.merge(Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(resolverLayer)), agentServices)
 Effect.runPromise(program.pipe(Effect.provide(memory)))
 ```
 
-`start` is immediate admission: the scoped memory scheduler can claim the returned Run without an application claim loop. The returned inspection's `status` and `lastSequence` are the authoritative lifecycle state and exclusive journal cursor.
+`register` captures the Agent's exact service environment once per process. `start` is immediate admission: the scoped memory scheduler can claim the returned Run without an application claim loop. `handle.await` returns the Agent's schema-decoded output, `handle.events` replays then follows the Run, and `inspect` reports authoritative lifecycle state.
 
 ## What runs
 
 ```text
-Runtime.start({ sessionId: "session:42", key: "answer:1" })
-├── validate pinned executable + registrations
+Runtime.start(agent, input, { sessionId: "session:42", idempotencyKey: "answer:1" })
+├── resolve the process registration by Agent name
+├── encode input through the Agent Schema
 ├── admit Run
 │   └── append RunAccepted(sequence: 0)
 └── local scheduler wake
@@ -50,9 +50,9 @@ Runtime.start({ sessionId: "session:42", key: "answer:1" })
 ```
 
 ```text
-RI  StartInput { sessionId: "session:42", idempotencyKey: "answer:1" }
+RI  Agent<Input, Output> + Input + StartOptions
         │ Runtime.start()
-RO  RunReceipt { runId: "<stable id>", duplicate: false, ... }
+RO  RunHandle<Output> { runId, await, events, steer, followUp }
         │ Runtime.inspect(runId)
 { status: "queued" | "running" | ... , lastSequence: 0..n }
 ```
@@ -88,10 +88,11 @@ worker/process loss
 
 - `generalist/runtime` is Worker-safe and supplies the contract plus memory implementation; Bun SQLite, SQL claims, and hosted SQL worker loops are opt-in subpaths. A blocking ask is not a Runtime primitive.
 - `Address` is an opaque routing key bound by a Layer to a pinned executable. `Message` carries Effect AI `Prompt`, idempotency, Session/lane, and correlation fields; Runtime adds no content vocabulary.
-- `start` atomically persists the exact executable, complete bounded immutable `{ pin, codec, version, payload }` registration catalog, Run, root associations, and optional bounded initial children/fan-outs. Registrations contain secret-free reconstruction data, not credentials. Changed initial-child sources conflict; exact retries return the same root and child IDs.
-- `admit` validates the same root input but persists only `RunAccepted` and leaves an unclaimable `queued` gate. `activate` races transactionally with `cancel`, appends `RunAttemptStarted` once when activation wins, and is idempotent before or after cancellation. `start` composes admission and activation.
+- `register` rejects duplicate Agent names in one Runtime process. `start(agent, input, options)` requires that registration, Schema-encodes the input, and atomically persists the generated executable identity, secret-free reconstruction registrations, and Run. An exact `{ sessionId, idempotencyKey }` retry returns a handle for the same Run ID without admitting a second run.
+- Recovery resolves typed starts by the persisted Agent name against the new process's registered set. A missing name suspends the Run with `UnknownAgent { name, runId }` instead of failing it or dispatching work.
+- `admit` is the separate low-level pinned-executable path. It persists only `RunAccepted` and leaves an unclaimable `queued` gate. `activate` races transactionally with `cancel`, appends `RunAttemptStarted` once when activation wins, and is idempotent before or after cancellation. Typed `start` performs immediate admission and activation.
 - Optional capability content `{ codec, version, digest }` participates in manifest/executable identity. Missing or drifted codec, version, payload digest, or conflicting duplicate pin fails typed; identical duplicates pass, content-less capabilities remain opaque, and `ExecutableRegistration.narrow` enforces the active executable.
-- `ExecutableResolver.resolve` receives only persisted Run identity, manifest, and root registrations. The application interprets codecs, dereferences credentials, reconstructs providers, composes compaction services, and scopes finalizers; recovery never falls back to application rows or current configuration. Runtime owns prompt, history, checkpoint, continuation, identity, budget, and manifest context limits.
+- Addressed and program execution still use `ExecutableResolver.resolve` with persisted Run identity, manifest, and root registrations. Typed Agent starts instead resolve the captured Agent and services by registered name. Runtime owns input, history, checkpoint, continuation, and durable execution identity.
 - Root admission is FIFO per Session across addresses; only the lane head receives the Session writer claim. Other Sessions and child Sessions run independently, while `respond`, `signal`, and `cancel` bypass the lane.
 - Exact idempotency replay returns the same receipt; changed payload fails typed. A caller-assigned `runId` conflicting with replay or existing identity fails `RunIdConflict`.
 

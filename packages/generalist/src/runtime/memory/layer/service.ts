@@ -76,7 +76,9 @@ const decodeStartEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, e
   )
 }
 
-const awaitStart = <Output>(events: Stream.Stream<StartEvent<Output>, import("../../service.js").EventsError | InvalidOutput>) =>
+const awaitStart = <Output>(
+  events: Stream.Stream<StartEvent<Output>, import("../../service.js").EventsError | InvalidOutput>,
+) =>
   events.pipe(
     Stream.filter(
       (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
@@ -87,7 +89,10 @@ const awaitStart = <Output>(events: Stream.Stream<StartEvent<Output>, import("..
         event,
       ): Effect.Effect<
         Output,
-        import("../../service.js").EventsError | import("../../run/event.js").RunFailed | import("../../run/event.js").RunCancelled | InvalidOutput
+        | import("../../service.js").EventsError
+        | import("../../run/event.js").RunFailed
+        | import("../../run/event.js").RunCancelled
+        | InvalidOutput
       > => {
         if (Option.isNone(event)) {
           return Effect.fail(RuntimeUnavailable.make({ message: "Run event stream ended before a terminal event" }))
@@ -136,16 +141,12 @@ export const makeRuntime = (
       Effect.gen(function* () {
         const registrations = yield* validateRegistrations(input.executable, input.registrations)
         const attestation = yield* Effect.scoped(
-          resolveRegisteredAgent(
-            agents,
-            resolver,
-            {
-              runId: input.runId,
-              ref: input.executable.ref,
-              manifest: input.executable.manifest,
-              registrations,
-            } satisfies ResolverInput,
-          ).pipe(
+          resolveRegisteredAgent(agents, resolver, {
+            runId: input.runId,
+            ref: input.executable.ref,
+            manifest: input.executable.manifest,
+            registrations,
+          } satisfies ResolverInput).pipe(
             Effect.map((resolution) => resolution.attestation),
             Effect.catchTag("generalist/runtime/UnknownAgent", () =>
               Effect.fail(ExecutablePinMissing.make({ runId: input.runId, ref: input.executable.ref })),
@@ -605,7 +606,10 @@ export const makeRuntime = (
       directory: (runId) => reachable({ store, policy, runId }),
       registerAgentName: store.registerAgentName,
       resolveOperation: store.resolveOperation,
-      inspect: store.inspect,
+      inspect: (runId) =>
+        store
+          .snapshot(runId)
+          .pipe(Effect.map((snapshot) => ({ ...snapshot.run, turn: snapshot.turn, usage: snapshot.usage }))),
       fanOut: (input) =>
         Effect.gen(function* () {
           return yield* store.admitFanOut(yield* normalizeFanOut(input.parentRunId, input))

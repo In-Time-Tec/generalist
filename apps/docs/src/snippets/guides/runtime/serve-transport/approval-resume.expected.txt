@@ -1,2 +1,2 @@
-waiting for approval on deploy-1
+waiting for Approval on approval:deploy-1
 Deployed api to production.

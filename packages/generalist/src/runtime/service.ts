@@ -57,7 +57,7 @@ import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
 import type { MessagingPolicy } from "./messaging/service.js"
-import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
+import type { RawUsageFact, RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { CompletedModelResponse, RunCancelled, RunCompleted, RunEvent, RunFailed } from "./run/event.js"
 import type { AgentExecutionResult, ProgramExecutionResult } from "./execution/state.js"
 import type { WaitResolution } from "./run/wait.js"
@@ -172,6 +172,12 @@ export interface RunHandle<Output> {
   readonly events: Stream.Stream<StartEvent<Output>, EventsError | InvalidOutput>
   readonly steer: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
   readonly followUp: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
+}
+
+/** @experimental Authoritative Runtime inspection with the latest zero-based turn and raw provider usage facts. */
+export interface RuntimeInspection extends RunInspection {
+  readonly turn: number
+  readonly usage: ReadonlyArray<RawUsageFact>
 }
 
 export interface SpawnInput {
@@ -405,15 +411,9 @@ export interface Service {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
     input: InputCodec["Type"],
     options?: StartOptions,
-  ) => Effect.Effect<
-    RunHandle<OutputCodec["Type"]>,
-    StartError,
-    never
-  >
+  ) => Effect.Effect<RunHandle<OutputCodec["Type"]>, StartError, never>
   /** @internal Begin one already-normalized pinned execution. */
-  readonly startExecution: (
-    input: StartExecutionInput,
-  ) => Effect.Effect<StartReceipt, StartExecutionError>
+  readonly startExecution: (input: StartExecutionInput) => Effect.Effect<StartReceipt, StartExecutionError>
   /** @experimental Durably admit one exact root without making it executable. */
   readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
   /** Idempotently activate an admitted root and return its authoritative current state. */
@@ -486,7 +486,7 @@ export interface Service {
   /** Bind one host-assigned name, unique within the Run's naming scope. */
   readonly registerAgentName: (input: RegisterAgentNameInput) => Effect.Effect<DirectoryEntry, RegisterAgentNameError>
   readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
-  readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
+  readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, InspectError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, InspectFanOutError>
   readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>

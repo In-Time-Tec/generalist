@@ -11,6 +11,7 @@ import { operationRecoverySuite } from "../../operation/suites/recovery.js"
 import { tempDbPath } from "../../sql/scenario.js"
 import { toolCancellationSuite } from "../../operation/suites/tool-cancellation.js"
 import { allowAllAuthorization } from "../../../authorization.js"
+import { Testing } from "../../../../src/testing/index.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -35,6 +36,115 @@ toolCancellationSuite({
   name: "sqlite",
   makeLayer: (options) => SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("tool-cancellation") }),
 })
+
+it.live("reopens a typed Agent start without redispatching its completed tool call", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("typed-agent-start-recovery")
+    const tool = Tool.make("write_once", {
+      parameters: Schema.Struct({ value: Schema.String }),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(tool)
+    const agent = Agent.make({ name: "typed-agent-start-recovery", toolkit })
+    let toolCalls = 0
+    const handlers = toolkit.toLayer({
+      write_once: ({ value }) =>
+        Effect.sync(() => {
+          toolCalls += 1
+          return value
+        }),
+    })
+    const resolver = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
+    const options = {
+      filename,
+      addresses: [],
+      scheduler: { pollInterval: "1 hour" as const },
+    }
+    const startOptions = {
+      sessionId: "session:typed-agent-start-recovery",
+      idempotencyKey: "typed-agent-start-recovery",
+    }
+    let firstModelCalls = 0
+    const firstModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          firstModelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("tool-call", {
+              id: "write-once-1",
+              name: "write_once",
+              params: { value: "written" },
+              providerExecuted: false,
+            }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const firstEnvironment = Layer.mergeAll(allowAllAuthorization, firstModel, handlers)
+    const firstLayer = Layer.merge(
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, Testing.chaos.interruptAfter(5)))),
+      firstEnvironment,
+    )
+
+    const runId = yield* scopedWith(firstLayer)(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(agent)
+        const handle = yield* runtime.start(agent, "write exactly once", startOptions)
+        yield* host.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "before-restart" }))
+
+        expect((yield* runtime.inspect(handle.runId)).status).toBe("running")
+        expect(toolCalls).toBe(1)
+        expect(firstModelCalls).toBe(1)
+        return handle.runId
+      }),
+    )
+
+    let recoveredModelCalls = 0
+    const recoveredModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          recoveredModelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "recovered", delta: "complete after restart" }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const recoveredEnvironment = Layer.mergeAll(allowAllAuthorization, recoveredModel, handlers)
+    const recoveredLayer = Layer.merge(
+      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolver)),
+      recoveredEnvironment,
+    )
+
+    yield* scopedWith(recoveredLayer)(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(agent)
+        const handle = yield* runtime.start(agent, "write exactly once", startOptions)
+
+        expect(handle.runId).toBe(runId)
+        yield* host.execute(yield* store.claimExecution({ runId, ownerId: "after-restart" }))
+        expect(yield* handle.await).toBe("complete after restart")
+        expect(toolCalls).toBe(1)
+        expect(recoveredModelCalls).toBe(1)
+        const history = yield* runtime.history({ runId, limit: 100 })
+        expect(history.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
+        expect(history.filter((event) => event._tag === "ToolExecutionCompleted")).toHaveLength(1)
+      }),
+    )
+  }),
+)
 
 it.live("reconciles a crashed framework tool before resuming its Agent", () =>
   Effect.gen(function* () {

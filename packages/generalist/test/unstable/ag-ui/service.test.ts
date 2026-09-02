@@ -188,6 +188,7 @@ describe("AGUI", () => {
         durability: "ephemeral" as const,
       },
       cursor: 3,
+      turn: 0,
       usage: [],
       compactions: [],
     }
@@ -245,6 +246,7 @@ describe("AGUI", () => {
         durability: "ephemeral" as const,
       },
       cursor: 8,
+      turn: 0,
       usage: [],
       compactions: [],
     }
@@ -291,6 +293,7 @@ describe("AGUI", () => {
         durability: "durable" as const,
       },
       cursor: 12,
+      turn: 0,
       usage: [],
       compactions: [],
     }

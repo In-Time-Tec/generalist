@@ -9,6 +9,7 @@ export type {
   StartOptions,
   StartEvent,
   RunHandle,
+  RuntimeInspection,
   AdmitInput,
   ActivateInput,
   InitialChildInput,

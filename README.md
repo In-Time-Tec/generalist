@@ -75,7 +75,7 @@ const frontDesk = Handoff.supervisor({
 })
 ```
 
-The same agent runs durably. Pin it once (the [durable runtime guide](https://generalist-docs-production.up.railway.app/docs/guides/runtime/serve-transport) shows how), then runs survive restarts, and you can stop, inspect, and resume them from any process:
+The same agent runs durably. Register it once when the Runtime process starts, then use the same typed input contract as a local run. Durable stores recover by the registered Agent name after restart:
 
 ```ts
 import { Effect } from "effect"
@@ -83,16 +83,13 @@ import { Runtime } from "generalist/runtime"
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.start({
-    executable,
-    registrations,
+  yield* runtime.register(frontDesk)
+  const handle = yield* runtime.start(frontDesk, "…", {
     sessionId: "user:42",
     idempotencyKey: "q:1",
-    prompt: "…",
   })
-  yield* runtime.cancel({ runId: receipt.runId }) // stop
-  yield* runtime.inspect(receipt.runId) // authoritative status + journal cursor
-  yield* runtime.respond({ runId: receipt.runId, waitId, resolution: { _tag: "Approved" } }) // approve a suspended run
+  yield* handle.await // typed Agent output
+  yield* runtime.inspect(handle.runId) // authoritative status + journal cursor
 })
 ```
 

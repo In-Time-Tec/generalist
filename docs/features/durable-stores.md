@@ -6,27 +6,29 @@ Durable stores persist Runs, events, operations, Sessions, and related records i
 
 ```ts
 import { Effect, Layer } from "effect"
+import { Agent } from "generalist"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
 declare const resolverLayer: Layer.Layer<ExecutableResolver.ExecutableResolver>
-declare const executable: Runtime.StartInput["executable"]
-declare const registrations: Runtime.StartInput["registrations"]
+const agent = Agent.make({ name: "build-explainer" })
+declare const agentServices: Layer.Layer<Agent.Requirements<typeof agent>>
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  return yield* runtime.start({
-    executable,
-    registrations,
+  yield* runtime.register(agent)
+  return yield* runtime.start(agent, "Explain the failed build", {
     sessionId: "session:42",
     idempotencyKey: "answer:1",
-    prompt: "Explain the failed build",
   })
 })
 
-const store = SqliteRuntime.layerSqlite({
-  filename: "./generalist.sqlite",
-  addresses: [],
-}).pipe(Layer.provide(resolverLayer))
+const store = Layer.merge(
+  SqliteRuntime.layerSqlite({
+    filename: "./generalist.sqlite",
+    addresses: [],
+  }).pipe(Layer.provide(resolverLayer)),
+  agentServices,
+)
 Effect.runPromise(program.pipe(Effect.provide(store)))
 ```
 
@@ -37,7 +39,7 @@ Effect.runPromise(program.pipe(Effect.provide(store)))
 ```text
 construct SQLite Layer (source = "./generalist.sqlite")
 ├── apply/verify schema { version: 4, dirty: false }
-└── Runtime.start({ sessionId: "session:42" })
+└── Runtime.start(agent, input, { sessionId: "session:42" })
     └── transaction
         ├── lock identity "answer:1"; persist Run + Session
         ├── append RunAccepted

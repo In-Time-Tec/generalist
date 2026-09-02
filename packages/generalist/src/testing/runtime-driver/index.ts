@@ -147,6 +147,8 @@ const registerStartByAgent = <LayerError, ClaimsLayerError>(
         expect(yield* services.runtime.inspect(handle.runId)).toMatchObject({
           runId: handle.runId,
           status: "succeeded",
+          turn: 0,
+          usage: [],
         })
       }),
     ),
