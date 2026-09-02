@@ -59,6 +59,10 @@
       "types": "./dist/core/turn/compaction.d.ts",
       "import": "./dist/core/turn/compaction.js"
     },
+    "./eval": {
+      "types": "./dist/eval/eval.d.ts",
+      "import": "./dist/eval/eval.js"
+    },
     "./permissions": {
       "types": "./dist/core/policy/permissions.d.ts",
       "import": "./dist/core/policy/permissions.js"
@@ -106,6 +110,10 @@
     "./testing/runtime-driver": {
       "types": "./dist/testing/runtime-driver/index.d.ts",
       "import": "./dist/testing/runtime-driver/index.js"
+    },
+    "./trajectory": {
+      "types": "./dist/trajectory/trajectory.d.ts",
+      "import": "./dist/trajectory/trajectory.js"
     },
     "./providers/model-catalog": {
       "types": "./dist/ai/model-catalog.d.ts",
