@@ -27,6 +27,7 @@ class PackageSmokeFailed extends Schema.TaggedError<PackageSmokeFailed>()("gener
 }) {}
 
 const smokeError = (message: string): PackageSmokeFailed => PackageSmokeFailed.make({ message })
+const declarationSizeLimit = 400_000
 
 const Dependencies = Schema.Record(Schema.String, Schema.String)
 const ExportTarget = Schema.Struct({
@@ -632,6 +633,21 @@ const program = Effect.gen(function* () {
         .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
       if (unsafeTypes.length > 0) {
         return yield* smokeError(`${packageName} contains a non-regular entry`)
+      }
+      const oversizedDeclarations = verboseListing
+        .split("\n")
+        .filter((entry) => entry.endsWith(".d.ts"))
+        .map((entry) => {
+          const fields = entry.trim().split(/\s+/)
+          return { bytes: Number(fields[2]), file: fields[5] }
+        })
+        .filter(({ bytes }) => bytes > declarationSizeLimit)
+      if (oversizedDeclarations.length > 0) {
+        return yield* smokeError(
+          `${packageName} declarations exceed ${declarationSizeLimit} bytes:\n${oversizedDeclarations
+            .map(({ bytes, file }) => `${file}: ${bytes}`)
+            .join("\n")}`,
+        )
       }
       return entries
     })
