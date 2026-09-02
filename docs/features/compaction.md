@@ -43,7 +43,8 @@ const program = Agent.run(agent, "Continue.", {
 
 ```ts
 import { Effect, Option } from "effect"
-import { Compaction, Prompt } from "generalist"
+import { Prompt } from "effect/unstable/ai"
+import { Compaction } from "generalist"
 
 const mine = Compaction.make({
   shouldCompact: ({ tokens, contextWindow }) => tokens > contextWindow * 0.75,

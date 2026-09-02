@@ -101,7 +101,7 @@ describe("RunClient", () => {
         )
       }),
     )
-    const testLayer = Layer.merge(Layer.succeed(HttpClient.HttpClient, client), Chaos.dropConnection(2))
+    const testLayer = Layer.merge(Layer.succeed(HttpClient.HttpClient, client), Chaos.layerDropConnection(2))
     layer(testLayer, { excludeTestServices: true })("SSE reconnect", (suite) => {
       suite.effect("resumes after the last event without duplicates", () =>
         RunClient.streamSSE({ url: "https://test/runs/run-1/events", reconnect: Schedule.recurs(1) }).pipe(
