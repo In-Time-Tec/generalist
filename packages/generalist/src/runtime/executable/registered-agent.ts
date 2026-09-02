@@ -8,6 +8,7 @@ import {
   type Any as AnyAgent,
   type Closed,
   type ClosedServices,
+  withTools,
 } from "../../core/agent/lifecycle/definition.js"
 import {
   DuplicateAgent,
@@ -20,6 +21,7 @@ import { make as makeExecutable } from "./manifest.js"
 import type { Input as ResolverInput, Resolution, Service as ResolverService } from "./resolver.js"
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js"
+import { Configuration as Tasks } from "../../tasks/internal.js"
 
 const codec = "generalist/runtime/registered-agent"
 const version = "1"
@@ -27,6 +29,7 @@ const version = "1"
 /** @internal One process-local Agent registration paired with its durable admission identity. */
 export interface RegisteredAgent {
   readonly name: string
+  readonly registeredFrom: AnyAgent
   readonly source: AnyAgent
   readonly agent: Closed
   readonly context: Context.Context<unknown>
@@ -64,7 +67,7 @@ export const make = (): RegisteredAgents => {
     getFor: (agent) =>
       Effect.sync(() => {
         const registration = entries.get(agent.name)
-        return Option.fromUndefinedOr(registration?.source === agent ? registration : undefined)
+        return Option.fromUndefinedOr(registration?.registeredFrom === agent ? registration : undefined)
       }),
   }
 }
@@ -139,15 +142,23 @@ const pinnedAgent = (agent: AnyAgent, children: ReadonlyArray<{ readonly selecti
   })
 }
 
-const graphIdentities = (root: AnyAgent) => {
+const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any> = []) => {
   const graph = graphFor(root)
+  const implementations = new Map(
+    graph.agents.map((agent) => {
+      if (additionalTools.length === 0) return [agent, agent] as const
+      const hidden: unknown = agent
+      // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: graphFor accepts only Agent definitions and erases their invariant parameters.
+      return [agent, withTools(hidden as ErasedAgent, additionalTools)] as const
+    }),
+  )
   const pinned = new Map(
     graph.agents.map(
       (agent) =>
         [
           agent,
           pinnedAgent(
-            agent,
+            implementations.get(agent)!,
             (graph.children.get(agent) ?? []).map(({ selection }) => ({ selection })),
           ),
         ] as const,
@@ -171,6 +182,7 @@ const graphIdentities = (root: AnyAgent) => {
   }))
   return {
     graph,
+    implementations,
     identities: new Map(
       graph.agents.map(
         (agent) =>
@@ -200,11 +212,12 @@ export const durableIdentity = <
 
 /** @internal Close an Agent over the registration call's exact environment and derive its durable admission identity. */
 const registered = (
-  agent: AnyAgent,
+  registeredFrom: AnyAgent,
+  implementation: AnyAgent,
   context: Context.Context<unknown>,
   identity: ReturnType<typeof durableIdentity>,
 ): RegisteredAgent => {
-  const hiddenAgent: unknown = agent
+  const hiddenAgent: unknown = implementation
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; every registered member originates from Agent.make.
   const erased = hiddenAgent as ErasedAgent
   const hiddenEnvironment: unknown = Layer.succeedContext(context)
@@ -213,8 +226,9 @@ const registered = (
     ClosedServices<Record<string, Tool.Any>, unknown, Schema.Top, Schema.Top>
   >
   return {
-    name: agent.name,
-    source: agent,
+    name: implementation.name,
+    registeredFrom,
+    source: implementation,
     agent: close(erased, environment),
     context,
     executable: identity.executable,
@@ -233,13 +247,15 @@ export const capture = <
 >(
   agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
 ): Effect.Effect<ReadonlyArray<RegisteredAgent>, never, ClosedServices<Tools, R, InputCodec, OutputCodec>> =>
-  Effect.context<ClosedServices<Tools, R, InputCodec, OutputCodec>>().pipe(
-    Effect.map((context) => {
-      const graph = graphIdentities(agent)
-      const erasedContext = Context.makeUnsafe<unknown>(context.mapUnsafe)
-      return graph.graph.agents.map((member) => registered(member, erasedContext, graph.identities.get(member)!))
-    }),
-  )
+  Effect.gen(function* () {
+    const context = yield* Effect.context<ClosedServices<Tools, R, InputCodec, OutputCodec>>()
+    const tasks = yield* Effect.serviceOption(Tasks)
+    const graph = graphIdentities(agent, Option.isSome(tasks) ? tasks.value.tools : [])
+    const erasedContext = Context.makeUnsafe<unknown>(context.mapUnsafe)
+    return graph.graph.agents.map((member) =>
+      registered(member, graph.implementations.get(member)!, erasedContext, graph.identities.get(member)!),
+    )
+  })
 
 const registeredInput = (input: ResolverInput): boolean =>
   input.registrations.length > 0 &&

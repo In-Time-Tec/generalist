@@ -57,7 +57,7 @@ host.runs.cancel(runId, reason?)       -> void
 host.runs.rewind(runId, { toSequence }) -> void
 
 host.events.subscribe(sessionId, cursor?)
-  -> Effect<Stream<RunStarted | Turn | ToolCall | ApprovalRequested | Compacted | Completed>, SessionError>
+  -> Effect<Stream<RunStarted | Turn | ToolCall | TasksUpdated | ApprovalRequested | Compacted | Completed>, SessionError>
 
 host.approvals.resolve(runId, token, decision, operator) -> void
 

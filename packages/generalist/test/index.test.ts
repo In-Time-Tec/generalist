@@ -120,6 +120,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
     () => import("../src/memo.js"),
     ["Dependencies", "Store", "layerDependencies", "layerMemory", "layerSql", "models", "pure"],
   ],
+  ["tasks", () => import("../src/tasks/index.js"), ["Item", "Items", "Status", "Update", "layer", "update"]],
 ]
 
 describe("generalist public surface", () => {
@@ -167,6 +168,7 @@ describe("generalist public surface", () => {
         "SessionSync",
         "SkillCatalog",
         "Steering",
+        "Tasks",
         "ToolAuthorization",
         "ToolContext",
         "ToolExecutor",

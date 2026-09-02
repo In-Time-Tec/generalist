@@ -56,6 +56,7 @@ export type { HostSession } from "../runtime/session/host.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
   HostEvent,
+  TasksUpdated,
   type ApprovalRequested,
   type Compacted,
   type Completed,
@@ -495,6 +496,5 @@ const create = <
     }
     return host
   })
-
 /** Stable process-local product host. */
 export const Generalist = { create, plugin } as const

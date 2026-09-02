@@ -119,6 +119,7 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
             sandbox: "fresh",
             instructions: "own",
             memory: "inherit",
+            tasks: "none",
           },
           {
             history: "full",
@@ -127,6 +128,7 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
             sandbox: "fresh",
             instructions: "own",
             memory: "inherit",
+            tasks: "none",
           },
         ])
         for (const [index, runId] of suspended.childRunIds.entries()) {

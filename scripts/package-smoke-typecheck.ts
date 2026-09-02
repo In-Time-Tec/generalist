@@ -2,7 +2,7 @@
 export const packageSmokeTypecheck = (
   exports: ReadonlyArray<string>,
 ): string => `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
-import { Agent, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, Session, ToolOutput } from "generalist"
+import { Agent, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, Session, Tasks, ToolOutput } from "generalist"
 import { LanguageModel } from "effect/unstable/ai"
 import { A2A } from "generalist/unstable/a2a"
 import { AGUI } from "generalist/unstable/ag-ui"
@@ -41,6 +41,7 @@ type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Op
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
 type TestingRuntimeDriver = Assert<Equal<typeof Testing.runtimeDriver, typeof import("generalist/testing/runtime-driver").runtimeDriver>>
+type TasksCanonical = Assert<Equal<typeof Tasks, typeof import("generalist/tasks")>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>

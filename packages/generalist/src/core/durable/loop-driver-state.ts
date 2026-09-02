@@ -5,6 +5,7 @@ import { Exhausted } from "./run-budget.js"
 import { ToolBatchCheckpoint } from "../agent/tools/checkpoint.js"
 import { Checkpoint as HookCheckpoint } from "../../hooks/index.js"
 import { Checkpoint as GateCheckpoint } from "../agent/gates/definition.js"
+import { Items as TaskItems } from "../../tasks/item.js"
 
 /** Pending operation the interpreter schedules before decide. */
 export const PendingOperation = Schema.Struct({
@@ -24,6 +25,7 @@ export const LoopDriverState = Schema.Struct({
   handoff: Schema.optionalKey(ControlState),
   pending: Schema.optionalKey(PendingOperation),
   toolBatch: Schema.optionalKey(ToolBatchCheckpoint),
+  tasks: Schema.optionalKey(TaskItems),
   hooks: Schema.optionalKey(Schema.Array(HookCheckpoint)),
   gates: Schema.optionalKey(Schema.Array(GateCheckpoint)),
   postCommitFailure: Schema.optionalKey(Exhausted),

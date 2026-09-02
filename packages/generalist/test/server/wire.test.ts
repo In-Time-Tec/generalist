@@ -14,12 +14,8 @@ describe("Server event wire contract", () => {
 
   it("rejects a wrapper whose Runtime event belongs to another Host event category", () => {
     const event = hostEvent(4)
-    expect(
-      Schema.decodeOption(Server.HostEvent)({
-        ...event,
-        _tag: "Completed",
-      })._tag,
-    ).toBe("None")
+    const invalid = { ...event, _tag: "Completed" }
+    expect(Schema.decodeUnknownOption(Server.HostEvent)(invalid)._tag).toBe("None")
   })
 
   it("decodes origin and applied cursors", () => {

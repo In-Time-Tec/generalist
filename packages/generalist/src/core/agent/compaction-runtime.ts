@@ -35,6 +35,11 @@ import type { SkillCatalogError } from "../context/skill-catalog.js"
 import { CompactionProjection } from "./session/compaction-projection.js"
 import { compaction as applyCompactionHooks } from "./lifecycle/hooks.js"
 import type { RunId } from "../durable/run-id.js"
+import {
+  currentOption as currentTasks,
+  retain as retainTasks,
+  withCurrent as withCurrentTasks,
+} from "../../tasks/internal.js"
 type CompactionContext = {
   readonly runId: RunId
   readonly activeSession: Option.Option<SessionStore>
@@ -356,34 +361,47 @@ export const make = (context: CompactionContext) => {
     applicationIdentity: string,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
     onCommitted?: () => void,
-  ): Effect.Effect<void, RunError, DriverInterpreter> => {
-    const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-    const interceptionBase = {
-      turn,
-      tag: result._tag,
-      applicationIdentity,
-    }
-    const interceptionInput =
-      commitData === undefined ? interceptionBase : { ...interceptionBase, compactionId: commitData.compactionId }
-    return intercept(
-      {
-        kind: "compaction",
-        key: operationKey(logicalId, "compaction", "apply", turn, applicationIdentity),
+  ): Effect.Effect<void, RunError, DriverInterpreter> =>
+    Effect.gen(function* () {
+      const tasks = yield* currentTasks
+      const retained = Option.isSome(tasks) ? retainTasks(result, tasks.value) : result
+      const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+      const interceptionBase = {
         turn,
-        input: interceptionInput,
-        replayPolicy: "pure",
-        success: Schema.Void,
-        failure: RunError,
-      },
-      applyCompactionResultBody(turn, result, parentId, commitData, onCommitted),
-    )
-  }
+        tag: retained._tag,
+        applicationIdentity,
+      }
+      const interceptionInput =
+        commitData === undefined ? interceptionBase : { ...interceptionBase, compactionId: commitData.compactionId }
+      yield* intercept(
+        {
+          kind: "compaction",
+          key: operationKey(logicalId, "compaction", "apply", turn, applicationIdentity),
+          turn,
+          input: interceptionInput,
+          replayPolicy: "pure",
+          success: Schema.Void,
+          failure: RunError,
+        },
+        applyCompactionResultBody(turn, retained, parentId, commitData, onCommitted),
+      )
+      if (Option.isSome(tasks)) yield* Ref.update(chat.history, (history) => withCurrentTasks(history, tasks.value))
+    })
+  const historyWithCurrentTasks = Effect.gen(function* () {
+    const history = yield* Ref.get(chat.history)
+    const tasks = yield* currentTasks
+    if (Option.isNone(tasks)) return { history, tasks }
+    const retained = withCurrentTasks(history, tasks.value)
+    yield* Ref.set(chat.history, retained)
+    return { history: retained, tasks }
+  })
   const preparePrompt = (turn: number, prompt: Prompt.Prompt, overflow: boolean) =>
     Option.match(compactionService, {
-      onNone: () => Effect.succeed({ prompt, changed: false }),
+      onNone: () => historyWithCurrentTasks.pipe(Effect.as({ prompt, changed: false })),
       onSome: (compaction) =>
         Effect.gen(function* () {
-          const history = yield* Ref.get(chat.history)
+          const current = yield* historyWithCurrentTasks
+          const history = current.history
           const path = yield* sessionPathForCompaction(turn, history, prompt)
           const usage = yield* compactionUsage(turn, history, prompt)
           if (compaction.willCompact !== undefined && !compaction.willCompact({ usage, overflow }))
@@ -454,11 +472,14 @@ export const make = (context: CompactionContext) => {
                 compactEffect,
               )
           if (Option.isNone(compacted)) return { prompt, changed: false }
+          const result = Option.isSome(current.tasks)
+            ? retainTasks(compacted.value, current.tasks.value)
+            : compacted.value
           let applicationCommitted = false
           return yield* Effect.gen(function* () {
             const changed =
-              !Equal.equals(originalHistory.content, compacted.value.history.content) ||
-              !Equal.equals(originalPrompt.content, compacted.value.prompt.content)
+              !Equal.equals(originalHistory.content, result.history.content) ||
+              !Equal.equals(originalPrompt.content, result.prompt.content)
             if (!changed) {
               const skippedAt = yield* Clock.currentTimeMillis
               yield* emitTelemetry({ _tag: "CompactionSkipped", turn, compactionId, skippedAt })
@@ -466,20 +487,14 @@ export const make = (context: CompactionContext) => {
             }
             const allowed = [...historyRecalled, ...promptRecalled]
             const required = Option.isSome(activeSession) ? promptRecalled : allowed
-            if (
-              !preservesRecalledMessages(
-                allowed,
-                required,
-                Prompt.concat(compacted.value.history, compacted.value.prompt),
-              )
-            ) {
+            if (!preservesRecalledMessages(allowed, required, Prompt.concat(result.history, result.prompt))) {
               return yield* MiddlewareViolation.make({
                 turn,
                 detail: "Compaction must preserve recalled-memory message lineage outside the lossless Session path",
               })
             }
-            yield* CompactionProjection.validate(turn, compacted.value)
-            const after = Prompt.concat(compacted.value.history, compacted.value.prompt)
+            yield* CompactionProjection.validate(turn, result)
+            const after = Prompt.concat(result.history, result.prompt)
             const contextTokensAfter = yield* Effect.option(countTokens(turn, after))
             const commitBase = {
               compactionId,
@@ -490,11 +505,11 @@ export const make = (context: CompactionContext) => {
             const commit = Option.isSome(contextTokensAfter)
               ? { ...commitBase, contextTokensAfter: contextTokensAfter.value }
               : commitBase
-            yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null, compactionId, commit, () => {
+            yield* applyCompactionResult(turn, result, path.at(-1)?.id ?? null, compactionId, commit, () => {
               applicationCommitted = true
             })
             return {
-              prompt: Option.isNone(activeSession) ? Prompt.fromMessages([]) : compacted.value.prompt,
+              prompt: Option.isNone(activeSession) ? Prompt.fromMessages([]) : result.prompt,
               changed: true,
             }
           }).pipe(

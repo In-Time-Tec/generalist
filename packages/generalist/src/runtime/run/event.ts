@@ -34,6 +34,7 @@ import { Sequence, SpecVersion } from "./event-identity.js"
 import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
 import { AdmissionPolicy, MessageSource } from "./steering.js"
 import { Message as AddressedMessage, type Message } from "../messaging/message.js"
+import { Items as TaskItems } from "../../tasks/item.js"
 
 export type { AgentLoopEvent, ExecutionResult }
 export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
@@ -380,6 +381,7 @@ export const AgentLoopEventSchema = Schema.Union([
     turn: Schema.Finite,
     call: ToolCall,
     result: ToolResult,
+    tasksUpdated: Schema.optionalKey(TaskItems),
     ...optionalMetadata,
   }),
   Schema.TaggedStruct("ToolExecutionWaiting", {

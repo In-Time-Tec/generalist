@@ -8,6 +8,7 @@ import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
 import type { Result as CompletionGateResult } from "./gates/definition.js"
 import type { AwaitEvent } from "./tools/wake-event.js"
+import type { Items as TaskItems } from "../../tasks/item.js"
 /** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
@@ -101,6 +102,7 @@ export interface ToolExecutionCompleted {
   readonly turn: number
   readonly call: Response.ToolCallPart<string, unknown>
   readonly result: Response.ToolResultPart<string, unknown, unknown>
+  readonly tasksUpdated?: TaskItems
   readonly metadata?: Metadata & {
     readonly toolProgress?: {
       readonly dropped: number

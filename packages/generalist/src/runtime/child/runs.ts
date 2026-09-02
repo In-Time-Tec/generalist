@@ -13,6 +13,7 @@ import { GroupReceipt, resultFromInspection } from "./group.js"
 import { ChildLifecycle } from "./lifecycle.js"
 import { ChildRuns, catchDomainFailure, success, type FanOutGroupInput, type Service } from "./executor.js"
 import { inheritance, Inheritance } from "../../core/agent/lifecycle/fan-out.js"
+import { Items as TaskItems } from "../../tasks/item.js"
 
 export * from "./group.js"
 type Mutable<Value> = Value extends Value ? { -readonly [Key in keyof Value]: Value[Key] } : never
@@ -67,6 +68,7 @@ export const make = (store: RunStoreService): Service => {
     childGroupLabel?: string
     childInheritancePolicy: Schema.Json
     parentAgentName: string
+    parentTasks?: Schema.Json
   }
   type MutableReceiptChild = {
     -readonly [Key in keyof GroupReceipt["children"][number]]: GroupReceipt["children"][number][Key]
@@ -180,6 +182,9 @@ export const make = (store: RunStoreService): Service => {
               Schema.encodeSync(Inheritance)(inheritance(member.inherit)),
             ),
             parentAgentName: agentName,
+          }
+          if (inheritance(member.inherit).tasks === "read") {
+            metadata.parentTasks = Schema.decodeSync(Schema.Json)(Schema.encodeSync(TaskItems)(input.tasks ?? []))
           }
           if (member.label !== undefined) metadata.childGroupLabel = member.label
           const origin: Origin = { parentToolCallId: input.toolCallId }

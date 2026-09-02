@@ -167,8 +167,9 @@ const applyEvent = (model: Model, event: RunEvent): readonly [Model, Option.Opti
 
 const applyHostEvent = (model: Model, hostEvent: HostEvent): readonly [Model, Option.Option<Output>] => {
   if (hostEvent.cursor <= model.lastSeq) return [model, Option.none()]
-  const event = hostEvent.event
   const withSequence = changeModel(model, { lastSeq: hostEvent.cursor })
+  if (hostEvent._tag === "TasksUpdated") return [withSequence, Option.none()]
+  const event = hostEvent.event
   switch (event._tag) {
     case "ApprovalRequested":
       return [

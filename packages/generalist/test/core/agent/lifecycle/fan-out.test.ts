@@ -36,6 +36,7 @@ it("normalizes every child inheritance field and its safe defaults", () => {
     sandbox: "fork",
     instructions: "inherit",
     memory: "inherit",
+    tasks: "none",
   })
   expect(
     Agent.child(stringAgent, "explicit", {
@@ -47,6 +48,7 @@ it("normalizes every child inheritance field and its safe defaults", () => {
         sandbox: "share",
         instructions: "own",
         memory: "fresh",
+        tasks: "read",
       },
     }).inherit,
   ).toEqual({
@@ -57,6 +59,7 @@ it("normalizes every child inheritance field and its safe defaults", () => {
     sandbox: "share",
     instructions: "own",
     memory: "fresh",
+    tasks: "read",
   })
 })
 

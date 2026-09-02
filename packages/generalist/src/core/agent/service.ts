@@ -1,5 +1,4 @@
-import { Effect, Option, Predicate, type Ref, Schema, Stream } from "effect"
-import { dual } from "effect/Function"
+import { Effect, Function, Option, Predicate, type Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type AgentSuspended, type Event } from "./event.js"
 import type { BudgetLimits, RunBudget } from "../durable/run-budget.js"
@@ -18,6 +17,7 @@ import {
   type HandoffAgent,
   type ToolDeclaration,
   type ToolSchedulingPolicy,
+  withTools,
 } from "./lifecycle/definition.js"
 import { allocateRun } from "./lifecycle/run-handle.js"
 import { encode as encodeInput } from "./lifecycle/input.js"
@@ -33,6 +33,7 @@ import {
 import type { SandboxService } from "../../sandbox/service.js"
 import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner } from "./lifecycle/fan-out.js"
 import type { HandlersFor } from "./tool/fan-out.js"
+import { Configuration as Tasks } from "../../tasks/internal.js"
 export {
   AgentTypeId,
   close,
@@ -399,9 +400,8 @@ interface StreamFunction {
     RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
   >
 }
-
 /** Stream an Agent run as Events ending in `Completed { output }`. */
-export const stream: StreamFunction = dual(
+export const stream: StreamFunction = Function.dual(
   isDataFirst,
   <
     Tools extends Record<string, Tool.Any>,
@@ -419,13 +419,14 @@ export const stream: StreamFunction = dual(
       Effect.gen(function* () {
         const context = yield* Effect.context<never>()
         const prompt = yield* encodeInput(agent.input, input)
+        const tasks = yield* Effect.serviceOption(Tasks)
+        const configured = Option.isSome(tasks) ? withTools(agent, tasks.value.tools) : agent
         return Stream.scoped(
-          Stream.unwrap(allocateRun(agent, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
+          Stream.unwrap(allocateRun(configured, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
         ).pipe(Stream.provideService(ProcessRunner, processRunner(context, agentRunner)))
       }),
     ),
 )
-
 interface RunFunction {
   <InputValue, O extends InvocationOptions = Record<never, never>>(
     input: InputValue,
@@ -464,9 +465,8 @@ interface RunFunction {
     RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
   >
 }
-
 /** Run an Agent to its schema-decoded output. */
-export const run: RunFunction = dual(
+export const run: RunFunction = Function.dual(
   isDataFirst,
   <
     Tools extends Record<string, Tool.Any>,
