@@ -4,6 +4,7 @@ import {
   KernelSnapshotStore,
   KernelStateUnavailable,
   Manifest,
+  snapshotId,
   type Service,
   type Snapshot,
 } from "../kernel-snapshot-store.js"
@@ -41,6 +42,9 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
     const directoryOf = (sessionId: string): string => path.join(options.dataRoot, "kernel-state", safeName(sessionId))
     const manifestFile = (sessionId: string): string => path.join(directoryOf(sessionId), "manifest.json")
     const payloadFile = (sessionId: string): string => path.join(directoryOf(sessionId), "payload.bin")
+    const immutableDirectory = (id: string): string => path.join(options.dataRoot, "kernel-snapshots", safeName(id))
+    const immutableManifestFile = (id: string): string => path.join(immutableDirectory(id), "manifest.json")
+    const immutablePayloadFile = (id: string): string => path.join(immutableDirectory(id), "payload.bin")
     const writeAtomic = (
       sessionId: string,
       file: string,
@@ -117,6 +121,41 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
               snapshotError(sessionId, "io", `kernel state cannot be dropped for session ${sessionId}`),
             ),
           ),
+      saveImmutable: (snapshot: Snapshot) =>
+        Effect.gen(function* () {
+          const id = snapshotId(snapshot)
+          const text = yield* encodeManifest(snapshot.manifest).pipe(
+            Effect.mapError(() => snapshotError(id, "corrupt", "kernel snapshot manifest cannot be encoded")),
+          )
+          yield* writeAtomic(id, immutablePayloadFile(id), (temporary) =>
+            fileSystem.writeFile(temporary, snapshot.payload, { mode: FILE_MODE }),
+          )
+          yield* writeAtomic(id, immutableManifestFile(id), (temporary) =>
+            fileSystem.writeFileString(temporary, text, { mode: FILE_MODE }),
+          )
+          return id
+        }),
+      loadImmutable: (id: string) =>
+        fileSystem.readFileString(immutableManifestFile(id)).pipe(
+          Effect.matchEffect({
+            onFailure: (error) =>
+              isNotFound(error)
+                ? Effect.succeedNone
+                : Effect.fail(snapshotError(id, "io", `kernel snapshot is unreadable for ${id}`)),
+            onSuccess: (text) =>
+              decodeManifest(text).pipe(
+                Effect.mapError(() => snapshotError(id, "corrupt", `kernel snapshot manifest is corrupt for ${id}`)),
+                Effect.flatMap((manifest) =>
+                  fileSystem.readFile(immutablePayloadFile(id)).pipe(
+                    Effect.mapError(() => snapshotError(id, "corrupt", `kernel snapshot payload is missing for ${id}`)),
+                    Effect.map((payload): Snapshot => ({ manifest, payload })),
+                  ),
+                ),
+                Effect.asSome,
+              ),
+          }),
+          Effect.map((option) => (option._tag === "Some" ? option.value : undefined)),
+        ),
     }
   })
 

@@ -22,6 +22,7 @@ import {
   KernelSnapshotStore,
   KernelStateUnavailable,
   Manifest,
+  snapshotId,
   type Snapshot,
 } from "./kernel-snapshot-store.js"
 import { type KernelProfile, digest } from "./kernel-profile.js"
@@ -199,6 +200,7 @@ export const layerTestPool = (options: TestPoolOptions): Layer.Layer<KernelPool>
 /** @experimental An in-memory snapshot store keyed by Session identity. */
 export const makeMemoryStore: Effect.Effect<KernelSnapshotStoreService> = Effect.gen(function* () {
   const snapshots = yield* Ref.make(new Map<string, Snapshot>())
+  const immutable = yield* Ref.make(new Map<string, Snapshot>())
   return {
     load: (sessionId) => Ref.get(snapshots).pipe(Effect.map((all) => all.get(sessionId))),
     save: (snapshot) =>
@@ -217,6 +219,11 @@ export const makeMemoryStore: Effect.Effect<KernelSnapshotStoreService> = Effect
         next.delete(sessionId)
         return next
       }),
+    saveImmutable: (snapshot) => {
+      const id = snapshotId(snapshot)
+      return Ref.update(immutable, (all) => new Map(all).set(id, snapshot)).pipe(Effect.as(id))
+    },
+    loadImmutable: (id) => Ref.get(immutable).pipe(Effect.map((all) => all.get(id))),
   }
 })
 

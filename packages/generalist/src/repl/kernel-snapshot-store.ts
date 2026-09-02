@@ -1,4 +1,5 @@
 import { Context, Effect, Schema } from "effect"
+import { digest } from "../core/durable/canonical-json.js"
 import { DropReason, Epoch, SessionId } from "./cell.js"
 
 /** @experimental How one binding was put back into a restored namespace. */
@@ -43,6 +44,13 @@ export interface Snapshot {
   readonly payload: Uint8Array
 }
 
+/** @experimental Content identity of one immutable namespace image. */
+export const snapshotId = (snapshot: Snapshot): string =>
+  `kernel-snapshot:v1:sha256:${digest({
+    manifest: Schema.encodeSync(Manifest)(snapshot.manifest),
+    payload: Array.from(snapshot.payload),
+  })}`
+
 /** @experimental A snapshot store operation failed. Restore failure is non-fatal and reported. */
 export class KernelStateUnavailable extends Schema.TaggedError<KernelStateUnavailable>()(
   "generalist/repl/KernelStateUnavailable",
@@ -61,6 +69,10 @@ export interface Service {
   readonly load: (sessionId: SessionId) => Effect.Effect<Snapshot | undefined, KernelStateUnavailable>
   readonly save: (snapshot: Snapshot) => Effect.Effect<void, KernelStateUnavailable>
   readonly drop: (sessionId: SessionId) => Effect.Effect<void, KernelStateUnavailable>
+  /** @experimental Persist one immutable namespace image and return its durable content identity. */
+  readonly saveImmutable: (snapshot: Snapshot) => Effect.Effect<string, KernelStateUnavailable>
+  /** @experimental Load one immutable namespace image by its durable content identity. */
+  readonly loadImmutable: (snapshotId: string) => Effect.Effect<Snapshot | undefined, KernelStateUnavailable>
 }
 
 /** @experimental */
