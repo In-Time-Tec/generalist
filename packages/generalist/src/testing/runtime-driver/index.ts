@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { beforeAll, describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
 import { IdempotencyConflict, RunIdConflict } from "../../runtime/errors.js"
 import { RunExecutor } from "../../runtime/execution/run-executor.js"
@@ -12,7 +12,7 @@ import { registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
 import { registerApprovalSuspend } from "./approval-suspend.js"
 import { registerHostSessions } from "./host-sessions.js"
-import { record } from "../report.js"
+import { Suite, record } from "../report.js"
 import type {
   MultiWorkerClaimCapability,
   NotificationRecoveryCapability,
@@ -49,19 +49,20 @@ const provideLayer = <A, E, LayerError>(
 ): Effect.Effect<A, E | LayerError> =>
   Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => use(servicesFrom(context))))
 
-const capabilityNames = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): Array<string> =>
-  Object.entries(options.capabilities).flatMap(([name, value]) =>
-    value === undefined || value === false ? [] : [name],
-  )
+const certification = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): Suite =>
+  Suite.make({
+    name: `runtimeDriver:${options.name}`,
+    capabilities: Object.entries(options.capabilities).flatMap(([name, value]) =>
+      value === undefined || value === false ? [] : [name],
+    ),
+  })
 
 const prepare = <A, E, LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
   effect: Effect.Effect<A, E>,
 ): Effect.Effect<A, E> => {
   const prepared = options.setup === undefined ? effect : Effect.andThen(options.setup, effect)
-  return record({ name: `runtimeDriver:${options.name}`, capabilities: capabilityNames(options) }).pipe(
-    Effect.andThen(prepared),
-  )
+  return record(certification(options)).pipe(Effect.andThen(prepared))
 }
 
 const provide = <A, E, LayerError, ClaimsLayerError>(
@@ -435,8 +436,12 @@ const registerNotificationRecovery = <LayerError, ClaimsLayerError>(
 /** Registers only the conformance suites selected by the supplied driver capabilities. */
 export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): void => {
   const suite = options.skip === true ? describe.skip : describe
-  const certification = [options.name, ...capabilityNames(options)].map(encodeURIComponent).join(",")
-  suite(`${options.name} Generalist Runtime driver conformance [generalist-certification:${certification}]`, () => {
+  suite(`${options.name} Generalist Runtime driver conformance`, () => {
+    // Suite `meta` reaches Vitest reporters; the repository certification reporter decodes it.
+    // oxlint-disable-next-line no-empty-pattern -- Vitest requires a destructuring pattern for the fixture argument.
+    beforeAll(({}, task) => {
+      Object.assign(task.meta, { generalistCertification: certification(options) })
+    })
     if (options.capabilities.admission === true) registerAdmission(options)
     if (options.capabilities.runtime !== undefined) registerRuntime(options, options.capabilities.runtime)
     if (options.capabilities["host-sessions"] !== undefined) {

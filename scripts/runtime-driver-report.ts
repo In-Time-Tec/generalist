@@ -1,24 +1,22 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- the Vitest reporter is a test-runner boundary. */
 import { layer } from "@effect/platform-bun/BunServices"
-import { Effect, FileSystem, Schema } from "effect"
+import { Effect, FileSystem, Option, Schema } from "effect"
 import type { TestModule } from "vitest/node"
 import type { Reporter, TestRunEndReason } from "vitest/reporters"
 import { Certification, Suite, writeCertification } from "../packages/generalist/src/testing/report.js"
 
 export const certificationReportPath = "docs/features/hosts-report.json"
-const certificationMarker = " [generalist-certification:"
+
+/** Suite `meta` attached by `Testing.runtimeDriver`; it crosses the worker boundary, so decode it. */
+const certificationMeta = Schema.decodeUnknownOption(Schema.Struct({ generalistCertification: Suite }))
 
 const collectPassedSuites = (modules: ReadonlyArray<TestModule>): Array<Suite> => {
   const passed = new Map<string, Suite>()
   for (const module of modules) {
     for (const suite of module.children.allSuites()) {
-      const marker = suite.name.indexOf(certificationMarker)
-      if (suite.state() !== "passed" || marker < 0) continue
-      const [name, ...capabilities] = suite.name
-        .slice(marker + certificationMarker.length, -1)
-        .split(",")
-        .map(decodeURIComponent)
-      passed.set(`runtimeDriver:${name}`, Suite.make({ name: `runtimeDriver:${name}`, capabilities }))
+      if (suite.state() !== "passed") continue
+      const meta = certificationMeta(suite.meta())
+      if (Option.isSome(meta)) passed.set(meta.value.generalistCertification.name, meta.value.generalistCertification)
     }
   }
   return [...passed.values()]
