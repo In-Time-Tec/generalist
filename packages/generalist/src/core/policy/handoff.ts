@@ -1,5 +1,6 @@
 import { Array, Cause, Effect, Exit, Fiber, Function, Layer, Queue, Ref, Schema } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { type Agent, type RunError, type InvocationOptions, type RunRequirements, make } from "../agent/service.js"
 import { AgentError } from "../agent/event.js"
 import type { HandoffAccepted } from "../agent/handoff/state.js"
@@ -102,12 +103,15 @@ export type FanOutMemberResult =
       readonly cause?: Cause.Cause<RunError | RegistrationError>
     }
 
-export class FanOutUnsatisfied extends Schema.TaggedError<FanOutUnsatisfied>()("generalist/core/FanOutUnsatisfied", {
+export class FanOutUnsatisfied extends ActionableTaggedError<FanOutUnsatisfied>()("generalist/core/FanOutUnsatisfied", {
   join: Schema.Literals(["FirstSuccess", "Quorum"]),
   required: Schema.Int.check(Schema.isGreaterThan(0)),
   succeeded: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   settled: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  hint: errorHint(
+    "Lower the required quorum, add viable members, or inspect the failed member causes before retrying.",
+  ),
 }) {}
 
 export interface Supervisor<R, Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>> {

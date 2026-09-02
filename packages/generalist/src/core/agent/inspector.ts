@@ -1,5 +1,6 @@
 import { Clock, Context, Effect, Layer, Option, Ref, Schema, Stream } from "effect"
 import type { RunId } from "../durable/run-id.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import type { Event } from "./event.js"
 
 /** Process-local token totals reported by completed model turns. */
@@ -19,14 +20,10 @@ export interface Snapshot {
 }
 
 /** The requested process-local Run is not known to this Inspector. */
-export class RunNotFound extends Schema.TaggedError<RunNotFound>()("generalist/core/InspectorRunNotFound", {
+export class RunNotFound extends ActionableTaggedError<RunNotFound>()("generalist/core/InspectorRunNotFound", {
   runId: Schema.String,
-  hint: Schema.String,
-}) {
-  override get message(): string {
-    return `Inspector has no process-local Run ${this.runId}. ${this.hint}`
-  }
-}
+  hint: errorHint("Consume the Agent Run with this Inspector layer before requesting its snapshot."),
+}) {}
 
 /** Process-local Agent Run inspection seam. */
 export interface Service {
@@ -119,10 +116,7 @@ export const layerMemory: Layer.Layer<Inspector> = Layer.effect(
         Effect.gen(function* () {
           const state = (yield* Ref.get(states)).get(runId)
           if (state === undefined) {
-            return yield* RunNotFound.make({
-              runId,
-              hint: "Consume the Agent Run with this Inspector layer before requesting its snapshot.",
-            })
+            return yield* RunNotFound.make({ runId })
           }
           const now = yield* Clock.currentTimeMillis
           const snapshot: Snapshot = {

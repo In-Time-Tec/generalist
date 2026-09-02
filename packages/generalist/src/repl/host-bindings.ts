@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { ToolContext, type Service as ToolContextService } from "../core/tools/tool-context.js"
 
 /** Every host operation failure is tagged, so a cell can discriminate it as data. */
@@ -46,25 +47,34 @@ export type Response =
   | { readonly _tag: "Failure"; readonly failure: unknown }
 
 /** The cell addressed a module or operation that is not mounted. */
-export class HostModuleNotFound extends Schema.TaggedError<HostModuleNotFound>()("generalist/repl/HostModuleNotFound", {
-  module: Schema.String,
-  operation: Schema.optionalKey(Schema.String),
-}) {}
+export class HostModuleNotFound extends ActionableTaggedError<HostModuleNotFound>()(
+  "generalist/repl/HostModuleNotFound",
+  {
+    module: Schema.String,
+    operation: Schema.optionalKey(Schema.String),
+    hint: errorHint("Mount the named module and operation before invoking it from a cell."),
+  },
+) {}
 
 /** Two modules or two operations claimed the same mounted name. */
-export class HostModuleConflict extends Schema.TaggedError<HostModuleConflict>()("generalist/repl/HostModuleConflict", {
-  module: Schema.String,
-  operation: Schema.optionalKey(Schema.String),
-}) {}
+export class HostModuleConflict extends ActionableTaggedError<HostModuleConflict>()(
+  "generalist/repl/HostModuleConflict",
+  {
+    module: Schema.String,
+    operation: Schema.optionalKey(Schema.String),
+    hint: errorHint("Rename or remove the duplicate module or operation before mounting host bindings."),
+  },
+) {}
 
 /** A host request or reply did not match the operation's declared schema. */
-export class HostModuleSchemaFailure extends Schema.TaggedError<HostModuleSchemaFailure>()(
+export class HostModuleSchemaFailure extends ActionableTaggedError<HostModuleSchemaFailure>()(
   "generalist/repl/HostModuleSchemaFailure",
   {
     module: Schema.String,
     operation: Schema.String,
     stage: Schema.Literals(["decode-input", "encode-output", "encode-failure"]),
     message: Schema.String,
+    hint: errorHint("Correct the value at the reported host-module schema stage, then retry."),
   },
 ) {}
 

@@ -2,6 +2,7 @@ import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stre
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
+import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
 import {
   layerWebSocket as runClientLayerWebSocket,
   RunClient,
@@ -41,8 +42,9 @@ export const Incoming: Schema.Schema<Incoming> = Schema.Union([
 ])
 
 /** @experimental */
-export class SendFailed extends Schema.TaggedError<SendFailed>()("generalist/foldkit/SendFailed", {
+export class SendFailed extends ActionableTaggedError<SendFailed>()("generalist/foldkit/SendFailed", {
   reason: Schema.String,
+  hint: errorHint("Restore the chat connection and resend the command only if its outcome was not accepted."),
 }) {}
 /** @experimental */
 export const AgentCommandError = Schema.Union([TransportError, SendFailed])

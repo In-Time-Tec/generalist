@@ -5,6 +5,7 @@ import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable/manifest.js"
 import { TreeCursor, TreeCursorInvalid, TreeCursorRootMismatch } from "./tree/cursor.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 
 export { TreeCursorInvalid, TreeCursorRootMismatch }
 export {
@@ -17,36 +18,51 @@ export {
   StaleClaim,
 } from "./sql/errors.js"
 
-export class AddressNotFound extends Schema.TaggedError<AddressNotFound>()("generalist/runtime/AddressNotFound", {
+export class AddressNotFound extends ActionableTaggedError<AddressNotFound>()("generalist/runtime/AddressNotFound", {
   address: Address,
+  hint: errorHint("Bind this address to a registered Agent before sending or starting work."),
 }) {}
 
-export class ExecutablePinMissing extends Schema.TaggedError<ExecutablePinMissing>()(
+export class ExecutablePinMissing extends ActionableTaggedError<ExecutablePinMissing>()(
   "generalist/runtime/ExecutablePinMissing",
-  { runId: Schema.String, ref: ExecutableRef },
+  {
+    runId: Schema.String,
+    ref: ExecutableRef,
+    hint: errorHint("Register the exact executable pin recorded for this Run before recovery."),
+  },
 ) {}
 
-export class ExecutableRegistrationInvalid extends Schema.TaggedError<ExecutableRegistrationInvalid>()(
+export class ExecutableRegistrationInvalid extends ActionableTaggedError<ExecutableRegistrationInvalid>()(
   "generalist/runtime/ExecutableRegistrationInvalid",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+    hint: errorHint("Correct the executable registration described by message before starting the Run."),
+  },
 ) {}
 
-export class ExecutableRegistrationConflict extends Schema.TaggedError<ExecutableRegistrationConflict>()(
+export class ExecutableRegistrationConflict extends ActionableTaggedError<ExecutableRegistrationConflict>()(
   "generalist/runtime/ExecutableRegistrationConflict",
-  { pin: Schema.String },
+  {
+    pin: Schema.String,
+    hint: errorHint("Keep one exact registration per pin, or assign a new pin to changed content."),
+  },
 ) {}
 
-export class ExecutableRegistrationMissing extends Schema.TaggedError<ExecutableRegistrationMissing>()(
+export class ExecutableRegistrationMissing extends ActionableTaggedError<ExecutableRegistrationMissing>()(
   "generalist/runtime/ExecutableRegistrationMissing",
-  { pin: Schema.String },
+  {
+    pin: Schema.String,
+    hint: errorHint("Supply the registration named by pin before starting or recovering the Run."),
+  },
 ) {}
 
-export class ExecutableIdentityMismatch extends Schema.TaggedError<ExecutableIdentityMismatch>()(
+export class ExecutableIdentityMismatch extends ActionableTaggedError<ExecutableIdentityMismatch>()(
   "generalist/runtime/ExecutableIdentityMismatch",
   {
     runId: Schema.String,
     expectedRef: ExecutableRef,
     actualRef: ExecutableRef,
+    hint: errorHint("Resolve the executable using the exact reference persisted with this Run."),
   },
 ) {}
 
@@ -58,56 +74,69 @@ export const StructuredAgentFailure: Schema.Codec<
   typeof Exhausted.Encoded | typeof ResumeMismatch.Encoded
 > = Schema.Union([Exhausted, ResumeMismatch])
 
-export class AgentExecutionFailure extends Schema.TaggedError<AgentExecutionFailure>()(
+export class AgentExecutionFailure extends ActionableTaggedError<AgentExecutionFailure>()(
   "generalist/runtime/AgentExecutionFailure",
   {
     message: Schema.String,
     failure: Schema.optionalKey(StructuredAgentFailure),
     cause: Schema.optionalKey(Schema.Defect()),
+    hint: errorHint("Inspect failure and cause, repair the Agent boundary, then resume or start again."),
   },
 ) {}
 
-export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>()(
+export class IdempotencyConflict extends ActionableTaggedError<IdempotencyConflict>()(
   "generalist/runtime/IdempotencyConflict",
   {
     address: Address,
     sessionId: Schema.String,
     idempotencyKey: Schema.String,
     existingRunId: Schema.String,
+    hint: errorHint(
+      "Reuse the original request for this idempotency key or submit the changed request under a new key.",
+    ),
   },
 ) {}
 
-export class RunIdConflict extends Schema.TaggedError<RunIdConflict>()("generalist/runtime/RunIdConflict", {
+export class RunIdConflict extends ActionableTaggedError<RunIdConflict>()("generalist/runtime/RunIdConflict", {
   runId: Schema.String,
   existingRunId: Schema.String,
+  hint: errorHint("Use the existing Run identity for an exact replay, or allocate a new Run ID."),
 }) {}
 
-export class RunNotFound extends Schema.TaggedError<RunNotFound>()("generalist/runtime/RunNotFound", {
+export class RunNotFound extends ActionableTaggedError<RunNotFound>()("generalist/runtime/RunNotFound", {
   runId: Schema.String,
+  hint: errorHint("Check the Run ID and inspect the Runtime instance that admitted it."),
 }) {}
 
 /** An Agent name is already registered in this Runtime process. */
-export class DuplicateAgent extends Schema.TaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {
+export class DuplicateAgent extends ActionableTaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {
   name: Schema.String,
+  hint: errorHint("Register each Agent name once per Runtime process, or rename the conflicting Agent."),
 }) {}
 
 /** A durable Run names an Agent that this Runtime process has not registered. */
-export class UnknownAgent extends Schema.TaggedError<UnknownAgent>()("generalist/runtime/UnknownAgent", {
+export class UnknownAgent extends ActionableTaggedError<UnknownAgent>()("generalist/runtime/UnknownAgent", {
   name: Schema.String,
   runId: Schema.String,
+  hint: errorHint("Register the named Agent in this Runtime process before recovering or inspecting the Run."),
 }) {}
 
-export class RunTerminal extends Schema.TaggedError<RunTerminal>()("generalist/runtime/RunTerminal", {
+export class RunTerminal extends ActionableTaggedError<RunTerminal>()("generalist/runtime/RunTerminal", {
   runId: Schema.String,
   status: Schema.Literals(["succeeded", "failed", "cancelled"]),
+  hint: errorHint("Inspect the terminal Run outcome and start a new Run for additional work."),
 }) {}
 
-export class ChildSelectionMissing extends Schema.TaggedError<ChildSelectionMissing>()(
+export class ChildSelectionMissing extends ActionableTaggedError<ChildSelectionMissing>()(
   "generalist/runtime/ChildSelectionMissing",
-  { parentRunId: Schema.String, selection: Schema.String },
+  {
+    parentRunId: Schema.String,
+    selection: Schema.String,
+    hint: errorHint("Add the selected child Agent to the parent's admitted registration catalog."),
+  },
 ) {}
 
-export class ChildDepthExceeded extends Schema.TaggedError<ChildDepthExceeded>()(
+export class ChildDepthExceeded extends ActionableTaggedError<ChildDepthExceeded>()(
   "generalist/runtime/ChildDepthExceeded",
   {
     parentRunId: Schema.String,
@@ -117,10 +146,11 @@ export class ChildDepthExceeded extends Schema.TaggedError<ChildDepthExceeded>()
     requested: Schema.Int,
     current: Schema.Int,
     limit: Schema.Int,
+    hint: errorHint("Reduce child depth or increase the root tree depth limit before spawning."),
   },
 ) {}
 
-export class ChildLimitExceeded extends Schema.TaggedError<ChildLimitExceeded>()(
+export class ChildLimitExceeded extends ActionableTaggedError<ChildLimitExceeded>()(
   "generalist/runtime/ChildLimitExceeded",
   {
     parentRunId: Schema.String,
@@ -130,167 +160,222 @@ export class ChildLimitExceeded extends Schema.TaggedError<ChildLimitExceeded>()
     requested: Schema.Int,
     current: Schema.Int,
     limit: Schema.Int,
+    hint: errorHint("Wait for existing children to settle, reduce the fan-out, or increase the child limit."),
   },
 ) {}
 
-export class TreePolicyInvalid extends Schema.TaggedError<TreePolicyInvalid>()("generalist/runtime/TreePolicyInvalid", {
+export class TreePolicyInvalid extends ActionableTaggedError<TreePolicyInvalid>()(
+  "generalist/runtime/TreePolicyInvalid",
+  {
+    message: Schema.String,
+    hint: errorHint("Correct the finite tree policy values described by message before admission."),
+  },
+) {}
+
+export class StartInvalid extends ActionableTaggedError<StartInvalid>()("generalist/runtime/StartInvalid", {
   message: Schema.String,
+  hint: errorHint("Correct the invalid start input described by message and submit it again."),
 }) {}
 
-export class StartInvalid extends Schema.TaggedError<StartInvalid>()("generalist/runtime/StartInvalid", {
-  message: Schema.String,
-}) {}
-
-export class SteeringConflict extends Schema.TaggedError<SteeringConflict>()("generalist/runtime/SteeringConflict", {
+export class SteeringConflict extends ActionableTaggedError<SteeringConflict>()("generalist/runtime/SteeringConflict", {
   runId: Schema.String,
   idempotencyKey: Schema.String,
+  hint: errorHint("Reuse the original steering payload for this key or send the changed payload under a new key."),
 }) {}
 
-export class WaitNotOpen extends Schema.TaggedError<WaitNotOpen>()("generalist/runtime/WaitNotOpen", {
+export class WaitNotOpen extends ActionableTaggedError<WaitNotOpen>()("generalist/runtime/WaitNotOpen", {
   runId: Schema.String,
   waitId: Schema.String,
+  hint: errorHint("Inspect the Run's open waits and respond to one that is still unresolved."),
 }) {}
 
-export class ResponseConflict extends Schema.TaggedError<ResponseConflict>()("generalist/runtime/ResponseConflict", {
+export class ResponseConflict extends ActionableTaggedError<ResponseConflict>()("generalist/runtime/ResponseConflict", {
   runId: Schema.String,
   waitId: Schema.String,
+  hint: errorHint("Reuse the original wait response or submit a response for a different open wait."),
 }) {}
 
 /** The approval no longer names an unresolved request. */
-export class ApprovalStale extends Schema.TaggedError<ApprovalStale>()("generalist/runtime/ApprovalStale", {
+export class ApprovalStale extends ActionableTaggedError<ApprovalStale>()("generalist/runtime/ApprovalStale", {
   runId: Schema.String,
   approvalId: Schema.String,
+  hint: errorHint("Inspect current approvals and respond only to an unresolved approval identity."),
 }) {}
 
 /** The response conflicts with the authoritative approval identity or decision. */
-export class ApprovalMismatch extends Schema.TaggedError<ApprovalMismatch>()("generalist/runtime/ApprovalMismatch", {
+export class ApprovalMismatch extends ActionableTaggedError<ApprovalMismatch>()("generalist/runtime/ApprovalMismatch", {
   runId: Schema.String,
   approvalId: Schema.String,
   mismatch: Schema.Literals(["approval-id", "wait-kind", "decision"]),
   expectedApprovalId: Schema.optionalKey(Schema.String),
+  hint: errorHint("Respond with the exact current approval identity and repeat only the same decision."),
 }) {}
 
-export class OperationResolutionConflict extends Schema.TaggedError<OperationResolutionConflict>()(
+export class OperationResolutionConflict extends ActionableTaggedError<OperationResolutionConflict>()(
   "generalist/runtime/OperationResolutionConflict",
-  { runId: Schema.String, operationId: Schema.String, idempotencyKey: Schema.String },
+  {
+    runId: Schema.String,
+    operationId: Schema.String,
+    idempotencyKey: Schema.String,
+    hint: errorHint("Reuse the original resolution or submit a changed resolution under a new idempotency key."),
+  },
 ) {}
 
-export class CursorExpired extends Schema.TaggedError<CursorExpired>()("generalist/runtime/CursorExpired", {
+export class CursorExpired extends ActionableTaggedError<CursorExpired>()("generalist/runtime/CursorExpired", {
   runId: Schema.String,
   cursor: Cursor,
   earliestSequence: Schema.Int,
+  hint: errorHint("Take a fresh snapshot and resume replay from its current exclusive cursor."),
 }) {}
 
-export class TreeCursorExpired extends Schema.TaggedError<TreeCursorExpired>()("generalist/runtime/TreeCursorExpired", {
-  rootRunId: Schema.String,
-  cursor: TreeCursor,
-  earliestCursor: TreeCursor,
-}) {}
+export class TreeCursorExpired extends ActionableTaggedError<TreeCursorExpired>()(
+  "generalist/runtime/TreeCursorExpired",
+  {
+    rootRunId: Schema.String,
+    cursor: TreeCursor,
+    earliestCursor: TreeCursor,
+    hint: errorHint("Take a fresh tree checkpoint and replay from its current exclusive cursor."),
+  },
+) {}
 
 /** The cursor names a position that has not committed. */
-export class TreeCursorFuture extends Schema.TaggedError<TreeCursorFuture>()("generalist/runtime/TreeCursorFuture", {
+export class TreeCursorFuture extends ActionableTaggedError<TreeCursorFuture>()("generalist/runtime/TreeCursorFuture", {
   rootRunId: Schema.String,
   cursor: TreeCursor,
   latestCursor: TreeCursor,
+  hint: errorHint("Wait for more tree events or replay from a cursor no later than latestCursor."),
 }) {}
 
 /** A replay request falls outside the fixed page-size contract. */
-export class TreeReplayLimitInvalid extends Schema.TaggedError<TreeReplayLimitInvalid>()(
+export class TreeReplayLimitInvalid extends ActionableTaggedError<TreeReplayLimitInvalid>()(
   "generalist/runtime/TreeReplayLimitInvalid",
   {
     received: Schema.String,
     minimum: Schema.Int,
     maximum: Schema.Int,
+    hint: errorHint("Request a replay page whose limit is within the reported minimum and maximum."),
   },
 ) {}
 
-export class SubscriberLagged extends Schema.TaggedError<SubscriberLagged>()("generalist/runtime/SubscriberLagged", {
+export class SubscriberLagged extends ActionableTaggedError<SubscriberLagged>()("generalist/runtime/SubscriberLagged", {
   runId: Schema.String,
   lastDeliveredSequence: Schema.Int,
+  hint: errorHint("Take a fresh snapshot and reconnect from its exclusive cursor."),
 }) {}
 
 /** The acknowledged sequence is not a valid processed-through point for the Run. */
-export class AckInvalid extends Schema.TaggedError<AckInvalid>()("generalist/runtime/AckInvalid", {
+export class AckInvalid extends ActionableTaggedError<AckInvalid>()("generalist/runtime/AckInvalid", {
   runId: Schema.String,
   // oxlint-disable-next-line effecttsgo/schema-number
   sequence: Schema.Number,
   message: Schema.String,
+  hint: errorHint("Acknowledge -1 or the sequence of a committed TurnCompleted boundary."),
 }) {}
 
 /** The acknowledged sequence is beyond the last committed model cycle. */
-export class AckBeyondCommitted extends Schema.TaggedError<AckBeyondCommitted>()(
+export class AckBeyondCommitted extends ActionableTaggedError<AckBeyondCommitted>()(
   "generalist/runtime/AckBeyondCommitted",
   {
     runId: Schema.String,
     sequence: Schema.Int,
     lastCommittedSequence: Schema.Int,
+    hint: errorHint("Acknowledge no later than lastCommittedSequence after that cycle commits."),
   },
 ) {}
 
-export class RuntimeUnavailable extends Schema.TaggedError<RuntimeUnavailable>()(
+export class RuntimeUnavailable extends ActionableTaggedError<RuntimeUnavailable>()(
   "generalist/runtime/RuntimeUnavailable",
   {
     message: Schema.String,
+    hint: errorHint("Restore the Runtime store or host dependency described by message, then retry."),
   },
 ) {}
 
-export class SessionEntryNotFound extends Schema.TaggedError<SessionEntryNotFound>()(
+export class SessionEntryNotFound extends ActionableTaggedError<SessionEntryNotFound>()(
   "generalist/runtime/SessionEntryNotFound",
-  { sessionId: Schema.String, entryId: Schema.String },
+  {
+    sessionId: Schema.String,
+    entryId: Schema.String,
+    hint: errorHint("Check the Session and entry identities against the authoritative Session store."),
+  },
 ) {}
 
-export class SessionEntryCorrupt extends Schema.TaggedError<SessionEntryCorrupt>()(
+export class SessionEntryCorrupt extends ActionableTaggedError<SessionEntryCorrupt>()(
   "generalist/runtime/SessionEntryCorrupt",
-  { sessionId: Schema.String, entryId: Schema.String, message: Schema.String },
+  {
+    sessionId: Schema.String,
+    entryId: Schema.String,
+    message: Schema.String,
+    hint: errorHint("Repair or restore the identified Session entry from authoritative data before replay."),
+  },
 ) {}
 
-export class FanOutConflict extends Schema.TaggedError<FanOutConflict>()("generalist/runtime/FanOutConflict", {
+export class FanOutConflict extends ActionableTaggedError<FanOutConflict>()("generalist/runtime/FanOutConflict", {
   parentRunId: Schema.String,
   idempotencyKey: Schema.String,
   existingFanOutId: Schema.String,
+  hint: errorHint("Reuse the original fan-out request for this key or submit changed members under a new key."),
 }) {}
 
-export class FanOutNotFound extends Schema.TaggedError<FanOutNotFound>()("generalist/runtime/FanOutNotFound", {
+export class FanOutNotFound extends ActionableTaggedError<FanOutNotFound>()("generalist/runtime/FanOutNotFound", {
   fanOutId: Schema.String,
+  hint: errorHint("Check the fan-out ID against the Runtime that admitted the group."),
 }) {}
 
-export class FanOutInvalid extends Schema.TaggedError<FanOutInvalid>()("generalist/runtime/FanOutInvalid", {
+export class FanOutInvalid extends ActionableTaggedError<FanOutInvalid>()("generalist/runtime/FanOutInvalid", {
   message: Schema.String,
+  hint: errorHint("Correct the fan-out input described by message before admission."),
 }) {}
 
-export class FanOutRemainderUnsupported extends Schema.TaggedError<FanOutRemainderUnsupported>()(
+export class FanOutRemainderUnsupported extends ActionableTaggedError<FanOutRemainderUnsupported>()(
   "generalist/runtime/FanOutRemainderUnsupported",
-  { remainder: Schema.Literal("terminate"), durability: Schema.Literals(["ephemeral", "durable"]) },
+  {
+    remainder: Schema.Literal("terminate"),
+    durability: Schema.Literals(["ephemeral", "durable"]),
+    hint: errorHint("Choose a remainder policy supported by this Runtime durability mode."),
+  },
 ) {}
 
-export class MessagingUnauthorized extends Schema.TaggedError<MessagingUnauthorized>()(
+export class MessagingUnauthorized extends ActionableTaggedError<MessagingUnauthorized>()(
   "generalist/runtime/MessagingUnauthorized",
   {
     from: Address,
     to: Address,
     reason: Schema.Literals(["unrelated", "cross-session", "policy"]),
+    hint: errorHint("Send only along an allowed relationship or update the host messaging policy."),
   },
 ) {}
 
-export class MailboxFull extends Schema.TaggedError<MailboxFull>()("generalist/runtime/MailboxFull", {
+export class MailboxFull extends ActionableTaggedError<MailboxFull>()("generalist/runtime/MailboxFull", {
   to: Address,
   dimension: Schema.Literals(["pending", "bytes"]),
   limit: Schema.Int,
+  hint: errorHint("Drain the target mailbox, reduce the message, or increase its finite bound."),
 }) {}
 
-export class MailboxRateLimited extends Schema.TaggedError<MailboxRateLimited>()(
+export class MailboxRateLimited extends ActionableTaggedError<MailboxRateLimited>()(
   "generalist/runtime/MailboxRateLimited",
-  { to: Address, limit: Schema.Int, windowMillis: Schema.Int },
+  {
+    to: Address,
+    limit: Schema.Int,
+    windowMillis: Schema.Int,
+    hint: errorHint("Wait for the reported rate window before sending another message to this address."),
+  },
 ) {}
 
-export class MessageConflict extends Schema.TaggedError<MessageConflict>()("generalist/runtime/MessageConflict", {
+export class MessageConflict extends ActionableTaggedError<MessageConflict>()("generalist/runtime/MessageConflict", {
   to: Address,
   messageId: Schema.String,
   idempotencyKey: Schema.String,
+  hint: errorHint("Reuse the original message payload or submit changed content under a new identity."),
 }) {}
 
-export class AgentNameConflict extends Schema.TaggedError<AgentNameConflict>()("generalist/runtime/AgentNameConflict", {
-  scope: Schema.String,
-  name: Schema.String,
-  existingRunId: Schema.String,
-}) {}
+export class AgentNameConflict extends ActionableTaggedError<AgentNameConflict>()(
+  "generalist/runtime/AgentNameConflict",
+  {
+    scope: Schema.String,
+    name: Schema.String,
+    existingRunId: Schema.String,
+    hint: errorHint("Use a unique name in this scope or address the existing named Run."),
+  },
+) {}

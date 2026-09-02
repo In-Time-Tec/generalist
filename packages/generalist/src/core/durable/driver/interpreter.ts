@@ -15,6 +15,7 @@ import { applyCommit, chargeUsage as chargeCheckpointUsage, withBudget, withHand
 import type { ControlState } from "../../agent/handoff/state.js"
 import { OperationOutcomeResolution } from "./operation-outcome.js"
 import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
+import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
 import { scheduleOperations } from "./schedule.js"
 export type { OperationSpec } from "./operation.js"
@@ -93,9 +94,13 @@ export interface Service {
   readonly refundChild: (child: RunBudget) => Effect.Effect<void, DriverError>
   readonly setHandoffState: (state: ControlState) => Effect.Effect<void, DriverError | DriverStateInvalid>
 }
-export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>()(
+export class DriverUnknownReplay extends ActionableTaggedError<DriverUnknownReplay>()(
   "generalist/core/DriverUnknownReplay",
-  { operationKey: Schema.String, operationId: Schema.String },
+  {
+    operationKey: Schema.String,
+    operationId: Schema.String,
+    hint: errorHint("Resolve the unknown never-replay operation from external evidence before resuming."),
+  },
 ) {}
 export class DriverInterpreter extends Context.Service<DriverInterpreter, Service>()(
   "generalist/core/durable/driver/interpreter/DriverInterpreter",

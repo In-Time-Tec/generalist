@@ -1,16 +1,18 @@
 import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
 
 /** Model context cannot be admitted while framework tool calls lack outcomes. */
-export class ContextInvalid extends Schema.TaggedError<ContextInvalid>()("generalist/core/ContextInvalid", {
+export class ContextInvalid extends ActionableTaggedError<ContextInvalid>()("generalist/core/ContextInvalid", {
   issues: Schema.Array(
     Schema.Struct({
       toolCallId: Schema.String,
       reason: Schema.Literals(["unresolved", "duplicate-call", "duplicate-result", "name-mismatch"]),
     }),
   ),
+  hint: errorHint("Persist exactly one matching tool result for each framework tool call before invoking the model."),
 }) {}
 
 interface ToolCallState {

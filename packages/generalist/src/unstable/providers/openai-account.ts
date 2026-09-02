@@ -5,6 +5,7 @@ import {
   layer as modelRegistryLayer,
   registration as modelRegistration,
 } from "../../core/model/registry.js"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Context, Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, OpenAIAccountAuth } from "./openai-account-auth.js"
@@ -38,10 +39,11 @@ export interface OpenAIAccountCredential {
 }
 
 /** @experimental */
-export class OpenAIAccountCredentialError extends Schema.TaggedError<OpenAIAccountCredentialError>()(
+export class OpenAIAccountCredentialError extends ActionableTaggedError<OpenAIAccountCredentialError>()(
   "generalist/ai/OpenAIAccountCredentialError",
   {
     operation: Schema.Literals(["acquire", "refreshRejected"]),
+    hint: errorHint("Log in to the OpenAI account provider and reacquire valid account credentials."),
   },
 ) {}
 

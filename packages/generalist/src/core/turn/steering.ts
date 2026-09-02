@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 /** How many queued inputs to drain at a boundary. */
 export type DrainMode = "all" | "one-at-a-time"
@@ -47,22 +48,25 @@ export const Receipt = Schema.Struct({
 export type Receipt = typeof Receipt.Type
 
 /** A finite Run inbox rejected an input without admitting it. */
-export class InboxFull extends Schema.TaggedError<InboxFull>()("generalist/core/InboxFull", {
+export class InboxFull extends ActionableTaggedError<InboxFull>()("generalist/core/InboxFull", {
   runId: Schema.String,
   queue: Schema.Literals(["steering", "followUp"]),
   dimension: Schema.Literals(["entries", "bytes"]),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
+  hint: errorHint("Drain the queue, reduce the prompt, or increase the finite inbox bound before retrying."),
 }) {}
 
 /** A producer attempted to address a Run after its inbox closed. */
-export class RunClosed extends Schema.TaggedError<RunClosed>()("generalist/core/RunClosed", {
+export class RunClosed extends ActionableTaggedError<RunClosed>()("generalist/core/RunClosed", {
   runId: Schema.String,
+  hint: errorHint("Start a new Run; this process-local Run no longer accepts steering or follow-up input."),
 }) {}
 
 /** A process-local Run inbox policy is not finite and positive. */
-export class PolicyInvalid extends Schema.TaggedError<PolicyInvalid>()("generalist/core/PolicyInvalid", {
+export class PolicyInvalid extends ActionableTaggedError<PolicyInvalid>()("generalist/core/PolicyInvalid", {
   field: Schema.String,
   value: Schema.String,
+  hint: errorHint("Set the named inbox policy field to a positive safe integer."),
 }) {}
 
 /** Producer-only process-local control capability for one Run. */

@@ -1,14 +1,18 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { IdGenerator } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import type {
   DeliveryBatch,
   ModelInvocationCompleted,
   ModelInvocationFailed,
   ModelInvocationStarted,
 } from "./events.js"
-export class InvocationLifecycleFailed extends Schema.TaggedError<InvocationLifecycleFailed>()(
+export class InvocationLifecycleFailed extends ActionableTaggedError<InvocationLifecycleFailed>()(
   "generalist/core/InvocationLifecycleFailed",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+    hint: errorHint("Restore the lifecycle sink or correct its implementation before retrying the model attempt."),
+  },
 ) {}
 export class InvocationLifecycle extends Context.Service<
   InvocationLifecycle,
@@ -29,9 +33,10 @@ export const layerInvocationLifecycleNoop: Layer.Layer<InvocationLifecycle> = La
 export const isInvocationLifecycleFailed = Schema.is(InvocationLifecycleFailed)
 
 /** Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
-export class SinkFailed extends Schema.TaggedError<SinkFailed>()("generalist/core/SinkFailed", {
+export class SinkFailed extends ActionableTaggedError<SinkFailed>()("generalist/core/SinkFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Reconcile ambiguous delivery with the sink, restore it, then retry from the acknowledged batch."),
 }) {}
 
 /** Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */

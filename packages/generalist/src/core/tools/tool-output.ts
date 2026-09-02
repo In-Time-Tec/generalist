@@ -1,6 +1,7 @@
 import { Cause, Clock, Context, Effect, Function, HashMap, Layer, Option, Ref, Schema } from "effect"
 import type { Success } from "./tool-executor.js"
 import { sha256Text } from "../durable/canonical-json.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 /** A bounded tool result: inline content plus optional spilled overflow references. */
 export interface Output {
   readonly inline: unknown
@@ -20,8 +21,9 @@ export class Store extends Context.Service<
     readonly put: (toolCallId: string, content: OutputContent) => Effect.Effect<Option.Option<string>, Error>
   }
 >()("generalist/core/tools/tool-output/Store") {}
-export class Error extends Schema.TaggedError<Error>()("generalist/core/ToolOutputError", {
+export class Error extends ActionableTaggedError<Error>()("generalist/core/ToolOutputError", {
   message: Schema.String,
+  hint: errorHint("Restore the tool-output store or reduce the result size, then retry persistence."),
 }) {}
 export const layerNoop: Layer.Layer<Store> = Layer.succeed(
   Store,

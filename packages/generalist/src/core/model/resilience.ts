@@ -8,6 +8,7 @@ import {
   promoteStreamFailures,
 } from "./response/failure.js"
 import { isTerminationFailure } from "./stream-termination.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 export { defaultResolveFailure }
 export type { FailureInput, FailureResolver } from "./response/failure.js"
 
@@ -35,10 +36,14 @@ export class ModelResilience extends Context.Service<ModelResilience, Policy>()(
 ) {}
 
 /** A model resilience policy contains an unsafe correction bound. */
-export class Misconfigured extends Schema.TaggedError<Misconfigured>()("generalist/core/ModelResilienceMisconfigured", {
-  reason: Schema.Literal("invalid-tool-call-correction-limit"),
-  message: Schema.String,
-}) {}
+export class Misconfigured extends ActionableTaggedError<Misconfigured>()(
+  "generalist/core/ModelResilienceMisconfigured",
+  {
+    reason: Schema.Literal("invalid-tool-call-correction-limit"),
+    message: Schema.String,
+    hint: errorHint("Set invalidToolCallCorrectionLimit to a safe integer from 0 through 2."),
+  },
+) {}
 
 /**
  * A stream that ended without its terminal event is retryable

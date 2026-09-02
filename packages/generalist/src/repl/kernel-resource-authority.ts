@@ -1,4 +1,5 @@
 import { Context, Effect, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { CellId, Epoch, SessionId } from "./cell.js"
 import { CheckpointKind } from "./kernel-profile.js"
 
@@ -87,7 +88,7 @@ export const Lease = Schema.Struct({
 export type Lease = typeof Lease.Type
 
 /** A resource authority rejected an ownership or lifecycle transition atomically. */
-export class KernelResourceRejected extends Schema.TaggedError<KernelResourceRejected>()(
+export class KernelResourceRejected extends ActionableTaggedError<KernelResourceRejected>()(
   "generalist/repl/KernelResourceRejected",
   {
     sessionId: SessionId,
@@ -101,15 +102,17 @@ export class KernelResourceRejected extends Schema.TaggedError<KernelResourceRej
       "cleanup-pending",
     ]),
     message: Schema.String,
+    hint: errorHint("Reload the session lease and retry only the valid ownership or lifecycle transition."),
   },
 ) {}
 
 /** The resource authority could not read or commit its durable state. */
-export class KernelResourceAuthorityUnavailable extends Schema.TaggedError<KernelResourceAuthorityUnavailable>()(
+export class KernelResourceAuthorityUnavailable extends ActionableTaggedError<KernelResourceAuthorityUnavailable>()(
   "generalist/repl/KernelResourceAuthorityUnavailable",
   {
     sessionId: Schema.optionalKey(SessionId),
     message: Schema.String,
+    hint: errorHint("Restore the durable resource-authority store before retrying the operation."),
   },
 ) {}
 

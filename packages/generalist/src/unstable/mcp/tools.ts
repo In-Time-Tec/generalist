@@ -8,6 +8,7 @@ import {
   type JsonValue,
   MCPConnectionFailed,
   type MCPTool,
+  MCPToolCallFailed,
   type MCPToolFailure,
 } from "./client.js"
 import type { OAuthProviderError } from "./oauth.js"
@@ -34,12 +35,8 @@ export interface MCPTools {
 export const toolkit = (client: Service): Effect.Effect<Toolkit.Toolkit<Record<string, MCPTool>>> =>
   client.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools)))
 
-const toolFailure = (server: string, tool: string, message: string): MCPToolFailure => ({
-  _tag: "generalist/mcp/MCPToolCallFailed",
-  server,
-  tool,
-  message,
-})
+const toolFailure = (server: string, tool: string, message: string): MCPToolFailure =>
+  MCPToolCallFailed.make({ server, tool, message })
 
 /**
  * Effect AI handler layer that proxies MCP tool calls to the MCP server.

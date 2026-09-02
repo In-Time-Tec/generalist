@@ -4,6 +4,7 @@ import type { Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 import type { CompletedModelResponse } from "../model/response/builder.js"
 import { Diagnostics as SessionSyncDiagnostics } from "../context/session-sync.js"
 import { StopReason } from "../turn/policy.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
 /** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
@@ -219,20 +220,22 @@ export type Event<Output = unknown> =
   | ModelTelemetryEvent
 
 /** The loop failed. `turn` is the 0-based turn that failed. */
-export class AgentError extends Schema.TaggedError<AgentError>()("generalist/core/AgentError", {
+export class AgentError extends ActionableTaggedError<AgentError>()("generalist/core/AgentError", {
   message: Schema.String,
   turn: Schema.Finite,
   cause: Schema.optionalKey(Schema.Defect()),
   diagnostics: Schema.optionalKey(SessionSyncDiagnostics),
+  hint: errorHint("Inspect the cause and diagnostics, correct the failing boundary, and run the Agent again."),
 }) {}
 
 /** The model's terminal value did not satisfy the Agent output Schema. */
-export class InvalidOutput extends Schema.TaggedError<InvalidOutput>()("generalist/core/InvalidOutput", {
+export class InvalidOutput extends ActionableTaggedError<InvalidOutput>()("generalist/core/InvalidOutput", {
   issues: Schema.Array(Schema.String),
+  hint: errorHint("Correct the model output or Agent output Schema so the terminal value decodes."),
 }) {}
 
 /** The turn policy declined another turn while tool results were still pending. */
-export class TurnLimitExceeded extends Schema.TaggedError<TurnLimitExceeded>()("generalist/core/TurnLimitExceeded", {
+export class TurnLimitExceeded extends ActionableTaggedError<TurnLimitExceeded>()("generalist/core/TurnLimitExceeded", {
   turn: Schema.Finite,
   limit: Schema.Finite,
   pending: Schema.Array(
@@ -241,10 +244,11 @@ export class TurnLimitExceeded extends Schema.TaggedError<TurnLimitExceeded>()("
       tool_name: Schema.String,
     }),
   ),
+  hint: errorHint("Increase the turn limit or change the policy so pending tool results can reach the model."),
 }) {}
 
 /** A turn policy successfully stopped for a reason other than a configured turn limit. */
-export class PolicyStopped extends Schema.TaggedError<PolicyStopped>()("generalist/core/PolicyStopped", {
+export class PolicyStopped extends ActionableTaggedError<PolicyStopped>()("generalist/core/PolicyStopped", {
   turn: Schema.Finite,
   reason: StopReason,
   pending: Schema.Array(
@@ -253,6 +257,7 @@ export class PolicyStopped extends Schema.TaggedError<PolicyStopped>()("generali
       tool_name: Schema.String,
     }),
   ),
+  hint: errorHint("Change the policy stop condition or handle the listed pending tool results before stopping."),
 }) {}
 
 /**
@@ -267,40 +272,44 @@ export class PolicyStopped extends Schema.TaggedError<PolicyStopped>()("generali
  * means text was streamed but never committed: a middleware chain removed it,
  * or the attempt that streamed it was discarded before release.
  */
-export class RunEndedWithoutOutput extends Schema.TaggedError<RunEndedWithoutOutput>()(
+export class RunEndedWithoutOutput extends ActionableTaggedError<RunEndedWithoutOutput>()(
   "generalist/core/RunEndedWithoutOutput",
   {
     turn: Schema.Finite,
     finishReason: Schema.optionalKey(Response.FinishReason),
     providerTextCharacters: Schema.Finite,
     reasoningCharacters: Schema.Finite,
+    hint: errorHint("Make the provider return assistant text, or use a structured Agent output Schema."),
   },
 ) {}
 
 /** A ModelMiddleware hook violated the loop contract. */
-export class MiddlewareViolation extends Schema.TaggedError<MiddlewareViolation>()(
+export class MiddlewareViolation extends ActionableTaggedError<MiddlewareViolation>()(
   "generalist/core/MiddlewareViolation",
   {
     turn: Schema.Finite,
     detail: Schema.String,
+    hint: errorHint("Fix the middleware hook named by detail so it preserves the Agent loop contract."),
   },
 ) {}
 
 /** A transformed model response reused a tool-call identifier. */
-export class DuplicateToolCallId extends Schema.TaggedError<DuplicateToolCallId>()(
+export class DuplicateToolCallId extends ActionableTaggedError<DuplicateToolCallId>()(
   "generalist/core/DuplicateToolCallId",
   {
     id: Schema.String,
     firstIndex: Schema.Finite,
     duplicateIndex: Schema.Finite,
+    hint: errorHint("Make every post-middleware tool-call ID unique within the model response."),
   },
 ) {}
 
 /** An explicitly failing tool progress queue reached capacity. */
-export class ProgressOverflow extends Schema.TaggedError<ProgressOverflow>()("generalist/core/ProgressOverflow", {
+export class ProgressOverflow extends ActionableTaggedError<ProgressOverflow>()("generalist/core/ProgressOverflow", {
   turn: Schema.Finite,
   toolCallId: Schema.String,
   capacity: Schema.Finite,
+  hint: errorHint("Drain progress faster, increase capacity, or choose a dropping or sliding progress policy."),
 }) {}
 
 /** The origin of one tool declaration in an Agent run. */
@@ -316,9 +325,10 @@ export const ToolOrigin = Schema.Union([
 export type ToolOrigin = typeof ToolOrigin.Type
 
 /** The advertised tool set contains more than one declaration for a name. */
-export class ToolNameCollision extends Schema.TaggedError<ToolNameCollision>()("generalist/core/ToolNameCollision", {
+export class ToolNameCollision extends ActionableTaggedError<ToolNameCollision>()("generalist/core/ToolNameCollision", {
   name: Schema.String,
   origins: Schema.NonEmptyArray(ToolOrigin),
+  hint: errorHint("Rename or remove one listed declaration so each advertised tool name is unique."),
 }) {}
 
 /**
@@ -326,14 +336,16 @@ export class ToolNameCollision extends Schema.TaggedError<ToolNameCollision>()("
  * The run did NOT finish; the host resolves waits out-of-band and re-enters via
  * `RunOptions.resume` with this exact batch checkpoint.
  */
-export class AgentSuspended extends Schema.TaggedError<AgentSuspended>()("generalist/core/AgentSuspended", {
+export class AgentSuspended extends ActionableTaggedError<AgentSuspended>()("generalist/core/AgentSuspended", {
   checkpoint: ToolBatchCheckpoint,
   waits: Schema.Array(ToolBatchWait),
+  hint: errorHint("Resolve every listed wait and resume with this exact suspension checkpoint."),
 }) {}
 
 /** A resume identity did not match the current authoritative suspension checkpoint. */
-export class ResumeMismatch extends Schema.TaggedError<ResumeMismatch>()("generalist/core/ResumeMismatch", {
+export class ResumeMismatch extends ActionableTaggedError<ResumeMismatch>()("generalist/core/ResumeMismatch", {
   reason: Schema.Literals(["checkpoint-not-found", "identity-mismatch"]),
   expected: Schema.optional(AgentSuspended),
   received: AgentSuspended,
+  hint: errorHint("Resume with the sole current suspension checkpoint and its exact wait identities."),
 }) {}

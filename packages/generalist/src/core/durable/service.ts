@@ -3,6 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { ExecutableRef } from "./manifest/executable-manifest.js"
 import type { DriverCheckpoint, DriverDecision, OperationOutcome } from "./driver/contract.js"
 import type { RunBudget } from "./run-budget.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 /** Input used to construct the first checkpoint for one run. */
 export interface DriverInput {
@@ -22,20 +23,26 @@ export interface DurableAgentDriver {
     outcome: OperationOutcome,
   ) => Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid>
 }
-export class DriverError extends Schema.TaggedError<DriverError>()("generalist/core/DriverError", {
+export class DriverError extends ActionableTaggedError<DriverError>()("generalist/core/DriverError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Inspect the cause, repair the durable driver boundary, and resume from its last checkpoint."),
 }) {}
-export class DriverVersionMismatch extends Schema.TaggedError<DriverVersionMismatch>()(
+export class DriverVersionMismatch extends ActionableTaggedError<DriverVersionMismatch>()(
   "generalist/core/DriverVersionMismatch",
   {
     expected: Schema.String,
     actual: Schema.String,
+    hint: errorHint("Use the driver version recorded by the checkpoint or migrate the checkpoint explicitly."),
   },
 ) {}
-export class DriverStateInvalid extends Schema.TaggedError<DriverStateInvalid>()("generalist/core/DriverStateInvalid", {
-  message: Schema.String,
-}) {}
+export class DriverStateInvalid extends ActionableTaggedError<DriverStateInvalid>()(
+  "generalist/core/DriverStateInvalid",
+  {
+    message: Schema.String,
+    hint: errorHint("Repair or discard the invalid checkpoint before resuming this Run."),
+  },
+) {}
 export const requireDriverVersion: {
   (version: string): (checkpoint: Pick<DriverCheckpoint, "driverVersion">) => Effect.Effect<void, DriverVersionMismatch>
   (checkpoint: Pick<DriverCheckpoint, "driverVersion">, version: string): Effect.Effect<void, DriverVersionMismatch>

@@ -12,6 +12,7 @@ import {
   Semaphore,
 } from "effect"
 import { digest } from "../durable/canonical-json.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import {
   make as makeProgramManifest,
   type PinnedProgram,
@@ -80,13 +81,22 @@ const AgentResult = Schema.Struct({
     output: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
 })
-export class ProgramHandlerMismatch extends Schema.TaggedError<ProgramHandlerMismatch>()(
+export class ProgramHandlerMismatch extends ActionableTaggedError<ProgramHandlerMismatch>()(
   "generalist/core/ProgramHandlerMismatch",
-  { kind: Schema.Literals(["tool", "step", "agent"]), name: Schema.String, reason: Schema.String },
+  {
+    kind: Schema.Literals(["tool", "step", "agent"]),
+    name: Schema.String,
+    reason: Schema.String,
+    hint: errorHint("Register a handler whose name and schema match the pinned program declaration."),
+  },
 ) {}
-export class ProgramIdentityMismatch extends Schema.TaggedError<ProgramIdentityMismatch>()(
+export class ProgramIdentityMismatch extends ActionableTaggedError<ProgramIdentityMismatch>()(
   "generalist/core/ProgramIdentityMismatch",
-  { expected: Schema.String, actual: Schema.String },
+  {
+    expected: Schema.String,
+    actual: Schema.String,
+    hint: errorHint("Execute the request with the exact pinned program identity that created it."),
+  },
 ) {}
 
 /** Failures returned by Core-owned Program execution. */

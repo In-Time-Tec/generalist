@@ -16,6 +16,7 @@ import {
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { make as makeCursor, type Cursor } from "../../runtime/cursor.js"
 import { ConnectionFault } from "./connection-fault.js"
 import { ReconnectExhausted, TransportError } from "./errors.js"
@@ -41,10 +42,11 @@ export interface ConnectOptions {
 }
 
 /** @experimental The connection options cannot create a bounded client. */
-export class InvalidConnectOptions extends Schema.TaggedError<InvalidConnectOptions>()(
+export class InvalidConnectOptions extends ActionableTaggedError<InvalidConnectOptions>()(
   "generalist/transport/InvalidConnectOptions",
   {
     message: Schema.String,
+    hint: errorHint("Provide a valid endpoint and a finite reconnect schedule before connecting."),
   },
 ) {}
 

@@ -1,6 +1,7 @@
 import { Effect, Function, Layer, Option, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../core/agent/service.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import type { ProgramAuthority } from "../core/durable/manifest/agent-manifest.js"
 import {
   type ExecutableEntry,
@@ -106,22 +107,29 @@ export const makeParameters = (authority: ProgramAuthority) => {
     }),
   })
 }
-export class ProgramAuthorityMissing extends Schema.TaggedError<ProgramAuthorityMissing>()(
+export class ProgramAuthorityMissing extends ActionableTaggedError<ProgramAuthorityMissing>()(
   "generalist/runtime/ProgramAuthorityMissing",
-  { runId: Schema.String },
+  {
+    runId: Schema.String,
+    hint: errorHint("Configure ProgramAuthority for this run before invoking the code-mode tool."),
+  },
 ) {}
-export class ProgramAuthorityExceeded extends Schema.TaggedError<ProgramAuthorityExceeded>()(
+export class ProgramAuthorityExceeded extends ActionableTaggedError<ProgramAuthorityExceeded>()(
   "generalist/runtime/ProgramAuthorityExceeded",
   {
     dimension: AuthorityDimension,
     requestedId: Schema.optionalKey(SelectionId),
     allowedIds: SelectionIds,
     message: Schema.String.check(Schema.isMaxLength(512)),
+    hint: errorHint("Request only allowed selections and stay within the named authority budget."),
   },
 ) {}
-export class ProgramAdmissionFailed extends Schema.TaggedError<ProgramAdmissionFailed>()(
+export class ProgramAdmissionFailed extends ActionableTaggedError<ProgramAdmissionFailed>()(
   "generalist/runtime/ProgramAdmissionFailed",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+    hint: errorHint("Inspect the admission failure and submit a program that fits the run authority."),
+  },
 ) {}
 
 const makeDeclaration = (parameters: ReturnType<typeof makeParameters>) =>

@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Schema, type Scope } from "effect"
 import { dual } from "effect/Function"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { CompactionCommit, Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 /** Opaque session entry id. */
 export type EntryId = string
@@ -142,13 +143,15 @@ export const EntryPayload = Schema.Union([
 ])
 export type EntryPayload = typeof EntryPayload.Type
 /** Session store operation failure. */
-export class SessionStoreError extends Schema.TaggedError<SessionStoreError>()("generalist/core/SessionStoreError", {
+export class SessionStoreError extends ActionableTaggedError<SessionStoreError>()("generalist/core/SessionStoreError", {
   message: Schema.String,
+  hint: errorHint("Restore the session store connection or permissions, then retry the operation."),
 }) {}
 /** Session append conflict with the active path or entry identity. */
-export class SessionConflict extends Schema.TaggedError<SessionConflict>()("generalist/core/SessionConflict", {
+export class SessionConflict extends ActionableTaggedError<SessionConflict>()("generalist/core/SessionConflict", {
   reason: Schema.Literals(["stale-leaf", "entry-id-reused", "checkpoint-id-reused", "checkpoint-not-on-active-path"]),
   message: Schema.String,
+  hint: errorHint("Reload the active session path and retry with fresh entry and checkpoint identities."),
 }) {}
 /** Expected active leaf for a store-assigned Session entry identity. */
 export type GeneratedAppendOptions = {

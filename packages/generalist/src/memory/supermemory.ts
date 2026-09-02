@@ -2,6 +2,7 @@ import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Prompt } from "effect/unstable/ai"
 import { type Item, type Key, Memory, MemoryError, type Metadata, type Service } from "../core/context/memory.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 
 const CreateResponse = Schema.Struct({
   memories: Schema.Array(Schema.Struct({ id: Schema.String })),
@@ -18,9 +19,12 @@ const SearchResponse = Schema.Struct({
 })
 
 /** Supermemory HTTP API failure. */
-export class SupermemoryError extends Schema.TaggedError<SupermemoryError>()("generalist/memory/SupermemoryError", {
+export class SupermemoryError extends ActionableTaggedError<SupermemoryError>()("generalist/memory/SupermemoryError", {
   status: Schema.Int,
   body: Schema.String,
+  hint: errorHint(
+    "Inspect the HTTP status and body, correct credentials or request data, then retry if the status permits.",
+  ),
 }) {}
 
 /** Hosted Supermemory configuration. */

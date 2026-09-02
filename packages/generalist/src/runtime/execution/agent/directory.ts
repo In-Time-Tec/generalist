@@ -1,4 +1,5 @@
 import { Effect, Function, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
 import { Address } from "../../address.js"
 import { RunStatus } from "../../run.js"
 
@@ -34,9 +35,10 @@ export type AddressTarget =
   | { readonly _tag: "Session"; readonly sessionId: string }
   | { readonly _tag: "Name"; readonly scope: string; readonly name: string }
 
-export class AddressInvalid extends Schema.TaggedError<AddressInvalid>()("generalist/runtime/AddressInvalid", {
+export class AddressInvalid extends ActionableTaggedError<AddressInvalid>()("generalist/runtime/AddressInvalid", {
   address: Address,
   message: Schema.String,
+  hint: errorHint("Use a valid run, session, or scoped-name address and ensure the target exists."),
 }) {}
 
 const decodeSegment = (value: string): string | undefined => {

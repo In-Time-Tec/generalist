@@ -1,5 +1,6 @@
 import { Function, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import type { Service } from "./tool-executor.js"
 import type { DomainFailure, Request, Success } from "./tool-result-codec.js"
 
@@ -24,11 +25,12 @@ export type CancellationOutcome =
   | { readonly _tag: "AlreadyTerminal"; readonly outcome: TerminalOutcome }
 
 /** A concrete executor could not definitively cancel one admitted operation. */
-export class CancellationFailure extends Schema.TaggedError<CancellationFailure>()(
+export class CancellationFailure extends ActionableTaggedError<CancellationFailure>()(
   "generalist/core/CancellationFailure",
   {
     tool: Schema.String,
     message: Schema.String,
+    hint: errorHint("Reconcile the named tool operation with its provider before retrying cancellation."),
   },
 ) {}
 

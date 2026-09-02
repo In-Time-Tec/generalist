@@ -1,21 +1,27 @@
 import { Effect, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 
 export const TreeCursor = Schema.String.pipe(Schema.brand("generalist/runtime/TreeCursor"))
 export type TreeCursor = typeof TreeCursor.Type
 
-export class TreeCursorInvalid extends Schema.TaggedError<TreeCursorInvalid>()("generalist/runtime/TreeCursorInvalid", {
-  rootRunId: Schema.String,
-  cursor: TreeCursor,
-  message: Schema.String,
-}) {}
+export class TreeCursorInvalid extends ActionableTaggedError<TreeCursorInvalid>()(
+  "generalist/runtime/TreeCursorInvalid",
+  {
+    rootRunId: Schema.String,
+    cursor: TreeCursor,
+    message: Schema.String,
+    hint: errorHint("Use a TreeCursor produced by this root Run's checkpoint or replay page."),
+  },
+) {}
 
 /** The cursor belongs to a different root Run. */
-export class TreeCursorRootMismatch extends Schema.TaggedError<TreeCursorRootMismatch>()(
+export class TreeCursorRootMismatch extends ActionableTaggedError<TreeCursorRootMismatch>()(
   "generalist/runtime/TreeCursorRootMismatch",
   {
     rootRunId: Schema.String,
     cursor: TreeCursor,
     cursorRootRunId: Schema.String,
+    hint: errorHint("Use a cursor issued for rootRunId instead of cursorRootRunId."),
   },
 ) {}
 

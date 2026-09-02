@@ -1,4 +1,5 @@
 import { Context, Effect, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 const programKey = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/), Schema.isMinLength(1), Schema.isMaxLength(64)),
@@ -13,19 +14,32 @@ export const ProgramMemberKey = programKey
 export type ProgramMemberKey = typeof ProgramMemberKey.Type
 export const LogLevel = Schema.Literals(["debug", "info", "warn", "error"])
 export type LogLevel = typeof LogLevel.Type
-export class ProgramCapabilityMissing extends Schema.TaggedError<ProgramCapabilityMissing>()(
+export class ProgramCapabilityMissing extends ActionableTaggedError<ProgramCapabilityMissing>()(
   "generalist/core/ProgramCapabilityMissing",
-  { capability: Schema.String },
+  {
+    capability: Schema.String,
+    hint: errorHint("Provide the named capability in the program host before running this operation."),
+  },
 ) {}
-export class ProgramCapabilityDenied extends Schema.TaggedError<ProgramCapabilityDenied>()(
+export class ProgramCapabilityDenied extends ActionableTaggedError<ProgramCapabilityDenied>()(
   "generalist/core/ProgramCapabilityDenied",
-  { capability: Schema.String, operation: ProgramOperationName, reason: Schema.String },
+  {
+    capability: Schema.String,
+    operation: ProgramOperationName,
+    reason: Schema.String,
+    hint: errorHint("Grant the capability for this operation or remove the denied operation from the program."),
+  },
 ) {}
-export class ProgramAuthorizationFailure extends Schema.TaggedError<ProgramAuthorizationFailure>()(
+export class ProgramAuthorizationFailure extends ActionableTaggedError<ProgramAuthorizationFailure>()(
   "generalist/core/ProgramAuthorizationFailure",
-  { capability: Schema.String, operation: ProgramOperationName, cause: Schema.Unknown },
+  {
+    capability: Schema.String,
+    operation: ProgramOperationName,
+    cause: Schema.Unknown,
+    hint: errorHint("Inspect cause and repair the host authorization service before retrying the operation."),
+  },
 ) {}
-export class ProgramSchemaFailure extends Schema.TaggedError<ProgramSchemaFailure>()(
+export class ProgramSchemaFailure extends ActionableTaggedError<ProgramSchemaFailure>()(
   "generalist/core/ProgramSchemaFailure",
   {
     boundary: Schema.Literals([
@@ -40,23 +54,37 @@ export class ProgramSchemaFailure extends Schema.TaggedError<ProgramSchemaFailur
     ]),
     capability: Schema.optionalKey(Schema.String),
     message: Schema.String,
+    hint: errorHint("Correct the value at the named schema boundary and retry the program."),
   },
 ) {}
-export class ProgramToolFailure extends Schema.TaggedError<ProgramToolFailure>()("generalist/core/ProgramToolFailure", {
-  tool: Schema.String,
-  operation: ProgramOperationName,
-  cause: Schema.Unknown,
-}) {}
-export class ProgramStepFailure extends Schema.TaggedError<ProgramStepFailure>()("generalist/core/ProgramStepFailure", {
-  step: Schema.String,
-  operation: ProgramOperationName,
-  cause: Schema.Unknown,
-}) {}
-export class ProgramAgentFailure extends Schema.TaggedError<ProgramAgentFailure>()(
-  "generalist/core/ProgramAgentFailure",
-  { selection: Schema.String, operation: ProgramOperationName, cause: Schema.Unknown },
+export class ProgramToolFailure extends ActionableTaggedError<ProgramToolFailure>()(
+  "generalist/core/ProgramToolFailure",
+  {
+    tool: Schema.String,
+    operation: ProgramOperationName,
+    cause: Schema.Unknown,
+    hint: errorHint("Inspect cause and fix or handle the named tool operation before retrying."),
+  },
 ) {}
-export class ProgramBudgetExhausted extends Schema.TaggedError<ProgramBudgetExhausted>()(
+export class ProgramStepFailure extends ActionableTaggedError<ProgramStepFailure>()(
+  "generalist/core/ProgramStepFailure",
+  {
+    step: Schema.String,
+    operation: ProgramOperationName,
+    cause: Schema.Unknown,
+    hint: errorHint("Inspect cause and fix or handle the named step operation before retrying."),
+  },
+) {}
+export class ProgramAgentFailure extends ActionableTaggedError<ProgramAgentFailure>()(
+  "generalist/core/ProgramAgentFailure",
+  {
+    selection: Schema.String,
+    operation: ProgramOperationName,
+    cause: Schema.Unknown,
+    hint: errorHint("Inspect cause and fix or handle the selected agent before retrying."),
+  },
+) {}
+export class ProgramBudgetExhausted extends ActionableTaggedError<ProgramBudgetExhausted>()(
   "generalist/core/ProgramBudgetExhausted",
   {
     dimension: Schema.Literals([
@@ -69,29 +97,43 @@ export class ProgramBudgetExhausted extends Schema.TaggedError<ProgramBudgetExha
       "outputBytes",
     ]),
     limit: Schema.Finite,
+    hint: errorHint("Raise the named program budget limit or reduce the work requested by the program."),
   },
 ) {}
-export class ProgramReplayDivergence extends Schema.TaggedError<ProgramReplayDivergence>()(
+export class ProgramReplayDivergence extends ActionableTaggedError<ProgramReplayDivergence>()(
   "generalist/core/ProgramReplayDivergence",
-  { operation: ProgramOperationName, expected: Schema.String, actual: Schema.String },
+  {
+    operation: ProgramOperationName,
+    expected: Schema.String,
+    actual: Schema.String,
+    hint: errorHint("Replay with the original operation content or start a new program execution."),
+  },
 ) {}
-export class ProgramOperationUnknown extends Schema.TaggedError<ProgramOperationUnknown>()(
+export class ProgramOperationUnknown extends ActionableTaggedError<ProgramOperationUnknown>()(
   "generalist/core/ProgramOperationUnknown",
-  { operation: ProgramOperationName },
+  {
+    operation: ProgramOperationName,
+    hint: errorHint("Register or implement the named operation in the program host before retrying."),
+  },
 ) {}
 
 /** One decoded invocation failed with an implementation-specific error. */
-export class ProgramInvocationFailure extends Schema.TaggedError<ProgramInvocationFailure>()(
+export class ProgramInvocationFailure extends ActionableTaggedError<ProgramInvocationFailure>()(
   "generalist/core/ProgramInvocationFailure",
-  { cause: Schema.Unknown },
+  {
+    cause: Schema.Unknown,
+    hint: errorHint("Inspect cause and repair the program invocation handler before retrying."),
+  },
 ) {}
-export class ProgramSuspended extends Schema.TaggedError<ProgramSuspended>()("generalist/core/ProgramSuspended", {
+export class ProgramSuspended extends ActionableTaggedError<ProgramSuspended>()("generalist/core/ProgramSuspended", {
   operation: ProgramOperationName,
   reason: Schema.Literals(["approval", "tool-wait", "agent", "step"]),
   token: Schema.optionalKey(Schema.String),
+  hint: errorHint("Resume the suspended operation with the recorded token after its dependency is ready."),
 }) {}
-export class ProgramCancelled extends Schema.TaggedError<ProgramCancelled>()("generalist/core/ProgramCancelled", {
+export class ProgramCancelled extends ActionableTaggedError<ProgramCancelled>()("generalist/core/ProgramCancelled", {
   reason: Schema.String,
+  hint: errorHint("Inspect the cancellation reason and start a new execution if the work is still required."),
 }) {}
 export interface ToolCallInput {
   readonly operation: ProgramOperationName

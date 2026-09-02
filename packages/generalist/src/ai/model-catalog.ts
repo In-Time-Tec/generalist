@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 
 /** Conservative context window used when model metadata is unavailable. */
 export const conservativeContextWindow = 32_768
@@ -17,9 +18,10 @@ export interface Metadata {
   readonly modalities?: ReadonlyArray<"text" | "image" | "audio">
 }
 
-export class NotFound extends Schema.TaggedError<NotFound>()("generalist/ai/ModelMetadataNotFound", {
+export class NotFound extends ActionableTaggedError<NotFound>()("generalist/ai/ModelMetadataNotFound", {
   provider: Schema.String,
   model: Schema.String,
+  hint: errorHint("Register metadata for this provider and model or use the conservative context-window fallback."),
 }) {}
 
 export interface Service {

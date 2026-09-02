@@ -1,5 +1,6 @@
 import { Context, Effect, Schema } from "effect"
 import { digest } from "../core/durable/canonical-json.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { DropReason, Epoch, SessionId } from "./cell.js"
 
 /** How one binding was put back into a restored namespace. */
@@ -48,12 +49,13 @@ export const snapshotId = (snapshot: Snapshot): string =>
   })}`
 
 /** A snapshot store operation failed. Restore failure is non-fatal and reported. */
-export class KernelStateUnavailable extends Schema.TaggedError<KernelStateUnavailable>()(
+export class KernelStateUnavailable extends ActionableTaggedError<KernelStateUnavailable>()(
   "generalist/repl/KernelStateUnavailable",
   {
     sessionId: Schema.String,
     reason: Schema.Literals(["missing", "corrupt", "io"]),
     message: Schema.String,
+    hint: errorHint("Restore a valid snapshot for this session or continue with a fresh kernel namespace."),
   },
 ) {}
 

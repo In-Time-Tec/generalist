@@ -1,5 +1,6 @@
 import { Cause, Context, Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { adapt, invokeGenerateObject, invokeGenerateText, invokeStreamText } from "../../core/model/service.js"
 import {
   type AvailabilityFailureClassifier,
@@ -25,9 +26,14 @@ export interface Route {
 }
 
 /** @experimental An ordered candidate route contains a candidate without provider-approved availability semantics. */
-export class AvailabilitySemanticsMissing extends Schema.TaggedError<AvailabilitySemanticsMissing>()(
+export class AvailabilitySemanticsMissing extends ActionableTaggedError<AvailabilitySemanticsMissing>()(
   "generalist/ai/AvailabilitySemanticsMissing",
-  { provider: Schema.String, model: Schema.String, registrationKey: Schema.optionalKey(Schema.String) },
+  {
+    provider: Schema.String,
+    model: Schema.String,
+    registrationKey: Schema.optionalKey(Schema.String),
+    hint: errorHint("Register an availability-failure classifier for this provider and model before routing to it."),
+  },
 ) {}
 
 interface Candidate {

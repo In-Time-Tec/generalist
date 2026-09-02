@@ -1,4 +1,5 @@
 import { Context, Effect, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 /** What a matched permission rule grants. */
 export type Level = "allow" | "deny" | "ask"
@@ -21,14 +22,16 @@ export const RuleSchema = Schema.Struct({
 export const RuleFile = Schema.Array(RuleSchema)
 
 /** Permission service failure. */
-export class PermissionError extends Schema.TaggedError<PermissionError>()("generalist/core/PermissionError", {
+export class PermissionError extends ActionableTaggedError<PermissionError>()("generalist/core/PermissionError", {
   message: Schema.String,
+  hint: errorHint("Restore access to the permission rule store, then retry the operation."),
 }) {}
 
 /** A permission rule file failed JSON/YAML parsing or Rule schema validation. */
-export class InvalidRuleFile extends Schema.TaggedError<InvalidRuleFile>()("generalist/core/InvalidRuleFile", {
+export class InvalidRuleFile extends ActionableTaggedError<InvalidRuleFile>()("generalist/core/InvalidRuleFile", {
   path: Schema.String,
   issues: Schema.String,
+  hint: errorHint("Correct the rule file at path using the reported schema issues, then reload it."),
 }) {}
 
 /** Permission rule persistence failure. */
