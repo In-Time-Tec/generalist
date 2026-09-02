@@ -81,6 +81,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "FileSystemStore",
       "Instructions",
       "Overview",
+      "PackageCatalog",
       "Refinement",
       "Registration",
       "Snapshot",
