@@ -86,6 +86,16 @@ export const minimumConsumerProfiles = [
         runtimes: nodeAndBun,
         exports: ["layer", "makeProvider"],
       },
+      {
+        specifier: "generalist/unstable/sandbox/daytona",
+        runtimes: nodeAndBun,
+        exports: ["layer", "makeProvider"],
+      },
+      {
+        specifier: "generalist/unstable/sandbox/fly-sprites",
+        runtimes: nodeAndBun,
+        exports: ["layer", "makeProvider"],
+      },
     ],
   },
   {
