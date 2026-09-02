@@ -68,7 +68,7 @@ const defaultProviderClassify = (cause: unknown): Classification =>
 export const defaultPolicy: Policy = {
   classify: defaultProviderClassify,
   resolve: defaultResolveFailure,
-  retrySchedule: Schedule.exponential("2 seconds").pipe(Schedule.upTo({ times: 2, duration: "30 seconds" })),
+  retrySchedule: Schedule.exponential("500 millis").pipe(Schedule.jittered, Schedule.upTo({ times: 5 })),
   invalidToolCallCorrectionLimit: 0,
 }
 
