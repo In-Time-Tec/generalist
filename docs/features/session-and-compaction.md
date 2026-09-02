@@ -1,6 +1,6 @@
 # Session and compaction
 
-`Session` is the authoritative append-only conversation log; its current root-to-leaf path projects the next model prompt. Optional compaction replaces only that projection with a self-contained checkpoint while preserving the lossless log.
+`Session` is the authoritative conversation log; ordinary execution appends entries, and its current root-to-leaf path projects the next model prompt. Optional compaction replaces only that projection with a self-contained checkpoint while preserving the lossless log.
 
 ## Usage
 
@@ -82,6 +82,7 @@ The default strategy first bounds successful tool outputs, then keeps a safe rec
 - Sync diagnostics contain only session ID, bounded counts, alignment/common-prefix facts, final entry tag, and first-divergence roles, part types, and digests—never raw prompt, message, or tool payload text.
 - A normal append may use an exact `id` and `expectedLeafId`; an identical identity, parent, and payload retry does not advance sequence or leaf.
 - Reusing an entry ID with changed parent or payload fails `SessionConflict` with `entry-id-reused`. Exact retries remain valid below an active descendant, but not after abandoning that branch; ambiguous appends are retried exactly.
+- Runtime rewind first copies the complete discarded Session continuation to the retained branch, then removes that suffix from the named source Session and resets its leaf to the checkpoint. Ordinary Session mutation remains append-only; the explicit rewind transition makes the source a replayable prefix without losing the discarded future.
 - Every admitted framework tool call has exactly one matching terminal result. Duplicate, mismatched, and unresolved histories are rejected before provider invocation, and successful Run settlement is rejected while calls remain unresolved.
 - Tool settlement appends proven, unknown, cancelled, or failed outcomes in the same transition or SQL transaction that settles the Run.
 - A terminal model operation atomically commits one normalized `ModelResponse`, compact operation reference, exactly one semantic event, and post-usage driver checkpoint. Operation results and response events retain Session/entry identity, input parent, attempt facts, usage, finish reason, and digest—not response content; `Runtime.resolveModelResponse` verifies and hydrates the exact entry. Retries must match identity, parent, payload, and digest; later sync does not duplicate it.

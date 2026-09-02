@@ -469,6 +469,8 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
       registerForkRewind({
         options,
         capability: options.capabilities["fork-rewind"],
+        prepare: (effect) => prepare(options, effect),
+        open: (use) => provideLayer(options.layer, use),
         provide: (use) => provide(options, use),
       })
     }

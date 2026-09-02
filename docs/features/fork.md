@@ -25,7 +25,7 @@ The optional substitution names one completed tool operation in the retained pre
 - A Run with no sandbox progress in the selected prefix can fork normally. If its latest `SandboxSnapshot` progress marker is `SandboxSnapshotUnavailable`, the transition fails with `NoSnapshot`; a later available snapshot makes later prefixes forkable again.
 - Fork and rewind are atomic store transitions. A reopened SQL Runtime sees either the old state or the complete branch state, never a partially copied prefix.
 - Each branch owns a copied prefix. Memory, SQLite, PostgreSQL, and MySQL use the same behavior without reference-aware event reads.
-- Rewind retains the discarded future as a branch before replacing the source Run.
+- Rewind first copies the discarded Run and Session future into a branch. It then removes the source Session suffix after the retained checkpoint before resetting its leaf, so deterministic replay can append that suffix again without colliding with inactive entries.
 - Runtime journal, operation, Session, and child state remain authoritative. The copied branch journal carries the latest Sandbox snapshot ID, but restoring a branch Sandbox from that ID is not wired yet. `Sandbox.layerWorktree` is the process-host leaf intended to serve that later restoration path.
 
 ## Host join point
