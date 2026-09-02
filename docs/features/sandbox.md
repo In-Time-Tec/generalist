@@ -39,12 +39,14 @@ A leaf rejects another command kind with `Unsupported`; it never guesses how to 
 
 ## Shipped leaves
 
-| Leaf                                        | Isolation    | Commands           | Files         | Pause/resume  | Snapshot | Fork          | Enforced limits    | Billing model                                          |
-| ------------------------------------------- | ------------ | ------------------ | ------------- | ------------- | -------- | ------------- | ------------------ | ------------------------------------------------------ |
-| `layerBunKernel`                            | `process`    | `TypeScript`       | yes           | yes           | yes      | yes           | wall clock         | host process; no vendor billing claim                  |
-| `generalist/unstable/sandbox/worker-loader` | `v8-isolate` | `JavaScriptModule` | `Unsupported` | `Unsupported` | no       | no            | CPU and wall clock | Workers request CPU and invocation duration            |
-| `generalist/unstable/sandbox/e2b`           | `microvm`    | `Process`          | yes           | yes           | yes      | yes           | wall clock         | per-second CPU/RAM while running; paused is not billed |
-| `generalist/unstable/sandbox/cloudflare`    | `container`  | `Process`          | yes           | `Unsupported` | no       | `Unsupported` | wall clock         | Containers vCPU, memory, disk, egress, Worker, and DO  |
+| Leaf                                        | Isolation    | Commands           | Files         | Pause/resume  | Snapshot | Fork          | Enforced limits    | Billing model                                            |
+| ------------------------------------------- | ------------ | ------------------ | ------------- | ------------- | -------- | ------------- | ------------------ | -------------------------------------------------------- |
+| `layerBunKernel`                            | `process`    | `TypeScript`       | yes           | yes           | yes      | yes           | wall clock         | host process; no vendor billing claim                    |
+| `generalist/unstable/sandbox/worker-loader` | `v8-isolate` | `JavaScriptModule` | `Unsupported` | `Unsupported` | no       | no            | CPU and wall clock | Workers request CPU and invocation duration              |
+| `generalist/unstable/sandbox/e2b`           | `microvm`    | `Process`          | yes           | yes           | yes      | yes           | wall clock         | per-second CPU/RAM while running; paused is not billed   |
+| `generalist/unstable/sandbox/daytona`       | configured   | `Process`          | yes           | VM only       | no       | `Unsupported` | wall clock         | active vCPU/RAM/disk; stopped or paused bills disk only  |
+| `generalist/unstable/sandbox/fly-sprites`   | `microvm`    | `Process`          | yes           | `Unsupported` | no       | `Unsupported` | wall clock         | active CPU/RAM by second; durable storage remains billed |
+| `generalist/unstable/sandbox/cloudflare`    | `container`  | `Process`          | yes           | `Unsupported` | no       | `Unsupported` | wall clock         | Containers vCPU, memory, disk, egress, Worker, and DO    |
 
 `process` is a factual process boundary, not confinement. The Bun kernel is for trusted local code: it shares the host operating-system identity and its rooted Effect `FileSystem` is a path view, not a security boundary. It does not claim container or microVM isolation. CPU and per-sandbox memory bounds are unsupported because the Bun leaf cannot enforce them independently.
 
@@ -60,12 +62,14 @@ CPU and wall clock are different resources:
 
 Pausing the Bun leaf closes its child process and retains the last captured namespace plus workspace files; resume boots lazily on the next cell. That can stop active process cost, but Generalist does not claim a vendor billing guarantee. Worker Loader executions are fresh and have nothing persistent to pause.
 
-The hosted leaves are unstable while their live conformance record matures. E2B pauses with memory and filesystem state on explicit pause, framework auto-pause, and acquisition-scope close. E2B documents that compute billing stops while paused. Cloudflare Sandbox has inactivity sleep but no provider operation matching Generalist's explicit pause/resume contract, so those operations remain `Unsupported`; closing the acquisition scope destroys its container to release resources. Cloudflare bills the underlying Container dimensions plus the Worker and Durable Object that route it.
+The hosted leaves are unstable while their live conformance record matures. E2B pauses with memory and filesystem state on explicit pause, framework auto-pause, and acquisition-scope close. E2B documents that compute billing stops while paused. Daytona requires a factual `sandboxClass`: image builds are containers, while Linux VM sandboxes use an existing VM snapshot. The leaf validates the returned class, labels containers `container` and Linux VMs `microvm`, and exposes explicit pause/resume and framework auto-pause only for Linux VMs. Closing a fresh acquisition deletes it; closing a keyed reconnection pauses a VM or stops a container so the caller's resource remains addressable. Daytona snapshot creation is asynchronous and returns the source sandbox rather than a ready immutable image identity, so snapshot and fork remain `Unsupported`. Fly Sprites are microVMs that hibernate automatically, but automatic hibernation is not an explicit pause/resume operation. Sprite checkpoints restore only the same Sprite and cannot seed an isolated fork, so snapshot and fork also remain `Unsupported`. Closing a fresh Sprite acquisition deletes it, while closing a keyed reconnection leaves the caller-owned Sprite intact. Cloudflare Sandbox has inactivity sleep but no provider operation matching Generalist's explicit pause/resume contract, so those operations remain `Unsupported`; closing the acquisition scope destroys its container to release resources. Cloudflare bills the underlying Container dimensions plus the Worker and Durable Object that route it.
 
 ```ts
 import { Config } from "effect"
 import * as CloudflareSandbox from "generalist/unstable/sandbox/cloudflare"
+import * as Daytona from "generalist/unstable/sandbox/daytona"
 import * as E2B from "generalist/unstable/sandbox/e2b"
+import * as FlySprites from "generalist/unstable/sandbox/fly-sprites"
 
 const e2b = E2B.layer({
   apiKey: Config.redacted("E2B_API_KEY"),
@@ -74,6 +78,17 @@ const e2b = E2B.layer({
 })
 
 const cloudflare = CloudflareSandbox.layer({ binding: env.SANDBOX })
+
+const daytona = Daytona.layer({
+  apiKey: Config.redacted("DAYTONA_API_KEY"),
+  image: "ubuntu:22.04",
+  sandboxClass: "container",
+})
+
+const sprites = FlySprites.layer({
+  token: Config.redacted("SPRITES_TOKEN"),
+  app: "generalist",
+})
 ```
 
 Callers inspect `sandbox.capabilities` before selecting behavior. If a requested capability is absent, they must still execute the operation when checking the boundary and handle its typed `Unsupported` result; silently skipping it would make capability labels unverifiable.

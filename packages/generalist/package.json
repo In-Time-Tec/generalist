@@ -251,6 +251,14 @@
       "types": "./dist/unstable/sandbox/e2b/index.d.ts",
       "import": "./dist/unstable/sandbox/e2b/index.js"
     },
+    "./unstable/sandbox/daytona": {
+      "types": "./dist/unstable/sandbox/daytona/index.d.ts",
+      "import": "./dist/unstable/sandbox/daytona/index.js"
+    },
+    "./unstable/sandbox/fly-sprites": {
+      "types": "./dist/unstable/sandbox/fly-sprites/index.d.ts",
+      "import": "./dist/unstable/sandbox/fly-sprites/index.js"
+    },
     "./unstable/sandbox/cloudflare": {
       "types": "./dist/unstable/sandbox/cloudflare/index.d.ts",
       "import": "./dist/unstable/sandbox/cloudflare/index.js"
