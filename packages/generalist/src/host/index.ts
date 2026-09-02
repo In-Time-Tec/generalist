@@ -43,7 +43,7 @@ import {
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
-import { DuplicateAgent } from "../runtime/errors.js"
+import { DuplicateAgent, type RuntimeUnavailable } from "../runtime/errors.js"
 
 export type { HostSession } from "../runtime/session/host.js"
 export {
@@ -144,7 +144,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly sessions: {
     readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
     readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
-    readonly list: () => Effect.Effect<ReadonlyArray<HostSession>, import("../runtime/errors.js").RuntimeUnavailable>
+    readonly list: () => Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable>
   }
   readonly runs: {
     readonly start: <Selected extends Agents[number]>(

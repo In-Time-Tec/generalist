@@ -4,9 +4,9 @@ Every Generalist framework error carries a stable `_tag`, identifying fields whe
 
 For every error below, the final segment of the tag names when it fires at the named API boundary. The error's `hint` is the supported fix. The identifying fields select the affected run, turn, tool, agent, provider, or resource. This keeps firing conditions and fixes on the error value instead of duplicating text that can drift from the implementation.
 
-## Approvals, eval, and trajectory
+## Approvals, eval, host, and trajectory
 
-`generalist/approvals/ApprovalTokenInvalid`, `generalist/eval/InvalidSuiteOptions`, `generalist/trajectory/ProjectionFailed`.
+`generalist/approvals/ApprovalTokenInvalid`, `generalist/eval/InvalidSuiteOptions`, `generalist/host/AgentNotRegistered`, `generalist/host/PluginNameConflict`, `generalist/host/PluginToolConflict`, `generalist/host/SessionConflict`, `generalist/host/SessionCursorExpired`, `generalist/host/SessionNotFound`, `generalist/host/SessionSubscriberLagged`, `generalist/trajectory/ProjectionFailed`.
 
 ## AI
 
