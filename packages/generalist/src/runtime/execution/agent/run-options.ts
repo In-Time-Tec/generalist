@@ -1,4 +1,4 @@
-import { Option, Schema } from "effect"
+import { Option, type Ref, Schema } from "effect"
 import type { RunOptions } from "../../../core/agent/service.js"
 import { AgentSuspended } from "../../../core/agent/event.js"
 import type { DriverCheckpoint } from "../../../core/durable/driver.js"
@@ -8,6 +8,9 @@ import type { ExecutionContinuation } from "../../run/steering.js"
 import { Suspended as NestedOperationSuspended } from "../../../core/tools/nested-operation.js"
 
 type HostedRunOptions = Omit<RunOptions, "memory" | "steering">
+
+const sandboxInvocation = (snapshot: Ref.Ref<string | undefined> | undefined) =>
+  snapshot === undefined ? {} : { inheritedSandboxSnapshot: snapshot }
 
 export const make = (input: {
   readonly claim: ExecutionClaim
@@ -21,6 +24,7 @@ export const make = (input: {
   readonly resume: boolean
   readonly budget: NonNullable<RunOptions["budget"]>
   readonly compaction?: RunOptions["compaction"]
+  readonly inheritedSandboxSnapshot: Ref.Ref<string | undefined> | undefined
 }): HostedRunOptions | undefined => {
   const suspension = input.resume ? input.execution.suspension : undefined
   const agentSuspension = Schema.decodeUnknownOption(AgentSuspended)(suspension)
@@ -35,6 +39,7 @@ export const make = (input: {
       rootRunId: input.execution.rootRunId,
       attempt: input.attempt,
       admittedAt: input.execution.admittedAt,
+      ...sandboxInvocation(input.inheritedSandboxSnapshot),
     },
     executableRef: input.execution.executableRef,
     executableManifest: input.execution.executableManifest,

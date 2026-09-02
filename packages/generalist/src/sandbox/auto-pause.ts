@@ -54,8 +54,8 @@ const wrapSandbox = (
         Effect.tap(() => schedule),
       ),
       snapshot: active(sandbox.snapshot),
-      fork: (snapshotId) =>
-        active(sandbox.fork(snapshotId)).pipe(Effect.flatMap((fork) => wrapSandbox(fork, duration, scope))),
+      fork: (snapshotId, options) =>
+        active(sandbox.fork(snapshotId, options)).pipe(Effect.flatMap((fork) => wrapSandbox(fork, duration, scope))),
     })
   })
 

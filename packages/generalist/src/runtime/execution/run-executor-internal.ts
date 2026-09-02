@@ -26,6 +26,7 @@ import { make as makeExecutionRetry } from "./retry.js"
 import { ExecutionResolution } from "./resolution/resolve.js"
 import { make as makeToolCancellation } from "../operation/tool-cancellation.js"
 import { make as makeAgentRunOptions } from "./agent/run-options.js"
+import { latestSandboxSnapshotId } from "./agent/sandbox-snapshot.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-response/preview-internal.js"
 import {
   clearDriverOperation,
@@ -156,6 +157,11 @@ const makeFor = (
               environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>,
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
+                const snapshotId = latestSandboxSnapshotId(
+                  yield* store.history({ runId, cursor: -1, limit: Number.MAX_SAFE_INTEGER }).pipe(Effect.orDie),
+                )
+                const inheritedSandboxSnapshot =
+                  snapshotId === undefined ? undefined : yield* Ref.make<string | undefined>(snapshotId)
                 const nested = yield* makeOperations({ claim, claimed, store })
                 const budgetContext = { runId, claim, store, nested, codeMode }
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
@@ -378,6 +384,7 @@ const makeFor = (
                         prompt,
                         resume,
                         budget: budget.remaining,
+                        inheritedSandboxSnapshot,
                       }
                       if (history !== undefined) runOptionsInput.history = history
                       if (budget.checkpoint !== undefined) runOptionsInput.checkpoint = budget.checkpoint

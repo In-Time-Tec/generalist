@@ -161,7 +161,11 @@ export interface SandboxService {
   readonly pause: Effect.Effect<void, SandboxError>
   readonly resume: Effect.Effect<void, SandboxError>
   readonly snapshot: Effect.Effect<SnapshotId, SandboxError>
-  readonly fork: (snapshotId: SnapshotId) => Effect.Effect<SandboxService, SandboxError>
+  /** Restore an isolated image, optionally binding it for later keyed acquisition. */
+  readonly fork: (
+    snapshotId: SnapshotId,
+    options?: Pick<AcquireOptions, "key">,
+  ) => Effect.Effect<SandboxService, SandboxError>
 }
 
 /** Acquired sandbox service tag. */

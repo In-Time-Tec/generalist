@@ -257,11 +257,14 @@ export const sandbox = <E>(options: Options<E>): void => {
             yield* expectUnsupported(service.fork("missing"), "fork")
             return
           }
+          const key = `sandbox-conformance-fork-${++nextRequest}`
           if (primaryCommand(service) === "TypeScript") {
             expect(yield* executeValue(service, "let sandboxCounter = 41; sandboxCounter")).toBe("41")
             const snapshotId = yield* service.snapshot
-            const fork = yield* service.fork(snapshotId)
+            const fork = yield* service.fork(snapshotId, { key })
             expect(yield* executeValue(fork, "sandboxCounter += 1")).toBe("42")
+            const continued = yield* provider.acquire({ key })
+            expect(yield* executeValue(continued, "sandboxCounter")).toBe("42")
             expect(yield* executeValue(service, "sandboxCounter")).toBe("41")
             return
           }
@@ -271,10 +274,12 @@ export const sandbox = <E>(options: Options<E>): void => {
           yield* files.makeDirectory("conformance", { recursive: true })
           yield* files.writeFileString("conformance/counter.txt", "41")
           const snapshotId = yield* service.snapshot
-          const fork = yield* service.fork(snapshotId)
+          const fork = yield* service.fork(snapshotId, { key })
           const forkFiles = yield* fork.files
           expect(yield* forkFiles.readFileString("conformance/counter.txt")).toBe("41")
           yield* forkFiles.writeFileString("conformance/counter.txt", "42")
+          const continued = yield* provider.acquire({ key })
+          expect(yield* (yield* continued.files).readFileString("conformance/counter.txt")).toBe("42")
           expect(yield* files.readFileString("conformance/counter.txt")).toBe("41")
         }),
       ),

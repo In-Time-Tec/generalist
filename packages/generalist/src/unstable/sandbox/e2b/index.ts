@@ -210,6 +210,7 @@ export const makeProvider = (
 ): Effect.Effect<SandboxProviderService, never, HttpClient.HttpClient> =>
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
+    const aliases = yield* Ref.make<ReadonlyMap<string, string>>(new Map())
     const apiRequest = (request: HttpClientRequest.HttpClientRequest) =>
       request.pipe(
         HttpClientRequest.setHeader("x-api-key", Redacted.value(options.apiKey)),
@@ -460,8 +461,16 @@ export const makeProvider = (
             Effect.flatMap((response) => decodeJson(response, SnapshotResponse, "E2B returned an invalid snapshot")),
             Effect.map((snapshot) => snapshot.snapshotID),
           ),
-          fork: (snapshotId) =>
-            create(snapshotId, snapshotId).pipe(Effect.flatMap((forked) => sandbox(forked, limits, scope))),
+          fork: (snapshotId, request = {}) =>
+            create(snapshotId, snapshotId).pipe(
+              Effect.tap((forked) => {
+                const key = request.key
+                return key === undefined
+                  ? Effect.void
+                  : Ref.update(aliases, (current) => new Map(current).set(key, forked.sandboxID))
+              }),
+              Effect.flatMap((forked) => sandbox(forked, limits, scope)),
+            ),
         })
       })
 
@@ -471,8 +480,11 @@ export const makeProvider = (
         Effect.gen(function* () {
           const limits = yield* requestedLimits(request.limits)
           const scope = yield* Scope.Scope
+          const key = request.key
           const connection =
-            request.key === undefined ? yield* create(request.image ?? options.template) : yield* connect(request.key)
+            key === undefined
+              ? yield* create(request.image ?? options.template)
+              : yield* connect((yield* Ref.get(aliases)).get(key) ?? key)
           return yield* sandbox(connection, limits, scope)
         }),
     })

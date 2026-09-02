@@ -26,7 +26,8 @@ The optional substitution names one completed tool operation in the retained pre
 - Fork and rewind are atomic store transitions. A reopened SQL Runtime sees either the old state or the complete branch state, never a partially copied prefix.
 - Each branch owns a copied prefix. Memory, SQLite, PostgreSQL, and MySQL use the same behavior without reference-aware event reads.
 - Rewind first copies the discarded Run and Session future into a branch. It then removes the source Session suffix after the retained checkpoint before resetting its leaf, so deterministic replay can append that suffix again without colliding with inactive entries.
-- Runtime journal, operation, Session, and child state remain authoritative. The copied branch journal carries the latest Sandbox snapshot ID, but restoring a branch Sandbox from that ID is not wired yet. `Sandbox.layerWorktree` is the process-host leaf intended to serve that later restoration path.
+- Runtime journal, operation, Session, and child state remain authoritative. At execution bootstrap, the durable host derives the newest valid `SandboxSnapshot` from the retained journal. The first sandbox-using tool restores that snapshot under the branch Session key; after successful restoration, later cells acquire the keyed branch Sandbox instead of applying the inherited snapshot again. Rewind follows the same path using its truncated journal.
+- Snapshot recovery reads the authoritative store, not process memory. Closing and reopening a SQL Runtime between the source Run and its fork does not lose the inherited Sandbox state.
 
 ## Host join point
 

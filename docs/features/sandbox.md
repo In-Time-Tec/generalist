@@ -115,7 +115,7 @@ Callers inspect `sandbox.capabilities` before selecting behavior. If a requested
 
 ## Snapshots and durable runs
 
-`snapshot` returns an immutable `SnapshotId`. `fork(snapshotId)` creates a new sandbox namespace from that image; mutating the fork does not mutate the source. The Bun leaf content-addresses the exact snapshot bytes and manifest, then restores the image under a fresh kernel Session identity.
+`snapshot` returns an immutable `SnapshotId`. `fork(snapshotId)` creates a new sandbox namespace from that image; mutating the fork does not mutate the source. `fork(snapshotId, { key })` also binds the restored namespace to that logical key, so a later `provider.acquire({ key })` continues the fork. The Bun leaf content-addresses the exact snapshot bytes and manifest, then restores the image under the requested key or a fresh kernel Session identity.
 
 After a successful `CellTool` call, the adapter snapshots capable leaves and emits:
 
@@ -128,7 +128,9 @@ After a successful `CellTool` call, the adapter snapshots capable leaves and emi
 
 When the leaf cannot snapshot, `CellTool` instead emits the same progress message with `data: { _tag: "SandboxSnapshotUnavailable" }`. Runtime persists either marker with the tool completion, so fork and rewind can distinguish a Run that never used a Sandbox from sandbox state that cannot be restored.
 
-The copied branch journal carries an available `SnapshotId`, but branch acquisition does not yet call `sandbox.fork(snapshotId)`; keyed acquisition currently receives the branch Session ID and starts fresh. Wiring that durable host hint is a separate integration step. `layerWorktree` is the process-host leaf that will serve it: its hidden Git commit is an immutable snapshot and `git worktree add` creates the isolated branch workspace. The snapshot is working state only; the Runtime journal, operations, Session entries, and children remain authority.
+At durable execution bootstrap, Runtime derives the newest valid `SandboxSnapshot` from the authoritative retained journal and places a one-shot restoration hint in `ToolContext`. The first `CellTool` acquisition calls `fork(snapshotId, { key: branchSessionId })`; the hint clears only after that succeeds. Later cells acquire the keyed branch Sandbox, and a snapshot newly journaled by the branch supersedes the inherited image for future recovery. Fork therefore restores the selected source prefix, rewind restores the truncated prefix, and SQL close/reopen does not depend on process memory.
+
+`layerWorktree` is the process-host filesystem leaf for this path: its hidden Git commit is an immutable snapshot, keyed fork binds the detached worktree to the branch Session, and Layer release removes every created worktree. The snapshot is working state only; the Runtime journal, operations, Session entries, and children remain authority.
 
 ## Errors
 

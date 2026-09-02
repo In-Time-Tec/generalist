@@ -34,6 +34,7 @@ export const layerWorktree = (
       const scope = yield* Effect.scope
       const counter = yield* Ref.make(0)
       const worktrees = yield* Ref.make<ReadonlyArray<string>>([])
+      const sessions = yield* Ref.make<ReadonlyMap<string, string>>(new Map())
 
       const git = (repo: string, args: ReadonlyArray<string>, environment?: Readonly<Record<string, string>>) =>
         Effect.scoped(
@@ -176,7 +177,7 @@ export const layerWorktree = (
             yield* files.remove(index, { force: true }).pipe(Effect.ignore)
             return ref
           }).pipe(Effect.mapError((cause) => ExecutionFailed.make({ message: "Worktree snapshot failed", cause }))),
-          fork: (snapshotId) =>
+          fork: (snapshotId, request = {}) =>
             Effect.gen(function* () {
               const exists = yield* git(options.repo, ["rev-parse", "--verify", snapshotId]).pipe(
                 Effect.as(true),
@@ -190,6 +191,8 @@ export const layerWorktree = (
                 Effect.mapError((cause) => ExecutionFailed.make({ message: "Worktree fork failed", cause })),
               )
               yield* registerWorktree(directory)
+              const key = request.key
+              if (key !== undefined) yield* Ref.update(sessions, (all) => new Map(all).set(key, directory))
               return sandbox(directory)
             }),
         })
@@ -197,15 +200,17 @@ export const layerWorktree = (
 
       const provider: SandboxProviderService = {
         defaultImage: "git-worktree",
-        acquire: (request: AcquireOptions = {}) => {
-          if (request.image !== undefined && request.image !== "git-worktree") {
-            return Unavailable.make({ message: `Worktree image ${request.image} is unavailable` })
-          }
-          if (request.limits?.cpuMs !== undefined) return Effect.fail(unsupported("limit:cpu"))
-          if (request.limits?.memoryMb !== undefined) return Effect.fail(unsupported("limit:memory"))
-          if (request.limits?.wallClock !== undefined) return Effect.fail(unsupported("limit:wall-clock"))
-          return Effect.succeed(sandbox(options.repo))
-        },
+        acquire: (request: AcquireOptions = {}) =>
+          Effect.gen(function* () {
+            if (request.image !== undefined && request.image !== "git-worktree") {
+              return yield* Unavailable.make({ message: `Worktree image ${request.image} is unavailable` })
+            }
+            if (request.limits?.cpuMs !== undefined) return yield* unsupported("limit:cpu")
+            if (request.limits?.memoryMb !== undefined) return yield* unsupported("limit:memory")
+            if (request.limits?.wallClock !== undefined) return yield* unsupported("limit:wall-clock")
+            const directory = request.key === undefined ? undefined : (yield* Ref.get(sessions)).get(request.key)
+            return sandbox(directory ?? options.repo)
+          }),
       }
       return SandboxProvider.of(provider)
     }),
