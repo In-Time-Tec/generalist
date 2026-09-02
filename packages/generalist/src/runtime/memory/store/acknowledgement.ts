@@ -1,5 +1,5 @@
 import { DateTime, Effect, Function } from "effect"
-import { type Point, validateBoundary, validateRange } from "../../acknowledgement.js"
+import { type Point, validateBoundary, validateRange } from "../../run/acknowledgement.js"
 import { AckBeyondCommitted, AckInvalid, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import type { MemoryState, StoredRun } from "../state.js"
 

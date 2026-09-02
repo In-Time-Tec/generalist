@@ -12,7 +12,7 @@ import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../run/errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
 import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
-import type { ExecutionContinuation } from "../run/steering.js"
+import type { ExecutionContinuation, SteeringEntry } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
@@ -49,9 +49,20 @@ import { make as makeRegisteredResolution } from "./agent/registered-resolution.
 import type { Service } from "./run-executor.js"
 import { requireRunAvailable } from "../budget/state.js"
 import { prepare as prepareBudget } from "../budget/suspend.js"
+import { Runtime } from "../service.js"
+import { make as makeMessaging, Policy as MessagingPolicy } from "../messaging/service.js"
+import { RuntimeUnavailable } from "../errors.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
+
+type SteeringQueue = NonNullable<ExecutionContinuation["queue"]>
+
+const continuationQueue = (continuation: ExecutionContinuation | undefined): SteeringQueue | undefined =>
+  continuation === undefined ? undefined : (continuation.queue ?? "steering")
+
+const belongsToQueue = (queue: SteeringQueue, policy: SteeringEntry["policy"]): boolean =>
+  queue === "followUp" ? policy === "enqueue" : policy !== "enqueue"
 
 const makeFor = (
   agents: RegisteredAgents,
@@ -60,6 +71,15 @@ const makeFor = (
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const resolver = yield* ExecutableResolver
+    const runtime = yield* Effect.serviceOption(Runtime)
+    const messaging = makeMessaging({
+      store,
+      policy: MessagingPolicy.make(),
+      sendMessage: (request) =>
+        Option.isSome(runtime)
+          ? runtime.value.sendMessage(request)
+          : Effect.fail(RuntimeUnavailable.make({ message: "RunExecutor requires Runtime for in-agent messaging" })),
+    })
     const registered = makeRegisteredResolution({ agents, resolver, store })
     const journalFault = yield* Effect.serviceOption(JournalFault)
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
@@ -141,7 +161,7 @@ const makeFor = (
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
                 const boundSession = yield* sessionBinding({ store, claim })
                 const baseContext = Context.mergeAll(
-                  yield* hostContext({ agent, environment, store, codeMode, nested }),
+                  yield* hostContext({ agent, environment, store, codeMode, nested, messaging }),
                   boundSession.context,
                   interruption.context,
                 )
@@ -162,6 +182,7 @@ const makeFor = (
                       if (budget === undefined) return
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
                       const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
+                      const observedQueue = yield* Ref.make(continuationQueue(continuation))
                       const activeContinuation = yield* Ref.make(continuation)
                       const bufferedEvents = yield* Ref.make<ReadonlyArray<DurableAgentLoopEvent>>(
                         continuation === undefined
@@ -170,33 +191,36 @@ const makeFor = (
                               {
                                 _tag: "SteeringDrained",
                                 turn: Math.max(0, continuation.nextTurn - 1),
-                                queue: "steering",
+                                queue: continuation.queue ?? "steering",
                                 count: continuation.steeringEntryIds.length,
                               },
                             ],
                       )
-                      const take = Effect.gen(function* () {
-                        const current = yield* Ref.get(observed)
-                        if (current.length > 0) return []
-                        yield* store.deliverPendingMessages({ runId })
-                        const entries = yield* store.readSteering(claim)
-                        yield* Ref.set(
-                          observed,
-                          entries.map((entry) => entry.entryId),
-                        )
-                        yield* Ref.set(
-                          observedPrompt,
-                          entries.reduce<Prompt.Prompt>(
-                            (accumulated, entry) => Prompt.concat(accumulated, entry.prompt),
-                            Prompt.empty,
-                          ),
-                        )
-                        return entries.map((entry) => ({ prompt: entry.prompt }))
-                      }).pipe(Effect.orDie)
+                      const take = (queue: "steering" | "followUp") =>
+                        Effect.gen(function* () {
+                          const current = yield* Ref.get(observed)
+                          if (current.length > 0) return []
+                          const pending = yield* store.readSteering(claim)
+                          const entries = pending.filter((entry) => belongsToQueue(queue, entry.policy))
+                          if (entries.length === 0) return []
+                          yield* Ref.set(
+                            observed,
+                            entries.map((entry) => entry.entryId),
+                          )
+                          yield* Ref.set(
+                            observedPrompt,
+                            entries.reduce<Prompt.Prompt>(
+                              (accumulated, entry) => Prompt.concat(accumulated, entry.prompt),
+                              Prompt.empty,
+                            ),
+                          )
+                          yield* Ref.set(observedQueue, queue)
+                          return entries.map((entry) => ({ prompt: entry.prompt }))
+                        }).pipe(Effect.orDie)
                       const inbox = externalRunInbox({
                         runId,
-                        takeSteering: take,
-                        takeFollowUp: take,
+                        takeSteering: take("steering"),
+                        takeFollowUp: take("followUp"),
                       })
                       const pendingCompletion = yield* Ref.make<ExecutionContinuation | undefined>(undefined)
                       const preparedCompletions = yield* Ref.make(
@@ -212,20 +236,22 @@ const makeFor = (
                         onScheduled: (operation, checkpoint) =>
                           Effect.gen(function* () {
                             yield* requireOperationBudget(operation.kind, runId, store)
-                            const [steeringEntryIds, steeringPrompt, steeringEvents] =
+                            const [steeringEntryIds, steeringPrompt, steeringQueue, steeringEvents] =
                               operation.kind === "model"
                                 ? yield* Effect.all([
                                     Ref.get(observed),
                                     Ref.get(observedPrompt),
+                                    Ref.get(observedQueue),
                                     Ref.get(bufferedEvents),
                                   ])
-                                : [[], undefined, []]
+                                : [[], undefined, undefined, []]
                             const completed = steeringEvents.findLast((event) => event._tag === "TurnCompleted")
                             const currentContinuation = yield* Ref.get(activeContinuation)
                             const scheduledContinuation = continuationForOperation({
                               model: operation.kind === "model",
                               steeringEntryIds,
                               steeringPrompt,
+                              queue: steeringQueue,
                               completed,
                               current: currentContinuation,
                             })
@@ -263,6 +289,7 @@ const makeFor = (
                             if (operation.kind === "model") {
                               yield* Ref.set(observed, [])
                               yield* Ref.set(observedPrompt, undefined)
+                              yield* Ref.set(observedQueue, undefined)
                               yield* Ref.set(bufferedEvents, [])
                               yield* Ref.set(
                                 activeContinuation,

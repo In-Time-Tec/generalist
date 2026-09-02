@@ -24,7 +24,6 @@ export const runtimeLayer = (resolver: ExecutableResolver.Service): Layer.Layer<
   Runtime.layerMemory({
     addresses: [],
     messagingPolicy,
-    mailboxBounds: { maxPending: 64, maxPendingBytes: 262_144, maxPerWindow: 16, windowMillis: 60_000 },
   }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)))
 
 const text = (value: string) =>

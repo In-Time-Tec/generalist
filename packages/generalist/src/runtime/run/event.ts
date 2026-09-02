@@ -32,6 +32,8 @@ import { Inheritance } from "../../core/agent/lifecycle/fan-out.js"
 import { TriggerEventSchema, TriggerTags, type TriggerEvent } from "./trigger-event.js"
 import { Sequence, SpecVersion } from "./event-identity.js"
 import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
+import { AdmissionPolicy, MessageSource } from "./steering.js"
+import { Message as AddressedMessage, type Message } from "../messaging/message.js"
 
 export type { AgentLoopEvent, ExecutionResult }
 export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
@@ -90,6 +92,18 @@ export type SteeringAccepted = RunEventBase & {
   readonly idempotencyKey: string
   readonly digest: string
   readonly prompt: Prompt.Prompt
+}
+/** One accepted Run inbox message, journaled before it becomes eligible for delivery. */
+export type Inbox = RunEventBase & {
+  readonly _tag: "Inbox"
+  readonly entryId: string
+  readonly inboxSequence: number
+  readonly idempotencyKey: string
+  readonly digest: string
+  readonly message: Prompt.Prompt
+  readonly policy: AdmissionPolicy
+  readonly from: MessageSource
+  readonly addressed?: Message
 }
 /** Exact durable steering consumption fact. */
 export type SteeringConsumed = RunEventBase & {
@@ -193,6 +207,7 @@ export type LifecycleEvent =
   | RunAttemptStarted
   | RunWaiting
   | RunResumed
+  | Inbox
   | SteeringAccepted
   | SteeringConsumed
   | SteeringDiscarded
@@ -219,6 +234,7 @@ export const LifecycleTag = Schema.Literals([
   "RunAttemptStarted",
   "RunWaiting",
   "RunResumed",
+  "Inbox",
   "SteeringAccepted",
   "SteeringConsumed",
   "SteeringDiscarded",
@@ -431,6 +447,16 @@ const LifecycleEventSchema = Schema.Union([
   Schema.TaggedStruct("RunAttemptStarted", { attempt: Schema.Finite }),
   Schema.TaggedStruct("RunWaiting", { wait: RunWait }),
   Schema.TaggedStruct("RunResumed", { waitId: Schema.String, resolution: WaitResolution }),
+  Schema.TaggedStruct("Inbox", {
+    entryId: Schema.String,
+    inboxSequence: Sequence,
+    idempotencyKey: Schema.String,
+    digest: Schema.String,
+    message: Prompt.Prompt,
+    policy: AdmissionPolicy,
+    from: MessageSource,
+    addressed: Schema.optionalKey(AddressedMessage),
+  }),
   Schema.TaggedStruct("SteeringAccepted", {
     entryId: Schema.String,
     steeringSequence: Sequence,

@@ -11,6 +11,7 @@ import { appendEvent, loadEventsAfter, loadRun, nowIso, toOperationRecord } from
 import type { EventHub } from "../../subscribers.js"
 import { encodeContinuation } from "../../../run/steering.js"
 import { checkpointRef } from "../../../executable/manifest-internal.js"
+import { validateSteeringPrefix } from "./steering-prefix.js"
 
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import {
@@ -162,15 +163,7 @@ export const recordOperation: {
       return yield* priorOperation(sql, input, prior)
     }
     const steeringEntryIds = input.steeringEntryIds ?? []
-    const pending = yield* sql<SteeringConsumptionRow>`
-      SELECT entry_id, sequence, consumed_operation_id, discarded_reason FROM generalist_run_steering
-      WHERE run_id = ${input.runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
-      ORDER BY sequence
-    `
-    const selected = pending.slice(0, steeringEntryIds.length)
-    if (!sameEntries(selected, steeringEntryIds)) {
-      return yield* RuntimeUnavailable.make({ message: "steering entries are not the pending prefix" })
-    }
+    yield* validateSteeringPrefix(input)
     const operationId = yield* nextOperationId
     const executableRef = yield* Effect.try({
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),

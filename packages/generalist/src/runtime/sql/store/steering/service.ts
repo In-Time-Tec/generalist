@@ -2,20 +2,16 @@ import { Effect, Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
 import { InboxFull, defaultCapacity, defaultMaxPendingBytes } from "../../../../core/turn/steering.js"
-import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../../errors.js"
+import { RunBusy, RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../../errors.js"
 import { isTerminal, type RunStatus } from "../../../run.js"
-import type { AdmitSteeringInput, ExecutionClaim } from "../../../run/store.js"
-import {
-  encodeContinuation,
-  type ExecutionContinuation,
-  type SteeringEntry,
-  type SteeringReceipt,
-} from "../../../run/steering.js"
+import type { AdmitSteeringInput, ExecutionClaim, PendingRunOutcome, SteeringAdmission } from "../../../run/store.js"
+import { encodeContinuation, type ExecutionContinuation, type SteeringEntry } from "../../../run/steering.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { ExecutionResult } from "../../../execution/state.js"
-import { appendEvent, loadRun, lockRun } from "../statements.js"
+import { appendEvent, loadEventsAfter, loadRun, lockRun } from "../statements.js"
 import { decodeJson, encodeJson } from "../../codec/codecs.js"
 import type { EventHub } from "../../subscribers.js"
+import type { Inbox } from "../../../run/event.js"
 
 interface SteeringRow {
   readonly entry_id: string
@@ -26,20 +22,31 @@ interface SteeringRow {
   readonly prompt_json: string
 }
 
-const decode = (row: SteeringRow): SteeringEntry => ({
+const decode = (row: SteeringRow, inbox: Inbox | undefined): SteeringEntry => ({
   entryId: row.entry_id,
   runId: row.run_id,
   sequence: Number(row.sequence),
   idempotencyKey: row.idempotency_key,
   digest: row.digest,
   prompt: decodeJson(Prompt.Prompt, row.prompt_json),
+  policy: inbox?.policy ?? "steer",
+  from: inbox?.from ?? { system: true },
+  ...(inbox?.addressed === undefined ? undefined : { addressed: inbox.addressed }),
 })
 
 type AdmitSteeringEffect = Effect.Effect<
-  SteeringReceipt,
-  RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict | InboxFull | SqlError,
+  SteeringAdmission,
+  RunNotFound | RunTerminal | RunBusy | RuntimeUnavailable | SteeringConflict | InboxFull | SqlError,
   SqlClient.SqlClient
 >
+
+const terminalStatus = (run: {
+  readonly status: RunStatus
+  readonly pendingOutcome?: PendingRunOutcome | undefined
+}): "succeeded" | "failed" | "cancelled" => {
+  if (run.status === "succeeded" || run.status === "failed" || run.status === "cancelled") return run.status
+  return run.pendingOutcome?._tag === "Completed" ? "succeeded" : "failed"
+}
 
 export const admitSteering: {
   (input: AdmitSteeringInput): (hub: EventHub) => AdmitSteeringEffect
@@ -57,15 +64,16 @@ export const admitSteering: {
     const prior = existing[0]
     if (prior !== undefined) {
       if (prior.digest === input.digest) {
-        return { entryId: prior.entry_id, sequence: Number(prior.sequence) } satisfies SteeringReceipt
+        return {
+          receipt: { entryId: prior.entry_id, sequence: Number(prior.sequence) },
+          duplicate: true,
+        } satisfies SteeringAdmission
       }
       return yield* SteeringConflict.make({ runId: input.runId, idempotencyKey: input.idempotencyKey })
     }
+    if (input.policy === "reject" && run.ownerWorkerId !== undefined) return yield* RunBusy.make({ runId: run.runId })
     if (isTerminal(run.status) || run.pendingOutcome !== undefined) {
-      let status: RunStatus = "failed"
-      if (isTerminal(run.status)) status = run.status
-      else if (run.pendingOutcome?._tag === "Completed") status = "succeeded"
-      return yield* RunTerminal.make({ runId: run.runId, status })
+      return yield* RunTerminal.make({ runId: run.runId, status: terminalStatus(run) })
     }
     const pending = yield* sql<Pick<SteeringRow, "prompt_json">>`
       SELECT prompt_json FROM generalist_run_steering
@@ -104,18 +112,21 @@ export const admitSteering: {
       )
     `
     yield* appendEvent(hub, run, {
-      _tag: "SteeringAccepted",
+      _tag: "Inbox",
       entryId,
-      steeringSequence: sequence,
+      inboxSequence: sequence,
       idempotencyKey: input.idempotencyKey,
       digest: input.digest,
-      prompt: input.prompt,
+      message: input.prompt,
+      policy: input.policy,
+      from: input.from,
+      ...(input.addressed === undefined ? undefined : { addressed: input.addressed }),
     })
-    return { entryId, sequence } satisfies SteeringReceipt
+    return { receipt: { entryId, sequence }, duplicate: false } satisfies SteeringAdmission
   }),
 )
 
-const readPendingSteering = (runId: string) =>
+export const readPendingSteering = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<SteeringRow>`
@@ -123,7 +134,12 @@ const readPendingSteering = (runId: string) =>
       WHERE run_id = ${runId} AND consumed_operation_id IS NULL AND discarded_reason IS NULL
       ORDER BY sequence
     `
-    return rows.map(decode)
+    const inbox = new Map(
+      (yield* loadEventsAfter(runId, -1))
+        .filter((event): event is Inbox => event._tag === "Inbox")
+        .map((event) => [event.entryId, event]),
+    )
+    return rows.map((row) => decode(row, inbox.get(row.entry_id)))
   })
 
 export const readSteering = (input: ExecutionClaim) => readPendingSteering(input.runId)
@@ -144,14 +160,20 @@ export const saveCompletionContinuation: {
     if (run?.cancellationRequested === true) return undefined
     const sql = yield* SqlClient.SqlClient
     const entries = yield* readPendingSteering(runId)
+    const followUp = entries.filter((entry) => entry.policy === "enqueue")
+    const selected = followUp.length > 0 ? followUp : entries.filter((entry) => entry.policy !== "enqueue")
     const continuation: ExecutionContinuation | undefined =
-      entries.length === 0
+      selected.length === 0
         ? undefined
         : {
             schemaVersion: 1,
-            prompt: entries.reduce<Prompt.Prompt>((prompt, entry) => Prompt.concat(prompt, entry.prompt), Prompt.empty),
+            queue: followUp.length > 0 ? "followUp" : "steering",
+            prompt: selected.reduce<Prompt.Prompt>(
+              (prompt, entry) => Prompt.concat(prompt, entry.prompt),
+              Prompt.empty,
+            ),
             nextTurn: result.turns,
-            steeringEntryIds: entries.map((entry) => entry.entryId),
+            steeringEntryIds: selected.map((entry) => entry.entryId),
           }
     yield* sql`
       UPDATE generalist_runs SET

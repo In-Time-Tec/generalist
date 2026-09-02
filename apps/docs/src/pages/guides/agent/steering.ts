@@ -104,7 +104,7 @@ export const steering = definePage({
     callout(
       "info",
       "Process-local versus durable",
-      "A Core RunHandle does not promise replay after interruption or process loss. Use Runtime.steer for a durable idempotency key, restart-safe reads, atomic consume-with-model-operation behavior, and terminal disposition. Runtime targets an exact Run ID and uses the same 64-entry and 1 MiB fail-fast defaults.",
+      "A Core RunHandle does not promise replay after interruption or process loss. Use Runtime.send with an admission policy for a durable idempotency key, restart-safe reads, atomic consume-with-model-operation behavior, and terminal disposition. Runtime targets an exact Run ID and uses the same 64-entry and 1 MiB fail-fast defaults.",
     ),
     h2("interrupt-a-run", "3. Interrupt a run"),
     p(

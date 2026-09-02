@@ -35,10 +35,10 @@ export const sqliteManualClaimLayer = (filename: string) =>
   )
 
 /**
- * A SQLite Runtime whose mailbox bounds and messaging policy the test chooses.
+ * A SQLite Runtime whose messaging policy the test chooses.
  *
- * Bounds and policy are Runtime construction options, so each variant is its own Runtime over its
- * own database file rather than a mutation of a shared one.
+ * Each policy variant is its own Runtime over its own database file rather than a mutation of a
+ * shared one.
  */
 export const sqliteMessagingLayer = (label: string) => (overrides: MessagingOverrides) =>
   SqliteRuntime.layerSqlite({ filename: tempDbPath(label), ...options, ...overrides }).pipe(

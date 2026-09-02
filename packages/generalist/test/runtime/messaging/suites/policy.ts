@@ -45,7 +45,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
             prompt: textPrompt("reply"),
           })
           .pipe(Effect.flip)
-        expect(reverse).toBeInstanceOf(Errors.MessagingUnauthorized)
+        expect(reverse).toBeInstanceOf(Errors.NotInFamily)
         expect(yield* runtime.messages({ runId: sender.runId, limit: 10 })).toEqual([])
       }).pipe(opened),
     )
@@ -65,7 +65,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
           })
           .pipe(Effect.flip)
 
-        expect(error).toBeInstanceOf(Errors.MessagingUnauthorized)
+        expect(error).toBeInstanceOf(Errors.NotInFamily)
       }).pipe(opened),
     )
 

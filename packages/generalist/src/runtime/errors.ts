@@ -168,6 +168,19 @@ export class RunTerminal extends ActionableTaggedError<RunTerminal>()("generalis
   hint: errorHint("Inspect the terminal Run outcome and start a new Run for additional work."),
 }) {}
 
+/** A reject-policy message arrived while its target Run was executing. */
+export class RunBusy extends ActionableTaggedError<RunBusy>()("generalist/runtime/RunBusy", {
+  runId: Schema.String,
+  hint: errorHint("Retry after the current turn completes or choose an admission policy that queues the message."),
+}) {}
+
+/** One Run attempted to message a target outside its durable Run family. */
+export class NotInFamily extends ActionableTaggedError<NotInFamily>()("generalist/runtime/NotInFamily", {
+  fromRunId: Schema.String,
+  targetRunId: Schema.String,
+  hint: errorHint("Send only to this Run, its parent, a direct child, or a sibling under the same parent."),
+}) {}
+
 export class ChildSelectionMissing extends ActionableTaggedError<ChildSelectionMissing>()(
   "generalist/runtime/ChildSelectionMissing",
   {
@@ -376,40 +389,6 @@ export class FanOutRemainderUnsupported extends ActionableTaggedError<FanOutRema
     hint: errorHint("Choose a remainder policy supported by this Runtime durability mode."),
   },
 ) {}
-
-export class MessagingUnauthorized extends ActionableTaggedError<MessagingUnauthorized>()(
-  "generalist/runtime/MessagingUnauthorized",
-  {
-    from: Address,
-    to: Address,
-    reason: Schema.Literals(["unrelated", "cross-session", "policy"]),
-    hint: errorHint("Send only along an allowed relationship or update the host messaging policy."),
-  },
-) {}
-
-export class MailboxFull extends ActionableTaggedError<MailboxFull>()("generalist/runtime/MailboxFull", {
-  to: Address,
-  dimension: Schema.Literals(["pending", "bytes"]),
-  limit: Schema.Int,
-  hint: errorHint("Drain the target mailbox, reduce the message, or increase its finite bound."),
-}) {}
-
-export class MailboxRateLimited extends ActionableTaggedError<MailboxRateLimited>()(
-  "generalist/runtime/MailboxRateLimited",
-  {
-    to: Address,
-    limit: Schema.Int,
-    windowMillis: Schema.Int,
-    hint: errorHint("Wait for the reported rate window before sending another message to this address."),
-  },
-) {}
-
-export class MessageConflict extends ActionableTaggedError<MessageConflict>()("generalist/runtime/MessageConflict", {
-  to: Address,
-  messageId: Schema.String,
-  idempotencyKey: Schema.String,
-  hint: errorHint("Reuse the original message payload or submit changed content under a new identity."),
-}) {}
 
 export class AgentNameConflict extends ActionableTaggedError<AgentNameConflict>()(
   "generalist/runtime/AgentNameConflict",

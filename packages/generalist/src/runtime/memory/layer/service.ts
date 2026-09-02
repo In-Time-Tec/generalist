@@ -1,4 +1,5 @@
-import { Clock, Effect, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Clock, DateTime, Effect, Layer, Option, Predicate, Ref, Schema, Stream } from "effect"
+import { Prompt } from "effect/unstable/ai"
 /* eslint-disable max-lines -- the memory Runtime layer implements one service contract */
 import {
   AddressNotFound,
@@ -6,7 +7,6 @@ import {
   ExecutableIdentityMismatch,
   ExecutablePinMissing,
   ExecutableRegistrationInvalid,
-  RunTerminal,
   StartInvalid,
   RuntimeUnavailable,
   IllegalOperatorAction,
@@ -14,19 +14,22 @@ import {
 import { make as makeAddress, type Address } from "../../address.js"
 import { origin as cursorOrigin } from "../../cursor.js"
 import { make as makeMessage } from "../../messaging/message.js"
-import { RunStore, type AdmitMessageInput, type AdmitSendInput, type AdmitStartInput } from "../../run/store.js"
+import { RunStore, type AdmitSendInput, type AdmitStartInput } from "../../run/store.js"
 import {
   Runtime,
   type Service as RuntimeService,
   type LayerOptions,
   type SendInput,
+  type SendError,
+  type RunSendOptions,
+  type RunSendError,
   type StartExecutionInput,
   type SpawnInput,
 } from "../../service.js"
 import { normalizePrompt } from "../prompt.js"
 import { normalizeInitialChild, normalizeInitialFanOut } from "../start.js"
 import { ActiveExecutions } from "../../execution/active-executions.js"
-import { digest as steeringDigest } from "../../run/steering.js"
+import { make as makeSteeringAdmission, type SteeringReceipt } from "../../run/steering.js"
 import { parseCursor } from "../../tree/cursor.js"
 import { decodePinned, equals, resolveChild } from "../../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../../executable/manifest.js"
@@ -41,17 +44,16 @@ import { ModelPreviewLane, previews as modelPreviews } from "../../execution/mod
 import { readEntry, resolveModelResponse } from "../../session/service.js"
 type Registrations = ReadonlyArray<ExecutableRegistration>
 import { childSessionId } from "../../child/session.js"
-import { parseAddress, runAddress } from "../../execution/agent/directory.js"
-import { authorize, Policy as MessagingPolicy, reachable } from "../../messaging/service.js"
-import { defaultBounds, digest as messageDigest, promptBytes } from "../../messaging/mailbox.js"
+import { Policy as MessagingPolicy, reachable } from "../../messaging/service.js"
+import { deliveryPrompt, promptBytes, type MailboxEntry } from "../../messaging/mailbox.js"
 import { defaultTreePolicy } from "../../tree/policy.js"
-import { isTerminal, type RunInspection } from "../../run.js"
+import type { RunInspection, RunReceipt } from "../../run.js"
 import { explain as explainRecovery, verify as verifyRecovery } from "../../execution/recovery/operator.js"
 import { resolveWith as resolveDurableApproval } from "../../operation/approval.js"
 import { awaitSessionTerminal } from "../../session/lifecycle.js"
 import { make as makeAgentStart, untypedHandle } from "./agent-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
-import { messageDigestInput, messageDraft } from "./message.js"
+import { messageDraft } from "./message.js"
 import { Invalid as BudgetInvalid, make as makeBudget } from "../../../core/durable/run-budget.js"
 import { generateId } from "../../../core/model/telemetry/events.js"
 import { WakeEvent } from "../../../core/agent/tools/wake-event.js"
@@ -61,7 +63,6 @@ const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
 type MutableSendAdmission = { -readonly [Key in keyof AdmitSendInput]: AdmitSendInput[Key] }
-type MutableMessageAdmission = { -readonly [Key in keyof AdmitMessageInput]: AdmitMessageInput[Key] }
 
 const makeRuntimeWith = (
   options: LayerOptions,
@@ -74,7 +75,6 @@ const makeRuntimeWith = (
     const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const childAdmission = makeChildAdmission(store)
     const policy = MessagingPolicy.make(options.messagingPolicy ?? {})
-    const bounds = { ...defaultBounds, ...options.mailboxBounds }
     const addresses = new Map<
       string,
       { readonly executable: PinnedExecutable; readonly registrations: Registrations }
@@ -296,7 +296,6 @@ const makeRuntimeWith = (
         if (input.runId !== undefined) admission.runId = input.runId
         return yield* store.admitStart(admission, { activate })
       })
-    const agentStart = makeAgentStart({ agents, store, admitStart })
     const operatorExplain: RuntimeService["operator"]["explain"] = (runId) =>
       store.recoveryJournal(runId).pipe(Effect.map(explainRecovery))
     const normalizeBudgetDelta = (delta: Parameters<RuntimeService["extendBudget"]>[1]) =>
@@ -382,6 +381,72 @@ const makeRuntimeWith = (
           yield* store.extendBudgetRecovery({ runId, delta: normalized, operator: operatorIdentity })
         }),
     }
+
+    const sendRoot = (input: SendInput): Effect.Effect<RunReceipt, SendError> =>
+      Effect.gen(function* () {
+        const binding = addresses.get(input.to)
+        if (binding === undefined) return yield* AddressNotFound.make({ address: input.to })
+        const executable = yield* decode(binding.executable)
+        const registrations = yield* admissionRegistrations({
+          address: input.to,
+          sessionId: input.sessionId,
+          idempotencyKey: input.idempotencyKey,
+          executable,
+          registrations: binding.registrations,
+          runId: input.runId ?? "pending",
+        })
+        const prompt = normalizePrompt(input.prompt)
+        const message = makeMessage(
+          messageDraft({
+            id: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
+            to: input.to,
+            sessionId: input.sessionId,
+            prompt,
+            idempotencyKey: input.idempotencyKey,
+            correlationId: input.correlationId ?? input.idempotencyKey,
+            metadata: input.metadata ?? {},
+            from: input.from,
+            causationId: input.causationId,
+            inReplyTo: input.inReplyTo,
+          }),
+        )
+        const admission: MutableSendAdmission = {
+          message,
+          executableRef: executable.ref,
+          executableManifest: executable.manifest,
+          registrations,
+          treePolicy: input.treePolicy ?? defaultTreePolicy,
+        }
+        if (input.runId !== undefined) admission.runId = input.runId
+        return yield* store.admitSend(admission)
+      })
+
+    const admitRunMessage = yield* makeSteeringAdmission({ store, active, policy })
+    const sendRun = (runId: string, message: Prompt.Prompt | string, sendOptions: RunSendOptions = {}) =>
+      admitRunMessage(runId, message, sendOptions).pipe(Effect.map((admission) => admission.receipt))
+
+    const agentStart = makeAgentStart({
+      agents,
+      store,
+      admitStart,
+      send: sendRun,
+    })
+
+    function send(
+      runId: string,
+      prompt: Prompt.Prompt | string,
+      sendOptions?: RunSendOptions,
+    ): Effect.Effect<SteeringReceipt, RunSendError>
+    function send(input: SendInput): Effect.Effect<RunReceipt, SendError>
+    function send(
+      input: SendInput | string,
+      prompt?: Prompt.Prompt | string,
+      sendOptions?: RunSendOptions,
+    ): Effect.Effect<RunReceipt | SteeringReceipt, SendError | RunSendError> {
+      if (!Predicate.isString(input)) return sendRoot(input)
+      return sendRun(input, prompt ?? "", sendOptions)
+    }
+
     const service: RuntimeService = {
       operator,
       register: agentStart.register,
@@ -398,44 +463,7 @@ const makeRuntimeWith = (
           })),
         ),
       activate: store.activate,
-      send: (input: SendInput) =>
-        Effect.gen(function* () {
-          const binding = addresses.get(input.to)
-          if (binding === undefined) return yield* AddressNotFound.make({ address: input.to })
-          const executable = yield* decode(binding.executable)
-          const registrations = yield* admissionRegistrations({
-            address: input.to,
-            sessionId: input.sessionId,
-            idempotencyKey: input.idempotencyKey,
-            executable,
-            registrations: binding.registrations,
-            runId: input.runId ?? "pending",
-          })
-          const prompt = normalizePrompt(input.prompt)
-          const message = makeMessage(
-            messageDraft({
-              id: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
-              to: input.to,
-              sessionId: input.sessionId,
-              prompt,
-              idempotencyKey: input.idempotencyKey,
-              correlationId: input.correlationId ?? input.idempotencyKey,
-              metadata: input.metadata ?? {},
-              from: input.from,
-              causationId: input.causationId,
-              inReplyTo: input.inReplyTo,
-            }),
-          )
-          const admission: MutableSendAdmission = {
-            message,
-            executableRef: executable.ref,
-            executableManifest: executable.manifest,
-            registrations,
-            treePolicy: input.treePolicy ?? defaultTreePolicy,
-          }
-          if (input.runId !== undefined) admission.runId = input.runId
-          return yield* store.admitSend(admission)
-        }),
+      send,
       spawn: (input: SpawnInput) =>
         Effect.gen(function* () {
           const sessionId =
@@ -513,55 +541,87 @@ const makeRuntimeWith = (
           })
         }),
       awaitSessionTerminal: (input) => awaitSessionTerminal({ store, ...input }),
-      steer: (input) => {
-        const prompt = normalizePrompt(input.prompt)
-        return store.admitSteering({ ...input, prompt, digest: steeringDigest(prompt) })
-      },
       sendMessage: (input) =>
         Effect.gen(function* () {
-          const sender = yield* store.directory(input.fromRunId)
           const target = yield* store.resolveAddress(input.to)
-          const addressTarget = yield* parseAddress(input.to)
-          const durableTo = addressTarget._tag === "Session" ? input.to : runAddress(target.runId)
-          yield* authorize({ sender, target, policy })
-          if (addressTarget._tag !== "Session" && isTerminal(target.status)) {
-            return yield* RunTerminal.make({ runId: target.runId, status: target.status })
-          }
+          const sender = yield* store.directory(input.fromRunId)
           const prompt = normalizePrompt(input.prompt)
-          const correlationId = input.correlationId ?? input.idempotencyKey
-          const metadata = input.metadata ?? {}
-          const admission: MutableMessageAdmission = {
-            fromRunId: sender.runId,
-            fromAddress: runAddress(sender.runId),
-            to: durableTo,
-            targetSessionId: target.sessionId,
-            messageId: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
-            idempotencyKey: input.idempotencyKey,
-            digest: messageDigest(
-              messageDigestInput({
-                to: durableTo,
-                from: runAddress(sender.runId),
-                prompt,
-                correlationId,
-                metadata,
-                causationId: input.causationId,
-                inReplyTo: input.inReplyTo,
-              }),
-            ),
-            bytes: promptBytes(prompt),
+          const message = makeMessage(
+            messageDraft({
+              id: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
+              to: input.to,
+              sessionId: target.sessionId,
+              prompt,
+              idempotencyKey: input.idempotencyKey,
+              correlationId: input.correlationId ?? input.idempotencyKey,
+              metadata: input.metadata ?? {},
+              from: sender.address,
+              causationId: input.causationId,
+              inReplyTo: input.inReplyTo,
+            }),
+          )
+          const rendered = deliveryPrompt({
+            from: sender.address,
+            messageId: message.id,
             prompt,
-            correlationId,
-            metadata,
-            bounds,
+          })
+          const admission = yield* admitRunMessage(target.runId, rendered, {
+            policy: input.policy ?? "steer",
+            from: { runId: input.fromRunId },
+            idempotencyKey: input.idempotencyKey,
+            addressed: message,
+          })
+          return {
+            messageId: message.id,
+            entryId: admission.receipt.entryId,
+            sequence: admission.receipt.sequence,
+            duplicate: admission.duplicate,
           }
-          if (input.causationId !== undefined) admission.causationId = input.causationId
-          if (input.inReplyTo !== undefined) admission.inReplyTo = input.inReplyTo
-          return yield* store.admitMessage(admission)
         }),
       messages: (input) =>
         Effect.gen(function* () {
-          const entry = yield* store.directory(input.runId)
-          return yield* store.pendingMessages({ sessionId: entry.sessionId, runId: input.runId, limit: input.limit })
+          const entries = yield* store.pendingSteering(input)
+          const admittedAt = new Map(
+            (yield* store
+              .history({ runId: input.runId, cursor: cursorOrigin, limit: Number.MAX_SAFE_INTEGER })
+              .pipe(Effect.catchTag("generalist/runtime/CursorExpired", () => Effect.succeed([])))).flatMap((event) =>
+              event._tag === "Inbox"
+                ? [
+                    [
+                      event.entryId,
+                      Option.map(DateTime.make(event.occurredAt), DateTime.toEpochMillis).pipe(
+                        Option.getOrElse(() => 0),
+                      ),
+                    ] as const,
+                  ]
+                : [],
+            ),
+          )
+          return entries.flatMap((entry): ReadonlyArray<MailboxEntry> => {
+            const message = entry.addressed
+            if (message === undefined || !("runId" in entry.from) || message.from === undefined) return []
+            return [
+              {
+                entryId: entry.entryId,
+                targetSessionId: message.sessionId,
+                sequence: entry.sequence,
+                from: message.from,
+                fromRunId: entry.from.runId,
+                to: message.to,
+                messageId: message.id,
+                idempotencyKey: entry.idempotencyKey,
+                digest: entry.digest,
+                bytes: promptBytes(message.prompt),
+                admittedAtMillis: admittedAt.get(entry.entryId) ?? 0,
+                prompt: message.prompt,
+                correlationId: message.correlationId,
+                metadata: message.metadata,
+                steeringEntryId: entry.entryId,
+                ...(message.causationId === undefined ? undefined : { causationId: message.causationId }),
+                ...(message.inReplyTo === undefined ? undefined : { inReplyTo: message.inReplyTo }),
+              },
+            ]
+          })
         }),
       childSettlements: (input) =>
         store.settlementNotifications({
@@ -594,7 +654,11 @@ const makeRuntimeWith = (
           const newRunId = `run_${yield* generateId}`
           const receipt = yield* store.fork({ runId, newRunId, ...input })
           yield* store.activate({ runId: receipt.runId })
-          return untypedHandle(store, receipt.runId)
+          return untypedHandle({
+            store,
+            runId: receipt.runId,
+            send: sendRun,
+          })
         }),
       rewind: (runId, input) =>
         Effect.gen(function* () {

@@ -2,6 +2,13 @@ import { Function, HashMap } from "effect"
 import { Response } from "effect/unstable/ai"
 import type { DomainFailure, Success } from "../../tools/tool-executor.js"
 
+const interruption = { reason: "interrupted", message: "Tool execution was interrupted by an admitted message" }
+export const interrupted: DomainFailure = {
+  _tag: "DomainFailure",
+  failure: interruption,
+  encodedFailure: interruption,
+}
+
 export type AnyToolCall = Response.ToolCallPart<string, unknown>
 
 export type PendingToolResult = Response.ToolResultPart<string, unknown, unknown> & {

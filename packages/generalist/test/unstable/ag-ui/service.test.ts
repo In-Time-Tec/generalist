@@ -1,7 +1,16 @@
 import { describe, expect, layer } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
-import { Effect, Layer, Stream } from "effect"
-import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Runtime, TreePolicy } from "generalist/runtime"
+import { Effect, Layer, Predicate, Stream } from "effect"
+import type { Prompt } from "effect/unstable/ai"
+import {
+  Address,
+  Approval,
+  ExecutableManifest,
+  Errors as RuntimeErrors,
+  Run,
+  Runtime,
+  TreePolicy,
+} from "generalist/runtime"
 import { AGUI } from "../../../src/unstable/ag-ui/index.js"
 
 const address = Address.make("agent:assistant")
@@ -40,6 +49,25 @@ const runtimeLayer = (runtime: Runtime.Service) => Layer.succeed(Runtime.Runtime
 
 const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
 
+const rootSend = (
+  handler: (input: Runtime.SendInput) => Effect.Effect<Run.RunReceipt, Runtime.SendError>,
+): Runtime.Service["send"] => {
+  function send(
+    runId: string,
+    prompt: Prompt.Prompt | string,
+    options?: Runtime.RunSendOptions,
+  ): Effect.Effect<Runtime.SteeringReceipt, Runtime.RunSendError>
+  function send(input: Runtime.SendInput): Effect.Effect<Run.RunReceipt, Runtime.SendError>
+  function send(
+    sendInput: Runtime.SendInput | string,
+    _prompt?: Prompt.Prompt | string,
+    _options?: Runtime.RunSendOptions,
+  ): Effect.Effect<Runtime.SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
+    return Predicate.isString(sendInput) ? unused() : handler(sendInput)
+  }
+  return send
+}
+
 const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
     operator: {
@@ -60,7 +88,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     activate: () => unused(),
     fork: () => unused(),
     rewind: () => unused(),
-    send: () => unused(),
+    send: rootSend(() => unused()),
     previews: () => Stream.empty,
     spawn: () => unused(),
     events: () => Stream.empty,
@@ -86,7 +114,6 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     cancel: () => unused(),
     cancelSession: () => unused(),
     awaitSessionTerminal: () => unused(),
-    steer: () => unused(),
     sendMessage: () => unused(),
     messages: () => unused(),
     childSettlements: () => unused(),
@@ -107,7 +134,7 @@ describe("AGUI", () => {
   {
     let sent: Runtime.SendInput | undefined
     const runtime = mockRuntime({
-      send: (value) => {
+      send: rootSend((value) => {
         sent = value
         return Effect.succeed({
           runId: value.runId ?? "generated",
@@ -115,7 +142,7 @@ describe("AGUI", () => {
           acceptedSequence: 0,
           duplicate: false,
         })
-      },
+      }),
       events: () => Stream.make(accepted),
     })
     layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
@@ -277,8 +304,9 @@ describe("AGUI", () => {
       gates: [],
     }
     const runtime = mockRuntime({
-      send: () =>
+      send: rootSend(() =>
         Effect.succeed({ runId: "client-run-1", messageId: "message-1", acceptedSequence: 0, duplicate: false }),
+      ),
       events: ({ cursor }) => {
         lagCursors.push(cursor)
         return lagCursors.length === 1
@@ -327,13 +355,14 @@ describe("AGUI", () => {
       gates: [],
     }
     const runtime = mockRuntime({
-      send: () =>
+      send: rootSend(() =>
         Effect.succeed({
           runId: "client-run-1",
           messageId: "message-1",
           acceptedSequence: 0,
           duplicate: true,
         }),
+      ),
       events: ({ cursor }) => {
         expiredCursors.push(cursor)
         return expiredCursors.length === 1

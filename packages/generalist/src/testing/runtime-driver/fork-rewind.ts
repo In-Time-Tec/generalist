@@ -199,7 +199,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         }
 
         yield* services.runtime.rewind(handle.runId, { toSequence: completedTool.sequence })
-        yield* handle.followUp({ prompt: "Continue with the exact suffix REWOUND-FOLLOW-UP." })
+        yield* handle.send("Continue with the exact suffix REWOUND-FOLLOW-UP.", { policy: "steer" })
         yield* services.executor.execute(
           yield* capability.claim(services, { runId: handle.runId, workerId: "rewind-follow-up" }),
         )

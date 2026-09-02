@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { Point, validateBoundary, validateRange } from "../acknowledgement.js"
+import { Point, validateBoundary, validateRange } from "../run/acknowledgement.js"
 import { AckBeyondCommitted, AckInvalid, RunNotFound, RuntimeUnavailable } from "../errors.js"
 import { decodeEvent } from "./codec/codecs.js"
 import { isoFromSql } from "./store/run-decoding.js"

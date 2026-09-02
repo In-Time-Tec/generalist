@@ -237,11 +237,10 @@ const observeRunStore = (backend: Exclude<StoreBackend, "memory">, store: RunSto
     cancel: (input) => observe("cancel", { runId: input.runId }, store.cancel(input)),
     cancelSession: (input) => observe("cancelSession", {}, store.cancelSession(input)),
     admitSteering: (input) => observe("admitSteering", { runId: input.runId }, store.admitSteering(input)),
+    admitRollback: (input) => observe("admitRollback", { runId: input.runId }, store.admitRollback(input)),
     readSteering: (input) => observe("readSteering", { runId: input.runId }, store.readSteering(input)),
+    pendingSteering: (input) => observe("pendingSteering", { runId: input.runId }, store.pendingSteering(input)),
     registerAgentName: (input) => observe("registerAgentName", { runId: input.runId }, store.registerAgentName(input)),
-    admitMessage: (input) => observe("admitMessage", {}, store.admitMessage(input)),
-    deliverPendingMessages: (input) =>
-      observe("deliverPendingMessages", { runId: input.runId }, store.deliverPendingMessages(input)),
     acknowledge: (input) => observe("acknowledge", { runId: input.runId }, store.acknowledge(input)),
     complete: (input) => observe("complete", { runId: input.runId }, store.complete(input)),
     fail: (input) => observe("fail", { runId: input.runId }, store.fail(input)),

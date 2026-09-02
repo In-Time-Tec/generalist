@@ -68,6 +68,13 @@ export interface ForkRewindCapability {
   readonly claim: ClaimExecution
 }
 
+/** Inbox persistence and exactly-once delivery capability. */
+export interface SteeringCapability {
+  readonly claim: ClaimExecution
+  /** Persistent drivers rebuild their Runtime; process-memory drivers retain one open store. */
+  readonly recovery: "rebuild" | "reclaim"
+}
+
 /** SQL transaction conformance capability. */
 export interface SqlTransactionCapability {
   readonly claim: ClaimExecution
@@ -139,6 +146,7 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly "unknown-agent-on-recovery"?: UnknownAgentOnRecoveryCapability
   readonly runTree?: RunTreeCapability
   readonly "fork-rewind"?: ForkRewindCapability
+  readonly steering?: SteeringCapability
   readonly sqlTransactions?: SqlTransactionCapability
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>
   readonly notificationRecovery?: NotificationRecoveryCapability

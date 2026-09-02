@@ -11,10 +11,6 @@ import type { Cursor } from "./cursor.js"
 import type {
   AddressNotFound,
   AgentNameConflict,
-  MailboxFull,
-  MailboxRateLimited,
-  MessageConflict,
-  MessagingUnauthorized,
   CursorExpired,
   IdempotencyConflict,
   RunIdConflict,
@@ -57,10 +53,12 @@ import type {
   ForkSequenceInvalid,
   NoSnapshot,
   SubstitutionInvalid,
+  RunBusy,
+  NotInFamily,
 } from "./errors.js"
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
-import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
+import type { MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
 import type { MessagingPolicy } from "./messaging/service.js"
 import type { RawUsageFact, RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { Result as GateResult } from "../core/agent/gates/definition.js"
@@ -71,7 +69,7 @@ import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
 import type { FanOutInput, FanOutMemberOrigin, InitialFanOutInput } from "./child/fan-out-internal.js"
 import type { ChildInspection } from "./child/admission.js"
 import type { ResolveOperationInput } from "./operation/resolution.js"
-import type { SteeringReceipt } from "./run/steering.js"
+import type { AdmissionPolicy, MessageSource, SteeringReceipt } from "./run/steering.js"
 import type {
   RespondInput as RespondApprovalInput,
   ResolveError as ResolveDurableApprovalError,
@@ -81,7 +79,7 @@ import type { ForkOptions, RewindOptions } from "./fork.js"
 import type { Notification as ChildSettlementNotification } from "./child/settlement.js"
 import type { Event as ModelPreviewEvent } from "./execution/model-response/preview.js"
 import type { RunActivationProjection } from "./run/activation.js"
-import type { Point as AcknowledgementPoint } from "./acknowledgement.js"
+import type { Point as AcknowledgementPoint } from "./run/acknowledgement.js"
 import type { RuntimeHostSessions } from "./session/host.js"
 import type {
   RunBudget,
@@ -114,7 +112,6 @@ export interface LayerOptions {
   readonly subscriberQueueCapacity?: number
   /** Host policy for addressing beyond Generalist's derived relationships. Absent means relationships only. */
   readonly messagingPolicy?: MessagingPolicy.Service
-  readonly mailboxBounds?: Partial<MailboxBounds>
   /** Final-state callback executed synchronously inside each authoritative store transaction. */
   readonly activationProjection?: RunActivationProjection
   readonly scheduler?: {
@@ -136,6 +133,13 @@ export interface SendInput {
   readonly correlationId?: string
   readonly inReplyTo?: string
   readonly metadata?: Metadata
+}
+
+/** Admission options for a message sent to one existing Run. */
+export interface RunSendOptions {
+  readonly policy?: AdmissionPolicy
+  readonly from?: MessageSource
+  readonly idempotencyKey?: string
 }
 
 /** @internal Exact root execution admission used below the typed Agent API. */
@@ -208,9 +212,17 @@ export interface RunHandle<Output> {
   readonly runId: import("../core/durable/run-id.js").RunId
   readonly await: Effect.Effect<Output, RunFailed | RunCancelled | EventsError | InvalidOutput>
   readonly events: Stream.Stream<StartEvent<Output>, EventsError | InvalidOutput>
-  readonly steer: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
-  readonly followUp: (input: import("../core/turn/steering.js").Input) => Effect.Effect<SteeringReceipt, SteerError>
+  readonly send: (
+    message: Prompt.Prompt | string,
+    options?: RunSendOptions,
+  ) => Effect.Effect<SteeringReceipt, RunSendError>
 }
+
+/** Durable admission for one existing Run. */
+export type RunSend = (
+  runId: string,
+  ...input: Parameters<RunHandle<unknown>["send"]>
+) => ReturnType<RunHandle<unknown>["send"]>
 
 /** Authoritative Runtime inspection with the latest zero-based turn and raw provider usage facts. */
 export interface RuntimeInspection extends RunInspection {
@@ -290,12 +302,6 @@ export interface AwaitSessionTerminalInput {
   readonly sessionId: string
 }
 
-export interface SteerInput {
-  readonly runId: string
-  readonly idempotencyKey: string
-  readonly prompt: Prompt.Prompt | Prompt.RawInput
-}
-
 /**
  * One addressed send between agents.
  *
@@ -312,6 +318,7 @@ export interface SendMessageInput {
   readonly correlationId?: string
   readonly inReplyTo?: string
   readonly metadata?: Metadata
+  readonly policy?: AdmissionPolicy
 }
 export interface MessagesInput {
   readonly runId: string
@@ -384,12 +391,15 @@ export type SpawnError =
 export type SendMessageError =
   | AddressNotFound
   | AddressInvalid
-  | MessagingUnauthorized
-  | MailboxFull
-  | MailboxRateLimited
-  | MessageConflict
+  | NotInFamily
   | RunTerminal
+  | RunBusy
   | RunNotFound
+  | SteeringConflict
+  | ForkSequenceInvalid
+  | NoSnapshot
+  | CursorExpired
+  | import("../core/turn/steering.js").InboxFull
   | RuntimeUnavailable
 export type DirectoryError = RunNotFound | RuntimeUnavailable
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable
@@ -410,12 +420,26 @@ export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTer
 export type RespondApprovalError = RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
-export type SteerError =
+export type RunSendError =
   | RunNotFound
   | RunTerminal
+  | RunBusy
+  | NotInFamily
   | SteeringConflict
+  | ForkSequenceInvalid
+  | NoSnapshot
+  | CursorExpired
   | import("../core/turn/steering.js").InboxFull
   | RuntimeUnavailable
+
+export interface SendFunction {
+  (
+    runId: string,
+    prompt: Prompt.Prompt | string,
+    options?: RunSendOptions,
+  ): Effect.Effect<SteeringReceipt, RunSendError>
+  (input: SendInput): Effect.Effect<RunReceipt, SendError>
+}
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
 export type ForkError = RunNotFound | ForkSequenceInvalid | NoSnapshot | SubstitutionInvalid | RuntimeUnavailable
@@ -510,7 +534,7 @@ export interface Service extends RuntimeHostSessions {
   readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
   /** Idempotently activate an admitted root and return its authoritative current state. */
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>
-  readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
+  readonly send: SendFunction
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
   /** Observe the memory-only live preview lane for one Run.
@@ -549,15 +573,14 @@ export interface Service extends RuntimeHostSessions {
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly cancelSession: (input: CancelSessionInput) => Effect.Effect<void, RuntimeUnavailable>
   readonly awaitSessionTerminal: (input: AwaitSessionTerminalInput) => Effect.Effect<void, RuntimeUnavailable>
-  readonly steer: (input: SteerInput) => Effect.Effect<SteeringReceipt, SteerError>
   /**
    * Send one addressed message into the target's durable inbox.
    *
    * Authorization is relationship-scoped from authoritative identity plus the host policy seam.
-   * Delivery to a live target lands at its next turn boundary; otherwise it waits for its next Run.
+   * Address resolution selects one exact target Run before unified inbox admission.
    */
   readonly sendMessage: (input: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
-  /** Messages admitted for a Run's session that no Run has taken yet. */
+  /** Pending addressed-message projections for this exact Run. */
   readonly messages: (input: MessagesInput) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError>
   /** Read ordered durable child settlements for one exact parent Run. */
   readonly childSettlements: (

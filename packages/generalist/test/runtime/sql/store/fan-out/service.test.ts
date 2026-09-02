@@ -128,14 +128,14 @@ standalone.live("recovers a pending SQLite root outcome and settles it after fan
           remainder: "await",
         }
         const receipt = yield* runtime.fanOut(fanOutInput)
-        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+        yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
         const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
         yield* store.complete({ ...parentClaim, result: { _tag: "Program", value: "parent" } })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
-        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
-        expect(
-          yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
-        ).toBeInstanceOf(Errors.RunTerminal)
+        yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
+        expect(yield* runtime.send(parent.runId, "late", { idempotencyKey: "late" }).pipe(Effect.flip)).toBeInstanceOf(
+          Errors.RunTerminal,
+        )
         expect((yield* runtime.fanOut(fanOutInput)).duplicate).toBe(true)
         expect(
           yield* runtime.fanOut({ ...fanOutInput, idempotencyKey: "late-fan-out" }).pipe(Effect.flip),

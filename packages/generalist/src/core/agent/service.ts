@@ -19,7 +19,7 @@ import {
   type ToolDeclaration,
   type ToolSchedulingPolicy,
 } from "./lifecycle/definition.js"
-import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/run-handle.js"
+import { allocateRun } from "./lifecycle/run-handle.js"
 import { encode as encodeInput } from "./lifecycle/input.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
@@ -70,7 +70,7 @@ export {
   awaitEvent,
   type AwaitEventOptions,
 } from "./tools/wake-event.js"
-export { defaultObjectPrompt, type RunHandle }
+export { defaultObjectPrompt, send, type RunHandle, type SendError } from "./lifecycle/run-handle.js"
 export { child, defaultInheritance, Inheritance, inheritance, type InheritanceOptions } from "./lifecycle/fan-out.js"
 /** Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }
@@ -270,7 +270,6 @@ export function make<
   }
   return complete
 }
-
 export interface Resume {
   readonly suspension: AgentSuspended
   readonly resolutions?: ReadonlyArray<ToolBatchResolution>
@@ -281,7 +280,6 @@ export type ProgressOverflowPolicy =
   | { readonly _tag: "Dropping"; readonly capacity: number }
   | { readonly _tag: "Sliding"; readonly capacity: number }
   | { readonly _tag: "Fail"; readonly capacity: number }
-
 /** Internal prompt-level options for an Agent run. */
 export interface RunOptions {
   /** Schema-encoded Agent input for the first turn. Ignored when `resume` is set. */
@@ -310,6 +308,8 @@ export interface RunOptions {
   readonly modelCallOrdinalStart?: number
   /** First turn number for a host continuing an existing transcript. */
   readonly turnStart?: number
+  /** @internal Runtime-owned inbox drain entering this hosted execution. */
+  readonly initialSteering?: { readonly queue: "steering" | "followUp"; readonly count: number; readonly turn: number }
   /** Runtime-owned checkpoint used to reconstruct the same durable driver. */
   readonly driverCheckpoint?: DriverCheckpoint
   /** Pinned identity admitted by a durable host. */

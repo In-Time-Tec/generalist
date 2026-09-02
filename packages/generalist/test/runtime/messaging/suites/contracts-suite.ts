@@ -89,22 +89,6 @@ describe("relationship derivation", () => {
 })
 
 describe("mailbox payload identity", () => {
-  const base = {
-    to: AgentDirectory.runAddress("target"),
-    from: AgentDirectory.runAddress("sender"),
-    prompt: Prompt.make("hello"),
-    correlationId: "correlation",
-    metadata: {},
-  }
-
-  it("is stable for the same payload and differs when any field changes", () => {
-    expect(Mailbox.digest(base)).toBe(Mailbox.digest({ ...base }))
-    expect(Mailbox.digest({ ...base, prompt: Prompt.make("different") })).not.toBe(Mailbox.digest(base))
-    expect(Mailbox.digest({ ...base, correlationId: "other" })).not.toBe(Mailbox.digest(base))
-    expect(Mailbox.digest({ ...base, inReplyTo: "msg:1" })).not.toBe(Mailbox.digest(base))
-    expect(Mailbox.digest({ ...base, metadata: { a: 1 } })).not.toBe(Mailbox.digest(base))
-  })
-
   it("charges a larger payload more bytes", () => {
     expect(Mailbox.promptBytes(Prompt.make("hi"))).toBeLessThan(Mailbox.promptBytes(Prompt.make("hi".repeat(200))))
   })

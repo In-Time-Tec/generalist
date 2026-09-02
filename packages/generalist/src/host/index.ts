@@ -42,6 +42,7 @@ import {
   type RewindError,
   type RespondApprovalError,
   type RunHandle,
+  type RunSend,
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
@@ -128,6 +129,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     ) => Effect.Effect<HostRun<unknown>, StartError | SessionError | AgentNotRegistered | AgentInputInvalid>
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
     readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
+    readonly send: RunSend
     readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, CancelError>
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
@@ -251,8 +253,7 @@ const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
   id: handle.runId,
   await: handle.await,
   events: handle.events,
-  steer: handle.steer,
-  followUp: handle.followUp,
+  send: handle.send,
 })
 
 const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService => {
@@ -457,6 +458,7 @@ const create = <
           }),
         list: runtime.sessionRuns,
         inspect: runtime.inspect,
+        send: (runId, prompt, sendOptions) => runtime.send(runId, prompt, sendOptions),
         cancel: (runId, reason) => {
           const input: Types.Mutable<{ readonly runId: string; readonly reason?: string }> = { runId }
           if (reason !== undefined) input.reason = reason

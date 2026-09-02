@@ -6,7 +6,6 @@ import "./suites/operation-suite.js"
 import "./suites/program-suite.js"
 import "./suites/runtime-suite.js"
 import "./suites/session-store-suite.js"
-import "./suites/suspend-suite.js"
 import { layer, RuntimeSchema } from "generalist/pg"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
@@ -572,9 +571,9 @@ describePostgres("PostgreSQL run store", () => {
           idempotencyKey: "run",
           prompt: "start",
         })
-        const first = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "one", prompt: "first" })
-        expect(yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "one", prompt: "first" })).toEqual(first)
-        const second = yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "two", prompt: "second" })
+        const first = yield* runtime.send(receipt.runId, "first", { idempotencyKey: "one" })
+        expect(yield* runtime.send(receipt.runId, "first", { idempotencyKey: "one" })).toEqual(first)
+        const second = yield* runtime.send(receipt.runId, "second", { idempotencyKey: "two" })
         expect(second.sequence).toBe(first.sequence + 1)
         expect(second.entryId).not.toBe(first.entryId)
         const [claim] = yield* claims.claimReadyRuns({ workerId: "steering", limit: 1, lease: "10 seconds" })
@@ -605,27 +604,20 @@ describePostgres("PostgreSQL run store", () => {
           continuation: null,
           steeringEntryIds: entries.map((entry) => entry.entryId),
         })
-        const remaining = yield* runtime.steer({
-          runId: receipt.runId,
-          idempotencyKey: "remaining",
-          prompt: "remaining",
-        })
+        const remaining = yield* runtime.send(receipt.runId, "remaining", { idempotencyKey: "remaining" })
         yield* store.fail({ ...executionClaim, error: Errors.AgentExecutionFailure.make({ message: "failed" }) })
         const lifecycle = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
-          (event) =>
-            event._tag === "SteeringAccepted" ||
-            event._tag === "SteeringConsumed" ||
-            event._tag === "SteeringDiscarded",
+          (event) => event._tag === "Inbox" || event._tag === "SteeringConsumed" || event._tag === "SteeringDiscarded",
         )
         expect(lifecycle).toEqual([
-          expect.objectContaining({ _tag: "SteeringAccepted", entryId: first.entryId, steeringSequence: 0 }),
-          expect.objectContaining({ _tag: "SteeringAccepted", entryId: second.entryId, steeringSequence: 1 }),
+          expect.objectContaining({ _tag: "Inbox", entryId: first.entryId, inboxSequence: 0 }),
+          expect.objectContaining({ _tag: "Inbox", entryId: second.entryId, inboxSequence: 1 }),
           expect.objectContaining({
             _tag: "SteeringConsumed",
             entryIds: [first.entryId, second.entryId],
             operationId: operation.operationId,
           }),
-          expect.objectContaining({ _tag: "SteeringAccepted", entryId: remaining.entryId, steeringSequence: 2 }),
+          expect.objectContaining({ _tag: "Inbox", entryId: remaining.entryId, inboxSequence: 2 }),
           expect.objectContaining({ _tag: "SteeringDiscarded", entryIds: [remaining.entryId], reason: "failed" }),
         ])
       }).pipe(scopedWith(postgresLayer(url))),
@@ -644,19 +636,16 @@ describePostgres("PostgreSQL run store", () => {
         })
         const accepted = yield* Effect.forEach(
           Array.from({ length: Steering.defaultCapacity }, (_, index) => index),
-          (index) =>
-            runtime.steer({ runId: receipt.runId, idempotencyKey: `entry:${index}`, prompt: `prompt ${index}` }),
+          (index) => runtime.send(receipt.runId, `prompt ${index}`, { idempotencyKey: `entry:${index}` }),
           { concurrency: "unbounded" },
         )
         expect(
-          yield* runtime.steer({
-            runId: receipt.runId,
+          yield* runtime.send(receipt.runId, `prompt ${Steering.defaultCapacity - 1}`, {
             idempotencyKey: `entry:${Steering.defaultCapacity - 1}`,
-            prompt: `prompt ${Steering.defaultCapacity - 1}`,
           }),
         ).toEqual(accepted.at(-1))
         const full = yield* runtime
-          .steer({ runId: receipt.runId, idempotencyKey: "entry:full", prompt: "not admitted" })
+          .send(receipt.runId, "not admitted", { idempotencyKey: "entry:full" })
           .pipe(Effect.flip)
         expect(full).toBeInstanceOf(Steering.InboxFull)
         expect(full).toMatchObject({
@@ -666,7 +655,7 @@ describePostgres("PostgreSQL run store", () => {
         })
         expect(
           (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
-            (event) => event._tag === "SteeringAccepted",
+            (event) => event._tag === "Inbox",
           ),
         ).toHaveLength(Steering.defaultCapacity)
 
@@ -677,11 +666,7 @@ describePostgres("PostgreSQL run store", () => {
           prompt: "start",
         })
         const byteFull = yield* runtime
-          .steer({
-            runId: byteRun.runId,
-            idempotencyKey: "too-large",
-            prompt: "x".repeat(Steering.defaultMaxPendingBytes),
-          })
+          .send(byteRun.runId, "x".repeat(Steering.defaultMaxPendingBytes), { idempotencyKey: "too-large" })
           .pipe(Effect.flip)
         expect(byteFull).toBeInstanceOf(Steering.InboxFull)
         expect(byteFull).toMatchObject({
@@ -1874,9 +1859,9 @@ describePostgres("PostgreSQL run store", () => {
           outputLimit: 100,
         })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
-        expect(
-          yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
-        ).toBeInstanceOf(Errors.RunTerminal)
+        expect(yield* runtime.send(parent.runId, "late", { idempotencyKey: "late" }).pipe(Effect.flip)).toBeInstanceOf(
+          Errors.RunTerminal,
+        )
         const [childClaim] = yield* claims.claimReadyRuns({ workerId: "program-child", limit: 1 })
         expect(childClaim?.run.runId).toBe(fanOut.childRunIds[0])
         yield* claims.commitWithClaim({

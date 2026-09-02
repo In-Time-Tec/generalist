@@ -1,8 +1,6 @@
-import "./suites/delivery/stranded.js"
 import "./suites/send-operation-suite.js"
 import "./suites/delivery/durability-suite.js"
 import "./suites/delivery/service-suite.js"
-import "./suites/delivery/idempotence-suite.js"
 import "./suites/contracts-suite.js"
 import "./suites/authorization-suite.js"
 import { messagingLayer } from "./scenario.js"

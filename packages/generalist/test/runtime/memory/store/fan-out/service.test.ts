@@ -225,14 +225,14 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
     Effect.gen(function* () {
       const { runtime, parent, input, receipt } = yield* admit("pending-wins", { count: 1 })
       const store = yield* RunStore.RunStore
-      yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+      yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
       const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "pending-wins" })
       yield* store.complete({ ...claim, result: { _tag: "Program", value: "preserved" } })
       expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
-      yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
-      expect(
-        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
-      ).toBeInstanceOf(Errors.RunTerminal)
+      yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
+      expect(yield* runtime.send(parent.runId, "late", { idempotencyKey: "late" }).pipe(Effect.flip)).toBeInstanceOf(
+        Errors.RunTerminal,
+      )
       expect(yield* runtime.fanOut(input)).toEqual({ ...receipt, duplicate: true })
       expect(yield* runtime.fanOut({ ...input, idempotencyKey: "late-fan-out" }).pipe(Effect.flip)).toBeInstanceOf(
         Errors.FanOutInvalid,

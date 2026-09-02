@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
-import { Cursor } from "./cursor.js"
-import { AckBeyondCommitted, AckInvalid } from "./errors.js"
-import { RunId } from "./run.js"
+import { Cursor } from "../cursor.js"
+import { AckBeyondCommitted, AckInvalid } from "../errors.js"
+import { RunId } from "../run.js"
 
 /** One durable host processed-through point on the Run event sequence. */
 export const Point = Schema.Struct({

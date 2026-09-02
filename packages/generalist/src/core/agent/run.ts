@@ -38,7 +38,7 @@ import { type HandoffRunState, make as makeHandoffStateRef, takePendingContinuat
 import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
 import type { RunInbox } from "../turn/steering-inbox.js"
-import { modelCallMiddleware, runStart as applyRunStart } from "./lifecycle/hooks.js"
+import { modelCallMiddleware, runStartWithSteering } from "./lifecycle/hooks.js"
 import { recoveredRetry as recoveredGateRetry } from "./gates/prompt.js"
 import { make as makeVerifierRunner } from "./gates/verifier-runner.js"
 const errorMessage = String
@@ -325,6 +325,7 @@ const streamInternalImpl = <
       const { preparePrompt, applyCompactionResult, countTokens, syncSession } = compactionRuntime
       const toolContext = {
         runId: inbox.runId,
+        inbox,
         options,
         state,
         isSkillActivationCall,
@@ -390,6 +391,12 @@ const streamInternalImpl = <
         return Effect.succeed(baseInitialPrompt)
       }
       const initialPrompt = yield* loadInitialPrompt()
+      const applyRunStart = runStartWithSteering({
+        runId: inbox.runId,
+        agentName: agent.name,
+        turn: state.turn,
+        steering: options.initialSteering,
+      })
       const applyContinuation = (continuation: HandoffRunState["pendingContinuation"]) => {
         if (continuation === undefined) return initialPrompt
         const prompt = Prompt.make(continuation.prompt)
@@ -401,14 +408,7 @@ const streamInternalImpl = <
         options.resume === undefined && options.driverCheckpoint !== undefined && handoffStateRef !== undefined
           ? takePendingContinuation(handoffStateRef, setHandoffState).pipe(Effect.map(applyContinuation))
           : Effect.succeed(initialPrompt)
-      const runPrompt = loadRunPrompt().pipe(
-        Effect.flatMap((prompt) =>
-          applyRunStart({
-            input: { runId: inbox.runId, agentName: agent.name, input: Prompt.make(prompt) },
-            turn: state.turn,
-          }),
-        ),
-      )
+      const runPrompt = loadRunPrompt().pipe(Effect.flatMap(applyRunStart))
       return Stream.unwrap(
         runPrompt.pipe(
           Effect.map((prompt) => {

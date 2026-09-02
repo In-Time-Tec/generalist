@@ -21,7 +21,6 @@ import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 const options = {
   ...parentRelativeOptions,
   scheduler: { pollInterval: "1 hour" as const },
-  mailboxBounds: { maxPending: 2, maxPerWindow: 2 },
 }
 
 const layers = [
@@ -158,9 +157,8 @@ for (const [backend, runtimeLayer] of layers) {
           idempotencyKey: "next-run",
           prompt: textPrompt("next"),
         })
-        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
         const history = yield* runtime.history({ runId: later.runId, cursor: -1, limit: 100 })
-        expect(history.filter((event) => event._tag === "SteeringAccepted")).toEqual([])
+        expect(history.filter((event) => event._tag === "Inbox")).toEqual([])
         const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
         expect(notification).toMatchObject({ childRunId: child.runId, status: "succeeded" })
         expect(notification!.resultText).toContain("notes")
@@ -185,9 +183,8 @@ for (const [backend, runtimeLayer] of layers) {
           idempotencyKey: "next-run-after-failure",
           prompt: textPrompt("next"),
         })
-        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
         const history = yield* runtime.history({ runId: later.runId, cursor: -1, limit: 100 })
-        expect(history.filter((event) => event._tag === "SteeringAccepted")).toEqual([])
+        expect(history.filter((event) => event._tag === "Inbox")).toEqual([])
         const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
         expect(notification).toMatchObject({ childRunId: child.runId, status: "failed" })
         expect(notification!.resultText).toContain("child provider failed")
@@ -218,7 +215,6 @@ for (const [backend, runtimeLayer] of layers) {
           notifications[0],
         )
 
-        expect(yield* store.deliverPendingMessages({ runId: parent.runId })).toHaveLength(0)
         const parentHistory = yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 100 })
         expect(parentHistory).toEqual(
           expect.arrayContaining([
@@ -229,9 +225,7 @@ for (const [backend, runtimeLayer] of layers) {
             }),
           ]),
         )
-        expect(parentHistory.some((event) => event._tag === "SteeringAccepted" || event._tag === "RunResumed")).toBe(
-          false,
-        )
+        expect(parentHistory.some((event) => event._tag === "Inbox" || event._tag === "RunResumed")).toBe(false)
 
         yield* store.fail({
           ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "finished" })),
@@ -243,10 +237,9 @@ for (const [backend, runtimeLayer] of layers) {
           idempotencyKey: "next-run-after-cancellation",
           prompt: textPrompt("next"),
         })
-        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
         expect(
           (yield* runtime.history({ runId: later.runId, cursor: -1, limit: 100 })).some(
-            (event) => event._tag === "SteeringAccepted",
+            (event) => event._tag === "Inbox",
           ),
         ).toBe(false)
         expect(yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })).toEqual(notifications)
@@ -399,7 +392,11 @@ for (const [backend, runtimeLayer] of layers) {
           idempotencyKey: `later:${backend}`,
           prompt: textPrompt("later"),
         })
-        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
+        expect(
+          (yield* runtime.history({ runId: later.runId, cursor: -1, limit: 100 })).some(
+            (event) => event._tag === "Inbox",
+          ),
+        ).toBe(false)
       }),
     )
   })

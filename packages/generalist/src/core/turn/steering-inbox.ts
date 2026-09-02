@@ -1,10 +1,11 @@
-import { Effect, Scope, TxQueue, TxRef } from "effect"
+import { Deferred, Effect, Ref, Scope, TxQueue, TxRef } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 import type { RunId } from "../durable/run-id.js"
 import {
   InboxFull,
   PolicyInvalid,
+  RunBusy,
   RunClosed,
   defaultCapacity,
   defaultMaxPendingBytes,
@@ -63,6 +64,10 @@ export type Completion =
 export interface RunInbox {
   readonly runId: RunId
   readonly start: Effect.Effect<boolean>
+  readonly busy: Effect.Effect<boolean>
+  readonly watchToolInterrupt: Effect.Effect<Effect.Effect<void>, never, Scope.Scope>
+  readonly interruptTools: Effect.Effect<void>
+  readonly interruptTool: <A, E, R>(effect: Effect.Effect<A, E, R>, interrupted: A) => Effect.Effect<A, E, R>
   readonly takeSteering: Effect.Effect<ReadonlyArray<Input>>
   readonly takeFollowUp: Effect.Effect<ReadonlyArray<Input>>
   readonly complete: Effect.Effect<Completion>
@@ -104,15 +109,27 @@ const resolveOptions = (options: Options): Effect.Effect<ResolvedOptions, Policy
 
 /** @internal Allocate one scoped process-local Run inbox and its producer capability. */
 export const allocateRunInbox: {
+  (options: Options): (runId: RunId) => Effect.Effect<
+    {
+      readonly inbox: RunInbox
+      readonly producer: Producer
+      readonly reject: (input: Input) => Effect.Effect<Receipt, InboxFull | RunClosed | RunBusy>
+    },
+    PolicyInvalid,
+    Scope.Scope
+  >
   (
-    options: Options,
-  ): (
-    runId: RunId,
-  ) => Effect.Effect<{ readonly inbox: RunInbox; readonly producer: Producer }, PolicyInvalid, Scope.Scope>
-  (
     runId: RunId,
     options: Options,
-  ): Effect.Effect<{ readonly inbox: RunInbox; readonly producer: Producer }, PolicyInvalid, Scope.Scope>
+  ): Effect.Effect<
+    {
+      readonly inbox: RunInbox
+      readonly producer: Producer
+      readonly reject: (input: Input) => Effect.Effect<Receipt, InboxFull | RunClosed | RunBusy>
+    },
+    PolicyInvalid,
+    Scope.Scope
+  >
 } = dual(2, (runId: RunId, options: Options) =>
   Effect.gen(function* () {
     const resolved = yield* resolveOptions(options)
@@ -122,6 +139,7 @@ export const allocateRunInbox: {
     const followUpSequence = yield* TxRef.make(0)
     const pendingBytes = yield* TxRef.make(0)
     const lifecycle = yield* TxRef.make<Lifecycle>("allocated")
+    const toolInterruptions = yield* Ref.make<ReadonlySet<Deferred.Deferred<void>>>(new Set())
     const steering: Lane = { queue: steeringQueue, policy: resolved.steering, sequence: steeringSequence }
     const followUp: Lane = { queue: followUpQueue, policy: resolved.followUp, sequence: followUpSequence }
 
@@ -213,7 +231,17 @@ export const allocateRunInbox: {
       )
     yield* Effect.addFinalizer(() => close("scope"))
 
-    const offer = (queue: QueueName, input: Input): Effect.Effect<Receipt, InboxFull | RunClosed> => {
+    function offer(queue: QueueName, input: Input): Effect.Effect<Receipt, InboxFull | RunClosed>
+    function offer(
+      queue: QueueName,
+      input: Input,
+      rejectBusy: true,
+    ): Effect.Effect<Receipt, InboxFull | RunClosed | RunBusy>
+    function offer(
+      queue: QueueName,
+      input: Input,
+      rejectBusy = false,
+    ): Effect.Effect<Receipt, InboxFull | RunClosed | RunBusy> {
       const prompt = Prompt.make(input.prompt)
       const bytes = promptBytes(prompt)
       const lane = queue === "steering" ? steering : followUp
@@ -224,6 +252,9 @@ export const allocateRunInbox: {
             const totalBytes = yield* TxRef.get(pendingBytes)
             if ((yield* TxRef.get(lifecycle)) === "closed") {
               return { _tag: "Closed" as const, size, totalBytes }
+            }
+            if (rejectBusy && (yield* TxRef.get(lifecycle)) === "running") {
+              return { _tag: "Busy" as const, size, totalBytes }
             }
             let fullDimension: "entries" | "bytes" | undefined
             if (size >= lane.policy.capacity) fullDimension = "entries"
@@ -257,6 +288,7 @@ export const allocateRunInbox: {
           "generalist.agent.inbox.offered_bytes": bytes,
         })
         if (outcome._tag === "Closed") return yield* RunClosed.make({ runId })
+        if (outcome._tag === "Busy") return yield* RunBusy.make({ runId })
         if (outcome._tag === "Full") {
           return yield* InboxFull.make({ runId, queue, dimension: outcome.dimension, limit: outcome.limit })
         }
@@ -313,10 +345,36 @@ export const allocateRunInbox: {
         state === "allocated" ? [true, "running"] : [false, state],
       ),
     )
+    const busy = Effect.tx(TxRef.get(lifecycle)).pipe(Effect.map((state) => state === "running"))
+    const watchToolInterrupt = Effect.acquireRelease(
+      Deferred.make<void>().pipe(
+        Effect.tap((signal) => Ref.update(toolInterruptions, (current) => new Set([...current, signal]))),
+      ),
+      (signal) =>
+        Ref.update(toolInterruptions, (current) => {
+          const next = new Set(current)
+          next.delete(signal)
+          return next
+        }),
+    ).pipe(Effect.map(Deferred.await))
+    const interruptTools = Ref.get(toolInterruptions).pipe(
+      Effect.flatMap((signals) =>
+        Effect.forEach(signals, (signal) => Deferred.succeed(signal, undefined), { discard: true }),
+      ),
+    )
+    const interruptTool: RunInbox["interruptTool"] = (effect, interrupted) =>
+      watchToolInterrupt.pipe(
+        Effect.flatMap((signal) => Effect.raceFirst(effect, signal.pipe(Effect.as(interrupted)))),
+        Effect.scoped,
+      )
     return {
       inbox: {
         runId,
         start,
+        busy,
+        watchToolInterrupt,
+        interruptTools,
+        interruptTool,
         takeSteering: drain("steering", steering),
         takeFollowUp: drain("followUp", followUp),
         complete,
@@ -326,6 +384,7 @@ export const allocateRunInbox: {
         steer: (input: Input) => offer("steering", input),
         followUp: (input: Input) => offer("followUp", input),
       },
+      reject: (input: Input) => offer("steering", input, true),
     }
   }),
 )
@@ -338,19 +397,19 @@ export const externalRunInbox = (input: {
 }): RunInbox => ({
   runId: input.runId,
   start: Effect.succeed(true),
+  busy: Effect.succeed(true),
+  watchToolInterrupt: Effect.succeed(Effect.never),
+  interruptTools: Effect.void,
+  interruptTool: (effect) => effect,
   takeSteering: input.takeSteering,
   takeFollowUp: input.takeFollowUp,
-  complete: input.takeFollowUp.pipe(
-    Effect.map(
-      (inputs): Completion =>
-        inputs.length === 0
-          ? { _tag: "Closed" }
-          : {
-              _tag: "Pending",
-              queue: "followUp",
-              inputs,
-            },
-    ),
-  ),
+  complete: Effect.gen(function* () {
+    const followUp = yield* input.takeFollowUp
+    if (followUp.length > 0) return { _tag: "Pending", queue: "followUp", inputs: followUp } satisfies Completion
+    const steering = yield* input.takeSteering
+    return steering.length === 0
+      ? ({ _tag: "Closed" } satisfies Completion)
+      : ({ _tag: "Pending", queue: "steering", inputs: steering } satisfies Completion)
+  }),
   close: () => Effect.void,
 })

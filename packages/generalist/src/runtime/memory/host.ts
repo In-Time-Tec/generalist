@@ -32,7 +32,7 @@ export type {
   CancelInput,
   CancelSessionInput,
   AwaitSessionTerminalInput,
-  SteerInput,
+  RunSendOptions,
   SendMessageInput,
   MessagesInput,
   ChildSettlementsInput,
@@ -57,7 +57,7 @@ export type {
   SignalError,
   WakeError,
   CancelError,
-  SteerError,
+  RunSendError,
   InspectError,
   ExtendBudgetError,
   OperatorActionError,
@@ -84,7 +84,7 @@ export type {
   UnknownResolution,
 } from "../execution/recovery/operator.js"
 export type { FanOutInput, FanOutMemberInput } from "../child/fan-out-internal.js"
-export type { Point as AckPoint } from "../acknowledgement.js"
+export type { Point as AckPoint } from "../run/acknowledgement.js"
 export type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
 export type {
   Change as ModelPreviewChange,

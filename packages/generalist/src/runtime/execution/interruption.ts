@@ -90,7 +90,13 @@ export const settleInterruptedExecution = (input: {
       .pipe(Effect.catch((failure) => (Schema.is(RunTerminal)(failure) ? Effect.void : Effect.fail(failure))))
     yield* Ref.set(input.activeOperationIds, new Set())
     yield* Ref.set(input.completingRetrySafeOperationIds, new Set())
-  }).pipe(Effect.orDie)
+  }).pipe(
+    Effect.catchTags({
+      "generalist/runtime/StaleClaim": () => Effect.void,
+      "generalist/runtime/StaleSessionClaim": () => Effect.void,
+    }),
+    Effect.orDie,
+  )
 
 export interface ExecutionInterruption {
   readonly context: Context.Context<typeof ActiveModelResponse>

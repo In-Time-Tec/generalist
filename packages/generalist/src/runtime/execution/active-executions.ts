@@ -30,6 +30,7 @@ export interface Service {
     afterExit?: Effect.Effect<void, never, R2>,
   ) => Effect.Effect<void, never, R | R2>
   readonly interrupt: (runId: string) => Effect.Effect<void>
+  readonly interruptAndAwait: (runId: string) => Effect.Effect<void>
   /** Run IDs this process is executing right now. A scheduler must not re-admit them. */
   readonly active: Effect.Effect<ReadonlySet<string>>
 }
@@ -43,6 +44,23 @@ export const layer: Layer.Layer<ActiveExecutions> = Layer.effect(
   Effect.gen(function* () {
     const cancellationObservers = yield* FiberMap.make<string, void, never>()
     const active = yield* FiberMap.make<string, void, unknown>()
+    const interrupt = (runId: string) =>
+      Effect.gen(function* () {
+        const fiber = FiberMap.getUnsafe(active, runId)
+        if (Option.isNone(fiber)) return Option.none<Fiber.Fiber<void, never>>()
+        fiber.value.interruptUnsafe()
+        const observer = yield* FiberMap.run(cancellationObservers, runId, observeCancellation(runId, fiber.value), {
+          onlyIfMissing: true,
+          startImmediately: true,
+        })
+        return Option.some(observer)
+      })
+    const awaitInactive = (runId: string): Effect.Effect<void> =>
+      Effect.suspend(() =>
+        Option.isNone(FiberMap.getUnsafe(active, runId))
+          ? Effect.void
+          : Effect.yieldNow.pipe(Effect.andThen(awaitInactive(runId))),
+      )
     return ActiveExecutions.of({
       run: (runId, execution, afterExit = Effect.void) =>
         Effect.uninterruptibleMask((restore) =>
@@ -72,16 +90,13 @@ export const layer: Layer.Layer<ActiveExecutions> = Layer.effect(
             yield* complete
           }),
         ),
-      interrupt: (runId) =>
-        Effect.gen(function* () {
-          const fiber = FiberMap.getUnsafe(active, runId)
-          if (Option.isNone(fiber)) return
-          fiber.value.interruptUnsafe()
-          yield* FiberMap.run(cancellationObservers, runId, observeCancellation(runId, fiber.value), {
-            onlyIfMissing: true,
-            startImmediately: true,
-          })
-        }),
+      interrupt: (runId) => interrupt(runId).pipe(Effect.asVoid),
+      interruptAndAwait: (runId) =>
+        interrupt(runId).pipe(
+          Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: (fiber) => Fiber.await(fiber) })),
+          Effect.andThen(awaitInactive(runId)),
+          Effect.asVoid,
+        ),
       active: Effect.sync(() => new Set(Array.from(active, ([runId]) => runId))),
     })
   }),

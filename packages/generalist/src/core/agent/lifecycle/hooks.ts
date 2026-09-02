@@ -352,6 +352,22 @@ export const steer = (input: SteerInput) =>
     ),
   )
 
+/** @internal Apply a Runtime-owned initial inbox drain before RunStart. */
+export const runStartWithSteering = (options: {
+  readonly runId: RunStartInput["runId"]
+  readonly agentName: string
+  readonly turn: number
+  readonly steering: Pick<SteerInput, "turn" | "queue" | "count"> | undefined
+}) => {
+  const base = { runId: options.runId, agentName: options.agentName }
+  return (input: Prompt.RawInput) => {
+    const prompt = Prompt.make(input)
+    return (
+      options.steering === undefined ? Effect.succeed(prompt) : steer({ ...base, ...options.steering, prompt })
+    ).pipe(Effect.flatMap((steered) => runStart({ input: { ...base, input: steered }, turn: options.turn })))
+  }
+}
+
 /** @internal Apply RunEnd hooks before the terminal Completed event is exposed. */
 export const runEnd = <Output>(input: RunEndInput<Output>) =>
   evaluate<RunEndInput<Output>>({
