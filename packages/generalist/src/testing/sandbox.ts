@@ -13,7 +13,7 @@ import {
 } from "../core/program/code-executor.js"
 import { CellResult } from "../repl/cell.js"
 import {
-  ExecutionFailed,
+  type Command,
   type Isolation,
   LimitExceeded,
   type SandboxError,
@@ -75,7 +75,7 @@ const withProvider = <A, E, LayerError>(
     ),
   )
 
-const expectUnsupported = <A>(effect: Effect.Effect<A, SandboxError>, operation: Unsupported["operation"]) =>
+const expectUnsupported = <A, R>(effect: Effect.Effect<A, SandboxError, R>, operation: Unsupported["operation"]) =>
   Effect.gen(function* () {
     const failure = yield* effect.pipe(Effect.flip)
     expect(Schema.is(Unsupported)(failure)).toBe(true)
@@ -98,6 +98,35 @@ const executeValue = (sandbox: SandboxService, source: string) =>
     return result.stdout
   })
 
+const command = (tag: Command["_tag"]): Effect.Effect<Command> =>
+  Effect.gen(function* () {
+    switch (tag) {
+      case "Process":
+        return { _tag: "Process", command: "printf", arguments: ["unsupported"] }
+      case "TypeScript":
+        return { _tag: "TypeScript", cellId: `unsupported-${++nextRequest}`, source: "42" }
+      case "JavaScriptModule": {
+        const now = yield* Clock.currentTimeMillis
+        return {
+          _tag: "JavaScriptModule",
+          request: moduleRequest("export default () => 42", undefined, now + 5_000),
+          capabilities,
+        }
+      }
+    }
+  })
+
+const commandOperation = (tag: Command["_tag"]): Unsupported["operation"] => {
+  switch (tag) {
+    case "Process":
+      return "exec:process"
+    case "TypeScript":
+      return "exec:typescript"
+    case "JavaScriptModule":
+      return "exec:javascript-module"
+  }
+}
+
 /** @experimental Registers the authoritative Sandbox service conformance suite. */
 export const sandbox = <E>(options: Options<E>): void => {
   describe(`Generalist Sandbox conformance (${options.name})`, () => {
@@ -109,6 +138,18 @@ export const sandbox = <E>(options: Options<E>): void => {
           expect(service.capabilities.commands).not.toHaveLength(0)
           const expected = service.capabilities.commands.includes("JavaScriptModule") ? 42 : "42"
           expect(yield* executeValue(service, "42")).toBe(expected)
+        }),
+      ),
+    )
+
+    it.live("returns typed Unsupported for every undeclared command kind", () =>
+      withProvider(options, (provider) =>
+        Effect.gen(function* () {
+          const service = yield* provider.acquire()
+          for (const tag of ["Process", "TypeScript", "JavaScriptModule"] as const) {
+            if (service.capabilities.commands.includes(tag)) continue
+            yield* expectUnsupported(service.exec(yield* command(tag)), commandOperation(tag))
+          }
         }),
       ),
     )
@@ -192,16 +233,19 @@ export const sandbox = <E>(options: Options<E>): void => {
       ),
     )
 
-    it.live("enforces a declared wall-clock limit and rejects unsupported memory limits", () =>
+    it.live("enforces declared limits and rejects unsupported limits", () =>
       withProvider(options, (provider) =>
         Effect.gen(function* () {
           const baseline = yield* provider.acquire()
+          if (baseline.capabilities.limits.includes("cpu")) {
+            expect((yield* provider.acquire({ limits: { cpuMs: 1 } })).limits.cpuMs).toBe(1)
+          } else {
+            yield* expectUnsupported(provider.acquire({ limits: { cpuMs: 1 } }), "limit:cpu")
+          }
           if (baseline.capabilities.limits.includes("memory")) {
             expect((yield* provider.acquire({ limits: { memoryMb: 1 } })).limits.memoryMb).toBe(1)
           } else {
-            const memory = yield* provider.acquire({ limits: { memoryMb: 1 } }).pipe(Effect.flip)
-            expect(Schema.is(Unsupported)(memory)).toBe(true)
-            if (Schema.is(Unsupported)(memory)) expect(memory.operation).toBe("limit:memory")
+            yield* expectUnsupported(provider.acquire({ limits: { memoryMb: 1 } }), "limit:memory")
           }
 
           if (!baseline.capabilities.limits.includes("wall-clock")) return
@@ -224,7 +268,8 @@ export const sandbox = <E>(options: Options<E>): void => {
                   })
                   .pipe(Effect.flip)
               })
-          expect(Schema.is(LimitExceeded)(failure) || Schema.is(ExecutionFailed)(failure)).toBe(true)
+          expect(Schema.is(LimitExceeded)(failure)).toBe(true)
+          if (Schema.is(LimitExceeded)(failure)) expect(failure.resource).toBe("wall-clock")
         }),
       ),
     )

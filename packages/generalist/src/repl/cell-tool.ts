@@ -1,4 +1,4 @@
-import { Effect, type Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import type { ToolSchedulingPolicy } from "../core/agent/service.js"
 import { type Progress, type Service, ToolContext } from "../core/tools/tool-context.js"
@@ -7,7 +7,7 @@ import {
   type FrameworkStage,
   type Outcome,
   type Request,
-  type ToolExecutor,
+  ToolExecutor,
   layerRouter,
   route as toolExecutorRoute,
 } from "../core/tools/tool-executor.js"
@@ -185,5 +185,23 @@ export const route: Route<ToolContext | SandboxProvider> = toolExecutorRoute<Too
   execute,
 })
 
+const executeRouted = (request: Request): ReturnType<typeof execute> =>
+  route.matches(request)
+    ? execute(request)
+    : Effect.fail(
+        FrameworkFailure.make({
+          stage: "route",
+          tool: request.call.name,
+          message: `Tool ${request.call.name} has no matching route`,
+        }),
+      )
+
 /** @experimental */
-export const layer: Layer.Layer<ToolExecutor, never, ToolContext | SandboxProvider> = layerRouter([route])
+export const layer: Layer.Layer<ToolExecutor, never, SandboxProvider> = Layer.effect(
+  ToolExecutor,
+  Effect.map(SandboxProvider, (provider) =>
+    ToolExecutor.of({
+      execute: (request) => executeRouted(request).pipe(Effect.provideService(SandboxProvider, provider)),
+    }),
+  ),
+)

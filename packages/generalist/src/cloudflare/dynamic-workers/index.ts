@@ -6,6 +6,7 @@ import {
   type ExecutionFailure as ExecutionFailureType,
   protocolVersion,
   Result,
+  SandboxDeadlineExceeded,
   SandboxExecutionFailure,
   SandboxResourceExceeded,
   SandboxUnavailable,
@@ -21,6 +22,9 @@ const codeExecutorFailure = (failure: SandboxError): ExecutionFailureType => {
   if (Schema.is(LimitExceeded)(failure)) {
     if (failure.resource === "cpu") {
       return SandboxResourceExceeded.make({ resource: "cpu", limit: failure.limit })
+    }
+    if (failure.resource === "wall-clock") {
+      return SandboxDeadlineExceeded.make({ message: `sandbox wall-clock limit ${failure.limit} exceeded` })
     }
     return SandboxExecutionFailure.make({ message: `sandbox ${failure.resource} limit ${failure.limit} exceeded` })
   }

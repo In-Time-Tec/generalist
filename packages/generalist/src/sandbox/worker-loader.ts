@@ -1,6 +1,7 @@
-import { Clock, Effect, Layer, Stream } from "effect"
+import { Clock, Effect, Layer, Schema, Stream } from "effect"
 import { execute as executeWorker } from "../cloudflare/dynamic-workers/execution.js"
 import type { Options as DynamicWorkerOptions } from "../cloudflare/dynamic-workers/types.js"
+import { SandboxDeadlineExceeded, SandboxResourceExceeded } from "../core/program/code-executor.js"
 import {
   type AcquireOptions,
   ExecutionFailed,
@@ -58,6 +59,17 @@ const failureMessage = (cause: unknown): string => {
   return "Worker Loader execution failed"
 }
 
+const executionFailure = (cause: unknown, limits: Limits): ExecutionFailed | LimitExceeded => {
+  if (Schema.is(SandboxDeadlineExceeded)(cause)) {
+    const wallClock = wallClockMillis(limits)
+    if (wallClock !== undefined) return LimitExceeded.make({ resource: "wall-clock", limit: wallClock })
+  }
+  if (Schema.is(SandboxResourceExceeded)(cause) && cause.resource === "cpu") {
+    return LimitExceeded.make({ resource: "cpu", limit: cause.limit })
+  }
+  return ExecutionFailed.make({ message: failureMessage(cause), cause })
+}
+
 const sandbox = (options: WorkerLoaderOptions, limits: Limits): SandboxService => {
   const start: SandboxService["start"] = (command) => {
     if (command._tag !== "JavaScriptModule") {
@@ -77,7 +89,7 @@ const sandbox = (options: WorkerLoaderOptions, limits: Limits): SandboxService =
         }
       }
       const value = yield* executeWorker(options, module.request, module.capabilities).pipe(
-        Effect.mapError((cause) => ExecutionFailed.make({ message: failureMessage(cause), cause })),
+        Effect.mapError((cause) => executionFailure(cause, limits)),
       )
       return { stdout: "", stderr: "", exitCode: 0, value }
     })
