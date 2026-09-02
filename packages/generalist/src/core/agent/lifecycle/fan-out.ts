@@ -1,14 +1,157 @@
-import { Context, Effect, Exit, Function, Schema } from "effect"
-import { Tool } from "effect/unstable/ai"
-import { AgentError } from "../event.js"
+import { Context, Effect, Exit, Function, Option, Predicate, Schema } from "effect"
+import { Prompt, Tool } from "effect/unstable/ai"
+import { AgentError, ChildExceedsParent } from "../event.js"
 import type { RunError } from "../run/error.js"
-import type { Agent, Any as AnyAgent, ExecutionServices, Input, Output } from "./definition.js"
-import type { BudgetLimits } from "../../durable/run-budget.js"
+import {
+  AgentTypeId,
+  type Agent,
+  type Any as AnyAgent,
+  type ExecutionServices,
+  type Input,
+  type Output,
+} from "./definition.js"
+import { BudgetLimits } from "../../durable/run-budget.js"
+import { ToolContext } from "../../tools/tool-context.js"
+
+/** Authority and context inherited by one child Run. */
+export const Inheritance = Schema.Struct({
+  history: Schema.Literals(["none", "summary", "full"]),
+  tools: Schema.Literals(["attenuate", "same"]),
+  permissions: Schema.Literals(["inherit", "fresh"]),
+  budget: Schema.optionalKey(BudgetLimits),
+  sandbox: Schema.Literals(["share", "fork", "fresh"]),
+  instructions: Schema.Literals(["inherit", "own"]),
+  memory: Schema.Literals(["inherit", "fresh"]),
+})
+export type Inheritance = typeof Inheritance.Type
+
+/** Caller-authored child inheritance options. Omitted fields use safe defaults. */
+export type InheritanceOptions = Partial<Inheritance>
+
+/** Safe child inheritance defaults. */
+export const defaultInheritance: Inheritance = {
+  history: "none",
+  tools: "attenuate",
+  permissions: "inherit",
+  sandbox: "fork",
+  instructions: "inherit",
+  memory: "inherit",
+}
+
+/** Normalize one child inheritance record before execution or journaling. */
+export const inheritance = (options?: InheritanceOptions): Inheritance => ({ ...defaultInheritance, ...options })
+
+const closePendingToolCalls = (parent: Prompt.Prompt): Prompt.Prompt => {
+  const pending = new Map<string, Prompt.ToolCallPart>()
+  for (const message of parent.content) {
+    for (const part of message.content) {
+      if (Schema.is(Schema.String)(part)) continue
+      if (part.type === "tool-call") pending.set(part.id, part)
+      if (part.type === "tool-result") pending.delete(part.id)
+    }
+  }
+  if (pending.size === 0) return parent
+  const result = Prompt.makeMessage("tool", {
+    content: [...pending.values()].map((call) =>
+      Prompt.makePart("tool-result", {
+        id: call.id,
+        name: call.name,
+        isFailure: false,
+        providerExecuted: false,
+        result: { status: "delegated-to-child" },
+      }),
+    ),
+  })
+  return Prompt.concat(parent, Prompt.fromMessages([result]))
+}
+
+/** @internal Project the live parent transcript according to one normalized history policy. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal projection with two required direct-style arguments.
+export const inheritedHistory = (
+  policy: Inheritance["history"],
+  parent: Prompt.Prompt | undefined,
+): Prompt.Prompt | undefined => {
+  if (parent === undefined || policy === "none") return undefined
+  if (policy === "full") return closePendingToolCalls(parent)
+  const latest = parent.content.findLast((message) => message.role === "user")
+  return latest === undefined ? undefined : Prompt.fromMessages([latest])
+}
+
+/** @internal Reject child authority that the parent does not hold. Shared by process-local and durable spawn paths. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal authority check with three required direct-style arguments.
+export const validateAuthority = (
+  parent: AnyAgent,
+  child: AnyAgent,
+  inherit: Inheritance,
+): Effect.Effect<void, ChildExceedsParent> => {
+  const parentTools = Object.keys(parent.toolkit.tools)
+  const childTools = Object.keys(child.toolkit.tools)
+  if (inherit.tools === "attenuate" && !childTools.every((name) => parentTools.includes(name))) {
+    return ChildExceedsParent.make({ field: "tools" })
+  }
+  if (
+    inherit.permissions === "fresh" &&
+    child.authorization !== undefined &&
+    child.authorization !== parent.authorization
+  ) {
+    return ChildExceedsParent.make({ field: "permissions" })
+  }
+  if (inherit.sandbox === "fresh" && child.sandbox !== undefined && parent.sandbox === undefined) {
+    return ChildExceedsParent.make({ field: "sandbox" })
+  }
+  return Effect.void
+}
+
+const inheritedSandbox = (parent: AnyAgent, child: AnyAgent, policy: Inheritance["sandbox"]) => {
+  if (policy === "fresh") return Effect.succeed(child.sandbox)
+  if (policy === "share" || parent.sandbox === undefined) return Effect.succeed(parent.sandbox)
+  return parent.sandbox.snapshot.pipe(
+    Effect.flatMap(parent.sandbox.fork),
+    Effect.mapError((cause) => AgentError.make({ message: "Failed to fork the parent Sandbox", turn: 0, cause })),
+  )
+}
+
+/** @internal Apply process-local child inheritance after authority validation. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal inheritance boundary with three required direct-style arguments.
+export const applyInheritance = <A extends AnyAgent>(
+  parent: AnyAgent,
+  child: A,
+  inherit: Inheritance,
+): Effect.Effect<A, ChildExceedsParent | AgentError> =>
+  Effect.gen(function* () {
+    yield* validateAuthority(parent, child, inherit)
+    const sandbox = yield* inheritedSandbox(parent, child, inherit.sandbox)
+    const inherited = {
+      ...child,
+      ...Object.assign({}, inherit.tools === "same" ? { toolkit: parent.toolkit } : undefined),
+      ...Object.assign(
+        {},
+        inherit.permissions === "inherit" && parent.authorization !== undefined
+          ? { authorization: parent.authorization }
+          : undefined,
+      ),
+      ...Object.assign(
+        {},
+        inherit.instructions === "inherit" && parent.instructions !== undefined
+          ? { instructions: parent.instructions }
+          : undefined,
+      ),
+      ...Object.assign(
+        {},
+        inherit.memory === "inherit" && parent.memory !== undefined ? { memory: parent.memory } : undefined,
+      ),
+      ...Object.assign({}, sandbox === undefined ? undefined : { sandbox }),
+    }
+    return inherited
+  })
 
 /** One typed Agent invocation admitted into a process-local fan-out. */
 export interface Child<A extends AnyAgent = AnyAgent> {
   readonly agent: A
   readonly input: Input<A>
+  readonly inherit: Inheritance
+  /** @internal Exact parent prefix captured by AgentTool.fanOut. */
+  readonly history?: Prompt.Prompt
 }
 
 /** Process-local fan-out policy. */
@@ -47,13 +190,36 @@ export interface AgentRunner {
   readonly run: (
     agent: ErasedAgent,
     input: BoundaryValue,
-    budget?: BudgetLimits,
+    inherit: Inheritance,
+    history?: Prompt.Prompt,
   ) => Effect.Effect<BoundaryValue, RunError>
 }
 
+type RunChild = (
+  agent: ErasedAgent,
+  input: BoundaryValue,
+  options: { readonly budget?: BudgetLimits; readonly history?: Prompt.Prompt },
+) => Effect.Effect<BoundaryValue, RunError>
+
+/** @internal Construct the recursive runner used by Agent.run. */
+export const recursiveAgentRunner = (execute: RunChild): AgentRunner => ({
+  run: (agent, input, inherit, history) =>
+    Effect.gen(function* () {
+      const context = yield* Effect.serviceOption(ToolContext)
+      const parent = Option.isSome(context) ? context.value : undefined
+      const inheritedAgent = parent?.agent === undefined ? agent : yield* applyInheritance(parent.agent, agent, inherit)
+      const parentHistory = history ?? (parent?.history === undefined ? undefined : yield* parent.history)
+      const historyProjection = inheritedHistory(inherit.history, parentHistory)
+      return yield* execute(inheritedAgent, input, {
+        ...Object.assign({}, inherit.budget === undefined ? undefined : { budget: inherit.budget }),
+        ...Object.assign({}, historyProjection === undefined ? undefined : { history: historyProjection }),
+      })
+    }),
+})
+
 /** Process-local child runner supplied by Agent.run and absent under a hosted Runtime. */
 export interface ProcessRunnerService {
-  readonly run: (child: AnyChild, budget?: BudgetLimits) => Effect.Effect<BoundaryValue, RunError>
+  readonly run: (child: AnyChild) => Effect.Effect<BoundaryValue, RunError>
 }
 
 /** @internal Optional recursive Agent.run capability for model-authored process-local fan-out. */
@@ -61,10 +227,10 @@ export class ProcessRunner extends Context.Service<ProcessRunner, ProcessRunnerS
   "generalist/core/agent/lifecycle/fan-out/ProcessRunner",
 ) {}
 
-const executeChild = (runner: AgentRunner, invocation: AnyChild, budget?: BudgetLimits) => {
+const executeChild = (runner: AgentRunner, invocation: AnyChild) => {
   const hiddenAgent: unknown = invocation.agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.child accepts only Agent definitions and preserves the paired input before existential erasure.
-  return runner.run(hiddenAgent as ErasedAgent, invocation.input, budget)
+  return runner.run(hiddenAgent as ErasedAgent, invocation.input, invocation.inherit, invocation.history)
 }
 
 /** @internal Close a recursive runner over the caller's exact process-local Agent environment. */
@@ -72,15 +238,22 @@ const executeChild = (runner: AgentRunner, invocation: AnyChild, budget?: Budget
 export const processRunner = <R>(context: Context.Context<R>, runner: AgentRunner): ProcessRunnerService => {
   const erased = Context.makeUnsafe<unknown>(context.mapUnsafe)
   return ProcessRunner.of({
-    run: (invocation, budget) => executeChild(runner, invocation, budget).pipe(Effect.provideContext(erased)),
+    run: (invocation) => executeChild(runner, invocation).pipe(Effect.provideContext(erased)),
   })
 }
 
 /** Construct one lazy typed child invocation. */
 export const child: {
-  <A extends AnyAgent>(input: Input<A>): (agent: A) => Child<A>
-  <A extends AnyAgent>(agent: A, input: Input<A>): Child<A>
-} = Function.dual(2, <A extends AnyAgent>(agent: A, input: Input<A>): Child<A> => ({ agent, input }))
+  <A extends AnyAgent>(input: Input<A>, options?: { readonly inherit?: InheritanceOptions }): (agent: A) => Child<A>
+  <A extends AnyAgent>(agent: A, input: Input<A>, options?: { readonly inherit?: InheritanceOptions }): Child<A>
+} = Function.dual(
+  (args) => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId),
+  <A extends AnyAgent>(agent: A, input: Input<A>, options?: { readonly inherit?: InheritanceOptions }): Child<A> => ({
+    agent,
+    input,
+    inherit: inheritance(options?.inherit),
+  }),
+)
 
 /** @internal Execute one fan-out through the caller-owned Agent runner. */
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal adapter with three required direct-style arguments.

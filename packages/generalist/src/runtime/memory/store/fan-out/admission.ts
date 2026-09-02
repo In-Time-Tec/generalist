@@ -54,7 +54,7 @@ interface AdmissionPlan {
 }
 
 const linkedDetailsFor = (member: StoredFanOutMember, readiness: FanOutMemberResult["readiness"]) => {
-  const base = { readiness, key: member.key }
+  const base = { readiness, key: member.key, inherit: member.inherit }
   if (member.label !== undefined && member.origin !== undefined)
     return { ...base, label: member.label, origin: member.origin }
   if (member.label !== undefined) return { ...base, label: member.label }
@@ -293,7 +293,7 @@ export const admitFanOut: {
     const memberBudget = split(input.budgetDivisor ?? members.length)(childGrant(available, members.length))
     const memberBudgets: Array<BudgetLimits> = []
     for (const member of members) {
-      const narrowed = narrowGrant(memberBudget, member.budget)
+      const narrowed = narrowGrant(memberBudget, member.inherit.budget)
       if (narrowed === undefined) {
         return yield* FanOutInvalid.make({
           message: `fan-out member '${member.key}' budget exceeds its reserved share`,

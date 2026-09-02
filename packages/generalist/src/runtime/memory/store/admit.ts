@@ -23,6 +23,7 @@ import { make as makeMessage, type Message } from "../../messaging/message.js"
 import type { SpawnInput, StartReceipt } from "../../service.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../append.js"
 import { childDigest, rootDigest, startDigest } from "../digest.js"
+import { defaultInheritance } from "../../../core/agent/lifecycle/fan-out.js"
 import { enqueueLane, promoteHead } from "../lanes.js"
 import { idempotencyKey, laneKey, type MemoryState, type StoredRun } from "../state.js"
 import { make as makeAddress } from "../../address.js"
@@ -441,6 +442,7 @@ export const admitSpawn: {
         parent.runId,
         childLinkedEvent(runId, input.invocationId, input.selection, input.message.prompt, parent.depth + 1, {
           ...childDetails(childReadiness, input),
+          inherit: defaultInheritance,
           budget: childBudget,
         }),
       )

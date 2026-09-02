@@ -331,6 +331,7 @@ const streamInternalImpl = <
         agent,
         staticToolkit,
         chat,
+        lastWirePrompt: yield* Ref.make<Prompt.Prompt | undefined>(undefined),
         sessionId,
         executor,
         authorizer,
@@ -348,7 +349,7 @@ const streamInternalImpl = <
           : makeToolExecution({ ...toolContext, handoffState: handoffStateRef })
       const { resumeApproved, toolCallEvents, transformResolved } = toolRuntime
       const modelContext = {
-        agent,
+        ...toolContext,
         modelSource,
         resilienceService,
         activeModelResponse,
@@ -362,10 +363,7 @@ const streamInternalImpl = <
         replayMessages: (sessionParentId: string) =>
           replayModelMessages({ activeSession, sessionParentId, system, turn: state.turn, sessionError }),
         emitTelemetry,
-        chat,
         compactionService,
-        state,
-        errorMessage,
         toolCallEvents,
       }
       const modelRuntime =

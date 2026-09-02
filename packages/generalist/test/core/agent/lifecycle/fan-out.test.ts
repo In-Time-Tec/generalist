@@ -28,6 +28,38 @@ const typedFanOutProof: Assert<
   >
 > = true
 
+it("normalizes every child inheritance field and its safe defaults", () => {
+  expect(Agent.child(stringAgent, "default").inherit).toEqual({
+    history: "none",
+    tools: "attenuate",
+    permissions: "inherit",
+    sandbox: "fork",
+    instructions: "inherit",
+    memory: "inherit",
+  })
+  expect(
+    Agent.child(stringAgent, "explicit", {
+      inherit: {
+        history: "full",
+        tools: "same",
+        permissions: "fresh",
+        budget: { usd: 1 },
+        sandbox: "share",
+        instructions: "own",
+        memory: "fresh",
+      },
+    }).inherit,
+  ).toEqual({
+    history: "full",
+    tools: "same",
+    permissions: "fresh",
+    budget: { usd: 1 },
+    sandbox: "share",
+    instructions: "own",
+    memory: "fresh",
+  })
+})
+
 const textDelta = (text: string) => Response.makePart("text-delta", { id: "fan-out", delta: text })
 const promptText = (options: Parameters<Parameters<typeof LanguageModel.make>[0]["streamText"]>[0]): string =>
   JSON.stringify(options.prompt.content)
@@ -103,7 +135,7 @@ it.effect("executes AgentTool.fanOut without a caller-supplied handler", () => {
   const delegate = AgentTool.fanOut({
     name: "delegate",
     description: "Delegate independent tasks",
-    agents: { researcher: child },
+    agents: { researcher: { agent: child } },
     maxChildren: 2,
   })
   const toolkit = Toolkit.make(delegate)

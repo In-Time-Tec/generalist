@@ -4,6 +4,7 @@ import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
 import { AgentError, type Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
+import { applyInheritance, Inheritance } from "../../core/agent/lifecycle/fan-out.js"
 import { type DriverCheckpoint, DriverJournal, type DriverOperation, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim, type Service as RunStoreService } from "../run/store.js"
@@ -479,7 +480,17 @@ const makeFor = (
                 yield* runHosted(codeMode === undefined ? withChildren : withCodeModeTool(withChildren, codeMode))
               })
 
-            yield* resolved.agent.open(runClosed)
+            yield* resolved.agent.open((agent, environment) =>
+              Effect.gen(function* () {
+                const policy = Schema.decodeUnknownOption(Inheritance)(claimed.message.metadata.childInheritancePolicy)
+                const parentName = Schema.decodeUnknownOption(Schema.String)(claimed.message.metadata.parentAgentName)
+                if (Option.isNone(policy) || Option.isNone(parentName)) return yield* runClosed(agent, environment)
+                const parent = yield* agents.get(parentName.value)
+                if (Option.isNone(parent)) return yield* runClosed(agent, environment)
+                const inherited = yield* applyInheritance(parent.value.source, agent, policy.value)
+                return yield* runClosed(inherited, environment)
+              }).pipe(Effect.orDie),
+            )
           }),
         )
         const cancellationRequested = store.loadExecution(runId).pipe(

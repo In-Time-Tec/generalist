@@ -4,7 +4,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { ExecutableRef } from "../executable/manifest.js"
 import type { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 import { promptDigestValue } from "../run/prompt-digest.js"
-import type { BudgetLimits } from "../../core/durable/run-budget.js"
+import { Inheritance, type InheritanceOptions } from "../../core/agent/lifecycle/fan-out.js"
 
 export const FanOutMemberOrigin = Schema.Struct({
   parentToolCallId: Schema.optionalKey(Schema.String),
@@ -20,7 +20,7 @@ export interface FanOutMemberInput {
   readonly sessionId?: string
   readonly metadata?: Readonly<Record<string, typeof Schema.Unknown.Type>>
   readonly origin?: FanOutMemberOrigin
-  readonly budget?: BudgetLimits
+  readonly inherit?: InheritanceOptions
 }
 
 export interface FanOutInput {
@@ -47,7 +47,7 @@ export interface StoredFanOutMember {
   readonly sessionId: string
   readonly metadata: Readonly<Record<string, typeof Schema.Unknown.Type>>
   readonly origin?: FanOutMemberOrigin
-  readonly budget?: BudgetLimits
+  readonly inherit: Inheritance
 }
 
 export interface AdmitFanOutInput {
@@ -139,6 +139,6 @@ export const digestFanOut = (input: {
       sessionId: member.sessionId,
       metadata: member.metadata,
       origin: member.origin ?? null,
-      budget: member.budget ?? null,
+      inherit: member.inherit,
     })),
   })

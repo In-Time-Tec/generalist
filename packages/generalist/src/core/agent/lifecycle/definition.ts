@@ -83,6 +83,7 @@ export interface Any {
   readonly policy: Policy<unknown>
   readonly model?: ModelSelection
   readonly memory?: Key
+  readonly authorization?: Authorizer<unknown>
   readonly toolScheduling: ToolSchedulingPolicy
   readonly metadata?: AgentMetadata
   readonly budget?: BudgetLimits

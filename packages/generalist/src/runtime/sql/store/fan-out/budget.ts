@@ -15,7 +15,7 @@ export const allocateMemberBudgets = (
     const share = split(input.budgetDivisor ?? members.length)(childGrant(available, members.length))
     const budgets = new Map<string, BudgetLimits>()
     for (const member of members) {
-      const narrowed = narrowGrant(share, member.budget)
+      const narrowed = narrowGrant(share, member.inherit.budget)
       if (narrowed === undefined) {
         return yield* FanOutInvalid.make({
           message: `fan-out member '${member.key}' budget exceeds its reserved share`,

@@ -23,7 +23,7 @@ const failureFixture = (onFailure: "collect" | "failFast") => {
   const delegate = AgentTool.fanOut({
     name: `delegate_${onFailure}`,
     description: "Exercise durable child failure policy",
-    agents: { worker },
+    agents: { worker: { agent: worker } },
     maxChildren: 2,
   })
   const parent = Agent.make({ name: `durable-${onFailure}-parent`, toolkit: Toolkit.make(delegate) })
@@ -94,11 +94,16 @@ it.effect("runs typed durable children under the parent and returns their ordere
   const delegate = AgentTool.fanOut({
     name: "delegate_research",
     description: "Research independent topics",
-    agents: { researcher },
+    agents: {
+      researcher: { agent: researcher, inherit: { history: "full" } },
+      constrained: { agent: researcher, inherit: { budget: { tokens: 10 } } },
+    },
     maxChildren: 4,
   })
   const parent = Agent.make({ name: "durable-parent", toolkit: Toolkit.make(delegate) })
   let parentCalls = 0
+  let parentPrefix: ReadonlyArray<unknown> = []
+  const childPrompts: Array<ReadonlyArray<unknown>> = []
   const model = Layer.effect(
     LanguageModel.LanguageModel,
     LanguageModel.make({
@@ -107,6 +112,7 @@ it.effect("runs typed durable children under the parent and returns their ordere
         if (tools(options).includes("delegate_research")) {
           parentCalls += 1
           if (parentCalls === 1) {
+            parentPrefix = options.prompt.content
             return Stream.fromIterable([
               Response.makePart("tool-call", {
                 id: "fan-out-call",
@@ -114,7 +120,7 @@ it.effect("runs typed durable children under the parent and returns their ordere
                 params: {
                   children: [
                     { agent: "researcher", input: "alpha" },
-                    { agent: "researcher", input: "beta", budget: { tokens: 10 } },
+                    { agent: "constrained", input: "beta" },
                   ],
                   concurrency: 2,
                   onFailure: "collect",
@@ -130,6 +136,7 @@ it.effect("runs typed durable children under the parent and returns their ordere
           ])
         }
         const prompt = JSON.stringify(options.prompt.content)
+        childPrompts.push(options.prompt.content)
         return Stream.fromIterable([
           Response.makePart("text-delta", {
             id: "child",
@@ -167,6 +174,8 @@ it.effect("runs typed durable children under the parent and returns their ordere
           yield* store.claimExecution({ runId: child.run.runId, ownerId: `fan-out-child-${index}` }),
         )
       }
+      const fullChildPrompt = childPrompts.find((prompt) => JSON.stringify(prompt).includes("alpha")) ?? []
+      expect(fullChildPrompt.slice(0, parentPrefix.length)).toEqual(parentPrefix)
 
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "running",
@@ -180,6 +189,10 @@ it.effect("runs typed durable children under the parent and returns their ordere
       expect(history.filter((event) => event._tag === "ChildLinked").map((event) => event.budget?.tokens)).toEqual([
         24, 10,
       ])
+      expect(history.filter((event) => event._tag === "ChildLinked").map((event) => event.inherit.history)).toEqual([
+        "full",
+        "none",
+      ])
       const completion = history.find(
         (event) => event._tag === "ToolExecutionCompleted" && event.call.name === "delegate_research",
       )
@@ -188,6 +201,71 @@ it.effect("runs typed durable children under the parent and returns their ordere
         { _tag: "Success", value: "beta result" },
       ])
       expect(history.map((event) => event._tag)).toContain("FanOutJoined")
+    }),
+  )
+})
+
+it.effect("rejects a child tool set wider than its parent before admission", () => {
+  const leaf = Agent.make({ name: "authority-leaf" })
+  const widerTool = AgentTool.fanOut({
+    name: "wider_child_tool",
+    description: "Authority unavailable to the parent",
+    agents: { leaf: { agent: leaf } },
+    maxChildren: 1,
+  })
+  const child = Agent.make({ name: "authority-child", toolkit: Toolkit.make(widerTool) })
+  const delegate = AgentTool.fanOut({
+    name: "delegate_authority",
+    description: "Attempt an invalid delegation",
+    agents: { child: { agent: child } },
+    maxChildren: 1,
+  })
+  const parent = Agent.make({ name: "authority-parent", toolkit: Toolkit.make(delegate) })
+  let calls = 0
+  const model = Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText: () => {
+        calls += 1
+        return calls === 1
+          ? Stream.fromIterable([
+              Response.makePart("tool-call", {
+                id: "authority-call",
+                name: delegate.name,
+                params: { children: [{ agent: "child", input: "attempt" }] },
+                providerExecuted: false,
+              }),
+              Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
+            ])
+          : Stream.fromIterable([Response.makePart("text-delta", { id: "done", delta: "recovered" }), finish])
+      },
+    }),
+  )
+  const layer = Layer.merge(
+    Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    ),
+    Layer.merge(allowAllAuthorization, model),
+  )
+  return provideScoped(
+    layer,
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const executor = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore.RunStore
+      yield* runtime.register(parent)
+      const handle = yield* runtime.start(parent, "delegate")
+      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "authority-parent" }))
+      expect(yield* handle.await).toBe("recovered")
+      expect((yield* runtime.inspect(handle.runId)).children).toEqual([])
+      const history = yield* runtime.history({ runId: handle.runId, limit: 100 })
+      const completion = history.find(
+        (event) => event._tag === "ToolExecutionCompleted" && event.call.name === delegate.name,
+      )
+      expect(yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(completion)).toContain(
+        "generalist/core/ChildExceedsParent",
+      )
     }),
   )
 })

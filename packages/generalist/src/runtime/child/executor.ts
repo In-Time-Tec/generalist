@@ -1,14 +1,16 @@
-import { Context, Effect, Exit, Layer, Option, Schema, SchemaIssue } from "effect"
+import { Context, Effect, Exit, Layer, Option, Result, Schema, SchemaIssue } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import { AgentError } from "../../core/agent/event.js"
+import { AgentError, ChildExceedsParent } from "../../core/agent/event.js"
 import type { Agent, ClosedServices } from "../../core/agent/service.js"
 import { RunError } from "../../core/agent/run/error.js"
 import {
   definition as agentFanOutDefinition,
   type Definition as AgentFanOutDefinition,
+  validateAuthority,
   withoutFanOut,
 } from "../../core/agent/tool/fan-out.js"
-import { Exhausted, type BudgetLimits } from "../../core/durable/run-budget.js"
+import { Exhausted } from "../../core/durable/run-budget.js"
+import { inheritedHistory, inheritance, type InheritanceOptions } from "../../core/agent/lifecycle/fan-out.js"
 import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
@@ -72,7 +74,8 @@ export interface FanOutGroupInput {
     readonly selection: string
     readonly label?: string
     readonly prompt: Prompt.RawInput
-    readonly budget?: BudgetLimits
+    readonly inherit?: InheritanceOptions
+    readonly history?: Prompt.Prompt
   }>
   readonly concurrency?: number
   readonly budgetDivisor?: number
@@ -104,6 +107,10 @@ const ErrorMessage = Schema.Struct({ message: Schema.String })
 const domainFailure = <Error>(error: Error): DomainFailure => {
   if (Schema.is(Exhausted)(error)) {
     return { _tag: "DomainFailure", failure: error, encodedFailure: Schema.encodeSync(Exhausted)(error) }
+  }
+  if (Schema.is(ChildExceedsParent)(error)) {
+    const failure = { message: error.message, failure: error }
+    return { _tag: "DomainFailure", failure: error, encodedFailure: Schema.encodeSync(Failure)(failure) }
   }
   const decoded = Schema.decodeUnknownOption(ErrorMessage)(error)
   const failure =
@@ -233,7 +240,16 @@ const makeExecutor = <
       }
       const environment = yield* Layer.build(options.environment)
       const parameters = yield* decodeFanOut(request, definition, environment)
+      const authority = yield* Effect.result(
+        validateAuthority(
+          options.agent,
+          definition,
+          parameters.children.map((member) => member.agent),
+        ),
+      )
+      if (Result.isFailure(authority)) return domainFailure(authority.failure)
       const members: Array<FanOutGroupInput["members"][number]> = []
+      const parentHistory = context.history === undefined ? undefined : yield* context.history
       for (const [index, member] of parameters.children.entries()) {
         const prompt = yield* definition
           .encodeInput(member.agent, member.input, environment)
@@ -242,11 +258,14 @@ const makeExecutor = <
               FrameworkFailure.make({ stage: "decode-input", tool: request.call.name, message: error.message }),
             ),
           )
+        const inherit = inheritance(member.inherit)
+        const history = inheritedHistory(inherit.history, parentHistory)
         members.push({
           key: String(index),
           selection: member.agent,
           prompt,
-          ...Object.assign({}, member.budget === undefined ? undefined : { budget: member.budget }),
+          inherit,
+          ...Object.assign({}, history === undefined ? undefined : { history }),
         })
       }
       const failFast = (parameters.onFailure ?? "collect") === "failFast"

@@ -7,6 +7,7 @@ import { digest as messageDigest } from "../../messaging/mailbox.js"
 import type { InitialFanOutInput } from "../../service.js"
 import { normalizeInitialFanOut } from "../start.js"
 import { normalizePrompt } from "../prompt.js"
+import { inheritance } from "../../../core/agent/lifecycle/fan-out.js"
 
 type MessageDraft = {
   id: string
@@ -28,11 +29,12 @@ type MessageDraftSource = Omit<MessageDraft, "from" | "causationId" | "inReplyTo
   metadata: Metadata
 }
 
-type NormalizedFanOutMember = ReturnType<typeof normalizeInitialFanOut>["members"][number] & {
+type NormalizedFanOutMember = Omit<ReturnType<typeof normalizeInitialFanOut>["members"][number], "inherit"> & {
   readonly ordinal: number
   readonly childRunId: string
   readonly sessionId: string
   readonly metadata: NonNullable<InitialFanOutInput["members"][number]["metadata"]>
+  readonly inherit: import("../../../core/agent/lifecycle/fan-out.js").Inheritance
 }
 
 type MessageDigestInput = Parameters<typeof messageDigest>[0]
@@ -90,9 +92,9 @@ export const normalizedFanOutMember = (input: {
     prompt: normalizePrompt(member.prompt),
     sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
     metadata: member.metadata ?? {},
+    inherit: inheritance(member.inherit),
   }
   if (member.label !== undefined) normalized.label = member.label
   if (member.origin !== undefined) normalized.origin = member.origin
-  if (member.budget !== undefined) normalized.budget = member.budget
   return normalized
 }

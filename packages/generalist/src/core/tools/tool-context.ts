@@ -1,4 +1,6 @@
 import { Context, Effect, Layer, Schema } from "effect"
+import type { Prompt } from "effect/unstable/ai"
+import type { Any as AnyAgent } from "../agent/lifecycle/definition.js"
 
 /** A progress update emitted by a running tool. */
 export interface Progress {
@@ -22,6 +24,10 @@ export interface Service {
   readonly attempt?: number
   readonly admittedAt?: string
   readonly deadline?: string
+  /** @internal Exact live transcript available to child inheritance at a tool-spawn boundary. */
+  readonly history?: Effect.Effect<Prompt.Prompt>
+  /** @internal Parent definition used to attenuate process-local children. */
+  readonly agent?: AnyAgent
 }
 export class ToolContext extends Context.Service<ToolContext, Service>()(
   "generalist/core/tools/tool-context/ToolContext",

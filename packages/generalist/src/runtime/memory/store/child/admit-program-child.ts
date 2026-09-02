@@ -18,6 +18,7 @@ import { idempotencyKey, type MemoryState, type StoredRun } from "../../state.js
 import { readinessForAdmission } from "./capacity.js"
 import { suspend } from "../control/suspend.js"
 import { revokeSession } from "../execution.js"
+import { defaultInheritance } from "../../../../core/agent/lifecycle/fan-out.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
 
@@ -146,7 +147,7 @@ export const admitProgramChild: {
         input.executableRef.active,
         input.message.prompt,
         parent.depth + 1,
-        { readiness: childReadiness, budget: childBudget },
+        { readiness: childReadiness, inherit: defaultInheritance, budget: childBudget },
       ),
     )
     next = linked
