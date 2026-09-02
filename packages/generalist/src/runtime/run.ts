@@ -111,7 +111,8 @@ const hasValidExecutable = (value: {
   }
 }
 
-export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = Schema.Struct({
+/** Field schemas shared by `RunInspection` and the schemas that extend it. */
+export const RunInspectionFields = {
   runId: RunId,
   status: RunStatus,
   executableRef: ExecutableRef,
@@ -124,7 +125,9 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   durability: Schema.Literals(["ephemeral", "durable"]),
   branches: Schema.Array(RunBranch),
-}).pipe(
+} as const
+
+export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = Schema.Struct(RunInspectionFields).pipe(
   Schema.refine((value): value is typeof value => hasValidExecutable(value), {
     message: "executableRef must match executableManifest",
   }),

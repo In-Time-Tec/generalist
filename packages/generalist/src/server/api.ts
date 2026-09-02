@@ -6,15 +6,12 @@ import { HostEvent } from "../host/event.js"
 import { HostSession } from "../runtime/session/host.js"
 import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
-import { RawUsageFact, RunBranch, RunId, RunInspection, RunOutcome, RunStatus } from "../runtime/run.js"
+import { RawUsageFact, RunInspection, RunInspectionFields, RunOutcome, RunStatus } from "../runtime/run.js"
 import { AgentLoopEventSchema } from "../runtime/run/event.js"
 import type { RuntimeInspection } from "../runtime/service.js"
 import { isInspectionEvent } from "../runtime/execution/agent/event.js"
 import { ChildReadiness } from "../runtime/child/readiness.js"
 import { ExecutionSuspension } from "../runtime/execution/state.js"
-import { ExecutableManifest, ExecutableRef } from "../runtime/executable/manifest.js"
-import { TreePolicy } from "../runtime/tree/policy.js"
-import { RunWait } from "../runtime/run/wait.js"
 import { Authentication } from "./auth.js"
 import { ApiError, apiErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
@@ -85,18 +82,7 @@ const listRuns = HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
 })
 const InspectionLastEvent = AgentLoopEventSchema.pipe(Schema.refine(isInspectionEvent))
 const RuntimeInspectionResponse: Schema.Codec<RuntimeInspection, unknown> = Schema.Struct({
-  runId: RunId,
-  status: RunStatus,
-  executableRef: ExecutableRef,
-  executableManifest: ExecutableManifest,
-  parentRunId: Schema.optionalKey(RunId),
-  childReadiness: Schema.optionalKey(ChildReadiness),
-  depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  treePolicy: TreePolicy,
-  waits: Schema.Array(RunWait),
-  lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
-  durability: Schema.Literals(["ephemeral", "durable"]),
-  branches: Schema.Array(RunBranch),
+  ...RunInspectionFields,
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   usage: Schema.Struct({ inputTokens: Schema.Finite, outputTokens: Schema.Finite }),
   usageFacts: Schema.Array(RawUsageFact),
