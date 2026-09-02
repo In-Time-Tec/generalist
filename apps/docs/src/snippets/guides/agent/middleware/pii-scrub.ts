@@ -2,6 +2,11 @@ import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, Guardrail, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const lastUserText = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")
   const last = userMessages.at(-1)
@@ -22,6 +27,7 @@ const modelLayer = Layer.effect(
           id: "assistant",
           delta: `Received: ${lastUserText(options.prompt)} Escalate to oncall@example.com if needed.`,
         }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
       ),
   }),
 )

@@ -1,6 +1,7 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, AgentEvent, Approvals, ModelMiddleware, Permissions, Policy } from "generalist"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 
 const lookupTool = Tool.make("lookup", {
   description: "Look up one fact",
@@ -16,25 +17,10 @@ const agent = Agent.make({
   policy: Policy.recurs(1),
 })
 
-let calls = 0
-
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => {
-      calls += 1
-      return Stream.make(
-        Response.makePart("tool-call", {
-          id: `lookup-${calls}`,
-          name: "lookup",
-          params: { topic: `fact-${calls}` },
-          providerExecuted: false,
-        }),
-      )
-    },
-  }),
-)
+const modelLayer = TestModel.layer([
+  TestModel.toolCall("lookup", { topic: "fact-1" }, { id: "lookup-1" }),
+  TestModel.toolCall("lookup", { topic: "fact-2" }, { id: "lookup-2" }),
+])
 
 const program = Effect.gen(function* () {
   const failure = yield* Agent.run(agent, "Keep looking things up.").pipe(Effect.flip)

@@ -2,6 +2,11 @@ import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, Handoff, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -12,6 +17,7 @@ const modelLayer = Layer.effect(
           id: "assistant",
           delta: `done: ${JSON.stringify(options.prompt.content).slice(0, 32)}`,
         }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
       ),
   }),
 )

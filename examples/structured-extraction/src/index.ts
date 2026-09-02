@@ -1,16 +1,8 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { LanguageModel, Response } from "effect/unstable/ai"
-
-type ModelParams = Parameters<typeof LanguageModel.make>[0]
+import { TestModel } from "generalist/testing"
 
 const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
-
-const modelLayer = (
-  streamText: ModelParams["streamText"],
-  generateText: ModelParams["generateText"],
-): Layer.Layer<LanguageModel.LanguageModel> =>
-  Layer.effect(LanguageModel.LanguageModel, LanguageModel.make({ streamText, generateText }))
 
 const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data.", output: invoiceSchema })
 
@@ -20,10 +12,10 @@ const program = Effect.gen(function* () {
 })
 
 const runtimeLayer = Layer.mergeAll(
-  modelLayer(
-    () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
-    () => Effect.succeed([{ type: "text", text: '{"output":{"total":42,"currency":"USD"}}' }]),
-  ),
+  TestModel.layer([
+    TestModel.text("Extracting invoice."),
+    TestModel.object({ output: { total: 42, currency: "USD" } }),
+  ]),
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
   Permissions.layerAllowAll,
   Approvals.layerAutoApprove,

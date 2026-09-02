@@ -1,5 +1,5 @@
 import { Console, Effect, Equal, Layer, Schema } from "effect"
-import { Agent } from "generalist"
+import { Agent, Approvals, Permissions } from "generalist"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { TestModel } from "generalist/testing"
 
@@ -31,13 +31,17 @@ const program = Effect.gen(function* () {
       Layer.build(
         fixture.layer.pipe(
           Layer.provideMerge(
-            toolkit.toLayer({
-              lookup_order: (params) =>
-                Effect.sync(() => {
-                  executedCalls.push(params)
-                  return "shipped yesterday"
-                }),
-            }),
+            Layer.mergeAll(
+              toolkit.toLayer({
+                lookup_order: (params) =>
+                  Effect.sync(() => {
+                    executedCalls.push(params)
+                    return "shipped yesterday"
+                  }),
+              }),
+              Permissions.layerAllowAll,
+              Approvals.layerAutoApprove,
+            ),
           ),
         ),
       ),

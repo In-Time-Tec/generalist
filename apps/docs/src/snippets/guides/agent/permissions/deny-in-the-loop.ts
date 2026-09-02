@@ -1,6 +1,7 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 
 const dropTableTool = Tool.make("drop_table", {
   description: "Drop a database table",
@@ -16,28 +17,14 @@ const permissionsLayer = Permissions.layerRuleset({
   fallback: "allow",
 })
 
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () =>
-      Stream.make(
-        Response.makePart("tool-call", {
-          id: "drop-1",
-          name: "drop_table",
-          params: { table: "users" },
-          providerExecuted: false,
-        }),
-      ),
-  }),
-)
+const modelLayer = TestModel.layer([TestModel.toolCall("drop_table", { table: "users" }, { id: "drop-1" })])
 
 const program = Effect.gen(function* () {
   const result = yield* Agent.run(agent, "Drop the users table.")
   yield* Console.log(result)
 }).pipe(
-  Effect.catchTag("generalist/core/FrameworkFailure", (failure) =>
-    Console.log(`${failure.tool} ${failure.stage}: ${failure.message}`),
+  Effect.catchTag("generalist/core/PermissionDenied", (failure) =>
+    Console.log(`drop_table authorization: ${failure.message}`),
   ),
 )
 

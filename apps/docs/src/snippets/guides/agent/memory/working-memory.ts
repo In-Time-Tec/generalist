@@ -3,6 +3,11 @@ import { Agent, Approvals, Memory, ModelMiddleware, Permissions, ToolExecutor } 
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { WorkingMemory } from "generalist/memory"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const key: Memory.Key = { agent: "support-agent", subject: "user-ada" }
 
 const agent = Agent.make({ name: "support-agent" })
@@ -14,7 +19,10 @@ const modelLayer = Layer.effect(
     streamText: (options) => {
       const content = JSON.stringify(options.prompt.content)
       const text = content.includes("Ada prefers dark mode") ? "Ada prefers dark mode." : "Noted."
-      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
+      return Stream.make(
+        Response.makePart("text-delta", { id: "assistant", delta: text }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+      )
     },
   }),
 )

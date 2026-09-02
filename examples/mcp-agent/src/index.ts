@@ -1,9 +1,9 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
-import { LanguageModel, Response, Tool } from "effect/unstable/ai"
+import { Tool } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 import { MCPClient } from "generalist/unstable/mcp"
 import { layerToolkit, toolkit } from "generalist/unstable/mcp/tools"
-type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const client: MCPClient.Service = {
   server: "local",
@@ -28,31 +28,11 @@ const client: MCPClient.Service = {
   ]),
 }
 
-const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<LanguageModel.LanguageModel> =>
-  Layer.effect(
-    LanguageModel.LanguageModel,
-    LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText,
-    }),
-  )
-
-let calls = 0
-
 const runtimeLayer = Layer.mergeAll(
-  modelLayer(() => {
-    calls += 1
-    return calls === 1
-      ? Stream.make(
-          Response.makePart("tool-call", {
-            id: "search-1",
-            name: "local_search",
-            params: { query: "setup" },
-            providerExecuted: false,
-          }),
-        )
-      : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
-  }),
+  TestModel.layer([
+    TestModel.toolCall("local_search", { query: "setup" }, { id: "search-1" }),
+    TestModel.text("Found local setup docs."),
+  ]),
   layerToolkit(client),
   Permissions.layerAllowAll,
   Approvals.layerAutoApprove,

@@ -2,6 +2,11 @@ import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, SkillCatalog, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const releaseNotesSkill: SkillCatalog.Skill = {
   name: "release-notes",
   description: "Draft release notes from merged changes before announcing a version.",
@@ -28,6 +33,7 @@ const modelLayer = Layer.effect(
             params: { name: "release-notes" },
             providerExecuted: false,
           }),
+          Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
         )
       }
       const bodyLoaded = JSON.stringify(options.prompt.content).includes("one sentence per change")
@@ -36,6 +42,7 @@ const modelLayer = Layer.effect(
           id: "assistant",
           delta: bodyLoaded ? "Skill body loaded; drafting the release notes." : "Skill body missing.",
         }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
       )
     },
   }),

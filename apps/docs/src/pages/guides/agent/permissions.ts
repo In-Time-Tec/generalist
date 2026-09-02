@@ -51,7 +51,7 @@ export const permissions = definePage({
       " turns the ruleset into a static policy layer. A denied call never reaches the executor: the host receives your ",
       code("reason"),
       " in a typed ",
-      code("FrameworkFailure"),
+      code("PermissionDenied"),
       ", which the host handles without inventing a value outside the tool's declared failure schema:",
     ),
     codeBlock({ label: "deny-in-the-loop.ts", source: denyInTheLoop, expectedOutput: denyInTheLoopExpected }),
