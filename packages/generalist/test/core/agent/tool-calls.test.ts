@@ -392,11 +392,7 @@ it.effect("resumes exact approval identity and completed replay without duplicat
       Stream.runCollect,
       Effect.provide(Approvals.layerAutoApprove),
     )
-    expect(replayed.map((event) => event._tag)).toEqual([
-      "ApprovalRequested",
-      "ToolExecutionStarted",
-      "ToolExecutionCompleted",
-    ])
+    expect(replayed.map((event) => event._tag)).toEqual(["ApprovalRequested", "ToolExecutionCompleted"])
     expect(replayed.at(-1)).toMatchObject({
       _tag: "ToolExecutionCompleted",
       call: { id: "gated-1", name: "gated" },

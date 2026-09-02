@@ -1,4 +1,4 @@
-import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./result.js"
@@ -124,6 +124,8 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     handoffState === undefined
       ? Effect.succeed(agent.name)
       : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.name))
+  const unlessBlocked = <E, R>(reason: string | undefined, execute: () => Effect.Effect<Outcome, E, R>) =>
+    reason === undefined ? execute() : Effect.succeed(hookBlockedOutcome("ToolCall", reason))
 
   const defaultExecute = (
     request: Request,
@@ -265,32 +267,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     )
   }
 
-  const toolOutcome = (
-    turn: number,
-    call: AnyToolCall,
-    request: Request,
-    registry: Registry,
-    handoffExecution: ReturnType<typeof handoffDispatch> | undefined,
-    requestExecutor: typeof ToolExecutor.Service | undefined,
-    skillActivation: boolean,
-    operation: string,
-    blockedReason: string | undefined,
-  ) =>
-    blockedReason === undefined
-      ? memoizeRegistered({
-          registry,
-          name: call.name,
-          skillActivation,
-          handoff: handoffExecution !== undefined,
-          params: call.params,
-          run: options.invocation?.runId ?? sessionId,
-          operation,
-          execute: executionFor(turn, call, request, registry, handoffExecution, requestExecutor, skillActivation).pipe(
-            Effect.flatMap((outcome) => boundOutcome(call, outcome)),
-          ),
-        })
-      : Effect.succeed(hookBlockedOutcome("ToolCall", blockedReason))
-
   const executeApproved = (
     turn: number,
     call: AnyToolCall,
@@ -298,115 +274,139 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     registry: Registry,
     blockedReason?: string,
   ): Stream.Stream<Event, RunError, ClosedServices<T, never> | DriverInterpreter> =>
-    Stream.concat(
-      Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
-      Stream.unwrap(
-        Effect.gen(function* () {
-          const progressQueue = yield* Effect.acquireRelease(makeProgressQueue(), Queue.shutdown)
-          const droppedProgress = yield* Ref.make(0)
-          const emitSemaphore = yield* Semaphore.make(1)
-          const signal = yield* Effect.abortSignal
-          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const durableOperationKey = makeOperationKey(logicalId, "tool", turn, call.id, call.name)
-          const invocation = options.invocation ?? {}
-          const emit = emitProgress(turn, call, progressQueue, droppedProgress, emitSemaphore)
-          const contextBase = {
-            signal,
-            sessionId,
-            runId,
-            agentName: request.agentName,
-            turn,
-            toolCallId: call.id,
-            operationKey: durableOperationKey,
-            idempotencyKey: durableOperationKey,
-            ...invocation,
-            emit,
-          }
-          const toolContext = ToolContext.of(contextBase)
-          const handoffExecution = handoffFor(request, registry)
-          const skillActivation = isSkillActivationCall(call, registry)
-          const requestExecutor =
-            !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
-          const replayPolicy = requestExecutor?.replayPolicy?.(request) ?? "never"
-          const cancellation =
-            requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
-              ? { cancellation: cancellableOperation(request) }
-              : {}
-          const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
-          const invocationPath =
-            handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-          const executionBase = toolOutcome(
-            turn,
-            call,
-            request,
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const startQueue = yield* Effect.acquireRelease(Queue.bounded<Event, Cause.Done>(1), Queue.shutdown)
+        const progressQueue = yield* Effect.acquireRelease(makeProgressQueue(), Queue.shutdown)
+        const startPersisted = yield* Deferred.make<void>()
+        const droppedProgress = yield* Ref.make(0)
+        const emitSemaphore = yield* Semaphore.make(1)
+        const signal = yield* Effect.abortSignal
+        const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+        const durableOperationKey = makeOperationKey(logicalId, "tool", turn, call.id, call.name)
+        const invocation = options.invocation ?? {}
+        const emit = emitProgress(turn, call, progressQueue, droppedProgress, emitSemaphore)
+        const contextBase = {
+          signal,
+          sessionId,
+          runId,
+          agentName: request.agentName,
+          turn,
+          toolCallId: call.id,
+          operationKey: durableOperationKey,
+          idempotencyKey: durableOperationKey,
+          ...invocation,
+          emit,
+        }
+        const toolContext = ToolContext.of(contextBase)
+        const handoffExecution = handoffFor(request, registry)
+        const skillActivation = isSkillActivationCall(call, registry)
+        const requestExecutor =
+          !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
+        const replayPolicy = requestExecutor?.replayPolicy?.(request) ?? "never"
+        const cancellation =
+          requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
+            ? { cancellation: cancellableOperation(request) }
+            : {}
+        const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
+        const invocationPath =
+          handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
+        const liveOutcome = unlessBlocked(blockedReason, () =>
+          memoizeRegistered({
             registry,
-            handoffExecution,
-            requestExecutor,
+            name: call.name,
             skillActivation,
-            durableOperationKey,
-            blockedReason,
-          ).pipe(Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)))
-          const execution = intercept(
-            {
-              kind: "tool",
-              key: durableOperationKey,
+            handoff: handoffExecution !== undefined,
+            params: call.params,
+            run: options.invocation?.runId ?? sessionId,
+            operation: durableOperationKey,
+            execute: executionFor(
               turn,
-              input: { turn, callId: call.id, name: call.name, ...cancellation },
-              replayPolicy,
-              success: Outcome,
-              failure: RunError,
-              applyCheckpoint: applyToolOutcome({
-                callIndex: request.toolCallIndex,
-                call,
-                operationKey: durableOperationKey,
-                activatedSkills,
-                invocationPath,
-                collapseSuspension: options.suspensionPropagation === "collapse-to-domain-failure",
-              }),
-            },
-            executionBase,
-          ).pipe(
-            Effect.tap((outcome) =>
-              Effect.gen(function* () {
-                if (!skillActivation || outcome._tag !== "Success") return
-                const activation = Schema.decodeUnknownOption(activateSkillSuccess)(outcome.result)
-                yield* activateSkillOutcome(turn, call, Option.isSome(activation) ? activation.value.body : undefined)
-              }),
-            ),
-          )
-          const toolBody = Effect.uninterruptibleMask((restore) =>
-            restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
-              Effect.flatMap((outcome) =>
-                Ref.get(droppedProgress).pipe(
-                  Effect.flatMap((dropped) =>
-                    outcomeEvent(
-                      turn,
-                      request.toolCallBatch,
-                      request.toolCallIndex,
-                      call,
-                      outcome,
-                      dropped,
-                      registry,
-                      durableOperationKey,
-                    ),
+              call,
+              request,
+              registry,
+              handoffExecution,
+              requestExecutor,
+              skillActivation,
+            ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome))),
+          }),
+        )
+        const start = Queue.offer(startQueue, { _tag: "ToolExecutionStarted", turn, call }).pipe(
+          Effect.ensuring(Queue.end(startQueue).pipe(Effect.asVoid)),
+          Effect.andThen(Deferred.await(startPersisted)),
+        )
+        const executionBase = start.pipe(
+          Effect.andThen(liveOutcome),
+          Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)),
+        )
+        const execution = intercept(
+          {
+            kind: "tool",
+            key: durableOperationKey,
+            turn,
+            input: { turn, callId: call.id, name: call.name, ...cancellation },
+            replayPolicy,
+            success: Outcome,
+            failure: RunError,
+            applyCheckpoint: applyToolOutcome({
+              callIndex: request.toolCallIndex,
+              call,
+              operationKey: durableOperationKey,
+              activatedSkills,
+              invocationPath,
+              collapseSuspension: options.suspensionPropagation === "collapse-to-domain-failure",
+            }),
+          },
+          executionBase,
+        ).pipe(
+          Effect.tap((outcome) =>
+            Effect.gen(function* () {
+              if (!skillActivation || outcome._tag !== "Success") return
+              const activation = Schema.decodeUnknownOption(activateSkillSuccess)(outcome.result)
+              yield* activateSkillOutcome(turn, call, Option.isSome(activation) ? activation.value.body : undefined)
+            }),
+          ),
+        )
+        const toolBody = Effect.uninterruptibleMask((restore) =>
+          restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
+            Effect.flatMap((outcome) =>
+              Ref.get(droppedProgress).pipe(
+                Effect.flatMap((dropped) =>
+                  outcomeEvent(
+                    turn,
+                    request.toolCallBatch,
+                    request.toolCallIndex,
+                    call,
+                    outcome,
+                    dropped,
+                    registry,
+                    durableOperationKey,
                   ),
                 ),
               ),
             ),
-          ).pipe(
-            Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
-            Effect.withSpan("Generalist.Agent.tool", {
-              attributes: {
-                "generalist.turn": turn,
-                "generalist.tool.call_id": call.id,
-                "generalist.tool.name": call.name,
-              },
-            }),
-          )
-          const fiber = yield* Effect.forkScoped(toolBody, { startImmediately: true })
-          return Stream.concat(Stream.fromQueue(progressQueue), Stream.fromEffect(Fiber.join(fiber)))
-        }),
-      ),
+          ),
+        ).pipe(
+          Effect.ensuring(Queue.end(startQueue).pipe(Effect.asVoid)),
+          Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
+          Effect.withSpan("Generalist.Agent.tool", {
+            attributes: {
+              "generalist.turn": turn,
+              "generalist.tool.call_id": call.id,
+              "generalist.tool.name": call.name,
+            },
+          }),
+        )
+        const fiber = yield* Effect.forkScoped(toolBody, { startImmediately: true })
+        const started = Stream.concat(
+          Stream.fromQueue(startQueue),
+          Stream.fromEffect(Deferred.succeed(startPersisted, undefined)).pipe(Stream.drain),
+        )
+        return Stream.concat(
+          started,
+          Stream.concat(Stream.fromQueue(progressQueue), Stream.fromEffect(Fiber.join(fiber))),
+        )
+      }),
     )
 
   const resumeApproved = (

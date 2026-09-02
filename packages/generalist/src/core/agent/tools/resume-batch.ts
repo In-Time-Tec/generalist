@@ -137,9 +137,11 @@ export const resumeBatch = <R, R2>(input: {
         )
         if (driverState.toolBatch === undefined) return
         yield* input.onCheckpoint(driverState.toolBatch)
-        const openWaits = waits(driverState.toolBatch)
-        if (openWaits.length > 0) {
-          return yield* AgentSuspended.make({ checkpoint: driverState.toolBatch, waits: openWaits })
+        const unresolvedWaits = waits(driverState.toolBatch).filter(
+          (wait) => resolutionFor(input.resolutions, wait.waitId) === undefined,
+        )
+        if (unresolvedWaits.length > 0) {
+          return yield* AgentSuspended.make({ checkpoint: driverState.toolBatch, waits: unresolvedWaits })
         }
       }),
   })

@@ -96,6 +96,7 @@ Successful output is JSON-sized at the common post-codec boundary before durable
 - Fresh admission requires the exact active static-tool snapshot, Session and logical-operation identities, turn, immutable authorization messages, and optional budget, invocation, and executable identity.
 - Recovery accepts only the persisted driver checkpoint, matching executable identity and authorization-message digest, plus an exact suspension resolution when resolving a wait.
 - The checkpoint is authoritative for calls, indexes, keys, active tools, turn, and remaining budget; hosts cannot inject a scheduler, authorizer, executor, toolkit, call index, or provider payload at recovery.
+- Resuming an authored-order batch skips waits resolved by the supplied resume and reaches each later barrier once; unresolved sibling waits remain suspended.
 - Authorization checks active membership, evaluates base permissions with remembered `RuleStore` rules as a last-match overlay, then calls `Approvals.resolve(Pending)` once for `Ask` or `needsApproval`.
 - `Approved` executes and remembers only an explicit `remember` rule; `Denied` fails; `Pending` suspends once.
 - `ApprovalRequested` contains canonical `{ approvalId, operation, capability, input }`; standalone IDs are the permission token or `approval:<tool-call-id>`, while hosted IDs add an encoded Run identity for durable token-only resolution. Adapters never replace the ID.
@@ -109,7 +110,7 @@ Successful output is JSON-sized at the common post-codec boundary before durable
 - `CancellationRequest` preserves execution plus operation key, attempt, Session, Run, root Run, tool-call, and tool-name identities; cancellation callbacks must be idempotent for that identity.
 - Cancellation acknowledges only `Cancelled` or `AlreadyTerminal` with terminal success/domain failure; failure or interruption is redelivered after reclaim.
 - Generic Effect interruption, host shutdown, and lease loss never invoke semantic cancellation; an abort signal is cooperative and does not prove an external side effect stopped.
-- The bounded outcome is identical in durable operation, replay, completion event, Session result, terminal fallback, and provider prompt; committed replay neither executes nor spills again.
+- The bounded outcome is identical in durable operation, replay, completion event, Session result, terminal fallback, and provider prompt; committed replay neither executes, emits another `ToolExecutionStarted`, nor spills again.
 - Without a `ToolOutput.Store`, only the bounded preview enters model context and durable state; spans record limits, truncation, spill status, digest, and path count, never raw output.
 - `activate_skill` uses the same bound; live execution, replay, and resume rebuild its run-local registry from the original success, and may reload a bounded body from `SkillCatalog`.
 - Tool and authorization producers belong to the Agent stream scope; interruption requests producer interruption and waits for children, finalizers, and actual exit without an abandoning teardown timeout.
