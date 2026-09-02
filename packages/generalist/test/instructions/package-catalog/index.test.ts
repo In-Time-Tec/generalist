@@ -1,7 +1,9 @@
 import { BunServices } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Crypto, Effect, Encoding, FileSystem, Layer, Path, Schema } from "effect"
+import { Context, Crypto, Effect, Encoding, FileSystem, Layer, Path, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
+import { Response as AiResponse } from "effect/unstable/ai"
+import { ToolContext, ToolExecutor } from "../../../src/index.js"
 import { PackageCatalog } from "../../../src/instructions/index.js"
 
 const fixtureRoot = "examples/packages/generalist-skills-example"
@@ -135,6 +137,26 @@ describe("PackageCatalog", () => {
         expect(Object.keys(catalog.toolkit.tools)).toEqual(["package_echo"])
         expect(Layer.isLayer(catalog.executorLayer)).toBe(true)
         expect(requests).toEqual([`${registry}/${encodeURIComponent(packageName)}`, tarball])
+
+        const toolContext = yield* Layer.build(Layer.merge(catalog.executorLayer, ToolContext.layerDefault))
+        const executor = Context.get(toolContext, ToolExecutor.ToolExecutor)
+        const call = AiResponse.toolCallPart<"package_echo", { readonly text: string }>({
+          id: "package-echo-1",
+          name: "package_echo",
+          params: { text: "installed" },
+          providerExecuted: false,
+        })
+        const outcome = yield* executor
+          .execute({
+            call,
+            toolCallBatch: { calls: [call] },
+            turn: 0,
+            toolCallIndex: 0,
+            agentName: "package-catalog-test",
+            sessionId: "package-catalog-test",
+          })
+          .pipe(Effect.provideService(ToolContext.ToolContext, Context.get(toolContext, ToolContext.ToolContext)))
+        expect(outcome).toMatchObject({ _tag: "Success", result: "installed" })
 
         const fs = yield* FileSystem.FileSystem
         const lock = yield* fs.readFileString(temp.lock)
