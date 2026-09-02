@@ -31,7 +31,7 @@ import {
   type Requirements as GateRequirements,
 } from "./gates/definition.js"
 import type { SandboxService } from "../../sandbox/service.js"
-import { make as makeFanOut, processRunner, ProcessRunner, type AgentRunner } from "./lifecycle/fan-out.js"
+import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner } from "./lifecycle/fan-out.js"
 import type { HandlersFor } from "./tool/fan-out.js"
 export {
   AgentTypeId,
@@ -71,7 +71,7 @@ export {
   type AwaitEventOptions,
 } from "./tools/wake-event.js"
 export { defaultObjectPrompt, type RunHandle }
-export { child } from "./lifecycle/fan-out.js"
+export { child, defaultInheritance, Inheritance, inheritance, type InheritanceOptions } from "./lifecycle/fan-out.js"
 /** Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }
 export type * from "./tool-calls.js"
@@ -491,10 +491,9 @@ export const run: RunFunction = dual(
       ),
     ),
 )
-const agentRunner: AgentRunner = {
-  run: (agent, input, budget) =>
-    // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- SAFETY: processRunner closes erased child requirements over the captured context; Agent.fanOut restores them in its public signature.
-    run(agent, input, budget === undefined ? {} : { budget }) as Effect.Effect<unknown, RunError>,
-}
+const agentRunner = recursiveAgentRunner(
+  // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- SAFETY: processRunner closes erased child requirements over the captured context; Agent.fanOut restores them in its public signature.
+  (agent, input, options) => run(agent, input, options) as Effect.Effect<unknown, RunError>,
+)
 /** Run typed child Agents concurrently in-process without requiring a Runtime. */
 export const fanOut = makeFanOut(agentRunner)

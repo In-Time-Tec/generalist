@@ -209,6 +209,7 @@ export const admitFanOut: {
         childDepth: parent.depth + 1,
         readiness,
         key: member.key,
+        inherit: member.inherit,
         budget: grantedBudget,
       } satisfies AppendPartial
       if (member.label !== undefined) Object.assign(linked, { label: member.label })

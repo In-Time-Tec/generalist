@@ -31,7 +31,6 @@ import { make as makeRetryableOverflow } from "./retryable-overflow.js"
 import { validateContext } from "../../context/session.js"
 import { scheduleBatch, type ToolExecution } from "./tool-batch.js"
 import { ModelSource } from "./model-source.js"
-
 export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
@@ -167,7 +166,6 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
       ),
     )
   }
-
   const modelTurn = (
     turn: number,
     prompt: Prompt.RawInput,
@@ -295,7 +293,9 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     }
                     const rawParts = LanguageModel.streamText({
-                      prompt: yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock),
+                      prompt: yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock).pipe(
+                        Effect.tap((wire) => Ref.set(context.lastWirePrompt, wire)),
+                      ),
                       toolkit: activeRegistry.toolkit,
                       disableToolCallResolution: true,
                     }).pipe(

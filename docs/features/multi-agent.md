@@ -22,7 +22,7 @@ const local = Agent.fanOut([Agent.child(researcher, "Research A"), Agent.child(r
 const delegateResearch = AgentTool.fanOut({
   name: "delegate_research",
   description: "Run researchers in parallel on independent questions",
-  agents: { researcher },
+  agents: { researcher: { agent: researcher } },
   maxChildren: 8,
 })
 const lead = Agent.make({ name: "lead", toolkit: Toolkit.make(delegateResearch) })
@@ -54,7 +54,23 @@ const handoffLayer = Layer.mergeAll(ToolExecutor.layerToolkit(supervisor.toolkit
 const run = Agent.run(supervisor.agent, "Refund order 42")
 ```
 
-Provide the local Effects and `handoffLayer` with the model, permissions, approvals, middleware, and Agent requirements. Provide `durable` with a Runtime host plus the same Agent requirements. The model calls `delegate_research` with ordered `{ agent, input, budget? }` members and optional `concurrency` and `onFailure`; it calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`. A child's `model` option is any closed `Layer<LanguageModel>` — typically a provider's `layerModel` over its `layerConfig` client; omitting it means the child inherits the ambient model.
+Provide the local Effects and `handoffLayer` with the model, permissions, approvals, middleware, and Agent requirements. Provide `durable` with a Runtime host plus the same Agent requirements. The model calls `delegate_research` with ordered `{ agent, input }` members and optional `concurrency` and `onFailure`; inheritance is fixed by each declared agent profile and is not model-authored. It calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`. A child's `model` option is any closed `Layer<LanguageModel>` — typically a provider's `layerModel` over its `layerConfig` client; omitting it means the child inherits the ambient model.
+
+## Child inheritance
+
+`Agent.child(agent, input, { inherit })` and each `AgentTool.fanOut` profile use the same normalized record. For example, declare `agents: { researcher: { agent: researcher, inherit: { history: "full", budget: { usd: 1 } } } }`. Omitted fields use these defaults:
+
+| Field          | Values                          | Default       | Behavior                                                                                                    |
+| -------------- | ------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `history`      | `"none"`, `"summary"`, `"full"` | `"none"`      | Fresh transcript; latest user message; or the exact encoded parent prefix for provider prompt-cache reuse   |
+| `tools`        | `"attenuate"`, `"same"`         | `"attenuate"` | Child-declared subset of parent tools, or exactly the parent's tool set                                     |
+| `permissions`  | `"inherit"`, `"fresh"`          | `"inherit"`   | Parent authorization and remembered rules, or a fresh authorization context under the same parent authority |
+| `budget`       | `BudgetLimits`                  | parent share  | Narrows the reserved `parent remaining / maxChildren` share                                                 |
+| `sandbox`      | `"share"`, `"fork"`, `"fresh"`  | `"fork"`      | Parent sandbox, snapshot/fork of it, or the child profile's fresh sandbox                                   |
+| `instructions` | `"inherit"`, `"own"`            | `"inherit"`   | Parent instructions or the child Agent's instructions                                                       |
+| `memory`       | `"inherit"`, `"fresh"`          | `"inherit"`   | Parent memory key or no inherited memory                                                                    |
+
+The declaration, not the model call, owns this policy. A child tool, custom authorization policy, or sandbox absent from the parent fails at spawn with `ChildExceedsParent { field }`; no child Run or model call is admitted. Durable fan-out includes the normalized record in its admission digest and `ChildLinked` event, so restart reattaches with the same history, authority, budget, sandbox, instructions, and memory choices.
 
 ## What runs
 
@@ -90,7 +106,7 @@ Agent.run(front-desk)                      Run ID: run-1
 
 With `onFailure: "collect"`, every child settles and the result contains one `Exit` per authored member. A failed child is encoded into that tool result, so the parent model continues. With `"failFast"`, the first child failure fails the parent call; process-local sibling fibers are interrupted and a durable group requests cancellation of its unsettled children.
 
-A durable fan-out reserves one child slot and `parent remaining / maxChildren` for each admitted member. A member's optional `budget` may narrow that share but cannot widen it. The child's journaled usage remains charged and settlement returns its unused reservation. `Runtime.inspect(parentRunId)` returns the direct children and their current statuses alongside the journal-derived parent budget.
+A durable fan-out reserves one child slot and `parent remaining / maxChildren` for each admitted member. The profile's optional `inherit.budget` may narrow that share but cannot widen it. The child's journaled usage remains charged and settlement returns its unused reservation. `Runtime.inspect(parentRunId)` returns the direct children and their current statuses alongside the journal-derived parent budget.
 
 ## Handoff data flow
 
@@ -132,7 +148,7 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - `Agent.fanOut` requires explicit positive concurrency. Collect returns ordered typed `Exit` values; fail-fast interrupts sibling fibers.
 - `AgentTool.fanOut` accepts between one and `maxChildren` model-authored members and needs no caller-supplied handler.
 - Durable collect returns failed children as encoded `Exit` values. Durable fail-fast fails the parent and requests cancellation of unsettled siblings.
-- Durable child budget grants and refunds are derived from journal facts. A requested member budget can only narrow its `parent / maxChildren` share.
+- Durable child budget grants and refunds are derived from journal facts. A profile's `inherit.budget` can only narrow its `parent / maxChildren` share.
 - Runtime recovery resolves the registered child Agent graph from persisted executable pins and reattaches the parent's fan-out wait by `parentRunId` and group ID without redispatch.
 - Interrupting a durable parent closes child admission and cascades cancellation through its existing Run tree.
 - `Runtime.inspect(parent)` always includes its direct children with status and readiness.

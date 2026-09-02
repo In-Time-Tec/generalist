@@ -43,6 +43,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR, Schema.Top, Schema.Top>
   readonly staticToolkit: Toolkit.Toolkit<T>
   readonly chat: Chat.Service
+  readonly lastWirePrompt: Ref.Ref<import("effect/unstable/ai").Prompt.Prompt | undefined>
   readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly sessionId: string
   readonly executor: Option.Option<typeof ToolExecutor.Service>
@@ -65,6 +66,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     agent,
     staticToolkit,
     chat,
+    lastWirePrompt,
     activeSession,
     sessionId,
     executor,
@@ -128,12 +130,11 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.name))
   const unlessBlocked = <E, R>(reason: string | undefined, execute: () => Effect.Effect<Outcome, E, R>) =>
     reason === undefined ? execute() : Effect.succeed(hookBlockedOutcome("ToolCall", reason))
-
   const defaultExecute = (request: Request, registry: Registry) => {
     const registered = get(registry, request.call.name)
     if (registered?.dispatch === "Static") {
       const fanOut = fanOutDefinition(registered.tool)
-      if (fanOut !== undefined) return executeFanOut(fanOut, request)
+      if (fanOut !== undefined) return executeFanOut(agent, fanOut, request)
       return executeToolkit(withoutFanOut(staticToolkit), request)
     }
     return registered === undefined
@@ -152,7 +153,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           }),
         )
   }
-
   const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflow>> => {
     switch (progressPolicy._tag) {
       case "Backpressure":
@@ -164,7 +164,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         return Queue.sliding(progressPolicy.capacity)
     }
   }
-
   const progressEvent = (turn: number, progress: Progress): ToolProgress => {
     const base = { _tag: "ToolProgress" as const, turn, toolCallId: progress.toolCallId }
     const { message, data } = progress
@@ -172,7 +171,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     if (data === undefined) return { ...base, message }
     return { ...base, message, data }
   }
-
   const emitProgress =
     (
       turn: number,
@@ -298,6 +296,10 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           idempotencyKey: durableOperationKey,
           ...invocation,
           emit,
+          history: Ref.get(lastWirePrompt).pipe(
+            Effect.flatMap((prompt) => (prompt === undefined ? Ref.get(chat.history) : Effect.succeed(prompt))),
+          ),
+          agent,
         }
         const toolContext = ToolContext.of(contextBase)
         const handoffExecution = handoffFor(request, registry)
@@ -409,7 +411,6 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         )
       }),
     )
-
   const resumeApproved = (
     turn: number,
     toolCallBatch: Request["toolCallBatch"],

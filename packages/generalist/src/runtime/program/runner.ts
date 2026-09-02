@@ -25,6 +25,7 @@ import {
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 import type { CommitProgramLogInput, ProgramOperationKind, ProgramReservation } from "./store.js"
 import { childRunIdFor, fanOutIdFor } from "../child/fan-out-internal.js"
+import { defaultInheritance } from "../../core/agent/lifecycle/fan-out.js"
 import { fanOutMemberSessionId } from "../child/session.js"
 import {
   AgentFanOut,
@@ -46,7 +47,6 @@ import { Prompt } from "effect/unstable/ai"
 import { programWait } from "./approval.js"
 import { OperationOutcome } from "./operation-outcome.js"
 import { Authorization } from "./authorization.js"
-
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
@@ -269,6 +269,7 @@ export const make = (input: {
               sessionId: fanOutMemberSessionId({ fanOutId, key: member.member }),
               metadata: { programOperation: request.operation, programMember: member.member },
               origin: { operationKey: request.operation },
+              inherit: defaultInheritance,
             })),
             concurrency,
             join: { _tag: "AllSuccess" },
@@ -314,7 +315,6 @@ export const make = (input: {
       if (settled.status === "failed") return yield* storeFailure(settled.error)
       return results
     })
-
   const callBinding = (program: PinnedProgram, raw: SerializedValue, kind: "tool" | "step") =>
     Effect.gen(function* () {
       const boundary = kind === "tool" ? "tool-input" : "step-input"

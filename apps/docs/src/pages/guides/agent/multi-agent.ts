@@ -95,9 +95,29 @@ export const multiAgent = definePage({
     codeBlock({ label: "fan-out.ts", source: fanOut, expectedOutput: fanOutExpected }),
     p(
       code("AgentTool.fanOut({ name, description, agents, maxChildren })"),
-      " declares a model-callable fan-out without a static handler. A Runtime reserves each durable child's share from the parent budget, reports children from ",
+      " declares a model-callable fan-out without a static handler. Each agent profile fixes its ",
+      code("inherit"),
+      " policy; the model supplies only the agent selection and input. A Runtime reserves each durable child's share from the parent budget, reports children from ",
       code("runtime.inspect(parentRunId)"),
       ", and reattaches the parent to the same group after restart. Collect encodes child failures for the model; fail-fast requests sibling cancellation and fails the parent.",
+    ),
+    table(
+      ["Inheritance field", "Default", "Choices"],
+      [
+        [[code("history")], [code('"none"')], [code('"none"'), ", ", code('"summary"'), ", ", code('"full"')]],
+        [[code("tools")], [code('"attenuate"')], [code('"attenuate"'), ", ", code('"same"')]],
+        [[code("permissions")], [code('"inherit"')], [code('"inherit"'), ", ", code('"fresh"')]],
+        [[code("budget")], "Parent share", "Optional narrower limits"],
+        [[code("sandbox")], [code('"fork"')], [code('"share"'), ", ", code('"fork"'), ", ", code('"fresh"')]],
+        [[code("instructions")], [code('"inherit"')], [code('"inherit"'), ", ", code('"own"')]],
+        [[code("memory")], [code('"inherit"')], [code('"inherit"'), ", ", code('"fresh"')]],
+      ],
+    ),
+    p(
+      code('history: "full"'),
+      " preserves the exact parent prompt prefix for provider caching. A wider child tool, authorization policy, or sandbox fails before admission with ",
+      code("ChildExceedsParent"),
+      ". The normalized record is journaled, so recovery reuses the same choices.",
     ),
     h2("route-through-a-supervisor", "2. Route through a supervisor"),
     p(

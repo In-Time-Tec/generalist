@@ -1,59 +1,66 @@
 import { Context, Effect, Exit, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import type { BudgetLimits } from "../../durable/run-budget.js"
-import { AgentError } from "../event.js"
+import { AgentError, ChildExceedsParent } from "../event.js"
 import { encode as encodeAgentInput } from "../lifecycle/input.js"
 import type { Any as AnyAgent, ExecutionServices, Input, Output } from "../lifecycle/definition.js"
+import { inheritance, type Inheritance, type InheritanceOptions } from "../lifecycle/fan-out.js"
 import { RunError } from "../run/error.js"
 
 export const FanOutTypeId = "generalist/core/agent-tool/FanOut"
 
-type Selection<Agents extends Record<string, AnyAgent>> = Extract<keyof Agents, string>
+export interface Profile<A extends AnyAgent = AnyAgent> {
+  readonly agent: A
+  readonly inherit?: InheritanceOptions
+}
+
+type Profiles = Record<string, Profile>
+type Selection<Entries extends Profiles> = Extract<keyof Entries, string>
+type AgentAt<Entries extends Profiles, Name extends Selection<Entries>> = Entries[Name]["agent"]
 
 /** One model-authored child request. Array order is the result order. */
-export type Member<Agents extends Record<string, AnyAgent>> = {
-  readonly [Name in Selection<Agents>]: {
+export type Member<Entries extends Profiles> = {
+  readonly [Name in Selection<Entries>]: {
     readonly agent: Name
-    readonly input: Input<Agents[Name]>
-    readonly budget?: BudgetLimits
+    readonly input: Input<AgentAt<Entries, Name>>
   }
-}[Selection<Agents>]
+}[Selection<Entries>]
 
 /** Model-facing parameters of a fan-out tool. */
-export interface Parameters<Agents extends Record<string, AnyAgent>> {
-  readonly children: ReadonlyArray<Member<Agents>>
+export interface Parameters<Entries extends Profiles> {
+  readonly children: ReadonlyArray<Member<Entries>>
   readonly concurrency?: number
   readonly onFailure?: "collect" | "failFast"
 }
 
-type AgentOutput<Agents extends Record<string, AnyAgent>> = Output<Agents[Selection<Agents>]>
-type Requirements<Agents extends Record<string, AnyAgent>> = ExecutionServices<Agents[Selection<Agents>]>
-type InputCodec<Agents extends Record<string, AnyAgent>> = Agents[Selection<Agents>]["input"]
-type OutputCodec<Agents extends Record<string, AnyAgent>> = Agents[Selection<Agents>]["output"]
-type ParametersSchema<Agents extends Record<string, AnyAgent>> = Schema.Codec<
-  Parameters<Agents>,
+type SelectedAgent<Entries extends Profiles> = AgentAt<Entries, Selection<Entries>>
+type AgentOutput<Entries extends Profiles> = Output<SelectedAgent<Entries>>
+type Requirements<Entries extends Profiles> = ExecutionServices<SelectedAgent<Entries>>
+type InputCodec<Entries extends Profiles> = SelectedAgent<Entries>["input"]
+type OutputCodec<Entries extends Profiles> = SelectedAgent<Entries>["output"]
+type ParametersSchema<Entries extends Profiles> = Schema.Codec<
+  Parameters<Entries>,
   unknown,
-  InputCodec<Agents>["DecodingServices"],
-  InputCodec<Agents>["EncodingServices"]
+  InputCodec<Entries>["DecodingServices"],
+  InputCodec<Entries>["EncodingServices"]
 >
-type SuccessSchema<Agents extends Record<string, AnyAgent>> = Schema.Codec<
-  ReadonlyArray<Exit.Exit<AgentOutput<Agents>, RunError>>,
+type SuccessSchema<Entries extends Profiles> = Schema.Codec<
+  ReadonlyArray<Exit.Exit<AgentOutput<Entries>, RunError>>,
   unknown,
-  OutputCodec<Agents>["DecodingServices"],
-  OutputCodec<Agents>["EncodingServices"]
+  OutputCodec<Entries>["DecodingServices"],
+  OutputCodec<Entries>["EncodingServices"]
 >
 
 /** A Runtime-owned fan-out declaration; callers do not provide a separate handler. */
-export interface FanOutTool<Name extends string, Agents extends Record<string, AnyAgent>>
+export interface FanOutTool<Name extends string, Entries extends Profiles>
   extends Tool.Tool<
     Name,
     {
-      readonly parameters: ParametersSchema<Agents>
-      readonly success: SuccessSchema<Agents>
+      readonly parameters: ParametersSchema<Entries>
+      readonly success: SuccessSchema<Entries>
       readonly failure: typeof RunError
       readonly failureMode: "error"
     },
-    Requirements<Agents>
+    Requirements<Entries>
   > {
   readonly [FanOutTypeId]: true
 }
@@ -65,10 +72,10 @@ export type WithoutFanOut<Tools extends Record<string, Tool.Any>> = {
 /** Static handlers still required after Runtime-owned fan-out tools are removed. */
 export type HandlersFor<Tools extends Record<string, Tool.Any>> = Tool.HandlersFor<WithoutFanOut<Tools>>
 
-export interface Options<Name extends string, Agents extends Record<string, AnyAgent>> {
+export interface Options<Name extends string, Entries extends Profiles> {
   readonly name: Name
   readonly description: string
-  readonly agents: Agents
+  readonly agents: Entries
   readonly maxChildren: number
 }
 
@@ -78,7 +85,7 @@ interface DecodedParameters {
   readonly children: ReadonlyArray<{
     readonly agent: string
     readonly input: BoundaryValue
-    readonly budget?: BudgetLimits
+    readonly inherit: Inheritance
   }>
   readonly concurrency?: number
   readonly onFailure?: "collect" | "failFast"
@@ -86,6 +93,7 @@ interface DecodedParameters {
 
 export interface Definition {
   readonly agents: Readonly<Record<string, AnyAgent>>
+  readonly inheritance: Readonly<Record<string, Inheritance>>
   readonly maxChildren: number
   readonly parameters: Schema.Top
   readonly success: Schema.Top
@@ -114,28 +122,19 @@ const union = ([first, second, ...rest]: ReadonlyArray<Schema.Top>): Schema.Top 
 }
 
 /** Construct one model-callable typed fan-out declaration. */
-export const make = <const Name extends string, const Agents extends Record<string, AnyAgent>>(
-  options: Options<Name, Agents>,
-): FanOutTool<Name, Agents> => {
+export const make = <const Name extends string, const Entries extends Profiles>(
+  options: Options<Name, Entries>,
+): FanOutTool<Name, Entries> => {
   if (!Number.isSafeInteger(options.maxChildren) || options.maxChildren < 1 || options.maxChildren > 64) {
     throw new TypeError("AgentTool.fanOut maxChildren must be a positive safe integer no greater than 64")
   }
   const entries = Object.entries(options.agents)
   if (entries.length === 0) throw new TypeError("AgentTool.fanOut requires at least one Agent")
   const memberSchema = union(
-    entries.map(([selection, agent]) =>
+    entries.map(([selection, profile]) =>
       Schema.Struct({
         agent: Schema.Literal(selection),
-        input: agent.input,
-        budget: Schema.optionalKey(
-          Schema.Struct({
-            tokens: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-            usd: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
-            duration: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
-            toolCalls: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-            children: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-          }),
-        ),
+        input: profile.agent.input,
       }),
     ),
   )
@@ -146,15 +145,15 @@ export const make = <const Name extends string, const Agents extends Record<stri
     ),
     onFailure: Schema.optionalKey(Schema.Literals(["collect", "failFast"])),
   })
-  const output = union(entries.map(([, agent]) => agent.output))
+  const output = union(entries.map(([, profile]) => profile.agent.output))
   const success = Schema.Array(Schema.toCodecIso(Schema.Exit(output, RunError, Schema.Defect())))
   const hiddenParameters: unknown = parameters
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: every union branch pairs one literal selection with that selected Agent's input schema.
-  const typedParameters = hiddenParameters as ParametersSchema<Agents>
+  const typedParameters = hiddenParameters as ParametersSchema<Entries>
   const hiddenSuccess: unknown = success
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: the success union contains exactly the declared Agents' output schemas and RunError.
-  const typedSuccess = hiddenSuccess as SuccessSchema<Agents>
-  const tool: FanOutTool<Name, Agents> = Object.assign(
+  const typedSuccess = hiddenSuccess as SuccessSchema<Entries>
+  const tool: FanOutTool<Name, Entries> = Object.assign(
     Tool.make(options.name, {
       description: options.description,
       parameters: typedParameters,
@@ -165,7 +164,8 @@ export const make = <const Name extends string, const Agents extends Record<stri
   )
   Object.defineProperty(tool, FanOutTypeId, { enumerable: false, value: true })
   definitions.set(tool, {
-    agents: options.agents,
+    agents: Object.fromEntries(entries.map(([selection, profile]) => [selection, profile.agent])),
+    inheritance: Object.fromEntries(entries.map(([selection, profile]) => [selection, inheritance(profile.inherit)])),
     maxChildren: options.maxChildren,
     parameters,
     success,
@@ -176,7 +176,7 @@ export const make = <const Name extends string, const Agents extends Record<stri
             children: decoded.children.map((member) => ({
               agent: member.agent,
               input: member.input,
-              ...Object.assign({}, member.budget === undefined ? undefined : { budget: member.budget }),
+              inherit: inheritance(options.agents[member.agent]?.inherit),
             })),
             ...Object.assign({}, decoded.concurrency === undefined ? undefined : { concurrency: decoded.concurrency }),
             ...Object.assign({}, decoded.onFailure === undefined ? undefined : { onFailure: decoded.onFailure }),
@@ -186,12 +186,12 @@ export const make = <const Name extends string, const Agents extends Record<stri
       ),
     encode: (exits, context) => Schema.encodeUnknownEffect(success)(exits).pipe(Effect.provideContext(context)),
     encodeInput: (selection, input, context) => {
-      const agent = options.agents[selection]
-      if (agent === undefined) {
+      const profile = options.agents[selection]
+      if (profile === undefined) {
         return AgentError.make({ message: `Unknown fan-out Agent selection: ${selection}`, turn: 0 })
       }
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Agent.Any erases its schema services, and the declaration restores them from the captured registration context.
-      return encodeAgentInput(agent.input, input).pipe(Effect.provideContext(context))
+      return encodeAgentInput(profile.agent.input, input).pipe(Effect.provideContext(context))
     },
   })
   return tool
@@ -199,6 +199,36 @@ export const make = <const Name extends string, const Agents extends Record<stri
 
 /** Read fan-out routing data from the exact declaration that owns it. */
 export const definition = (tool: Tool.Any): Definition | undefined => definitions.get(tool)
+
+/** @internal Reject selected child authority that the parent does not hold. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal authority boundary with three required direct-style arguments.
+export const validateAuthority = (
+  parent: AnyAgent,
+  fanOut: Definition,
+  selections: ReadonlyArray<string>,
+): Effect.Effect<void, ChildExceedsParent> =>
+  Effect.gen(function* () {
+    const parentTools = Object.keys(parent.toolkit.tools)
+    for (const selection of selections) {
+      const child = fanOut.agents[selection]
+      const policy = fanOut.inheritance[selection]
+      if (child === undefined || policy === undefined) continue
+      const childTools = Object.keys(child.toolkit.tools)
+      if (policy.tools === "attenuate" && !childTools.every((name) => parentTools.includes(name))) {
+        return yield* ChildExceedsParent.make({ field: "tools" })
+      }
+      if (
+        policy.permissions === "fresh" &&
+        child.authorization !== undefined &&
+        (parent.authorization === undefined || child.authorization !== parent.authorization)
+      ) {
+        return yield* ChildExceedsParent.make({ field: "permissions" })
+      }
+      if (policy.sandbox === "fresh" && child.sandbox !== undefined && parent.sandbox === undefined) {
+        return yield* ChildExceedsParent.make({ field: "sandbox" })
+      }
+    }
+  })
 
 const hasOnlyStaticTools = <Tools extends Record<string, Tool.Any>>(
   candidate: Toolkit.Any,

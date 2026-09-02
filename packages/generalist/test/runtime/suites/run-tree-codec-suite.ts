@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { Agent } from "../../../src/index.js"
 import { RunEvent, RunTree } from "../../../src/runtime/index.js"
 import { assistantRef } from "../execution/fixtures.js"
 
@@ -71,6 +72,7 @@ const representativeEvents: ReadonlyArray<RunTree.TreeEvent> = [
       prompt: Prompt.make("research the request"),
       childDepth: 1,
       readiness: "ready",
+      inherit: Agent.defaultInheritance,
     },
     cursor: cursor(2),
   },

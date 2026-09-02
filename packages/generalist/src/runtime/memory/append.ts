@@ -299,7 +299,7 @@ export const makeUnknown = (operationId: string) =>
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
 
 type ChildLinked = Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
-type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin" | "budget">
+type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin" | "inherit" | "budget">
 
 export const childLinkedEvent: {
   (

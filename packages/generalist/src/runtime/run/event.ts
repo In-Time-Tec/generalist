@@ -28,6 +28,7 @@ import { FanOutJoin, FanOutRemainder } from "../child/fan-out.js"
 import { FanOutMemberOrigin, type FanOutMemberOrigin as FanOutOrigin } from "../child/fan-out-internal.js"
 import { ChildReadiness } from "../child/readiness.js"
 import { BudgetLimits, Dimension, Spend } from "../../core/durable/run-budget.js"
+import { Inheritance } from "../../core/agent/lifecycle/fan-out.js"
 import { TriggerEventSchema, TriggerTags, type TriggerEvent } from "./trigger-event.js"
 import { Sequence, SpecVersion } from "./event-identity.js"
 import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
@@ -125,6 +126,7 @@ export type ChildLinked = RunEventBase & {
   readonly key?: string
   readonly label?: string
   readonly origin?: FanOutOrigin
+  readonly inherit: Inheritance
   readonly budget?: BudgetLimits
 }
 export type ChildReadinessChanged = RunEventBase & {
@@ -456,6 +458,7 @@ const LifecycleEventSchema = Schema.Union([
     key: Schema.optionalKey(Schema.String),
     label: Schema.optionalKey(Schema.String),
     origin: Schema.optionalKey(FanOutMemberOrigin),
+    inherit: Inheritance,
     budget: Schema.optionalKey(BudgetLimits),
   }),
   Schema.TaggedStruct("ChildReadinessChanged", { childRunId: RunId, readiness: ChildReadiness }),

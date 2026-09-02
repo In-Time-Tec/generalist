@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Outcome } from "../../core/tools/tool-executor.js"
@@ -11,8 +11,8 @@ import { childRunIdFor, fanOutIdFor } from "./fan-out-internal.js"
 import { fanOutMemberSessionId } from "./session.js"
 import { GroupReceipt, resultFromInspection } from "./group.js"
 import { ChildLifecycle } from "./lifecycle.js"
-import type { BudgetLimits } from "../../core/durable/run-budget.js"
 import { ChildRuns, catchDomainFailure, success, type FanOutGroupInput, type Service } from "./executor.js"
+import { inheritance, Inheritance } from "../../core/agent/lifecycle/fan-out.js"
 
 export * from "./group.js"
 type Mutable<Value> = Value extends Value ? { -readonly [Key in keyof Value]: Value[Key] } : never
@@ -65,6 +65,8 @@ export const make = (store: RunStoreService): Service => {
     childGroupId: string
     childGroupKey: string
     childGroupLabel?: string
+    childInheritancePolicy: Schema.Json
+    parentAgentName: string
   }
   type MutableReceiptChild = {
     -readonly [Key in keyof GroupReceipt["children"][number]]: GroupReceipt["children"][number][Key]
@@ -174,6 +176,10 @@ export const make = (store: RunStoreService): Service => {
             parentToolCallId: input.toolCallId,
             childGroupId: groupId,
             childGroupKey: member.key,
+            childInheritancePolicy: Schema.decodeSync(Schema.Json)(
+              Schema.encodeSync(Inheritance)(inheritance(member.inherit)),
+            ),
+            parentAgentName: agentName,
           }
           if (member.label !== undefined) metadata.childGroupLabel = member.label
           const origin: Origin = { parentToolCallId: input.toolCallId }
@@ -183,14 +189,17 @@ export const make = (store: RunStoreService): Service => {
             key: member.key,
             childRunId: childRunIdFor(groupId, ordinal),
             selection: member.selection,
-            prompt: normalizePrompt(member.prompt),
+            prompt:
+              member.history === undefined
+                ? normalizePrompt(member.prompt)
+                : Prompt.concat(member.history, Prompt.make(normalizePrompt(member.prompt))),
             sessionId: fanOutMemberSessionId({ fanOutId: groupId, key: member.key }),
             metadata,
             origin,
+            inherit: inheritance(member.inherit),
           }
-          const admittedWithLabel: typeof admitted & { label?: string; budget?: BudgetLimits } = admitted
+          const admittedWithLabel: typeof admitted & { label?: string } = admitted
           if (member.label !== undefined) admittedWithLabel.label = member.label
-          if (member.budget !== undefined) admittedWithLabel.budget = member.budget
           return admittedWithLabel
         }),
       })

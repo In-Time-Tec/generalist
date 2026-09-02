@@ -268,6 +268,15 @@ export class AgentError extends ActionableTaggedError<AgentError>()("generalist/
   }
 }
 
+/** A child requested authority unavailable to its parent. */
+export class ChildExceedsParent extends ActionableTaggedError<ChildExceedsParent>()(
+  "generalist/core/ChildExceedsParent",
+  {
+    field: Schema.Literals(["tools", "permissions", "sandbox"]),
+    hint: errorHint("Attenuate the named child field to authority already held by the parent."),
+  },
+) {}
+
 /** The model's terminal value did not satisfy the Agent output Schema. */
 export class InvalidOutput extends ActionableTaggedError<InvalidOutput>()("generalist/core/InvalidOutput", {
   issues: Schema.Array(Schema.String),

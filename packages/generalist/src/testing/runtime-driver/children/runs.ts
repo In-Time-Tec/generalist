@@ -33,7 +33,12 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
     const delegate = makeFanOut({
       name: "delegate_driver_work",
       description: "Delegate driver conformance work",
-      agents: { worker: child },
+      agents: {
+        worker: {
+          agent: child,
+          inherit: { history: "full", instructions: "own", sandbox: "fresh" },
+        },
+      },
       maxChildren: 4,
     })
     const parent = makeAgent({ name, toolkit: Toolkit.make(delegate) })
@@ -105,6 +110,25 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
           status: "waiting",
           children: [{ status: "queued" }, { status: "queued" }],
         })
+        const recoveredHistory = yield* services.runtime.history({ runId: suspended.runId, limit: 100 })
+        expect(recoveredHistory.filter((event) => event._tag === "ChildLinked").map((event) => event.inherit)).toEqual([
+          {
+            history: "full",
+            tools: "attenuate",
+            permissions: "inherit",
+            sandbox: "fresh",
+            instructions: "own",
+            memory: "inherit",
+          },
+          {
+            history: "full",
+            tools: "attenuate",
+            permissions: "inherit",
+            sandbox: "fresh",
+            instructions: "own",
+            memory: "inherit",
+          },
+        ])
         for (const [index, runId] of suspended.childRunIds.entries()) {
           const claim = yield* capability.claim(services, { runId, workerId: `child-runs-child-${index}` })
           yield* services.store.complete({

@@ -3,6 +3,7 @@ import type { StartReceipt } from "../../../service.js"
 import type { FanOutReceipt } from "../../../child/fan-out.js"
 import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput } from "../../../child/fan-out-internal.js"
 import { fanOutMemberSessionId } from "../../../child/session.js"
+import { inheritance } from "../../../../core/agent/lifecycle/fan-out.js"
 import type { AdmitStartInput } from "../../../run/store.js"
 import type { MemoryState } from "../../state.js"
 
@@ -48,6 +49,7 @@ const fanOutAdmissionMember = (
     prompt: member.prompt,
     sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
     metadata: member.metadata ?? {},
+    inherit: inheritance(member.inherit),
   }
   if (member.label !== undefined) admitted.label = member.label
   if (member.origin !== undefined) admitted.origin = member.origin

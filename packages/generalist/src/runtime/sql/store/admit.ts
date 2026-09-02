@@ -23,6 +23,7 @@ import { decodePinnedExecutable, decodeSqlInteger } from "../codec/codecs.js"
 import type { RunRow } from "../codec/rows.js"
 import { appendEvent, insertRun, loadEventsAfter, loadRun, nowIso } from "./statements.js"
 import { enforceChildAdmission, nextId } from "./admit-send.js"
+import { defaultInheritance } from "../../../core/agent/lifecycle/fan-out.js"
 import type { EventHub } from "../subscribers.js"
 import { associateRegistrations, loadRegistrations, persistRegistrations } from "../executable/registrations.js"
 import { narrow } from "../../executable/registration.js"
@@ -363,6 +364,7 @@ export const admitSpawn: {
       prompt: input.message.prompt,
       childDepth: parent.depth + 1,
       readiness: childReadiness,
+      inherit: defaultInheritance,
       budget: childBudget,
     }
     if (input.label !== undefined) Object.assign(linked, { label: input.label })
@@ -473,6 +475,7 @@ export const admitProgramChild: {
       prompt: input.message.prompt,
       childDepth: parent.depth + 1,
       readiness: childReadiness,
+      inherit: defaultInheritance,
       budget: childBudget,
     })
     const child = (yield* loadRun(input.childRunId))!

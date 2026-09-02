@@ -67,6 +67,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly replayMessages: (sessionParentId: string) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>
   readonly chat: Chat.Service
+  readonly lastWirePrompt: import("effect").Ref.Ref<Prompt.Prompt | undefined>
   readonly compactionService: Option.Option<typeof import("../../turn/compaction.js").Compaction.Service>
   readonly state: AgentRunState
   readonly errorMessage: <E>(error: E) => string

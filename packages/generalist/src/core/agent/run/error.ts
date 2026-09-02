@@ -3,6 +3,7 @@ import { AiError } from "effect/unstable/ai"
 import {
   AgentError,
   AgentSuspended,
+  ChildExceedsParent,
   DuplicateToolCallId,
   InvalidOutput,
   MiddlewareViolation,
@@ -38,6 +39,7 @@ export const RunError = Schema.Union([
   HookFailed,
   GateFailed,
   AgentError,
+  ChildExceedsParent,
   InvalidOutput,
   AgentSuspended,
   ResumeMismatch,

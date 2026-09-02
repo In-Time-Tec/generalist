@@ -1,5 +1,6 @@
 import { digest } from "../../core/durable/pin.js"
 import { Schema } from "effect"
+import { inheritance } from "../../core/agent/lifecycle/fan-out.js"
 
 /**
  * Session identity for a Run spawned by another Run.
@@ -32,6 +33,7 @@ export const fanOutMember = <
     readonly sessionId?: string
     readonly metadata?: Readonly<Record<string, typeof Schema.Unknown.Type>>
     readonly origin?: import("./fan-out-internal.js").FanOutMemberOrigin
+    readonly inherit?: import("../../core/agent/lifecycle/fan-out.js").InheritanceOptions
   },
   P,
 >(input: {
@@ -48,6 +50,7 @@ export const fanOutMember = <
     prompt: input.member.prompt,
     sessionId: input.member.sessionId ?? fanOutMemberSessionId({ fanOutId: input.fanOutId, key: input.member.key }),
     metadata: input.member.metadata ?? {},
+    inherit: inheritance(input.member.inherit),
   }
   if (input.member.label !== undefined) Object.assign(member, { label: input.member.label })
   if (input.member.origin !== undefined) Object.assign(member, { origin: input.member.origin })

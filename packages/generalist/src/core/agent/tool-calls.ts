@@ -294,6 +294,7 @@ const streamToolCallsImpl = <Tools extends Record<string, Tool.Any>, R, P, A>(
       const authorizer = yield* setupToolAuthorizer(agent)
       const executor = yield* Effect.serviceOption(ToolExecutor)
       const chat = yield* Chat.fromPrompt(messages)
+      const lastWirePrompt = yield* Ref.make<Prompt.Prompt | undefined>(Prompt.fromMessages(messages))
       const toolState = yield* Ref.make({ registry, activatedSkillBodies: new Map<string, string>() })
       const state = {
         text: "",
@@ -314,6 +315,7 @@ const streamToolCallsImpl = <Tools extends Record<string, Tool.Any>, R, P, A>(
         agent,
         staticToolkit,
         chat,
+        lastWirePrompt,
         activeSession: Option.none(),
         sessionId: options.sessionId ?? agent.name,
         executor,
