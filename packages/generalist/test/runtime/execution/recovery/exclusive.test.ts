@@ -326,6 +326,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
         expect(recoveredToolCalls).toBe(0)
         expect(recoveredPrompt).toContain("resolved external write")
         expect(completedHistory.map((event) => event._tag)).toContain("ToolExecutionCompleted")
+        expect(completedHistory.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
         expect(completedHistory.map((event) => event._tag)).not.toContain("RunFailed")
       }),
     )

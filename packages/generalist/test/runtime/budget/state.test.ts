@@ -169,20 +169,37 @@ it.effect("suspends when elapsed duration is exhausted before provider dispatch"
   ),
 )
 
-it.effect("suspends at the tool boundary before executing an exhausted tool call", () => {
+it.effect("one tool-call extension pays for exactly one handler execution", () => {
   let calls = 0
+  let modelCalls = 0
   const echo = Tool.make("echo", { parameters: Schema.Struct({ text: Schema.String }), success: Schema.String })
   const toolkit = Toolkit.make(echo)
   const toolAgent = Agent.make({ name: "tool-budget", toolkit })
-  const model = modelLayer([
-    Response.makePart("tool-call", {
-      id: "budget-tool",
-      name: "echo",
-      params: { text: "blocked" },
-      providerExecuted: false,
+  const model = Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText: () => {
+        modelCalls += 1
+        return Stream.fromIterable<Response.StreamPartEncoded>(
+          modelCalls === 1
+            ? [
+                Response.makePart("tool-call", {
+                  id: "budget-tool",
+                  name: "echo",
+                  params: { text: "approved" },
+                  providerExecuted: false,
+                }),
+                Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
+              ]
+            : [
+                Response.makePart("text-delta", { id: "budget-done", delta: "done" }),
+                Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+              ],
+        )
+      },
     }),
-    Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
-  ])
+  )
   return provideScoped(
     Layer.merge(
       runtimeLayer(model),
@@ -206,6 +223,14 @@ it.effect("suspends at the tool boundary before executing an exhausted tool call
         status: "waiting",
         suspension: { _tag: "BudgetExhausted", budget: "toolCalls" },
       })
+      yield* runtime.extendBudget(handle.runId, { toolCalls: 1 })
+      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget:tool-resume" }))
+      expect(yield* handle.await).toBe("done")
+      expect(calls).toBe(1)
+      expect(modelCalls).toBe(2)
+      const history = yield* runtime.history({ runId: handle.runId, limit: 100 })
+      expect(history.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
+      expect(history.filter((event) => event._tag === "ToolExecutionCompleted")).toHaveLength(1)
     }),
   )
 })

@@ -147,6 +147,7 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
         expect(recoveredPrompt).toContain("substituted")
         const history = yield* runtime.history({ runId: branch.runId, limit: 100 })
         expect(history.filter((event) => event._tag === "Substituted")).toHaveLength(1)
+        expect(history.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
       }),
     )
   }),
