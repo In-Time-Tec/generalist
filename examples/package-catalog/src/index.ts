@@ -1,16 +1,23 @@
 import { BunServices } from "@effect/platform-bun"
-import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, Permissions, SkillCatalog } from "generalist"
 import { layer as layerInstructions, PackageCatalog } from "generalist/instructions"
 
-const packages = PackageCatalog.layer({
-  packages: ["@in-time-tec/generalist-skills-example@^1"],
-  cacheDir: ".generalist/packages",
-  lock: ".generalist/packages.lock",
-  allowTools: true,
-})
+const packages = Layer.unwrap(
+  Config.string("GENERALIST_NPM_REGISTRY_URL").pipe(
+    Effect.map((npmRegistryUrl) =>
+      PackageCatalog.layer({
+        packages: ["@in-time-tec/generalist-skills-example@^1"],
+        cacheDir: ".generalist/packages",
+        lock: ".generalist/packages.lock",
+        allowTools: true,
+        npmRegistryUrl,
+      }),
+    ),
+  ),
+)
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },

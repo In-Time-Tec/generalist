@@ -57,6 +57,7 @@ const runEvent = (sequence: number, fields: Partial<Connection.Incoming>): Conne
       sequence,
       executableRef: chatAgent,
       rootRunId: "capstone-run",
+      depth: 0,
       occurredAt: "2026-08-03T00:00:00.000Z",
     },
     fields,
@@ -77,8 +78,9 @@ const chatFrames: ReadonlyArray<Connection.Incoming> = [
     sessionId: "capstone-session",
     sessionParentId: null,
     sessionEntryId: "entry-response-0",
+    budgetCharge: 0,
     digest: "response-digest-0",
-    response: { content: [Response.makePart("text", { text: "deterministic response" })] },
+    response: { content: [Response.makePart("text", { text: "deterministic response" })], finishReason: "stop" },
   }),
   runEvent(2, { _tag: "TurnCompleted", turn: 0 }),
   runEvent(3, {

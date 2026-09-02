@@ -2,6 +2,11 @@ import { Console, Effect, Layer, Schema, Stream } from "effect"
 import { Agent, AgentEvent, Approvals, ModelMiddleware, Permissions } from "generalist"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const deployTool = Tool.make("deploy_service", {
   description: "Deploy a service to production",
   parameters: Schema.Struct({ service: Schema.String }),
@@ -28,8 +33,12 @@ const modelLayer = Layer.effect(
               params: { service: "api" },
               providerExecuted: false,
             }),
+            Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
           )
-        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "api is deployed." }))
+        : Stream.make(
+            Response.makePart("text-delta", { id: "assistant", delta: "api is deployed." }),
+            Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+          )
     },
   }),
 )

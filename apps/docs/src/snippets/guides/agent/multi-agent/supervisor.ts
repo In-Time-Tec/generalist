@@ -2,6 +2,11 @@ import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Handoff, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 let supervisorCalls = 0
 
 const modelLayer = Layer.effect(
@@ -11,19 +16,26 @@ const modelLayer = Layer.effect(
     streamText: (options) => {
       const isChildTurn = options.tools.length === 0
       if (isChildTurn) {
-        return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Refund for order 42 issued." }))
+        return Stream.make(
+          Response.makePart("text-delta", { id: "assistant", delta: "Refund for order 42 issued." }),
+          Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+        )
       }
       supervisorCalls += 1
       return supervisorCalls === 1
         ? Stream.make(
             Response.makePart("tool-call", {
               id: "route-1",
-              name: "transfer_to_billing",
+              name: "handoff_to_billing",
               params: { prompt: "Refund order 42" },
               providerExecuted: false,
             }),
+            Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
           )
-        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Billing handled it: refund issued." }))
+        : Stream.make(
+            Response.makePart("text-delta", { id: "assistant", delta: "Billing handled it: refund issued." }),
+            Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+          )
     },
   }),
 )

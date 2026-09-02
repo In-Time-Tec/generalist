@@ -4,6 +4,10 @@ import { LanguageModel, Response } from "effect/unstable/ai"
 import { WorkingMemory } from "generalist/memory"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
 
 const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.effect(
@@ -31,7 +35,10 @@ const runtimeLayer = Layer.mergeAll(
   modelLayer((options) => {
     const content = JSON.stringify(options.prompt.content)
     const text = content.includes("Ada likes Effect") ? "I remember that Ada likes Effect." : "Stored that fact."
-    return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
+    return Stream.make(
+      Response.makePart("text-delta", { id: "assistant", delta: text }),
+      Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+    )
   }),
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
   Permissions.layerAllowAll,

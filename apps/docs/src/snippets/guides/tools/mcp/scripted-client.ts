@@ -1,6 +1,7 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
-import { LanguageModel, Response, Tool } from "effect/unstable/ai"
+import { Tool } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 import { MCPClient } from "generalist/unstable/mcp"
 import { layerToolkit, toolkit } from "generalist/unstable/mcp/tools"
 const client: MCPClient.Service = {
@@ -26,27 +27,10 @@ const client: MCPClient.Service = {
   ]),
 }
 
-let calls = 0
-
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => {
-      calls += 1
-      return calls === 1
-        ? Stream.make(
-            Response.makePart("tool-call", {
-              id: "search-1",
-              name: "local_search",
-              params: { query: "setup" },
-              providerExecuted: false,
-            }),
-          )
-        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
-    },
-  }),
-)
+const modelLayer = TestModel.layer([
+  TestModel.toolCall("local_search", { query: "setup" }, { id: "search-1" }),
+  TestModel.text("Found local setup docs."),
+])
 
 const runtimeLayer = Layer.mergeAll(
   modelLayer,

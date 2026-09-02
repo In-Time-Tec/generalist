@@ -2,13 +2,21 @@ import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, Handoff, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: (options) => {
       const task = JSON.stringify(options.prompt.content).match(/(Plan|Review) the work/)?.[0] ?? "unknown task"
-      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: `finished: ${task}` }))
+      return Stream.make(
+        Response.makePart("text-delta", { id: "assistant", delta: `finished: ${task}` }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+      )
     },
   }),
 )

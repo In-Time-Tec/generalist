@@ -1,6 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",
@@ -16,31 +17,11 @@ const agent = Agent.make({
   toolkit,
 })
 
-let calls = 0
-
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => {
-      calls += 1
-      if (calls === 1) {
-        return Stream.make(
-          Response.makePart("tool-call", {
-            id: "weather-1",
-            name: "get_weather",
-            params: { city: "Boise" },
-            providerExecuted: false,
-          }),
-        )
-      }
-      if (calls === 2) {
-        return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Boise is sunny and 72°F." }))
-      }
-      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "You asked about Boise." }))
-    },
-  }),
-)
+const modelLayer = TestModel.layer([
+  TestModel.toolCall("get_weather", { city: "Boise" }, { id: "weather-1" }),
+  TestModel.text("Boise is sunny and 72°F."),
+  TestModel.text("You asked about Boise."),
+])
 
 const layers = Layer.mergeAll(
   modelLayer,

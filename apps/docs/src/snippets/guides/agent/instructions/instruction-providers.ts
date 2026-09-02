@@ -2,6 +2,11 @@ import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "
 import { Agent, Approvals, Instructions, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const persona = Instructions.fromText("persona", "You are the release-notes assistant.")
 
 const houseStyle = Instructions.fromText("house-style", "Write one sentence per change. Never use exclamation marks.")
@@ -20,7 +25,10 @@ const modelLayer = Layer.effect(
         system === undefined
           ? "no system message"
           : Option.getOrElse(Schema.decodeOption(Schema.String)(system.content), () => "no system message")
-      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
+      return Stream.make(
+        Response.makePart("text-delta", { id: "assistant", delta: text }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+      )
     },
   }),
 )

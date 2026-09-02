@@ -1,6 +1,7 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, AgentTool, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 
 const summarizer = Agent.make({
   name: "summarizer",
@@ -30,39 +31,11 @@ const parent = Agent.make({
   toolkit: parentToolkit,
 })
 
-let calls = 0
-
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => {
-      calls += 1
-      switch (calls) {
-        case 1:
-          return Stream.make(
-            Response.makePart("tool-call", {
-              id: "summarize-1",
-              name: "summarize",
-              params: { document: "Generalist is an Effect-native agent loop." },
-              providerExecuted: false,
-            }),
-          )
-        case 2:
-          return Stream.make(
-            Response.makePart("text-delta", { id: "assistant", delta: "Generalist runs agent loops on Effect." }),
-          )
-        default:
-          return Stream.make(
-            Response.makePart("text-delta", {
-              id: "assistant",
-              delta: "Summary ready: Generalist runs agent loops on Effect.",
-            }),
-          )
-      }
-    },
-  }),
-)
+const modelLayer = TestModel.layer([
+  TestModel.toolCall("summarize", { document: "Generalist is an Effect-native agent loop." }, { id: "summarize-1" }),
+  TestModel.text("Generalist runs agent loops on Effect."),
+  TestModel.text("Summary ready: Generalist runs agent loops on Effect."),
+])
 
 const program = Agent.run(parent, "Summarize the intro document.").pipe(Effect.flatMap((result) => Console.log(result)))
 

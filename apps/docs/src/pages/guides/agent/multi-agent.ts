@@ -96,10 +96,10 @@ export const multiAgent = definePage({
     p(
       code("Handoff.supervisor"),
       " builds one ",
-      code("transfer_to_<specialist>"),
+      code("handoff_to_<specialist>"),
       " tool per specialist, an agent whose toolkit advertises them, and a handled toolkit for ",
       code("ToolExecutor.layerToolkit"),
-      ". The transfer tool is a routing convention: the supervisor's model still decides when to call it.",
+      ". The handoff tool is a routing convention: the supervisor's model still decides when to call it.",
     ),
     codeBlock({ label: "supervisor.ts", source: supervisor, expectedOutput: supervisorExpected }),
     callout(

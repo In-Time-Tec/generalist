@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "bun src/core.ts && bun src/providers.ts && bun src/instructions.ts && bun src/instructions-skills.ts && bun src/memory.ts && bun src/mcp.ts && bun src/transport.ts && bun src/foldkit.ts && bun src/test.ts",
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {

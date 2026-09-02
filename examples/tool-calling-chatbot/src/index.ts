@@ -1,22 +1,7 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-
-type ModelParams = Parameters<typeof LanguageModel.make>[0]
-
-const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<LanguageModel.LanguageModel> =>
-  Layer.effect(
-    LanguageModel.LanguageModel,
-    LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText,
-    }),
-  )
-
-const textDelta = (delta: string) => Response.makePart("text-delta", { id: "assistant", delta })
-
-const toolCall = (id: string, name: string, params: { readonly city: string }) =>
-  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",
@@ -36,20 +21,16 @@ const agent = Agent.make({
   toolkit,
 })
 
-let calls = 0
-
 const program = Effect.gen(function* () {
   const result = yield* Agent.run(agent, "Should I bring a jacket in Boise?")
   yield* Console.log(result)
 })
 
 const runtimeLayer = Layer.mergeAll(
-  modelLayer(() => {
-    calls += 1
-    return calls === 1
-      ? Stream.make(toolCall("weather-1", "get_weather", { city: "Boise" }))
-      : Stream.make(textDelta("Boise is sunny and 72°F; no jacket needed."))
-  }),
+  TestModel.layer([
+    TestModel.toolCall("get_weather", { city: "Boise" }, { id: "weather-1" }),
+    TestModel.text("Boise is sunny and 72°F; no jacket needed."),
+  ]),
   toolkitLayer,
   Permissions.layerAllowAll,
   Approvals.layerAutoApprove,

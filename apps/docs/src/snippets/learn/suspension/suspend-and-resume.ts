@@ -1,6 +1,7 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, AgentEvent, Approvals, ModelMiddleware, Permissions } from "generalist"
-import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { TestModel } from "generalist/testing"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service to production",
@@ -17,27 +18,10 @@ const agent = Agent.make({
   toolkit,
 })
 
-let modelCalls = 0
-
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => {
-      modelCalls += 1
-      return modelCalls === 1
-        ? Stream.make(
-            Response.makePart("tool-call", {
-              id: "deploy-1",
-              name: "deploy",
-              params: { service: "api" },
-              providerExecuted: false,
-            }),
-          )
-        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "The api service is deployed." }))
-    },
-  }),
-)
+const modelLayer = TestModel.layer([
+  TestModel.toolCall("deploy", { service: "api" }, { id: "deploy-1" }),
+  TestModel.text("The api service is deployed."),
+])
 
 let approvalChecks = 0
 
