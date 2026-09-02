@@ -15,7 +15,6 @@ import {
   progressData,
 } from "../../core/tools/nested-operation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
-import type { AgentSuspended } from "../../core/agent/event.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStoreService } from "../run/store.js"
 import { approvalReason, type WaitReason } from "../run/wait.js"
 
@@ -31,17 +30,18 @@ interface PendingApproval {
 
 /** Runtime-owned nested durable operations plus the waits they open. */
 export interface Service extends NestedOperationService {
-  readonly waitFor: (
-    wait: AgentSuspended["waits"][number],
-  ) => Effect.Effect<{ readonly waitId: string; readonly reason: WaitReason } | undefined>
+  readonly waitFor: (wait: {
+    readonly token: string
+  }) => Effect.Effect<{ readonly waitId: string; readonly reason: WaitReason } | undefined>
 }
 
 /** Persisted identity of one nested operation beneath an outer durable operation. */
 export const nestedOperationKey = (input: { readonly operationKey: string; readonly ordinal: number }): string =>
   `${input.operationKey}#${input.ordinal}`
 
-/** Stable approval identity for one nested operation. */
-export const nestedApprovalId = (nestedKey: string): string => `nested-approval:${nestedKey}`
+/** Stable, operator-resolvable approval identity for one nested operation. */
+export const nestedApprovalId = (input: { readonly runId: string; readonly nestedKey: string }): string =>
+  `runtime-approval:${encodeURIComponent(input.runId)}:nested-approval:${input.nestedKey}`
 
 const NestedInput = Schema.Struct({ kind: Schema.String, ordinal: Schema.Finite, payload: Schema.Unknown })
 type NestedInput = typeof NestedInput.Type
@@ -188,7 +188,7 @@ export const make = (input: {
           const approval = request.approval
           const authorize = Effect.gen(function* () {
             const capability = approval.capability
-            const approvalId = nestedApprovalId(nestedKey)
+            const approvalId = nestedApprovalId({ runId: input.claim.runId, nestedKey })
             const prior = resolvedApproval(approvalId)
             const denied = (reason: string) =>
               Effect.gen(function* () {

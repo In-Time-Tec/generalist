@@ -309,7 +309,7 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
     it.live("opens a wait carrying the nested operation's own approval identity", () =>
       provide(
         Effect.gen(function* () {
-          const { nested } = yield* claimedRun("approval-wait")
+          const { nested, runId } = yield* claimedRun("approval-wait")
           const approvals: Approvals.Service = { resolve: (pending) => Effect.succeed(pending) }
           const failure = yield* Effect.flip(
             nested
@@ -323,7 +323,10 @@ export const nestedOperationsSuite = <StoreError, Extra = never>(
               ),
           )
           if (!Schema.is(NestedOperation.Suspended)(failure)) throw new Error("expected suspension")
-          const expected = nestedApprovalId(nestedOperationKey({ operationKey: OPERATION_KEY, ordinal: 0 }))
+          const expected = nestedApprovalId({
+            runId,
+            nestedKey: nestedOperationKey({ operationKey: OPERATION_KEY, ordinal: 0 }),
+          })
           expect(failure.token).toBe(expected)
           const suspended = suspension({
             waitId: failure.token,

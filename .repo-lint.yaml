@@ -42,6 +42,8 @@ rules:
         - "packages/*/test/ai/provider/layer-model.test.ts"
         # Memo conformance spans the public facade, Agent loop, Runtime journal, and storage drivers
         - "packages/generalist/test/memo/*.test.ts"
+        # Learning acceptance spans the unstable leaf, Hooks, approvals, Runtime recovery, and storage drivers
+        - "packages/generalist/test/learning/*.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
       target: "packages/*/src/**/*.ts"
       pattern: "*.tui.test.ts -> *.ts"

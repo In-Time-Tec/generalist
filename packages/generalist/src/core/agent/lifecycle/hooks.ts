@@ -28,6 +28,7 @@ import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../../durable/service.js"
 import type { RunId } from "../../durable/run-id.js"
 import type { Middleware } from "../../model/middleware.js"
+import { Suspended as NestedOperationSuspended } from "../../tools/nested-operation.js"
 import { AgentError } from "../event.js"
 
 /** Result of one complete ordered hook declaration chain. */
@@ -367,5 +368,10 @@ export const runEnd = <Output>(input: RunEndInput<Output>) =>
             message: `RunEnd hook blocked completion: ${result.blocked}`,
             turn: Math.max(0, input.turns - 1),
           }),
+    ),
+    Effect.catchTag("generalist/core/HookFailed", (error) =>
+      Effect.fail<HookFailed | NestedOperationSuspended>(
+        Schema.is(NestedOperationSuspended)(error.cause) ? error.cause : error,
+      ),
     ),
   )

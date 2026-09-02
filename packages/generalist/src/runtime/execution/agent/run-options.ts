@@ -5,6 +5,7 @@ import type { DriverCheckpoint } from "../../../core/durable/driver.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
+import { Suspended as NestedOperationSuspended } from "../../../core/tools/nested-operation.js"
 
 type HostedRunOptions = Omit<RunOptions, "memory" | "steering">
 
@@ -21,11 +22,10 @@ export const make = (input: {
   readonly budget: NonNullable<RunOptions["budget"]>
   readonly compaction?: RunOptions["compaction"]
 }): HostedRunOptions | undefined => {
-  const suspension =
-    !input.resume || input.execution.suspension === undefined
-      ? Option.none<AgentSuspended>()
-      : Schema.decodeUnknownOption(AgentSuspended)(input.execution.suspension)
-  if (input.resume && input.execution.suspension !== undefined && Option.isNone(suspension)) return undefined
+  const suspension = input.resume ? input.execution.suspension : undefined
+  const agentSuspension = Schema.decodeUnknownOption(AgentSuspended)(suspension)
+  const nestedSuspension = Schema.decodeUnknownOption(NestedOperationSuspended)(suspension)
+  if (suspension !== undefined && Option.isNone(agentSuspension) && Option.isNone(nestedSuspension)) return undefined
   const options: HostedRunOptions = {
     prompt: input.prompt,
     sessionId: input.execution.message.sessionId,
@@ -45,9 +45,9 @@ export const make = (input: {
   if (input.history !== undefined) Object.assign(options, { history: input.history })
   const turnStart = input.turnStart ?? input.continuation?.nextTurn
   if (turnStart !== undefined) Object.assign(options, { turnStart })
-  if (Option.isSome(suspension)) {
-    const resume: NonNullable<HostedRunOptions["resume"]> = { suspension: suspension.value }
-    const waitIds = new Set(suspension.value.waits.map((wait) => wait.waitId))
+  if (Option.isSome(agentSuspension)) {
+    const resume: NonNullable<HostedRunOptions["resume"]> = { suspension: agentSuspension.value }
+    const waitIds = new Set(agentSuspension.value.waits.map((wait) => wait.waitId))
     const resolutions = input.execution.resolutions.filter((entry) => waitIds.has(entry.waitId))
     if (resolutions.length > 0) Object.assign(resume, { resolutions })
     Object.assign(options, { resume })
