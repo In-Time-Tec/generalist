@@ -368,6 +368,8 @@ describe("model instrumentation", () => {
                 request: undefined,
               }),
               Response.makePart("reasoning-delta", { id: "r1", delta: "thinking" }),
+              Response.makePart("text-start", { id: "t1" }),
+              Response.makePart("text-delta", { id: "t1", delta: "" }),
               Response.makePart("text-delta", { id: "t1", delta: "Hello " }),
               Response.makePart("text-delta", { id: "t1", delta: "world" }),
               Response.toolCallPart({ id: "call-1", name: "echo", params: {}, providerExecuted: false }),
@@ -377,8 +379,9 @@ describe("model instrumentation", () => {
         { emit, turn: 3, identity },
       )
 
-      yield* Stream.runDrain(wrapped.streamText({ prompt: "hello" }))
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "hello" }))
 
+      expect(parts.filter((part) => part.type === "text-delta").map((part) => part.delta)).toEqual(["Hello ", "world"])
       expect(tags(events)).toEqual([
         "ModelCallStarted",
         "ModelAttemptStarted",

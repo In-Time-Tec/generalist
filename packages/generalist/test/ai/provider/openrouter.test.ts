@@ -1,14 +1,16 @@
 import "./suites/openrouter-stream-error-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
+import { Response as AiResponse, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
-import { Agent, ModelResilience } from "generalist"
+import { Agent, AgentEvent, ModelResilience } from "generalist"
 import { decodeConfig, layer } from "../../../src/ai/provider/openrouter.js"
 import { allowAllAuthorization } from "../../authorization.js"
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type Assert<T extends true> = T
+const findEvent = <Tag extends AgentEvent.Event["_tag"]>(events: ReadonlyArray<AgentEvent.Event>, tag: Tag) =>
+  events.find((event): event is Extract<AgentEvent.Event, { readonly _tag: Tag }> => event._tag === tag)
 
 describe("OpenRouter request configuration", () => {
   it("excludes transport-owned debug from the public configuration type", () => {
@@ -123,11 +125,15 @@ const usage = {
   prompt_tokens: 3,
   total_tokens: 5,
 }
+const inconsistentUsage = {
+  ...usage,
+  completion_tokens_details: { reasoning_tokens: 3 },
+}
 interface ChatChunkInput {
   readonly choices?: ReadonlyArray<unknown>
   readonly provider?: string
   readonly system_fingerprint?: string
-  readonly usage?: typeof usage
+  readonly usage?: typeof usage | typeof inconsistentUsage
 }
 const chunk = (input: ChatChunkInput) => ({
   id: "generation-test",
@@ -182,6 +188,82 @@ describe("OpenRouter public flow", () => {
       })
       expect(encodeUnknown(completed)).not.toContain("prompt-secret")
       expect(completed).not.toHaveProperty("prompt")
+    })
+  })
+
+  it.effect("drops empty text deltas and exposes normalized inconsistent usage through every event level", () => {
+    const client = HttpClient.make((request) =>
+      Effect.succeed(
+        response(
+          request,
+          sse(
+            chunk({
+              choices: [{ delta: { content: "", reasoning: "thinking" }, finish_reason: null, index: 0 }],
+            }),
+            chunk({ choices: [{ delta: { content: "" }, finish_reason: null, index: 0 }] }),
+            chunk({ choices: [{ delta: { content: "done" }, finish_reason: "stop", index: 0 }] }),
+            chunk({ provider: "OpenAI", usage: inconsistentUsage }),
+          ),
+        ),
+      ),
+    )
+
+    return Effect.gen(function* () {
+      const events = Array.from(
+        yield* Agent.stream(
+          Agent.make({
+            name: "openrouter-usage-normalization",
+            model: { provider: "openrouter", model: "requested/model" },
+          }),
+          "hello",
+        ).pipe(
+          Stream.provide(
+            layer({ model: "requested/model", apiKey }).pipe(
+              Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
+            ),
+          ),
+          Stream.runCollect,
+        ),
+      )
+      const modelParts = events.filter((event) => event._tag === "ModelPart")
+      const textDeltas = modelParts.flatMap((event) => (event.part.type === "text-delta" ? [event.part.delta] : []))
+      const textStartIndex = events.findIndex((event) => event._tag === "ModelPart" && event.part.type === "text-start")
+      const firstTextIndex = events.findIndex(
+        (event) => event._tag === "ModelAttemptFirstOutput" && event.kind === "text",
+      )
+      const visibleTextIndex = events.findIndex(
+        (event) => event._tag === "ModelPart" && event.part.type === "text-delta" && event.part.delta === "done",
+      )
+      const normalizedUsage = AiResponse.Usage.make({
+        inputTokens: { uncached: 3, total: 3, cacheRead: 0, cacheWrite: 0 },
+        outputTokens: { total: 2, text: 0, reasoning: 2 },
+      })
+      const finish = modelParts.find((event) => event.part.type === "finish")
+      const attempt = findEvent(events, "ModelAttemptCompleted")
+      const call = findEvent(events, "ModelCallCompleted")
+      const committed = findEvent(events, "ModelResponseCommitted")
+      const turn = findEvent(events, "TurnCompleted")
+      const completed = findEvent(events, "Completed")
+
+      expect(textDeltas).toEqual(["done"])
+      expect(firstTextIndex).toBeGreaterThan(textStartIndex)
+      expect(firstTextIndex).toBeLessThan(visibleTextIndex)
+      expect(finish?._tag === "ModelPart" && finish.part.type === "finish" && finish.part.usage).toEqual(
+        normalizedUsage,
+      )
+      expect(finish?._tag === "ModelPart" && finish.part.type === "finish" && finish.part.metadata).toMatchObject({
+        openrouter: { usage: inconsistentUsage },
+        generalist: { usageInconsistent: true },
+      })
+      expect(attempt?.usage).toEqual(normalizedUsage)
+      expect(attempt?.providerMetadata).toMatchObject({
+        openrouter: { usage: inconsistentUsage },
+        generalist: { usageInconsistent: true },
+      })
+      expect(call?.usage).toEqual(normalizedUsage)
+      expect(committed?.response.usage).toEqual(normalizedUsage)
+      expect(turn?.usage).toEqual(normalizedUsage)
+      expect(completed?.usage).toEqual(normalizedUsage)
     })
   })
 

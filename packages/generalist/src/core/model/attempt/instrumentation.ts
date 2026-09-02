@@ -386,6 +386,7 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
           ? requireTerminal(stream, terminalOptions)
           : requireTerminal(stream, { ...terminalOptions, idleTimeout })
       return terminated.pipe(
+        Stream.filter((part) => part.type !== "text-delta" || part.delta.length > 0),
         Stream.tap((part) => observeStreamPart(context, attempt, part)),
         Stream.catchCause((cause) =>
           Stream.unwrap(

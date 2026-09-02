@@ -32,7 +32,9 @@ export const coreEventsReference = definePage({
             code("Ai.Response.StreamPart"),
             " visible only while directly observing ",
             code("Agent.stream"),
-            ". It is tentative provider activity, not durable response authority.",
+            ". Empty ",
+            code("text-delta"),
+            " parts are discarded. Remaining parts are tentative provider activity, not durable response authority.",
           ],
         ],
         [
@@ -62,7 +64,11 @@ export const coreEventsReference = definePage({
     p(
       "The rest of the union describes turn boundaries, tool execution and progress, approvals, steering, handoffs, typed completion, and model-call telemetry. Every event carries its stable correlation fields; ",
       code("turn"),
-      " is 0-based wherever present.",
+      " is 0-based wherever present. ",
+      code("ModelAttemptFirstOutput"),
+      " reports text only for the first non-empty text part or delta; a ",
+      code("text-start"),
+      " lifecycle part does not trigger it.",
     ),
     table(
       ["Family", "Events", "Purpose"],

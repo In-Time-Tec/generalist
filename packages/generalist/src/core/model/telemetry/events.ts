@@ -164,7 +164,10 @@ export const AttemptStarted = Schema.Struct({
 })
 export type AttemptStarted = typeof AttemptStarted.Type
 
-/** The first reasoning, text, or tool-call output of one attempt; at most one event per kind. */
+/**
+ * The first reasoning, non-empty text, or tool-call output of one attempt; at
+ * most one event per kind. Text lifecycle starts and empty deltas do not count.
+ */
 export const AttemptFirstOutput = Schema.Struct({
   _tag: Schema.tag("ModelAttemptFirstOutput"),
   deliveryId: Schema.String,
