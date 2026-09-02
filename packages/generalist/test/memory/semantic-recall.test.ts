@@ -129,7 +129,7 @@ layer(memoryLayer)("SemanticRecall", (it) => {
       const retained = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
       const otherRetained = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("color")) })
 
-      expect(retained.map(itemText)).toEqual(["User: What color is the ocean?\nAssistant: blue"])
+      expect(retained.map(itemText)).toEqual(beforeForget.filter((item) => item.id !== first.id).map(itemText))
       expect(otherRetained.map(itemText)).toEqual(["User: What color is the door?\nAssistant: blue"])
     }),
   )

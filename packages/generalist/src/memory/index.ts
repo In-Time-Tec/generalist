@@ -10,6 +10,7 @@ import {
 } from "./working-memory.js"
 
 export * as SemanticRecall from "./semantic-recall.js"
+export * as Supermemory from "./supermemory.js"
 export * as VectorStore from "./vector-store.js"
 export * as WorkingMemory from "./working-memory.js"
 
@@ -18,6 +19,11 @@ export interface Options {
   readonly working?: WorkingMemoryOptions
   readonly semantic?: SemanticRecallOptions
 }
+
+/** @experimental Hosted semantic Memory backed by Supermemory. */
+export { layer as layerSupermemory, SupermemoryError, type Options as SupermemoryOptions } from "./supermemory.js"
+/** @experimental Persistent PostgreSQL vector store. Requires the `vector` extension. */
+export { layer as layerPgVector, type Options as PgVectorOptions } from "./pgvector.js"
 
 /** @internal The ambient LanguageModel is required only when working memory summarizes without an explicit model layer. */
 export type WorkingRequirement<O> = O extends { readonly working?: infer W }

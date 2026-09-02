@@ -59,18 +59,114 @@ Retention transcript
 [system, user("What does Ada prefer?"), assistant(...)]
 ```
 
-## Implementations
+## Working and semantic memory
 
 - `WorkingMemory.layer` keeps a non-durable recency window per key and can
   summarize overflow into a `working-summary` item. Pass
   `summarize: { model }` with a closed `Layer<LanguageModel>` (typically a
   provider's `layerModel`) to give summary calls their own model; omit `model`
   and the layer carries the ambient `LanguageModel` requirement.
-- `SemanticRecall.layer` plus `VectorStore.layerMemory` is non-durable. It
-  embeds prompt user text for recall and stores the final user/assistant
-  exchange only on terminal turns.
+- `SemanticRecall.layer` embeds prompt user text for similarity search and
+  stores the final user/assistant exchange only on terminal turns. It needs one
+  `VectorStore` and one Effect AI `EmbeddingModel`.
 - `layer({ working?, semantic? })` concatenates working recall first; remember
   and forget fan out to both implementations.
+
+Working memory is a bounded prompt window. Semantic memory is retrieval across
+older exchanges. Use either independently or combine them.
+
+## Semantic adapters
+
+### In-memory
+
+`VectorStore.layerMemory` is deterministic process-local storage for tests and
+short-lived applications. It is not durable.
+
+### PostgreSQL with pgvector
+
+`layerPgVector` uses the shared `SqlClient` from `@effect/sql`; it
+does not create a second connection pool or depend on `pg`.
+
+```ts
+import { Layer } from "effect"
+import { layer as layerMemory, layerPgVector } from "generalist/memory"
+import { layerEmbedding } from "generalist/ai/amazon-bedrock"
+
+const memory = layerMemory({ semantic: { limit: 5 } }).pipe(
+  Layer.provide(layerPgVector({ table: "generalist_memory", dimensions: 1024 })),
+  Layer.provide(layerEmbedding({ model: "amazon.titan-embed-text-v2:0" })),
+)
+```
+
+Provide the resulting layer with your existing PostgreSQL `SqlClient`. Before
+the first run, enable pgvector in that database with an account allowed to
+install extensions:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+The application account only needs normal create/read/write privileges for the
+configured table after that. The adapter creates the table if it is absent,
+validates every vector against `dimensions`, scopes rows by the complete
+`{ agent, subject }` key, and keeps data when its layer is closed and rebuilt.
+
+### Supermemory
+
+Supermemory replaces both local embeddings and `VectorStore`:
+
+```ts
+import { Config } from "effect"
+import { layerSupermemory } from "generalist/memory"
+
+const memory = layerSupermemory({
+  apiKey: Config.redacted("SUPERMEMORY_API_KEY"),
+  containerTag: "session:user-ada",
+})
+```
+
+A string binds the layer to one Supermemory container. For one layer shared by
+many keys, also pass `containerTagForKey: (key) => key.subject`; the host remains
+the authority that maps keys to tenant-safe container tags. Whole-key `forget`
+deletes that container through Supermemory's container-tag endpoint, which
+requires an organization owner or admin API key. One-item `forget` uses the v4
+memory endpoint. HTTP and response-decoding failures become `MemoryError` with
+a typed `SupermemoryError { status, body }` in `cause`.
+
+Tests use recorded HTTP responses. A live run is intentionally opt-in: set
+`SUPERMEMORY_API_KEY` and use the same layer with `FetchHttpClient.layer`; do
+not put the key in source control.
+
+## Embedding models
+
+Semantic recall accepts the provider-neutral `EmbeddingModel` from
+`effect/unstable/ai`:
+
+- OpenAI: `generalist/ai/openai-embedding`.
+- Amazon Bedrock Titan: `layerEmbedding` from
+  `generalist/ai/amazon-bedrock`. Titan v2 supports 256, 512, and 1024
+  dimensions; its default is 1024.
+- Ollama and other OpenAI-compatible servers:
+  `generalist/ai/openai-compatible-embedding` with the server base URL.
+
+To bring your own provider, implement the batch boundary once:
+
+```ts
+import { Effect, Layer } from "effect"
+import { AiError, EmbeddingModel } from "effect/unstable/ai"
+
+declare const embedBatch: (inputs: ReadonlyArray<string>) => Effect.Effect<Array<Array<number>>, AiError.AiError>
+
+const embeddings = Layer.effect(
+  EmbeddingModel.EmbeddingModel,
+  EmbeddingModel.make({
+    embedMany: ({ inputs }) =>
+      embedBatch(inputs).pipe(Effect.map((results) => ({ results, usage: { inputTokens: undefined } }))),
+  }),
+)
+```
+
+The vector-store `dimensions` must exactly equal the model output length.
 
 ## Invariants
 
@@ -92,8 +188,8 @@ Retention transcript
   its `turn` and `terminal` status.
 - `forget({ key })` is host-requested cleanup for the whole key;
   `forget({ key, id })` removes one implementation-owned item.
-- Core defines the seam and a no-op layer. Durable storage and retention policy
-  remain host-owned; in-memory implementations do not survive process loss.
+- Core defines the seam and a no-op layer. Retention policy remains host-owned;
+  only pgvector and hosted Supermemory survive process loss.
 
 ## Related
 

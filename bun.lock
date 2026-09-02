@@ -161,6 +161,19 @@
         "typescript": "catalog:",
       },
     },
+    "examples/memory": {
+      "name": "generalist-example-memory",
+      "dependencies": {
+        "@aws-sdk/client-bedrock-runtime": "catalog:",
+        "@aws-sdk/credential-provider-node": "catalog:",
+        "effect": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/memory-chat": {
       "name": "generalist-example-memory-chat",
       "dependencies": {
@@ -1262,6 +1275,8 @@
     "generalist-example-mcp-agent": ["generalist-example-mcp-agent@workspace:examples/mcp-agent"],
 
     "generalist-example-mcp-toolkit-server": ["generalist-example-mcp-toolkit-server@workspace:examples/mcp-toolkit-server"],
+
+    "generalist-example-memory": ["generalist-example-memory@workspace:examples/memory"],
 
     "generalist-example-memory-chat": ["generalist-example-memory-chat@workspace:examples/memory-chat"],
 

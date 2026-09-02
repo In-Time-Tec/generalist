@@ -26,6 +26,7 @@ export {
   RecoveryFailure,
 } from "./client.js"
 export { CredentialFailure, defaultChain, type Credential, type Credentials } from "./credentials.js"
+export { layer as layerEmbedding, make as makeEmbedding, type Options as EmbeddingOptions } from "./embedding.js"
 
 declare module "effect/unstable/ai/Prompt" {
   export interface SystemMessageOptions extends ProviderOptions {

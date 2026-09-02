@@ -2,10 +2,13 @@ import {
   BedrockRuntimeClient,
   ConverseCommand,
   ConverseStreamCommand,
+  InvokeModelCommand,
   type ConverseCommandInput,
   type ConverseCommandOutput,
   type ConverseStreamCommandOutput,
   type BedrockRuntimeClientConfig,
+  type InvokeModelCommandInput,
+  type InvokeModelCommandOutput,
 } from "@aws-sdk/client-bedrock-runtime"
 import type { AwsCredentialIdentity } from "@smithy/types"
 import { Context, Effect, Layer, Option, Redacted, Schema, Semaphore } from "effect"
@@ -13,7 +16,7 @@ import { defaultChain, type Credential, type Credentials } from "./credentials.j
 
 /** @experimental */
 export class ClientFailure extends Schema.TaggedError<ClientFailure>()("generalist/ai/AmazonBedrockClientFailure", {
-  operation: Schema.Literals(["converse", "converseStream"]),
+  operation: Schema.Literals(["converse", "converseStream", "invokeModel"]),
   description: Schema.String,
   awsErrorName: Schema.optional(Schema.String),
   awsErrorCode: Schema.optional(Schema.String),
@@ -33,6 +36,7 @@ export class RecoveryFailure extends Schema.TaggedError<RecoveryFailure>()(
 export interface Service {
   readonly converse: (input: ConverseCommandInput) => Effect.Effect<ConverseCommandOutput, ClientFailure>
   readonly converseStream: (input: ConverseCommandInput) => Effect.Effect<ConverseStreamCommandOutput, ClientFailure>
+  readonly invokeModel: (input: InvokeModelCommandInput) => Effect.Effect<InvokeModelCommandOutput, ClientFailure>
 }
 
 /** @experimental */
@@ -211,6 +215,14 @@ export const layerClient = (options: ClientOptions = {}) => {
         )
       }
 
+      const sendInvokeModel = (command: InvokeModelCommand, credential?: Credential) => {
+        const client = makeClient(credential)
+        return Effect.tryPromise({
+          try: (signal) => client.send(command, { abortSignal: signal }),
+          catch: (cause) => clientFailure("invokeModel", cause),
+        }).pipe(Effect.ensuring(Effect.sync(() => client.destroy())))
+      }
+
       const send = <A>(
         operation: ClientFailure["operation"],
         sendOnce: (credential?: Credential) => Effect.Effect<A, ClientFailure>,
@@ -252,6 +264,8 @@ export const layerClient = (options: ClientOptions = {}) => {
         converse: (input) => send("converse", (credential) => sendConverse(new ConverseCommand(input), credential)),
         converseStream: (input) =>
           send("converseStream", (credential) => sendStream(new ConverseStreamCommand(input), credential)),
+        invokeModel: (input) =>
+          send("invokeModel", (credential) => sendInvokeModel(new InvokeModelCommand(input), credential)),
       })
     }),
   )

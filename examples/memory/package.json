@@ -1,0 +1,19 @@
+{
+  "name": "generalist-example-memory",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "catalog:",
+    "@aws-sdk/credential-provider-node": "catalog:",
+    "generalist": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

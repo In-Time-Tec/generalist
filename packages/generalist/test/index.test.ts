@@ -132,7 +132,20 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   ["ag-ui", () => import("../src/interoperability/ag-ui/index.js"), ["AGUI", "Errors"]],
   ["a2a", () => import("../src/interoperability/a2a/index.js"), ["A2A", "Content", "Errors", "Projection"]],
   ["foldkit", () => import("../src/foldkit/index.js"), ["Chat", "Connection"]],
-  ["memory", () => import("../src/memory/index.js"), ["SemanticRecall", "VectorStore", "WorkingMemory", "layer"]],
+  [
+    "memory",
+    () => import("../src/memory/index.js"),
+    [
+      "SemanticRecall",
+      "Supermemory",
+      "SupermemoryError",
+      "VectorStore",
+      "WorkingMemory",
+      "layer",
+      "layerPgVector",
+      "layerSupermemory",
+    ],
+  ],
 ]
 
 describe("generalist public surface", () => {
