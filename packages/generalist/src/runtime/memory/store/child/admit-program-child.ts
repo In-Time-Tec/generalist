@@ -131,6 +131,7 @@ export const admitProgramChild: {
       subscribers: new Map(),
       steering: [],
       registrations,
+      checkpoints: new Map(),
     }
     const runs = new Map(state.runs)
     runs.set(parent.runId, { ...parent, children: [...parent.children, child.runId] })

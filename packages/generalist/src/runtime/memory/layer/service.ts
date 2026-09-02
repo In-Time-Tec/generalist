@@ -49,10 +49,11 @@ import { isTerminal, type RunInspection } from "../../run.js"
 import { explain as explainRecovery, verify as verifyRecovery } from "../../execution/recovery/operator.js"
 import { resolveWith as resolveDurableApproval } from "../../operation/approval.js"
 import { awaitSessionTerminal } from "../../session/lifecycle.js"
-import { make as makeAgentStart } from "./agent-start.js"
+import { make as makeAgentStart, untypedHandle } from "./agent-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
 import { messageDigestInput, messageDraft } from "./message.js"
 import { Invalid as BudgetInvalid, make as makeBudget } from "../../../core/durable/run-budget.js"
+import { generateId } from "../../../core/model/telemetry/events.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
@@ -574,6 +575,20 @@ const makeRuntimeWith = (
             return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
           }),
         ),
+      fork: (runId, input) =>
+        Effect.gen(function* () {
+          const newRunId = `run_${yield* generateId}`
+          const receipt = yield* store.fork({ runId, newRunId, ...input })
+          yield* store.activate({ runId: receipt.runId })
+          return untypedHandle(store, receipt.runId)
+        }),
+      rewind: (runId, input) =>
+        Effect.gen(function* () {
+          yield* active.interrupt(runId)
+          const branchRunId = `run_${yield* generateId}`
+          yield* store.rewind({ runId, branchRunId, ...input })
+          yield* store.activate({ runId })
+        }),
       fanOut: (input) =>
         Effect.gen(function* () {
           return yield* store.admitFanOut(yield* normalizeFanOut(input.parentRunId, input))

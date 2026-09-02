@@ -36,10 +36,13 @@ import type {
 } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
 import type { RunEvent } from "../runtime/run/event.js"
+import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import {
   Runtime,
   type CancelError,
+  type ForkError,
   type InspectError,
+  type RewindError,
   type RunHandle,
   type StartError,
   type StartOptions,
@@ -148,6 +151,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
     readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
     readonly list: () => Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable>
+    readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
     readonly start: <Selected extends Agents[number]>(
@@ -159,6 +163,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
     readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
     readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, CancelError>
+    readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
   readonly events: {
     readonly subscribe: (sessionId: string, cursor?: Cursor) => Stream.Stream<HostEvent, SessionEventsError>
@@ -436,6 +441,7 @@ const create = <
           }),
         get: runtime.session,
         list: () => runtime.listSessions,
+        fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
       runs: {
         start: (sessionId, agent, input, startOptions) =>
@@ -463,6 +469,7 @@ const create = <
           if (reason !== undefined) input.reason = reason
           return runtime.cancel(input)
         },
+        rewind: runtime.rewind,
       },
       events: {
         subscribe: (sessionId, cursor) => {

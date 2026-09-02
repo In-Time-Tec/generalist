@@ -162,6 +162,7 @@ export const admitSend: {
         subscribers: new Map(),
         steering: [],
         registrations: input.registrations,
+        checkpoints: new Map(),
       }
       const runs = new Map(withId.runs)
       runs.set(runId, run)
@@ -427,6 +428,7 @@ export const admitSpawn: {
         subscribers: new Map(),
         steering: [],
         registrations,
+        checkpoints: new Map(),
       }
       const runs = new Map(withId.runs)
       const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }

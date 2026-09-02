@@ -78,7 +78,15 @@ export interface RunInspection {
   readonly waits: ReadonlyArray<RunWait>
   readonly lastSequence: number
   readonly durability: "ephemeral" | "durable"
+  readonly branches: ReadonlyArray<RunBranch>
 }
+
+/** A durable alternate continuation retained from a fork or rewind. */
+export const RunBranch = Schema.Struct({
+  runId: RunId,
+  forkedAt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+})
+export type RunBranch = typeof RunBranch.Type
 
 /** Encoded durable Run inspection. */
 interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "waits"> {
@@ -113,6 +121,7 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   waits: Schema.Array(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   durability: Schema.Literals(["ephemeral", "durable"]),
+  branches: Schema.Array(RunBranch),
 }).pipe(
   Schema.refine((value): value is typeof value => hasValidExecutable(value), {
     message: "executableRef must match executableManifest",

@@ -140,6 +140,8 @@ export const appendEvent: {
         return yield* RuntimeUnavailable.make({ message: `tree root ${run.rootRunId} missing during append` })
       }
       const position = root.lastPosition + 1
+      const checkpoints = new Map(run.checkpoints)
+      checkpoints.set(sequence, run.checkpoint)
       const updated: MutableStoredRun = {
         ...run,
         runId: run.runId,
@@ -155,6 +157,7 @@ export const appendEvent: {
         children: run.children,
         events: [...run.events, event],
         subscribers: run.subscribers,
+        checkpoints,
       }
       updateOptionalRunFields(updated, run, event)
       const runs = new Map(terminalState.runs)

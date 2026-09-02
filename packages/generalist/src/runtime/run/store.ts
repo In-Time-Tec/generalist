@@ -39,6 +39,9 @@ import type {
   AckInvalid,
   AckBeyondCommitted,
   IllegalOperatorAction,
+  ForkSequenceInvalid,
+  NoSnapshot,
+  SubstitutionInvalid,
 } from "../errors.js"
 import type { Message } from "../messaging/message.js"
 import type { AgentName, DirectoryEntry } from "../execution/agent/directory.js"
@@ -82,7 +85,9 @@ import type {
   Durability,
   ExecutionClaim,
   ExecutionRecord,
+  ForkRunInput,
   OperationCompletionOutcome,
+  RewindRunInput,
   RecordOperationInput,
   ResolveAddressError,
   SessionReader,
@@ -119,7 +124,9 @@ export type {
   Durability,
   ExecutionClaim,
   ExecutionRecord,
+  ForkRunInput,
   OperationCompletionOutcome,
+  RewindRunInput,
   RecordOperationInput,
   ResolveAddressError,
   SessionReader,
@@ -287,6 +294,15 @@ export interface Service {
     readonly runId: string
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
+  readonly fork: (
+    input: ForkRunInput,
+  ) => Effect.Effect<
+    RunReceipt,
+    RunNotFound | ForkSequenceInvalid | NoSnapshot | SubstitutionInvalid | RuntimeUnavailable
+  >
+  readonly rewind: (
+    input: RewindRunInput,
+  ) => Effect.Effect<void, RunNotFound | ForkSequenceInvalid | NoSnapshot | RuntimeUnavailable>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
   /** Durably advance the host processed-through point to an exact committed model cycle. */
   readonly acknowledge: (input: {

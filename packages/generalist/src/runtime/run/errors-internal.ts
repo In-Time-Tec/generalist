@@ -1,4 +1,4 @@
-import { AgentExecutionFailure } from "./errors.js"
+import { AgentExecutionFailure } from "../errors.js"
 
 export const failureMessage = (message: string): string => {
   const trimmed = message.trim()

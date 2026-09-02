@@ -8,7 +8,7 @@ import { type DriverCheckpoint, DriverJournal, type Journal } from "../../core/d
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim } from "../run/store.js"
 import { ActiveExecutions } from "./active-executions.js"
-import { compactionOptionsMismatch, undecodableSuspension } from "../errors-internal.js"
+import { compactionOptionsMismatch, undecodableSuspension } from "../run/errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
 import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
 import type { ExecutionContinuation } from "../run/steering.js"

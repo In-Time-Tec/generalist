@@ -54,6 +54,9 @@ import type {
   DuplicateAgent,
   UnknownAgent,
   IllegalOperatorAction,
+  ForkSequenceInvalid,
+  NoSnapshot,
+  SubstitutionInvalid,
 } from "./errors.js"
 import type { Metadata } from "./messaging/message.js"
 import type { AgentName, AddressInvalid, DirectoryEntry } from "./execution/agent/directory.js"
@@ -72,6 +75,7 @@ import type {
   ResolveError as ResolveDurableApprovalError,
 } from "./operation/approval.js"
 import type { ExecutableRegistration } from "./executable/registration.js"
+import type { ForkOptions, RewindOptions } from "./fork.js"
 import type { Notification as ChildSettlementNotification } from "./child/settlement.js"
 import type { Event as ModelPreviewEvent } from "./execution/model-response/preview.js"
 import type { RunActivationProjection } from "./run/activation.js"
@@ -398,6 +402,8 @@ export type SteerError =
   | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
+export type ForkError = RunNotFound | ForkSequenceInvalid | NoSnapshot | SubstitutionInvalid | RuntimeUnavailable
+export type RewindError = RunNotFound | ForkSequenceInvalid | NoSnapshot | RuntimeUnavailable
 export type ExtendBudgetError = InspectError | BudgetInvalid
 export type OperatorActionError = InspectError | IllegalOperatorAction
 export type OperatorApprovalError = ResolveDurableApprovalError | IllegalOperatorAction
@@ -540,6 +546,10 @@ export interface Service extends RuntimeHostSessions {
   readonly registerAgentName: (input: RegisterAgentNameInput) => Effect.Effect<DirectoryEntry, RegisterAgentNameError>
   readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
   readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, InspectError>
+  /** Start a new Run from one committed journal prefix. */
+  readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<RunHandle<unknown>, ForkError>
+  /** Continue this Run from an earlier prefix while retaining its old suffix as a branch. */
+  readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   /** Primitive used by the operator API to journal a budget top-up and resume budget suspension. */
   readonly extendBudget: (runId: string, delta: BudgetDelta) => Effect.Effect<void, ExtendBudgetError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>

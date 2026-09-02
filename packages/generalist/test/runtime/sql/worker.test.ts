@@ -84,6 +84,7 @@ const storeService = (status: RunStatus): StoreService =>
         lastSequence: decodedRun.lastSequence,
         durability: "durable",
         waits: [],
+        branches: [],
       } satisfies RunInspection),
   })
 

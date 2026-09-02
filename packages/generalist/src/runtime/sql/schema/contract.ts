@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the logical SQL schema contract is one checksum authority */
 import { Effect, Function } from "effect"
 import { sha256Text } from "../../../core/durable/canonical-json.js"
 import {
@@ -12,7 +13,7 @@ import {
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
 /** The single logical SQL Runtime schema version. */
-export const SQL_SCHEMA_VERSION = 7
+export const SQL_SCHEMA_VERSION = 8
 
 export interface SqlLogicalTable {
   readonly name: string
@@ -98,6 +99,8 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
         "max_subagents",
         "parent_run_id",
         "invocation_id",
+        "forked_from",
+        "fork_sequence",
         "attempt",
         "attempt_fence",
         "last_sequence",
@@ -117,7 +120,15 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
     },
     {
       name: "generalist_run_events",
-      columns: ["run_id", "sequence", "event_id", "event_json", "host_session_id", "host_session_sequence"],
+      columns: [
+        "run_id",
+        "sequence",
+        "event_id",
+        "event_json",
+        "checkpoint_json",
+        "host_session_id",
+        "host_session_sequence",
+      ],
     },
     {
       name: "generalist_run_acknowledgements",
@@ -141,6 +152,8 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
         "finished_at",
         "resolution_idempotency_key",
         "resolution_json",
+        "checkpoint_json",
+        "completed_sequence",
       ],
     },
     {

@@ -43,12 +43,14 @@ Effect.runPromise(
 host.sessions.create({ id?, title? }) -> HostSession
 host.sessions.get(sessionId)          -> HostSession
 host.sessions.list()                  -> HostSession[]
+host.sessions.fork(runId, { atSequence, substitute? }) -> HostRun<unknown>
 
 host.runs.start(sessionId, agent, typedInput, { idempotencyKey? })
   -> { id, await, events, steer, followUp }
 host.runs.list(sessionId)             -> root Run inspections
 host.runs.inspect(runId)              -> Run inspection
 host.runs.cancel(runId, reason?)       -> void
+host.runs.rewind(runId, { toSequence }) -> void
 
 host.events.subscribe(sessionId, cursor?)
   -> Stream<RunStarted | Turn | ToolCall | ApprovalRequested | Compacted | Completed>
@@ -94,6 +96,7 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 ## Invariants
 
 - Host delegates Run registration, execution, inspection, cancellation, and replay to Runtime; it has no second executor or event journal.
+- `sessions.fork` and `runs.rewind` delegate to Runtime's atomic branch transitions. Future server routes can join at these Host methods without owning replay behavior.
 - Memory Sessions live for the Layer lifetime. SQLite, PostgreSQL, and MySQL persist Session metadata, root membership, and Session event cursors in the shared Runtime schema.
 - A Session identity is created explicitly before Host starts a Run in it. Omitted Session IDs use Generalist's Effect-based ID generator.
 - Loading a plugin performs no module-level side effects.

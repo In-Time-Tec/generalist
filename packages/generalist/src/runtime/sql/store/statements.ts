@@ -13,6 +13,7 @@ import {
   decodeSqlInteger,
   encodeExecutableManifest,
   encodeExecutableRef,
+  encodeJson,
   encodeEvent,
   encodeMessage,
   encodeQueue,
@@ -35,9 +36,12 @@ import { discardPendingSteering } from "./steering/disposition.js"
 import { appendTerminalToolResultsForEvent } from "../session/terminalization.js"
 import { claim as claimHostSessionCursor, publish as publishHostSessionEvent } from "../session/cursor.js"
 import { decodeRunEffect, isoFromSql as asIso } from "./run-decoding.js"
+import { ExecutionCheckpoint } from "../../execution/state.js"
 export { decodeRun, decodeRunEffect } from "./run-decoding.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
+const encodeCheckpoint = (checkpoint: DecodedRun["driverCheckpoint"]): string | null =>
+  checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, checkpoint)
 
 const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
   sql.onDialectOrElse({
@@ -45,6 +49,8 @@ const sqlBool = (sql: SqlClient.SqlClient, value: boolean): boolean | 0 | 1 =>
     mysql: () => (value ? 1 : 0),
     orElse: () => (value ? 1 : 0),
   })
+/** Dialect-correct SQL false for BOOLEAN or INTEGER flag columns. */
+export const sqlFalse = (sql: SqlClient.SqlClient): boolean | 0 | 1 => sqlBool(sql, false)
 
 export const clearLeaseOnOwnerRelease = (sql: SqlClient.SqlClient) =>
   sql.onDialectOrElse({
@@ -243,9 +249,10 @@ export const appendEvent: {
       const hostSessionCursor = yield* claimHostSessionCursor(run.rootRunId)
       yield* sql`
       INSERT INTO generalist_run_events (
-        run_id, sequence, event_id, event_json, host_session_id, host_session_sequence
+        run_id, sequence, event_id, event_json, checkpoint_json, host_session_id, host_session_sequence
       ) VALUES (
         ${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)},
+        ${encodeCheckpoint(run.driverCheckpoint)},
         ${hostSessionCursor?.sessionId ?? null}, ${hostSessionCursor?.cursor ?? null}
       )
     `

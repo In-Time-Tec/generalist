@@ -17,6 +17,8 @@ const asIso = (value: string | Date | null | undefined): string | undefined => {
 const assignRunOptionals = (result: DecodedRun, row: RunRow, checkpoint: ExecutionCheckpoint | undefined): void => {
   Object.assign(result, row.parent_run_id === null ? {} : { parentRunId: row.parent_run_id })
   Object.assign(result, row.invocation_id === null ? {} : { invocationId: row.invocation_id })
+  Object.assign(result, row.forked_from === null ? {} : { forkedFrom: row.forked_from })
+  Object.assign(result, row.fork_sequence === null ? {} : { forkSequence: row.fork_sequence })
   Object.assign(result, row.cancel_reason === null ? {} : { cancelReason: row.cancel_reason })
   Object.assign(result, row.terminal_event_id === null ? {} : { terminalEventId: row.terminal_event_id })
   Object.assign(result, row.owner_worker_id == null ? {} : { ownerWorkerId: row.owner_worker_id })

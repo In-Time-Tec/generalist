@@ -76,6 +76,8 @@ const inspect = (filename: string) => {
     "max_subagents",
     "parent_run_id",
     "invocation_id",
+    "forked_from",
+    "fork_sequence",
     "attempt",
     "attempt_fence",
     "last_sequence",

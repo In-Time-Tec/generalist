@@ -130,6 +130,7 @@ Testing.runtimeDriver({
     "operator-retry": { claim: conformanceClaim },
     "operator-resolve-unknown": { claim: conformanceClaim },
     "operator-scan": { claim: conformanceClaim },
+    "fork-rewind": { claim: conformanceClaim },
   },
 })
 

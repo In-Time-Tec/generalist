@@ -192,6 +192,7 @@ const addMember = (
         { ref: member.executableRef, manifest: parent.executableManifest },
         parent.registrations,
       ).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) }))),
+      checkpoints: new Map(),
     }
     const runs = new Map(state.runs)
     const currentParent = runs.get(parent.runId)

@@ -76,6 +76,7 @@ Testing.runtimeDriver({
     "operator-resolve-unknown": { claim },
     "operator-scan": { claim },
     runTree: { claim },
+    "fork-rewind": { claim },
   },
 })
 
@@ -96,6 +97,7 @@ Testing.runtimeDriver({
     "operator-resolve-unknown": { claim },
     "operator-scan": { claim },
     runTree: { claim },
+    "fork-rewind": { claim },
   },
 })
 

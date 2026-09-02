@@ -5,6 +5,7 @@ import { projectRunSnapshot, projectTreeCheckpoint } from "../../execution/inspe
 import { make as makeTreeCursor } from "../../tree/cursor.js"
 import { decodeEvent, decodeSqlInteger } from "../codec/codecs.js"
 import { decodeRunEffect, loadRunWaitsByStatus } from "../store/statements.js"
+import { loadRunBranches } from "../store/fork/index.js"
 import type { EventRow, RunRow } from "../codec/rows.js"
 import type { ChildReadiness } from "../../child/readiness.js"
 
@@ -44,6 +45,7 @@ const loadRuns = (rootRunId: string) =>
       Effect.gen(function* () {
         const run = yield* decodeRunEffect(row)
         const waits = yield* loadRunWaitsByStatus(run.runId, "open")
+        const branches = yield* loadRunBranches(run.runId)
         const inspection = {
           runId: run.runId,
           status: run.status,
@@ -54,6 +56,7 @@ const loadRuns = (rootRunId: string) =>
           waits,
           lastSequence: run.lastSequence,
           durability: "durable" as const,
+          branches,
         }
         if (run.parentRunId !== undefined) Object.assign(inspection, { parentRunId: run.parentRunId })
         const childReadiness = readiness.get(run.runId)

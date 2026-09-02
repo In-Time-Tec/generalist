@@ -111,6 +111,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       waits: run.waits,
       lastSequence: run.events.at(-1)?.sequence ?? -1,
       durability: "ephemeral" as const,
+      branches: [],
     }
     return common
   }
@@ -131,6 +132,8 @@ const makeRuntime = (acceptedSequence = 0) => {
     startExecution: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
     activate: () => Effect.die("not used"),
+    fork: () => Effect.die("not used"),
+    rewind: () => Effect.die("not used"),
     send: (input) => {
       sentRunIds.push(input.runId!)
       const runId = input.runId!
