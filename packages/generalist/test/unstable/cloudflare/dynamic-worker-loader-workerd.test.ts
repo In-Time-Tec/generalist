@@ -42,7 +42,7 @@ layer(Layer.merge(bunLayer, FetchHttpClient.layer), { excludeTestServices: true,
           yield* Effect.tryPromise(() =>
             build({
               entryPoints: [
-                path.join(repositoryRoot, "packages/generalist/test/cloudflare/workerd/dynamic-loader-worker.ts"),
+                path.join(repositoryRoot, "packages/generalist/test/unstable/cloudflare/workerd/dynamic-loader-worker.ts"),
               ],
               bundle: true,
               format: "esm",

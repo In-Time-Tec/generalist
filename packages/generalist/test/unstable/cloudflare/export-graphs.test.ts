@@ -3,12 +3,12 @@ import { Effect } from "effect"
 import { build } from "esbuild"
 
 const entries = [
-  ["workers", "packages/generalist/src/cloudflare/workers/index.ts"],
-  ["durable-objects", "packages/generalist/src/cloudflare/durable-objects/index.ts"],
-  ["dynamic-workers", "packages/generalist/src/cloudflare/dynamic-workers/index.ts"],
+  ["workers", "packages/generalist/src/unstable/cloudflare/workers/index.ts"],
+  ["durable-objects", "packages/generalist/src/unstable/cloudflare/durable-objects/index.ts"],
+  ["dynamic-workers", "packages/generalist/src/unstable/cloudflare/dynamic-workers/index.ts"],
   ["core", "packages/generalist/src/index.ts"],
-  ["foldkit", "packages/generalist/src/foldkit/index.ts"],
-  ["transport client", "packages/generalist/src/transport/run-client.ts"],
+  ["foldkit", "packages/generalist/src/unstable/foldkit/index.ts"],
+  ["transport client", "packages/generalist/src/unstable/transport/run-client.ts"],
   ["injected SQL store", "packages/generalist/src/runtime/sql/store.ts"],
 ] as const
 const forbidden = [
