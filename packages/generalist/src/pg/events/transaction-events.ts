@@ -28,6 +28,8 @@ export const transactionRunner = (input: {
     ...input.hub,
     touchRun: (runId) => Effect.flatMap(State, ({ runIds }) => Effect.sync(() => void runIds.add(runId))),
     publish: (runId) => Effect.flatMap(State, ({ runIds }) => Effect.sync(() => void runIds.add(runId))),
+    publishHostSession: (_sessionId, entry) =>
+      Effect.flatMap(State, ({ runIds }) => Effect.sync(() => void runIds.add(entry.event.runId))),
   }
   const transaction: SqlStoreRunner["transaction"] = (effect) => input.sql.withTransaction(effect)
   const run: SqlStoreRunner["run"] = (effect) =>

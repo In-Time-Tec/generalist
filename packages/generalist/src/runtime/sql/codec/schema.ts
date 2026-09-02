@@ -19,6 +19,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   accepted_sequence INTEGER NOT NULL,
   queue_json TEXT NOT NULL
 )`,
+  `CREATE TABLE IF NOT EXISTS generalist_host_sessions (
+  session_id TEXT PRIMARY KEY,
+  title TEXT,
+  next_event_sequence INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+)`,
   `CREATE TABLE IF NOT EXISTS generalist_runs (
   run_id TEXT PRIMARY KEY,
   status TEXT NOT NULL,
@@ -58,8 +64,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   sequence INTEGER NOT NULL,
   event_id TEXT NOT NULL UNIQUE,
   event_json TEXT NOT NULL,
+  host_session_id TEXT,
+  host_session_sequence INTEGER,
   PRIMARY KEY (run_id, sequence),
-  FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
+  UNIQUE (host_session_id, host_session_sequence),
+  FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id),
+  FOREIGN KEY (host_session_id) REFERENCES generalist_host_sessions(session_id)
 )`,
   `CREATE TABLE IF NOT EXISTS generalist_run_acknowledgements (
   run_id TEXT PRIMARY KEY,

@@ -1,4 +1,4 @@
-import { DateTime, Effect, Function, Option } from "effect"
+import { DateTime, Effect, Function, Option, Types } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import { RuntimeUnavailable } from "../errors.js"
@@ -6,7 +6,7 @@ import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionResult } from "../execution/state.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run/event.js"
-import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
+import type { MemoryPublication, MemoryState, StoredRun, SubscriberQueue } from "./state.js"
 import { projectTreeEvent } from "../tree/event.js"
 import { appendTerminalToolResults } from "./session-store.js"
 
@@ -169,22 +169,39 @@ export const appendEvent: {
         lastPosition: position,
         events: [...root.events, projectTreeEvent(event, position, run)],
       })
+      const publication: Types.Mutable<MemoryPublication> = {
+        runId,
+        event,
+        lastDeliveredSequence: run.lastSequence,
+        subscribers: run.subscribers,
+        treeSubscribers: root.subscribers,
+      }
+      const hostSessions = new Map(terminalState.hostSessions)
+      const rootRun = terminalState.runs.get(run.rootRunId)
+      const hostSession = rootRun === undefined ? undefined : hostSessions.get(rootRun.message.sessionId)
+      if (hostSession !== undefined) {
+        const cursor = hostSession.lastCursor + 1
+        const entry = { cursor, event }
+        hostSessions.set(hostSession.session.id, {
+          ...hostSession,
+          lastCursor: cursor,
+          events: [...hostSession.events, entry],
+        })
+        publication.hostSession = {
+          sessionId: hostSession.session.id,
+          entry,
+          lastDeliveredCursor: hostSession.lastCursor,
+          subscribers: hostSession.subscribers,
+        }
+      }
       return [
         event,
         {
           ...terminalState,
           runs,
           treeRoots,
-          publications: [
-            ...terminalState.publications,
-            {
-              runId,
-              event,
-              lastDeliveredSequence: run.lastSequence,
-              subscribers: run.subscribers,
-              treeSubscribers: root.subscribers,
-            },
-          ],
+          hostSessions,
+          publications: [...terminalState.publications, publication],
         },
       ] as const
     }),

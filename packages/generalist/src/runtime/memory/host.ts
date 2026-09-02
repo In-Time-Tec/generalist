@@ -58,6 +58,16 @@ export type {
   FanOutError,
   InspectFanOutError,
 } from "../service.js"
+export type {
+  HostSession,
+  HostSessionEvent,
+  CreateSessionInput,
+  SessionEventsInput,
+  CreateSessionError,
+  SessionError,
+  SessionEventsError,
+} from "../session/host.js"
+export { SessionNotFound, SessionConflict, SessionCursorExpired, SessionSubscriberLagged } from "../session/host.js"
 export type { FanOutInput, FanOutMemberInput } from "../child/fan-out-internal.js"
 export type { Point as AckPoint } from "../acknowledgement.js"
 export type { RespondInput as RespondApprovalInput } from "../operation/approval.js"

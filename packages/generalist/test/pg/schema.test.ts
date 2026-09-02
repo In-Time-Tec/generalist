@@ -2,6 +2,6 @@ import { expect, it } from "vitest"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/pg/schema.js"
 
 it("freezes the logical SQL Runtime schema checksum", () => {
-  expect(SCHEMA_VERSION).toBe(5)
-  expect(schemaChecksum()).toBe("f2294d7660cc5bdee163b6c7df36b06557699a292641ecd687d5b262cb2ca9b9")
+  expect(SCHEMA_VERSION).toBe(6)
+  expect(schemaChecksum()).toBe("18d42d25b5249f1cfe3654bc42c647cb9b317b6a48b7cc209b84ec2f8cc35f27")
 })

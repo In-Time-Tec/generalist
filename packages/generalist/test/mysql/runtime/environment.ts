@@ -89,6 +89,7 @@ const RUNTIME_TABLES = [
   "generalist_run_operations",
   "generalist_run_events",
   "generalist_runs",
+  "generalist_host_sessions",
   "generalist_lanes",
 ] as const
 

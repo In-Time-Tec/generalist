@@ -21,23 +21,28 @@ export const sqliteDriver = (options: SqliteStoreOptions): SqlStoreDriver<Sqlite
   makeRunner: ({ sql, hub, eventCommit, activationProjection }) => {
     interface TransactionState {
       readonly events: Array<readonly [string, import("../../../run/event.js").RunEvent]>
+      readonly hostSessionEvents: Array<readonly [string, import("../../../session/host.js").HostSessionEvent]>
       readonly touched: Set<string>
     }
     const State = Context.Reference<TransactionState>("generalist/runtime/sql/SqliteTransactionState", {
-      defaultValue: () => ({ events: [], touched: new Set() }),
+      defaultValue: () => ({ events: [], hostSessionEvents: [], touched: new Set() }),
     })
     const transactionHub: EventHub = {
       ...hub,
       touchRun: (runId) => Effect.flatMap(State, ({ touched }) => Effect.sync(() => void touched.add(runId))),
       publish: (runId, event) =>
         Effect.flatMap(State, ({ events }) => Effect.sync(() => void events.push([runId, event]))),
+      publishHostSession: (sessionId, entry) =>
+        Effect.flatMap(State, ({ hostSessionEvents }) =>
+          Effect.sync(() => void hostSessionEvents.push([sessionId, entry])),
+        ),
     }
     const transaction: SqlStoreRunner["transaction"] = (effect) => sql.withTransaction(effect)
     const run: SqlStoreRun = (effect) =>
       eventCommit.withPermits(1)(
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
-            const state: TransactionState = { events: [], touched: new Set() }
+            const state: TransactionState = { events: [], hostSessionEvents: [], touched: new Set() }
             const result = yield* restore(
               withSql(
                 sql,
@@ -58,6 +63,11 @@ export const sqliteDriver = (options: SqliteStoreOptions): SqlStoreDriver<Sqlite
               ),
             )
             yield* Effect.forEach(state.events, ([runId, event]) => hub.publish(runId, event), { discard: true })
+            yield* Effect.forEach(
+              state.hostSessionEvents,
+              ([sessionId, entry]) => hub.publishHostSession(sessionId, entry),
+              { discard: true },
+            )
             return result
           }),
         ),

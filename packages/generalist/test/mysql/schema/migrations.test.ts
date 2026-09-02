@@ -38,6 +38,7 @@ const tables = [
   "generalist_run_acknowledgements",
   "generalist_run_events",
   "generalist_runs",
+  "generalist_host_sessions",
   "generalist_lanes",
   "generalist_permission_rules",
   "generalist_runtime_locks",

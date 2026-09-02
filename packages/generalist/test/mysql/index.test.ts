@@ -122,6 +122,7 @@ Testing.runtimeDriver({
   skip,
   capabilities: {
     runtime: { claim: conformanceClaim },
+    "host-sessions": { claim: conformanceClaim },
     "start-by-agent": { claim: conformanceClaim },
     "idempotent-start": { claim: conformanceClaim },
     "unknown-agent-on-recovery": { claim: conformanceClaim },

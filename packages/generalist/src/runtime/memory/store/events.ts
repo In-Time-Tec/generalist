@@ -175,9 +175,20 @@ export const shutdownStore = (stateRef: SynchronizedRef.SynchronizedRef<MemorySt
               Effect.forEach(root.subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
             { discard: true },
           ),
+          Effect.forEach(
+            state.hostSessions.values(),
+            (session) =>
+              Effect.forEach(session.subscribers.values(), (queue) => Queue.fail(queue, unavailable), {
+                discard: true,
+              }),
+            { discard: true },
+          ),
         ],
         { discard: true },
       )
-      return [undefined, { ...state, closed: true, runs: new Map(), treeRoots: new Map() }] as const
+      return [
+        undefined,
+        { ...state, closed: true, runs: new Map(), treeRoots: new Map(), hostSessions: new Map() },
+      ] as const
     }),
   ).pipe(Effect.asVoid)

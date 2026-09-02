@@ -32,6 +32,7 @@ import { RuntimeUnavailable } from "../../errors.js"
 import { admitChildSettlementFromEventId } from "../settlement-notifications.js"
 import { discardPendingSteering } from "./steering/disposition.js"
 import { appendTerminalToolResultsForEvent } from "../session/terminalization.js"
+import { claim as claimHostSessionCursor, publish as publishHostSessionEvent } from "../session/cursor.js"
 import { decodeRunEffect, isoFromSql as asIso } from "./run-decoding.js"
 export { decodeRun, decodeRunEffect } from "./run-decoding.js"
 
@@ -238,9 +239,14 @@ export const appendEvent: {
       const sequence = run.lastSequence + 1
       const occurredAt = yield* nowIso
       const event = makeEvent(run, partial, sequence, occurredAt)
+      const hostSessionCursor = yield* claimHostSessionCursor(run.rootRunId)
       yield* sql`
-      INSERT INTO generalist_run_events (run_id, sequence, event_id, event_json)
-      VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
+      INSERT INTO generalist_run_events (
+        run_id, sequence, event_id, event_json, host_session_id, host_session_sequence
+      ) VALUES (
+        ${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)},
+        ${hostSessionCursor?.sessionId ?? null}, ${hostSessionCursor?.cursor ?? null}
+      )
     `
       yield* sql`UPDATE generalist_tree_roots SET last_position = last_position + 1 WHERE root_run_id = ${run.rootRunId}`
       const treeRoot = (yield* sql<{ last_position: number | string | bigint }>`
@@ -293,6 +299,7 @@ export const appendEvent: {
       `
       }
       yield* hub.publish(run.runId, event)
+      yield* publishHostSessionEvent({ hub, claimed: hostSessionCursor, event })
       return event
     }),
 )

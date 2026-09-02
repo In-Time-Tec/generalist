@@ -89,6 +89,14 @@ import type {
   WorkerMutationError,
 } from "./store-types.js"
 import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
+import type {
+  HostSession,
+  HostSessionEvent,
+  SessionConflict,
+  SessionCursorExpired,
+  SessionNotFound,
+  SessionSubscriberLagged,
+} from "../session/host.js"
 export type {
   AdmitMessageError,
   AdmitMessageInput,
@@ -273,6 +281,27 @@ export interface Service {
   }) => Effect.Effect<void, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable>
   /** Read the durable host processed-through point; -1 means no cycle is acknowledged. */
   readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, RunNotFound | RuntimeUnavailable>
+  /** Persist one product-facing Session identity and metadata. */
+  readonly createHostSession: (input: {
+    readonly id: string
+    readonly title?: string
+  }) => Effect.Effect<HostSession, SessionConflict | RuntimeUnavailable>
+  /** Read one product-facing Session by identity. */
+  readonly hostSession: (sessionId: string) => Effect.Effect<HostSession, SessionNotFound | RuntimeUnavailable>
+  /** List product-facing Sessions in creation order. */
+  readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable>
+  /** List root Runs admitted through one product-facing Session. */
+  readonly hostSessionRuns: (
+    sessionId: string,
+  ) => Effect.Effect<ReadonlyArray<RunInspection>, SessionNotFound | RuntimeUnavailable>
+  /** Replay then follow one product-facing Session's authoritative event cursor. */
+  readonly hostSessionEvents: (input: {
+    readonly sessionId: string
+    readonly cursor: Cursor
+  }) => Stream.Stream<
+    HostSessionEvent,
+    SessionNotFound | SessionCursorExpired | SessionSubscriberLagged | RuntimeUnavailable
+  >
   readonly treeCheckpoint: (
     rootRunId: string,
   ) => Effect.Effect<import("../tree.js").Checkpoint, RunNotFound | RuntimeUnavailable>

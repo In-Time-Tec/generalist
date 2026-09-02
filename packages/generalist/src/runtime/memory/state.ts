@@ -20,10 +20,19 @@ import type { MailboxEntry } from "../messaging/mailbox.js"
 import type { Entry as SessionEntry } from "../../core/context/session.js"
 import type { ExternalRoot, Placement as ExternalChildPlacement } from "../child/external/placement.js"
 import type { Point as AcknowledgementPoint } from "../acknowledgement.js"
+import type { HostSession, HostSessionEvent, SessionSubscriberLagged } from "../session/host.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
 export type TreeSubscriberQueue = Queue.Queue<void, RuntimeUnavailable>
+export type HostSessionSubscriberQueue = Queue.Queue<HostSessionEvent, SessionSubscriberLagged | RuntimeUnavailable>
+
+export interface HostSessionPublication {
+  readonly sessionId: string
+  readonly entry: HostSessionEvent
+  readonly lastDeliveredCursor: number
+  readonly subscribers: ReadonlyMap<number, HostSessionSubscriberQueue>
+}
 
 /** Internal publication deferred until the owning memory transition commits. */
 export interface MemoryPublication {
@@ -32,6 +41,7 @@ export interface MemoryPublication {
   readonly lastDeliveredSequence: number
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly treeSubscribers: ReadonlyMap<number, TreeSubscriberQueue>
+  readonly hostSession?: HostSessionPublication
 }
 
 export interface IdempotencyEntry {
@@ -92,6 +102,13 @@ export interface MemorySession {
   }
 }
 
+export interface StoredHostSession {
+  readonly session: HostSession
+  readonly lastCursor: number
+  readonly events: ReadonlyArray<HostSessionEvent>
+  readonly subscribers: ReadonlyMap<number, HostSessionSubscriberQueue>
+}
+
 export interface MemoryState {
   readonly closed: boolean
   readonly nextRunCounter: number
@@ -102,6 +119,7 @@ export interface MemoryState {
   readonly runs: ReadonlyMap<string, StoredRun>
   readonly waits: ReadonlyMap<string, RunWait>
   readonly sessions: ReadonlyMap<string, MemorySession>
+  readonly hostSessions: ReadonlyMap<string, StoredHostSession>
   readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
@@ -159,6 +177,7 @@ export const emptyState = (input: {
   runs: new Map(),
   waits: new Map(),
   sessions: new Map(),
+  hostSessions: new Map(),
   treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),

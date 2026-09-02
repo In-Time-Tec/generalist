@@ -365,6 +365,12 @@ const makeRuntimeWith = (
       snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
+      createSession: store.createHostSession,
+      session: store.hostSession,
+      listSessions: store.listHostSessions,
+      sessionRuns: store.hostSessionRuns,
+      sessionEvents: (input) =>
+        store.hostSessionEvents({ sessionId: input.sessionId, cursor: input.cursor ?? cursorOrigin }),
       acknowledge: store.acknowledge,
       acknowledged: store.acknowledged,
       sessionEntry: readEntry(store),

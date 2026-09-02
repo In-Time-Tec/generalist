@@ -38,7 +38,7 @@ Effect.runPromise(program.pipe(Effect.provide(store)))
 
 ```text
 construct SQLite Layer (source = "./generalist.sqlite")
-├── apply/verify schema { version: 4, dirty: false }
+├── apply/verify schema { version: 6, dirty: false }
 └── Runtime.start(agent, input, { sessionId: "session:42" })
     └── transaction
         ├── lock identity "answer:1"; persist Run + Session
@@ -93,11 +93,12 @@ RuntimeWorker.run (subscribe before catch-up)
 
 ## Invariants
 
-- Version `4`, logical checksum, and baseline `{ id: 1, name: "generalist_runtime" }` are identical across adapters; physical DDL is adapter-owned.
+- Version `6`, logical checksum, and baseline `{ id: 1, name: "generalist_runtime" }` are identical across adapters; physical DDL is adapter-owned.
+- `generalist_host_sessions` persists product Session identity, optional title, creation time, and the next Session event sequence. Each `generalist_run_events` row may carry the root Run's Host Session ID plus its unique Session sequence, avoiding a copied Session event journal.
 - Schema checks reject absent/old, dirty, unsupported, checksum-mismatched, or migration-identity-mismatched schemas with typed errors.
 - Baseline creation refuses to overwrite existing Generalist application tables.
 - Server Layers verify an applied schema; SQLite applies and verifies its schema during Layer construction.
-- Store transitions atomically commit state, events, checkpoints, operations, and Session changes, or expose none.
+- Store transitions atomically commit state, events, checkpoints, operations, conversation Session changes, and Host Session cursors, or expose none.
 - Exact idempotent retries return the existing result; divergent identity reuse is rejected.
 - Claim commits require the current worker, Run attempt fence, and Session write claim.
 - Claim notifications are lossy hints; durable ordered scans are authoritative.

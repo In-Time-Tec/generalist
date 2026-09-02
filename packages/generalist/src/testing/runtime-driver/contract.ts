@@ -37,6 +37,11 @@ export interface RuntimeCapability {
   readonly claim: ClaimExecution
 }
 
+/** Product-facing Session persistence and replay capability. */
+export interface HostSessionsCapability {
+  readonly claim: ClaimExecution
+}
+
 /** Typed Agent start capability exercised with one storage-issued execution claim. */
 export interface StartByAgentCapability {
   readonly claim: ClaimExecution
@@ -85,6 +90,7 @@ export interface MultiWorkerClaimCapability<E = never> {
 export interface Capabilities<ClaimsLayerError = never> {
   readonly admission?: true
   readonly runtime?: RuntimeCapability
+  readonly "host-sessions"?: HostSessionsCapability
   readonly "start-by-agent"?: StartByAgentCapability
   readonly "idempotent-start"?: IdempotentStartCapability
   readonly "unknown-agent-on-recovery"?: UnknownAgentOnRecoveryCapability
