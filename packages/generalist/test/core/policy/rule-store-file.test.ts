@@ -1,13 +1,13 @@
 import { layer as sqliteClientLayer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { BunFileSystem } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Config, Effect, FileSystem, Layer, Option, Path, PlatformError, Schema } from "effect"
+import { Effect, FileSystem, Layer, Path, PlatformError, Schema } from "effect"
 import { Response, Tool } from "effect/unstable/ai"
 import { Permissions } from "../../../src/index.js"
 import { make as makeAuthorizer } from "../../../src/core/tools/tool-authorization.js"
-import { RuntimeSchema } from "../../../src/pg/index.js"
 import { apply as applySqliteSchema } from "../../../src/runtime/sql/migrate.js"
 import { Testing } from "../../../src/testing/index.js"
+import { postgresAvailable, postgresDatabase } from "../../pg/database.js"
 
 const ruleFile = "/project/.generalist/permissions.json"
 
@@ -67,23 +67,15 @@ const sqlLayer = Permissions.layerRuleStoreSql({ scope: "session:test" }).pipe(L
 Testing.ruleStore({ layer: fileLayer })
 Testing.ruleStore({ layer: sqlLayer })
 
-const postgresUrl = Effect.runSync(
-  Config.option(Config.string("GENERALIST_DATABASE_URL").pipe(Config.orElse(() => Config.string("DATABASE_URL")))).pipe(
-    Effect.map(Option.getOrUndefined),
-  ),
-)
-if (postgresUrl === undefined || postgresUrl.length === 0) {
-  describe.skip("PostgreSQL RuleStore conformance (set GENERALIST_DATABASE_URL or DATABASE_URL)", () => undefined)
-} else {
+if (postgresAvailable) {
+  const database = postgresDatabase("rule-store")
   Testing.ruleStore({
-    layer: Permissions.layerRuleStoreSql({ scope: `rule-store:${process.pid}` }).pipe(
-      Layer.provide(
-        Layer.effectDiscard(RuntimeSchema.apply("rule-store")).pipe(
-          Layer.provideMerge(RuntimeSchema.layerClient({ url: postgresUrl, maxConnections: 2 })),
-        ),
-      ),
+    layer: database.provision(
+      Permissions.layerRuleStoreSql({ scope: "session:test" }).pipe(Layer.provide(database.client)),
     ),
   })
+} else {
+  describe.skip("PostgreSQL RuleStore conformance (set GENERALIST_DATABASE_URL or DATABASE_URL)", () => undefined)
 }
 
 const shell = Tool.make("shell", {
