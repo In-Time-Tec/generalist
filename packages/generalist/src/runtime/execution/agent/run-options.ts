@@ -6,7 +6,7 @@ import type { Prompt } from "effect/unstable/ai"
 import type { ExecutionClaim, ExecutionRecord } from "../../run/store.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
 
-type HostedRunOptions = Omit<RunOptions, "memory" | "output" | "steering">
+type HostedRunOptions = Omit<RunOptions, "memory" | "steering">
 
 export const make = (input: {
   readonly claim: ExecutionClaim
