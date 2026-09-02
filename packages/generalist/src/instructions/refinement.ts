@@ -1,4 +1,5 @@
 import { Function, Result, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import {
   AppliedRefinementEdit,
   GuidanceEntry,
@@ -34,13 +35,16 @@ export const RefinementRejection = Schema.Literals([
 export type RefinementRejection = typeof RefinementRejection.Type
 
 /** One proposal was rejected and no state changed. */
-export class RefinementRejected extends Schema.TaggedError<RefinementRejected>()(
+export class RefinementRejected extends ActionableTaggedError<RefinementRejected>()(
   "generalist/instructions/RefinementRejected",
   {
     reason: RefinementRejection,
     proposal: GuidanceId,
     target: Schema.optionalKey(Schema.String),
     message: Schema.String,
+    hint: errorHint(
+      "Correct the proposal identified by proposal and target, then submit it against fresh guidance state.",
+    ),
   },
 ) {}
 

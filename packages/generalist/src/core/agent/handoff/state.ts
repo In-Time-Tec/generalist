@@ -5,6 +5,7 @@ import type { Any as AnyAgent } from "../closure.js"
 import type { TurnOverrides } from "../../turn/policy.js"
 import type { Target } from "../../policy/handoff-target.js"
 import { AgentPin } from "../../durable/pin.js"
+import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 
 export const HandoffFrame = Schema.Struct({
   handoffId: Schema.String,
@@ -183,24 +184,31 @@ export const incrementEdge: {
   },
 )
 
-export class TargetMissing extends Schema.TaggedError<TargetMissing>()("generalist/core/TargetMissing", {
+export class TargetMissing extends ActionableTaggedError<TargetMissing>()("generalist/core/TargetMissing", {
   target: Schema.String,
   turn: Schema.Finite,
+  hint: errorHint("Register the named handoff target on the Agent before running this turn."),
 }) {}
 
-export class HandoffLimitExceeded extends Schema.TaggedError<HandoffLimitExceeded>()(
+export class HandoffLimitExceeded extends ActionableTaggedError<HandoffLimitExceeded>()(
   "generalist/core/HandoffLimitExceeded",
   {
     kind: Schema.Literals(["total", "edge", "depth"]),
     turn: Schema.Finite,
     limit: Schema.Finite,
     edge: Schema.optionalKey(Schema.String),
+    hint: errorHint("Reduce handoffs or increase the matching total, edge, or depth budget."),
   },
 ) {}
 
-export class HandoffRequirementsMissing extends Schema.TaggedError<HandoffRequirementsMissing>()(
+export class HandoffRequirementsMissing extends ActionableTaggedError<HandoffRequirementsMissing>()(
   "generalist/core/HandoffRequirementsMissing",
-  { target: Schema.String, message: Schema.String, turn: Schema.Finite },
+  {
+    target: Schema.String,
+    message: Schema.String,
+    turn: Schema.Finite,
+    hint: errorHint("Provide the target Agent's required services before allowing this same-run handoff."),
+  },
 ) {}
 
 export const HandoffAccepted = Schema.TaggedStruct("HandoffAccepted", {

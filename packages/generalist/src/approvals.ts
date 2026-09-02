@@ -1,5 +1,6 @@
 import { Effect, Layer, Schema } from "effect"
 import { dual } from "effect/Function"
+import { ActionableTaggedError, errorHint } from "./core/error-hint.js"
 import { Approvals, type Approved, type Denied } from "./core/policy/approvals.js"
 import { RuleStore, type Level, type RuleStoreError } from "./core/policy/permissions.js"
 import { Runtime, type RespondApprovalError } from "./runtime/service.js"
@@ -34,12 +35,12 @@ export interface DurableOptions<R> {
 }
 
 /** A Runtime approval token was malformed or did not carry a Run identity. */
-export class ApprovalTokenInvalid extends Schema.TaggedError<ApprovalTokenInvalid>()(
+export class ApprovalTokenInvalid extends ActionableTaggedError<ApprovalTokenInvalid>()(
   "generalist/approvals/ApprovalTokenInvalid",
   {
     token: Schema.String,
     message: Schema.String,
-    hint: Schema.String,
+    hint: errorHint("Resolve the exact token emitted by Approvals.layerDurable."),
   },
 ) {}
 
@@ -47,7 +48,6 @@ const invalidToken = (token: string): ApprovalTokenInvalid =>
   ApprovalTokenInvalid.make({
     token,
     message: "Approval token does not contain a durable Runtime Run identity",
-    hint: "Resolve the exact token emitted by Approvals.layerDurable",
   })
 
 const runIdFromToken = (token: string): Effect.Effect<string, ApprovalTokenInvalid> => {

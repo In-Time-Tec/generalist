@@ -27,6 +27,7 @@ import type { RunEvent } from "../../runtime/run/event.js"
 import type { EventsError, Service as RuntimeService } from "../../runtime/service.js"
 import { RunNotFound } from "../../runtime/errors.js"
 import { Effect, Function, Option, Schema, Stream } from "effect"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { decode } from "./content.js"
 import { artifactFromEvent, fromRuntime, stateFromRun, statusFromEvent } from "./projection.js"
 import { TaskNotWaiting } from "./handler-error.js"
@@ -110,8 +111,9 @@ function rejectedPromise<E>(error: E): Promise<never> {
   return Promise.reject(error)
 }
 
-class A2AStreamFailure extends Schema.TaggedError<A2AStreamFailure>()("generalist/a2a/A2AStreamFailure", {
+class A2AStreamFailure extends ActionableTaggedError<A2AStreamFailure>()("generalist/a2a/A2AStreamFailure", {
   cause: Schema.Unknown,
+  hint: errorHint("Inspect the stream cause and restore the A2A event stream before subscribing again."),
 }) {}
 
 const decodeStreamFailure = Schema.decodeUnknownOption(A2AStreamFailure)

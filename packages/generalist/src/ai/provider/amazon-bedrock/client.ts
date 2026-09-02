@@ -12,19 +12,24 @@ import {
 } from "@aws-sdk/client-bedrock-runtime"
 import type { AwsCredentialIdentity } from "@smithy/types"
 import { Context, Effect, Layer, Option, Redacted, Schema, Semaphore } from "effect"
+import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
 import { defaultChain, type Credential, type Credentials } from "./credentials.js"
-export class ClientFailure extends Schema.TaggedError<ClientFailure>()("generalist/ai/AmazonBedrockClientFailure", {
+export class ClientFailure extends ActionableTaggedError<ClientFailure>()("generalist/ai/AmazonBedrockClientFailure", {
   operation: Schema.Literals(["converse", "converseStream", "invokeModel"]),
   description: Schema.String,
   awsErrorName: Schema.optional(Schema.String),
   awsErrorCode: Schema.optional(Schema.String),
   httpStatus: Schema.optional(Schema.Finite),
   requestId: Schema.optional(Schema.String),
+  hint: errorHint(
+    "Inspect the AWS error fields and request id, correct credentials or request parameters, then retry if safe.",
+  ),
 }) {}
-export class RecoveryFailure extends Schema.TaggedError<RecoveryFailure>()(
+export class RecoveryFailure extends ActionableTaggedError<RecoveryFailure>()(
   "generalist/ai/AmazonBedrockRecoveryFailure",
   {
     description: Schema.String,
+    hint: errorHint("Restore credential refresh and reconcile the rejected generation before retrying the request."),
   },
 ) {}
 export interface Service {

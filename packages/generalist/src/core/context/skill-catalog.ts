@@ -1,15 +1,17 @@
 import { Context, Effect, Function, Layer, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { listing } from "./skill-catalog-internal.js"
 
 /** Per-entry description character cap. */
 export { descriptionLimit } from "./skill-catalog-internal.js"
 
 /** Skill catalog operation failed. */
-export class SkillCatalogError extends Schema.TaggedError<SkillCatalogError>()("generalist/core/SkillCatalogError", {
+export class SkillCatalogError extends ActionableTaggedError<SkillCatalogError>()("generalist/core/SkillCatalogError", {
   source: Schema.String,
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Check the named skill source, fix its metadata or instructions, and retry catalog loading."),
 }) {}
 
 /** A discovered skill. */

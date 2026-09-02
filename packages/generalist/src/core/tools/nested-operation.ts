@@ -1,5 +1,6 @@
 import { Cause, Context, Effect, Function, Layer, Option, Ref, Schema } from "effect"
 import { digest as canonicalDigest } from "../durable/canonical-json.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { ReplayPolicy as ReplayPolicySchema } from "../durable/driver/contract.js"
 import { ToolContext } from "./tool-context.js"
 import type { Outcome } from "./tool-executor.js"
@@ -127,36 +128,40 @@ export interface Request<A = unknown, E = unknown> {
 }
 
 /** The same nested identity was reused with different content. */
-export class Divergence extends Schema.TaggedError<Divergence>()("generalist/core/NestedOperationDivergence", {
+export class Divergence extends ActionableTaggedError<Divergence>()("generalist/core/NestedOperationDivergence", {
   operationKey: Schema.String,
   ordinal: Ordinal,
   recordedKind: Kind,
   recordedDigest: Schema.String,
   requestedKind: Kind,
   requestedDigest: Schema.String,
+  hint: errorHint("Use a new operation identity or replay the exact original nested operation content."),
 }) {}
 
 /** A non-idempotent nested operation crossed its boundary with an unobserved outcome. */
-export class Unknown extends Schema.TaggedError<Unknown>()("generalist/core/NestedOperationUnknown", {
+export class Unknown extends ActionableTaggedError<Unknown>()("generalist/core/NestedOperationUnknown", {
   operationKey: Schema.String,
   ordinal: Ordinal,
   operationId: Schema.String,
+  hint: errorHint("Reconcile the non-idempotent operation with the host before deciding whether to retry."),
 }) {}
 
 /** The host denied the nested operation's approval request. */
-export class Denied extends Schema.TaggedError<Denied>()("generalist/core/NestedOperationDenied", {
+export class Denied extends ActionableTaggedError<Denied>()("generalist/core/NestedOperationDenied", {
   operationKey: Schema.String,
   ordinal: Ordinal,
   capability: Kind,
   reason: Schema.String,
+  hint: errorHint("Grant the named capability or remove the denied nested operation."),
 }) {}
 
 /** The run must suspend until the host resolves the nested operation's approval. */
-export class Suspended extends Schema.TaggedError<Suspended>()("generalist/core/NestedOperationSuspended", {
+export class Suspended extends ActionableTaggedError<Suspended>()("generalist/core/NestedOperationSuspended", {
   token: Schema.String,
   operationKey: Schema.String,
   ordinal: Ordinal,
   capability: Kind,
+  hint: errorHint("Resolve the host approval and resume with the recorded token."),
 }) {}
 export type Failure = Divergence | Unknown | Denied | Suspended
 

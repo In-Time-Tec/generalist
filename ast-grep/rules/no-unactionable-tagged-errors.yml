@@ -1,0 +1,10 @@
+id: no-unactionable-tagged-errors
+language: TypeScript
+severity: error
+message: Framework errors must use ActionableTaggedError; only error-hint.ts may call Schema.TaggedError directly.
+rule:
+  pattern: Schema.TaggedError<$$$TYPE>($$$ARGS)
+files:
+  - "packages/generalist/src/**/*.ts"
+ignores:
+  - "packages/generalist/src/core/error-hint.ts"

@@ -8,6 +8,7 @@ import type { InboxFull, Input as SteeringInput, PolicyInvalid, RunClosed } from
 import { streamInternal } from "../run.js"
 import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js"
 import { AgentError, type Event, InvalidOutput } from "../event.js"
+import { observe } from "../inspection/service.js"
 import { requiredField, type StructuredRunConfig } from "../loop/context.js"
 
 /** Default prompt for the terminal structured-output turn. */
@@ -134,10 +135,13 @@ export const allocateRun: {
       )
       const events = typedEvents(
         agent.output,
-        Stream.unwrap(
-          start.pipe(
-            Effect.as(
-              streamInternal(agent, options, structured, inbox).pipe(Stream.ensuring(inbox.close("execution-exit"))),
+        observe(
+          runId,
+          Stream.unwrap(
+            start.pipe(
+              Effect.as(
+                streamInternal(agent, options, structured, inbox).pipe(Stream.ensuring(inbox.close("execution-exit"))),
+              ),
             ),
           ),
         ),

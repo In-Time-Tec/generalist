@@ -9,6 +9,7 @@ import {
   type ToolJsonSchemaCompiler,
   withToolJsonSchemaCompiler,
 } from "./registry-internal.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 export {
   classifyFailure,
@@ -31,12 +32,13 @@ export interface ModelSelection {
 
 /** Provider-owned decision that a failed invocation may advance an ordered candidate route. */
 export type AvailabilityFailureClassifier = (cause: unknown) => boolean
-export class LanguageModelNotRegistered extends Schema.TaggedError<LanguageModelNotRegistered>()(
+export class LanguageModelNotRegistered extends ActionableTaggedError<LanguageModelNotRegistered>()(
   "generalist/core/LanguageModelNotRegistered",
   {
     provider: Schema.String,
     model: Schema.String,
     registration_key: Schema.optionalKey(Schema.String),
+    hint: errorHint("Register the exact provider, model, and optional registration key before running the Agent."),
   },
 ) {}
 export interface Registration {

@@ -1,5 +1,6 @@
 import { Effect, Function, Schema } from "effect"
 import type { ParseOptions } from "effect/SchemaAST"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 /** Finite resource limits for one run or child grant. */
 const Count = Schema.Finite.check(
@@ -26,17 +27,19 @@ export const RunBudget = Schema.Struct({
   depth: Count,
 })
 export type RunBudget = typeof RunBudget.Type
-export class Exhausted extends Schema.TaggedError<Exhausted>()("generalist/core/RunBudgetExhausted", {
+export class Exhausted extends ActionableTaggedError<Exhausted>()("generalist/core/RunBudgetExhausted", {
   dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth", "deadline"]),
   requested: Schema.Finite,
   remaining: Schema.optionalKey(Schema.Finite),
   message: Schema.optionalKey(Schema.String),
+  hint: errorHint("Reduce the requested work or start the Run with a larger budget for this dimension."),
 }) {}
-export class GrantWidened extends Schema.TaggedError<GrantWidened>()("generalist/core/RunBudgetGrantWidened", {
+export class GrantWidened extends ActionableTaggedError<GrantWidened>()("generalist/core/RunBudgetGrantWidened", {
   dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth"]),
   grant: Schema.Finite,
   remaining: Schema.Finite,
   message: Schema.optionalKey(Schema.String),
+  hint: errorHint("Narrow the child grant so it does not exceed the parent's remaining allocation."),
 }) {}
 
 type ChargeDimension = "modelCalls" | "toolCalls" | "totalTokens"

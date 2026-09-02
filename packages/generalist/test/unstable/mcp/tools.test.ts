@@ -116,6 +116,7 @@ describe("mcp tools adapter", () => {
             server: "calc",
             tool: "boom",
             message: "boom failed",
+            hint: "Inspect the server response and correct the named tool request before retrying.",
           })
           expect(completed.result.encodedResult).toEqual(completed.result.result)
         }

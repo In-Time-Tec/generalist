@@ -1,6 +1,7 @@
 import { Effect, Layer, Schema } from "effect"
 import { dual } from "effect/Function"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 /** Snapshot given to a policy before each follow-up turn. */
 export interface TurnInfo {
   readonly turn: number // 0-based count of completed model turns so far
@@ -59,9 +60,10 @@ export const StopReason = Schema.Union([
 export type StopReason = typeof StopReason.Type
 
 /** A turn policy could not evaluate its decision. */
-export class PolicyError extends Schema.TaggedError<PolicyError>()("generalist/core/TurnPolicyError", {
+export class PolicyError extends ActionableTaggedError<PolicyError>()("generalist/core/TurnPolicyError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Fix the turn policy or its required service, then retry the decision."),
 }) {}
 
 /** A turn policy in the spirit of `Schedule`. */

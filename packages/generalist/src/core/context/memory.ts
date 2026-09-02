@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 const provenanceOption = "generalist/memory"
 const recallLineage = new WeakMap<Prompt.Message, Prompt.Message>()
@@ -64,10 +65,11 @@ export interface ForgetInput {
   readonly key: Key
   readonly id?: string | undefined
 }
-export class MemoryError extends Schema.TaggedError<MemoryError>()("generalist/core/MemoryError", {
+export class MemoryError extends ActionableTaggedError<MemoryError>()("generalist/core/MemoryError", {
   reason: Schema.optionalKey(Schema.Literals(["embedding", "vector-store", "language-model"])),
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Inspect reason and cause, restore the failing memory dependency, then retry the operation."),
 }) {}
 export interface Service {
   readonly recall: (input: RecallInput) => Effect.Effect<ReadonlyArray<Item>, MemoryError>

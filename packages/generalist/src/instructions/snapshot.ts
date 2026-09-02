@@ -1,4 +1,5 @@
 import { Effect, Function, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { GuidanceEntry, GuidanceScope, GuidanceSnapshotId } from "./entry.js"
 import { GuidanceState, allEntries, make as makeState, snapshotId } from "./state.js"
 
@@ -24,18 +25,23 @@ export const GuidanceSnapshot = Schema.Struct({ id: GuidanceSnapshotId, payload:
 export type GuidanceSnapshot = typeof GuidanceSnapshot.Type
 
 /** A pinned snapshot payload does not reconstruct the snapshot it claims. */
-export class SnapshotMismatch extends Schema.TaggedError<SnapshotMismatch>()(
+export class SnapshotMismatch extends ActionableTaggedError<SnapshotMismatch>()(
   "generalist/instructions/SnapshotMismatch",
   {
     expected: Schema.String,
     actual: Schema.String,
+    hint: errorHint("Load the snapshot whose payload digest matches its pinned snapshot id."),
   },
 ) {}
 
 /** A pinned snapshot payload is not a valid guidance state. */
-export class SnapshotInvalid extends Schema.TaggedError<SnapshotInvalid>()("generalist/instructions/SnapshotInvalid", {
-  message: Schema.String,
-}) {}
+export class SnapshotInvalid extends ActionableTaggedError<SnapshotInvalid>()(
+  "generalist/instructions/SnapshotInvalid",
+  {
+    message: Schema.String,
+    hint: errorHint("Correct or replace the invalid snapshot payload before restoring guidance state."),
+  },
+) {}
 
 /** Pin one exact state as a content-addressed snapshot. */
 export const make = (state: GuidanceState): GuidanceSnapshot => ({

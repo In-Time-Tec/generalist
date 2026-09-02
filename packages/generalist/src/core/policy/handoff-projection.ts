@@ -1,5 +1,6 @@
 import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 export const Input = Schema.Struct({
   prompt: Schema.optionalKey(Schema.String),
@@ -15,10 +16,11 @@ export const Output = Schema.Struct({
 
 export type Output = typeof Output.Type
 
-export class ProjectionInvalid extends Schema.TaggedError<ProjectionInvalid>()(
+export class ProjectionInvalid extends ActionableTaggedError<ProjectionInvalid>()(
   "generalist/core/HandoffProjectionInvalid",
   {
     message: Schema.String,
+    hint: errorHint("Return a prompt history with every tool call paired to its result."),
   },
 ) {}
 

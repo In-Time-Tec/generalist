@@ -1,4 +1,5 @@
 import { Clock, Context, Crypto, Effect, Encoding, Function, Layer, Option, Redacted, Result, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 
 /** @experimental */
 export const issuer = "https://auth.openai.com"
@@ -18,15 +19,17 @@ export const deviceExchangeRedirect = `${issuer}/deviceauth/callback`
 export const credentialFormatVersion = 1
 
 /** @experimental */
-export class AuthError extends Schema.TaggedError<AuthError>()("generalist/ai/OpenAIAccountAuthError", {
+export class AuthError extends ActionableTaggedError<AuthError>()("generalist/ai/OpenAIAccountAuthError", {
   kind: Schema.Literals(["cancelled", "timeout", "host", "network", "protocol", "account-mismatch", "login-required"]),
   message: Schema.String,
+  hint: errorHint("Inspect kind, correct the login or callback failure, then start a new authorization flow."),
 }) {}
 
 /** @experimental */
-export class StoreError extends Schema.TaggedError<StoreError>()("generalist/ai/OpenAIAccountAuthStoreError", {
+export class StoreError extends ActionableTaggedError<StoreError>()("generalist/ai/OpenAIAccountAuthStoreError", {
   kind: Schema.Literals(["missing", "corrupt", "unsafe", "busy", "io"]),
   message: Schema.String,
+  hint: errorHint("Repair or replace the credential store and retry after it is safe and accessible."),
 }) {}
 
 /** @experimental */

@@ -1,6 +1,7 @@
 import { Context, type Effect, type Option, Schema } from "effect"
 import { LanguageModel, Prompt } from "effect/unstable/ai"
 import type { Entry } from "../context/session.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { withCompactionLifecycle } from "./compaction-telemetry.js"
 
 /** Token accounting for a compaction decision. */
@@ -48,9 +49,10 @@ export type MicrocompactResult = Extract<Result, { readonly _tag: "Microcompact"
 export type SummarizeResult = Extract<Result, { readonly _tag: "Summarize" }>
 
 /** Compaction service failure. */
-export class CompactionError extends Schema.TaggedError<CompactionError>()("generalist/core/CompactionError", {
+export class CompactionError extends ActionableTaggedError<CompactionError>()("generalist/core/CompactionError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Inspect cause, fix the compaction model or service, and retry before continuing the turn."),
 }) {}
 
 /** Compaction service boundary consulted by the loop. */

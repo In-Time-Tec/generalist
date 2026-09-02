@@ -1,6 +1,7 @@
 import { Cause, Context, Effect, Layer, Schema, Types } from "effect"
 import type { Prompt, Response, Tool } from "effect/unstable/ai"
 import type { ApprovalRequest } from "../agent/event.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { RuleStore, evaluateWithRules, type Decision, type RuleStoreError } from "../policy/permissions.js"
 
 type Approvals = import("../policy/approvals.js").Service
@@ -17,15 +18,20 @@ export interface AccessRequest {
 }
 
 /** A final authorization denial. */
-export class PermissionDenied extends Schema.TaggedError<PermissionDenied>()("generalist/core/PermissionDenied", {
+export class PermissionDenied extends ActionableTaggedError<PermissionDenied>()("generalist/core/PermissionDenied", {
   message: Schema.String,
+  hint: errorHint("Change the matching permission rule or remove the denied tool call."),
 }) {}
 
 /** Failure while producing a final authorization decision. */
-export class AuthorizationError extends Schema.TaggedError<AuthorizationError>()("generalist/core/AuthorizationError", {
-  message: Schema.String,
-  cause: Schema.optional(Schema.Defect()),
-}) {}
+export class AuthorizationError extends ActionableTaggedError<AuthorizationError>()(
+  "generalist/core/AuthorizationError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+    hint: errorHint("Inspect cause and repair the permission or approval service before retrying."),
+  },
+) {}
 
 /** The tool may execute. */
 export interface Execute {

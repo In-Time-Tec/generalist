@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Ref, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { GuidanceScope } from "./entry.js"
 import { GuidanceState, empty } from "./state.js"
 
@@ -7,11 +8,12 @@ export const StoreRejection = Schema.Literals(["corrupt", "encode", "unreadable"
 export type StoreRejection = typeof StoreRejection.Type
 
 /** A guidance store operation failed. */
-export class StoreError extends Schema.TaggedError<StoreError>()("generalist/instructions/StoreError", {
+export class StoreError extends ActionableTaggedError<StoreError>()("generalist/instructions/StoreError", {
   reason: StoreRejection,
   scope: Schema.String,
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Inspect reason and cause, restore access to this guidance scope, then retry."),
 }) {}
 
 /** Durable instruction state seam, keyed by scope. */

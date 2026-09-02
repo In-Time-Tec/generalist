@@ -1,6 +1,7 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node"
 import type { AwsCredentialIdentity } from "@smithy/types"
 import { Effect, Redacted, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
 export interface Credential {
   readonly accessKeyId: string
   readonly secretAccessKey: Redacted.Redacted<string>
@@ -10,9 +11,12 @@ export interface Credential {
 }
 
 type CredentialBuilder = { -readonly [Key in keyof Credential]: Credential[Key] }
-export class CredentialFailure extends Schema.TaggedError<CredentialFailure>()(
+export class CredentialFailure extends ActionableTaggedError<CredentialFailure>()(
   "generalist/ai/AmazonBedrockCredentialFailure",
-  { operation: Schema.Literals(["acquire", "refreshRejected"]) },
+  {
+    operation: Schema.Literals(["acquire", "refreshRejected"]),
+    hint: errorHint("Check AWS credential configuration and permissions, then reacquire credentials."),
+  },
 ) {}
 export interface Credentials {
   readonly acquire: Effect.Effect<Credential, CredentialFailure>

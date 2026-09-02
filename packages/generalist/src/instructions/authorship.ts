@@ -1,4 +1,5 @@
 import { Brand, Effect, Function, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { AuthoredProposal, type AuthoredRefinementProposal } from "./entry.js"
 
 export { isAuthored } from "./refinement.js"
@@ -8,9 +9,13 @@ export const AuthorshipRejection = Schema.Literals(["pinned-revision", "malforme
 export type AuthorshipRejection = typeof AuthorshipRejection.Type
 
 /** Untrusted proposal input was refused and no state was inspected or changed. */
-export class AuthorshipRejected extends Schema.TaggedError<AuthorshipRejected>()(
+export class AuthorshipRejected extends ActionableTaggedError<AuthorshipRejected>()(
   "generalist/instructions/AuthorshipRejected",
-  { reason: AuthorshipRejection, message: Schema.String },
+  {
+    reason: AuthorshipRejection,
+    message: Schema.String,
+    hint: errorHint("Remove pinned revision fields and submit a well-formed untrusted proposal."),
+  },
 ) {}
 
 const decodeAuthored = Schema.decodeUnknownEffect(AuthoredProposal, { onExcessProperty: "error" })

@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { digest } from "../../../core/durable/canonical-json.js"
+import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution/state.js"
 import { PinnedExecutable } from "../../executable/manifest.js"
 import { RunOutcome } from "../../run.js"
@@ -93,43 +94,68 @@ export const suspensionIdentity = (input: ParentSuspension): string =>
   digest(Schema.encodeSync(ParentSuspension)(input))
 
 /** No child slot is available; reservation made no mutation. */
-export class ExternalChildCapacityUnavailable extends Schema.TaggedError<ExternalChildCapacityUnavailable>()(
+export class ExternalChildCapacityUnavailable extends ActionableTaggedError<ExternalChildCapacityUnavailable>()(
   "generalist/runtime/ExternalChildCapacityUnavailable",
-  { parentRunId: Schema.String, limit: Schema.Int },
+  {
+    parentRunId: Schema.String,
+    limit: Schema.Int,
+    hint: errorHint("Wait for an existing child to settle or raise the parent's child capacity."),
+  },
 ) {}
 
 /** A placement id was replayed with different immutable facts. */
-export class ExternalChildPlacementConflict extends Schema.TaggedError<ExternalChildPlacementConflict>()(
+export class ExternalChildPlacementConflict extends ActionableTaggedError<ExternalChildPlacementConflict>()(
   "generalist/runtime/ExternalChildPlacementConflict",
-  { placementId: Schema.String },
+  {
+    placementId: Schema.String,
+    hint: errorHint("Reuse the placement id only with its original immutable child placement facts."),
+  },
 ) {}
 
 /** No external placement has this id. */
-export class ExternalChildPlacementNotFound extends Schema.TaggedError<ExternalChildPlacementNotFound>()(
+export class ExternalChildPlacementNotFound extends ActionableTaggedError<ExternalChildPlacementNotFound>()(
   "generalist/runtime/ExternalChildPlacementNotFound",
-  { placementId: Schema.String },
+  {
+    placementId: Schema.String,
+    hint: errorHint("Create or reserve the external child placement before reading or settling it."),
+  },
 ) {}
 
 /** A settlement identity was replayed with a different outcome. */
-export class ExternalChildSettlementConflict extends Schema.TaggedError<ExternalChildSettlementConflict>()(
+export class ExternalChildSettlementConflict extends ActionableTaggedError<ExternalChildSettlementConflict>()(
   "generalist/runtime/ExternalChildSettlementConflict",
-  { placementId: Schema.String, settlementId: Schema.String },
+  {
+    placementId: Schema.String,
+    settlementId: Schema.String,
+    hint: errorHint("Replay the settlement identity only with its original outcome."),
+  },
 ) {}
 
 /** An external root identity was replayed with different immutable facts. */
-export class ExternalRootConflict extends Schema.TaggedError<ExternalRootConflict>()(
+export class ExternalRootConflict extends ActionableTaggedError<ExternalRootConflict>()(
   "generalist/runtime/ExternalRootConflict",
-  { placementId: Schema.String },
+  {
+    placementId: Schema.String,
+    hint: errorHint("Reuse the placement id only with its original immutable external root facts."),
+  },
 ) {}
 
 /** No locally owned external root has this placement id. */
-export class ExternalRootNotFound extends Schema.TaggedError<ExternalRootNotFound>()(
+export class ExternalRootNotFound extends ActionableTaggedError<ExternalRootNotFound>()(
   "generalist/runtime/ExternalRootNotFound",
-  { placementId: Schema.String },
+  {
+    placementId: Schema.String,
+    hint: errorHint("Create the locally owned external root before reading or settling it."),
+  },
 ) {}
 
 /** The supplied digest does not identify the root executable. */
-export class ExternalRootExecutableMismatch extends Schema.TaggedError<ExternalRootExecutableMismatch>()(
+export class ExternalRootExecutableMismatch extends ActionableTaggedError<ExternalRootExecutableMismatch>()(
   "generalist/runtime/ExternalRootExecutableMismatch",
-  { placementId: Schema.String, expected: Schema.String, actual: Schema.String },
+  {
+    placementId: Schema.String,
+    expected: Schema.String,
+    actual: Schema.String,
+    hint: errorHint("Run the placement with the executable digest that was originally reserved."),
+  },
 ) {}

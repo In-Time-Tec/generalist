@@ -1,5 +1,6 @@
 import { Context, Effect, HashMap, Layer, Ref, Schema } from "effect"
 import type { Key, Metadata } from "../core/context/memory.js"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 export interface Document {
   readonly id: string
   readonly key: Key
@@ -23,8 +24,9 @@ export interface DeleteInput {
   readonly key: Key
   readonly id?: string | undefined
 }
-export class VectorStoreError extends Schema.TaggedError<VectorStoreError>()("generalist/memory/VectorStoreError", {
+export class VectorStoreError extends ActionableTaggedError<VectorStoreError>()("generalist/memory/VectorStoreError", {
   message: Schema.String,
+  hint: errorHint("Restore the vector store or correct the rejected document or query, then retry."),
 }) {}
 export interface Service {
   readonly upsert: (documents: ReadonlyArray<Embedded>) => Effect.Effect<void, VectorStoreError>

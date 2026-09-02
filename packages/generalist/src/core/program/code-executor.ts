@@ -1,5 +1,6 @@
 import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
 import { digest } from "../durable/canonical-json.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { CapabilityFailure, type ProgramCapabilities } from "./capabilities.js"
 
 const positiveInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
@@ -87,49 +88,74 @@ export const Result = Schema.Struct({
   output: Schema.Unknown,
 })
 export type Result = typeof Result.Type
-export class SandboxUnavailable extends Schema.TaggedError<SandboxUnavailable>()("generalist/core/SandboxUnavailable", {
-  message: Schema.String,
-}) {}
-export class SandboxSourceInvalid extends Schema.TaggedError<SandboxSourceInvalid>()(
+export class SandboxUnavailable extends ActionableTaggedError<SandboxUnavailable>()(
+  "generalist/core/SandboxUnavailable",
+  {
+    message: Schema.String,
+    hint: errorHint("Configure an isolated code executor or disable program execution for this host."),
+  },
+) {}
+export class SandboxSourceInvalid extends ActionableTaggedError<SandboxSourceInvalid>()(
   "generalist/core/SandboxSourceInvalid",
   {
     message: Schema.String,
+    hint: errorHint("Correct the submitted source so it passes the sandbox source policy, then retry."),
   },
 ) {}
-export class SandboxInputInvalid extends Schema.TaggedError<SandboxInputInvalid>()(
+export class SandboxInputInvalid extends ActionableTaggedError<SandboxInputInvalid>()(
   "generalist/core/SandboxInputInvalid",
   {
     message: Schema.String,
+    hint: errorHint("Encode the input with the program input schema before submitting it to the sandbox."),
   },
 ) {}
-export class SandboxOutputInvalid extends Schema.TaggedError<SandboxOutputInvalid>()(
+export class SandboxOutputInvalid extends ActionableTaggedError<SandboxOutputInvalid>()(
   "generalist/core/SandboxOutputInvalid",
   {
     message: Schema.String,
+    hint: errorHint("Fix the program output so it satisfies the declared output schema."),
   },
 ) {}
-export class SandboxProtocolViolation extends Schema.TaggedError<SandboxProtocolViolation>()(
+export class SandboxProtocolViolation extends ActionableTaggedError<SandboxProtocolViolation>()(
   "generalist/core/SandboxProtocolViolation",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+    hint: errorHint("Check executor and framework protocol versions and reject malformed executor responses."),
+  },
 ) {}
-export class SandboxDeadlineExceeded extends Schema.TaggedError<SandboxDeadlineExceeded>()(
+export class SandboxDeadlineExceeded extends ActionableTaggedError<SandboxDeadlineExceeded>()(
   "generalist/core/SandboxDeadlineExceeded",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+    hint: errorHint("Increase the deadline or reduce the program work before retrying."),
+  },
 ) {}
-export class SandboxCancelled extends Schema.TaggedError<SandboxCancelled>()("generalist/core/SandboxCancelled", {
+export class SandboxCancelled extends ActionableTaggedError<SandboxCancelled>()("generalist/core/SandboxCancelled", {
   message: Schema.String,
+  hint: errorHint("Inspect the cancellation source and start a new execution if the work is still required."),
 }) {}
-export class SandboxResourceExceeded extends Schema.TaggedError<SandboxResourceExceeded>()(
+export class SandboxResourceExceeded extends ActionableTaggedError<SandboxResourceExceeded>()(
   "generalist/core/SandboxResourceExceeded",
-  { resource: Schema.Literals(["cpu", "subrequests", "output"]), limit: positiveInt },
+  {
+    resource: Schema.Literals(["cpu", "subrequests", "output"]),
+    limit: positiveInt,
+    hint: errorHint("Raise the named resource limit or reduce the program's resource use."),
+  },
 ) {}
-export class SandboxGuaranteeUnavailable extends Schema.TaggedError<SandboxGuaranteeUnavailable>()(
+export class SandboxGuaranteeUnavailable extends ActionableTaggedError<SandboxGuaranteeUnavailable>()(
   "generalist/core/SandboxGuaranteeUnavailable",
-  { guarantee: guaranteeName, message: Schema.String },
+  {
+    guarantee: guaranteeName,
+    message: Schema.String,
+    hint: errorHint("Use an executor that provides the named guarantee or stop requesting it."),
+  },
 ) {}
-export class SandboxExecutionFailure extends Schema.TaggedError<SandboxExecutionFailure>()(
+export class SandboxExecutionFailure extends ActionableTaggedError<SandboxExecutionFailure>()(
   "generalist/core/SandboxExecutionFailure",
-  { message: Schema.String },
+  {
+    message: Schema.String,
+    hint: errorHint("Inspect the executor failure and repair the sandbox service before retrying."),
+  },
 ) {}
 
 /** Typed failures that may cross the sandbox capability protocol. */

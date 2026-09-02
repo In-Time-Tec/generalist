@@ -1,4 +1,5 @@
 import { Context, Duration, Effect, FileSystem, Schema, Scope, Stream } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import type { Service as ProgramCapabilitiesService } from "../core/program/capabilities.js"
 import type { Request as CodeExecutorRequest } from "../core/program/code-executor.js"
 
@@ -95,31 +96,36 @@ export const Operation = Schema.Literals([
 export type Operation = typeof Operation.Type
 
 /** The leaf does not implement the requested capability. */
-export class Unsupported extends Schema.TaggedError<Unsupported>()("generalist/sandbox/Unsupported", {
+export class Unsupported extends ActionableTaggedError<Unsupported>()("generalist/sandbox/Unsupported", {
   operation: Operation,
   message: Schema.String,
+  hint: errorHint("Use a sandbox provider that supports this operation or stop requesting it."),
 }) {}
 
 /** The provider could not acquire or reach the sandbox. */
-export class Unavailable extends Schema.TaggedError<Unavailable>()("generalist/sandbox/Unavailable", {
+export class Unavailable extends ActionableTaggedError<Unavailable>()("generalist/sandbox/Unavailable", {
   message: Schema.String,
+  hint: errorHint("Restore the sandbox provider connection or capacity, then retry acquisition."),
 }) {}
 
 /** The command failed after being admitted by the sandbox. */
-export class ExecutionFailed extends Schema.TaggedError<ExecutionFailed>()("generalist/sandbox/ExecutionFailed", {
+export class ExecutionFailed extends ActionableTaggedError<ExecutionFailed>()("generalist/sandbox/ExecutionFailed", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Unknown),
+  hint: errorHint("Inspect cause and command output, correct the command or sandbox, then retry if safe."),
 }) {}
 
 /** A sandbox stopped work at an enforced resource limit. */
-export class LimitExceeded extends Schema.TaggedError<LimitExceeded>()("generalist/sandbox/LimitExceeded", {
+export class LimitExceeded extends ActionableTaggedError<LimitExceeded>()("generalist/sandbox/LimitExceeded", {
   resource: Schema.Literals(["cpu", "memory", "wall-clock"]),
   limit: PositiveInt,
+  hint: errorHint("Raise the named resource limit or reduce the command's resource use."),
 }) {}
 
 /** An immutable sandbox image is unavailable to this provider. */
-export class SnapshotNotFound extends Schema.TaggedError<SnapshotNotFound>()("generalist/sandbox/SnapshotNotFound", {
+export class SnapshotNotFound extends ActionableTaggedError<SnapshotNotFound>()("generalist/sandbox/SnapshotNotFound", {
   snapshotId: SnapshotId,
+  hint: errorHint("Use an available immutable snapshot id or create the requested snapshot first."),
 }) {}
 
 /** Closed failure union for the provider-neutral sandbox boundary. */

@@ -18,6 +18,7 @@ import {
   Semaphore,
   SynchronizedRef,
 } from "effect"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 
 const TokenFields = Schema.Struct({
   access_token: Schema.String,
@@ -36,26 +37,33 @@ const TokenDocument = Schema.Struct({
 const TokenDocumentJson = Schema.fromJsonString(TokenDocument)
 
 /** @experimental */
-export class OAuthPending extends Schema.TaggedError<OAuthPending>()("generalist/mcp/OAuthPending", {
+export class OAuthPending extends ActionableTaggedError<OAuthPending>()("generalist/mcp/OAuthPending", {
   authorizationUrl: Schema.String,
+  hint: errorHint("Open the authorization URL, complete consent, then resume the connection."),
 }) {}
 
 /** @experimental */
-export class OAuthDenied extends Schema.TaggedError<OAuthDenied>()("generalist/mcp/OAuthDenied", {
+export class OAuthDenied extends ActionableTaggedError<OAuthDenied>()("generalist/mcp/OAuthDenied", {
   reason: Schema.String,
+  hint: errorHint("Review the denial reason and restart authorization only after access is allowed."),
 }) {}
 
 /** @experimental */
-export class OAuthExpired extends Schema.TaggedError<OAuthExpired>()("generalist/mcp/OAuthExpired", {
+export class OAuthExpired extends ActionableTaggedError<OAuthExpired>()("generalist/mcp/OAuthExpired", {
   server: Schema.String,
+  hint: errorHint("Restart OAuth authorization for this server to obtain fresh tokens."),
 }) {}
 
 /** @experimental */
-export class OAuthProviderError extends Schema.TaggedError<OAuthProviderError>()("generalist/mcp/OAuthProviderError", {
-  server: Schema.String,
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+export class OAuthProviderError extends ActionableTaggedError<OAuthProviderError>()(
+  "generalist/mcp/OAuthProviderError",
+  {
+    server: Schema.String,
+    operation: Schema.String,
+    message: Schema.String,
+    hint: errorHint("Inspect the server and operation, repair OAuth provider or token-store access, then retry."),
+  },
+) {}
 
 /** @experimental */
 export class TokenStore extends Context.Service<

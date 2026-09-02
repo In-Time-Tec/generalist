@@ -3,6 +3,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, Duration, Effect, Function, Layer, Option, Ref, Schema, Scope } from "effect"
 import type { JsonSchema } from "effect/JsonSchema"
 import { Tool } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { OAuthProviderError } from "./oauth.js"
 /** @experimental */
 export type JsonValue = Schema.Json
@@ -13,19 +14,21 @@ export interface CallOptions {
 }
 
 /** @experimental */
-export class MCPConnectionFailed extends Schema.TaggedError<MCPConnectionFailed>()(
+export class MCPConnectionFailed extends ActionableTaggedError<MCPConnectionFailed>()(
   "generalist/mcp/MCPConnectionFailed",
   {
     server: Schema.String,
     message: Schema.String,
+    hint: errorHint("Check the MCP server address and authentication, then reconnect."),
   },
 ) {}
 
 /** @experimental */
-export class MCPToolCallFailed extends Schema.TaggedError<MCPToolCallFailed>()("generalist/mcp/MCPToolCallFailed", {
+export class MCPToolCallFailed extends ActionableTaggedError<MCPToolCallFailed>()("generalist/mcp/MCPToolCallFailed", {
   server: Schema.String,
   tool: Schema.String,
   message: Schema.String,
+  hint: errorHint("Inspect the server response and correct the named tool request before retrying."),
 }) {}
 
 /** @experimental */

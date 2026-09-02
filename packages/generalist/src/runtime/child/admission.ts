@@ -1,4 +1,5 @@
 import { Context, Effect, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import { make as makeAddress } from "../address.js"
 import { childSessionId } from "./session.js"
@@ -22,9 +23,13 @@ import type { ChildReadiness } from "./readiness.js"
  * Parentage is read from the durable child record, so knowing a child Run id grants nothing to a
  * Run that did not admit it.
  */
-export class ChildParentageInvalid extends Schema.TaggedError<ChildParentageInvalid>()(
+export class ChildParentageInvalid extends ActionableTaggedError<ChildParentageInvalid>()(
   "generalist/runtime/ChildParentageInvalid",
-  { parentRunId: Schema.String, childRunId: Schema.String },
+  {
+    parentRunId: Schema.String,
+    childRunId: Schema.String,
+    hint: errorHint("Address only children owned by the current parent run."),
+  },
 ) {}
 
 /** Parameters for one non-blocking child admission. */

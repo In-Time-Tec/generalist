@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 type BoundaryValue = typeof Schema.Unknown.Type
 
@@ -59,17 +60,19 @@ export const FrameworkStage = Schema.Literals([
 ])
 export type FrameworkStage = typeof FrameworkStage.Type
 
-export class FrameworkFailure extends Schema.TaggedError<FrameworkFailure>()("generalist/core/FrameworkFailure", {
+export class FrameworkFailure extends ActionableTaggedError<FrameworkFailure>()("generalist/core/FrameworkFailure", {
   stage: FrameworkStage,
   tool: Schema.String,
   message: Schema.String,
+  hint: errorHint("Use stage and tool to repair the failing tool boundary, then retry the call."),
 }) {}
 
-export class RemoteRetryMisconfigured extends Schema.TaggedError<RemoteRetryMisconfigured>()(
+export class RemoteRetryMisconfigured extends ActionableTaggedError<RemoteRetryMisconfigured>()(
   "generalist/core/RemoteRetryMisconfigured",
   {
     reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
     message: Schema.String,
+    hint: errorHint("Use a finite retry count and one stable operation key for every retry attempt."),
   },
 ) {}
 

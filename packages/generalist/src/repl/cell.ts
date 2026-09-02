@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 
 /** Generalist Session identity that owns exactly one kernel. */
 export const SessionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(256))
@@ -46,7 +47,7 @@ export type CellResult = typeof CellResult.Type
  * The cell threw. This is model input, not a framework failure: the namespace, the
  * kernel, and every prior binding survive.
  */
-export class CellExecutionFailed extends Schema.TaggedError<CellExecutionFailed>()(
+export class CellExecutionFailed extends ActionableTaggedError<CellExecutionFailed>()(
   "generalist/repl/CellExecutionFailed",
   {
     cellId: CellId,
@@ -58,6 +59,7 @@ export class CellExecutionFailed extends Schema.TaggedError<CellExecutionFailed>
     stdout: Schema.String,
     stderr: Schema.String,
     durationMillis: NonNegative,
+    hint: errorHint("Inspect the cell message, stack, stdout, and stderr; correct the cell and submit a new one."),
   },
 ) {}
 
@@ -72,19 +74,21 @@ export const UnavailableReason = Schema.Literals([
 export type UnavailableReason = typeof UnavailableReason.Type
 
 /** No kernel was available to run the cell. Nothing was evaluated. */
-export class KernelUnavailable extends Schema.TaggedError<KernelUnavailable>()("generalist/repl/KernelUnavailable", {
+export class KernelUnavailable extends ActionableTaggedError<KernelUnavailable>()("generalist/repl/KernelUnavailable", {
   sessionId: SessionId,
   reason: UnavailableReason,
   message: Schema.String,
+  hint: errorHint("Restore or recreate the session kernel, then submit the cell again."),
 }) {}
 
 /** The kernel broke the cell protocol: out-of-order sequence, unknown frame, or malformed payload. */
-export class KernelProtocolViolation extends Schema.TaggedError<KernelProtocolViolation>()(
+export class KernelProtocolViolation extends ActionableTaggedError<KernelProtocolViolation>()(
   "generalist/repl/KernelProtocolViolation",
   {
     sessionId: SessionId,
     cellId: Schema.optionalKey(CellId),
     message: Schema.String,
+    hint: errorHint("Restart the kernel and inspect the host/kernel protocol implementation before retrying."),
   },
 ) {}
 
@@ -96,13 +100,19 @@ export type UnknownReason = typeof UnknownReason.Type
  * The cell may or may not have committed its effects. It is never replayed; a host
  * resolves it explicitly.
  */
-export class CellOutcomeUnknown extends Schema.TaggedError<CellOutcomeUnknown>()("generalist/repl/CellOutcomeUnknown", {
-  sessionId: SessionId,
-  cellId: CellId,
-  epoch: Epoch,
-  reason: UnknownReason,
-  message: Schema.String,
-}) {}
+export class CellOutcomeUnknown extends ActionableTaggedError<CellOutcomeUnknown>()(
+  "generalist/repl/CellOutcomeUnknown",
+  {
+    sessionId: SessionId,
+    cellId: CellId,
+    epoch: Epoch,
+    reason: UnknownReason,
+    message: Schema.String,
+    hint: errorHint(
+      "Reconcile external effects before choosing to submit a new cell; never replay this cell automatically.",
+    ),
+  },
+) {}
 
 /** Closed union of everything a cell call can fail with. */
 export const CellFailure = Schema.Union([

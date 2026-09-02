@@ -52,6 +52,9 @@ import {
   makeRequest as makeSandboxRequest,
   type Service as CodeExecutor,
 } from "./code-executor.js"
+import { ProgramHandlerMismatch, ProgramIdentityMismatch } from "./errors.js"
+
+export { ProgramHandlerMismatch, ProgramIdentityMismatch }
 
 const ToolCall = Schema.Struct({ operation: ProgramOperationName, tool: Schema.String, input: Schema.Unknown })
 const StepCall = Schema.Struct({ operation: ProgramOperationName, step: Schema.String, input: Schema.Unknown })
@@ -80,14 +83,6 @@ const AgentResult = Schema.Struct({
     output: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
 })
-export class ProgramHandlerMismatch extends Schema.TaggedError<ProgramHandlerMismatch>()(
-  "generalist/core/ProgramHandlerMismatch",
-  { kind: Schema.Literals(["tool", "step", "agent"]), name: Schema.String, reason: Schema.String },
-) {}
-export class ProgramIdentityMismatch extends Schema.TaggedError<ProgramIdentityMismatch>()(
-  "generalist/core/ProgramIdentityMismatch",
-  { expected: Schema.String, actual: Schema.String },
-) {}
 
 /** Failures returned by Core-owned Program execution. */
 export const ExecutionFailure = Schema.Union([SandboxFailure, ProgramHandlerMismatch, ProgramIdentityMismatch])

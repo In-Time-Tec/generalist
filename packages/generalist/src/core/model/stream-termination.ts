@@ -1,5 +1,6 @@
 import { Duration, Effect, Function, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 /**
  * What already escaped downstream when a model part stream ended
@@ -32,15 +33,18 @@ const terminationFields = {
  * A provider part stream reached a clean end without its terminal
  * `finish` part, so the attempt produced no finish reason and no usage.
  */
-export class Truncated extends Schema.TaggedError<Truncated>()(
-  "generalist/core/ModelStreamTruncated",
-  terminationFields,
-) {}
+export class Truncated extends ActionableTaggedError<Truncated>()("generalist/core/ModelStreamTruncated", {
+  ...terminationFields,
+  hint: errorHint(
+    "Retry only when emitted is Nothing; otherwise preserve the partial output and inspect the provider stream.",
+  ),
+}) {}
 
 /** A provider part stream exceeded its configured idle deadline. */
-export class Timeout extends Schema.TaggedError<Timeout>()("generalist/core/ModelStreamTimeout", {
+export class Timeout extends ActionableTaggedError<Timeout>()("generalist/core/ModelStreamTimeout", {
   ...terminationFields,
   idleMillis: Schema.Finite,
+  hint: errorHint("Increase the model idle timeout or investigate why the provider stopped emitting stream parts."),
 }) {}
 
 /** A model part stream did not reach a provider-reported terminal event. */
