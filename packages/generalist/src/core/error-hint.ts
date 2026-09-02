@@ -43,10 +43,14 @@ const describe = (error: Record<string, unknown>): string => {
     .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
     .join(" ")
   const hint = oneLine(String(error.hint))
-  return `${String(error._tag)}${context.length > 0 ? ` (${context})` : ""}. Hint: ${hint}`
+  return context.length > 0 ? `${context}. Hint: ${hint}` : `Hint: ${hint}`
 }
 
-/** @internal Schema TaggedError whose printed name includes identifying fields and its actionable hint. */
+/**
+ * @internal Schema TaggedError whose native `message` is derived from its identifying fields and hint
+ * when the schema declares no `message` field. Errors that declare `message` keep that value; their
+ * `hint` stays a separate field. `name` is always the tag, as Effect sets it.
+ */
 type ErrorConstructor = new (props: Record<string, unknown>) => Error & Record<string, unknown>
 const taggedError = Schema.TaggedError as unknown as (
   identifier?: string,
@@ -58,12 +62,9 @@ export const ActionableTaggedError: typeof Schema.TaggedError = ((identifier?: s
     return class extends Base {
       constructor(props: Record<string, unknown>) {
         super(props)
-        const actionable = describe(this)
-        if (Object.hasOwn(this, "name")) {
-          if (!this.message.includes(". Hint: ")) this.message = `${oneLine(this.message)} ${actionable}`.trim()
-        } else {
-          Object.defineProperty(this, "name", {
-            value: actionable,
+        if (!Object.hasOwn(this, "message")) {
+          Object.defineProperty(this, "message", {
+            value: describe(this),
             configurable: true,
             writable: true,
           })

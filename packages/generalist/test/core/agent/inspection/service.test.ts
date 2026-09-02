@@ -85,7 +85,7 @@ describe("Agent.Inspector", () => {
 
       expect(error.runId).toBe("run-missing")
       expect(error.hint).toContain("Consume the Agent Run")
-      expect(error.name).toContain(error.hint)
+      expect(error.message).toContain(error.hint)
     }).pipe(Effect.provide(Agent.Inspector.layerMemory)),
   )
 })
