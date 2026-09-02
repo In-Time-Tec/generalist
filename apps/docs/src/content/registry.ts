@@ -11,6 +11,7 @@ import { foldkitChat } from "../pages/guides/runtime/foldkit-chat"
 import { instructions } from "../pages/guides/agent/instructions"
 import { mcp } from "../pages/guides/tools/mcp"
 import { memory } from "../pages/guides/agent/memory"
+import { memoization } from "../pages/guides/agent/memoization"
 import { middleware } from "../pages/guides/agent/middleware"
 import { multiAgent } from "../pages/guides/agent/multi-agent"
 import { permissions } from "../pages/guides/agent/permissions"
@@ -81,6 +82,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   instructions,
   skills,
   memory,
+  memoization,
   compaction,
   steering,
   providers,

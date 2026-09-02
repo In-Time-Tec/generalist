@@ -118,6 +118,11 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "layerSupermemory",
     ],
   ],
+  [
+    "memo",
+    () => import("../src/memo.js"),
+    ["Dependencies", "Store", "layerDependencies", "layerMemory", "layerSql", "models", "pure"],
+  ],
 ]
 
 describe("generalist public surface", () => {
@@ -140,6 +145,7 @@ describe("generalist public surface", () => {
         "Guardrail",
         "Handoff",
         "Instructions",
+        "Memo",
         "Memory",
         "ModelMiddleware",
         "ModelRegistry",

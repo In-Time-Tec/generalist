@@ -1,4 +1,5 @@
 import { memory } from "./memory.js"
+import { memo } from "./memo.js"
 import { write } from "./report.js"
 import { ruleStore } from "./rule-store.js"
 import { runtimeDriver } from "./runtime-driver/index.js"
@@ -16,6 +17,7 @@ export * as KernelProviderConformance from "./repl/kernel-provider.js"
 export const Testing = {
   runtimeDriver,
   memory,
+  memo,
   ruleStore,
   sandbox,
   report: { write },

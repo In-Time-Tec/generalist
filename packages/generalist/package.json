@@ -97,6 +97,10 @@
       "types": "./dist/memory/index.d.ts",
       "import": "./dist/memory/index.js"
     },
+    "./memo": {
+      "types": "./dist/memo.d.ts",
+      "import": "./dist/memo.js"
+    },
     "./repl": {
       "types": "./dist/repl/index.d.ts",
       "import": "./dist/repl/index.js"

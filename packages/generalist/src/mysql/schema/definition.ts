@@ -362,6 +362,14 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   created_at VARCHAR(32) NOT NULL,
   PRIMARY KEY (scope, pattern)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_memo_entries (
+  memo_key VARCHAR(64) NOT NULL,
+  value_json LONGTEXT NOT NULL,
+  from_run VARCHAR(255) NOT NULL,
+  from_operation VARCHAR(512) NOT NULL,
+  expires_at_millis BIGINT NOT NULL,
+  PRIMARY KEY (memo_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
 ]
 
 export const SCHEMA_TABLES: ReadonlyArray<string> = SCHEMA_STATEMENTS.flatMap(

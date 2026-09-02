@@ -33,6 +33,8 @@ import { validate as validateOptions } from "./options.js"
 import { setupChat, setupSession } from "./session.js"
 import { setupPromptContext } from "./resume.js"
 import type { ModelSource } from "../model-turn/model-source.js"
+import { memoizeModel } from "../../memo/model.js"
+import { Store as MemoStore } from "../../memo/service.js"
 
 /** @internal Resolve the configured authorization policy; absent policy is a typed error, never an implicit allow-all. */
 export const setupToolAuthorizer = <T extends Record<string, Tool.Any>, R, P, A>(
@@ -75,6 +77,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
     const { resume, compactionService, activeSession, resumeChat, validatedResume } = yield* setupSession(options)
     const { staticCandidates, staticRegistry, staticToolkit } = yield* setupStaticTools(agent)
     const executor = yield* Effect.serviceOption(ToolExecutor)
+    const memoStore = yield* Effect.serviceOption(MemoStore)
     const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
       Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
     )
@@ -159,6 +162,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
     let modelCallOrdinal = restoredModelCallOrdinal ?? options.modelCallOrdinalStart ?? 0
     const modelCallUsage = new Map<string, ProviderUsage | undefined>()
     const clock = yield* Effect.clockWith((currentClock) => Effect.succeed(currentClock))
+    const memoizedModels = new WeakMap<LanguageModel.Service, LanguageModel.Service>()
     const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service => {
       const baseInstrumentation = {
         clock,
@@ -187,7 +191,12 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
       const instrumentation = Option.isNone(resilienceService)
         ? withLifecycle
         : { ...withLifecycle, resilience: resilienceService.value }
-      return instrument(model, instrumentation)
+      if (Option.isNone(memoStore) || !memoStore.value.modelsEnabled) return instrument(model, instrumentation)
+      const cached = memoizedModels.get(model)
+      if (cached !== undefined) return instrument(cached, instrumentation)
+      const memoized = memoizeModel(options.invocation?.runId ?? sessionId)(model)
+      memoizedModels.set(model, memoized)
+      return instrument(memoized, instrumentation)
     }
     const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
     const memoryService = yield* Effect.serviceOption(Memory)

@@ -1,11 +1,55 @@
 /* oxlint-disable effecttsgo/strict-effect-provide */
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Stream } from "effect"
+import { Effect, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Replay, Wire } from "../../../src/unstable/transport/index.js"
 import { event, runtimeLayer } from "./fixtures.js"
 
 describe("Replay", () => {
+  it.effect("preserves memo provenance without consulting a memo store", () => {
+    const call = Response.toolCallPart({
+      id: "search-1",
+      name: "search",
+      params: { query: "effect" },
+      providerExecuted: false,
+    })
+    const result = Object.assign(
+      Response.toolResultPart({
+        id: call.id,
+        name: call.name,
+        isFailure: false,
+        result: "cached",
+        encodedResult: "cached",
+        providerExecuted: false,
+        preliminary: false,
+      }),
+      { memoized: { fromRun: "run-origin", fromOperation: "operation-origin" } },
+    )
+    const completed = { ...event(0), _tag: "ToolExecutionCompleted" as const, turn: 0, call, result }
+    return Effect.gen(function* () {
+      const page = yield* Replay.page({ runId: "run-1", limit: 1 })
+      const decoded = yield* Wire.observerCodec.decode(page.frames[0]!.data)
+      const provenance = (yield* Schema.decodeUnknownEffect(
+        Schema.TaggedStruct("ToolExecutionCompleted", {
+          result: Schema.Struct({
+            memoized: Schema.Struct({ fromRun: Schema.String, fromOperation: Schema.String }),
+          }),
+        }),
+      )(decoded)).result.memoized
+      expect(provenance).toEqual({
+        fromRun: "run-origin",
+        fromOperation: "operation-origin",
+      })
+    }).pipe(
+      Effect.provide(
+        runtimeLayer({
+          events: () => Stream.empty,
+          history: () => Effect.succeed([completed]),
+        }),
+      ),
+    )
+  })
+
   it.effect("returns a bounded strict page and preserves the load cursor", () =>
     Effect.gen(function* () {
       const result = yield* Replay.page({ runId: "run-1", cursor: 0, limit: 1 })
