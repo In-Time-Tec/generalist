@@ -8,6 +8,8 @@ import type { Authorizer } from "../../tools/tool-authorization.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 import type { Policy } from "../../turn/policy.js"
 import type { ToolOrigin } from "../event.js"
+import type { Any as AnyGate, FailureMode as GateFailureMode } from "../gates/definition.js"
+import type { SandboxService } from "../../../sandbox/service.js"
 
 export const AgentTypeId = "generalist/core/Agent"
 
@@ -49,6 +51,9 @@ export interface Agent<
   readonly metadata?: AgentMetadata
   readonly budget?: BudgetLimits
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
+  readonly gates: ReadonlyArray<AnyGate>
+  readonly onGateFailure: GateFailureMode
+  readonly sandbox?: SandboxService
 }
 
 /**
@@ -81,6 +86,9 @@ export interface Any {
   readonly metadata?: AgentMetadata
   readonly budget?: BudgetLimits
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
+  readonly gates: ReadonlyArray<AnyGate>
+  readonly onGateFailure: GateFailureMode
+  readonly sandbox?: SandboxService
 }
 
 /** Services closed over with an Agent. */

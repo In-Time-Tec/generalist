@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause } from "effect"
-import { AgentEvent, RunBudget } from "../../../../src/index.js"
+import { AgentEvent, Gate, RunBudget } from "../../../../src/index.js"
 import { make as makeAgentExecutionFailure } from "../../../../src/runtime/execution/agent/failure.js"
 
 const messageFor = <E>(error: E): string => makeAgentExecutionFailure(Cause.fail(error)).message
@@ -60,6 +60,11 @@ describe("terminal agent failure messages", () => {
       error: RunBudget.Exhausted.make({ budget: "tokens", requested: 165703, remaining: 43421 }),
       expected: "Run budget exhausted for tokens: requested 165703, remaining 43421",
     },
+    {
+      name: "GateFailed",
+      error: Gate.GateFailed.make({ gate: { name: "quality", verdict: "fail", evidence: { score: 0.4 } } }),
+      expected: 'Completion gate quality failed: {"score":0.4}',
+    },
   ])("states what happened for $name", ({ error, expected }) => {
     expect(messageFor(error)).toBe(expected)
   })
@@ -76,6 +81,11 @@ describe("terminal agent failure messages", () => {
 
   it("keeps the structured budget failure attached for callers that branch on it", () => {
     const error = RunBudget.Exhausted.make({ budget: "tokens", requested: 2, remaining: 1 })
+    expect(makeAgentExecutionFailure(Cause.fail(error)).failure).toStrictEqual(error)
+  })
+
+  it("keeps a structured gate failure attached for callers that branch on it", () => {
+    const error = Gate.GateFailed.make({ gate: { name: "quality", verdict: "fail", evidence: "rejected" } })
     expect(makeAgentExecutionFailure(Cause.fail(error)).failure).toStrictEqual(error)
   })
 

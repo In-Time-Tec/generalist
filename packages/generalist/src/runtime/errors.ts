@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { ResumeMismatch } from "../core/agent/event.js"
 import { Exhausted } from "../core/durable/run-budget.js"
 import { PermissionDenied } from "../core/tools/tool-authorization.js"
+import { GateFailed } from "../core/agent/gates/definition.js"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable/manifest.js"
@@ -69,12 +70,12 @@ export class ExecutableIdentityMismatch extends ActionableTaggedError<Executable
 ) {}
 
 /** The structured Agent failures a durable terminal event preserves verbatim. */
-export type StructuredAgentFailure = Exhausted | PermissionDenied | ResumeMismatch
+export type StructuredAgentFailure = Exhausted | GateFailed | PermissionDenied | ResumeMismatch
 
 export const StructuredAgentFailure: Schema.Codec<
   StructuredAgentFailure,
-  typeof Exhausted.Encoded | typeof PermissionDenied.Encoded | typeof ResumeMismatch.Encoded
-> = Schema.Union([Exhausted, PermissionDenied, ResumeMismatch])
+  typeof Exhausted.Encoded | typeof GateFailed.Encoded | typeof PermissionDenied.Encoded | typeof ResumeMismatch.Encoded
+> = Schema.Union([Exhausted, GateFailed, PermissionDenied, ResumeMismatch])
 
 export class AgentExecutionFailure extends ActionableTaggedError<AgentExecutionFailure>()(
   "generalist/runtime/AgentExecutionFailure",

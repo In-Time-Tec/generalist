@@ -6,6 +6,7 @@ import { Diagnostics as SessionSyncDiagnostics } from "../context/session-sync.j
 import { StopReason } from "../turn/policy.js"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
+import type { Result as CompletionGateResult } from "./gates/definition.js"
 /** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
@@ -165,6 +166,12 @@ export interface TurnCompleted {
   readonly metadata?: Metadata
 }
 
+/** One ordered completion gate verdict for a proposed terminal output. */
+export interface GateResult extends CompletionGateResult {
+  readonly _tag: "GateResult"
+  readonly turn: number
+}
+
 /** Terminal event: the run finished without suspension. */
 export interface Completed<Output = unknown> {
   readonly _tag: "Completed"
@@ -216,6 +223,7 @@ export type Event<Output = unknown> =
   | ApprovalRequested
   | SteeringDrained
   | TurnCompleted
+  | GateResult
   | Completed<Output>
   | ModelTelemetryEvent
 

@@ -571,6 +571,7 @@ const makeRuntimeWith = (
               turn: snapshot.turn,
               usage: snapshot.usage,
               budget: snapshot.budget,
+              gates: snapshot.gates,
             }
             return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
           }),

@@ -29,12 +29,14 @@ import { PolicyError } from "../../turn/policy.js"
 import { PolicyInvalid } from "../../turn/steering.js"
 import { HookFailed } from "../../../hooks/index.js"
 import { Suspended as NestedOperationSuspended } from "../../tools/nested-operation.js"
+import { GateFailed } from "../gates/definition.js"
 
 /** The error channel and durable codec of `Agent.run` and `Agent.stream`. */
 export const RunError = Schema.Union([
   SinkFailed,
   InvocationLifecycleFailed,
   HookFailed,
+  GateFailed,
   AgentError,
   InvalidOutput,
   AgentSuspended,

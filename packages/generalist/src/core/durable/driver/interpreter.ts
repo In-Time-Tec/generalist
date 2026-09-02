@@ -19,6 +19,7 @@ import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
 import { scheduleOperations } from "./schedule.js"
 import type { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
+import type { Checkpoint as GateCheckpoint } from "../../agent/gates/definition.js"
 export type { OperationSpec } from "./operation.js"
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
 /** Recorded operation for tests and future runtime journaling. */
@@ -88,6 +89,9 @@ export interface Service {
   readonly recordHookDecisions: (
     checkpoint: HookCheckpoint,
   ) => Effect.Effect<HookCheckpoint, DriverError | DriverStateInvalid>
+  readonly recordGateResult: (
+    checkpoint: GateCheckpoint,
+  ) => Effect.Effect<GateCheckpoint, DriverError | DriverStateInvalid>
   readonly recorded: Effect.Effect<ReadonlyArray<RecordedOperation>>
   readonly abortPending: (
     error: OperationFailure,
@@ -393,6 +397,23 @@ export const make = (input: {
             yield* Ref.set(checkpointRef, next)
             yield* journal.onCheckpoint(next)
             return hookCheckpoint
+          }),
+        ),
+      recordGateResult: (gateCheckpoint) =>
+        commitSemaphore.withPermit(
+          Effect.gen(function* () {
+            const current = yield* Ref.get(checkpointRef)
+            const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+              Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+            )
+            const existingIndex = state.gates?.findIndex((entry) => entry.key === gateCheckpoint.key) ?? -1
+            const existing = state.gates?.[existingIndex]
+            if (existing !== undefined) return existing
+            const gates = [...(state.gates ?? []), gateCheckpoint]
+            const next = { ...current, state: { ...state, gates } }
+            yield* Ref.set(checkpointRef, next)
+            yield* journal.onCheckpoint(next)
+            return gateCheckpoint
           }),
         ),
       abortPending: (error) =>

@@ -142,11 +142,26 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         ...claim,
         event: { _tag: "TurnCompleted", turn: 2, usage },
       })
+      yield* store.emitAgentEvent({
+        ...claim,
+        event: {
+          _tag: "GateResult",
+          turn: 2,
+          name: "quality",
+          verdict: "pass",
+          evidence: { score: 1 },
+        },
+      })
       const snapshot = yield* runtime.snapshot(receipt.runId)
       expect(snapshot.turn).toBe(2)
       expect(snapshot.usage.map((fact) => fact._tag)).toEqual(["Completed", "Failed"])
       expect(snapshot.usage[0]).toMatchObject({ provider: "provider", model: "model", requestId: "request:1" })
-      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ turn: 2, usage: snapshot.usage })
+      expect(snapshot.gates).toEqual([{ name: "quality", verdict: "pass", evidence: { score: 1 } }])
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
+        turn: 2,
+        usage: snapshot.usage,
+        gates: snapshot.gates,
+      })
     }),
   )
 

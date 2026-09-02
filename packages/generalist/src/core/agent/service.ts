@@ -24,6 +24,14 @@ import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/ru
 import { encode as encodeInput } from "./lifecycle/input.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
+import {
+  validateAgentGates,
+  type Any as AnyGate,
+  type FailureMode as GateFailureMode,
+  type Gate,
+  type Requirements as GateRequirements,
+} from "./gates/definition.js"
+import type { SandboxService } from "../../sandbox/service.js"
 
 export {
   AgentTypeId,
@@ -78,6 +86,9 @@ export interface MakeOptions<
   readonly toolScheduling?: ToolSchedulingPolicy
   readonly metadata?: AgentMetadata
   readonly budget?: BudgetLimits
+  readonly gates?: ReadonlyArray<Gate<OutputSchema["Type"], unknown>>
+  readonly onGateFailure?: GateFailureMode
+  readonly sandbox?: SandboxService
 }
 
 /** Agent options with ordered static declarations instead of a pre-built toolkit. */
@@ -105,6 +116,11 @@ type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends
 type MemoryRequirement<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
 type PolicyRequirement<O> = O extends { readonly policy: Policy<infer R> } ? R : never
 type AuthorizationRequirement<O> = O extends { readonly authorization: Authorizer<infer R> } ? R : never
+type GateRequirement<O> = O extends { readonly gates: ReadonlyArray<infer G> }
+  ? unknown extends GateRequirements<G>
+    ? never
+    : GateRequirements<G>
+  : never
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
@@ -116,25 +132,39 @@ type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | MemoryRequirement<O>
   | PolicyRequirement<O>
   | AuthorizationRequirement<O>
+  | GateRequirement<O>
   | InputCodecOf<O>["EncodingServices"]
   | OutputCodecOf<O>["DecodingServices"]
   | OutputCodecOf<O>["EncodingServices"]
 interface MakeImplementationResult {
   readonly name: string
 }
+type MakeOptionsConstraint<Tools extends Record<string, Tool.Any>> = Omit<
+  MakeOptions<Tools, unknown, unknown, Schema.Top, Schema.Top>,
+  "gates"
+> & { readonly gates?: ReadonlyArray<AnyGate> }
+type MakeToolsOptionsConstraint<StaticTools extends ReadonlyArray<Tool.Any>> = Omit<
+  MakeToolsOptions<StaticTools, unknown, unknown, Schema.Top, Schema.Top>,
+  "gates"
+> & { readonly gates?: ReadonlyArray<AnyGate> }
+type PredicateResult = ReturnType<Extract<AnyGate, { readonly _tag: "Predicate" }>["check"]>
+type GateOutputConstraint<O> = {
+  readonly gates?: ReadonlyArray<
+    | { readonly _tag: "Command" }
+    | { readonly _tag: "Verifier" }
+    | {
+        readonly _tag: "Predicate"
+        readonly check: (output: OutputCodecOf<NoInfer<O>>["Type"]) => PredicateResult
+      }
+  >
+}
 
 /** Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsOptions<
-    StaticTools,
-    unknown,
-    unknown,
-    Schema.Top,
-    Schema.Top
-  > = MakeToolsOptions<StaticTools>,
+  const O extends MakeToolsOptionsConstraint<StaticTools> = MakeToolsOptions<StaticTools>,
 >(
-  options: MakeToolsOptions<StaticTools, unknown, unknown, Schema.Top, Schema.Top> & O,
+  options: MakeToolsOptionsConstraint<StaticTools> & O & GateOutputConstraint<O>,
 ): Agent<
   Toolkit.ToolsByName<StaticTools>,
   OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>,
@@ -145,9 +175,9 @@ export function make<
 >
 export function make<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
-  const O extends MakeOptions<Tools, unknown, unknown, Schema.Top, Schema.Top> = MakeOptions<Tools>,
+  const O extends MakeOptionsConstraint<Tools> = MakeOptions<Tools>,
 >(
-  options: MakeOptions<Tools, unknown, unknown, Schema.Top, Schema.Top> & O,
+  options: MakeOptionsConstraint<Tools> & O & GateOutputConstraint<O>,
 ): Agent<
   Tools,
   OptionRequirements<Tools, O>,
@@ -170,6 +200,9 @@ export function make<
   const declaredTools: ReadonlyArray<Tool.Any> | undefined =
     "tools" in options && Array.isArray(options.tools) ? options.tools : undefined
   const toolkit = declaredTools === undefined ? (options.toolkit ?? Toolkit.empty) : Toolkit.make(...declaredTools)
+  const gates = options.gates ?? []
+  const onGateFailure = options.onGateFailure ?? "fail"
+  validateAgentGates({ gates, sandbox: options.sandbox, failureMode: onGateFailure })
   if (declaredTools !== undefined) {
     for (const tool of declaredTools) {
       const toolName = Schema.decodeSync(Schema.Struct({ name: Schema.String }))(tool).name
@@ -197,6 +230,10 @@ export function make<
     toolScheduling: options.toolScheduling ?? defaultToolScheduling,
     metadata: options.metadata,
     budget: options.budget,
+    // SAFETY: MakeOptionsConstraint accepts only Gate values and Agent.make preserves their declaration order.
+    gates: gates as ReadonlyArray<AnyGate>,
+    onGateFailure,
+    sandbox: options.sandbox,
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map(
       (tool): ToolDeclaration => ({
         tool,

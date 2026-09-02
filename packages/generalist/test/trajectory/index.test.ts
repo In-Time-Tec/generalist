@@ -110,6 +110,7 @@ const snapshot: RunSnapshot = {
   ],
   budget: { tokens: 94 },
   compactions: [],
+  gates: [{ name: "quality", verdict: "pass", evidence: { score: 1 } }],
 }
 const inputEntry = {
   _tag: "Message" as const,
@@ -133,6 +134,15 @@ it.effect("projects a recorded journal to stable JSON", () =>
         "budget": {
           "tokens": 100,
         },
+        "gates": [
+          {
+            "evidence": {
+              "score": 1,
+            },
+            "name": "quality",
+            "verdict": "pass",
+          },
+        ],
         "input": {
           "content": [
             {

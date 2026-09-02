@@ -47,6 +47,8 @@ Declarations run in registration order. Each declaration sees replacements and a
 
 With a durable driver, each returned decision is appended to `LoopDriverState` through the existing checkpoint journal before the next declaration runs. Recovery applies the recorded decision prefix; a completed chain, including a recorded `Block`, does not invoke its hooks again. Tool replacements retain the model-authored call separately from the effective call so approval suspension can validate the original transcript and resume the replaced arguments.
 
+Completion gates run before `onRunEnd`. A rejected completion therefore does not invoke the terminal hook. Once every gate passes, `onRunEnd` remains the boundary immediately before `Completed`; its trusted replacement becomes the final output without re-running the gates.
+
 Replacement values cross the durable checkpoint boundary. Durable applications should therefore return values accepted by their event's public Schema and by the host's serialized checkpoint format.
 
 ## Model middleware
@@ -73,6 +75,7 @@ Hook defects and typed failures are both captured as `HookFailed`; interruption 
 ## Invariants
 
 - Hook state is part of the existing driver checkpoint and operation journal; there is no hook store or event journal.
+- `onRunEnd` runs once for an accepted completion, after ordered gate decisions and before `Completed`.
 - Run, turn, model, compaction, steering, and terminal replacements remain inside the Agent's existing Prompt and output contracts.
 - A blocked ToolCall does not authorize or dispatch its handler. Its journaled domain failure still enters the authoritative tool result and next model prompt.
 - Process-local `AgentTool` children and Runtime singleton or grouped children use `ChildStart` and `ChildEnd` from the same Hooks service.

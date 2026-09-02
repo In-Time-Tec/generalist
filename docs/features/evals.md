@@ -19,7 +19,7 @@ const program = Effect.gen(function* () {
 
 `fromJournal` uses only the Runtime's cross-driver read surface: `snapshot`, bounded `history`, `sessionEntry`, and `resolveModelResponse`. It does not read a driver or operation store directly. Each turn contains the exact Session projection before the model response, the resolved normalized response, framework tool calls and results, raw per-attempt usage, and the last compaction for that turn.
 
-The input is the durable `Prompt` before the first model response. Runtime encodes typed Agent input into that prompt before admission, so an arbitrary pre-encoding JavaScript value cannot be reconstructed later. Output is the encoded terminal Agent output. Failed, cancelled, and nonterminal snapshots use `null` output and their Runtime status as the stop reason.
+The input is the durable `Prompt` before the first model response. Runtime encodes typed Agent input into that prompt before admission, so an arbitrary pre-encoding JavaScript value cannot be reconstructed later. Output is the encoded terminal Agent output. Failed, cancelled, and nonterminal snapshots use `null` output and their Runtime status as the stop reason. `gates` contains every ordered journaled completion-gate verdict, including rejected attempts that later retried.
 
 The optional `budget` currently records a non-empty Agent budget allocation from the executable manifest. It intentionally does not infer remaining spend from partial facts. The future journaled budget/spend projection can replace that optional field without changing drivers.
 
@@ -56,7 +56,12 @@ const program = Effect.gen(function* () {
   return yield* Eval.runSuite(
     triage,
     ["classify incident A", "classify incident B"],
-    [Eval.outputMatches(Schema.String), Eval.toolCalledAtMost("search", 0), Eval.usageUnder({ tokens: 100 })],
+    [
+      Eval.outputMatches(Schema.String),
+      Eval.gatesPassed(),
+      Eval.toolCalledAtMost("search", 0),
+      Eval.usageUnder({ tokens: 100 }),
+    ],
     { concurrency: 2 },
   ).pipe(Effect.provide(Layer.merge(runtime, model.layer)))
 })
@@ -65,5 +70,7 @@ const program = Effect.gen(function* () {
 `runSuite` returns `Eval.SuiteResult`, prints a plain-text pass/fail table, and bounds concurrent Runs by the supplied positive integer. The docs app has HTML prose-table rendering but no reusable terminal table formatter, so the package owns this small plain-text rendering.
 
 `Eval.judge({ rubric, model })` uses `LanguageModel.generateObject` and therefore keeps `LanguageModel.LanguageModel` in the Effect requirement channel. `model` is the stable judge label included in score output; provide the corresponding model Layer at the call boundary.
+
+`Eval.gatesPassed()` evaluates the latest verdict for each gate name, so a rejected attempt followed by a passing retry passes the scorer. No configured gates pass vacuously.
 
 USD checks use a provided `ModelCatalog` when available and otherwise the bundled catalog. Since the current catalog has no `cost` operation, the scorer computes the same price components from catalog metadata. Missing model identity, model metadata, or a required price produces unknown cost and a failed USD score rather than treating unknown as zero.

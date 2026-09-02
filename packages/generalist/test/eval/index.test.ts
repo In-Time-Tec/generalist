@@ -4,6 +4,7 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
 import {
   SuiteResult,
+  gatesPassed,
   judge,
   outputMatches,
   runSuite,
@@ -22,6 +23,7 @@ const trajectory: Trajectory = {
   agent: "triage",
   input: Prompt.make("triage"),
   output: { severity: "high" },
+  gates: [],
   stopReason: "stop",
   turns: [
     {
@@ -65,6 +67,32 @@ it.effect("scores output schemas deterministically", () =>
     ])
     expect(pass?.passed).toBe(true)
     expect(fail?.passed).toBe(false)
+  }),
+)
+
+it.effect("scores the latest completion-gate verdicts", () =>
+  Effect.gen(function* () {
+    const [passed, failed] = yield* score(
+      {
+        ...trajectory,
+        gates: [
+          { name: "quality", verdict: "fail", evidence: "first" },
+          { name: "quality", verdict: "pass", evidence: "retry" },
+        ],
+      },
+      [gatesPassed()],
+    ).pipe(
+      Effect.zip(
+        score({ ...trajectory, gates: [{ name: "quality", verdict: "fail", evidence: "rejected" }] }, [gatesPassed()]),
+      ),
+      Effect.map(([latestPass, latestFail]) => [latestPass[0], latestFail[0]] as const),
+    )
+    expect(passed).toMatchObject({ scorer: "gatesPassed", passed: true })
+    expect(failed).toMatchObject({
+      scorer: "gatesPassed",
+      passed: false,
+      message: "Failed completion gate(s): quality",
+    })
   }),
 )
 

@@ -4,6 +4,7 @@ import { AgentSuspended } from "../../../core/agent/event.js"
 import { BudgetExhausted, Exhausted } from "../../../core/durable/run-budget.js"
 import { DriverCheckpoint } from "../../../core/durable/driver.js"
 import { Suspended as NestedOperationSuspended } from "../../../core/tools/nested-operation.js"
+import { DriverError } from "../../../core/durable/service.js"
 import { RunTerminal } from "../../errors.js"
 import type { ExecutionContinuation } from "../../run/steering.js"
 import type { make as makeAgentRunOptions } from "../agent/run-options.js"
@@ -48,7 +49,8 @@ export const suspendedReason = (
   if (agent !== undefined) return agent
   const nested = Schema.decodeUnknownOption(NestedOperationSuspended)(reason.error).pipe(Option.getOrUndefined)
   if (nested !== undefined) return nested
-  const budget = Schema.decodeUnknownOption(Exhausted)(reason.error).pipe(Option.getOrUndefined)
+  const driver = Schema.is(DriverError)(reason.error) ? reason.error : undefined
+  const budget = Schema.decodeUnknownOption(Exhausted)(driver?.cause ?? reason.error).pipe(Option.getOrUndefined)
   return budget === undefined ? undefined : { _tag: "BudgetExhausted", budget: budget.budget }
 }
 

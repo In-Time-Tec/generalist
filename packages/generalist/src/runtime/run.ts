@@ -27,6 +27,7 @@ import {
 import { TreePolicy } from "./tree/policy.js"
 import { ChildReadiness } from "./child/readiness.js"
 import { Remaining as RemainingBudget, type Remaining } from "../core/durable/run-budget.js"
+import { Result as CompletionGateResult, type Result as GateResult } from "../core/agent/gates/definition.js"
 
 export const ExecutionResult = ExecutionResultSchema
 export type ExecutionResult = ExecutionResultType
@@ -300,15 +301,18 @@ export interface RunSnapshot {
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly budget: Remaining
   readonly compactions: ReadonlyArray<CompactionInspection>
+  readonly gates: ReadonlyArray<GateResult>
 }
 
 /** Encoded durable Run snapshot. */
-interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
+interface RunSnapshotEncoded
+  extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions" | "gates"> {
   readonly run: RunInspectionEncoded
   readonly cursor: typeof Cursor.Encoded
   readonly outcome?: RunOutcomeEncoded
   readonly usage: ReadonlyArray<RawUsageFactEncoded>
   readonly compactions: ReadonlyArray<CompactionInspectionEncoded>
+  readonly gates: ReadonlyArray<typeof CompletionGateResult.Encoded>
 }
 
 export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema.Struct({
@@ -319,6 +323,7 @@ export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema
   usage: Schema.Array(RawUsageFact),
   budget: RemainingBudget,
   compactions: Schema.Array(CompactionInspection),
+  gates: Schema.Array(CompletionGateResult),
 })
 
 export interface Run {

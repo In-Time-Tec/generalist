@@ -10,8 +10,8 @@ import {
   PolicyStopped,
 } from "../../../core/agent/event.js"
 import { Exhausted } from "../../../core/durable/run-budget.js"
-import { PermissionDenied } from "../../../core/tools/tool-authorization.js"
-import { AgentExecutionFailure } from "../../errors.js"
+import { GateFailed } from "../../../core/agent/gates/definition.js"
+import { AgentExecutionFailure, StructuredAgentFailure } from "../../errors.js"
 import { HookFailed } from "../../../hooks/index.js"
 
 const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; readonly tool_call_id: string }>): string =>
@@ -27,6 +27,7 @@ const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; reado
 const SummaryFailure = Schema.Union([
   Exhausted,
   HookFailed,
+  GateFailed,
   ResumeMismatch,
   TurnLimitExceeded,
   PolicyStopped,
@@ -41,6 +42,9 @@ type SummaryFailure = typeof SummaryFailure.Type
 const summary = (failure: SummaryFailure): string | undefined => {
   if (Schema.is(HookFailed)(failure)) {
     return `${failure.event} hook failed: ${failure.hint}`
+  }
+  if (Schema.is(GateFailed)(failure)) {
+    return `Completion gate ${failure.gate.name} failed: ${JSON.stringify(failure.gate.evidence)}`
   }
   if (Schema.is(Exhausted)(failure)) {
     const remaining = failure.remaining === undefined ? "unavailable" : failure.remaining
@@ -77,8 +81,8 @@ const summary = (failure: SummaryFailure): string | undefined => {
 const typedFailure = (cause: Cause.Cause<unknown>) => {
   const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
   if (reason === undefined || !Cause.isFailReason(reason)) return undefined
-  return Schema.decodeUnknownOption(Schema.Union([Exhausted, PermissionDenied, ResumeMismatch]))(reason.error).pipe(
-    (decoded) => (decoded._tag === "Some" ? decoded.value : undefined),
+  return Schema.decodeUnknownOption(StructuredAgentFailure)(reason.error).pipe((decoded) =>
+    decoded._tag === "Some" ? decoded.value : undefined,
   )
 }
 
