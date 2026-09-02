@@ -53,7 +53,7 @@ const tar = (files: ReadonlyArray<TarFile>, root: string): Uint8Array => {
 const fixtureArchive = Effect.fn("fixtureArchive")(function* () {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const entries = ["AGENTS.md", "dist/tools.js", "package.json", "skills/review/SKILL.md"]
+  const entries = ["AGENTS.md", "package.json", "skills/review/SKILL.md", "tools.js"]
   const files: Array<TarFile> = []
   for (const entry of entries) {
     const source = path.join(fixtureRoot, entry)

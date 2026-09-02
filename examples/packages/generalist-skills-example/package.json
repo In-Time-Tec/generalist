@@ -6,8 +6,8 @@
   "type": "module",
   "files": [
     "AGENTS.md",
-    "dist",
-    "skills"
+    "skills",
+    "tools.js"
   ],
   "peerDependencies": {
     "effect": "^4.0.0-rc.112"
@@ -19,6 +19,6 @@
     "skills": [
       "skills/*/SKILL.md"
     ],
-    "tools": "dist/tools.js"
+    "tools": "tools.js"
   }
 }
