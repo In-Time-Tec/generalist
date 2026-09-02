@@ -176,7 +176,8 @@ jobs:
 
   publish:
     needs: produce
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # npm provenance requires a GitHub-hosted runner; Blacksmith runners register as self-hosted.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
