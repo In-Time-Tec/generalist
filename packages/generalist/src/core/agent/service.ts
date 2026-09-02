@@ -1,7 +1,7 @@
-import { Effect, type Layer, Option, Schema, Stream, Types } from "effect"
+import { Effect, type Layer, Option, Predicate, Schema, Stream, Types } from "effect"
 import { dual } from "effect/Function"
 import { LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError, type AgentSuspended, type Completed, type Event, type ToolOrigin } from "./event.js"
+import { AgentError, type AgentSuspended, type Event, type ToolOrigin } from "./event.js"
 import type { BudgetLimits, RunBudget } from "../durable/run-budget.js"
 import type { DriverCheckpoint } from "../durable/driver/contract.js"
 import { type Key, Memory } from "../context/memory.js"
@@ -13,12 +13,13 @@ import type { RunId as RunIdType } from "../durable/run-id.js"
 import { RunError } from "./run/error.js"
 
 import { allocateRun, defaultObjectPrompt, type RunHandle } from "./lifecycle/run-handle.js"
+import { encode as encodeInput } from "./lifecycle/input.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
-import type { ObjectSchema } from "./loop/context.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
 
 export { close, withTools } from "./lifecycle/definition.js"
 export { ResumeResolution, type WithModelDefault } from "./lifecycle/resume.js"
+export { start, type StartEvent, type StartOptions } from "./lifecycle/start.js"
 export { streamToolCalls } from "./tool-calls.js"
 export { defaultObjectPrompt, type RunHandle }
 /** @experimental Allocate one scoped Run and its producer handle before consuming its event stream. */
@@ -37,8 +38,10 @@ export interface HandoffAgent<R> {
 export interface Agent<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   R = LanguageModel.LanguageModel,
-  PolicyServices = R,
-  AuthorizationServices = R,
+  PolicyServices extends R = R,
+  AuthorizationServices extends R = R,
+  InputSchema extends Schema.Top = Schema.Top,
+  OutputSchema extends Schema.Top = Schema.Top,
 > {
   readonly handoff: <A>(f: (agent: HandoffAgent<R>) => A) => A
   readonly [AgentTypeId]: {
@@ -46,6 +49,8 @@ export interface Agent<
     readonly requirements: Types.Invariant<R>
   }
   readonly name: string
+  readonly input: InputSchema
+  readonly output: OutputSchema
   readonly instructions?: string
   readonly supplemental?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
@@ -78,6 +83,8 @@ export interface ToolDeclaration {
 export interface Any {
   readonly [AgentTypeId]: unknown
   readonly name: string
+  readonly input: Schema.Top
+  readonly output: Schema.Top
   readonly instructions?: string
   readonly toolkit: Toolkit.Any
   readonly policy: Policy<unknown>
@@ -95,8 +102,8 @@ export type ClosedServices<Tools extends Record<string, Tool.Any>, R> =
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 /** @experimental Consumer of a hidden Agent identity and its environment. */
 export interface Opened<A> {
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  <Tools extends Record<string, Tool.Any>, R, InputSchema extends Schema.Top, OutputSchema extends Schema.Top>(
+    agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
     environment: Layer.Layer<ClosedServices<Tools, R>>,
   ): A
 }
@@ -106,14 +113,29 @@ export interface Closed extends Any {
 }
 /** @experimental Extract an agent's runtime requirements. */
 export type Requirements<A> = A extends Agent<infer _Tools, infer R> ? R : never
+/** @experimental Extract an Agent's decoded input type. */
+export type Input<A> = A extends { readonly input: infer InputCodec extends Schema.Top } ? InputCodec["Type"] : never
+/** @experimental Extract an Agent's encoded input type. */
+export type EncodedInput<A> =
+  A extends { readonly input: infer InputCodec extends Schema.Top } ? InputCodec["Encoded"] : never
+/** @experimental Extract an Agent's decoded output type. */
+export type Output<A> =
+  A extends { readonly output: infer OutputCodec extends Schema.Top } ? OutputCodec["Type"] : never
+/** @experimental Extract an Agent's encoded output type. */
+export type EncodedOutput<A> =
+  A extends { readonly output: infer OutputCodec extends Schema.Top } ? OutputCodec["Encoded"] : never
 
 /** @experimental */
 export interface MakeOptions<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   PolicyServices = never,
   AuthorizationServices = never,
+  InputSchema extends Schema.Top = typeof Schema.String,
+  OutputSchema extends Schema.Top = typeof Schema.String,
 > {
   readonly name: string
+  readonly input?: InputSchema
+  readonly output?: OutputSchema
   readonly instructions?: string
   readonly supplemental?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
@@ -132,7 +154,12 @@ export interface MakeToolsOptions<
   StaticTools extends ReadonlyArray<Tool.Any>,
   PolicyServices = never,
   AuthorizationServices = never,
-> extends Omit<MakeOptions<Record<never, never>, PolicyServices, AuthorizationServices>, "toolkit" | "tools"> {
+  InputSchema extends Schema.Top = typeof Schema.String,
+  OutputSchema extends Schema.Top = typeof Schema.String,
+> extends Omit<
+    MakeOptions<Record<never, never>, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
+    "toolkit" | "tools"
+  > {
   readonly tools: StaticTools
   readonly toolkit?: never
 }
@@ -147,6 +174,8 @@ type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends
 type MemoryRequirement<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
 type PolicyRequirement<O> = O extends { readonly policy: Policy<infer R> } ? R : never
 type AuthorizationRequirement<O> = O extends { readonly authorization: Authorizer<infer R> } ? R : never
+type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
+type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
@@ -156,6 +185,9 @@ type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | MemoryRequirement<O>
   | PolicyRequirement<O>
   | AuthorizationRequirement<O>
+  | InputCodecOf<O>["EncodingServices"]
+  | OutputCodecOf<O>["DecodingServices"]
+  | OutputCodecOf<O>["EncodingServices"]
 interface MakeImplementationResult {
   readonly name: string
 }
@@ -163,29 +195,46 @@ interface MakeImplementationResult {
 /** @experimental Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsOptions<StaticTools, unknown, unknown> = MakeToolsOptions<StaticTools>,
+  const O extends MakeToolsOptions<
+    StaticTools,
+    unknown,
+    unknown,
+    Schema.Top,
+    Schema.Top
+  > = MakeToolsOptions<StaticTools>,
 >(
-  options: MakeToolsOptions<StaticTools, unknown, unknown> & O,
+  options: MakeToolsOptions<StaticTools, unknown, unknown, Schema.Top, Schema.Top> & O,
 ): Agent<
   Toolkit.ToolsByName<StaticTools>,
   OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>,
   PolicyRequirement<O>,
-  AuthorizationRequirement<O>
+  AuthorizationRequirement<O>,
+  InputCodecOf<O>,
+  OutputCodecOf<O>
 >
 export function make<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
-  const O extends MakeOptions<Tools, unknown, unknown> = MakeOptions<Tools>,
+  const O extends MakeOptions<Tools, unknown, unknown, Schema.Top, Schema.Top> = MakeOptions<Tools>,
 >(
-  options: MakeOptions<Tools, unknown, unknown> & O,
-): Agent<Tools, OptionRequirements<Tools, O>, PolicyRequirement<O>, AuthorizationRequirement<O>>
+  options: MakeOptions<Tools, unknown, unknown, Schema.Top, Schema.Top> & O,
+): Agent<
+  Tools,
+  OptionRequirements<Tools, O>,
+  PolicyRequirement<O>,
+  AuthorizationRequirement<O>,
+  InputCodecOf<O>,
+  OutputCodecOf<O>
+>
 export function make<
   Tools extends Record<string, Tool.Any> = Record<never, never>,
   PolicyServices = never,
   AuthorizationServices = never,
+  InputSchema extends Schema.Top = typeof Schema.String,
+  OutputSchema extends Schema.Top = typeof Schema.String,
 >(
   options:
-    | MakeOptions<Tools, PolicyServices, AuthorizationServices>
-    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices>,
+    | MakeOptions<Tools, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>
+    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
 ): MakeImplementationResult {
   const declaredTools: ReadonlyArray<Tool.Any> | undefined =
     "tools" in options && Array.isArray(options.tools) ? options.tools : undefined
@@ -205,6 +254,8 @@ export function make<
   }
   const definition = {
     name: options.name,
+    input: options.input ?? Schema.String,
+    output: options.output ?? Schema.String,
     instructions: options.instructions,
     supplemental: options.supplemental,
     toolkit,
@@ -253,9 +304,9 @@ export type ProgressOverflowPolicy =
   | { readonly _tag: "Sliding"; readonly capacity: number }
   | { readonly _tag: "Fail"; readonly capacity: number }
 
-/** @experimental Options for an agent run. Set `output` for structured output. */
+/** @experimental Internal prompt-level options for an Agent run. */
 export interface RunOptions {
-  /** User input for the first turn. Ignored when `resume` is set. */
+  /** Schema-encoded Agent input for the first turn. Ignored when `resume` is set. */
   readonly prompt: Prompt.RawInput
   /**
    * Prior transcript. When set it is used VERBATIM as the initial chat
@@ -306,125 +357,134 @@ export interface RunOptions {
   readonly memory?: {
     readonly key: Key
   }
-  readonly output?: {
-    readonly schema: ObjectSchema
-    readonly name?: string
-    readonly prompt?: Prompt.RawInput
-  }
 }
 
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 export { RunError }
 
-/** @experimental Result of a non-streaming run. */
-export interface Result {
-  readonly text: string
-  readonly turns: number
-  readonly transcript: Prompt.Prompt
-}
-
-/** @experimental Result of a non-streaming structured-output run. */
-export interface ObjectResult<A> extends Result {
-  readonly value: A
-}
-type SchemaFromOutput<Output> = Output extends { readonly schema: infer S extends ObjectSchema } ? S : never
-type SchemaOf<O> = SchemaFromOutput<PresentOption<O, "output">>
-type SchemaServicesD<S extends ObjectSchema> = [unknown] extends [S["DecodingServices"]] ? never : S["DecodingServices"]
-type OutputRequirement<O> = [SchemaOf<O>] extends [never] ? never : SchemaServicesD<SchemaOf<O>>
+/** @experimental Per-invocation options after the Agent input has moved to the second argument. */
+export type InvocationOptions = Omit<RunOptions, "prompt">
 
 /** @experimental Services required by one run option set. */
 export type RunRequirements<Tools extends Record<string, Tool.Any>, R, O> =
   | R
   | StaticToolServices<Tools>
   | OperationRequirements<O>
-  | OutputRequirement<O>
 
-/** @experimental Result selected by one run option set. */
-export type RunResult<O> = O extends unknown
-  ? O extends { readonly output: { readonly schema: infer S extends ObjectSchema } }
-    ? ObjectResult<S["Type"]>
-    : [SchemaOf<O>] extends [never]
-      ? Result
-      : Result | ObjectResult<SchemaOf<O>["Type"]>
-  : never
+const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
 
-/** @experimental Stream an agent run as Events. Set options.output for structured output. */
-export const stream: {
-  <O extends RunOptions>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Stream.Stream<Event, RunError, RunRequirements<Tools, R, O>>
-  <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Stream.Stream<Event, RunError, RunRequirements<Tools, R, O>>
-} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  Stream.scoped(Stream.unwrap(allocateRun(agent, options).pipe(Effect.map((run) => run.events)))),
-)
+interface StreamFunction {
+  <InputValue, O extends InvocationOptions = Record<never, never>>(
+    input: InputValue,
+    options?: O,
+  ): <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: InputValue extends InputCodec["Type"]
+      ? Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>
+      : never,
+  ) => Stream.Stream<Event<OutputCodec["Type"]>, RunError, RunRequirements<Tools, R, O>>
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+    O extends InvocationOptions = Record<never, never>,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+    input: InputCodec["Type"],
+    options?: O,
+  ): Stream.Stream<Event<OutputCodec["Type"]>, RunError, RunRequirements<Tools, R, O>>
+}
 
-const generateText = <R>(events: Stream.Stream<Event, RunError, R>) =>
-  Stream.runLast(events).pipe(
-    Effect.flatMap(
-      Option.match({
-        onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
-        onSome: (event) =>
-          event._tag === "Completed"
-            ? Effect.succeed({ text: event.text, turns: event.turns, transcript: event.transcript })
-            : Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
-      }),
-    ),
-  )
-
-const generateObjectResult = <R>(events: Stream.Stream<Event, RunError, R>) =>
-  Stream.runFold(
-    events,
-    () => ({ value: Option.none<unknown>(), completed: Option.none<Completed>() }),
-    (acc, event) => {
-      if (event._tag === "StructuredOutput") return { ...acc, value: Option.some(event.value) }
-      if (event._tag === "Completed") return { ...acc, completed: Option.some(event) }
-      return acc
-    },
-  ).pipe(
-    Effect.flatMap(({ value, completed }) =>
-      Option.match(completed, {
-        onNone: () =>
-          Effect.fail(AgentError.make({ message: "Agent object run ended without a Completed event", turn: 0 })),
-        onSome: (event) =>
-          Option.match(value, {
-            onNone: () =>
-              Effect.fail(
-                AgentError.make({ message: "Agent object run ended without a StructuredOutput event", turn: 0 }),
-              ),
-            onSome: (typedValue) =>
-              Effect.succeed({
-                text: event.text,
-                turns: event.turns,
-                transcript: event.transcript,
-                value: typedValue,
-              }),
-          }),
-      }),
-    ),
-  )
-
-/** @experimental Run an agent to completion. Returns ObjectResult when options.output is set, otherwise Result. */
-export const generate: {
-  <O extends RunOptions>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Effect.Effect<RunResult<O>, RunError, RunRequirements<Tools, R, O>>
-  <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Effect.Effect<RunResult<O>, RunError, RunRequirements<Tools, R, O>>
-} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  Effect.scoped(
-    allocateRun(agent, options).pipe(
-      Effect.flatMap((run) =>
-        options.output === undefined ? generateText(run.events) : generateObjectResult(run.events),
+/** @experimental Stream an Agent run as Events ending in `Completed { output }`. */
+export const stream: StreamFunction = dual(
+  isDataFirst,
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+    input: InputCodec["Type"],
+    options: InvocationOptions = {},
+  ) =>
+    Stream.unwrap(
+      encodeInput(agent.input, input).pipe(
+        Effect.map((prompt) =>
+          Stream.scoped(
+            Stream.unwrap(allocateRun(agent, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
+          ),
+        ),
       ),
     ),
-  ),
+)
+
+interface RunFunction {
+  <InputValue, O extends InvocationOptions = Record<never, never>>(
+    input: InputValue,
+    options?: O,
+  ): <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: InputValue extends InputCodec["Type"]
+      ? Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>
+      : never,
+  ) => Effect.Effect<OutputCodec["Type"], RunError, RunRequirements<Tools, R, O>>
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+    O extends InvocationOptions = Record<never, never>,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+    input: InputCodec["Type"],
+    options?: O,
+  ): Effect.Effect<OutputCodec["Type"], RunError, RunRequirements<Tools, R, O>>
+}
+
+/** @experimental Run an Agent to its schema-decoded output. */
+export const run: RunFunction = dual(
+  isDataFirst,
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputCodec extends Schema.Top,
+    OutputCodec extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
+    input: InputCodec["Type"],
+    options: InvocationOptions = {},
+  ) =>
+    Stream.runLast(stream(agent, input, options)).pipe(
+      Effect.flatMap(
+        Option.match({
+          onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
+          onSome: (event) =>
+            event._tag === "Completed"
+              ? Effect.succeed(event.output)
+              : Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
+        }),
+      ),
+    ),
 )

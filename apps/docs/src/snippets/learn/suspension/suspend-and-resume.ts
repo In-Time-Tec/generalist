@@ -69,7 +69,7 @@ const layers = Layer.mergeAll(
 let transcript: Prompt.Prompt = Prompt.empty
 
 const program = Effect.gen(function* () {
-  const suspension = yield* Agent.stream(agent, { prompt: "Deploy the api service." }).pipe(
+  const suspension = yield* Agent.stream(agent, "Deploy the api service.").pipe(
     Stream.runForEach((event) =>
       Effect.sync(() => {
         if (event._tag === "TurnCompleted") transcript = event.transcript
@@ -86,15 +86,14 @@ const program = Effect.gen(function* () {
     return yield* Effect.die("expected an approval wait")
   }
   yield* Console.log(`suspended reason=${wait.reason} tool=${wait.call.name} token=${wait.token}`)
-  const result = yield* Agent.generate(agent, {
-    prompt: "",
+  const result = yield* Agent.run(agent, "", {
     history: transcript,
     resume: {
       suspension,
       resolutions: [{ waitId: wait.waitId, resolution: { _tag: "Approved" } }],
     },
   })
-  yield* Console.log(result.text)
+  yield* Console.log(result)
 })
 
 const runtime = ManagedRuntime.make(layers)

@@ -1,6 +1,6 @@
 import { Cause, Effect, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
-import { AgentError, AgentSuspended, type Event, type StructuredOutput, DuplicateToolCallId } from "../event.js"
+import { AgentError, AgentSuspended, type Event, InvalidOutput, DuplicateToolCallId } from "../event.js"
 import {
   CurrentCompactionId,
   CurrentInstrumentation,
@@ -44,7 +44,7 @@ interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<
 }
 const requiredField = <T, E, RD, RE>(schema: Schema.Codec<T, E, RD, RE>): RequiredFieldCodec<T, E, RD, RE> =>
   Schema.make<RequiredFieldCodec<T, E, RD, RE>>(schema.ast, { schema })
-const StructuredOutputError = Schema.Union([AgentError, AiError.AiError, LanguageModelNotRegistered])
+const StructuredOutputError = Schema.Union([AgentError, InvalidOutput, AiError.AiError, LanguageModelNotRegistered])
 const structuredResponseSchema = <S extends ObjectSchema>(
   schema: S,
 ): Schema.Codec<
@@ -83,7 +83,6 @@ export const make = <
     applyCompactionResult,
     deliverPending,
     flushTelemetry,
-    telemetryIdentity,
     checkpointSuspended,
     pendingResults,
     toolCallEvents,
@@ -127,8 +126,18 @@ export const make = <
             withModelTelemetry(structuredTurn, "structured-output"),
             withAgentModel,
             Effect.catchCause(
-              (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
+              (
+                cause,
+              ): Effect.Effect<never, AgentError | InvalidOutput | AiError.AiError | LanguageModelNotRegistered> => {
                 const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+                if (
+                  reason !== undefined &&
+                  Cause.isFailReason(reason) &&
+                  AiError.isAiError(reason.error) &&
+                  reason.error.reason._tag === "StructuredOutputError"
+                ) {
+                  return Effect.fail(InvalidOutput.make({ issues: [reason.error.reason.description] }))
+                }
                 return reason !== undefined && Cause.isFailReason(reason)
                   ? Effect.fail(
                       AgentError.make({
@@ -165,10 +174,6 @@ export const make = <
           return part
         })
         yield* captureStructuredUsage(content)
-        const structuredIdentity = telemetryIdentity.current
-        if (structuredIdentity === undefined) {
-          return yield* Effect.die(new globalThis.Error("Structured output model attempt identity is missing"))
-        }
         const transcript = Prompt.concat(Prompt.concat(history, transformedPrompt), Prompt.fromResponseParts(content))
         yield* applyCompactionResult(
           structuredTurn,
@@ -176,16 +181,9 @@ export const make = <
           (yield* syncSession(structuredTurn, history)).at(-1)?.id ?? null,
           "structured-output",
         )
-        const structuredOutput: StructuredOutput = {
-          _tag: "StructuredOutput",
-          turn: structuredTurn,
-          ...structuredIdentity,
-          value: response.value,
-          content,
-        }
         const completion = yield* inbox.complete
         if (completion._tag === "Closed") {
-          return [structuredOutput, terminalCompletedEvent(state, structuredTurn, transcript)]
+          return [terminalCompletedEvent(state, structuredTurn, transcript, config.output(response.value))]
         }
         onPending({ prompt: promptFromSteeringInputs(completion.inputs) })
         return [

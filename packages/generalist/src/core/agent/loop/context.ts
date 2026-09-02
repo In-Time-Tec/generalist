@@ -20,16 +20,16 @@ import type { RunInbox } from "../../turn/steering-inbox.js"
 import type { Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 
-export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, never, never>
+export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, unknown, unknown>
 export interface StructuredRunConfig<S extends ObjectSchema> {
   readonly schema: S
   readonly objectName: string
   readonly objectPrompt: Prompt.RawInput
+  readonly output: (value: S["Type"]) => unknown
 }
 /** @experimental Decoding services a structured-output schema requires, with an unconstrained schema contributing none. */
-export type SchemaServicesD<S extends ObjectSchema> = [unknown] extends [S["DecodingServices"]]
-  ? never
-  : S["DecodingServices"]
+export type SchemaServicesD<S extends ObjectSchema> = S["DecodingServices"]
+export type SchemaServicesE<S extends ObjectSchema> = S["EncodingServices"]
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
@@ -39,10 +39,11 @@ export type LoopServices<Tools extends Record<string, Tool.Any>, R, S extends Ob
   | R
   | StaticToolServices<Tools>
   | SchemaServicesD<S>
+  | SchemaServicesE<S>
   | DriverInterpreter
 
 /** @experimental Every service one model turn requires. */
-export type TurnServices<R, S extends ObjectSchema> = R | SchemaServicesD<S> | DriverInterpreter
+export type TurnServices<R, S extends ObjectSchema> = R | SchemaServicesD<S> | SchemaServicesE<S> | DriverInterpreter
 
 export type ToolState = {
   readonly registry: Registry

@@ -217,7 +217,7 @@ describe("prompt-cache", () => {
       })
       yield* Effect.scoped(
         Effect.flatMap(Layer.build(captureModel), (context) =>
-          Agent.generate(agent, { prompt: "fix the bug" }).pipe(Effect.provideContext(context)),
+          Agent.run(agent, "fix the bug").pipe(Effect.provideContext(context)),
         ),
       )
       const [prompt] = yield* Ref.get(sent)

@@ -13,9 +13,9 @@ const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(
 const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi))
 
 // Provide the model layer to exactly the run that should use it.
-const program = Agent.generate(agent, { prompt: "Name one Effect data type." }).pipe(
+const program = Agent.run(agent, "Name one Effect data type.").pipe(
   Effect.provide(sol),
-  Effect.flatMap((result) => Console.log(result.text)),
+  Effect.flatMap((result) => Console.log(result)),
 )
 
 const runtimeLayer = Layer.mergeAll(

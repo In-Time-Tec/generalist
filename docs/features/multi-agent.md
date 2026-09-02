@@ -25,7 +25,7 @@ const supervisor = Handoff.supervisor({
   specialists: [Handoff.target(billingAgent, { model: billingModel })],
 })
 const handoffLayer = Layer.mergeAll(ToolExecutor.layerToolkit(supervisor.toolkit), supervisor.catalog)
-const run = Agent.generate(supervisor.agent, { prompt: "Refund order 42" })
+const run = Agent.run(supervisor.agent, "Refund order 42")
 ```
 
 Provide `handoffLayer` with the model, permissions, approvals, middleware, and target requirements. The model calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`. A child's `model` option is any closed `Layer<LanguageModel>` — typically a provider's `layerModel` over its `layerConfig` client; omitting it means the child inherits the ambient model.
@@ -33,7 +33,7 @@ Provide `handoffLayer` with the model, permissions, approvals, middleware, and t
 ## What runs
 
 ```text
-Agent.generate(front-desk)                 Run ID: run-1
+Agent.run(front-desk)                      Run ID: run-1
 └── model turn: front-desk
     └── tool call handoff_to_billing
         ├── resolve Catalog["billing"]
@@ -41,10 +41,10 @@ Agent.generate(front-desk)                 Run ID: run-1
         └── record "handoff"; commit active = "billing"
             └── model turn: billing           Run ID: run-1
 
-Agent.generate(parent)                     Run ID: run-2
+Agent.run(parent)                          Run ID: run-2
 └── tool call ask_billing
     ├── DriverInterpreter.reserveChild(...)
-    ├── Agent.generate(billing)             Run ID: run-3
+    ├── Agent.run(billing)                  Run ID: run-3
     └── DriverInterpreter.refundChild(...)
 ```
 

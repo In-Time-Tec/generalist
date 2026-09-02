@@ -74,10 +74,10 @@ layer(
       const fixture = yield* Fixture
       const agent = Agent.make({ name: "scripted-agent", toolkit: echoToolkit })
 
-      const result = yield* Agent.generate(agent, { prompt: "start" })
+      const result = yield* Agent.run(agent, "start")
       const requests = yield* fixture.requests
 
-      expect(result.text).toBe("done")
+      expect(result).toBe("done")
       expect(planExecuted).toEqual(["from model"])
       expect(requests.map((request) => request.operation)).toEqual(["streamText", "streamText"])
       expect(yield* jsonString(requests[1]?.prompt)).toContain("from model")
@@ -233,9 +233,7 @@ layer(Layer.empty)("Agent runs over a truncated provider stream", (it) => {
         ),
       )
       const events: Array<unknown> = []
-      const exit = yield* Agent.stream(Agent.make({ name: "truncated-agent", toolkit: echoToolkit }), {
-        prompt: "go",
-      }).pipe(
+      const exit = yield* Agent.stream(Agent.make({ name: "truncated-agent", toolkit: echoToolkit }), "go").pipe(
         Stream.tap((event) => Effect.sync(() => events.push(event))),
         Stream.runDrain,
         Effect.provide(services),
@@ -326,9 +324,10 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
           echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),
         ),
       )
-      const events = yield* Agent.stream(Agent.make({ name: "reasoning-agent", toolkit: echoToolkit }), {
-        prompt: "think",
-      }).pipe(Stream.runCollect, Effect.provide(services))
+      const events = yield* Agent.stream(Agent.make({ name: "reasoning-agent", toolkit: echoToolkit }), "think").pipe(
+        Stream.runCollect,
+        Effect.provide(services),
+      )
       const modelParts = events.filter((event) => event._tag === "ModelPart").map((event) => event.part)
       const requests = yield* fixture.requests
 

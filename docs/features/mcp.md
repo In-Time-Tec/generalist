@@ -21,7 +21,7 @@ const program = Effect.gen(function* () {
   const services = yield* Layer.build(
     Layer.mergeAll(tools.executorLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
   )
-  return yield* Agent.generate(agent, { prompt: "Add 20 and 22" }).pipe(Effect.provide(services))
+  return yield* Agent.run(agent, "Add 20 and 22").pipe(Effect.provide(services))
 }).pipe(Effect.scoped)
 ```
 
@@ -34,7 +34,7 @@ Effect.scoped(program)
     ├── Client.listTools()                 once
     │   └── "add" -> Effect AI "calc_add"
     └── MCPTools { toolkit, executorLayer }
-        └── Agent.generate("Add 20 and 22")
+        └── Agent.run("Add 20 and 22")
             └── ToolExecutor.execute("calc_add", { a: 20, b: 22 })
                 └── Client.callTool("add", { a: 20, b: 22 }) -> "42"
 └── scope release -> Client.close()

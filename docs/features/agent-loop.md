@@ -1,6 +1,6 @@
 # Agent loop
 
-An `Agent` is a plain definition; `Agent.stream` runs model turns, schedules framework tools, and emits the authoritative event stream. `Agent.generate` consumes that same stream into a final text or structured result.
+An `Agent` is a plain typed definition. It owns input/output schemas, instructions, tools, and policy. `Agent.stream` emits the authoritative event stream; `Agent.run` consumes that stream and returns the schema-decoded terminal output.
 
 ## Usage
 
@@ -15,16 +15,16 @@ const agent = Agent.make({
 })
 
 const program = Effect.gen(function* () {
-  const events = yield* Agent.stream(agent, { prompt: "Find toolkit docs" }).pipe(Stream.runCollect)
-  const result = yield* Agent.generate(agent, { prompt: "Summarize them" })
-  return { tags: events.map((event) => event._tag), answer: result.text }
+  const events = yield* Agent.stream(agent, "Find toolkit docs").pipe(Stream.runCollect)
+  const answer = yield* Agent.run(agent, "Summarize them")
+  return { tags: events.map((event) => event._tag), answer }
 })
 ```
 
 ## What runs
 
 ```text
-Agent.stream(agent, { prompt: "Find toolkit docs" })
+Agent.stream(agent, "Find toolkit docs")
 └── allocateRun()                         scoped Run ID + inbox
     └── TurnStarted { turn: 0 }
         └── instrumented model call
@@ -62,8 +62,8 @@ terminal unstructured turn
 - A later turn requires pending tool results accepted by policy, or steering/follow-up input committed at its boundary.
 - `Policy.forever` is the default and adds no follow-up cap; natural completion still occurs when no tool results or queued input remain.
 - `Policy.recurs(n)` caps follow-up turns; stopping with pending results fails as `TurnLimitExceeded` or `PolicyStopped` and never drops them.
-- `Agent.allocateRun` allocates one scoped process-local Run ID, lazy event stream, and producer-only `steer`/`followUp` handle; `stream` and `generate` are scoped projections of it.
-- `output` selects structured output; `history` seeds the process-local transcript verbatim; `sessionId` selects an authoritative Session, not an inbox.
+- `Agent.allocateRun` allocates one scoped process-local Run ID, lazy event stream, and producer-only `steer`/`followUp` handle; `stream` and `run` are scoped projections of it.
+- `Agent.make.input` encodes the run input and `Agent.make.output` selects the terminal output contract; `history` seeds the process-local transcript verbatim and `sessionId` selects an authoritative Session, not an inbox.
 - Optional seams are discovered only for optional behavior; each behavior-bearing seam has a test or memory Layer.
 - Each Run has separate steering and follow-up lanes: steering drains all pending inputs after tools, while follow-up drains one when completion is otherwise possible.
 - Each lane defaults to 64 entries; together they allow 1 MiB of canonical encoded prompts.
@@ -102,7 +102,7 @@ terminal unstructured turn
 - Hosts deduplicate by `(sessionId, deliveryId)`; without Session, callback durability is only the sink host's durability.
 - A completed model operation has one deterministic token charge: terminal input plus output usage, or the context estimate when terminal usage is absent, plus reported failed-attempt usage.
 - The driver settles charge before completion journaling; overrun commits the paid response with zero tokens remaining, then fails typed before tools or another model call.
-- `Completed.text` is final-turn assistant text; turn text/state reset at each boundary, so intermediate narration is excluded.
+- `Completed.text` is final-turn assistant text; `Completed.output` is the Agent's decoded output. Turn text/state reset at each boundary, so intermediate narration is excluded.
 - An unstructured terminal turn requires non-empty text; otherwise it emits `TurnCompleted`, then `RunEndedWithoutOutput`; earlier turns may be textless.
 - That failure carries provider finish reason (`"unknown"` means no reason; absence means no terminal event) and pre-middleware provider text/reasoning character totals across all attempts.
 - Zero text with reasoning means reasoning-only; both zero means no output; nonzero uncommitted text means middleware removed it or its attempt was discarded.

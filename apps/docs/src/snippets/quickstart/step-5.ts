@@ -57,7 +57,7 @@ const layers = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const program = Agent.stream(agent, { prompt: "Should I bring a jacket in Boise?" }).pipe(
+const program = Agent.stream(agent, "Should I bring a jacket in Boise?").pipe(
   Stream.filter((event) => event._tag !== "ModelPart"),
   Stream.runForEach((event) => Console.log(event._tag)),
 )

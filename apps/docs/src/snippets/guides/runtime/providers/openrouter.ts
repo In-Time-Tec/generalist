@@ -15,8 +15,8 @@ const registryLayer = openRouterLayer({
 
 const program = ModelRegistry.withModel(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
-  Agent.generate(agent, { prompt: "Name one Effect data type." }),
-).pipe(Effect.flatMap((result) => Console.log(result.text)))
+  Agent.run(agent, "Name one Effect data type."),
+).pipe(Effect.flatMap((result) => Console.log(result)))
 
 const runtimeLayer = Layer.mergeAll(
   registryLayer,

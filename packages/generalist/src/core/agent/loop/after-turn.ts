@@ -65,7 +65,7 @@ const withoutPending = <Tools extends Record<string, Tool.Any>, R, StructuredOut
   return {
     events: Stream.fromIterable<Event>([
       input.completed,
-      terminalCompletedEvent(input.context.state, input.turn, input.transcript),
+      terminalCompletedEvent(input.context.state, input.turn, input.transcript, input.context.state.text),
     ]),
   }
 }

@@ -17,9 +17,7 @@ const modelLayer = Layer.effect(
 
 const layers = Layer.mergeAll(modelLayer)
 
-const program = Agent.generate(agent, { prompt: "Are you fully configured?" }).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
-)
+const program = Agent.run(agent, "Are you fully configured?").pipe(Effect.flatMap((result) => Console.log(result)))
 
 const runtime = ManagedRuntime.make(layers)
 await runtime.runPromise(program)

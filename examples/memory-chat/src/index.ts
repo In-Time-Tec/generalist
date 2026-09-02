@@ -26,9 +26,13 @@ const key: Memory.Key = { agent: "memory-agent", subject: "user-ada" }
 const agent = Agent.make({ name: "memory-agent" })
 
 const program = Effect.gen(function* () {
-  yield* Agent.generate(agent, { prompt: "Ada likes Effect.", memory: { key } })
-  const second = yield* Agent.generate(agent, { prompt: "What should you remember?", memory: { key } })
-  yield* Console.log(second.text)
+  yield* Agent.run(agent, "Ada likes Effect.", {
+    memory: { key },
+  })
+  const second = yield* Agent.run(agent, "What should you remember?", {
+    memory: { key },
+  })
+  yield* Console.log(second)
 })
 
 const runtimeLayer = Layer.mergeAll(

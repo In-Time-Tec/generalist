@@ -22,8 +22,8 @@ const resilienceLayer = ModelResilience.layer({
 
 const program = ModelRegistry.withModel(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
-  Agent.generate(agent, { prompt: "Summarize today's alerts." }),
-).pipe(Effect.flatMap((result) => Console.log(result.text)))
+  Agent.run(agent, "Summarize today's alerts."),
+).pipe(Effect.flatMap((result) => Console.log(result)))
 
 const runtimeLayer = Layer.mergeAll(
   openRouterLayer({

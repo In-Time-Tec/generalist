@@ -5,11 +5,9 @@ import { layerModel as deterministicModel } from "generalist/ai/deterministic"
 const agent = Agent.make({ name: "eval-agent" })
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, { prompt: "Say the deterministic answer." }).pipe(
-    Effect.provide(deterministicModel()),
-  )
-  if (result.text !== "deterministic response") {
-    return yield* Effect.die(`Unexpected eval output: ${result.text}`)
+  const result = yield* Agent.run(agent, "Say the deterministic answer.").pipe(Effect.provide(deterministicModel()))
+  if (result !== "deterministic response") {
+    return yield* Effect.die(`Unexpected eval output: ${result}`)
   }
   yield* Console.log("eval passed")
 })

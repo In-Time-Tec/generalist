@@ -20,7 +20,7 @@ Provide `guardrails` with the other Layers used to run the agent. The input and 
 ## What runs
 
 ```text
-Agent.generate()
+Agent.run()
 └── model turn { agentName: "support", turn: 0 }
     ├── compose Prompt
     ├── transformPrompt()        middleware 1 → 2 → 3

@@ -52,8 +52,7 @@ describe("ActiveModelResponse", () => {
           Response.makePart("tool-params-delta", { id: "unfinished", delta: '{"path":"cut' }),
         ).pipe(Stream.concat(Stream.never)),
       )
-      const run = Agent.stream(noToolAgent, {
-        prompt: "interrupt",
+      const run = Agent.stream(noToolAgent, "interrupt", {
         logicalOperationId: "terminal-partial",
       }).pipe(
         Stream.tap((event) =>
@@ -119,8 +118,7 @@ describe("ActiveModelResponse", () => {
           )
         }),
       )
-      const run = Agent.stream(noToolAgent, {
-        prompt: "retry",
+      const run = Agent.stream(noToolAgent, "retry", {
         logicalOperationId: "internal-retry",
       }).pipe(
         Stream.tap((event) =>
@@ -164,7 +162,9 @@ describe("ActiveModelResponse", () => {
         Stream.make(Response.makePart("text-delta", { id: "answer", delta: "complete" }), finish),
       )
       const events = yield* provideRun(
-        Agent.stream(noToolAgent, { prompt: "complete", logicalOperationId: "complete-response" }),
+        Agent.stream(noToolAgent, "complete", {
+          logicalOperationId: "complete-response",
+        }),
         handle,
         provider,
       ).pipe(Stream.runCollect)

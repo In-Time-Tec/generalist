@@ -56,7 +56,6 @@ const knownEventTags = new Set([
   "ApprovalRequested",
   "SteeringDrained",
   "TurnCompleted",
-  "StructuredOutput",
   "ModelCallStarted",
   "ModelAttemptStarted",
   "ModelAttemptFirstOutput",

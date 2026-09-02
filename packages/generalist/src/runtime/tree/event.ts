@@ -21,7 +21,6 @@ const modelIdentity = (event: RunEvent): CallIdentity => {
   switch (event._tag) {
     case "ModelResponseCommitted":
     case "ModelResponseInterrupted":
-    case "StructuredOutput":
     case "ModelAttemptStarted":
     case "ModelAttemptFirstOutput":
     case "ModelAttemptCompleted":

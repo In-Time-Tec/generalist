@@ -148,18 +148,13 @@ const isBoundary = (event: RunEvent): boolean =>
   event._tag === "RunFailed" ||
   event._tag === "RunCancelled"
 
-const publishEvent = (
-  bus: ExecutionEventBus,
-  task: Task,
-  event: RunEvent,
-  preceding: ReadonlyArray<RunEvent>,
-): void => {
+const publishEvent = (bus: ExecutionEventBus, task: Task, event: RunEvent): void => {
   if (event._tag === "RunCompleted") {
     bus.publish(
       AgentEvent.artifactUpdate({
         taskId: task.id,
         contextId: task.contextId,
-        artifact: artifactFromEvent(event, preceding),
+        artifact: artifactFromEvent(event),
         append: false,
         lastChunk: true,
         metadata: {},
@@ -178,10 +173,8 @@ const follow = (
   cursor: Cursor,
   bus: ExecutionEventBus,
 ): Effect.Effect<void, EventsError> => {
-  const preceding: Array<RunEvent> = []
   return runtime.events({ runId: task.id, cursor }).pipe(
-    Stream.tap((event) => Effect.sync(() => publishEvent(bus, task, event, preceding))),
-    Stream.tap((event) => Effect.sync(() => preceding.push(event))),
+    Stream.tap((event) => Effect.sync(() => publishEvent(bus, task, event))),
     Stream.takeUntil(isBoundary),
     Stream.runDrain,
   )
@@ -240,9 +233,8 @@ const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExe
         yield* runtime.cancel({ runId: taskId, reason: "A2A cancel request" })
         const snapshot = yield* runtime.snapshot(taskId)
         const task = yield* fromRuntime(runtime, taskId)
-        const history = yield* runtime.history({ runId: taskId, cursor: snapshot.cursor - 1, limit: 1 })
-        const event = history[0]
-        if (event !== undefined) publishEvent(bus, task, event, history)
+        const event = (yield* runtime.history({ runId: taskId, cursor: snapshot.cursor - 1, limit: 1 }))[0]
+        if (event !== undefined) publishEvent(bus, task, event)
         if (event === undefined && snapshot.run.status === "cancelled") {
           bus.publish(
             AgentEvent.statusUpdate({
@@ -334,7 +326,6 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
       task: Task,
       events: Stream.Stream<RunEvent, EventsError>,
     ): Stream.Stream<StreamResponse, EventsError> => {
-      const preceding: Array<RunEvent> = []
       return events.pipe(
         Stream.takeUntil(isBoundary),
         Stream.map((event) => {
@@ -346,7 +337,7 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
                 value: {
                   taskId: task.id,
                   contextId: task.contextId,
-                  artifact: artifactFromEvent(event, preceding),
+                  artifact: artifactFromEvent(event),
                   append: false,
                   lastChunk: true,
                   metadata: {},
@@ -363,7 +354,6 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
               },
             })
           }
-          preceding.push(event)
           return responses
         }),
         Stream.flatMap((responses) => Stream.fromIterable(responses)),

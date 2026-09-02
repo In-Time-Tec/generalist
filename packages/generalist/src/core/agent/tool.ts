@@ -1,6 +1,6 @@
 import { Cause, Effect, Function, Layer, Option, Schema } from "effect"
-import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
-import { type Agent, type Result, type RunError, type RunRequirements, generate } from "./service.js"
+import { LanguageModel, Tool } from "effect/unstable/ai"
+import { type Agent, run, type RunError, type RunRequirements } from "./service.js"
 import {
   AgentError,
   AgentSuspended,
@@ -20,18 +20,29 @@ import { RegistrationError, type Registration } from "./tool/registration.js"
 
 export { RegistrationError }
 
+type TextAgent<Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices> = Agent<
+  Tools,
+  R,
+  PolicyServices,
+  AuthorizationServices,
+  typeof Schema.String,
+  typeof Schema.String
+>
+
 export const register: {
   <R, E>(
     layer: Layer.Layer<R, E, never>,
-  ): <Tools extends Record<string, Tool.Any>>(agent: Agent<Tools, R>) => Registration<Tools, R>
-  <Tools extends Record<string, Tool.Any>, R, E>(
-    agent: Agent<Tools, R>,
+  ): <Tools extends Record<string, Tool.Any>, PolicyServices, AuthorizationServices>(
+    agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices>,
+  ) => Registration<Tools, R>
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices, E>(
+    agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices>,
     layer: Layer.Layer<R, E, never>,
   ): Registration<Tools, R>
 } = Function.dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R, E>(
-    agent: Agent<Tools, R>,
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices, E>(
+    agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices>,
     layer: Layer.Layer<R, E, never>,
   ): Registration<Tools, R> => {
     const registrationLayer = Layer.effectContext(
@@ -47,10 +58,10 @@ export const register: {
     )
     return {
       name: agent.name,
-      run: (options) =>
+      run: (input, options) =>
         Effect.scoped(
           Effect.flatMap(Layer.build(registrationLayer), (services) =>
-            generate(agent, options).pipe(Effect.provideContext(services)),
+            run(agent, input, options).pipe(Effect.provideContext(services)),
           ),
         ),
       requirements: (value) => value,
@@ -58,7 +69,7 @@ export const register: {
   },
 )
 
-type AgentToolRunOptions = { readonly prompt: Prompt.RawInput; readonly inheritedBudget?: RunBudget }
+type AgentToolRunOptions = { readonly inheritedBudget?: RunBudget }
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
@@ -77,8 +88,8 @@ export interface AsToolOptions<
   readonly description?: string
   readonly parameters?: Parameters
   readonly success?: Success
-  readonly toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
-  readonly fromResult?: (result: Result) => Success["Type"]
+  readonly toPrompt?: (params: Parameters["Type"]) => string
+  readonly fromResult?: (output: string) => Success["Type"]
   /** Model layer for the child run. Omit to inherit the model provided to the parent run. */
   readonly model?: Layer.Layer<LanguageModel.LanguageModel, never, ModelR>
 }
@@ -162,19 +173,19 @@ const errorMessage = (error: typeof Schema.Unknown.Type): string => {
 const causeMessage = (agentName: string, cause: Cause.Cause<unknown>): string =>
   `sub-agent '${agentName}' could not complete: ${errorMessage(Cause.squash(cause))}`
 
-const defaultPrompt = (params: ToolInput): Prompt.RawInput =>
+const defaultPrompt = (params: ToolInput): string =>
   Option.getOrElse(
     Schema.decodeUnknownOption(defaultParameters)(params).pipe(Option.map((decoded) => decoded.prompt)),
     () => String(params),
   )
 
-const defaultResult = (result: Result): string => result.text
+const defaultResult = (output: string): string => output
 
 const promptFor = <Parameters extends Schema.Top>(
   schema: Parameters | undefined,
-  callback: ((params: Parameters["Type"]) => Prompt.RawInput) | undefined,
+  callback: ((params: Parameters["Type"]) => string) | undefined,
   params: ToolInput,
-): Effect.Effect<Prompt.RawInput, string, Parameters["DecodingServices"]> => {
+): Effect.Effect<string, string, Parameters["DecodingServices"]> => {
   if (schema === undefined) {
     const decoded = Schema.decodeUnknownOption(defaultParameters)(params)
     if (Option.isNone(decoded)) return Effect.fail("Invalid agent-tool parameters")
@@ -196,11 +207,11 @@ const promptFor = <Parameters extends Schema.Top>(
 
 const resultFor = <Success extends Schema.Top>(
   schema: Success | undefined,
-  callback: ((result: Result) => Success["Type"]) | undefined,
-  result: Result,
+  callback: ((output: string) => Success["Type"]) | undefined,
+  output: string,
 ): Effect.Effect<unknown, string> =>
   Effect.try({
-    try: () => (callback === undefined ? defaultResult(result) : callback(result)),
+    try: () => (callback === undefined ? defaultResult(output) : callback(output)),
     catch: errorMessage,
   })
 
@@ -228,8 +239,8 @@ export const asTool: {
     ModelR = never,
   >(
     options?: AsToolOptions<Name, Parameters, Success, ModelR>,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R> | Registration<Tools, R>,
+  ): <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
+    agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices> | Registration<Tools, R>,
   ) => AgentToolToolkit<
     Name,
     Parameters,
@@ -239,12 +250,14 @@ export const asTool: {
   <
     Tools extends Record<string, Tool.Any>,
     R,
+    PolicyServices,
+    AuthorizationServices,
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
     ModelR = never,
   >(
-    agent: Agent<Tools, R> | Registration<Tools, R>,
+    agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices> | Registration<Tools, R>,
     options?: AsToolOptions<Name, Parameters, Success, ModelR>,
   ): AgentToolToolkit<
     Name,
@@ -257,12 +270,14 @@ export const asTool: {
   <
     Tools extends Record<string, Tool.Any>,
     R,
+    PolicyServices,
+    AuthorizationServices,
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
     ModelR = never,
   >(
-    agent: Agent<Tools, R> | Registration<Tools, R>,
+    agent: TextAgent<Tools, R, PolicyServices, AuthorizationServices> | Registration<Tools, R>,
     options: AsToolOptions<Name, Parameters, Success, ModelR> = {},
   ): AgentToolToolkit<
     Name,
@@ -284,12 +299,12 @@ export const asTool: {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
         const runChild = (runOptions: AgentToolRunOptions) => {
           const base: Effect.Effect<
-            Result,
+            string,
             RunError | RegistrationError,
             RunRequirements<Tools, R, AgentToolRunOptions>
-          > = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
+          > = "run" in agent ? agent.run(prompt, runOptions) : run(agent, prompt, runOptions)
           const execution: Effect.Effect<
-            Result,
+            string,
             RunError | RegistrationError,
             RunRequirements<Tools, R, AgentToolRunOptions> | ModelR
           > =
@@ -300,7 +315,7 @@ export const asTool: {
                     Effect.flatMap((modelContext) => base.pipe(Effect.provide(modelContext))),
                   ),
                 )
-          const handled: Effect.Effect<Result, string, RunRequirements<Tools, R, AgentToolRunOptions> | ModelR> =
+          const handled: Effect.Effect<string, string, RunRequirements<Tools, R, AgentToolRunOptions> | ModelR> =
             execution.pipe(
               Effect.catchCause((cause) => {
                 if (Cause.hasInterrupts(cause)) return Effect.interrupt
@@ -311,7 +326,7 @@ export const asTool: {
         }
         const interpreter = yield* Effect.serviceOption(DriverInterpreter)
         if (Option.isNone(interpreter)) {
-          const result = yield* runChild({ prompt })
+          const result = yield* runChild({})
           return yield* resultFor(options.success, options.fromResult, result)
         }
         const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
@@ -322,7 +337,7 @@ export const asTool: {
               Schema.is(Exhausted)(error) || Schema.is(GrantWidened)(error) ? errorMessage(error) : errorMessage(error),
             ),
           )
-        const result = yield* runChild({ prompt, inheritedBudget: childBudget }).pipe(
+        const result = yield* runChild({ inheritedBudget: childBudget }).pipe(
           Effect.ensuring(interpreter.value.refundChild(childBudget).pipe(Effect.orDie)),
         )
         return yield* resultFor(options.success, options.fromResult, result)

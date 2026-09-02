@@ -756,10 +756,9 @@ describe("DurableDriver Agent.stream integration", () => {
           const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "first", sessionId: "first" })
           const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.make({}) })
           const second = Agent.make({ name: "second" })
-          const failure = yield* Agent.stream(second, { prompt: "second", driverCheckpoint: checkpoint }).pipe(
-            Stream.runDrain,
-            Effect.flip,
-          )
+          const failure = yield* Agent.stream(second, "second", {
+            driverCheckpoint: checkpoint,
+          }).pipe(Stream.runDrain, Effect.flip)
           expect(failure._tag).toBe("generalist/core/DriverStateInvalid")
           expect(failure.message).toContain("explicit executable identity")
         }),
@@ -1026,7 +1025,9 @@ describe("DurableDriver Agent.stream integration", () => {
     )("records model and tool operations through the driver journal seam", (suite) => {
       suite.effect("records model and tool operations through the driver journal seam", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, { prompt: "use echo", logicalOperationId: "stable-run" }).pipe(Stream.runDrain)
+          yield* Agent.stream(agent, "use echo", {
+            logicalOperationId: "stable-run",
+          }).pipe(Stream.runDrain)
           expect(scheduled.find((operation) => operation.kind === "model")?.replayPolicy).toBe("never")
           expect(scheduled.some((operation) => operation.kind === "tool")).toBe(true)
           expect(scheduled.find((operation) => operation.kind === "tool")?.replayPolicy).toBe("never")
@@ -1052,9 +1053,9 @@ describe("DurableDriver Agent.stream integration", () => {
     )("selects a concrete ToolExecutor request replay policy before journaling", (suite) => {
       suite.effect("selects a concrete ToolExecutor request replay policy before journaling", () =>
         Effect.gen(function* () {
-          yield* Agent.stream(agent, { prompt: "use echo", logicalOperationId: "replay-safe-run" }).pipe(
-            Stream.runDrain,
-          )
+          yield* Agent.stream(agent, "use echo", {
+            logicalOperationId: "replay-safe-run",
+          }).pipe(Stream.runDrain)
           expect(scheduled.find((operation) => operation.kind === "model")?.replayPolicy).toBe("never")
           expect(scheduled.find((operation) => operation.kind === "tool")?.replayPolicy).toBe("provider-idempotent")
         }),
@@ -1078,8 +1079,7 @@ describe("DurableDriver Agent.stream integration", () => {
               journalLayer,
               unusedToolHandlerLayer,
             ),
-            Agent.stream(agent, {
-              prompt: "use echo",
+            Agent.stream(agent, "use echo", {
               logicalOperationId: "logical-1",
               sessionId: "session-1",
             }).pipe(Stream.runDrain),
@@ -1131,8 +1131,7 @@ describe("DurableDriver Agent.stream integration", () => {
           }),
         )
 
-        yield* Agent.stream(agent, {
-          prompt: "continue",
+        yield* Agent.stream(agent, "continue", {
           logicalOperationId: "bounded-session-sync",
           sessionId: "bounded-session-sync",
         }).pipe(Stream.runDrain)
@@ -1190,8 +1189,7 @@ describe("DurableDriver Agent.stream integration", () => {
     const run = (prompt: string) =>
       provideScoped(
         Layer.mergeAll(allowAllAuthorization, Session.layerMemory, modelLayer, journalLayer),
-        Agent.stream(agent, {
-          prompt,
+        Agent.stream(agent, prompt, {
           history: Prompt.empty,
           logicalOperationId: "sync-key-collision",
           sessionId: "sync-key-collision",
@@ -1275,8 +1273,7 @@ describe("DurableDriver Agent.stream integration", () => {
     )
     const agent = Agent.make({ name: "session-sync-replay-agent" })
     const run = (prompt = "reply") =>
-      Agent.stream(agent, {
-        prompt,
+      Agent.stream(agent, prompt, {
         history: Prompt.empty,
         logicalOperationId: "session-sync-replay",
         sessionId: "session-sync-replay",
@@ -1392,8 +1389,7 @@ describe("DurableDriver Agent.stream integration", () => {
       const run = (prompt: string) =>
         provideScoped(
           Layer.mergeAll(allowAllAuthorization, modelLayer, journalLayer),
-          Agent.stream(agent, {
-            prompt,
+          Agent.stream(agent, prompt, {
             logicalOperationId: "semantic-replay",
             sessionId: "semantic-replay",
           }).pipe(Stream.runCollect),
@@ -1446,8 +1442,7 @@ describe("DurableDriver Agent.stream integration", () => {
 
       const failure = yield* provideScoped(
         Layer.mergeAll(allowAllAuthorization, modelLayer, journalLayer, unusedToolHandlerLayer),
-        Agent.stream(Agent.make({ name: "model-completion-failure", toolkit: Toolkit.make(echoTool) }), {
-          prompt: "reply",
+        Agent.stream(Agent.make({ name: "model-completion-failure", toolkit: Toolkit.make(echoTool) }), "reply", {
           sessionId: "model-completion-failure",
         }).pipe(Stream.runDrain, Effect.flip),
       )
@@ -1538,6 +1533,7 @@ describe("DurableDriver Agent.stream integration", () => {
       }
       const agent = Agent.make({
         name: "compacted-recovery-agent",
+        input: Schema.Any,
         toolkit: Toolkit.make(echoTool),
       })
       const executable = ExecutableManifest.makeTest(agent.name, undefined)
@@ -1562,8 +1558,7 @@ describe("DurableDriver Agent.stream integration", () => {
                 Effect.map(Session.buildContext),
               ),
             )
-          const baseline = yield* Agent.stream(agent, {
-            prompt: rawPrompt,
+          const baseline = yield* Agent.stream(agent, rawPrompt, {
             logicalOperationId: "compacted-baseline",
             executableRef: executable.ref,
             sessionId: "compacted-baseline",
@@ -1572,8 +1567,7 @@ describe("DurableDriver Agent.stream integration", () => {
           const baselineFinal = yield* sessionContext("compacted-baseline")
 
           activeRun = "recovery"
-          const recoveryFiber = yield* Agent.stream(agent, {
-            prompt: rawPrompt,
+          const recoveryFiber = yield* Agent.stream(agent, rawPrompt, {
             logicalOperationId: "compacted-recovery",
             executableRef: executable.ref,
             sessionId: "compacted-recovery",
@@ -1595,8 +1589,7 @@ describe("DurableDriver Agent.stream integration", () => {
           expect((yield* sessionContext("compacted-recovery")).content).toEqual(compactedRequest.content)
 
           replaySettled = true
-          const recovered = yield* Agent.stream(agent, {
-            prompt: Prompt.empty,
+          const recovered = yield* Agent.stream(agent, Prompt.empty, {
             logicalOperationId: "compacted-recovery",
             executableRef: executable.ref,
             driverCheckpoint: pendingCheckpoint!,
@@ -1686,8 +1679,7 @@ describe("DurableDriver Agent.stream integration", () => {
             journalLayer,
             unusedToolHandlerLayer,
           ),
-          Agent.stream(agent, {
-            prompt: "use echo twice",
+          Agent.stream(agent, "use echo twice", {
             logicalOperationId: "parallel-replay",
             sessionId: "parallel-replay",
           }).pipe(Stream.runDrain),
@@ -2167,8 +2159,7 @@ describe("DurableDriver Agent.stream integration", () => {
       suite.effect("binds suspension checkpoints to resume tokens", () =>
         Effect.gen(function* () {
           const agent = Agent.make({ name: "driver-suspend-agent", toolkit: Toolkit.make(echoTool) })
-          const suspended = yield* Agent.stream(agent, {
-            prompt: "wait",
+          const suspended = yield* Agent.stream(agent, "wait", {
             logicalOperationId: "suspend-run",
             sessionId: "driver-suspend",
           }).pipe(Stream.runDrain, Effect.flip)
@@ -2178,8 +2169,7 @@ describe("DurableDriver Agent.stream integration", () => {
           ).toHaveLength(1)
           expect(scheduled.some((operation) => operation.kind === "wait")).toBe(false)
           streamPhase = "resume"
-          yield* Agent.stream(agent, {
-            prompt: "ignored",
+          yield* Agent.stream(agent, "ignored", {
             logicalOperationId: "suspend-run",
             sessionId: "driver-suspend",
             resume: {

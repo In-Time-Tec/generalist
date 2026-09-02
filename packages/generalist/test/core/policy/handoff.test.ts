@@ -12,7 +12,7 @@ type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const fanOutWithUnionOptions = (children: ReadonlyArray<Handoff.FanOutChild>, options: Handoff.FanOutOptions) => {
   const result: Effect.Effect<
-    ReadonlyArray<Agent.Result> | ReadonlyArray<Handoff.FanOutMemberResult>,
+    ReadonlyArray<string> | ReadonlyArray<Handoff.FanOutMemberResult>,
     Agent.RunError | Handoff.RegistrationError | Handoff.FanOutUnsatisfied
   > = Handoff.fanOut(children, options)
   return result
@@ -38,17 +38,13 @@ const modelFailure = (description: string) =>
 const toolCallPart = (id: string, name: string, params: Response.ToolCallPart<string, unknown>["params"]) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
-const directResult = (text: string): Agent.Result => ({ text, turns: 1, transcript: Prompt.fromMessages([]) })
-const directRegistration = (
-  name: string,
-  run: Effect.Effect<Agent.Result, Agent.RunError | Handoff.RegistrationError>,
-) =>
+const directRegistration = (name: string, run: Effect.Effect<string, Agent.RunError | Handoff.RegistrationError>) =>
   Handoff.register(
     Agent.make({ name }),
     modelLayer(() =>
       Stream.unwrap(
         run.pipe(
-          Effect.map((result) => Stream.make(textDelta(result.text))),
+          Effect.map((result) => Stream.make(textDelta(result))),
           Effect.mapError((failure) => modelFailure(String(failure))),
         ),
       ),
@@ -69,8 +65,7 @@ layer(Layer.empty)("Handoff", (it) => {
       const history = Prompt.fromMessages([
         Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "prior" })] }),
       ])
-      const result = yield* registration.run({
-        prompt: "current",
+      const result = yield* registration.run("current", {
         history,
         system: "system override",
         sessionId: "session-1",
@@ -79,7 +74,7 @@ layer(Layer.empty)("Handoff", (it) => {
         toolProgress: { _tag: "Backpressure", capacity: 4 },
         compaction: { contextWindow: 1024 },
       })
-      expect(result.text).toBe("child result")
+      expect(result).toBe("child result")
       expect(observed).toBeDefined()
       expect(promptText(observed!)).toContain("prior")
     })
@@ -91,7 +86,7 @@ layer(Layer.empty)("Handoff", (it) => {
       Layer.effect(LanguageModel.LanguageModel, Effect.fail("service unavailable")),
     )
     return Effect.gen(function* () {
-      const failure = yield* Effect.flip(registration.run({ prompt: "hello" }))
+      const failure = yield* Effect.flip(registration.run("hello"))
       expect(failure._tag).toBe("generalist/core/RegistrationError")
       if (Schema.is(Handoff.RegistrationError)(failure)) {
         expect(failure.agent).toBe("unavailable")
@@ -148,8 +143,7 @@ layer(Layer.empty)("Handoff", (it) => {
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
-          Agent.stream(supervisorSetup.agent, {
-            prompt: "solve",
+          Agent.stream(supervisorSetup.agent, "solve", {
             sessionId: "session-handoff-1",
             logicalOperationId: "op-handoff-1",
           }),
@@ -189,7 +183,7 @@ layer(Layer.empty)("Handoff", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, { prompt: "solve" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, "solve")))
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
             name: "handoff_to_math",
@@ -233,7 +227,7 @@ layer(Layer.empty)("Handoff", (it) => {
           active = 0
           maxActive = 0
           const results = yield* Handoff.fanOut(children, { concurrency })
-          expect(results.map((result) => result.text)).toEqual([
+          expect(results).toEqual([
             "done task 0",
             "done task 1",
             "done task 2",
@@ -328,9 +322,7 @@ layer(Layer.empty)("Handoff", (it) => {
         const winner = {
           registration: directRegistration(
             `winner-${remainder}`,
-            Effect.all([Deferred.await(firstStarted), Deferred.await(lastStarted)]).pipe(
-              Effect.as(directResult("winner")),
-            ),
+            Effect.all([Deferred.await(firstStarted), Deferred.await(lastStarted)]).pipe(Effect.as("winner")),
           ),
           prompt: "winner",
         }
@@ -422,7 +414,7 @@ layer(Layer.empty)("Handoff", (it) => {
               "after-interrupt",
               Effect.sync(() => {
                 secondStarted = true
-                return directResult("continued")
+                return "continued"
               }),
             ),
             prompt: "continue",
@@ -439,7 +431,7 @@ layer(Layer.empty)("Handoff", (it) => {
     Layer.mergeAll(allowAllAuthorization, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       const success = (name: string) => ({
-        registration: directRegistration(name, Effect.succeed(directResult(name))),
+        registration: directRegistration(name, Effect.succeed(name)),
         prompt: name,
       })
       const failure = (name: string) => ({

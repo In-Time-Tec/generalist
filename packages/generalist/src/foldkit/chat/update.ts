@@ -174,7 +174,6 @@ const ignoredEventTags = new Set<string>([
   "CompactionApplied",
   "CompactionFailed",
   "TurnCompleted",
-  "StructuredOutput",
 ])
 
 const applyEvent = (model: Model, event: ResolvedRunEvent): readonly [Model, Option.Option<Output>] => {

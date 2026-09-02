@@ -40,7 +40,7 @@ const scriptedModel = (attempt: (calls: number) => Stream.Stream<Response.Stream
 
 const agent = Agent.make({ name: "default-resilience-agent" })
 const run = (model: Layer.Layer<LanguageModel.LanguageModel>) =>
-  Stream.runCollect(Agent.stream(agent, { prompt: "retry" }).pipe(Stream.provide(model)))
+  Stream.runCollect(Agent.stream(agent, "retry").pipe(Stream.provide(model)))
 
 describe("Agent default model resilience", () => {
   it.effect("retries provider 429 and 5xx failures with backoff inside one turn", () =>

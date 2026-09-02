@@ -1,7 +1,7 @@
-import { Cause, Context, Effect, Layer, Option, Ref, type Scope, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../../core/agent/service.js"
-import type { Event } from "../../core/agent/event.js"
+import { AgentError, type Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
 import { type DriverCheckpoint, DriverJournal, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
@@ -105,8 +105,13 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
               programAuthority === undefined
                 ? undefined
                 : makeCodeMode({ claim, claimed, authority: programAuthority, store })
-            const runClosed = <Tools extends Record<string, Tool.Any>, R>(
-              agent: Agent<Tools, R>,
+            const runClosed = <
+              Tools extends Record<string, Tool.Any>,
+              R,
+              InputSchema extends Schema.Top,
+              OutputSchema extends Schema.Top,
+            >(
+              agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
               environment: Layer.Layer<ClosedServices<Tools, R>>,
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
@@ -119,7 +124,9 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
                   interruption.context,
                 )
                 const executionRetry = yield* makeExecutionRetry(claimed.attempt)
-                const runHosted = (hostedAgent: Agent<Tools, R>): Effect.Effect<void> => {
+                const runHosted = (
+                  hostedAgent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
+                ): Effect.Effect<void> => {
                   const runAgent = (
                     prompt: Prompt.RawInput,
                     history: Prompt.Prompt | undefined,
@@ -340,12 +347,22 @@ export const make: Effect.Effect<Service, never, RunStore | ActiveExecutions | E
                             return yield* preview.discard
                           }
                           if (event._tag === "Completed") {
+                            const output = yield* Schema.encodeEffect(hostedAgent.output)(event.output).pipe(
+                              Effect.mapError((error) =>
+                                AgentError.make({
+                                  message: `Agent output cannot be persisted: ${error.message}`,
+                                  turn: Math.max(0, event.turns - 1),
+                                  cause: error,
+                                }),
+                              ),
+                            ) as Effect.Effect<unknown, AgentError, R>
                             const leafId = yield* Option.match(boundSession.session, {
                               onNone: () => Effect.succeed(null),
                               onSome: (service) => service.leaf.pipe(Effect.orDie),
                             })
                             const result = {
                               text: event.text,
+                              output,
                               turns: event.turns,
                               session: { sessionId: claimed.message.sessionId, leafId },
                             }

@@ -11,20 +11,17 @@ const modelLayer = (
 ): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.effect(LanguageModel.LanguageModel, LanguageModel.make({ streamText, generateText }))
 
-const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
+const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data.", output: invoiceSchema })
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, {
-    prompt: "Invoice total is 42 USD.",
-    output: { schema: invoiceSchema },
-  })
-  yield* Console.log(`${result.value.total} ${result.value.currency}`)
+  const result = yield* Agent.run(agent, "Invoice total is 42 USD.")
+  yield* Console.log(`${result.total} ${result.currency}`)
 })
 
 const runtimeLayer = Layer.mergeAll(
   modelLayer(
     () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
-    () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
+    () => Effect.succeed([{ type: "text", text: '{"output":{"total":42,"currency":"USD"}}' }]),
   ),
   ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
   Permissions.layerAllowAll,

@@ -74,9 +74,7 @@ const modelLayer = Layer.effect(
   }),
 )
 
-const program = Agent.generate(parent, { prompt: "Summarize the intro document." }).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
-)
+const program = Agent.run(parent, "Summarize the intro document.").pipe(Effect.flatMap((result) => Console.log(result)))
 
 const runtimeLayer = Layer.mergeAll(
   modelLayer,

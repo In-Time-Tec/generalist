@@ -127,7 +127,7 @@ describe("AG-UI event projection", () => {
     }),
   )
 
-  it.effect("maps tool results, steps, terminal success, waits, progress, and structured output", () =>
+  it.effect("maps tool results, steps, terminal success, waits, and progress", () =>
     Effect.gen(function* () {
       const inputs = [
         { ...base, _tag: "TurnStarted", turn: 0 },
@@ -160,16 +160,6 @@ describe("AG-UI event projection", () => {
         { ...base, _tag: "ToolProgress", turn: 0, toolCallId: "tool-1", message: "working", data: { percent: 50 } },
         {
           ...base,
-          _tag: "StructuredOutput",
-          turn: 0,
-          modelCallId: "model-1",
-          modelAttemptId: "attempt-1",
-          attempt: 0,
-          value: { answer: 42 },
-          content: [],
-        },
-        {
-          ...base,
           _tag: "RunWaiting",
           wait: {
             waitId: "tool-1",
@@ -193,7 +183,6 @@ describe("AG-UI event projection", () => {
         "STEP_FINISHED",
         "RUN_FINISHED",
         "CUSTOM",
-        "CUSTOM",
         "RUN_FINISHED",
       ])
       expect(events[1]).toEqual({
@@ -208,7 +197,7 @@ describe("AG-UI event projection", () => {
         runId: "run-1",
         outcome: { type: "success" },
       })
-      expect(events[6]).toMatchObject({ outcome: { type: "interrupt", interrupts: [{ id: "tool-1" }] } })
+      expect(events[5]).toMatchObject({ outcome: { type: "interrupt", interrupts: [{ id: "tool-1" }] } })
     }),
   )
 

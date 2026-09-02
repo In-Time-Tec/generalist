@@ -217,8 +217,6 @@ export const project: {
         case "RunCancelled":
         case "OperationUnknown":
           return projectRunError(event)
-        case "StructuredOutput":
-          return emitAll([{ type: EventType.CUSTOM, name: "generalist.structured-output", value: event.value }])
         default:
           return Effect.succeed([])
       }

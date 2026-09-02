@@ -1,13 +1,6 @@
 import { Array, Cause, Effect, Exit, Fiber, Function, Layer, Queue, Ref, Schema } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
-import {
-  type Agent,
-  type Result,
-  type RunError,
-  type RunOptions,
-  type RunRequirements,
-  make,
-} from "../agent/service.js"
+import { type Agent, type RunError, type InvocationOptions, type RunRequirements, make } from "../agent/service.js"
 import { AgentError } from "../agent/event.js"
 import type { HandoffAccepted } from "../agent/handoff/state.js"
 import { type AgentToolToolkit, asTool, RegistrationError } from "../agent/tool.js"
@@ -31,8 +24,8 @@ export interface DelegateOptions<
   readonly description?: string
   readonly parameters?: Parameters
   readonly success?: Success
-  readonly toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
-  readonly fromResult?: (result: Result) => Success["Type"]
+  readonly toPrompt?: (params: Parameters["Type"]) => string
+  readonly fromResult?: (output: string) => Success["Type"]
 }
 
 export interface HandoffToolOptions {
@@ -44,8 +37,8 @@ export interface HandoffToolOptions {
 
 export interface FanOutChild<Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never> {
   readonly registration: Registration<Tools, R>
-  readonly prompt: Prompt.RawInput
-  readonly options?: Omit<RunOptions, "prompt" | "output" | "memory">
+  readonly prompt: string
+  readonly options?: Omit<InvocationOptions, "memory">
 }
 
 export type FanOutJoin =
@@ -67,8 +60,8 @@ interface DelegateToolConfiguration<Parameters extends Schema.Top, Success exten
   description: string
   parameters?: Parameters
   success?: Success
-  toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
-  fromResult?: (result: Result) => Success["Type"]
+  toPrompt?: (params: Parameters["Type"]) => string
+  fromResult?: (output: string) => Success["Type"]
 }
 interface HandoffMetadata {
   specialist: string
@@ -97,7 +90,7 @@ export interface FanOutCollectOptions extends FanOutBaseOptions {
 export type FanOutOptions = FanOutAllSuccessOptions | FanOutCollectOptions
 
 export type FanOutMemberResult =
-  | { readonly ordinal: number; readonly status: "succeeded"; readonly result: Result }
+  | { readonly ordinal: number; readonly status: "succeeded"; readonly result: string }
   | {
       readonly ordinal: number
       readonly status: "failed"
@@ -145,7 +138,7 @@ const positiveConcurrency = (value: number | undefined): Effect.Effect<number, A
 
 type FanOutCompletion = {
   readonly ordinal: number
-  readonly exit: Exit.Exit<Result, RunError | RegistrationError>
+  readonly exit: Exit.Exit<string, RunError | RegistrationError>
 }
 
 type FanOutDecision = "succeeded" | "failed" | undefined
@@ -196,7 +189,7 @@ const finishFanOut = (
   total: number,
   outcomes: ReadonlyArray<FanOutMemberResult>,
 ): Effect.Effect<
-  ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
+  ReadonlyArray<string> | ReadonlyArray<FanOutMemberResult>,
   RunError | RegistrationError | FanOutUnsatisfied
 > => {
   if (join._tag === "AllSuccess") {
@@ -224,9 +217,9 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
   children: ReadonlyArray<FanOutChild<Tools, R>>,
   options: FanOutOptions,
 ): Effect.Effect<
-  ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
+  ReadonlyArray<string> | ReadonlyArray<FanOutMemberResult>,
   RunError | RegistrationError | FanOutUnsatisfied,
-  RunRequirements<Tools, R, { prompt: Prompt.RawInput }>
+  RunRequirements<Tools, R, Record<never, never>>
 > =>
   Effect.gen(function* () {
     const concurrency = yield* positiveConcurrency(options.concurrency)
@@ -247,7 +240,7 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
     const worker: Effect.Effect<
       void,
       RunError | RegistrationError,
-      RunRequirements<Tools, R, { prompt: Prompt.RawInput }>
+      RunRequirements<Tools, R, Record<never, never>>
     > = Effect.suspend(() =>
       Ref.modify(nextOrdinal, (ordinal) =>
         ordinal < children.length ? ([ordinal, ordinal + 1] as const) : ([undefined, ordinal] as const),
@@ -258,7 +251,7 @@ const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
           if (child === undefined) return Effect.void
           return Effect.fiberId.pipe(
             Effect.flatMap((workerId) =>
-              child.registration.run({ ...child.options, prompt: child.prompt }).pipe(
+              child.registration.run(child.prompt, child.options).pipe(
                 Effect.onExit((exit) => Queue.offer(completions, { ordinal, exit })),
                 Effect.catchCause((cause) =>
                   Cause.hasInterruptsOnly(cause) && !Cause.interruptors(cause).has(workerId)
@@ -381,7 +374,7 @@ export const delegateTool: {
     if (options.success !== undefined) toolOptions.success = options.success
     if (options.toPrompt !== undefined) toolOptions.toPrompt = options.toPrompt
     if (options.fromResult !== undefined) toolOptions.fromResult = options.fromResult
-    return asTool<Tools, R, string, Parameters, Success>(registration, toolOptions)
+    return asTool<Tools, R, never, never, string, Parameters, Success>(registration, toolOptions)
   },
 )
 
@@ -415,18 +408,18 @@ export const fanOut: {
     options?: FanOutAllSuccessOptions,
   ): (
     children: ReadonlyArray<FanOutChild<Tools, R>>,
-  ) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  ) => Effect.Effect<ReadonlyArray<string>, RunError | RegistrationError>
   <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     options: FanOutOptions,
   ): (
     children: ReadonlyArray<FanOutChild<Tools, R>>,
   ) => Effect.Effect<
-    ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
+    ReadonlyArray<string> | ReadonlyArray<FanOutMemberResult>,
     RunError | RegistrationError | FanOutUnsatisfied
   >
   <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(): (
     children: ReadonlyArray<FanOutChild<Tools, R>>,
-  ) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  ) => Effect.Effect<ReadonlyArray<string>, RunError | RegistrationError>
   <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     children: ReadonlyArray<FanOutChild<Tools, R>>,
     options: FanOutCollectOptions,
@@ -434,12 +427,12 @@ export const fanOut: {
   <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     children: ReadonlyArray<FanOutChild<Tools, R>>,
     options?: FanOutAllSuccessOptions,
-  ): Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  ): Effect.Effect<ReadonlyArray<string>, RunError | RegistrationError>
   <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     children: ReadonlyArray<FanOutChild<Tools, R>>,
     options: FanOutOptions,
   ): Effect.Effect<
-    ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
+    ReadonlyArray<string> | ReadonlyArray<FanOutMemberResult>,
     RunError | RegistrationError | FanOutUnsatisfied
   >
 } = Function.dual(

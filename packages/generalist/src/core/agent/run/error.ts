@@ -4,6 +4,7 @@ import {
   AgentError,
   AgentSuspended,
   DuplicateToolCallId,
+  InvalidOutput,
   MiddlewareViolation,
   PolicyStopped,
   ProgressOverflow,
@@ -26,11 +27,12 @@ import { Rejected } from "../../policy/handoff-rejected.js"
 import { PolicyError } from "../../turn/policy.js"
 import { PolicyInvalid } from "../../turn/steering.js"
 
-/** @experimental The error channel and durable codec of `Agent.stream` and `Agent.generate`. */
+/** @experimental The error channel and durable codec of `Agent.run` and `Agent.stream`. */
 export const RunError = Schema.Union([
   SinkFailed,
   InvocationLifecycleFailed,
   AgentError,
+  InvalidOutput,
   AgentSuspended,
   ResumeMismatch,
   PolicyError,

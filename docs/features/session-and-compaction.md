@@ -17,8 +17,8 @@ const services = Layer.mergeAll(
 )
 
 const program = Effect.gen(function* () {
-  yield* Agent.generate(agent, { prompt: "My name is Ada.", sessionId: "user-42" })
-  return yield* Agent.generate(agent, { prompt: "What is my name?", sessionId: "user-42" })
+  yield* Agent.run(agent, "My name is Ada.", { sessionId: "user-42" })
+  return yield* Agent.run(agent, "What is my name?", { sessionId: "user-42" })
 }).pipe(Effect.provide(services))
 ```
 
@@ -27,7 +27,7 @@ The shared `sessionId` makes the second run continue the first. Removing it disa
 ## What runs
 
 ```text
-Agent.generate(..., sessionId: "user-42")
+Agent.run(..., { sessionId: "user-42" })
 ├── SessionDirectory.acquire("user-42")
 ├── SessionStore.path()
 │   └── Session.buildContext(root-to-leaf path)

@@ -72,11 +72,11 @@ describe("mcp tools adapter", () => {
               ModelMiddleware.layerIdentity,
             ),
           )
-          const result = yield* Agent.generate(agent, { prompt: "add the numbers" }).pipe(Effect.provide(services))
+          const result = yield* Agent.run(agent, "add the numbers").pipe(Effect.provide(services))
           const prompts = yield* model.prompts
           const secondPrompt = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(prompts[1])
 
-          expect(result.text).toBe("the answer is 42")
+          expect(result).toBe("the answer is 42")
           expect(secondPrompt).toContain("42")
           expect(fixture.closes.count).toBe(0)
         }),
@@ -104,10 +104,7 @@ describe("mcp tools adapter", () => {
             ModelMiddleware.layerIdentity,
           ),
         )
-        const events = yield* Agent.stream(agent, { prompt: "call boom" }).pipe(
-          Stream.runCollect,
-          Effect.provide(services),
-        )
+        const events = yield* Agent.stream(agent, "call boom").pipe(Stream.runCollect, Effect.provide(services))
         const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
 
         expect(completed?._tag).toBe("ToolExecutionCompleted")

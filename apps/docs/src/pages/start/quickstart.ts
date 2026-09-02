@@ -88,8 +88,8 @@ export const quickstart = definePage({
     ),
     h2("step-5-watch-the-loop", "Step 5: Watch the loop"),
     p(
-      code("Agent.generate"),
-      " is a fold over the primitive: ",
+      code("Agent.run"),
+      " folds the primitive ",
       code("Agent.stream"),
       ". Replace the ",
       code("program"),

@@ -6,14 +6,14 @@ import supervisor from "virtual:source/src/snippets/guides/agent/multi-agent/sup
 import supervisorExpected from "virtual:source/src/snippets/guides/agent/multi-agent/supervisor.expected.txt"
 import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../../prose"
 
-const childChannels = `Parent Agent.generate
+const childChannels = `Parent Agent.run
 │
 ├── Channel 1: Effect Context (inherited by nested child effect)
 │   ├── LanguageModel.LanguageModel
 │   ├── ToolExecutor / Approvals
 │   └── ModelMiddleware and other required services
 │
-└── AgentTool handler ──▶ Child Agent.generate({ prompt })
+└── AgentTool handler ──▶ Child Agent.run(prompt)
     │
     └── Channel 2: run options / orchestration (not implicitly inherited)
         ├── omitted sessionId means no Session
@@ -29,7 +29,7 @@ export const multiAgent = definePage({
   content: [
     p(
       "generalist multi-agent helpers are same-process and non-durable: they compose ",
-      code("Agent.generate"),
+      code("Agent.run"),
       ", toolkits, and the ",
       code("ToolExecutor"),
       " seam rather than adding a second execution model. For durable, addressable parent and child Runs, use generalist/runtime; see ",
@@ -126,12 +126,12 @@ export const multiAgent = definePage({
       " is the primitive under both handoff helpers: it wraps an agent in a handled toolkit containing one tool. Defaults are the agent's name, ",
       code("{ prompt: string }"),
       " parameters, and ",
-      code("result.text"),
+      code("result"),
       " as the output. Override any of them.",
     ),
     p(
       "Inside the handler the child invocation is ",
-      code("Agent.generate(summarizer, { prompt })"),
+      code("Agent.run(summarizer, prompt)"),
       ". The runnable example supplies the model, toolkit handler, executor, permissions, approvals, and middleware with the surrounding ",
       code("Effect.provide"),
       ". Because the child call omits ",

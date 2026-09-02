@@ -1,9 +1,9 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- each test is a test-host Layer composition root. */
 import { describe, expect, it } from "@effect/vitest"
-import { Config, Effect, Layer, Redacted, Schema } from "effect"
+import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
 import { Model, Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "generalist"
+import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "generalist"
 import {
   layerClient as bedrockClient,
   layerModel as bedrockModel,
@@ -57,10 +57,43 @@ const testLayers = Layer.mergeAll(
 describe("layerModel", () => {
   it.effect("provides the model directly to a run — no registry, no selection strings", () =>
     Effect.gen(function* () {
-      const result = yield* Agent.generate(agent, { prompt: "Say hello." }).pipe(Effect.provide(deterministicModel()))
-      expect(result.text).toBe("deterministic response")
+      const result = yield* Agent.run(agent, "Say hello.").pipe(Effect.provide(deterministicModel()))
+      expect(result).toBe("deterministic response")
     }).pipe(Effect.provide(testLayers)),
   )
+
+  it.effect("decodes typed output and rejects malformed deterministic output", () => {
+    const input = Schema.Struct({ question: Schema.String })
+    const output = Schema.Struct({ answer: Schema.Number })
+    const typedAgent = Agent.make({ name: "typed", input, output })
+    const textAgent = Agent.make({ name: "text" })
+    const validModel = deterministicModel({ response: '{"output":{"answer":42}}' })
+    const malformedModel = deterministicModel({ response: '{"output":{"answer":"forty-two"}}' })
+
+    return Effect.gen(function* () {
+      expect(yield* Agent.run(typedAgent, { question: "answer" }).pipe(Effect.provide(validModel))).toEqual({
+        answer: 42,
+      })
+
+      const failure = yield* Agent.run(typedAgent, { question: "answer" }).pipe(
+        Effect.provide(malformedModel),
+        Effect.flip,
+      )
+      expect(Schema.is(AgentEvent.InvalidOutput)(failure)).toBe(true)
+
+      expect(yield* Agent.run(textAgent, "answer").pipe(Effect.provide(deterministicModel()))).toBe(
+        "deterministic response",
+      )
+
+      const events = yield* Agent.stream(typedAgent, { question: "answer" }).pipe(
+        Stream.provide(validModel),
+        Stream.runCollect,
+      )
+      const completed = events.at(-1)
+      expect(completed?._tag).toBe("Completed")
+      if (completed?._tag === "Completed") expect(completed.output).toEqual({ answer: 42 })
+    }).pipe(Effect.provide(testLayers))
+  })
 
   it.effect("carries provider and model name tags for telemetry", () =>
     Effect.gen(function* () {
@@ -73,13 +106,13 @@ describe("layerModel", () => {
 
   it.effect("two model layers scope independently — supervisor Sol, utility Luna", () =>
     Effect.gen(function* () {
-      const sol = yield* Agent.generate(agent, { prompt: "Sol run." }).pipe(
+      const sol = yield* Agent.run(agent, "Sol run.").pipe(
         Effect.provide(deterministicModel({ provider: "test", model: "sol" })),
       )
-      const luna = yield* Agent.generate(agent, { prompt: "Luna run." }).pipe(
+      const luna = yield* Agent.run(agent, "Luna run.").pipe(
         Effect.provide(deterministicModel({ provider: "test", model: "luna" })),
       )
-      expect([sol.text, luna.text]).toEqual(["deterministic response", "deterministic response"])
+      expect([sol, luna]).toEqual(["deterministic response", "deterministic response"])
     }).pipe(Effect.provide(testLayers)),
   )
 

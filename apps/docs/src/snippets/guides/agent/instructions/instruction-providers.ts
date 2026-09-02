@@ -34,8 +34,8 @@ const modelLayer = Layer.effect(
 )
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generate(agent, { prompt: "What are your instructions?" })
-  yield* Console.log(result.text)
+  const result = yield* Agent.run(agent, "What are your instructions?")
+  yield* Console.log(result)
 })
 
 const runtimeLayer = Layer.mergeAll(

@@ -364,11 +364,42 @@ export const make = (input: {
 
 /** @experimental Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity. */
 export const withTool: {
-  (implementation: Service): <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>) => Agent<Tools, R>
-  <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, implementation: Service): Agent<Tools, R>
+  (
+    implementation: Service,
+  ): <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices,
+    AuthorizationServices,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
+  ) => Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices,
+    AuthorizationServices,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
+    implementation: Service,
+  ): Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>
 } = Function.dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, implementation: Service): Agent<Tools, R> => {
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices,
+    AuthorizationServices,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
+    implementation: Service,
+  ): Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema> => {
     const extended = withTools(agent, [implementation.tool])
     return {
       ...extended,

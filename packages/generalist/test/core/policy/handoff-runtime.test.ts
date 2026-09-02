@@ -102,8 +102,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         journal,
       ),
       Effect.gen(function* () {
-        yield* Agent.stream(supervisorSetup.agent, {
-          prompt: "start",
+        yield* Agent.stream(supervisorSetup.agent, "start", {
           executableRef: executable.ref,
           executableManifest: executable.manifest,
         }).pipe(Stream.runDrain)
@@ -116,8 +115,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
           pendingContinuation: { prompt: Prompt.make("continue") },
         })
         expect(handoffCommit?.state.path).toHaveLength(1)
-        yield* Agent.stream(childAgent, {
-          prompt: "restart",
+        yield* Agent.stream(childAgent, "restart", {
           executableRef: { ...executable.ref, active: child.pin },
           executableManifest: executable.manifest,
           driverCheckpoint: handoffCheckpoint!,
@@ -152,7 +150,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, { prompt: "start" }))
+        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, "start"))
         expect(mathTurn).toBe(1)
         expect(events.at(-1)?._tag).toBe("Completed")
       }),
@@ -189,8 +187,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       ),
       Effect.gen(function* () {
         for (let restart = 0; restart < 2; restart++) {
-          yield* Agent.stream(supervisorSetup.agent, {
-            prompt: "start stable",
+          yield* Agent.stream(supervisorSetup.agent, "start stable", {
             logicalOperationId: "stable-handoff-run",
           }).pipe(Stream.runDrain)
         }
@@ -235,7 +232,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
           name: "parent",
           toolkit: Toolkit.make(delegate.tool),
         })
-        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "go" }))
+        const events = yield* Stream.runCollect(Agent.stream(parent, "go"))
         const last = events.at(-1)
         expect(last?._tag).toBe("Completed")
         if (last?._tag === "Completed") expect(last.text).toBe("parent-final")
@@ -258,7 +255,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, { prompt: "go" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, "go")))
         expect(failure._tag).toBe("generalist/core/TargetMissing")
       }),
     ] as const
@@ -290,8 +287,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       Effect.gen(function* () {
         const failure = yield* Effect.flip(
           Stream.runDrain(
-            Agent.stream(supervisorSetup.agent, {
-              prompt: "go",
+            Agent.stream(supervisorSetup.agent, "go", {
               history: Prompt.fromMessages([
                 Prompt.makeMessage("assistant", {
                   content: [
@@ -338,7 +334,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, { prompt: "start" }))
+        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, "start"))
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("specialist-model-answer")
         expect(ambientCalls).toBe(1)
@@ -363,7 +359,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, { prompt: "start" }))
+        const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, "start"))
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("deterministic response")
       }),
@@ -386,7 +382,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, { prompt: "start" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, "start")))
         expect(failure).toMatchObject({ _tag: "generalist/core/HandoffRequirementsMissing" })
       }),
     ] as const

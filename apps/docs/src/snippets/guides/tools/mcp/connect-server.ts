@@ -36,11 +36,11 @@ const program = Effect.gen(function* () {
       (services) =>
         ModelRegistry.withModel(
           { provider: "openrouter", model: "openai/gpt-4o-mini" },
-          Agent.generate(agent, { prompt: "List the markdown files in this project." }),
+          Agent.run(agent, "List the markdown files in this project."),
         ).pipe(Effect.provideContext(services)),
     ),
   )
-  yield* Console.log(result.text)
+  yield* Console.log(result)
 }).pipe(Effect.scoped)
 
 const runtime = ManagedRuntime.make(FetchHttpClient.layer)

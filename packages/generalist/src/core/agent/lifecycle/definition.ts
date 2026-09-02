@@ -26,15 +26,36 @@ const cloneToolkit = <Tools extends Record<string, Tool.Any>>(
 export const close: {
   <Tools extends Record<string, Tool.Any>, R>(
     environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
-  ): (agent: Agent<Tools, R>) => Closed
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  ): <
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
+  ) => Closed
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
   ): Closed
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     environment: Layer.Layer<ClosedServices<Tools, R>>,
   ): Closed => ({ ...agent, open: (f) => f(agent, environment) }),
 )
@@ -43,17 +64,33 @@ export const close: {
 export const withTools: {
   <Tools extends Record<string, Tool.Any>, R>(
     declared: ReadonlyArray<Tool.Any>,
-  ): (agent: Agent<Tools, R>) => Agent<Tools, R>
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  ): <PolicyServices, AuthorizationServices, InputSchema extends Schema.Top, OutputSchema extends Schema.Top>(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
+  ) => Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices,
+    AuthorizationServices,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     declared: ReadonlyArray<Tool.Any>,
-  ): Agent<Tools, R>
+  ): Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices,
+    AuthorizationServices,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+  >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     declared: ReadonlyArray<Tool.Any>,
-  ): Agent<Tools, R> => {
+  ): Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema> => {
     const existing: ReadonlyArray<Tool.Any> = Object.values(agent.toolkit.tools)
     const toolkit = cloneToolkit(agent.toolkit)
     for (const tool of declared) {

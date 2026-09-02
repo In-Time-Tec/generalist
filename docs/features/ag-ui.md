@@ -75,7 +75,7 @@ TEXT_MESSAGE_END     messageId "run-1:1:text:0"
 - Interrupted normalized model content is projected before the later `RUN_ERROR`.
 - `RunWaiting` projects to `RUN_FINISHED` with an `interrupt` outcome; it is not a success.
 - `RunFailed`, `RunCancelled`, and `OperationUnknown` project to `RUN_ERROR` with distinct codes.
-- Tool progress and structured output project as `CUSTOM` events named `generalist.tool.progress` and `generalist.structured-output`.
+- Tool progress projects as a `CUSTOM` event named `generalist.tool.progress`.
 - Every projected event is validated by the AG-UI event schema.
 - Subscriber lag or an expired cursor emits `STATE_SNAPSHOT`, then resumes after the snapshot cursor.
 - `snapshot(runId)` returns the authoritative Runtime snapshot inside one `STATE_SNAPSHOT` event.

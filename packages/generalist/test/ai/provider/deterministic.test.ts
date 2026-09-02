@@ -417,16 +417,15 @@ describe("providers", () => {
       unexpectedToolLayer,
     ),
   )((test) => {
-    test.effect("round-trips the deterministic model through Agent.generate", () => {
+    test.effect("round-trips the deterministic model through Agent.run", () => {
       const agent = Agent.make({ name: "deterministic-agent", toolkit: unexpectedToolkit })
       return Effect.gen(function* () {
         const result = yield* ModelRegistry.withModel(
           { provider: "deterministic", model: "local" },
-          Agent.generate({ prompt: "hello" })(agent),
+          Agent.run("hello")(agent),
         )
 
-        expect(result.text).toBe("deterministic response")
-        expect(result.turns).toBe(1)
+        expect(result).toBe("deterministic response")
       })
     })
   })
@@ -560,16 +559,13 @@ describe("providers", () => {
           ["det-b", "model-b"],
         ])
 
-        const first = yield* ModelRegistry.withModel(
-          { provider: "det-a", model: "model-a" },
-          Agent.generate({ prompt: "hello" })(agent),
-        )
+        const first = yield* ModelRegistry.withModel({ provider: "det-a", model: "model-a" }, Agent.run("hello")(agent))
         const second = yield* ModelRegistry.withModel(
           { provider: "det-b", model: "model-b" },
-          Agent.generate({ prompt: "hello" })(agent),
+          Agent.run("hello")(agent),
         )
-        expect(first.text).toBe("deterministic response")
-        expect(second.text).toBe("deterministic response")
+        expect(first).toBe("deterministic response")
+        expect(second).toBe("deterministic response")
       })
     })
   })

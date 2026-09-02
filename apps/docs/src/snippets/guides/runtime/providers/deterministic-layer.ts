@@ -5,9 +5,9 @@ import { layerModel as deterministicModel } from "generalist/ai/deterministic"
 const agent = Agent.make({ name: "keyless-agent" })
 
 // No credentials, no client: the deterministic model layer answers "deterministic response".
-const program = Agent.generate(agent, { prompt: "Say the deterministic answer." }).pipe(
+const program = Agent.run(agent, "Say the deterministic answer.").pipe(
   Effect.provide(deterministicModel()),
-  Effect.flatMap((result) => Console.log(result.text)),
+  Effect.flatMap((result) => Console.log(result)),
 )
 
 const runtimeLayer = Layer.mergeAll(
