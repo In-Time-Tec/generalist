@@ -8,8 +8,8 @@ returns the matching Effect AI toolkit, handlers, and Generalist executor.
 ```ts
 import { Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware } from "generalist"
-import { make as makeHttp } from "generalist/mcp/client/http"
-import { connect } from "generalist/mcp/tools"
+import { make as makeHttp } from "generalist/unstable/mcp/client/http"
+import { connect } from "generalist/unstable/mcp/tools"
 
 const program = Effect.gen(function* () {
   const tools = yield* connect({

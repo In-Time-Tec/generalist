@@ -7,7 +7,7 @@ type Approvals = import("../policy/approvals.js").Service
 type PendingApproval = import("../policy/approvals.js").Pending
 type Permissions = import("../policy/permissions.js").Service
 
-/** @experimental The common identity and context of one authorization attempt. */
+/** The common identity and context of one authorization attempt. */
 export interface AccessRequest {
   readonly call: Response.ToolCallPart<string, unknown>
   readonly agentName: string
@@ -15,35 +15,35 @@ export interface AccessRequest {
   readonly sessionId?: string
 }
 
-/** @experimental A final authorization denial. */
+/** A final authorization denial. */
 export class PermissionDenied extends Schema.TaggedError<PermissionDenied>()("generalist/core/PermissionDenied", {
   message: Schema.String,
 }) {}
 
-/** @experimental Failure while producing a final authorization decision. */
+/** Failure while producing a final authorization decision. */
 export class AuthorizationError extends Schema.TaggedError<AuthorizationError>()("generalist/core/AuthorizationError", {
   message: Schema.String,
   cause: Schema.optional(Schema.Defect()),
 }) {}
 
-/** @experimental The tool may execute. */
+/** The tool may execute. */
 export interface Execute {
   readonly _tag: "Execute"
 }
-/** @experimental The tool must not execute. */
+/** The tool must not execute. */
 export interface Deny {
   readonly _tag: "Deny"
   readonly error: PermissionDenied
 }
-/** @experimental The run must suspend before the tool can execute. */
+/** The run must suspend before the tool can execute. */
 export interface Suspend {
   readonly _tag: "Suspend"
   readonly token: string
 }
-/** @experimental The one final decision for a tool execution attempt. */
+/** The one final decision for a tool execution attempt. */
 export type ToolAuthorization = Execute | Deny | Suspend
 
-/** @experimental Input to the final tool authorization boundary. */
+/** Input to the final tool authorization boundary. */
 export interface Request extends AccessRequest {
   readonly tool: Tool.Any | undefined
   readonly active: boolean
@@ -53,17 +53,17 @@ export interface Request extends AccessRequest {
   readonly onApprovalRequired: (request: ApprovalRequest) => Effect.Effect<void>
 }
 
-/** @experimental Final tool authorization boundary. */
+/** Final tool authorization boundary. */
 export interface Authorizer<R = never> {
   readonly authorize: (request: Request) => Effect.Effect<ToolAuthorization, AuthorizationError, R>
 }
 
-/** @experimental Optional exact tool authorizer service for run-layer composition. */
+/** Optional exact tool authorizer service for run-layer composition. */
 export class ToolAuthorizer extends Context.Service<ToolAuthorizer, Authorizer<never>>()(
   "generalist/core/tools/tool-authorization/ToolAuthorizer",
 ) {}
 
-/** @experimental Required services used by the linear authorization pass. */
+/** Required services used by the linear authorization pass. */
 export interface Options {
   readonly permissions: Permissions
   readonly approvals: Approvals
@@ -98,7 +98,7 @@ const suspend = (request: Request, token: string): Suspend => ({
   token,
 })
 
-/** @experimental Build the authorizer from its three required policy seams. */
+/** Build the authorizer from its three required policy seams. */
 export const make = (options: Options): Authorizer => ({
   authorize: (request) =>
     Effect.gen(function* () {
@@ -147,6 +147,6 @@ export const make = (options: Options): Authorizer => ({
     }),
 })
 
-/** @experimental Provide an exact authorizer for tests or run-layer composition. */
+/** Provide an exact authorizer for tests or run-layer composition. */
 export const layerTest = (authorizer: Authorizer): Layer.Layer<ToolAuthorizer> =>
   Layer.succeed(ToolAuthorizer, ToolAuthorizer.of(authorizer))

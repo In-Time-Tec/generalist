@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect"
 import { RuleStore } from "../core/policy/permissions.js"
 import { record } from "./report.js"
 
-/** @experimental Configuration for the permission RuleStore conformance suite. */
+/** Configuration for the permission RuleStore conformance suite. */
 export interface Options<E = never> {
   readonly layer: Layer.Layer<RuleStore, E, never>
 }
@@ -13,7 +13,7 @@ const provide = <A, E, LayerError>(options: Options<LayerError>, effect: Effect.
     Layer.build(options.layer).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
   )
 
-/** @experimental Registers the authoritative permission RuleStore conformance suite. */
+/** Registers the authoritative permission RuleStore conformance suite. */
 export const ruleStore = <E>(options: Options<E>): void => {
   describe("Generalist RuleStore conformance", () => {
     it.effect("retains concurrent writes and replaces an identical pattern", () =>

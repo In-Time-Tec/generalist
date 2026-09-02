@@ -5,7 +5,7 @@ import type { CompletedModelResponse } from "./response/builder.js"
 
 export { ModelResponseContent }
 
-/** @experimental A completed model response encoded as one durable operation result. */
+/** A completed model response encoded as one durable operation result. */
 export interface CompletedModelOperation {
   readonly operationId: string
   readonly turn: number
@@ -36,10 +36,10 @@ const CompletedModelOperationFields = Schema.Struct({
   digest: Schema.String,
 })
 
-/** @experimental Schema for the JSON-only result recorded for one completed model operation. */
+/** Schema for the JSON-only result recorded for one completed model operation. */
 export const CompletedModelOperation = CompletedModelOperationFields
 
-/** @experimental Returns whether an unknown journal result is a completed model operation. */
+/** Returns whether an unknown journal result is a completed model operation. */
 export const isCompletedModelOperation = Schema.is(CompletedModelOperation)
 
 /** @internal One validated part emitted while a model attempt is live or replayed. */

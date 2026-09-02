@@ -2,31 +2,22 @@
 export const packageSmokeTypecheck = (
   exports: ReadonlyArray<string>,
 ): string => `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
-import {
-  Agent,
-  Handoff,
-  LanguageModel,
-  Memory,
-  ModelMiddleware,
-  ModelRegistry,
-  ModelResilience,
-  Session,
-  ToolOutput,
-} from "generalist"
-import { A2A } from "generalist/a2a"
-import { AGUI } from "generalist/ag-ui"
+import { Agent, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, Session, ToolOutput } from "generalist"
+import { LanguageModel } from "effect/unstable/ai"
+import { A2A } from "generalist/unstable/a2a"
+import { AGUI } from "generalist/unstable/ag-ui"
 import { VectorStore } from "generalist/memory"
-import { MCPClient, OAuth } from "generalist/mcp"
-import { make as makeMcpHttpTransport } from "generalist/mcp/client/http"
-import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "generalist/mcp/tools"
+import { MCPClient, OAuth } from "generalist/unstable/mcp"
+import { make as makeMcpHttpTransport } from "generalist/unstable/mcp/client/http"
+import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "generalist/unstable/mcp/tools"
 import { load } from "generalist/instructions"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "generalist/instructions/skills"
-import { layer as deterministicLayer } from "generalist/ai/deterministic"
-import { make as makeModelRoute } from "generalist/ai/model-route"
+import { layer as deterministicLayer } from "generalist/providers/deterministic"
+import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
 import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
-import { RunClient, Snapshot, SSE, WebSocket, Wire } from "generalist/transport"
+import { RunClient, Snapshot, SSE, WebSocket, Wire } from "generalist/unstable/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -80,10 +71,10 @@ type MemoryRunRequirements = Assert<
   Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >
 void Handoff
-type TransportRoot = typeof import("generalist/transport")
+type TransportRoot = typeof import("generalist/unstable/transport")
 type RuntimeRoot = typeof import("generalist/runtime")
-type A2ARoot = typeof import("generalist/a2a")
-type AGUIRoot = typeof import("generalist/ag-ui")
+type A2ARoot = typeof import("generalist/unstable/a2a")
+type AGUIRoot = typeof import("generalist/unstable/ag-ui")
 type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AGUICanonical = Assert<Equal<AGUIRoot["AGUI"], typeof AGUI>>
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
@@ -101,22 +92,22 @@ void SqliteRunStore.layerSqlite
 void deterministicLayer
 void makeModelRoute
 type TransportClientSubpath = Assert<
-  MemberEqual<TransportRoot["RunClient"], typeof import("generalist/transport/run-client"), "layerWebSocket">
+  MemberEqual<TransportRoot["RunClient"], typeof import("generalist/unstable/transport/run-client"), "layerWebSocket">
 >
 type TransportErrorsSubpath = Assert<
-  MemberEqual<TransportRoot["Errors"], typeof import("generalist/transport/errors"), "TransportError">
+  MemberEqual<TransportRoot["Errors"], typeof import("generalist/unstable/transport/errors"), "TransportError">
 >
 type TransportSseSubpath = Assert<
-  MemberEqual<TransportRoot["SSE"], typeof import("generalist/transport/sse"), "respond">
+  MemberEqual<TransportRoot["SSE"], typeof import("generalist/unstable/transport/sse"), "respond">
 >
 type TransportWsSubpath = Assert<
-  MemberEqual<TransportRoot["WebSocket"], typeof import("generalist/transport/websocket"), "handle">
+  MemberEqual<TransportRoot["WebSocket"], typeof import("generalist/unstable/transport/websocket"), "handle">
 >
 type TransportWireSubpath = Assert<
-  MemberEqual<TransportRoot["Wire"], typeof import("generalist/transport/wire"), "producerCodec">
+  MemberEqual<TransportRoot["Wire"], typeof import("generalist/unstable/transport/wire"), "producerCodec">
 >
 type TransportSnapshotSubpath = Assert<
-  MemberEqual<TransportRoot["Snapshot"], typeof import("generalist/transport/snapshot"), "get">
+  MemberEqual<TransportRoot["Snapshot"], typeof import("generalist/unstable/transport/snapshot"), "get">
 >
 const cursor: Cursor.Cursor = Cursor.origin
 const snapshot = Snapshot.get("run:package-smoke")

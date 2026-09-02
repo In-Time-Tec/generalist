@@ -1,6 +1,6 @@
 # AG-UI
 
-`generalist/ag-ui` admits or resumes an authoritative Runtime Run, then projects
+`generalist/unstable/ag-ui` admits or resumes an authoritative Runtime Run, then projects
 its canonical `RunEvent` stream into schema-validated AG-UI events.
 
 ## Usage
@@ -8,7 +8,7 @@ its canonical `RunEvent` stream into schema-validated AG-UI events.
 ```ts
 import type { RunAgentInput } from "@ag-ui/core"
 import { Effect, Layer, Stream } from "effect"
-import { AGUI } from "generalist/ag-ui"
+import { AGUI } from "generalist/unstable/ag-ui"
 import { Address, Runtime } from "generalist/runtime"
 
 declare const runtimeLayer: Layer.Layer<Runtime.Runtime>

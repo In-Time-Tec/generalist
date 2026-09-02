@@ -1,5 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions } from "generalist"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 

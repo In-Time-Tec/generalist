@@ -11,7 +11,7 @@ export const foldkitChat = definePage({
     "Embed the headless Chat submodel in a FoldKit application, observe semantic RunEvents, and render committed entries, run state, and approvals.",
   content: [
     p(
-      code("generalist/foldkit"),
+      code("generalist/unstable/foldkit"),
       " adapts transport frames into FoldKit's Elm architecture. ",
       code("Connection.Connection"),
       " is a long-lived resource that observes decoded durable RunEvent frames and connection facts; ",
@@ -132,7 +132,7 @@ export const foldkitChat = definePage({
     ),
     p(
       "The full model, action, output, and helper tables are in ",
-      link("/docs/reference/foldkit", "the generalist/foldkit reference"),
+      link("/docs/reference/foldkit", "the generalist/unstable/foldkit reference"),
       ". To build the server side of this page, start at ",
       link("/docs/start/research-agent", "the research-agent tutorial"),
       ".",

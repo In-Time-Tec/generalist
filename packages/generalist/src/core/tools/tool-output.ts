@@ -1,40 +1,32 @@
 import { Cause, Clock, Context, Effect, Function, HashMap, Layer, Option, Ref, Schema } from "effect"
 import type { Success } from "./tool-executor.js"
 import { sha256Text } from "../durable/canonical-json.js"
-/** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
+/** A bounded tool result: inline content plus optional spilled overflow references. */
 export interface Output {
   readonly inline: unknown
   readonly outputPaths?: ReadonlyArray<string>
 }
 
-/** @experimental Content persisted by a tool-output store. */
+/** Content persisted by a tool-output store. */
 type OutputContent = Success["encodedResult"]
 
-/** @experimental A successful tool result after applying the output bound. */
+/** A successful tool result after applying the output bound. */
 export interface BoundedSuccess extends Success {
   readonly outputPaths: ReadonlyArray<string>
 }
-
-/** @experimental */
 export class Store extends Context.Service<
   Store,
   {
     readonly put: (toolCallId: string, content: OutputContent) => Effect.Effect<Option.Option<string>, Error>
   }
 >()("generalist/core/tools/tool-output/Store") {}
-
-/** @experimental */
 export class Error extends Schema.TaggedError<Error>()("generalist/core/ToolOutputError", {
   message: Schema.String,
 }) {}
-
-/** @experimental */
 export const layerNoop: Layer.Layer<Store> = Layer.succeed(
   Store,
   Store.of({ put: () => Effect.succeed(Option.none()) }),
 )
-
-/** @experimental */
 export const layerMemory: Layer.Layer<Store> = Layer.effect(
   Store,
   Ref.make({ next: 0, records: HashMap.empty<string, unknown>() }).pipe(
@@ -49,8 +41,6 @@ export const layerMemory: Layer.Layer<Store> = Layer.effect(
     ),
   ),
 )
-
-/** @experimental */
 export const layerTest = (implementation: Store["Service"]): Layer.Layer<Store> =>
   Layer.succeed(Store, Store.of(implementation))
 
@@ -154,8 +144,6 @@ const observeBound = (input: {
     const span = yield* Effect.option(Effect.currentSpan)
     if (Option.isSome(span)) span.value.event("generalist.tool.output.bound", yield* Clock.currentTimeNanos, observed)
   })
-
-/** @experimental */
 export const bound: {
   (options: {
     readonly toolCallId: string

@@ -30,7 +30,7 @@ const PackageToolkit = Schema.declare(
 
 const PackageHandlerLayer = Schema.declare((input): input is Layer.Layer<Tool.Handler<string>> => Layer.isLayer(input))
 
-/** @experimental Package catalog configuration. */
+/** Package catalog configuration. */
 export interface Options {
   readonly packages: ReadonlyArray<string>
   readonly cacheDir: string
@@ -40,7 +40,7 @@ export interface Options {
   readonly githubApiUrl?: string
 }
 
-/** @experimental A resolved package catalog. */
+/** A resolved package catalog. */
 export interface Service {
   readonly instructions: ReadonlyArray<Provider>
   readonly skills: SkillService
@@ -49,7 +49,6 @@ export interface Service {
   readonly handlers: Layer.Layer<Tool.Handler<string>>
 }
 
-/** @experimental */
 export class PackageCatalog extends Context.Service<PackageCatalog, Service>()(
   "generalist/instructions/package-catalog/PackageCatalog",
 ) {}
@@ -463,7 +462,7 @@ const make = Effect.fn("PackageCatalog.make")(function* (options: Options) {
   })
 })
 
-/** @experimental Resolve packages and hold their catalog for the Layer scope. */
+/** Resolve packages and hold their catalog for the Layer scope. */
 export const layer = (
   options: Options,
 ): Layer.Layer<

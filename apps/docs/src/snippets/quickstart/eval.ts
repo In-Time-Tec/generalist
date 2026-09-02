@@ -1,6 +1,6 @@
 import { Console, Effect } from "effect"
 import { Agent } from "generalist"
-import { layerModel as deterministicModel } from "generalist/ai/deterministic"
+import { layerModel as deterministicModel } from "generalist/providers/deterministic"
 
 const agent = Agent.make({ name: "eval-agent" })
 

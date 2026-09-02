@@ -26,7 +26,7 @@ import { type MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { Metadata } from "./message.js"
 import type { Service as RunStoreService } from "../run/store.js"
 
-/** @experimental One authorization question about one exact sender and target. */
+/** One authorization question about one exact sender and target. */
 export interface PolicyInput {
   readonly sender: DirectoryEntry
   readonly target: DirectoryEntry
@@ -35,18 +35,15 @@ export interface PolicyInput {
 }
 
 /**
- * @experimental The host seam for addressing beyond Generalist's derived relationships.
+ * The host seam for addressing beyond Generalist's derived relationships.
  *
  * Generalist always allows self, parent, direct child, and sibling-under-one-parent from authoritative
  * durable identity. Everything else — notably addressing another Session — is a host decision, so
  * cross-product addressing is opt-in rather than a consequence of knowing an id.
  */
-/** @experimental */
 export class MessagingPolicy extends Context.Service<MessagingPolicy, MessagingPolicy.Service>()(
   "generalist/runtime/messaging/service/MessagingPolicy",
 ) {}
-
-/** @experimental */
 export namespace MessagingPolicy {
   export interface Service {
     readonly allow: (input: PolicyInput) => Effect.Effect<boolean>
@@ -58,21 +55,19 @@ const relationshipsOnly: MessagingPolicy.Service = {
   allow: () => Effect.succeed(false),
   discover: () => Effect.succeed([]),
 }
-
-/** @experimental */
 const makePolicy = (policy: Partial<MessagingPolicy.Service> = {}): MessagingPolicy.Service => ({
   allow: policy.allow ?? relationshipsOnly.allow,
   discover: policy.discover ?? relationshipsOnly.discover,
 })
 
-/** @experimental Host messaging policy construction. */
+/** Host messaging policy construction. */
 export const Policy = { make: makePolicy }
 
-/** @experimental Host policy over exact sender and target identity. */
+/** Host policy over exact sender and target identity. */
 export const layer = (policy: Partial<MessagingPolicy.Service>): Layer.Layer<MessagingPolicy> =>
   Layer.succeed(MessagingPolicy, MessagingPolicy.of(Policy.make(policy)))
 
-/** @experimental Input for one addressed send. Sender identity is a Run id, never caller-supplied text. */
+/** Input for one addressed send. Sender identity is a Run id, never caller-supplied text. */
 export interface SendMessageInput {
   readonly fromRunId: string
   readonly to: Address
@@ -85,7 +80,7 @@ export interface SendMessageInput {
   readonly metadata?: Metadata
 }
 
-/** @experimental Durable send failure. */
+/** Durable send failure. */
 export const SendMessageError = Schema.Union([
   AddressNotFound,
   AddressInvalid,
@@ -97,15 +92,11 @@ export const SendMessageError = Schema.Union([
   RunNotFound,
   RuntimeUnavailable,
 ])
-
-/** @experimental */
 export type SendMessageError = typeof SendMessageError.Type
-
-/** @experimental */
 export type DirectoryError = RunNotFound | RuntimeUnavailable
 
 /**
- * @experimental Decide one addressing attempt.
+ * Decide one addressing attempt.
  *
  * Relationship is derived from durable parent links only. An Address a sender happens to know grants
  * nothing on its own.
@@ -133,7 +124,7 @@ export const authorize = (input: {
     })
   })
 
-/** @experimental Directory entries one Run may reach under Generalist relationships plus host policy. */
+/** Directory entries one Run may reach under Generalist relationships plus host policy. */
 export const reachable = (input: {
   readonly store: RunStoreService
   readonly policy: MessagingPolicy.Service
@@ -163,7 +154,6 @@ export const reachable = (input: {
   })
 
 /**
- * @experimental
  *
  * @effect-expect-leaking ToolContext
  * ToolContext is the per-call ambient identity of the running execution. Resolving it at Layer
@@ -198,7 +188,7 @@ const currentRunId = Effect.flatMap(ToolContext, (context) =>
 )
 
 /**
- * @experimental Build in-execution messaging over one RunStore and host policy.
+ * Build in-execution messaging over one RunStore and host policy.
  *
  * Every send is one durable `send` driver operation with a `never` replay policy: a crash between
  * the journal record and the mailbox insert settles as an unknown operation for explicit resolution

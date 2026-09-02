@@ -1,5 +1,6 @@
 import { Schema } from "effect"
-import { Agent, Tool, Toolkit } from "generalist"
+import { Agent } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 
 export const deployTool = Tool.make("deploy_service", {
   description: "Deploy a service to production",

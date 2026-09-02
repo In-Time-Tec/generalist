@@ -27,7 +27,7 @@ type Channel = "reasoning" | "text"
 
 export interface Sink {
   readonly offer: (part: ModelPart) => Effect.Effect<boolean>
-  /** @experimental Retire the current frame for subscribers without closing the sink for later attempts. */
+  /** Retire the current frame for subscribers without closing the sink for later attempts. */
   readonly discard: Effect.Effect<void>
   readonly clear: Effect.Effect<void>
 }

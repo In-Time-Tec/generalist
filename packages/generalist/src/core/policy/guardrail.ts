@@ -73,7 +73,7 @@ const redactPromptText = (prompt: Prompt.Prompt, options: RedactOptions): Prompt
     }),
   )
 
-/** @experimental Fail the run when `check` rejects the input prompt. */
+/** Fail the run when `check` rejects the input prompt. */
 export const validateInput = (
   check: (prompt: Prompt.Prompt, context: TurnContext) => Effect.Effect<Option.Option<string>>,
 ): Middleware => ({
@@ -89,12 +89,12 @@ export const validateInput = (
     ),
 })
 
-/** @experimental Redact matches in text-bearing prompt fields before the model sees them. */
+/** Redact matches in text-bearing prompt fields before the model sees them. */
 export const redactInput = (options: RedactOptions): Middleware => ({
   transformPrompt: (prompt) => Effect.succeed(redactPromptText(prompt, options)),
 })
 
-/** @experimental Redact matches in streamed text deltas before Generalist folds or emits them. */
+/** Redact matches in streamed text deltas before Generalist folds or emits them. */
 export const redactOutput = (options: RedactOptions): Middleware => ({
   transformPart: (part) => {
     if (part.type !== "text-delta") return Effect.succeed(Option.some(part))
@@ -110,7 +110,7 @@ export const redactOutput = (options: RedactOptions): Middleware => ({
   },
 })
 
-/** @experimental Drop streamed non-tool-call parts when `keep` returns false. */
+/** Drop streamed non-tool-call parts when `keep` returns false. */
 export const filterOutput = (
   keep: (part: Response.StreamPart<Record<string, Tool.Any>>, context: TurnContext) => boolean,
 ): Middleware => ({

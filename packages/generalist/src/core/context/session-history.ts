@@ -1,7 +1,7 @@
 import { Function } from "effect"
 import type { CompactionEntry, Entry, EntryId } from "./session.js"
 
-/** @experimental One bounded read over the exact entry log. */
+/** One bounded read over the exact entry log. */
 export interface HistoryPageInput {
   readonly limit: number
   /** Return entries strictly before this entry. Omitted reads the newest page. */
@@ -11,7 +11,7 @@ export interface HistoryPageInput {
 }
 
 /**
- * @experimental One page of exact Session entries plus the cursors that continue it.
+ * One page of exact Session entries plus the cursors that continue it.
  *
  * `entries` are in path order. `hasBefore` states whether older entries remain, which is how a
  * caller learns that history continues behind a compaction checkpoint rather than ending there.
@@ -31,7 +31,7 @@ export interface HistoryPage {
 }
 
 /**
- * @experimental Purely page one root-to-leaf path over its exact entries.
+ * Purely page one root-to-leaf path over its exact entries.
  *
  * Paging reads the entry log, not the projection, so entries recorded before a compaction
  * checkpoint stay reachable. A checkpoint is an ordinary entry in the page, never a floor.
@@ -66,6 +66,6 @@ export const page: {
   return result
 })
 
-/** @experimental Every compaction checkpoint on one path, oldest first. */
+/** Every compaction checkpoint on one path, oldest first. */
 export const compactionCheckpoints = (path: ReadonlyArray<Entry>): ReadonlyArray<CompactionEntry> =>
   path.filter((entry): entry is CompactionEntry => entry._tag === "Compaction")

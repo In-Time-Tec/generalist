@@ -448,10 +448,10 @@ const makeSqlStoreServices = <DriverError>(
     return { runStore, externalChildStore, ...(claims === undefined ? undefined : { claims }) }
   })
 
-/** @experimental Services constructed by a multi-worker SQL Runtime adapter. */
+/** Services constructed by a multi-worker SQL Runtime adapter. */
 export type SqlRuntimeServices = Runtime | RunStore | RunClaims | RunExecutor
 
-/** @experimental Assemble one server SQL driver around Runtime's lifecycle kernel. */
+/** Assemble one server SQL driver around Runtime's lifecycle kernel. */
 export const layerSqlRuntime = (input: {
   readonly options: SqlStoreOptions
   readonly driver: SqlRuntimeDriver<SqlDriverStoreError>

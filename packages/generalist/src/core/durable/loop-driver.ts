@@ -12,8 +12,6 @@ import { charge, settleModelTokens, type RunBudget, type Exhausted, type BudgetL
 import { LoopDriverState, type PendingOperation } from "./loop-driver-state.js"
 import { Commit, type ControlState } from "../agent/handoff/state.js"
 import { isCompletedModelOperation } from "../model/operation.js"
-
-/** @experimental */
 export interface LoopDriverOptions {
   readonly logicalOperationId: string
   readonly sessionId: string
@@ -75,7 +73,7 @@ const chargeForKind = (budget: RunBudget, kind: DriverOperationKind): Effect.Eff
   return Effect.succeed(budget)
 }
 
-/** @experimental Charge budget at operation schedule time before execution begins. */
+/** Charge budget at operation schedule time before execution begins. */
 export const chargeScheduled: {
   (
     kind: DriverOperationKind,
@@ -100,7 +98,7 @@ export const chargeScheduled: {
     }),
 )
 
-/** @experimental Apply token usage after a model boundary without scheduling a new operation. */
+/** Apply token usage after a model boundary without scheduling a new operation. */
 export const chargeUsage: {
   (usage: BudgetLimits): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, Exhausted>
   (checkpoint: DriverCheckpoint, usage: BudgetLimits): Effect.Effect<DriverCheckpoint, Exhausted>
@@ -113,7 +111,7 @@ export const chargeUsage: {
     }),
 )
 
-/** @experimental Replace checkpoint budget after child reservation or refund. */
+/** Replace checkpoint budget after child reservation or refund. */
 export const withBudget: {
   (budget: RunBudget): (checkpoint: DriverCheckpoint) => DriverCheckpoint
   (checkpoint: DriverCheckpoint, budget: RunBudget): DriverCheckpoint
@@ -195,7 +193,7 @@ const applyOutcome = (
     return encodeCheckpoint(checkpoint, rest)
   })
 
-/** @experimental Production durable driver backing inline Agent.stream runs. */
+/** Production durable driver backing inline Agent.stream runs. */
 export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
   version: currentDriverVersion,
   initial: (input: DriverInput) =>
@@ -235,7 +233,7 @@ export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
   apply: applyOutcome,
 })
 
-/** @experimental Attach the next pending operation before interpreter decide. */
+/** Attach the next pending operation before interpreter decide. */
 export const withPending: {
   (pending: PendingOperation, turn: number): (checkpoint: DriverCheckpoint) => DriverCheckpoint
   (checkpoint: DriverCheckpoint, pending: PendingOperation, turn: number): DriverCheckpoint

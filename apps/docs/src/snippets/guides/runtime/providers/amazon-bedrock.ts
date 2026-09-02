@@ -1,6 +1,6 @@
 import { Layer } from "effect"
 import { ModelRegistry } from "generalist"
-import { layer as amazonBedrockLayer } from "generalist/ai/amazon-bedrock"
+import { layer as amazonBedrockLayer } from "generalist/providers/amazon-bedrock"
 
 const model = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 

@@ -1,0 +1,18 @@
+id: no-stable-import-unstable
+language: TypeScript
+severity: error
+message: Stable Generalist modules cannot import from src/unstable.
+rule:
+  any:
+    - pattern: import $$$NAMES from "$SOURCE"
+    - pattern: import "$SOURCE"
+    - pattern: export { $$$NAMES } from "$SOURCE"
+    - pattern: export * from "$SOURCE"
+    - pattern: export * as $NAME from "$SOURCE"
+constraints:
+  SOURCE:
+    regex: ^(?:\.\./)+unstable/
+files:
+  - "packages/generalist/src/**/*.ts"
+ignores:
+  - "packages/generalist/src/unstable/**"

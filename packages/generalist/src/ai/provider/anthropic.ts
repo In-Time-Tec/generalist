@@ -13,8 +13,6 @@ import { AiError, AnthropicStructuredOutput, LanguageModel, Model, Tool } from "
 import { layerImageSources } from "../model/image-source.js"
 import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/failure.js"
 import type { RegistrationOptions } from "../model/registration.js"
-
-/** @experimental */
 export interface Options extends RegistrationOptions {
   readonly model: (string & {}) | AnthropicLanguageModel.Model
   readonly config?: Config
@@ -40,11 +38,9 @@ const ConfigSchema = Schema.Struct({
   disableParallelToolCalls: Schema.optionalKey(Schema.Boolean),
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),
 })
-
-/** @experimental */
 export type Config = typeof ConfigSchema.Type
 
-/** @experimental Decodes persisted provider options into Anthropic request configuration. */
+/** Decodes persisted provider options into Anthropic request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
 const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 
@@ -108,7 +104,7 @@ const resolveAnthropicFailure = ({ error, metadata: partMetadata, method }: Fail
   return AiError.make({ module: "AnthropicLanguageModel", method, reason: anthropicReason(type, message, metadata) })
 }
 
-/** @experimental Effective Anthropic request config; callers opt into top-level automatic caching. */
+/** Effective Anthropic request config; callers opt into top-level automatic caching. */
 export const resolvedConfig = (input: Options): Config => input.config ?? {}
 
 const providerConfig = (config: Config): Omit<typeof AnthropicLanguageModel.Config.Service, "model"> => {
@@ -123,7 +119,7 @@ const anthropicLanguageModelLayer = (input: Options) => {
   return layerModelFailures(layerImageSources(AnthropicLanguageModel.layer(options)), resolveAnthropicFailure)
 }
 
-/** @experimental Model layer over `AnthropicClient`; provide it to a run with `Effect.provide`. */
+/** Model layer over `AnthropicClient`; provide it to a run with `Effect.provide`. */
 export const layerModel = (
   input: Options,
 ): Model.Model<"anthropic", LanguageModel.LanguageModel, AnthropicClient.AnthropicClient> =>
@@ -145,11 +141,7 @@ const registrationOptions = (input: Options) => {
   if (input.metadata !== undefined) return { ...required, metadata: input.metadata }
   return required
 }
-
-/** @experimental */
 export const classifyFailure: FailureClassifier = classify
-
-/** @experimental */
 export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool, { transformer: AnthropicStructuredOutput.toCodecAnthropic }),
@@ -162,14 +154,10 @@ export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
         }),
       }),
   })
-
-/** @experimental */
 export interface ClientOptions extends Options {
   readonly apiKey: EffectConfig.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof AnthropicClient.layerConfig>[0]>, "apiKey">
 }
-
-/** @experimental */
 export const layer = (
   input: ClientOptions,
 ): Layer.Layer<ModelRegistry, EffectConfig.ConfigError, HttpClient.HttpClient> =>
@@ -177,9 +165,7 @@ export const layer = (
     Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
-/** @experimental Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
+/** Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
 export const registration = (input: Options): ReturnType<typeof modelRegistration> =>
   modelRegistration(registrationOptions(input))
-
-/** @experimental */
 export const layerConfig = AnthropicClient.layerConfig

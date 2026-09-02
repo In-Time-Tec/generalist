@@ -9,7 +9,7 @@ import {
   type SummaryCallCell,
 } from "../model/telemetry/events.js"
 
-/** @experimental Emit the compaction lifecycle around one pass that decided to do work. */
+/** Emit the compaction lifecycle around one pass that decided to do work. */
 export const withCompactionLifecycle: {
   (
     input: Request,
@@ -63,7 +63,7 @@ export const withCompactionLifecycle: {
     }),
 )
 
-/** @experimental The active model wrapped with the enclosing run's telemetry, when present. */
+/** The active model wrapped with the enclosing run's telemetry, when present. */
 export const summaryLanguageModel: Effect.Effect<LanguageModel.Service, never, LanguageModel.LanguageModel> =
   Effect.gen(function* () {
     const instrumentation = yield* CurrentInstrumentation

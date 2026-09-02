@@ -1,52 +1,36 @@
 import { Context, Effect, HashMap, Layer, Ref, Schema } from "effect"
 import type { Key, Metadata } from "../core/context/memory.js"
-
-/** @experimental */
 export interface Document {
   readonly id: string
   readonly key: Key
   readonly text: string
   readonly metadata?: Metadata
 }
-
-/** @experimental */
 export interface Embedded extends Document {
   readonly embedding: ReadonlyArray<number>
 }
-
-/** @experimental */
 export interface Match {
   readonly document: Embedded
   readonly score: number
 }
-
-/** @experimental */
 export interface Query {
   readonly key: Key
   readonly embedding: ReadonlyArray<number>
   readonly limit: number
   readonly minScore?: number
 }
-
-/** @experimental */
 export interface DeleteInput {
   readonly key: Key
   readonly id?: string | undefined
 }
-
-/** @experimental */
 export class VectorStoreError extends Schema.TaggedError<VectorStoreError>()("generalist/memory/VectorStoreError", {
   message: Schema.String,
 }) {}
-
-/** @experimental */
 export interface Service {
   readonly upsert: (documents: ReadonlyArray<Embedded>) => Effect.Effect<void, VectorStoreError>
   readonly query: (query: Query) => Effect.Effect<ReadonlyArray<Match>, VectorStoreError>
   readonly delete: (input: DeleteInput) => Effect.Effect<void, VectorStoreError>
 }
-
-/** @experimental */
 export class VectorStore extends Context.Service<VectorStore, Service>()(
   "generalist/memory/vector-store/VectorStore",
 ) {}
@@ -123,9 +107,7 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
   ),
 )
 
-/** @experimental Ref-backed non-durable vector store. */
+/** Ref-backed non-durable vector store. */
 export const layerMemory: Layer.Layer<VectorStore> = Layer.effect(VectorStore, make.pipe(Effect.map(VectorStore.of)))
-
-/** @experimental */
 export const layerTest = (implementation: Service): Layer.Layer<VectorStore> =>
   Layer.succeed(VectorStore, VectorStore.of(implementation))

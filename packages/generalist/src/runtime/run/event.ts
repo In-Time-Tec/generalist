@@ -75,7 +75,7 @@ export type RunResumed = RunEventBase & {
   readonly waitId: string
   readonly resolution: WaitResolution
 }
-/** @experimental Exact durable steering admission fact. */
+/** Exact durable steering admission fact. */
 export type SteeringAccepted = RunEventBase & {
   readonly _tag: "SteeringAccepted"
   readonly entryId: string
@@ -84,17 +84,17 @@ export type SteeringAccepted = RunEventBase & {
   readonly digest: string
   readonly prompt: Prompt.Prompt
 }
-/** @experimental Exact durable steering consumption fact. */
+/** Exact durable steering consumption fact. */
 export type SteeringConsumed = RunEventBase & {
   readonly _tag: "SteeringConsumed"
   readonly entryIds: ReadonlyArray<string>
   readonly operationId: string
 }
-/** @experimental Terminal disposition category for accepted steering. */
+/** Terminal disposition category for accepted steering. */
 export const SteeringDiscardReason = Schema.Literals(["completed", "failed", "cancelled"])
-/** @experimental Terminal disposition category for accepted steering. */
+/** Terminal disposition category for accepted steering. */
 export type SteeringDiscardReason = typeof SteeringDiscardReason.Type
-/** @experimental Exact terminal disposition fact for unconsumed steering. */
+/** Exact terminal disposition fact for unconsumed steering. */
 export type SteeringDiscarded = RunEventBase & {
   readonly _tag: "SteeringDiscarded"
   readonly entryIds: ReadonlyArray<string>

@@ -17,7 +17,7 @@ type AgentToolSchemaServices<Parameters extends Schema.Top, Success extends Sche
   | Success["DecodingServices"]
   | Success["EncodingServices"]
 
-/** @experimental Execute one tool call against a closed tool set that already owns its invocation. */
+/** Execute one tool call against a closed tool set that already owns its invocation. */
 export const executeWithClosedSet: {
   (
     request: Request,
@@ -61,7 +61,7 @@ export const executeWithClosedSet: {
   },
 )
 
-/** @experimental Execute one tool call against a closed agent-tool toolkit. */
+/** Execute one tool call against a closed agent-tool toolkit. */
 export const executeWithClosedToolkit: {
   (
     request: Request,

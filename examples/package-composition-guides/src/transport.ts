@@ -2,7 +2,7 @@ import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, AgentManifest, Pins } from "generalist"
 import { ExecutableManifest, ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
-import { SSE } from "generalist/transport"
+import { SSE } from "generalist/unstable/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
 const pinnedAgent = AgentManifest.fromLiveAgent(agent, {

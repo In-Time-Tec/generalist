@@ -5,7 +5,7 @@ import { Address } from "../address.js"
 import { Metadata } from "./message.js"
 
 /**
- * @experimental Bounds one durable inbox.
+ * Bounds one durable inbox.
  *
  * Bounds are enforced at admission so a sender learns immediately that its message was refused
  * instead of discovering silent loss later.
@@ -16,8 +16,6 @@ export interface MailboxBounds {
   readonly maxPerWindow: number
   readonly windowMillis: number
 }
-
-/** @experimental */
 export const defaultBounds: MailboxBounds = {
   maxPending: 256,
   maxPendingBytes: 1_048_576,
@@ -26,7 +24,7 @@ export const defaultBounds: MailboxBounds = {
 }
 
 /**
- * @experimental One durable message admitted to a target inbox.
+ * One durable message admitted to a target inbox.
  *
  * `sequence` is the total order for the target. `deliveredRunId` records the Run that took the
  * entry; until then the entry is pending and survives Server restart.
@@ -57,8 +55,6 @@ interface MailboxEntryEncoded extends Omit<MailboxEntry, "from" | "to" | "prompt
   readonly to: string
   readonly prompt: typeof Prompt.Prompt.Encoded
 }
-
-/** @experimental */
 export const MailboxEntry: Schema.Codec<MailboxEntry, MailboxEntryEncoded> = Schema.Struct({
   entryId: Schema.String,
   targetSessionId: Schema.String,
@@ -80,15 +76,13 @@ export const MailboxEntry: Schema.Codec<MailboxEntry, MailboxEntryEncoded> = Sch
   steeringEntryId: Schema.optionalKey(Schema.String),
 })
 
-/** @experimental Receipt for one admitted message. */
+/** Receipt for one admitted message. */
 export interface MessageReceipt {
   readonly messageId: string
   readonly entryId: string
   readonly sequence: number
   readonly duplicate: boolean
 }
-
-/** @experimental */
 export const MessageReceipt: Schema.Codec<MessageReceipt, MessageReceipt> = Schema.Struct({
   messageId: Schema.String,
   entryId: Schema.String,
@@ -97,7 +91,7 @@ export const MessageReceipt: Schema.Codec<MessageReceipt, MessageReceipt> = Sche
 })
 
 /**
- * @experimental Stable identity of one message payload.
+ * Stable identity of one message payload.
  *
  * Two admissions carrying the same message id and idempotency key must carry the same digest, or
  * the second is a conflict rather than a duplicate.
@@ -121,15 +115,15 @@ export const digest = (input: {
     metadata: input.metadata,
   })
 
-/** @experimental Encoded size charged against the inbox byte bound. */
+/** Encoded size charged against the inbox byte bound. */
 export const promptBytes = (prompt: Prompt.Prompt): number =>
   new TextEncoder().encode(JSON.stringify(Schema.encodeSync(Prompt.Prompt)(prompt))).length
 
-/** @experimental The steering idempotency key one mailbox entry delivers under. */
+/** The steering idempotency key one mailbox entry delivers under. */
 export const steeringKey = (entryId: string): string => `message:${entryId}`
 
 /**
- * @experimental Render one entry as model-facing conversation carrying its authoritative sender.
+ * Render one entry as model-facing conversation carrying its authoritative sender.
  *
  * Delivery re-enters the model as ordinary user content, exactly like steering, so addressed
  * messaging adds no second payload vocabulary to the agent loop.

@@ -1,4 +1,4 @@
-import { Chat, Connection } from "generalist/foldkit"
+import { Chat, Connection } from "generalist/unstable/foldkit"
 import { Cause, Effect, Function, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { define, mapMessage, mapMessages, type Command } from "foldkit/command"

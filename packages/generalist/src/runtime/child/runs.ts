@@ -36,21 +36,21 @@ import { supportsCancellation } from "../../core/tools/tool-executor-cancellatio
 
 export * from "./group.js"
 
-/** @experimental Input for one blocking child invocation. */
+/** Input for one blocking child invocation. */
 export type Input = typeof Parameters.Type & {
   readonly parentRunId: string
   readonly toolCallId: string
   readonly operationKey?: string
 }
 
-/** @experimental Input for one non-blocking bounded child-group admission. */
+/** Input for one non-blocking bounded child-group admission. */
 export type StartGroupInput = StartGroupParameters & {
   readonly parentRunId: string
   readonly toolCallId: string
   readonly operationKey?: string
 }
 
-/** @experimental Input for one durable child-group join. */
+/** Input for one durable child-group join. */
 export type AwaitGroupInput = AwaitGroupParameters & {
   readonly parentRunId: string
   readonly toolCallId: string
@@ -59,7 +59,7 @@ export type AwaitGroupInput = AwaitGroupParameters & {
 type MutableInput = { -readonly [Key in keyof Input]: Input[Key] }
 type MutableGroupInput = { -readonly [Key in keyof StartGroupInput]: StartGroupInput[Key] }
 
-/** @experimental Runtime-owned child execution operations used by the model-facing routes. */
+/** Runtime-owned child execution operations used by the model-facing routes. */
 export interface Service {
   readonly invoke: (input: Input) => Effect.Effect<Outcome>
   readonly runGroup: (input: StartGroupInput) => Effect.Effect<Outcome>
@@ -67,7 +67,7 @@ export interface Service {
   readonly awaitGroup: (input: AwaitGroupInput) => Effect.Effect<Outcome>
 }
 
-/** @experimental Runtime-owned child execution service. */
+/** Runtime-owned child execution service. */
 export class ChildRuns extends Context.Service<ChildRuns, Service>()("generalist/runtime/child/runs/ChildRuns") {}
 
 const success = <Result>(result: Result): Outcome => ({ _tag: "Success", result, encodedResult: result })
@@ -106,7 +106,7 @@ const schemaIssueMessage = (error: Schema.SchemaError): string =>
     })
     .join("\n")
 
-/** @experimental Construct Runtime-owned child execution operations over one RunStore. */
+/** Construct Runtime-owned child execution operations over one RunStore. */
 export const make = (store: RunStoreService): Service => {
   interface Origin {
     parentToolCallId: string
@@ -287,7 +287,7 @@ export const make = (store: RunStoreService): Service => {
   return ChildRuns.of({ invoke, runGroup, startGroup, awaitGroup })
 }
 
-/** @experimental Route Runtime-owned child tools and preserve every resolved upstream handler. */
+/** Route Runtime-owned child tools and preserve every resolved upstream handler. */
 const makeExecutor = <
   Tools extends Record<string, Tool.Any>,
   R,
@@ -332,7 +332,7 @@ const makeExecutor = <
   })
 }
 
-/** @experimental Tool executor that owns Runtime child routes. */
+/** Tool executor that owns Runtime child routes. */
 export const Executor = { make: makeExecutor }
 
 const runtimeContext = Effect.gen(function* () {
@@ -348,7 +348,7 @@ const runtimeContext = Effect.gen(function* () {
   return { context, children, runId: context.runId, toolCallId: context.toolCallId }
 })
 
-/** @experimental Route for the blocking and grouped child tools. */
+/** Route for the blocking and grouped child tools. */
 export const route: Route<ChildRuns | ToolContext> = toolExecutorRoute({
   tools: [toolName, runGroupToolName, startGroupToolName, awaitGroupToolName],
   execute: (request) =>

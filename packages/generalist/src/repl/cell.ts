@@ -1,43 +1,36 @@
 import { Schema } from "effect"
 
-/** @experimental Generalist Session identity that owns exactly one kernel. */
+/** Generalist Session identity that owns exactly one kernel. */
 export const SessionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(256))
-/** @experimental */
 export type SessionId = typeof SessionId.Type
 
-/** @experimental Identity of one authored cell execution. */
+/** Identity of one authored cell execution. */
 export const CellId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(256))
-/** @experimental */
 export type CellId = typeof CellId.Type
 
-/** @experimental Kernel generation. A restart or profile change starts a new epoch. */
+/** Kernel generation. A restart or profile change starts a new epoch. */
 export const Epoch = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-/** @experimental */
 export type Epoch = typeof Epoch.Type
 
-/** @experimental Cell-local monotonic event ordinal. Starts at 0 and increases by one per emitted event. */
+/** Cell-local monotonic event ordinal. Starts at 0 and increases by one per emitted event. */
 export const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-/** @experimental */
 export type Sequence = typeof Sequence.Type
 
 const NonNegative = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
-/** @experimental Output channel of one cell. */
+/** Output channel of one cell. */
 export const Channel = Schema.Literals(["stdout", "stderr", "result", "display"])
-/** @experimental */
 export type Channel = typeof Channel.Type
 
-/** @experimental Why a kernel binding did not survive a snapshot restore. */
+/** Why a kernel binding did not survive a snapshot restore. */
 export const DropReason = Schema.Literals(["function", "class", "module", "live-handle", "oversized", "unserializable"])
-/** @experimental */
 export type DropReason = typeof DropReason.Type
 
-/** @experimental Why the kernel started a new epoch. */
+/** Why the kernel started a new epoch. */
 export const RestartReason = Schema.Literals(["requested", "killed", "crashed", "profile-changed"])
-/** @experimental */
 export type RestartReason = typeof RestartReason.Type
 
-/** @experimental Terminal value of a cell that completed without throwing. */
+/** Terminal value of a cell that completed without throwing. */
 export const CellResult = Schema.Struct({
   cellId: CellId,
   epoch: Epoch,
@@ -47,11 +40,10 @@ export const CellResult = Schema.Struct({
   stderr: Schema.String,
   durationMillis: NonNegative,
 })
-/** @experimental */
 export type CellResult = typeof CellResult.Type
 
 /**
- * @experimental The cell threw. This is model input, not a framework failure: the namespace, the
+ * The cell threw. This is model input, not a framework failure: the namespace, the
  * kernel, and every prior binding survive.
  */
 export class CellExecutionFailed extends Schema.TaggedError<CellExecutionFailed>()(
@@ -69,7 +61,7 @@ export class CellExecutionFailed extends Schema.TaggedError<CellExecutionFailed>
   },
 ) {}
 
-/** @experimental Why no kernel could run the cell. */
+/** Why no kernel could run the cell. */
 export const UnavailableReason = Schema.Literals([
   "start-failed",
   "closed",
@@ -77,17 +69,16 @@ export const UnavailableReason = Schema.Literals([
   "profile-mismatch",
   "deadline-exceeded",
 ])
-/** @experimental */
 export type UnavailableReason = typeof UnavailableReason.Type
 
-/** @experimental No kernel was available to run the cell. Nothing was evaluated. */
+/** No kernel was available to run the cell. Nothing was evaluated. */
 export class KernelUnavailable extends Schema.TaggedError<KernelUnavailable>()("generalist/repl/KernelUnavailable", {
   sessionId: SessionId,
   reason: UnavailableReason,
   message: Schema.String,
 }) {}
 
-/** @experimental The kernel broke the cell protocol: out-of-order sequence, unknown frame, or malformed payload. */
+/** The kernel broke the cell protocol: out-of-order sequence, unknown frame, or malformed payload. */
 export class KernelProtocolViolation extends Schema.TaggedError<KernelProtocolViolation>()(
   "generalist/repl/KernelProtocolViolation",
   {
@@ -97,13 +88,12 @@ export class KernelProtocolViolation extends Schema.TaggedError<KernelProtocolVi
   },
 ) {}
 
-/** @experimental Why the cell outcome is uncertain. */
+/** Why the cell outcome is uncertain. */
 export const UnknownReason = Schema.Literals(["host-terminated", "kernel-killed", "transport-lost"])
-/** @experimental */
 export type UnknownReason = typeof UnknownReason.Type
 
 /**
- * @experimental The cell may or may not have committed its effects. It is never replayed; a host
+ * The cell may or may not have committed its effects. It is never replayed; a host
  * resolves it explicitly.
  */
 export class CellOutcomeUnknown extends Schema.TaggedError<CellOutcomeUnknown>()("generalist/repl/CellOutcomeUnknown", {
@@ -114,17 +104,16 @@ export class CellOutcomeUnknown extends Schema.TaggedError<CellOutcomeUnknown>()
   message: Schema.String,
 }) {}
 
-/** @experimental Closed union of everything a cell call can fail with. */
+/** Closed union of everything a cell call can fail with. */
 export const CellFailure = Schema.Union([
   CellExecutionFailed,
   KernelUnavailable,
   KernelProtocolViolation,
   CellOutcomeUnknown,
 ])
-/** @experimental */
 export type CellFailure = typeof CellFailure.Type
 
-/** @experimental A kernel process is starting for this cell. */
+/** A kernel process is starting for this cell. */
 export const KernelStarting = Schema.TaggedStruct("KernelStarting", {
   cellId: CellId,
   sequence: Sequence,
@@ -132,7 +121,7 @@ export const KernelStarting = Schema.TaggedStruct("KernelStarting", {
   epoch: Epoch,
 })
 
-/** @experimental The kernel is bootstrapped and the cell is about to evaluate. */
+/** The kernel is bootstrapped and the cell is about to evaluate. */
 export const KernelReady = Schema.TaggedStruct("KernelReady", {
   cellId: CellId,
   sequence: Sequence,
@@ -141,21 +130,21 @@ export const KernelReady = Schema.TaggedStruct("KernelReady", {
   profileDigest: Schema.String,
 })
 
-/** @experimental Stdout produced by the running cell. */
+/** Stdout produced by the running cell. */
 export const Stdout = Schema.TaggedStruct("Stdout", {
   cellId: CellId,
   sequence: Sequence,
   text: Schema.String,
 })
 
-/** @experimental Stderr produced by the running cell. */
+/** Stderr produced by the running cell. */
 export const Stderr = Schema.TaggedStruct("Stderr", {
   cellId: CellId,
   sequence: Sequence,
   text: Schema.String,
 })
 
-/** @experimental The cell's terminal value. */
+/** The cell's terminal value. */
 export const Result = Schema.TaggedStruct("Result", {
   cellId: CellId,
   sequence: Sequence,
@@ -163,7 +152,7 @@ export const Result = Schema.TaggedStruct("Result", {
   durationMillis: NonNegative,
 })
 
-/** @experimental One lifecycle transition for a host binding invoked by the cell. */
+/** One lifecycle transition for a host binding invoked by the cell. */
 export const HostCall = Schema.TaggedStruct("HostCall", {
   cellId: CellId,
   sequence: Sequence,
@@ -176,7 +165,7 @@ export const HostCall = Schema.TaggedStruct("HostCall", {
   message: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2_048))),
 })
 
-/** @experimental A host-rendered artifact emitted by the cell. */
+/** A host-rendered artifact emitted by the cell. */
 export const Display = Schema.TaggedStruct("Display", {
   cellId: CellId,
   sequence: Sequence,
@@ -185,7 +174,7 @@ export const Display = Schema.TaggedStruct("Display", {
   name: Schema.optionalKey(Schema.String),
 })
 
-/** @experimental Snapshot restore put these bindings back into the namespace. */
+/** Snapshot restore put these bindings back into the namespace. */
 export const StateRestored = Schema.TaggedStruct("StateRestored", {
   cellId: CellId,
   sequence: Sequence,
@@ -194,7 +183,7 @@ export const StateRestored = Schema.TaggedStruct("StateRestored", {
   restoredBySource: Schema.Array(Schema.String),
 })
 
-/** @experimental These bindings did not survive and will not come back. */
+/** These bindings did not survive and will not come back. */
 export const StateLost = Schema.TaggedStruct("StateLost", {
   cellId: CellId,
   sequence: Sequence,
@@ -203,7 +192,7 @@ export const StateLost = Schema.TaggedStruct("StateLost", {
   reason: DropReason,
 })
 
-/** @experimental The kernel started a new epoch. */
+/** The kernel started a new epoch. */
 export const KernelRestarted = Schema.TaggedStruct("KernelRestarted", {
   cellId: CellId,
   sequence: Sequence,
@@ -212,7 +201,7 @@ export const KernelRestarted = Schema.TaggedStruct("KernelRestarted", {
   reason: RestartReason,
 })
 
-/** @experimental Closed union of cell lifecycle events, ordered by a cell-local monotonic sequence. */
+/** Closed union of cell lifecycle events, ordered by a cell-local monotonic sequence. */
 export const CellEvent = Schema.Union([
   KernelStarting,
   KernelReady,
@@ -225,10 +214,9 @@ export const CellEvent = Schema.Union([
   StateLost,
   KernelRestarted,
 ])
-/** @experimental */
 export type CellEvent = typeof CellEvent.Type
 
-/** @experimental Every event tag in the closed cell event union. */
+/** Every event tag in the closed cell event union. */
 export const eventTags: ReadonlyArray<CellEvent["_tag"]> = [
   "KernelStarting",
   "KernelReady",
@@ -242,7 +230,7 @@ export const eventTags: ReadonlyArray<CellEvent["_tag"]> = [
   "KernelRestarted",
 ]
 
-/** @experimental Every failure tag in the closed cell failure union. */
+/** Every failure tag in the closed cell failure union. */
 export const failureTags: ReadonlyArray<CellFailure["_tag"]> = [
   "generalist/repl/CellExecutionFailed",
   "generalist/repl/KernelUnavailable",
@@ -250,17 +238,15 @@ export const failureTags: ReadonlyArray<CellFailure["_tag"]> = [
   "generalist/repl/CellOutcomeUnknown",
 ]
 
-/** @experimental The cell-local ordinal carried by any cell event. */
+/** The cell-local ordinal carried by any cell event. */
 export const sequenceOf = (event: CellEvent): number => event.sequence
-
-/** @experimental */
 export interface SequenceRun {
   readonly sessionId: string
   readonly events: ReadonlyArray<CellEvent>
 }
 
 /**
- * @experimental Verify one cell's event order. A kernel must emit strictly increasing sequences
+ * Verify one cell's event order. A kernel must emit strictly increasing sequences
  * starting at 0 for exactly one cell; anything else is a protocol violation.
  */
 export const validateSequence = (run: SequenceRun): KernelProtocolViolation | undefined => {

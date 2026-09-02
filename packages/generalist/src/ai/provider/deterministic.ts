@@ -32,8 +32,6 @@ const deterministicModelLayer = (response: string) =>
         Stream.make(Response.makePart("text-delta", { id: "text", delta: response }), deterministicFinish),
     }),
   )
-
-/** @experimental */
 export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model?: string
@@ -54,17 +52,13 @@ const deterministicRegistrationOptions = (input: Options) => {
   return input.metadata === undefined ? registered : { ...registered, metadata: input.metadata }
 }
 
-/** @experimental Scripted model layer for tests and CI; provide it to a run with `Effect.provide`. */
+/** Scripted model layer for tests and CI; provide it to a run with `Effect.provide`. */
 export const layerModel = (input: Options = {}): Model.Model<string, LanguageModel.LanguageModel, never> =>
   Model.make(
     input.provider ?? "deterministic",
     input.model ?? "deterministic",
     deterministicModelLayer(input.response ?? "deterministic response"),
   )
-
-/** @experimental */
 export const registration = (input: Options = {}): Effect.Effect<Registration, never, never> =>
   modelRegistration(deterministicRegistrationOptions(input))
-
-/** @experimental */
 export const layer = (input: Options = {}): Layer.Layer<ModelRegistry> => modelRegistryLayer([registration(input)])

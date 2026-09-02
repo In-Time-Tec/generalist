@@ -11,14 +11,14 @@ import {
 import { DriverError, DriverStateInvalid, type DurableAgentDriver, type DriverInput } from "../service.js"
 import { charge, type RunBudget } from "../run-budget.js"
 
-/** @experimental Scripted model response used by the tracer driver. */
+/** Scripted model response used by the tracer driver. */
 export interface TracerModelStep {
   readonly text?: string
   readonly toolCalls?: ReadonlyArray<{ readonly name: string; readonly params: unknown }>
   readonly wait?: { readonly waitId: string; readonly reason: string }
 }
 
-/** @experimental Internal tracer state serialized in DriverCheckpoint.state. */
+/** Internal tracer state serialized in DriverCheckpoint.state. */
 export const TracerState = Schema.Struct({
   promptText: Schema.String,
   text: Schema.String,
@@ -52,8 +52,6 @@ export const TracerState = Schema.Struct({
     }),
   ),
 })
-
-/** @experimental */
 export type TracerState = typeof TracerState.Type
 
 const promptText = (prompt: Prompt.Prompt): string => {
@@ -124,7 +122,7 @@ const chargeTool = (budget: RunBudget): Effect.Effect<RunBudget, DriverError> =>
 
 const currentStep = (state: TracerState) => state.script[state.modelIndex]
 
-/** @experimental Canonical in-memory driver for checkpoint/decision/apply conformance tests. */
+/** Canonical in-memory driver for checkpoint/decision/apply conformance tests. */
 export const make = (script: ReadonlyArray<TracerModelStep>): DurableAgentDriver => ({
   version: currentDriverVersion,
   initial: (input: DriverInput) =>
@@ -252,7 +250,7 @@ export const make = (script: ReadonlyArray<TracerModelStep>): DurableAgentDriver
     }),
 })
 
-/** @experimental Advance one Execute decision using a supplied outcome. */
+/** Advance one Execute decision using a supplied outcome. */
 export const applyOperation: {
   (
     checkpoint: DriverCheckpoint,
@@ -272,7 +270,7 @@ export const applyOperation: {
   ): Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> => driver.apply(checkpoint, outcome),
 )
 
-/** @experimental Produce a Complete decision from a terminal tracer checkpoint. */
+/** Produce a Complete decision from a terminal tracer checkpoint. */
 export const completeFromCheckpoint = (
   checkpoint: DriverCheckpoint,
 ): Effect.Effect<Extract<DriverDecision, { _tag: "Complete" }>, DriverStateInvalid> =>

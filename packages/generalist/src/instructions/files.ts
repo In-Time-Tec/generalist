@@ -1,12 +1,12 @@
 import { Effect, FileSystem, Path, PlatformError } from "effect"
 
-/** @experimental Loaded instruction-file content. */
+/** Loaded instruction-file content. */
 export interface InstructionFile {
   readonly path: string
   readonly content: string
 }
 
-/** @experimental Instruction-file discovery options. */
+/** Instruction-file discovery options. */
 export interface Options {
   readonly filenames?: ReadonlyArray<string>
   readonly cwd?: string
@@ -37,7 +37,7 @@ const ancestors = (path: Path.Path, cwd: string): ReadonlyArray<string> => {
   return directories.toReversed()
 }
 
-/** @experimental Load AGENTS.md / CLAUDE.md instruction files from global and ancestor paths. */
+/** Load AGENTS.md / CLAUDE.md instruction files from global and ancestor paths. */
 export const load = (
   options: Options = {},
 ): Effect.Effect<ReadonlyArray<InstructionFile>, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> =>

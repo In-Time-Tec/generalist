@@ -15,10 +15,7 @@ import {
 } from "./tool-placement.js"
 import type { PlacementSchemaServices } from "./tool-placement-internal.js"
 import type { ToolContext } from "./tool-context.js"
-
-/** @experimental */
 export function route(options: RouteOptions<ToolContext>): Route<ToolContext>
-/** @experimental */
 export function route<R>(options: RouteOptions<R>): Route<R>
 export function route<R>(options: RouteOptions<R>): Route<R> {
   const routedTools = options.tools ?? []
@@ -131,12 +128,12 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
     )
   })
 
-/** @experimental Route tool calls to a user/browser/desktop client. */
+/** Route tool calls to a user/browser/desktop client. */
 export const client = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: PlacementRouteOptions<Tools, E>,
 ): Route<ToolContext | PlacementSchemaServices<Tools>> => placementRoute("client", options)
 
-/** @experimental Route tool calls to a remote tool worker or service. */
+/** Route tool calls to a remote tool worker or service. */
 export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: RemoteRouteOptions<Tools, E>,
 ): Route<ToolContext | PlacementSchemaServices<Tools>> =>
@@ -150,12 +147,12 @@ export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFail
       )
     : placementRoute("remote", options)
 
-/** @experimental Route tool calls to an MCP placement adapter. */
+/** Route tool calls to an MCP placement adapter. */
 export const mcp = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: PlacementRouteOptions<Tools, E>,
 ): Route<ToolContext | PlacementSchemaServices<Tools>> => placementRoute("mcp", options)
 
-/** @experimental Route tool calls to a workspace or sandbox runtime. */
+/** Route tool calls to a workspace or sandbox runtime. */
 export const sandbox = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: PlacementRouteOptions<Tools, E>,
 ): Route<ToolContext | PlacementSchemaServices<Tools>> => placementRoute("sandbox", options)

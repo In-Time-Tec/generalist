@@ -82,7 +82,7 @@ export const setupPromptContext = <
     }
   })
 
-/** @experimental Re-entry resolution for an authoritative suspension checkpoint. */
+/** Re-entry resolution for an authoritative suspension checkpoint. */
 export const ResumeResolution = Schema.Union([
   Schema.TaggedStruct("Approved", {}),
   Schema.TaggedStruct("Denied", { reason: Schema.optionalKey(Schema.String) }),
@@ -90,10 +90,10 @@ export const ResumeResolution = Schema.Union([
   Schema.TaggedStruct("Signal", { name: Schema.String, payload: Schema.optionalKey(Schema.Unknown) }),
 ])
 
-/** @experimental Decoded re-entry resolution for an authoritative suspension checkpoint. */
+/** Decoded re-entry resolution for an authoritative suspension checkpoint. */
 export type ResumeResolution = typeof ResumeResolution.Type
 
-/** @experimental Agent options known to contain a model selection. */
+/** Agent options known to contain a model selection. */
 export interface WithModelDefault {
   readonly model: import("../../model/registry.js").ModelSelection
 }

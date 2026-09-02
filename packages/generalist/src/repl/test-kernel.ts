@@ -28,13 +28,11 @@ import {
 } from "./kernel-snapshot-store.js"
 import { type KernelProfile, digest } from "./kernel-profile.js"
 
-/** @experimental What the scripted pool does with one cell. */
+/** What the scripted pool does with one cell. */
 export type Script =
   | { readonly _tag: "Value"; readonly value: string; readonly stdout?: string; readonly stderr?: string }
   | { readonly _tag: "Throw"; readonly name: string; readonly message: string; readonly stderr?: string }
   | { readonly _tag: "Failure"; readonly failure: CellFailure }
-
-/** @experimental */
 export interface TestPoolOptions {
   readonly profile: KernelProfile
   readonly script?: (request: ExecuteRequest) => Script
@@ -52,7 +50,7 @@ const initial: SessionState = { epoch: 0, running: undefined, closed: false }
 const defaultScript = (request: ExecuteRequest): Script => ({ _tag: "Value", value: request.code })
 
 /**
- * @experimental A KernelPool that evaluates nothing. It enforces the observable kernel contract —
+ * A KernelPool that evaluates nothing. It enforces the observable kernel contract —
  * cell-local monotonic sequences, epochs across restart, closed sessions — so hosts and projections
  * can be tested without a worker process.
  */
@@ -193,8 +191,6 @@ export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolServ
         ),
     }
   })
-
-/** @experimental */
 export const layerTestPool = (options: TestPoolOptions): Layer.Layer<KernelPool> =>
   Layer.effect(KernelPool, makeTest(options))
 
@@ -202,7 +198,7 @@ const sandboxUnsupported = (operation: Unsupported["operation"]): Unsupported =>
   Unsupported.make({ operation, message: `TestKernel does not support ${operation}` })
 
 /**
- * @experimental A process-local Sandbox fake backed by TestKernel. It does not model an independent
+ * A process-local Sandbox fake backed by TestKernel. It does not model an independent
  * security boundary and must not be used to certify a production provider.
  */
 export const layerTestSandbox = (options: TestPoolOptions): Layer.Layer<SandboxProvider> =>
@@ -267,7 +263,7 @@ export const layerTestSandbox = (options: TestPoolOptions): Layer.Layer<SandboxP
     }),
   )
 
-/** @experimental An in-memory snapshot store keyed by Session identity. */
+/** An in-memory snapshot store keyed by Session identity. */
 export const makeMemoryStore: Effect.Effect<KernelSnapshotStoreService> = Effect.gen(function* () {
   const snapshots = yield* Ref.make(new Map<string, Snapshot>())
   const immutable = yield* Ref.make(new Map<string, Snapshot>())
@@ -296,8 +292,6 @@ export const makeMemoryStore: Effect.Effect<KernelSnapshotStoreService> = Effect
     loadImmutable: (id) => Ref.get(immutable).pipe(Effect.map((all) => all.get(id))),
   }
 })
-
-/** @experimental */
 export const layerMemoryStore: Layer.Layer<KernelSnapshotStore> = Layer.effect(KernelSnapshotStore, makeMemoryStore)
 
 export * from "./test-kernel-resource-authority.js"

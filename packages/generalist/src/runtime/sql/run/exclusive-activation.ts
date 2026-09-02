@@ -6,13 +6,13 @@ import { RunExecutor } from "../../execution/run-executor.js"
 import type { RunActivationProjection } from "../../run/activation.js"
 import { RunStore } from "../../run/store.js"
 
-/** @experimental Transaction-local callback which rearms a host wake mechanism. */
+/** Transaction-local callback which rearms a host wake mechanism. */
 export type Rearm = Effect.Effect<void, RuntimeUnavailable>
 
 const unavailable = (cause: unknown) =>
   RuntimeUnavailable.make({ message: `activation projection failed: ${String(cause)}` })
 
-/** @experimental Create the durable candidate projection schema for an exclusive SQLite Runtime host. */
+/** Create the durable candidate projection schema for an exclusive SQLite Runtime host. */
 export const createSchema = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`CREATE TABLE IF NOT EXISTS generalist_activations (
@@ -26,7 +26,7 @@ export const createSchema = Effect.gen(function* () {
     ON generalist_activations(due_at_millis, run_id)`
 })
 
-/** @experimental Construct the durable candidate projection over the current SQL transaction. */
+/** Construct the durable candidate projection over the current SQL transaction. */
 export const makeProjection: {
   (sqlClient: SqlClient.SqlClient, rearm: Rearm): RunActivationProjection
   (rearm: Rearm): (sqlClient: SqlClient.SqlClient) => RunActivationProjection
@@ -56,7 +56,7 @@ export const makeProjection: {
   }),
 )
 
-/** @experimental Create, backfill, and rearm durable candidates in the caller's transaction. */
+/** Create, backfill, and rearm durable candidates in the caller's transaction. */
 export const initialize = (rearm: Rearm): Effect.Effect<void, RuntimeUnavailable, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -78,7 +78,7 @@ export const initialize = (rearm: Rearm): Effect.Effect<void, RuntimeUnavailable
     yield* rearm
   }).pipe(Effect.mapError(unavailable))
 
-/** @experimental Earliest durable candidate wake. */
+/** Earliest durable candidate wake. */
 export const nextDueAt = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   const rows = yield* sql<{ due_at_millis: number | null }>`
@@ -86,16 +86,12 @@ export const nextDueAt = Effect.gen(function* () {
   `
   return rows[0]?.due_at_millis ?? undefined
 })
-
-/** @experimental */
 export interface DrainOptions {
   readonly ownerId: string
   readonly fuel: number
   readonly cancelRetryMillis?: number
   readonly rearm: Rearm
 }
-
-/** @experimental */
 export interface DrainResult {
   readonly processed: number
   readonly hasMore: boolean
@@ -135,7 +131,7 @@ const rearms = Metric.counter("generalist_runtime_sqlite_activation_rearms", {
   incremental: true,
 })
 
-/** @experimental Drain a deterministic bounded batch; authoritative claiming follows candidate reads. */
+/** Drain a deterministic bounded batch; authoritative claiming follows candidate reads. */
 export const drain = (
   options: DrainOptions,
 ): Effect.Effect<

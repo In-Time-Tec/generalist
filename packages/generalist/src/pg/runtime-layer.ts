@@ -13,22 +13,22 @@ import {
 import { layerClient } from "./client.js"
 import { postgresDriver } from "./store/index.js"
 
-/** @experimental PostgreSQL Runtime options independent of client acquisition. */
+/** PostgreSQL Runtime options independent of client acquisition. */
 export interface Options extends SqlStoreOptions {
   readonly source?: string
 }
 
-/** @experimental PostgreSQL Runtime options for the URL-backed convenience Layer. */
+/** PostgreSQL Runtime options for the URL-backed convenience Layer. */
 export interface UrlOptions extends Options {
   readonly url: string
   readonly maxConnections?: number
 }
 
-/** @experimental PostgreSQL Runtime construction failures. */
+/** PostgreSQL Runtime construction failures. */
 export type RuntimeError = SqlDriverStoreError
 
 /**
- * @experimental Build the PostgreSQL Runtime from the caller's `PgClient`.
+ * Build the PostgreSQL Runtime from the caller's `PgClient`.
  *
  * Host transactions must use the `SqlClient` exposed by the same client Layer. Runtime operations
  * then nest through that exact transaction service and therefore use PostgreSQL savepoints.
@@ -46,7 +46,7 @@ const layerWithClient = (
     ),
   )
 
-/** @experimental Build the PostgreSQL Runtime, optionally acquiring its client from a URL. */
+/** Build the PostgreSQL Runtime, optionally acquiring its client from a URL. */
 export function layer(options: UrlOptions): Layer.Layer<SqlRuntimeServices, RuntimeError | SqlError, ExecutableResolver>
 export function layer(
   options: Options,

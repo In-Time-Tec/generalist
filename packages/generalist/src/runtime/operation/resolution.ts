@@ -8,7 +8,7 @@ export const OperationResolution = Schema.Union([
 ])
 export type OperationResolution = typeof OperationResolution.Type
 
-/** @experimental Stable digest used for operation-resolution idempotency. */
+/** Stable digest used for operation-resolution idempotency. */
 export const digest = (resolution: OperationResolution): string => pinDigest(resolution)
 
 export const ResolveOperationInput = Schema.Struct({

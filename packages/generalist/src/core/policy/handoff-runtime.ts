@@ -278,7 +278,7 @@ export const executeSameRunHandoff = (input: ExecuteInput) =>
     return accepted
   })
 
-/** @experimental One same-run handoff tool specification. */
+/** One same-run handoff tool specification. */
 export interface HandoffToolSpecResult {
   readonly tool: Tool.Tool<
     string,

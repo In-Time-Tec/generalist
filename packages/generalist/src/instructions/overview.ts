@@ -2,7 +2,7 @@ import { Function } from "effect"
 import { GuidanceEntry, GuidanceKind, kinds } from "./entry.js"
 import { GuidanceState, snapshotId } from "./state.js"
 
-/** @experimental Bounds every prompt overview must respect. */
+/** Bounds every prompt overview must respect. */
 export interface OverviewOptions {
   readonly maxEntriesPerKind?: number
   readonly maxContentLength?: number
@@ -10,7 +10,7 @@ export interface OverviewOptions {
   readonly maxRefinements?: number
 }
 
-/** @experimental Default overview bounds. */
+/** Default overview bounds. */
 export const defaults = {
   maxEntriesPerKind: 8,
   maxContentLength: 240,
@@ -73,7 +73,7 @@ const refinementSection = (state: GuidanceState, limits: Required<OverviewOption
 }
 
 /**
- * @experimental Render one deterministic, bounded prompt overview of a guidance state. Output size depends only on
+ * Render one deterministic, bounded prompt overview of a guidance state. Output size depends only on
  * the supplied bounds, never on how many entries or refinements the state holds.
  */
 export const format: {

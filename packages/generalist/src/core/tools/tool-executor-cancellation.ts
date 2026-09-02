@@ -3,10 +3,10 @@ import { Response } from "effect/unstable/ai"
 import type { Service } from "./tool-executor.js"
 import type { DomainFailure, Request, Success } from "./tool-result-codec.js"
 
-/** @experimental A completed tool outcome reported while cancelling an exact durable operation. */
+/** A completed tool outcome reported while cancelling an exact durable operation. */
 export type TerminalOutcome = Success | DomainFailure
 
-/** @experimental Stable identity for semantic cancellation of one admitted tool operation. */
+/** Stable identity for semantic cancellation of one admitted tool operation. */
 export interface CancellationRequest {
   readonly operationKey: string
   readonly attempt: number
@@ -18,12 +18,12 @@ export interface CancellationRequest {
   readonly execution: Request
 }
 
-/** @experimental A definitive executor/provider acknowledgement of semantic cancellation. */
+/** A definitive executor/provider acknowledgement of semantic cancellation. */
 export type CancellationOutcome =
   | { readonly _tag: "Cancelled" }
   | { readonly _tag: "AlreadyTerminal"; readonly outcome: TerminalOutcome }
 
-/** @experimental A concrete executor could not definitively cancel one admitted operation. */
+/** A concrete executor could not definitively cancel one admitted operation. */
 export class CancellationFailure extends Schema.TaggedError<CancellationFailure>()(
   "generalist/core/CancellationFailure",
   {

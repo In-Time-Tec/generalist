@@ -1,4 +1,4 @@
-/** @experimental Split a Bun descriptor stream into newline-delimited commands. */
+/** Split a Bun descriptor stream into newline-delimited commands. */
 export const commandLines = (fd: number): AsyncIterableIterator<string> => {
   let buffered = ""
   const stream = Bun.file(fd)

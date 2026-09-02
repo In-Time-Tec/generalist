@@ -1,16 +1,10 @@
 import { Effect, Function, Schema, Stream } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
-
-/** @experimental */
 export type Method = "generateText" | "generateObject" | "streamText"
-
-/** @experimental */
 export interface FailureInput {
   readonly error: unknown
   readonly method: Method
 }
-
-/** @experimental */
 export type FailureResolver = (input: FailureInput) => AiError.AiError
 
 interface ModelResponse {
@@ -39,8 +33,6 @@ const failureDescription = (cause: unknown): string => {
   )
   return evidence.length === 0 ? "Language model returned an unknown error part" : bounded(evidence.join(" "))
 }
-
-/** @experimental */
 export const defaultResolveFailure: FailureResolver = ({ error, method }) =>
   AiError.isAiError(error)
     ? error
@@ -49,8 +41,6 @@ export const defaultResolveFailure: FailureResolver = ({ error, method }) =>
         method,
         reason: AiError.UnknownError.make({ description: failureDescription(error) }),
       })
-
-/** @experimental */
 export const promoteResponseFailure: {
   (
     method: Exclude<Method, "streamText">,
@@ -72,8 +62,6 @@ export const promoteResponseFailure: {
     return failure?.type === "error" ? Effect.fail(resolve({ error: failure.error, method })) : Effect.succeed(response)
   },
 )
-
-/** @experimental */
 export const promoteStreamFailures: {
   (
     resolve: FailureResolver,

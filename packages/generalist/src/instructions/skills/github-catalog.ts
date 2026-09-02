@@ -3,7 +3,7 @@ import { Url } from "effect/unstable/http"
 import { SkillCatalogError, layer as SkillCatalogLayer } from "../../core/context/skill-catalog.js"
 import { type Limits, make as makeHostedCatalog, validateSkillPath } from "./hosted-catalog.js"
 
-/** @experimental Manifest-backed GitHub catalog options. */
+/** Manifest-backed GitHub catalog options. */
 export interface Options extends Limits {
   readonly owner: string
   readonly repo: string
@@ -20,7 +20,7 @@ const encodedPath = (value: string): string =>
     .map(encodeURIComponent)
     .join("/")
 
-/** @experimental Build a manifest-backed immutable GitHub catalog. */
+/** Build a manifest-backed immutable GitHub catalog. */
 export const make = (options: Options) => {
   const validationSource = "github-skill-catalog"
   if (!/^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$/.test(options.ref)) {
@@ -79,5 +79,5 @@ export const make = (options: Options) => {
   })
 }
 
-/** @experimental Build a manifest-backed immutable GitHub catalog layer. */
+/** Build a manifest-backed immutable GitHub catalog layer. */
 export const layer = (options: Options): ReturnType<typeof SkillCatalogLayer> => SkillCatalogLayer([make(options)])

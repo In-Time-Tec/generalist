@@ -1,6 +1,6 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, Permissions, ToolExecutor } from "generalist"
-import { layer as openRouterLayer } from "generalist/ai/openrouter"
+import { layer as openRouterLayer } from "generalist/providers/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({

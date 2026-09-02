@@ -2,7 +2,6 @@ import { Effect, Layer } from "effect"
 import { EmbeddingModel, IdGenerator, Prompt } from "effect/unstable/ai"
 import { type Item, Memory, MemoryError, type Service } from "../core/context/memory.js"
 import { VectorStore, type Match, type Query } from "./vector-store.js"
-/** @experimental */
 export interface Options {
   readonly limit?: number
   readonly minScore?: number
@@ -54,8 +53,6 @@ const itemFromMatch = (match: Match): Item => ({
   content: [textPart(match.document.text)],
   metadata: { ...match.document.metadata, score: match.score },
 })
-
-/** @experimental */
 export const make = (
   options: Options = {},
 ): Effect.Effect<Service, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
@@ -104,7 +101,5 @@ export const make = (
       forget: (input) => store.delete(input).pipe(Effect.mapError((error) => memoryError("vector-store", error))),
     }
   })
-
-/** @experimental */
 export const layer = (options: Options = {}): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
   Layer.effect(Memory, make(options).pipe(Effect.map(Memory.of)))

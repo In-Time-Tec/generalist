@@ -122,7 +122,7 @@ export const memoryReference = definePage({
     ),
     p(
       "Embedding layers live in ",
-      link("/docs/reference/providers", "the generalist/ai/* provider leaves"),
+      link("/docs/reference/providers", "the generalist/providers/* provider leaves"),
       ". See ",
       link("/docs/guides/memory", "How to add memory"),
       ".",

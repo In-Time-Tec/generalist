@@ -37,7 +37,7 @@ rules:
         - "packages/*/test/**/*.tui.test.ts"
         - "packages/*/test/**/*.proc.test.ts"
         # Cross-module Cloudflare harnesses (live workerd, conformance, export graphs) test no single src module
-        - "packages/*/test/cloudflare/*.test.ts"
+        - "packages/*/test/unstable/cloudflare/*.test.ts"
         # Cross-provider layerModel conformance exercises every provider's own module
         - "packages/*/test/ai/provider/layer-model.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
@@ -67,6 +67,12 @@ rules:
   forbidPaths:
     - "apps/*/src/**/*.test.ts"
     - "packages/*/src/**/*.test.ts"
+    # Publicly unstable Generalist modules live under src/unstable so the import boundary is enforceable.
+    - "packages/generalist/src/{cloudflare,foldkit,interoperability,mcp,rivet,transport}/**"
+    - "packages/generalist/src/ai/model/route.ts"
+    - "packages/generalist/src/ai/provider/openai-account*.ts"
+    - "packages/generalist/src/sandbox/worker-loader.ts"
+    - "packages/generalist/src/testing/chaos.ts"
     - "*.contract.test.ts"
     - "*.integration.test.ts"
     - "*.live.test.ts"

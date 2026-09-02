@@ -1,5 +1,6 @@
 import { Schema } from "effect"
-import { Agent, Tool, Toolkit, Policy } from "generalist"
+import { Agent, Policy } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 
 const submitAnswerTool = Tool.make("submit_answer", {
   description: "Submit the final answer",

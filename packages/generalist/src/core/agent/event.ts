@@ -5,10 +5,10 @@ import type { CompletedModelResponse } from "../model/response/builder.js"
 import { Diagnostics as SessionSyncDiagnostics } from "../context/session-sync.js"
 import { StopReason } from "../turn/policy.js"
 import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
-/** @experimental Escape-hatch metadata carried by loop events. */
+/** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
-/** @experimental A model turn has started. `turn` is 0-based. */
+/** A model turn has started. `turn` is 0-based. */
 export interface TurnStarted {
   readonly _tag: "TurnStarted"
   readonly turn: number
@@ -16,7 +16,7 @@ export interface TurnStarted {
 }
 
 /**
- * @experimental A raw model stream part, passed through unchanged.
+ * A raw model stream part, passed through unchanged.
  * `modelCallId`, `modelAttemptId`, and 0-based `attempt` join the part to its
  * model-call and attempt lifecycle events.
  */
@@ -30,7 +30,7 @@ export interface ModelPart {
   readonly metadata?: Metadata
 }
 
-/** @experimental One normalized model response after its durable operation commit. */
+/** One normalized model response after its durable operation commit. */
 interface ModelResponseCommitted {
   readonly _tag: "ModelResponseCommitted"
   readonly turn: number
@@ -44,7 +44,7 @@ interface ModelResponseCommitted {
   readonly metadata?: Metadata
 }
 
-/** @experimental A tool call is about to execute via the ToolExecutor service. */
+/** A tool call is about to execute via the ToolExecutor service. */
 export interface ToolExecutionStarted {
   readonly _tag: "ToolExecutionStarted"
   readonly turn: number
@@ -52,7 +52,7 @@ export interface ToolExecutionStarted {
   readonly metadata?: Metadata
 }
 
-/** @experimental An in-flight progress update from a running tool. */
+/** An in-flight progress update from a running tool. */
 export interface ToolProgress {
   readonly _tag: "ToolProgress"
   readonly turn: number
@@ -62,7 +62,7 @@ export interface ToolProgress {
   readonly metadata?: Metadata
 }
 
-/** @experimental A same-run handoff was requested. */
+/** A same-run handoff was requested. */
 interface HandoffRequested {
   readonly _tag: "HandoffRequested"
   readonly turn: number
@@ -73,7 +73,7 @@ interface HandoffRequested {
   readonly metadata?: Metadata
 }
 
-/** @experimental A same-run handoff completed and switched the active agent. */
+/** A same-run handoff completed and switched the active agent. */
 interface HandoffCompleted {
   readonly _tag: "HandoffCompleted"
   readonly turn: number
@@ -83,7 +83,7 @@ interface HandoffCompleted {
   readonly metadata?: Metadata
 }
 
-/** @experimental A same-run handoff was rejected before switching agents. */
+/** A same-run handoff was rejected before switching agents. */
 interface RejectedEvent {
   readonly _tag: "Rejected"
   readonly turn: number
@@ -92,7 +92,7 @@ interface RejectedEvent {
   readonly metadata?: Metadata
 }
 
-/** @experimental A tool call finished; `result` is the part re-fed to the model. */
+/** A tool call finished; `result` is the part re-fed to the model. */
 export interface ToolExecutionCompleted {
   readonly _tag: "ToolExecutionCompleted"
   readonly turn: number
@@ -105,7 +105,7 @@ export interface ToolExecutionCompleted {
   }
 }
 
-/** @experimental A tool reached a durable wait without disturbing admitted siblings. */
+/** A tool reached a durable wait without disturbing admitted siblings. */
 interface ToolExecutionWaiting {
   readonly _tag: "ToolExecutionWaiting"
   readonly turn: number
@@ -115,22 +115,20 @@ interface ToolExecutionWaiting {
   readonly metadata?: Metadata
 }
 
-/** @experimental Stable identity for one authorization request. */
+/** Stable identity for one authorization request. */
 export const ApprovalId = Schema.String.check(Schema.isNonEmpty())
-/** @experimental */
 export type ApprovalId = typeof ApprovalId.Type
 
-/** @experimental Canonical identity and payload for one authorization request. */
+/** Canonical identity and payload for one authorization request. */
 export const ApprovalRequest = Schema.Struct({
   approvalId: ApprovalId,
   operation: Schema.String.check(Schema.isNonEmpty()),
   capability: Schema.String.check(Schema.isNonEmpty()),
   input: Schema.Unknown,
 })
-/** @experimental */
 export type ApprovalRequest = typeof ApprovalRequest.Type
 
-/** @experimental Emitted before resolving a permission ask or needsApproval tool. */
+/** Emitted before resolving a permission ask or needsApproval tool. */
 export interface ApprovalRequested {
   readonly _tag: "ApprovalRequested"
   readonly turn: number
@@ -139,10 +137,10 @@ export interface ApprovalRequested {
   readonly metadata?: Metadata
 }
 
-/** @experimental Steering queue whose inputs were consumed at a turn boundary. */
+/** Steering queue whose inputs were consumed at a turn boundary. */
 export type SteeringQueueName = "steering" | "followUp"
 
-/** @experimental A steering or follow-up queue was drained into the next prompt. */
+/** A steering or follow-up queue was drained into the next prompt. */
 export interface SteeringDrained {
   readonly _tag: "SteeringDrained"
   readonly turn: number
@@ -152,7 +150,7 @@ export interface SteeringDrained {
 }
 
 /**
- * @experimental Emitted after each model turn completes (after tool executions
+ * Emitted after each model turn completes (after tool executions
  * for that turn). `transcript` is the full chat history at this point — hosts
  * that persist conversation state read it
  * from here.
@@ -166,7 +164,7 @@ export interface TurnCompleted {
   readonly metadata?: Metadata
 }
 
-/** @experimental Terminal event: the run finished without suspension. */
+/** Terminal event: the run finished without suspension. */
 export interface Completed<Output = unknown> {
   readonly _tag: "Completed"
   readonly turns: number
@@ -180,7 +178,7 @@ export interface Completed<Output = unknown> {
 const addUsageField = (left: number | undefined, right: number | undefined): number | undefined =>
   left === undefined && right === undefined ? undefined : (left ?? 0) + (right ?? 0)
 
-/** @experimental Fieldwise sum of upstream model usage values. */
+/** Fieldwise sum of upstream model usage values. */
 export const addUsage: {
   (right: Response.Usage): (left: Response.Usage) => Response.Usage
   (left: Response.Usage, right: Response.Usage): Response.Usage
@@ -202,7 +200,7 @@ export const addUsage: {
     }),
 )
 
-/** @experimental Closed union of Generalist loop events. */
+/** Closed union of Generalist loop events. */
 export type Event<Output = unknown> =
   | TurnStarted
   | ModelPart
@@ -220,7 +218,7 @@ export type Event<Output = unknown> =
   | Completed<Output>
   | ModelTelemetryEvent
 
-/** @experimental The loop failed. `turn` is the 0-based turn that failed. */
+/** The loop failed. `turn` is the 0-based turn that failed. */
 export class AgentError extends Schema.TaggedError<AgentError>()("generalist/core/AgentError", {
   message: Schema.String,
   turn: Schema.Finite,
@@ -228,12 +226,12 @@ export class AgentError extends Schema.TaggedError<AgentError>()("generalist/cor
   diagnostics: Schema.optionalKey(SessionSyncDiagnostics),
 }) {}
 
-/** @experimental The model's terminal value did not satisfy the Agent output Schema. */
+/** The model's terminal value did not satisfy the Agent output Schema. */
 export class InvalidOutput extends Schema.TaggedError<InvalidOutput>()("generalist/core/InvalidOutput", {
   issues: Schema.Array(Schema.String),
 }) {}
 
-/** @experimental The turn policy declined another turn while tool results were still pending. */
+/** The turn policy declined another turn while tool results were still pending. */
 export class TurnLimitExceeded extends Schema.TaggedError<TurnLimitExceeded>()("generalist/core/TurnLimitExceeded", {
   turn: Schema.Finite,
   limit: Schema.Finite,
@@ -245,7 +243,7 @@ export class TurnLimitExceeded extends Schema.TaggedError<TurnLimitExceeded>()("
   ),
 }) {}
 
-/** @experimental A turn policy successfully stopped for a reason other than a configured turn limit. */
+/** A turn policy successfully stopped for a reason other than a configured turn limit. */
 export class PolicyStopped extends Schema.TaggedError<PolicyStopped>()("generalist/core/PolicyStopped", {
   turn: Schema.Finite,
   reason: StopReason,
@@ -258,7 +256,7 @@ export class PolicyStopped extends Schema.TaggedError<PolicyStopped>()("generali
 }) {}
 
 /**
- * @experimental The turn that would have ended the run left no assistant text,
+ * The turn that would have ended the run left no assistant text,
  * so the run has no answer to report and never completes. `finishReason` is
  * what the provider reported for that turn: `"unknown"` means the provider
  * never said why it stopped, and an absent reason means no terminal event was
@@ -279,7 +277,7 @@ export class RunEndedWithoutOutput extends Schema.TaggedError<RunEndedWithoutOut
   },
 ) {}
 
-/** @experimental A ModelMiddleware hook violated the loop contract. */
+/** A ModelMiddleware hook violated the loop contract. */
 export class MiddlewareViolation extends Schema.TaggedError<MiddlewareViolation>()(
   "generalist/core/MiddlewareViolation",
   {
@@ -288,7 +286,7 @@ export class MiddlewareViolation extends Schema.TaggedError<MiddlewareViolation>
   },
 ) {}
 
-/** @experimental A transformed model response reused a tool-call identifier. */
+/** A transformed model response reused a tool-call identifier. */
 export class DuplicateToolCallId extends Schema.TaggedError<DuplicateToolCallId>()(
   "generalist/core/DuplicateToolCallId",
   {
@@ -298,14 +296,14 @@ export class DuplicateToolCallId extends Schema.TaggedError<DuplicateToolCallId>
   },
 ) {}
 
-/** @experimental An explicitly failing tool progress queue reached capacity. */
+/** An explicitly failing tool progress queue reached capacity. */
 export class ProgressOverflow extends Schema.TaggedError<ProgressOverflow>()("generalist/core/ProgressOverflow", {
   turn: Schema.Finite,
   toolCallId: Schema.String,
   capacity: Schema.Finite,
 }) {}
 
-/** @experimental The origin of one tool declaration in an Agent run. */
+/** The origin of one tool declaration in an Agent run. */
 export const ToolOrigin = Schema.Union([
   Schema.TaggedStruct("Static", { agent: Schema.String }),
   Schema.TaggedStruct("Builtin", { builtin: Schema.Literal("activate_skill") }),
@@ -315,18 +313,16 @@ export const ToolOrigin = Schema.Union([
     mode: Schema.Literals(["same-run", "delegate"]),
   }),
 ])
-
-/** @experimental */
 export type ToolOrigin = typeof ToolOrigin.Type
 
-/** @experimental The advertised tool set contains more than one declaration for a name. */
+/** The advertised tool set contains more than one declaration for a name. */
 export class ToolNameCollision extends Schema.TaggedError<ToolNameCollision>()("generalist/core/ToolNameCollision", {
   name: Schema.String,
   origins: Schema.NonEmptyArray(ToolOrigin),
 }) {}
 
 /**
- * @experimental The run suspended with one or more exact authored-order waits.
+ * The run suspended with one or more exact authored-order waits.
  * The run did NOT finish; the host resolves waits out-of-band and re-enters via
  * `RunOptions.resume` with this exact batch checkpoint.
  */
@@ -335,7 +331,7 @@ export class AgentSuspended extends Schema.TaggedError<AgentSuspended>()("genera
   waits: Schema.Array(ToolBatchWait),
 }) {}
 
-/** @experimental A resume identity did not match the current authoritative suspension checkpoint. */
+/** A resume identity did not match the current authoritative suspension checkpoint. */
 export class ResumeMismatch extends Schema.TaggedError<ResumeMismatch>()("generalist/core/ResumeMismatch", {
   reason: Schema.Literals(["checkpoint-not-found", "identity-mismatch"]),
   expected: Schema.optional(AgentSuspended),

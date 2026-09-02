@@ -7,7 +7,7 @@ const isToolMessage = (message: Prompt.Message | undefined): boolean => message?
 const isAssistantToolCall = (message: Prompt.Message | undefined): boolean =>
   message?.role === "assistant" && message.content.some((part) => part.type === "tool-call")
 
-/** @experimental Finds a recent-context cut without separating a tool call from its result. */
+/** Finds a recent-context cut without separating a tool call from its result. */
 export const safeCutIndex: {
   (keepRecentTokens: number): (messages: ReadonlyArray<Prompt.Message>) => number
   (messages: ReadonlyArray<Prompt.Message>, keepRecentTokens: number): number

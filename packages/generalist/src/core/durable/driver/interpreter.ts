@@ -19,13 +19,13 @@ import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from
 import { scheduleOperations } from "./schedule.js"
 export type { OperationSpec } from "./operation.js"
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
-/** @experimental Recorded operation for tests and future runtime journaling. */
+/** Recorded operation for tests and future runtime journaling. */
 export interface RecordedOperation {
   readonly operation: DriverOperation
   readonly outcome: OperationOutcome
   readonly checkpoint: DriverCheckpoint
 }
-/** @experimental Host hook surface for durable operation journaling without runtime imports. */
+/** Host hook surface for durable operation journaling without runtime imports. */
 export interface Journal {
   readonly onScheduled: (
     operation: DriverOperation,
@@ -38,11 +38,11 @@ export interface Journal {
   ) => Effect.Effect<void, DriverError>
   readonly onCheckpoint: (checkpoint: DriverCheckpoint) => Effect.Effect<void, DriverError>
 }
-/** @experimental Optional host journal service merged into Agent.stream driver layers. */
+/** Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournal extends Context.Service<DriverJournal, Journal>()(
   "generalist/core/durable/driver/interpreter/DriverJournal",
 ) {}
-/** @experimental Caller-owned successful stream result and replay codec. */
+/** Caller-owned successful stream result and replay codec. */
 export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServices = never> {
   readonly observe: (value: A) => void
   /** Whether the source reached its authored semantic terminal value rather than a downstream consumer stopping early. */
@@ -51,7 +51,7 @@ export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServi
   readonly replay: (success: Success) => Stream.Stream<A, ReplayError, ReplayServices>
 }
 
-/** @experimental Collect and replay one stream as its emitted values. */
+/** Collect and replay one stream as its emitted values. */
 export const arrayStreamCodec = <A>(): StreamSuccessCodec<A, ReadonlyArray<A>> => {
   const values = new Array<A>()
   return {
@@ -63,7 +63,7 @@ export const arrayStreamCodec = <A>(): StreamSuccessCodec<A, ReadonlyArray<A>> =
 
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
 type OperationSpecServices<SRD, SRE, FRD, FRE> = SRD | SRE | FRD | FRE
-/** @experimental Inline interpreter executing driver operations through Effect services. */
+/** Inline interpreter executing driver operations through Effect services. */
 export interface Service {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
   readonly run: <A, E, R, SRD, SRE, FRD, FRE>(
@@ -93,12 +93,10 @@ export interface Service {
   readonly refundChild: (child: RunBudget) => Effect.Effect<void, DriverError>
   readonly setHandoffState: (state: ControlState) => Effect.Effect<void, DriverError | DriverStateInvalid>
 }
-/** @experimental */
 export class DriverUnknownReplay extends Schema.TaggedError<DriverUnknownReplay>()(
   "generalist/core/DriverUnknownReplay",
   { operationKey: Schema.String, operationId: Schema.String },
 ) {}
-/** @experimental */
 export class DriverInterpreter extends Context.Service<DriverInterpreter, Service>()(
   "generalist/core/durable/driver/interpreter/DriverInterpreter",
 ) {}
@@ -107,7 +105,6 @@ const noopJournal: Journal = {
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,
 }
-/** @experimental */
 export const guardUnknownNeverReplay: {
   (outcome: OperationOutcome): (operation: DriverOperation) => Effect.Effect<void, DriverUnknownReplay>
   (operation: DriverOperation, outcome: OperationOutcome): Effect.Effect<void, DriverUnknownReplay>
@@ -118,7 +115,6 @@ export const guardUnknownNeverReplay: {
       ? DriverUnknownReplay.make({ operationKey: operation.key, operationId: outcome.operationId })
       : Effect.void,
 )
-/** @experimental */
 export const make = (input: {
   readonly driver: DurableAgentDriver
   readonly journal?: Journal
@@ -425,7 +421,6 @@ export const make = (input: {
     }
     return interpreter
   })
-/** @experimental */
 export const layerInline = (input: {
   readonly driver: DurableAgentDriver
   readonly journal?: Journal
@@ -439,13 +434,10 @@ export const layerInline = (input: {
       return yield* make({ ...input, journal })
     }),
   )
-/** @experimental */
 export const layerTest = (input: {
   readonly driver: DurableAgentDriver
   readonly initial: DriverCheckpoint
   readonly journal?: Journal
 }): Layer.Layer<DriverInterpreter> => layerInline(input)
-
-/** @experimental */
 export const operationKey = (logicalOperationId: string, ...parts: ReadonlyArray<string | number>): string =>
   [logicalOperationId, ...parts.map(String)].join(":")

@@ -19,7 +19,7 @@ import {
 } from "./entry.js"
 import { GuidanceState, findEntry, snapshotId, withEntries } from "./state.js"
 
-/** @experimental Why one proposal cannot be applied to one state. */
+/** Why one proposal cannot be applied to one state. */
 export const RefinementRejection = Schema.Literals([
   "baseline-drift",
   "create-existing",
@@ -31,10 +31,9 @@ export const RefinementRejection = Schema.Literals([
   "update-missing",
   "version-drift",
 ])
-/** @experimental */
 export type RefinementRejection = typeof RefinementRejection.Type
 
-/** @experimental One proposal was rejected and no state changed. */
+/** One proposal was rejected and no state changed. */
 export class RefinementRejected extends Schema.TaggedError<RefinementRejected>()(
   "generalist/instructions/RefinementRejected",
   {
@@ -45,12 +44,11 @@ export class RefinementRejected extends Schema.TaggedError<RefinementRejected>()
   },
 ) {}
 
-/** @experimental The next state and the durable record of one applied proposal. */
+/** The next state and the durable record of one applied proposal. */
 export const RefinementResult = Schema.Struct({ state: GuidanceState, event: RefinementEvent })
-/** @experimental */
 export type RefinementResult = typeof RefinementResult.Type
 
-/** @experimental Bounds enforced while one proposal is applied. */
+/** Bounds enforced while one proposal is applied. */
 export interface ApplyOptions {
   readonly maxEntriesPerKind?: number
   readonly maxRefinements?: number
@@ -105,7 +103,7 @@ interface RollbackProposalInput {
   edits: ReadonlyArray<RefinementEdit>
 }
 
-/** @experimental Whether every edit of one proposal leaves its revision to the engine. */
+/** Whether every edit of one proposal leaves its revision to the engine. */
 export const isAuthored = (proposal: RefinementProposal): boolean =>
   proposal.rollbackOf === undefined &&
   proposal.edits.every((edit: RefinementEdit) => edit._tag === "Delete" || edit.revision === undefined)
@@ -211,7 +209,7 @@ const duplicateTarget = (proposal: RefinementProposal): RefinementRejected | und
 }
 
 /**
- * @experimental Apply one proposal that may pin an exact revision, recording before and after entries for every edit.
+ * Apply one proposal that may pin an exact revision, recording before and after entries for every edit.
  *
  * This is the trusted route: a pinned `revision` chooses an entry's `createdAt`, `updatedAt`, and `version` outright.
  * Only a host that already owns the audit trail may use it, which is why rollback and restore name it explicitly while
@@ -278,7 +276,7 @@ export const applyTrusted: {
 )
 
 /**
- * @experimental Apply one authored proposal atomically, recording before and after entries for every edit.
+ * Apply one authored proposal atomically, recording before and after entries for every edit.
  *
  * The brand is a compile-time discriminator; the runtime authorization boundary is the pinned-revision check below.
  * A host that mounts this behind an `unknown` boundary gets that check even when a cast erased the brand. Revision
@@ -332,7 +330,7 @@ const inverse = (applied: AppliedRefinementEdit): RefinementEdit => {
   return inverseEdit
 }
 
-/** @experimental Identity of the inverse proposal of one applied refinement. */
+/** Identity of the inverse proposal of one applied refinement. */
 export interface RollbackOptions {
   readonly id: GuidanceId
   readonly at: GuidanceInstant
@@ -340,7 +338,7 @@ export interface RollbackOptions {
   readonly source?: string
 }
 
-/** @experimental Build the proposal that restores the exact entries one refinement replaced. */
+/** Build the proposal that restores the exact entries one refinement replaced. */
 export const makeRollback: {
   (options: RollbackOptions): (result: RefinementResult) => RefinementProposal
   (result: RefinementResult, options: RollbackOptions): RefinementProposal
@@ -357,5 +355,5 @@ export const makeRollback: {
   return proposal
 })
 
-/** @experimental The exact snapshot one rollback proposal restores. */
+/** The exact snapshot one rollback proposal restores. */
 export const rollbackTarget = (result: RefinementResult): GuidanceSnapshotId => result.event.before

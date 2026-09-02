@@ -1,14 +1,6 @@
 import { Effect, Layer } from "effect"
-import {
-  Agent,
-  Approvals,
-  Compaction,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  ToolExecutor,
-  ToolOutput,
-} from "generalist"
+import { Agent, Approvals, Compaction, ModelMiddleware, Permissions, ToolExecutor, ToolOutput } from "generalist"
+import { LanguageModel } from "effect/unstable/ai"
 
 const agent = Agent.make({ name: "long-running-assistant" })
 

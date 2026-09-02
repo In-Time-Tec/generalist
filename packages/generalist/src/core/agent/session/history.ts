@@ -7,20 +7,20 @@ import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from 
 import { systemPrompt } from "../message.js"
 
 /**
- * @experimental Session owns model-facing history; a Chat is its live view.
+ * Session owns model-facing history; a Chat is its live view.
  *
  * The system message is derived from current instructions on every run, so it is never a Session
  * entry. These helpers are the single boundary between the two representations: entries hold
  * conversation only, and a Chat regains the derived system message whenever one is rebuilt.
  */
 
-/** @experimental Drop the derived system message before conversation becomes durable state. */
+/** Drop the derived system message before conversation becomes durable state. */
 export const conversationOnly = (prompt: Prompt.Prompt): Prompt.Prompt =>
   prompt.content.some((message) => message.role === "system")
     ? Prompt.fromMessages(prompt.content.filter((message) => message.role !== "system"))
     : prompt
 
-/** @experimental Restore a Session projection into a Chat by prepending the derived system message. */
+/** Restore a Session projection into a Chat by prepending the derived system message. */
 export const withDerivedSystem = (input: {
   readonly system: string | undefined
   readonly supplemental?: string | undefined
@@ -31,7 +31,7 @@ export const withDerivedSystem = (input: {
     : Prompt.concat(systemPrompt(input.supplemental, input.system), input.projection)
 
 /**
- * @experimental Seed a new Chat from the active Session path.
+ * Seed a new Chat from the active Session path.
  *
  * A run continues its Session instead of starting empty, which is what makes a second turn carry the
  * first. Returns undefined when no Session is active or the caller supplied explicit history.
@@ -44,7 +44,7 @@ export const seedFromSession = (input: {
     ? Effect.succeedNone
     : input.activeSession.value.path().pipe(Effect.map(buildContext), Effect.map(Option.some))
 
-/** @experimental Build the Chat a run starts from, preferring an active Session over supplied history. */
+/** Build the Chat a run starts from, preferring an active Session over supplied history. */
 export const initialChat = (input: {
   readonly sessionHistory: Option.Option<Prompt.Prompt>
   readonly suppliedHistory: Prompt.RawInput | undefined
@@ -131,7 +131,7 @@ export const refreshResumeSystem = (input: {
 }
 
 /**
- * @experimental Reopen the delivery outbox for a recovered checkpoint.
+ * Reopen the delivery outbox for a recovered checkpoint.
  *
  * Checkpoint telemetry was already observed live and recorded by the host. Restoring it lets an
  * unacknowledged batch be retried, but re-emitting it would replay events the run log already holds

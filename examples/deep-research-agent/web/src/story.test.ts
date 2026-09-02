@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { Response } from "generalist"
-import { Chat, Connection } from "generalist/foldkit"
+import { Response } from "effect/unstable/ai"
+import { Chat, Connection } from "generalist/unstable/foldkit"
 import { Errors, ExecutableManifest } from "generalist/runtime"
 import { Schema } from "effect"
 import { Story } from "foldkit"

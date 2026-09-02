@@ -11,13 +11,13 @@ interface StageHandlers<A extends ScheduledCall, B, E, R, E2, R2> {
   readonly afterStage: (stage: ReadonlyArray<A>) => Effect.Effect<void, E2, R2>
 }
 
-/** @experimental Default safe policy: every framework-executed call is an exclusive barrier. */
+/** Default safe policy: every framework-executed call is an exclusive barrier. */
 export const defaultToolScheduling: ToolSchedulingPolicy = {
   maxConcurrency: 1,
   parallelSafe: [],
 }
 
-/** @experimental Validate a live Agent's tool scheduling policy before its first model call. */
+/** Validate a live Agent's tool scheduling policy before its first model call. */
 export const validationFailure: {
   (declaredTools: ReadonlyArray<string>): (policy: ToolSchedulingPolicy) => string | undefined
   (policy: ToolSchedulingPolicy, declaredTools: ReadonlyArray<string>): string | undefined
@@ -60,7 +60,7 @@ const stages = <A extends ScheduledCall>(
 }
 
 /**
- * @experimental Execute parallel-safe calls with a bound while treating every other authored call as an exclusive
+ * Execute parallel-safe calls with a bound while treating every other authored call as an exclusive
  * barrier. Inner streams merge live; callers retain result order separately by the original call index.
  */
 export const schedule: {

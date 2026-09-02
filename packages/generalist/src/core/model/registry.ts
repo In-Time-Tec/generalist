@@ -19,26 +19,18 @@ export {
   withToolJsonSchemaCompiler,
 }
 const Metadata = Schema.Record(Schema.String, Schema.Unknown)
-
-/** @experimental */
 export type Metadata = typeof Metadata.Type
-
-/** @experimental */
 export interface GovernanceOptions {
   readonly maxConcurrentModelCalls?: number
 }
-
-/** @experimental */
 export interface ModelSelection {
   readonly provider: string
   readonly model: string
   readonly registrationKey?: string | undefined
 }
 
-/** @experimental Provider-owned decision that a failed invocation may advance an ordered candidate route. */
+/** Provider-owned decision that a failed invocation may advance an ordered candidate route. */
 export type AvailabilityFailureClassifier = (cause: unknown) => boolean
-
-/** @experimental */
 export class LanguageModelNotRegistered extends Schema.TaggedError<LanguageModelNotRegistered>()(
   "generalist/core/LanguageModelNotRegistered",
   {
@@ -47,8 +39,6 @@ export class LanguageModelNotRegistered extends Schema.TaggedError<LanguageModel
     registration_key: Schema.optionalKey(Schema.String),
   },
 ) {}
-
-/** @experimental */
 export interface Registration {
   readonly provider: string
   readonly model: string
@@ -59,13 +49,9 @@ export interface Registration {
   readonly toolJsonSchemaCompiler?: ToolJsonSchemaCompiler | undefined
   readonly isAvailabilityFailure?: AvailabilityFailureClassifier | undefined
 }
-
-/** @experimental */
 export interface RegisterInput {
   readonly registration: Registration
 }
-
-/** @experimental */
 export interface Service {
   readonly register: (input: RegisterInput) => Effect.Effect<void>
   readonly registrations: Effect.Effect<ReadonlyArray<Registration>>
@@ -78,13 +64,9 @@ export interface Service {
     stream: Stream.Stream<A, E, R>,
   ) => Stream.Stream<A, E | LanguageModelNotRegistered, Exclude<R, ModelEnvironment>>
 }
-
-/** @experimental */
 export class ModelRegistry extends Context.Service<ModelRegistry, Service>()(
   "generalist/core/model/registry/ModelRegistry",
 ) {}
-
-/** @experimental */
 export type ModelEnvironment = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName
 interface RegistryEntry {
   readonly registration: Registration
@@ -109,8 +91,6 @@ const upsertRegistration = (registry: Registry, entry: RegistryEntry): Registry 
 
 const findRegistration = (registry: Registry, selection: ModelSelection) =>
   HashMap.get(registry.byKey, selectionKey(selection)).pipe(Option.getOrUndefined)
-
-/** @experimental */
 export const registration = <R>(input: {
   readonly provider: string
   readonly model: string
@@ -224,8 +204,6 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
       })
     }),
   )
-
-/** @experimental */
 export const layer: {
   (): Layer.Layer<ModelRegistry>
   <E = never, R = never>(
@@ -247,8 +225,6 @@ export const layer: {
       Effect.all(registrations).pipe(Effect.map((initialRegistrations) => makeLayer(initialRegistrations, options))),
     ),
 )
-
-/** @experimental */
 export const layerMerged: {
   <E = never, R = never>(
     options?: GovernanceOptions,
@@ -270,24 +246,16 @@ export const layerMerged: {
     ),
 )
 
-/** @experimental In-memory model registry. */
-
-/** @experimental */
+/** In-memory model registry. */
 export const layerTest = (implementation: Service) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
-
-/** @experimental */
 export const register = Effect.fn("ModelRegistry.register.call")(function* (input: RegisterInput) {
   const service = yield* ModelRegistry
   return yield* service.register(input)
 })
-
-/** @experimental */
 export const registrations = Effect.fn("ModelRegistry.registrations.call")(function* () {
   const service = yield* ModelRegistry
   return yield* service.registrations
 })
-
-/** @experimental */
 export const withModel: {
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
@@ -304,8 +272,6 @@ export const withModel: {
     return yield* service.withModel(selection, effect)
   }),
 )
-
-/** @experimental */
 export const stream: {
   <A, E, R>(
     operation: Stream.Stream<A, E, R>,

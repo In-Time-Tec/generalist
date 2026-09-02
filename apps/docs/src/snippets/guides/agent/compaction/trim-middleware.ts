@@ -1,5 +1,6 @@
 import { Effect, Layer, Schema } from "effect"
-import { ModelMiddleware, Prompt } from "generalist"
+import { ModelMiddleware } from "generalist"
+import { Prompt } from "effect/unstable/ai"
 
 const maxUserChars = 8_000
 

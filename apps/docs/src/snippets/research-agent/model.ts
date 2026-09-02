@@ -1,6 +1,7 @@
-import { layer as openRouterLayer } from "generalist/ai/openrouter"
+import { layer as openRouterLayer } from "generalist/providers/openrouter"
 import { Config, Effect, Layer, Option, Schema, Stream } from "effect"
-import { LanguageModel, ModelRegistry, Prompt, Response } from "generalist"
+import { ModelRegistry } from "generalist"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const WebSearchSuccess = Schema.Struct({

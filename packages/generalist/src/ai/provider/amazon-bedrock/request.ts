@@ -263,8 +263,6 @@ const requestConfig = (config: Config, options: LanguageModel.ProviderOptions) =
     ...(toolConfig === undefined ? undefined : { toolConfig }),
   }
 }
-
-/** @experimental */
 export const make = Effect.fnUntraced(function* (input: Options, options: LanguageModel.ProviderOptions) {
   const { system, messages } = yield* prompt(options)
   return {

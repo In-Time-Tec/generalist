@@ -12,7 +12,7 @@ const State = Context.Reference<TransactionState>("generalist/runtime/sql/postgr
   defaultValue: () => ({ runIds: new Set() }),
 })
 
-/** @experimental Notify event followers through the active SQL transaction connection. */
+/** Notify event followers through the active SQL transaction connection. */
 export const notifyRun = (runId: string): Effect.Effect<void, SqlError, SqlClient.SqlClient> =>
   SqlClient.SqlClient.pipe(
     Effect.flatMap((sql) => sql`SELECT pg_notify(${NOTIFY_CHANNEL}, ${runId})`),

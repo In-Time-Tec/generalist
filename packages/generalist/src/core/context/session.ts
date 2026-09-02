@@ -2,13 +2,13 @@ import { Context, Effect, Layer, Schema, type Scope } from "effect"
 import { dual } from "effect/Function"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { CompactionCommit, Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
-/** @experimental Opaque session entry id. */
+/** Opaque session entry id. */
 export type EntryId = string
-/** @experimental Host-defined metadata carried by session entries. */
+/** Host-defined metadata carried by session entries. */
 export type Metadata = Readonly<Record<string, typeof Schema.Unknown.Type>>
-/** @experimental Common fields for session entries. */
+/** Common fields for session entries. */
 export type BaseEntry = { readonly id: EntryId; readonly parentId: EntryId | null; readonly metadata?: Metadata }
-/** @experimental A verbatim conversation message. */
+/** A verbatim conversation message. */
 export type MessageEntry = BaseEntry & { readonly _tag: "Message"; readonly message: Prompt.Message }
 const ModelToolCall = Schema.Struct({
   type: Schema.Literal("tool-call"),
@@ -65,24 +65,24 @@ export type ModelResponseEntry = BaseEntry & {
   readonly _tag: "ModelResponse"
   readonly content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>
 }
-/** @experimental A model-requested tool call. */
+/** A model-requested tool call. */
 export type ToolCallEntry = BaseEntry & { readonly _tag: "ToolCall"; readonly part: Prompt.ToolCallPart }
-/** @experimental A tool execution result. */
+/** A tool execution result. */
 export type ToolResultEntry = BaseEntry & { readonly _tag: "ToolResult"; readonly part: Prompt.ToolResultPart }
-/** @experimental Recalled or persisted memory context. */
+/** Recalled or persisted memory context. */
 export type MemoryEntry = BaseEntry & { readonly _tag: "Memory"; readonly items: ReadonlyArray<string> }
-/** @experimental An activated skill body. */
+/** An activated skill body. */
 export type SkillEntry = BaseEntry & { readonly _tag: "Skill"; readonly name: string; readonly body: string }
-/** @experimental Live steering input preserved as a prompt message. */
+/** Live steering input preserved as a prompt message. */
 export type SteeringEntry = BaseEntry & { readonly _tag: "Steering"; readonly message: Prompt.Message }
-/** @experimental A self-contained conversation projection imported by a durable handoff. */
+/** A self-contained conversation projection imported by a durable handoff. */
 export type HandoffEntry = BaseEntry & {
   readonly _tag: "Handoff"
   readonly handoffId: string
   readonly target: string
   readonly projectedHistory: Prompt.Prompt
 }
-/** @experimental An exact point-in-time compaction projection. */
+/** An exact point-in-time compaction projection. */
 export type CompactionEntry = BaseEntry & {
   readonly _tag: "Compaction"
   readonly projectedHistory: Prompt.Prompt
@@ -90,9 +90,9 @@ export type CompactionEntry = BaseEntry & {
   readonly compactionCommit?: CompactionCommit
   readonly summary?: string
 }
-/** @experimental A summary of an abandoned branch. */
+/** A summary of an abandoned branch. */
 export type BranchSummaryEntry = BaseEntry & { readonly _tag: "BranchSummary"; readonly summary: string }
-/** @experimental Closed union of session entries. */
+/** Closed union of session entries. */
 export type Entry =
   | MessageEntry
   | ModelResponseEntry
@@ -105,13 +105,13 @@ export type Entry =
   | CompactionEntry
   | BranchSummaryEntry
 type AppendEntryInput<Item extends Entry> = Item extends CompactionEntry ? never : Omit<Item, "id" | "parentId">
-/** @experimental Session entry input appended by a store implementation. */
+/** Session entry input appended by a store implementation. */
 export type AppendInput = AppendEntryInput<Entry>
 const payloadMetadata = {
   metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
 }
 /**
- * @experimental Durable wire form of a Session entry.
+ * Durable wire form of a Session entry.
  *
  * Session is the authority for model-facing history, so a store that persists entries needs one
  * shared encoding rather than each backend inventing its own. Entry ids and parent links are stored
@@ -140,27 +140,26 @@ export const EntryPayload = Schema.Union([
   }),
   Schema.TaggedStruct("BranchSummary", { summary: Schema.String, ...payloadMetadata }),
 ])
-/** @experimental */
 export type EntryPayload = typeof EntryPayload.Type
-/** @experimental Session store operation failure. */
+/** Session store operation failure. */
 export class SessionStoreError extends Schema.TaggedError<SessionStoreError>()("generalist/core/SessionStoreError", {
   message: Schema.String,
 }) {}
-/** @experimental Session append conflict with the active path or entry identity. */
+/** Session append conflict with the active path or entry identity. */
 export class SessionConflict extends Schema.TaggedError<SessionConflict>()("generalist/core/SessionConflict", {
   reason: Schema.Literals(["stale-leaf", "entry-id-reused", "checkpoint-id-reused", "checkpoint-not-on-active-path"]),
   message: Schema.String,
 }) {}
-/** @experimental Expected active leaf for a store-assigned Session entry identity. */
+/** Expected active leaf for a store-assigned Session entry identity. */
 export type GeneratedAppendOptions = {
   readonly id?: never
   readonly expectedLeafId?: EntryId | null
 }
-/** @experimental Exact identity and parent for an idempotent normal Session append. */
+/** Exact identity and parent for an idempotent normal Session append. */
 export type StableAppendOptions = { readonly id: EntryId; readonly expectedLeafId: EntryId | null }
-/** @experimental Identity and expected active leaf for a normal Session append. */
+/** Identity and expected active leaf for a normal Session append. */
 export type AppendOptions = GeneratedAppendOptions | StableAppendOptions
-/** @experimental Exact idempotent projection. Atomically persist projection, telemetry, and commit; remote failure is ambiguous. */
+/** Exact idempotent projection. Atomically persist projection, telemetry, and commit; remote failure is ambiguous. */
 export interface PreparedCheckpoint {
   readonly id: EntryId
   readonly parentId: EntryId | null
@@ -169,20 +168,20 @@ export interface PreparedCheckpoint {
   readonly compactionCommit?: CompactionCommit
   readonly summary?: string
 }
-/** @experimental Authoritative result of an idempotent checkpoint append. */
+/** Authoritative result of an idempotent checkpoint append. */
 export interface CheckpointAppend {
   readonly _tag: "Appended" | "AlreadyPresent"
   readonly checkpoint: CompactionEntry
   readonly leafId: EntryId
 }
-/** @experimental Session event-log service boundary. */
+/** Session event-log service boundary. */
 export interface SessionStore {
   readonly reserveEntryId: Effect.Effect<EntryId, SessionStoreError>
   readonly append: (
     entry: AppendInput,
     options?: AppendOptions,
   ) => Effect.Effect<Entry, SessionStoreError | SessionConflict>
-  /** @experimental Atomically persists projection, telemetry, and commit. Remote failure is ambiguous; retry exactly. */
+  /** Atomically persists projection, telemetry, and commit. Remote failure is ambiguous; retry exactly. */
   readonly appendCheckpoint: (
     checkpoint: PreparedCheckpoint,
   ) => Effect.Effect<CheckpointAppend, SessionStoreError | SessionConflict>
@@ -190,16 +189,15 @@ export interface SessionStore {
   readonly setLeaf: (id: EntryId | null) => Effect.Effect<void, SessionStoreError>
   readonly leaf: Effect.Effect<EntryId | null>
 }
-/** @experimental Keyed Session storage and same-Session Run admission. */
+/** Keyed Session storage and same-Session Run admission. */
 export interface Directory {
   readonly acquire: (sessionId: string) => Effect.Effect<SessionStore, SessionStoreError, Scope.Scope>
 }
-/** @experimental */
 export class SessionDirectory extends Context.Service<SessionDirectory, Directory>()(
   "generalist/core/context/session/SessionDirectory",
 ) {}
 
-/** @experimental Acquire one exact Session store for the current Scope. */
+/** Acquire one exact Session store for the current Scope. */
 export const acquire = (
   sessionId: string,
 ): Effect.Effect<SessionStore, SessionStoreError, SessionDirectory | Scope.Scope> =>
@@ -209,7 +207,7 @@ const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
 const telemetryEquivalence = Schema.toEquivalence(Schema.Array(ModelTelemetryEvent))
 const commitEquivalence = Schema.toEquivalence(CompactionCommit)
 
-/** @experimental Canonical exact checkpoint equivalence. */
+/** Canonical exact checkpoint equivalence. */
 export const checkpointMatches: {
   (prepared: PreparedCheckpoint): (entry: CompactionEntry) => boolean
   (entry: CompactionEntry, prepared: PreparedCheckpoint): boolean
@@ -234,7 +232,5 @@ export {
   unresolvedToolCalls,
   validateContext,
 } from "./session-projection.js"
-
-/** @experimental */
 export const layerTest = (implementation: Directory): Layer.Layer<SessionDirectory> =>
   Layer.succeed(SessionDirectory, SessionDirectory.of(implementation))

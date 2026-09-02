@@ -1,7 +1,7 @@
 import type { Effect } from "effect"
 import type { RuntimeUnavailable } from "../../errors.js"
 
-/** @experimental Exclusive-host recovery, intentionally separate from universal RunStore claims. */
+/** Exclusive-host recovery, intentionally separate from universal RunStore claims. */
 export interface ExclusiveExecutionRecovery {
   readonly recoverClaims: (input: {
     readonly newOwnerId: string

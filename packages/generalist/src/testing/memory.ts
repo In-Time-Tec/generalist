@@ -4,7 +4,7 @@ import { Prompt } from "effect/unstable/ai"
 import { type Item, type Key, Memory, type Service } from "../core/context/memory.js"
 import { record } from "./report.js"
 
-/** @experimental Configuration for the Memory service conformance suite. */
+/** Configuration for the Memory service conformance suite. */
 export interface Options<E = never> {
   readonly layer: Layer.Layer<Memory, E, never>
   /** Rebuild the layer between write and recall to prove storage survives service closure. */
@@ -47,7 +47,7 @@ const provide = <A, E, LayerError>(options: Options<LayerError>, effect: Effect.
     ),
   )
 
-/** @experimental Registers the authoritative Memory service conformance suite. */
+/** Registers the authoritative Memory service conformance suite. */
 export const memory = <E>(options: Options<E>): void => {
   describe("Generalist Memory conformance", () => {
     it.effect("recalls remembered content by semantic similarity", () =>

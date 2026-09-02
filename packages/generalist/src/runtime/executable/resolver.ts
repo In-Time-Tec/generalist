@@ -23,7 +23,7 @@ import {
   validate as validateRegistrations,
 } from "./registration.js"
 
-/** @experimental Exact persisted identity supplied to executable reconstruction. */
+/** Exact persisted identity supplied to executable reconstruction. */
 export interface Input {
   readonly runId: string
   readonly ref: ExecutableRef
@@ -38,7 +38,7 @@ export const Input: Schema.Codec<Input, unknown, never, never> = Schema.Struct({
   registrations: Schema.Array(ExecutableRegistration),
 })
 
-/** @experimental Verify resolver input against its paired authority. */
+/** Verify resolver input against its paired authority. */
 export const verifyInput = (input: Input): Input => {
   const executable = decodePinned({ ref: input.ref, manifest: input.manifest })
   return {
@@ -49,7 +49,7 @@ export const verifyInput = (input: Input): Input => {
   }
 }
 
-/** @experimental Resolver-owned proof of the reconstructed executable identity. */
+/** Resolver-owned proof of the reconstructed executable identity. */
 export interface Attestation {
   readonly ref: ExecutableRef
   readonly manifest: ExecutableManifest
@@ -60,10 +60,10 @@ export const Attestation: Schema.Codec<Attestation, unknown, never, never> = Sch
   manifest: ExecutableManifest,
 })
 
-/** @experimental Verify resolver attestation against pinned identity. */
+/** Verify resolver attestation against pinned identity. */
 export const verifyAttestation = (attestation: Attestation): Attestation => decodePinned(attestation)
 
-/** @experimental Live executable resources owned by the caller's scope. */
+/** Live executable resources owned by the caller's scope. */
 export interface AgentResolution {
   readonly _tag: "Agent"
   readonly agent: Closed
@@ -71,7 +71,7 @@ export interface AgentResolution {
   readonly attestation: Attestation
 }
 
-/** @experimental Resolver-owned static options attested by the persisted Agent manifest. */
+/** Resolver-owned static options attested by the persisted Agent manifest. */
 export interface StaticRunOptions {
   readonly compaction?: {
     readonly contextWindow: number
@@ -91,7 +91,7 @@ const matchesRunOptions = (manifest: AgentManifest, options: StaticRunOptions | 
   )
 }
 
-/** @experimental Verify resolver-owned static options against the persisted active Agent. */
+/** Verify resolver-owned static options against the persisted active Agent. */
 export const matchesActiveRunOptions: {
   (manifest: ExecutableManifest, options: StaticRunOptions | undefined): (ref: ExecutableRef) => boolean
   (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean
@@ -103,7 +103,7 @@ export const matchesActiveRunOptions: {
   },
 )
 
-/** @experimental Live Agent Program resources owned by the caller's scope. */
+/** Live Agent Program resources owned by the caller's scope. */
 export interface ProgramResolution {
   readonly _tag: "Program"
   readonly program: Program<unknown, unknown, unknown, unknown>
@@ -113,10 +113,8 @@ export interface ProgramResolution {
   readonly attestation: Attestation
 }
 
-/** @experimental Exactly one reconstructed executable kind. */
+/** Exactly one reconstructed executable kind. */
 export type Resolution = AgentResolution | ProgramResolution
-
-/** @experimental */
 export interface Service {
   readonly resolve: (
     input: Input,
@@ -126,13 +124,11 @@ export interface Service {
     Scope.Scope
   >
 }
-
-/** @experimental */
 export class ExecutableResolver extends Context.Service<ExecutableResolver, Service>()(
   "generalist/runtime/executable/resolver/ExecutableResolver",
 ) {}
 
-/** @experimental One exact static Agent executable bound to its persisted Agent pin. */
+/** One exact static Agent executable bound to its persisted Agent pin. */
 export interface StaticAgentExecutable {
   readonly _tag?: "Agent"
   readonly executable: PinnedExecutable
@@ -140,7 +136,7 @@ export interface StaticAgentExecutable {
   readonly runOptions?: StaticRunOptions
 }
 
-/** @experimental One exact static Program executable bound to its persisted Program pin. */
+/** One exact static Program executable bound to its persisted Program pin. */
 export interface StaticProgramExecutable {
   readonly _tag: "Program"
   readonly executable: PinnedExecutable
@@ -150,7 +146,7 @@ export interface StaticProgramExecutable {
   readonly services?: Layer.Layer<never>
 }
 
-/** @experimental One exact static executable used by tests and process-local hosts. */
+/** One exact static executable used by tests and process-local hosts. */
 export type StaticExecutable = StaticAgentExecutable | StaticProgramExecutable
 
 const invalidRegistration = (message: string): ExecutableRegistrationInvalid =>
@@ -279,7 +275,7 @@ const resolveStatic = (
     : Effect.succeed(staticResolution(entry, verifyAttestation(pinned)))
 }
 
-/** @experimental Construct an exact static resolver without resolving at admission or startup. */
+/** Construct an exact static resolver without resolving at admission or startup. */
 export const makeStatic = (
   executables: ReadonlyArray<StaticExecutable>,
 ): Effect.Effect<Service, ExecutableRegistrationInvalid> =>
@@ -291,16 +287,16 @@ export const makeStatic = (
     ),
   )
 
-/** @experimental Exact static resolver Layer helper. */
+/** Exact static resolver Layer helper. */
 export const layerStatic = (
   executables: ReadonlyArray<StaticExecutable>,
 ): Layer.Layer<ExecutableResolver, ExecutableRegistrationInvalid> =>
   Layer.effect(ExecutableResolver, makeStatic(executables))
 
-/** @experimental Typed failures allowed while reconstructing an admitted executable. */
+/** Typed failures allowed while reconstructing an admitted executable. */
 export type ReconstructionError = ExecutablePinMissing | ExecutableRegistrationInvalid | ExecutableRegistrationMissing
 
-/** @experimental Exact persisted authority for one reconstructed Program capability pin. */
+/** Exact persisted authority for one reconstructed Program capability pin. */
 export interface CapabilityRequest {
   readonly runId: string
   readonly ref: ExecutableRef
@@ -310,24 +306,24 @@ export interface CapabilityRequest {
   readonly registration: ExecutableRegistration
 }
 
-/** @experimental Exact persisted authority for one reconstructed Program boundary codec. */
+/** Exact persisted authority for one reconstructed Program boundary codec. */
 export interface CodecRequest extends CapabilityRequest {
   readonly boundary: "input" | "output"
 }
 
-/** @experimental Exact persisted authority for one reconstructed Program tool or step handler. */
+/** Exact persisted authority for one reconstructed Program tool or step handler. */
 export interface NamedCapabilityRequest extends CapabilityRequest {
   readonly name: string
 }
 
-/** @experimental Exact persisted authority for one reconstructed Program Agent handler. */
+/** Exact persisted authority for one reconstructed Program Agent handler. */
 export interface AgentCapabilityRequest extends CapabilityRequest {
   readonly selection: string
   readonly agent: AgentPin
   readonly agentManifest: AgentManifest
 }
 
-/** @experimental Exact persisted authority for the Run-scoped services of one reconstructed Program. */
+/** Exact persisted authority for the Run-scoped services of one reconstructed Program. */
 export interface ServicesRequest {
   readonly runId: string
   readonly ref: ExecutableRef
@@ -337,7 +333,7 @@ export interface ServicesRequest {
 }
 
 /**
- * @experimental Application-owned reconstruction of one admitted Agent Program from its exact persisted
+ * Application-owned reconstruction of one admitted Agent Program from its exact persisted
  * registrations. Every member owns its codec, version, and credential dereference, and may acquire scoped
  * resources finalized with the resolver scope.
  */
@@ -437,7 +433,7 @@ const resolveProgram = (
   })
 
 /**
- * @experimental Construct the canonical resolver: static Agents keyed by their exact persisted Agent pin, and
+ * Construct the canonical resolver: static Agents keyed by their exact persisted Agent pin, and
  * every admitted Agent Program reconstructed from its exact manifest and persisted registrations.
  */
 export const makeDynamic = (options: {
@@ -460,7 +456,7 @@ export const makeDynamic = (options: {
     ),
   )
 
-/** @experimental Canonical resolver Layer helper. */
+/** Canonical resolver Layer helper. */
 export const layerDynamic = (options: {
   readonly agents: ReadonlyArray<StaticAgentExecutable>
   readonly program: ProgramReconstruction

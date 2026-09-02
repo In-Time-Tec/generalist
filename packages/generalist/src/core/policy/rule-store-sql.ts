@@ -6,7 +6,7 @@ import { PermissionError, RuleSchema, RuleStore } from "./rule-store.js"
 const table = "generalist_permission_rules"
 
 /**
- * @experimental SQL permission-rule scope. Rules are stored and read per scope; pass a session id for
+ * SQL permission-rule scope. Rules are stored and read per scope; pass a session id for
  * per-session rules. Defaults to `"global"`.
  */
 export interface RuleStoreSqlOptions {
@@ -65,7 +65,7 @@ const make = (options: RuleStoreSqlOptions) =>
   })
 
 /**
- * @experimental A RuleStore in the Runtime `SqlClient`. The `generalist_permission_rules` table is part of
+ * A RuleStore in the Runtime `SqlClient`. The `generalist_permission_rules` table is part of
  * the Runtime SQL schema, so the schema must be migrated before this Layer is used.
  */
 export const layerRuleStoreSql = (

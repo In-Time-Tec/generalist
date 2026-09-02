@@ -2,7 +2,7 @@ import { Duration, Effect, Function, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 
 /**
- * @experimental What already escaped downstream when a model part stream ended
+ * What already escaped downstream when a model part stream ended
  * without its terminal `finish` part. `Nothing` means no part a consumer would
  * render or replay reached it, so the attempt can be retried without
  * duplicating transcript content.
@@ -17,8 +17,6 @@ export const EmittedOutput = Schema.Union([
     characters: Schema.Finite,
   }),
 ])
-
-/** @experimental */
 export type EmittedOutput = typeof EmittedOutput.Type
 
 const terminationFields = {
@@ -31,7 +29,7 @@ const terminationFields = {
 }
 
 /**
- * @experimental A provider part stream reached a clean end without its terminal
+ * A provider part stream reached a clean end without its terminal
  * `finish` part, so the attempt produced no finish reason and no usage.
  */
 export class Truncated extends Schema.TaggedError<Truncated>()(
@@ -39,23 +37,23 @@ export class Truncated extends Schema.TaggedError<Truncated>()(
   terminationFields,
 ) {}
 
-/** @experimental A provider part stream exceeded its configured idle deadline. */
+/** A provider part stream exceeded its configured idle deadline. */
 export class Timeout extends Schema.TaggedError<Timeout>()("generalist/core/ModelStreamTimeout", {
   ...terminationFields,
   idleMillis: Schema.Finite,
 }) {}
 
-/** @experimental A model part stream did not reach a provider-reported terminal event. */
+/** A model part stream did not reach a provider-reported terminal event. */
 export type TerminationFailure = Truncated | Timeout
 
 const isTruncated = Schema.is(Truncated)
 const isTimeoutFailure = Schema.is(Timeout)
 
-/** @experimental Whether a failure means the stream did not reach its terminal event. */
+/** Whether a failure means the stream did not reach its terminal event. */
 export const isTerminationFailure = (cause: unknown): cause is TerminationFailure =>
   isTruncated(cause) || isTimeoutFailure(cause)
 
-/** @experimental Whether a model stream exceeded its configured idle deadline. */
+/** Whether a model stream exceeded its configured idle deadline. */
 export const isTimeout = (cause: unknown): cause is Timeout => isTimeoutFailure(cause)
 
 interface Observation {
@@ -118,7 +116,7 @@ const emittedOutput = (observation: Observation): EmittedOutput => {
     : { _tag: "DisplayOnly", characters: observation.characters }
 }
 
-/** @experimental Provenance stamped onto a termination failure. */
+/** Provenance stamped onto a termination failure. */
 export interface Origin {
   readonly turn: number
   readonly provider: string | undefined
@@ -147,7 +145,7 @@ const originFields = (origin: Origin, observation: Observation) => {
 }
 
 /**
- * @experimental Fail a provider part stream that ended without its terminal
+ * Fail a provider part stream that ended without its terminal
  * `finish` part. A clean end with no `finish` fails with `Truncated`.
  * When `idleTimeout` is present, a pull that exceeds it fails with
  * `Timeout`; absence applies no idle deadline.

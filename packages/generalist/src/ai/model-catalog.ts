@@ -1,9 +1,8 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 
-/** @experimental Conservative context window used when model metadata is unavailable. */
+/** Conservative context window used when model metadata is unavailable. */
 export const conservativeContextWindow = 32_768
 
-/** @experimental */
 export interface Metadata {
   readonly provider: string
   readonly model: string
@@ -18,13 +17,11 @@ export interface Metadata {
   readonly modalities?: ReadonlyArray<"text" | "image" | "audio">
 }
 
-/** @experimental */
 export class NotFound extends Schema.TaggedError<NotFound>()("generalist/ai/ModelMetadataNotFound", {
   provider: Schema.String,
   model: Schema.String,
 }) {}
 
-/** @experimental */
 export interface Service {
   readonly find: (selection: {
     readonly provider: string
@@ -38,12 +35,11 @@ export interface Service {
   readonly list: Effect.Effect<ReadonlyArray<Metadata>>
 }
 
-/** @experimental */
 export class ModelCatalog extends Context.Service<ModelCatalog, Service>()(
   "generalist/ai/model-catalog/ModelCatalog",
 ) {}
 
-/** @experimental Hand-maintained static metadata snapshot. */
+/** Hand-maintained static metadata snapshot. */
 export const bundled: ReadonlyArray<Metadata> = [
   {
     provider: "openai",
@@ -161,15 +157,12 @@ const make = (entries: ReadonlyArray<Metadata>): Service => {
 
 const defaultCatalog = make(bundled)
 
-/** @experimental */
 export const layer = (overrides: ReadonlyArray<Metadata> = []): Layer.Layer<ModelCatalog> =>
   Layer.succeed(ModelCatalog, ModelCatalog.of(make(mergeEntries(bundled, overrides))))
 
-/** @experimental */
 export const layerTest = (entries: ReadonlyArray<Metadata>): Layer.Layer<ModelCatalog> =>
   Layer.succeed(ModelCatalog, ModelCatalog.of(make(entries)))
 
-/** @experimental */
 export const find = Effect.fn("ModelCatalog.find.call")(function* (selection: {
   readonly provider: string
   readonly model: string
@@ -178,7 +171,6 @@ export const find = Effect.fn("ModelCatalog.find.call")(function* (selection: {
   return yield* catalog.find(selection)
 })
 
-/** @experimental */
 export const get = Effect.fn("ModelCatalog.get.call")(function* (selection: {
   readonly provider: string
   readonly model: string
@@ -187,7 +179,7 @@ export const get = Effect.fn("ModelCatalog.get.call")(function* (selection: {
   return yield* catalog.get(selection)
 })
 
-/** @experimental Resolve a model context window from the provided catalog or bundled snapshot. */
+/** Resolve a model context window from the provided catalog or bundled snapshot. */
 export const contextWindow = Effect.fn("ModelCatalog.contextWindow.call")(function* (selection: {
   readonly provider: string
   readonly model: string
@@ -199,7 +191,6 @@ export const contextWindow = Effect.fn("ModelCatalog.contextWindow.call")(functi
   })
 })
 
-/** @experimental */
 export const list = Effect.fn("ModelCatalog.list.call")(function* () {
   const catalog = yield* ModelCatalog
   return yield* catalog.list

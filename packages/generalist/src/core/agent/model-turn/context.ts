@@ -26,7 +26,7 @@ export type ActiveModelServices<T extends Record<string, Tool.Any>, R> =
   | StaticToolServices<T>
   | DriverInterpreter
 
-/** @experimental Services remaining after an ambient or registered active model is scoped. */
+/** Services remaining after an ambient or registered active model is scoped. */
 export type ModelTurnServices<T extends Record<string, Tool.Any>, R> = R | StaticToolServices<T> | DriverInterpreter
 
 export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {

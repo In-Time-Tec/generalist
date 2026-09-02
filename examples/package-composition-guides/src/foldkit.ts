@@ -1,5 +1,5 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
-import { Connection } from "generalist/foldkit"
+import { Connection } from "generalist/unstable/foldkit"
 
 const incomingFrames = Stream.make(Connection.ConnectionOpened())
 const send = () => Effect.void

@@ -37,17 +37,13 @@ const ConfigSchema = Schema.Struct({
   ...openRouterConfigFields,
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),
 })
-
-/** @experimental */
 export type Config = typeof ConfigSchema.Type
-
-/** @experimental */
 export interface Options extends RegistrationOptions {
   readonly model: string
   readonly config?: Config
 }
 
-/** @experimental Decodes persisted provider options into OpenRouter request configuration. */
+/** Decodes persisted provider options into OpenRouter request configuration. */
 const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 type ConfigInput = typeof Schema.Unknown.Type
 
@@ -97,8 +93,6 @@ const preserveServedProvider = (client: OpenRouterClient.Service): OpenRouterCli
         ]),
       ),
   })
-
-/** @experimental */
 export const layerConfig = (options?: Parameters<typeof OpenRouterClient.layerConfig>[0]) =>
   Layer.effect(
     OpenRouterClient.OpenRouterClient,
@@ -203,13 +197,11 @@ const openRouterLanguageModelLayer = (input: Options) =>
     ),
   )
 
-/** @experimental Model layer over `OpenRouterClient`; provide it to a run with `Effect.provide`. */
+/** Model layer over `OpenRouterClient`; provide it to a run with `Effect.provide`. */
 export const layerModel = (
   input: Options,
 ): Model.Model<"openrouter", LanguageModel.LanguageModel, OpenRouterClient.OpenRouterClient> =>
   Model.make("openrouter", input.model, openRouterLanguageModelLayer(input))
-
-/** @experimental */
 export const classifyFailure: FailureClassifier = classify
 
 const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
@@ -227,8 +219,6 @@ const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
   }
   return LanguageModel.defaultCodecTransformer
 }
-
-/** @experimental */
 export const toolJsonSchemaCompiler =
   (model: string): ToolJsonSchemaCompiler =>
   (tool) =>
@@ -250,14 +240,10 @@ export const toolJsonSchemaCompiler =
         })
       },
     })
-
-/** @experimental */
 export interface ClientOptions extends Options {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof layerConfig>[0]>, "apiKey">
 }
-
-/** @experimental */
 export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),

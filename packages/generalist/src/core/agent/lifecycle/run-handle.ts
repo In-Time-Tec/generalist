@@ -10,10 +10,10 @@ import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js
 import { AgentError, type Event, InvalidOutput } from "../event.js"
 import { requiredField, type StructuredRunConfig } from "../loop/context.js"
 
-/** @experimental Default prompt for the terminal structured-output turn. */
+/** Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."
 
-/** @experimental Producer capability and event stream owned by one scoped Agent Run. */
+/** Producer capability and event stream owned by one scoped Agent Run. */
 export interface RunHandle<
   EventValue = Event,
   EventError = RunError,

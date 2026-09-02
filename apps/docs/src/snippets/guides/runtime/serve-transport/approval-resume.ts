@@ -1,17 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import {
-  Agent,
-  AgentManifest,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Pins,
-  Response,
-  Tool,
-  ToolExecutor,
-  Toolkit,
-} from "generalist"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { RunExecutor, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "generalist/runtime"
 
 const deployTool = Tool.make("deploy", {

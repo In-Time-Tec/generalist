@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-/** @experimental Per-entry description character cap. */
+/** Per-entry description character cap. */
 export const descriptionLimit = 1_024
 
 /** @internal Parsed SKILL.md frontmatter shared by catalog implementations. */

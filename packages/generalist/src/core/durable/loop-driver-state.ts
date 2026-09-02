@@ -4,18 +4,16 @@ import { ControlState } from "../agent/handoff/state.js"
 import { Exhausted } from "./run-budget.js"
 import { ToolBatchCheckpoint } from "../agent/tools/checkpoint.js"
 
-/** @experimental Pending operation the interpreter schedules before decide. */
+/** Pending operation the interpreter schedules before decide. */
 export const PendingOperation = Schema.Struct({
   kind: DriverOperationKind,
   key: Schema.String,
   input: Schema.Unknown,
   replayPolicy: ReplayPolicy,
 })
-
-/** @experimental */
 export type PendingOperation = typeof PendingOperation.Type
 
-/** @experimental Production loop driver state stored in DriverCheckpoint.state. */
+/** Production loop driver state stored in DriverCheckpoint.state. */
 export const LoopDriverState = Schema.Struct({
   logicalOperationId: Schema.String,
   sessionId: Schema.String,
@@ -32,8 +30,6 @@ export const LoopDriverState = Schema.Struct({
     }),
   ),
 })
-
-/** @experimental */
 export type LoopDriverState = typeof LoopDriverState.Type
 
 /** @internal The active call keeps its scheduled ordinal; safe checkpoints expose the next ordinal. */

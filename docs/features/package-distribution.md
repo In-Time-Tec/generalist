@@ -42,7 +42,7 @@ bun run package
     ├── import every profile subpath
     │   ├── generalist, generalist/runtime
     │   ├── generalist/pg, generalist/mysql
-    │   └── generalist/rivet/actors, provider leaves
+    │   └── generalist/unstable/rivet, provider leaves
     ├── verify Worker graphs and emitted modules
     │   ├── Wrangler: no forbidden modules
     │   └── pinned workerd: initialize, no compat flags
@@ -70,22 +70,22 @@ A manual workflow run only reconciles an existing immutable tag and its exact co
 
 ## Invariants
 
-- The only published package is `generalist`; `generalist/pg`, `generalist/mysql`, the three `generalist/cloudflare/*` entries, and `generalist/rivet/actors` are subpath exports.
+- The only published package is `generalist`; `generalist/pg`, `generalist/mysql`, the three `generalist/unstable/cloudflare/*` entries, and `generalist/unstable/rivet` are subpath exports.
 - The package contains only the allowlisted `dist`, `LICENSE`, and `README.md` payload, with consistent MIT metadata and a compressed size ceiling of 1,200,000 bytes.
 - Export maps target built `.js` and `.d.ts` files under `dist/`, with `types` before `import`; repository TypeScript and source maps are not consumer inputs.
-- The package is pure ESM, declares `sideEffects: false`, and intentionally does not support CommonJS; smoke verification rejects CommonJS loading of `generalist/rivet/actors`.
+- The package is pure ESM, declares `sideEffects: false`, and intentionally does not support CommonJS; smoke verification rejects CommonJS loading of `generalist/unstable/rivet`.
 - Supported engines are Node `>=22` and Bun `>=1.4.0`.
 - Effect and third-party integrations stay external. `effect` is one exact peer; every other integration dependency is an optional peer resolved from the workspace catalog during packing.
 - Root and package manifest versions are identical. Packing does not mutate the source manifest and leaves no unresolved `workspace:` or `catalog:` protocols.
 - Export verification covers every exact manifest export and resolves wildcard examples as concrete specifiers rather than testing a literal `*` path.
 - Package verification rejects unsafe inventory, missing exports, inconsistent dependencies or license metadata, declaration references to unavailable subpaths, runtime import cycles, and oversized output.
 - Fresh Bun and npm/Node consumers install the exact tarball and prove one physical installation of the workspace-pinned Effect release candidate.
-- Core, generic Runtime, and provider-neutral leaves require only `effect`; `generalist/ai/deterministic` is provider-free.
+- Core, generic Runtime, and provider-neutral leaves require only `effect`; `generalist/providers/deterministic` is provider-free.
 - Optional provider, MCP, FoldKit, A2A, AG-UI, and test-host profiles install only their declared peer set and reject unrelated peers.
 - SQLite is a separate Bun-only profile using `@effect/sql-sqlite-bun`.
 - `generalist/pg` and `generalist/mysql` import under Bun and Node with SQL driver peers and expose `layer` and `RuntimeSchema`.
-- `generalist/rivet/actors` imports under Bun and Node with `rivetkit` and `@standard-schema/spec`; its declaration dependency and single Effect installation are verified.
-- `generalist/cloudflare/workers`, `generalist/cloudflare/durable-objects`, and `generalist/cloudflare/dynamic-workers` bundle and initialize under workerd; `generalist/cloudflare` is deliberately not exported.
+- `generalist/unstable/rivet` imports under Bun and Node with `rivetkit` and `@standard-schema/spec`; its declaration dependency and single Effect installation are verified.
+- `generalist/unstable/cloudflare/workers`, `generalist/unstable/cloudflare/durable-objects`, and `generalist/unstable/cloudflare/dynamic-workers` bundle and initialize under workerd; `generalist/cloudflare` is deliberately not exported.
 - Worker-safe Core, MCP HTTP/OAuth, Runtime, and OpenRouter entrypoints are bundled separately with Wrangler, without Node compatibility flags.
 - Worker graph checks reject Node/Bun builtins, stdio, SQL drivers, SQLite, AWS/Bedrock, and provider dependencies from neutral bundles; pinned real `workerd` must also initialize each emitted module.
 - A successful Worker bundle alone is insufficient: both the forbidden-module graph gate and workerd initialization must pass.

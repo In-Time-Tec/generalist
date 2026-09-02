@@ -3,7 +3,7 @@ import { AiError, EmbeddingModel } from "effect/unstable/ai"
 import { Client, ClientFailure, layerClient, type ClientOptions } from "./client.js"
 import { clientFailure } from "./error.js"
 
-/** @experimental Amazon Bedrock embedding model configuration. */
+/** Amazon Bedrock embedding model configuration. */
 export interface Options {
   readonly model: string
   readonly dimensions?: 256 | 512 | 1024
@@ -30,7 +30,7 @@ const embeddingFailure = (error: AiError.AiError | ClientFailure | Schema.Schema
   })
 }
 
-/** @experimental Effect AI EmbeddingModel backed by Bedrock InvokeModel. */
+/** Effect AI EmbeddingModel backed by Bedrock InvokeModel. */
 export const make = Effect.fnUntraced(function* (options: Options) {
   const client = yield* Client
   return yield* EmbeddingModel.make({
@@ -69,7 +69,7 @@ export const make = Effect.fnUntraced(function* (options: Options) {
   })
 })
 
-/** @experimental EmbeddingModel layer backed by an owned Bedrock client. */
+/** EmbeddingModel layer backed by an owned Bedrock client. */
 export const layer = (
   options: Options & { readonly client?: ClientOptions },
 ): Layer.Layer<EmbeddingModel.EmbeddingModel> =>

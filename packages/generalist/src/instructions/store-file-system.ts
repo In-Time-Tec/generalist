@@ -6,7 +6,7 @@ import { Store, StoreError, type StoreRejection, type Service } from "./store.js
 const directoryMode = 0o700
 const fileMode = 0o600
 
-/** @experimental Where one scope's state is stored. The host owns every location decision. */
+/** Where one scope's state is stored. The host owns every location decision. */
 export interface Options {
   readonly path: (scope: GuidanceScope) => string
 }
@@ -90,7 +90,7 @@ const writeState = (
   })
 
 /**
- * @experimental Build one durable store over the Effect filesystem. Writes are owner-only and land through a
+ * Build one durable store over the Effect filesystem. Writes are owner-only and land through a
  * same-directory temporary file plus rename, so a reader never observes a partial state. A corrupt file fails typed
  * instead of resetting the scope, and concurrent saves of one scope are serialized.
  */
@@ -117,6 +117,6 @@ export const make = (options: Options): Effect.Effect<Service, never, FileSystem
     }
   })
 
-/** @experimental One durable filesystem-backed guidance store. */
+/** One durable filesystem-backed guidance store. */
 export const layer = (options: Options): Layer.Layer<Store, never, FileSystem.FileSystem | Path.Path> =>
   Layer.effect(Store, make(options).pipe(Effect.map(Store.of)))

@@ -120,10 +120,10 @@ export interface StartInput {
   readonly initialFanOuts?: ReadonlyArray<InitialFanOutInput>
 }
 
-/** @experimental One exact root admission held behind Generalist's durable execution gate. */
+/** One exact root admission held behind Generalist's durable execution gate. */
 export type AdmitInput = Omit<StartInput, "initialChildren" | "initialFanOuts">
 
-/** @experimental Release one admitted root's durable execution gate. */
+/** Release one admitted root's durable execution gate. */
 export interface ActivateInput {
   readonly runId: string
 }
@@ -176,7 +176,7 @@ export type ModelResponseEvent = Extract<
   { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
 >
 
-/** @experimental Select the memory-only live preview lane for one Run. */
+/** Select the memory-only live preview lane for one Run. */
 export interface PreviewsInput {
   readonly runId: string
 }
@@ -219,7 +219,7 @@ export interface SteerInput {
 }
 
 /**
- * @experimental One addressed send between agents.
+ * One addressed send between agents.
  *
  * `fromRunId` is the authoritative sender: Generalist reads its identity, parentage, and session from the
  * durable Run record, so callers cannot forge a sender by supplying an Address.
@@ -235,33 +235,23 @@ export interface SendMessageInput {
   readonly inReplyTo?: string
   readonly metadata?: Metadata
 }
-
-/** @experimental */
 export interface MessagesInput {
   readonly runId: string
   readonly limit: number
 }
-
-/** @experimental */
 export interface ChildSettlementsInput {
   readonly parentRunId: string
   readonly afterSequence?: number
   readonly limit: number
 }
-
-/** @experimental */
 export interface ChildSettlementChangesInput {
   readonly parentRunId: string
   readonly afterSequence?: number
 }
-
-/** @experimental */
 export interface AwaitChildSettlementInput {
   readonly parentRunId: string
   readonly childRunId: string
 }
-
-/** @experimental */
 export interface RegisterAgentNameInput {
   readonly runId: string
   readonly name: AgentName
@@ -295,9 +285,9 @@ export type StartError =
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
   | RuntimeUnavailable
-/** @experimental Exact-root staged admission failures. */
+/** Exact-root staged admission failures. */
 export type AdmitError = StartError
-/** @experimental Staged root activation failures. */
+/** Staged root activation failures. */
 export type ActivateError = RunNotFound | RuntimeUnavailable
 export type SpawnError =
   | RunNotFound
@@ -321,7 +311,7 @@ export type DirectoryError = RunNotFound | RuntimeUnavailable
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable
 export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
-/** @experimental Durable host acknowledgement failures. */
+/** Durable host acknowledgement failures. */
 export type AckError = RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable
 export type TreeReplayError =
   | RunNotFound
@@ -361,15 +351,15 @@ export type AwaitFanOutError = InspectFanOutError | EventsError
 
 export interface Service {
   readonly start: (input: StartInput) => Effect.Effect<StartReceipt, StartError>
-  /** @experimental Durably admit one exact root without making it executable. */
+  /** Durably admit one exact root without making it executable. */
   readonly admit: (input: AdmitInput) => Effect.Effect<RunReceipt, AdmitError>
-  /** @experimental Idempotently activate an admitted root and return its authoritative current state. */
+  /** Idempotently activate an admitted root and return its authoritative current state. */
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
   /**
-   * @experimental Observe the memory-only live preview lane for one Run.
+   * Observe the memory-only live preview lane for one Run.
    *
    * Frames contain bounded UTF-16 appends with per-attempt sequences and per-channel offsets.
    * Subscribers may lose frames without blocking execution and detect that loss from the next
@@ -378,27 +368,27 @@ export interface Service {
   readonly previews: (input: PreviewsInput) => Stream.Stream<ModelPreviewEvent>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
-  /** @experimental Durably advance the host processed-through point to an exact committed model cycle. */
+  /** Durably advance the host processed-through point to an exact committed model cycle. */
   readonly acknowledge: (input: { readonly runId: string; readonly sequence: number }) => Effect.Effect<void, AckError>
-  /** @experimental Read the durable host processed-through point; -1 means no cycle is acknowledged. */
+  /** Read the durable host processed-through point; -1 means no cycle is acknowledged. */
   readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, InspectError>
   readonly sessionEntry: (input: SessionEntryInput) => Effect.Effect<SessionEntry, SessionEntryError>
   readonly resolveModelResponse: (
     event: ModelResponseEvent,
   ) => Effect.Effect<CompletedModelResponse, ResolveModelResponseError>
-  /** @experimental Read one bounded, ordered page strictly after an opaque root-bound cursor. */
+  /** Read one bounded, ordered page strictly after an opaque root-bound cursor. */
   readonly treeReplay: (
     input: import("./tree.js").ReplayInput,
   ) => Effect.Effect<import("./tree.js").ReplayPage, TreeReplayError>
   readonly treeChanges: (rootRunId: string) => Stream.Stream<void, TreeEventsError>
-  /** @experimental Atomically pair a point-in-time tree inspection with its exclusive replay cursor. */
+  /** Atomically pair a point-in-time tree inspection with its exclusive replay cursor. */
   readonly treeCheckpoint: (rootRunId: string) => Effect.Effect<import("./tree.js").Checkpoint, InspectError>
   readonly list: (input: ListInput) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable>
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   /**
-   * @experimental Durably admit cancellation and request interruption from a process-local owner.
+   * Durably admit cancellation and request interruption from a process-local owner.
    *
    * Successful return does not acknowledge terminal cancellation. Observe Run state or events when
    * the caller must know whether owned work exited and external outcomes became definitive.
@@ -408,29 +398,29 @@ export interface Service {
   readonly awaitSessionTerminal: (input: AwaitSessionTerminalInput) => Effect.Effect<void, RuntimeUnavailable>
   readonly steer: (input: SteerInput) => Effect.Effect<SteeringReceipt, SteerError>
   /**
-   * @experimental Send one addressed message into the target's durable inbox.
+   * Send one addressed message into the target's durable inbox.
    *
    * Authorization is relationship-scoped from authoritative identity plus the host policy seam.
    * Delivery to a live target lands at its next turn boundary; otherwise it waits for its next Run.
    */
   readonly sendMessage: (input: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
-  /** @experimental Messages admitted for a Run's session that no Run has taken yet. */
+  /** Messages admitted for a Run's session that no Run has taken yet. */
   readonly messages: (input: MessagesInput) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError>
-  /** @experimental Read ordered durable child settlements for one exact parent Run. */
+  /** Read ordered durable child settlements for one exact parent Run. */
   readonly childSettlements: (
     input: ChildSettlementsInput,
   ) => Effect.Effect<ReadonlyArray<ChildSettlementNotification>, ChildSettlementError>
-  /** @experimental Subscribe to durable child settlements, replaying entries after the requested sequence. */
+  /** Subscribe to durable child settlements, replaying entries after the requested sequence. */
   readonly childSettlementChanges: (
     input: ChildSettlementChangesInput,
   ) => Stream.Stream<ChildSettlementNotification, ChildSettlementError>
-  /** @experimental Wait for one child's durable settlement without executing or scheduling the parent. */
+  /** Wait for one child's durable settlement without executing or scheduling the parent. */
   readonly awaitChildSettlement: (
     input: AwaitChildSettlementInput,
   ) => Effect.Effect<ChildSettlementNotification, ChildSettlementError>
-  /** @experimental Addresses this Run may reach under Generalist relationships plus host policy. */
+  /** Addresses this Run may reach under Generalist relationships plus host policy. */
   readonly directory: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError>
-  /** @experimental Bind one host-assigned name, unique within the Run's naming scope. */
+  /** Bind one host-assigned name, unique within the Run's naming scope. */
   readonly registerAgentName: (input: RegisterAgentNameInput) => Effect.Effect<DirectoryEntry, RegisterAgentNameError>
   readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>

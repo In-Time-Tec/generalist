@@ -25,7 +25,7 @@ const layer = ProgramRunner.layerDirect({ executor, handlers })
 const result = AgentProgram.run(program, { value: 41 }).pipe(Effect.provide(layer))
 ```
 
-`executor` is a production `CodeExecutor`; Generalist's shipped implementation is Cloudflare Worker Loader at `generalist/cloudflare/dynamic-workers`. Test-only examples may use `CodeExecutor.makeTest`.
+`executor` is a production `CodeExecutor`; Generalist's shipped implementation is Cloudflare Worker Loader at `generalist/unstable/cloudflare/dynamic-workers`. Test-only examples may use `CodeExecutor.makeTest`.
 
 ## What runs
 

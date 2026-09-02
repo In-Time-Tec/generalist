@@ -1,6 +1,7 @@
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { Console, Schema } from "effect"
-import { Agent, Tool, Toolkit } from "generalist"
+import { Agent } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",

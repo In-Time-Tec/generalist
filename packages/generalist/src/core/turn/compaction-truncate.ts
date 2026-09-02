@@ -31,7 +31,7 @@ const truncateService = (
     }),
 })
 
-/** @experimental Exact truncate-only compaction. The layer declares the `Tokenizer` requirement. */
+/** Exact truncate-only compaction. The layer declares the `Tokenizer` requirement. */
 export const layerTruncate = (maxTokens: number): Layer.Layer<Compaction, never, Tokenizer.Tokenizer> =>
   Layer.effect(
     Compaction,
@@ -40,7 +40,7 @@ export const layerTruncate = (maxTokens: number): Layer.Layer<Compaction, never,
     ),
   )
 
-/** @experimental Approximate truncate-only compaction over the prompt token estimator; no `Tokenizer` required. */
+/** Approximate truncate-only compaction over the prompt token estimator; no `Tokenizer` required. */
 export const layerTruncateEstimated = (maxTokens: number): Layer.Layer<Compaction> =>
   Layer.succeed(
     Compaction,

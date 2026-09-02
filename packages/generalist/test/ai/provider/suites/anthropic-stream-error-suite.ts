@@ -3,7 +3,7 @@ import { Config, Effect, Layer, Redacted, Stream } from "effect"
 import { AiError, LanguageModel } from "effect/unstable/ai"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { ModelRegistry } from "generalist"
-import { layer } from "generalist/ai/anthropic"
+import { layer } from "generalist/providers/anthropic"
 
 describe("Anthropic stream error normalization", () => {
   it.effect("fails with a bounded retryable AiError when Messages reports overload", () => {

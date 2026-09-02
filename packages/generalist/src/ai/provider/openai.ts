@@ -26,14 +26,8 @@ import {
   type Config as ModelConfig,
   type Options as ModelOptions,
 } from "./openai-model.js"
-
-/** @experimental */
 export type { RegistrationOptions } from "../model/registration.js"
-
-/** @experimental */
 export interface Options extends RegistrationOptions, ModelOptions {}
-
-/** @experimental */
 export type Config = ModelConfig
 
 const {
@@ -55,7 +49,7 @@ const ConfigSchema = Schema.Struct({
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),
 })
 
-/** @experimental Decodes persisted provider options into OpenAI request configuration. */
+/** Decodes persisted provider options into OpenAI request configuration. */
 const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 type ConfigInput = typeof Schema.Unknown.Type
 
@@ -63,11 +57,7 @@ export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema
   decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
 
 const NullableString = Schema.NullOr(Schema.String)
-
-/** @experimental */
 export const classifyFailure: FailureClassifier = classify
-
-/** @experimental */
 export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI }),
@@ -80,26 +70,22 @@ export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
         }),
       }),
   })
-
-/** @experimental */
 export interface ClientOptions extends Options {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAIClient.layerConfig>[0]>, "apiKey">
 }
-
-/** @experimental */
 export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   modelRegistryLayer([modelRegistration(registrationOptions(input))]).pipe(
     Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })),
   )
 
-/** @experimental Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
+/** Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
 export const layerModel = (
   input: Options,
 ): Model.Model<"openai", LanguageModel.LanguageModel, OpenAIClient.OpenAiClient> =>
   Model.make("openai", input.model, layerLanguageModel(input))
 
-/** @experimental Bare registration effect; the consumer provides the OpenAI client (see layerConfig). */
+/** Bare registration effect; the consumer provides the OpenAI client (see layerConfig). */
 export const registration = (input: Options): Effect.Effect<Registration, never, OpenAIClient.OpenAiClient> =>
   modelRegistration(registrationOptions(input))
 
@@ -214,8 +200,6 @@ const normalizeSseErrorFrames = <E>(body: Stream.Stream<Uint8Array, E>): Stream.
     ),
     Stream.encodeText,
   )
-
-/** @experimental */
 export const normalizeResponsesSSE = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
   HttpClient.transformResponse(client, (effect) =>
     Effect.map(effect, (response) => {
@@ -229,8 +213,6 @@ export const normalizeResponsesSSE = (client: HttpClient.HttpClient): HttpClient
       )
     }),
   )
-
-/** @experimental */
 export const layerConfig = (options?: Parameters<typeof OpenAIClient.layerConfig>[0]) =>
   OpenAIClient.layerConfig({
     ...options,
@@ -239,8 +221,6 @@ export const layerConfig = (options?: Parameters<typeof OpenAIClient.layerConfig
         ? normalizeResponsesSSE(client)
         : client.pipe(normalizeResponsesSSE, options.transformClient),
   })
-
-/** @experimental */
 export interface DeterministicFallbackOptions extends ClientOptions {
   readonly fallbackModel: string
   readonly fallbackProvider?: string
@@ -254,7 +234,7 @@ const fallbackRegistrationOptions = (options: DeterministicFallbackOptions) => {
   return options.metadata === undefined ? registered : { ...registered, metadata: options.metadata }
 }
 
-/** @experimental Selects OpenAI when its configured API key is present, otherwise the deterministic model. */
+/** Selects OpenAI when its configured API key is present, otherwise the deterministic model. */
 export const layerOrDeterministic = (options: DeterministicFallbackOptions) =>
   Layer.unwrap(
     Effect.gen(function* () {

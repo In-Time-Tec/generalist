@@ -80,35 +80,29 @@ const AgentResult = Schema.Struct({
     output: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
 })
-
-/** @experimental */
 export class ProgramHandlerMismatch extends Schema.TaggedError<ProgramHandlerMismatch>()(
   "generalist/core/ProgramHandlerMismatch",
   { kind: Schema.Literals(["tool", "step", "agent"]), name: Schema.String, reason: Schema.String },
 ) {}
-
-/** @experimental */
 export class ProgramIdentityMismatch extends Schema.TaggedError<ProgramIdentityMismatch>()(
   "generalist/core/ProgramIdentityMismatch",
   { expected: Schema.String, actual: Schema.String },
 ) {}
 
-/** @experimental Failures returned by Core-owned Program execution. */
+/** Failures returned by Core-owned Program execution. */
 export const ExecutionFailure = Schema.Union([SandboxFailure, ProgramHandlerMismatch, ProgramIdentityMismatch])
-/** @experimental */ export type ExecutionFailure = typeof ExecutionFailure.Type
+/** */ export type ExecutionFailure = typeof ExecutionFailure.Type
 
-/** @experimental Encoded execution request used by direct and durable hosts. */
+/** Encoded execution request used by direct and durable hosts. */
 export interface Request {
   readonly program: PinnedProgram
   readonly input: unknown
 }
-
-/** @experimental */
 export interface Service {
   readonly execute: (request: Request) => Effect.Effect<unknown, ExecutionFailure, Scope.Scope>
 }
 
-/** @experimental Owner of Agent Program execution and its host policy. */
+/** Owner of Agent Program execution and its host policy. */
 export class ProgramRunner extends Context.Service<ProgramRunner, Service>()(
   "generalist/core/program/runner/ProgramRunner",
 ) {}
@@ -175,7 +169,7 @@ const exactClosure: {
     }),
 )
 
-/** @experimental Verify that live Program handlers exactly match persisted manifest authority. */
+/** Verify that live Program handlers exactly match persisted manifest authority. */
 export const validateHandlers = exactClosure
 
 interface State {
@@ -432,7 +426,7 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
     } satisfies Capabilities)
   })
 
-/** @experimental Direct process-local runner for an explicitly supplied code executor and live handlers. */
+/** Direct process-local runner for an explicitly supplied code executor and live handlers. */
 export const layerDirect = (options: {
   readonly executor: CodeExecutor
   readonly handlers: Handlers

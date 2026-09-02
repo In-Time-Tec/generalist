@@ -1,8 +1,6 @@
 import { Duration, Effect, Stream } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
 import type { Operation, Part, ToolCallPart, TruncatedStep, TruncationPoint, TurnStep } from "./service.js"
-
-/** @experimental */
 export const emptyUsage = (): Response.Usage =>
   Response.Usage.make({
     inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
@@ -113,7 +111,7 @@ const compileTruncated = (
   return output
 }
 
-/** @experimental A compiled provider stream plus the per-part pacing delay, when scripted. */
+/** A compiled provider stream plus the per-part pacing delay, when scripted. */
 export interface CompiledStream {
   readonly parts: ReadonlyArray<Response.StreamPartEncoded>
   readonly partDelay?: Duration.Input
@@ -123,8 +121,6 @@ interface MutableCompiledStream {
   parts: ReadonlyArray<Response.StreamPartEncoded>
   partDelay?: Duration.Input
 }
-
-/** @experimental */
 const compileStreamFor = (step: TurnStep | TruncatedStep, requestIndex: number): CompiledStream | AiError.AiError => {
   if (step._tag === "Turn") {
     const stream: MutableCompiledStream = {
@@ -139,15 +135,11 @@ const compileStreamFor = (step: TurnStep | TruncatedStep, requestIndex: number):
   if (step.streamPartDelay !== undefined) stream.partDelay = step.streamPartDelay
   return stream
 }
-
-/** @experimental */
 const paceParts = (
   parts: ReadonlyArray<Response.StreamPartEncoded>,
   partDelay: Duration.Input,
 ): Stream.Stream<Response.StreamPartEncoded> =>
   Stream.fromIterable(parts).pipe(Stream.mapEffect((part) => Effect.sleep(partDelay).pipe(Effect.as(part))))
-
-/** @experimental */
 export const compile = {
   emptyUsage,
   finish,

@@ -1,21 +1,17 @@
 import { Effect, FileSystem, Path, PlatformError, Schema } from "effect"
 
-/** @experimental One conformance suite observed in the current test process. */
+/** One conformance suite observed in the current test process. */
 export const Suite = Schema.Struct({
   name: Schema.String,
   capabilities: Schema.Array(Schema.String),
 })
 
-/** @experimental Machine-readable conformance certification report. */
+/** Machine-readable conformance certification report. */
 export const Certification = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   suites: Schema.Array(Suite),
 })
-
-/** @experimental */
 export type Suite = typeof Suite.Type
-
-/** @experimental */
 export type Certification = typeof Certification.Type
 
 const suites = new Map<string, Suite>()
@@ -26,7 +22,7 @@ export const record = (suite: Suite): Effect.Effect<void> =>
     suites.set(suite.name, Suite.make({ name: suite.name, capabilities: [...suite.capabilities].toSorted() }))
   })
 
-/** @experimental Writes the suites observed in this process as deterministic JSON. */
+/** Writes the suites observed in this process as deterministic JSON. */
 export const write = (options: {
   readonly path: string
 }): Effect.Effect<void, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> =>

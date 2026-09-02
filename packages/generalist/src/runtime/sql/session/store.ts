@@ -152,7 +152,7 @@ export const verifyInterruptedSessionEntry = (
   })
 
 /**
- * @experimental Durable single-writer Session store.
+ * Durable single-writer Session store.
  *
  * Session owns model-facing conversation history, so a durable Runtime must persist it beside its
  * Runs rather than rebuilding it from execution records. Entries are append-only and immutable; a

@@ -1,8 +1,8 @@
 import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, Permissions } from "generalist"
-import { connect } from "generalist/mcp/tools"
-import { make as makeStdioTransport } from "generalist/mcp/client/stdio"
-import { layer as openRouterLayer } from "generalist/ai/openrouter"
+import { connect } from "generalist/unstable/mcp/tools"
+import { make as makeStdioTransport } from "generalist/unstable/mcp/client/stdio"
+import { layer as openRouterLayer } from "generalist/providers/openrouter"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {

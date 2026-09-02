@@ -2,15 +2,9 @@ import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "../../../../src/index.js"
-import {
-  Address,
-  ExternalChildPlacement,
-  ExternalChildStore,
-  Message,
-  Runtime,
-  RunStore,
-  ExecutableResolver,
-} from "../../../../src/runtime/index.js"
+import { executableDigest } from "../../../../src/runtime/child/external/placement.js"
+import { ExternalChildStore } from "../../../../src/runtime/child/external/store.js"
+import { Address, Message, Runtime, RunStore, ExecutableResolver } from "../../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
 import type { ExecutionClaim } from "../../../../src/runtime/run/store.js"
 import {
@@ -32,7 +26,7 @@ const externalRoot = (id: string) => ({
   parent: { partition: "openwork:parent", runId: `parent:${id}` },
   ref: { partition: "openwork:child", runId: `child:${id}` },
   requestDigest: `request:${id}`,
-  executableDigest: ExternalChildPlacement.executableDigest(assistantRef),
+  executableDigest: executableDigest(assistantRef),
   root: {
     message: Message.make({
       id: `message:${id}`,
@@ -50,13 +44,10 @@ const externalRoot = (id: string) => ({
   },
 })
 
-const suite = <E>(
-  name: string,
-  layer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExternalChildStore.ExternalChildStore, E>,
-) => {
+const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExternalChildStore, E>) => {
   let sequence = 0
   const provide = <A, Failure>(
-    effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore.RunStore | ExternalChildStore.ExternalChildStore>,
+    effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore.RunStore | ExternalChildStore>,
   ) => provideScoped(layer, effect)
   const placement = (claim: ExecutionClaim, placementId: string) => ({
     ...claim,
@@ -82,7 +73,7 @@ const suite = <E>(
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const input = externalRoot(`${name}:gate`)
           expect(yield* external.admitRoot(input)).toMatchObject({
             placementId: input.placementId,
@@ -130,7 +121,7 @@ const suite = <E>(
     it.live("cancels before activation and replays one terminal settlement until exact acknowledgement", () =>
       provide(
         Effect.gen(function* () {
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const input = externalRoot(`${name}:cancel-before-activation`)
           yield* external.admitRoot(input)
           expect(yield* external.cancelRoot(input.placementId, "parent requested cancellation")).toMatchObject({
@@ -169,7 +160,7 @@ const suite = <E>(
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
           const input = placement(claim, "placement:1")
@@ -210,7 +201,7 @@ const suite = <E>(
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
           yield* external.reserve(placement(claim, "placement:race"))
@@ -270,7 +261,7 @@ const suite = <E>(
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
           const input = {
@@ -316,7 +307,7 @@ const suite = <E>(
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
           yield* external.reserve(placement(claim, "placement:parent-cancel"))
@@ -346,7 +337,7 @@ const suite = <E>(
       provide(
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
-          const external = yield* ExternalChildStore.ExternalChildStore
+          const external = yield* ExternalChildStore
           const parent = yield* root
           const first = yield* store.claimExecution({ runId: parent.runId, ownerId: "old-owner" })
           const reserved = placement(first, "placement:existing")
@@ -375,7 +366,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
     const settlementId = yield* provideScoped(
       sqliteLayer(filename),
       Effect.gen(function* () {
-        const external = yield* ExternalChildStore.ExternalChildStore
+        const external = yield* ExternalChildStore
         yield* external.admitRoot(input)
         yield* external.cancelRoot(input.placementId, "reopen")
         const settlement = yield* external.rootSettlement(input.placementId)
@@ -386,7 +377,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
     yield* provideScoped(
       sqliteLayer(filename),
       Effect.gen(function* () {
-        const external = yield* ExternalChildStore.ExternalChildStore
+        const external = yield* ExternalChildStore
         expect(yield* external.inspectRoot(input.placementId)).toMatchObject({
           parent: input.parent,
           ref: input.ref,
@@ -427,7 +418,7 @@ it.live("rolls back reservation and projects settlement-driven cancellation in S
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const external = yield* ExternalChildStore.ExternalChildStore
+      const external = yield* ExternalChildStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "external-rollback",
@@ -493,7 +484,7 @@ it.live("decodes legacy TEXT true external-child cancellation rows in SQLite", (
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
-      const external = yield* ExternalChildStore.ExternalChildStore
+      const external = yield* ExternalChildStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "external-legacy-cancellation",

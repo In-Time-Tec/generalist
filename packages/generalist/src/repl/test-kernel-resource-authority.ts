@@ -66,13 +66,13 @@ const currentLease = (
     : Effect.fail(rejected(claim.sessionId, "stale-claim", "the kernel resource claim is not current"))
 }
 
-/** @experimental In-memory resource authority controls used only by deterministic provider tests. */
+/** In-memory resource authority controls used only by deterministic provider tests. */
 export interface MemoryResourceAuthority extends KernelResourceAuthorityService {
   readonly expire: (sessionId: string) => Effect.Effect<void>
 }
 
 /**
- * @experimental An atomic in-memory KernelResourceAuthority. It models ownership, command admission,
+ * An atomic in-memory KernelResourceAuthority. It models ownership, command admission,
  * takeover reconciliation, and retained cleanup without pretending to be durable storage.
  */
 export const makeMemoryResourceAuthority: Effect.Effect<MemoryResourceAuthority> = Effect.gen(function* () {
@@ -315,8 +315,6 @@ export const makeMemoryResourceAuthority: Effect.Effect<MemoryResourceAuthority>
       }),
   }
 })
-
-/** @experimental */
 export const layerMemoryResourceAuthority: Layer.Layer<KernelResourceAuthority> = Layer.effect(
   KernelResourceAuthority,
   makeMemoryResourceAuthority,

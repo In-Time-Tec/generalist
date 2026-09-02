@@ -291,7 +291,7 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
     {
       name: "neutral",
       specifiers: workerSafePackageExports.filter(
-        (specifier) => specifier !== "generalist/ai/openrouter" && specifier !== "generalist/runtime/sql-driver",
+        (specifier) => specifier !== "generalist/providers/openrouter" && specifier !== "generalist/runtime/sql-driver",
       ),
       forbidProviders: true,
       allowSqlRuntime: false,
@@ -304,7 +304,7 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
     },
     {
       name: "openrouter",
-      specifiers: workerSafePackageExports.filter((specifier) => specifier === "generalist/ai/openrouter"),
+      specifiers: workerSafePackageExports.filter((specifier) => specifier === "generalist/providers/openrouter"),
       forbidProviders: false,
       allowSqlRuntime: false,
     },
@@ -805,8 +805,8 @@ const program = Effect.gen(function* () {
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "external-child-bundle.ts"),
-    `import * as ExternalChildPlacement from "generalist/runtime/external-child-placement"
-import { ExternalChildStore } from "generalist/runtime/external-child-store"
+    `import * as ExternalChildPlacement from "generalist/unstable/runtime/external-child-placement"
+import { ExternalChildStore } from "generalist/unstable/runtime/external-child-store"
 console.log(ExternalChildPlacement, ExternalChildStore)
 `,
   )
@@ -827,19 +827,19 @@ for (const specifier of forbidden) {
   }
   if (!blocked) throw new Error(\`forbidden package export resolved: \${specifier}\`)
 }
-const { A2A } = await import("generalist/a2a")
-const { AGUI } = await import("generalist/ag-ui")
+const { A2A } = await import("generalist/unstable/a2a")
+const { AGUI } = await import("generalist/unstable/ag-ui")
 const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("generalist")
 const { VectorStore } = await import("generalist/memory")
 const { State, Store } = await import("generalist/instructions")
-const { MCPClient } = await import("generalist/mcp")
-const McpHttpClient = await import("generalist/mcp/client/http")
-const ModelCatalog = await import("generalist/ai/model-catalog")
-const OpenAI = await import("generalist/ai/openai")
+const { MCPClient } = await import("generalist/unstable/mcp")
+const McpHttpClient = await import("generalist/unstable/mcp/client/http")
+const ModelCatalog = await import("generalist/providers/model-catalog")
+const OpenAI = await import("generalist/providers/openai")
 const skills = await import("generalist/instructions/skills")
 const { TestModel, Testing } = await import("generalist/testing")
 const { Runtime, RunEvent } = await import("generalist/runtime")
-const { Snapshot, Wire } = await import("generalist/transport")
+const { Snapshot, Wire } = await import("generalist/unstable/transport")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
@@ -1000,11 +1000,11 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
       path.join(profileDirectory, "require.cjs"),
       `let blocked = false
 try {
-  require("generalist/rivet/actors")
+  require("generalist/unstable/rivet")
 } catch (error) {
   blocked = error?.code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
 }
-if (!blocked) throw new Error("generalist/rivet/actors must remain ESM-only")
+if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
 `,
     )
     yield* runProfileCommand({

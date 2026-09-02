@@ -1,7 +1,7 @@
 import { Config, Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { Agent } from "generalist"
-import { layerClient, layerLanguageModel } from "generalist/ai/amazon-bedrock"
+import { layerClient, layerLanguageModel } from "generalist/providers/amazon-bedrock"
 import { layerSupermemory } from "generalist/memory"
 
 const input = Schema.Struct({ question: Schema.String })

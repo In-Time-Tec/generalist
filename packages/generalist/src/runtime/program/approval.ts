@@ -1,6 +1,6 @@
 import { Function } from "effect"
 
-/** @experimental Derive one stable typed wait from a suspended Program operation. */
+/** Derive one stable typed wait from a suspended Program operation. */
 export const programWait = (input: {
   readonly runId: string
   readonly operation: string

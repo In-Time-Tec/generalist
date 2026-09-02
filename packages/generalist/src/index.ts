@@ -1,4 +1,4 @@
-/** @experimental Stable identity of one Agent execution. */
+/** Stable identity of one Agent execution. */
 export { RunId } from "./core/durable/run-id.js"
 export { withCacheBreakpoints } from "./core/model/prompt-cache.js"
 
@@ -43,18 +43,3 @@ export * as ToolExecutor from "./core/tools/tool-executor.js"
 export * as ToolOutput from "./core/tools/tool-output.js"
 export * as ToolPlacement from "./core/tools/tool-placement.js"
 export * as Policy from "./core/turn/policy.js"
-
-export {
-  AiError,
-  Chat,
-  EmbeddingModel,
-  IdGenerator,
-  LanguageModel,
-  Model,
-  Prompt,
-  Response,
-  Telemetry,
-  Tokenizer,
-  Tool,
-  Toolkit,
-} from "effect/unstable/ai"

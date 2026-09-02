@@ -140,7 +140,7 @@ export const researchAgent = definePage({
     codeBlock({ label: "index.html", language: "html", source: webIndexSource }),
     h3("wire-the-chat", "Wire the chat"),
     p(
-      code("generalist/foldkit"),
+      code("generalist/unstable/foldkit"),
       " ships a headless chat submodel that decodes durable frames and projects normalized model responses, tool state, and approval state. The program embeds ",
       code("Chat.Model"),
       " in its own model, forwards ",

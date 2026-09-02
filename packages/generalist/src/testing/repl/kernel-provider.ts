@@ -29,7 +29,7 @@ const expectUnavailable = (failure: CellFailure): void => {
   if (Schema.is(KernelUnavailable)(failure)) expect(failure.reason).toBe("lease-lost")
 }
 
-/** @experimental One fresh provider instance used by the shared KernelPool lifecycle guarantees. */
+/** One fresh provider instance used by the shared KernelPool lifecycle guarantees. */
 export interface Harness {
   readonly pool: KernelPool
   readonly profile: KernelProfile
@@ -37,10 +37,10 @@ export interface Harness {
   readonly resourceCount: Effect.Effect<number>
 }
 
-/** @experimental Deterministic failure positions a remote provider harness must be able to inject. */
+/** Deterministic failure positions a remote provider harness must be able to inject. */
 export type ConnectionLoss = "before-admission" | "after-admission" | "after-result"
 
-/** @experimental Additional two-host and provider lifecycle controls required by remote conformance. */
+/** Additional two-host and provider lifecycle controls required by remote conformance. */
 export interface RemoteHarness extends Harness {
   readonly hostB: KernelPool
   readonly changedProfileHost: KernelPool
@@ -56,7 +56,7 @@ export interface RemoteHarness extends Harness {
   readonly forbiddenModelText: ReadonlyArray<string>
 }
 
-/** @experimental Configuration for the reusable provider conformance suite. */
+/** Configuration for the reusable provider conformance suite. */
 export interface Options<CommonError = never, RemoteError = never> {
   readonly name: string
   readonly make: Effect.Effect<Harness, CommonError, Scope.Scope>
@@ -343,7 +343,7 @@ const registerRemote = <MakeError>(make: Effect.Effect<RemoteHarness, MakeError,
     ))
 }
 
-/** @experimental Register the shared KernelPool provider contract and optional remote guarantees. */
+/** Register the shared KernelPool provider contract and optional remote guarantees. */
 export const kernelProviderConformance = <CommonError, RemoteError>(
   options: Options<CommonError, RemoteError>,
 ): void => {

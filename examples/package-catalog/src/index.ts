@@ -1,7 +1,8 @@
 import { BunServices } from "@effect/platform-bun"
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, SkillCatalog } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
+import { Agent, Approvals, ModelMiddleware, Permissions, SkillCatalog } from "generalist"
 import { layer as layerInstructions, PackageCatalog } from "generalist/instructions"
 
 const packages = PackageCatalog.layer({

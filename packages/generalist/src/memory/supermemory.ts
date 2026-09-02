@@ -17,13 +17,13 @@ const SearchResponse = Schema.Struct({
   ),
 })
 
-/** @experimental Supermemory HTTP API failure. */
+/** Supermemory HTTP API failure. */
 export class SupermemoryError extends Schema.TaggedError<SupermemoryError>()("generalist/memory/SupermemoryError", {
   status: Schema.Int,
   body: Schema.String,
 }) {}
 
-/** @experimental Hosted Supermemory configuration. */
+/** Hosted Supermemory configuration. */
 export interface Options {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly containerTag: string
@@ -103,7 +103,7 @@ const item = (result: (typeof SearchResponse.Type.results)[number]): Item => ({
   } satisfies Metadata,
 })
 
-/** @experimental Hosted semantic Memory that uses Supermemory's embeddings and vector storage. */
+/** Hosted semantic Memory that uses Supermemory's embeddings and vector storage. */
 export const layer = (options: Options): Layer.Layer<Memory, Config.ConfigError, HttpClient.HttpClient> =>
   Layer.effect(
     Memory,

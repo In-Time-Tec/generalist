@@ -24,7 +24,7 @@ import {
 } from "../sandbox/index.js"
 import { record } from "./report.js"
 
-/** @experimental One provider registered against the public Sandbox conformance suite. */
+/** One provider registered against the public Sandbox conformance suite. */
 export interface Options<E = never> {
   readonly name: string
   readonly isolation: Isolation
@@ -166,7 +166,7 @@ const commandOperation = (tag: Command["_tag"]): Unsupported["operation"] => {
   }
 }
 
-/** @experimental Registers the authoritative Sandbox service conformance suite. */
+/** Registers the authoritative Sandbox service conformance suite. */
 export const sandbox = <E>(options: Options<E>): void => {
   describe(`Generalist Sandbox conformance (${options.name})`, () => {
     it.live("executes through its declared command and reports its factual isolation", () =>

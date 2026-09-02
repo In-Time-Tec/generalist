@@ -54,7 +54,7 @@ export class StaleClaim extends Schema.TaggedError<StaleClaim>()("generalist/run
   attemptFence: Schema.Finite,
 }) {}
 
-/** @experimental An exact Runtime Session write binding has been revoked or replaced. */
+/** An exact Runtime Session write binding has been revoked or replaced. */
 export class StaleSessionClaim extends Schema.TaggedError<StaleSessionClaim>()("generalist/runtime/StaleSessionClaim", {
   sessionId: Schema.String,
   runId: Schema.String,

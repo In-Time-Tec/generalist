@@ -10,43 +10,40 @@ import {
 } from "../../core/durable/manifest/executable-manifest.js"
 import { Function, Schema } from "effect"
 
-/** @experimental Complete closed executable profile registry and entry closure. */
+/** Complete closed executable profile registry and entry closure. */
 export type ExecutableManifest = CoreExecutableManifest
-/** @experimental One globally pinned child profile available by selection name. */
+/** One globally pinned child profile available by selection name. */
 export type ProfileBinding = CoreProfileBinding
-/** @experimental Encoded complete closed executable Agent graph. */
+/** Encoded complete closed executable Agent graph. */
 type ExecutableManifestEncoded = typeof CoreExecutableManifest.Encoded
 
-/** @experimental Complete closed executable Agent graph. */
+/** Complete closed executable Agent graph. */
 export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = CoreExecutableManifest
 
-/** @experimental Durable reference to one exact executable closure and active Agent. */
+/** Durable reference to one exact executable closure and active Agent. */
 export const ExecutableRef: typeof CoreExecutableRef = CoreExecutableRef
-/** @experimental */
 export type ExecutableRef = CoreExecutableRef
 
-/** @experimental Executable closure paired with its constructor-owned reference. */
+/** Executable closure paired with its constructor-owned reference. */
 export type PinnedExecutable = CorePinnedExecutable
-/** @experimental Encoded executable closure paired with its reference. */
+/** Encoded executable closure paired with its reference. */
 interface PinnedExecutableEncoded {
   readonly ref: typeof ExecutableRef.Encoded
   readonly manifest: ExecutableManifestEncoded
 }
 
-/** @experimental Paired executable authority boundary. */
+/** Paired executable authority boundary. */
 export const PinnedExecutable: Schema.Codec<PinnedExecutable, PinnedExecutableEncoded> = Schema.Struct({
   ref: ExecutableRef,
   manifest: ExecutableManifest,
 })
 
-/** @experimental Construct, validate, canonicalize, and pin a complete executable closure. */
+/** Construct, validate, canonicalize, and pin a complete executable closure. */
 export const make: typeof makeCore = makeCore
-/** @experimental Construct an exact static executable fixture. */
+/** Construct an exact static executable fixture. */
 export const makeTest: {
   (revision?: string): (name: string) => CorePinnedExecutable
   (name: string, revision?: string): CorePinnedExecutable
 } = Function.dual(2, (name: string, revision?: string) => makeTestCore(name, revision))
-/** @experimental */
 export const encode: typeof encodeCore = encodeCore
-/** @experimental */
 export const decode: typeof decodeCore = decodeCore

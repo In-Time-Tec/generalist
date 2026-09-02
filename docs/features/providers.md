@@ -6,8 +6,8 @@ Provider leaves export two layers: a client layer (`layerConfig`, or `layerClien
 
 ```ts
 import { Config, Console, Effect, Layer } from "effect"
-import { LanguageModel } from "generalist"
-import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/ai/openai"
+import { LanguageModel } from "effect/unstable/ai"
+import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/providers/openai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") })
@@ -41,14 +41,14 @@ When the model is genuinely runtime data — chosen per request from a database 
 
 There is no executable `generalist/ai` aggregate. Each exact leaf closes over only `effect` and its optional upstream peer.
 
-| Import                                                                                                           | Upstream peer                                                                           |
-| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `generalist/ai/openai`, `openai-responses`, `openai-embedding`                                                   | `@effect/ai-openai`                                                                     |
-| `generalist/ai/anthropic`                                                                                        | `@effect/ai-anthropic`                                                                  |
-| `generalist/ai/openrouter`                                                                                       | `@effect/ai-openrouter`                                                                 |
-| `generalist/ai/openai-chat-completions`, `openai-compatible`, `openai-compatible-embedding`                      | `@effect/ai-openai-compat`                                                              |
-| `generalist/ai/amazon-bedrock`                                                                                   | `@aws-sdk/client-bedrock-runtime`, `@aws-sdk/credential-provider-node`, `@smithy/types` |
-| `generalist/ai/deterministic`, `model-catalog`, `model-route`, `openai-account-auth`, `openai-account-auth-http` | none                                                                                    |
+| Import                                                                                                                  | Upstream peer                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `generalist/providers/openai`, `openai-responses`, `openai-embedding`                                                   | `@effect/ai-openai`                                                                     |
+| `generalist/providers/anthropic`                                                                                        | `@effect/ai-anthropic`                                                                  |
+| `generalist/providers/openrouter`                                                                                       | `@effect/ai-openrouter`                                                                 |
+| `generalist/providers/openai-chat-completions`, `openai-compatible`, `openai-compatible-embedding`                      | `@effect/ai-openai-compat`                                                              |
+| `generalist/providers/amazon-bedrock`                                                                                   | `@aws-sdk/client-bedrock-runtime`, `@aws-sdk/credential-provider-node`, `@smithy/types` |
+| `generalist/providers/deterministic`, `model-catalog`, `model-route`, `openai-account-auth`, `openai-account-auth-http` | none                                                                                    |
 
 OpenAI and configurable OpenAI Responses use `/responses`; Chat Completions and all seven compatible presets use `/chat/completions`. Compatible adapters accept arbitrary provider/model identities and base URLs. Responses config rejects excess and transport-owned fields; Chat Completions accepts JSON extensions but rejects `model` overrides. OpenRouter applies its generated request schema, preserves routing/preferences/plugins/trace shapes, and chooses Anthropic, OpenAI, or default structured-output codecs from the model id.
 

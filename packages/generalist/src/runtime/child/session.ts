@@ -2,7 +2,7 @@ import { digest } from "../../core/durable/pin.js"
 import { Schema } from "effect"
 
 /**
- * @experimental Session identity for a Run spawned by another Run.
+ * Session identity for a Run spawned by another Run.
  *
  * Session owns model-facing history, so a child that shares its parent's session identity inherits
  * the whole conversation. A subagent exists to work in isolation, so each spawned Run gets its own
@@ -18,11 +18,11 @@ import { Schema } from "effect"
 export const childSessionId = (input: { readonly parentRunId: string; readonly invocationId: string }): string =>
   `child:${encodeURIComponent(input.parentRunId)}:${digest(input.invocationId)}`
 
-/** @experimental Session identity for one member of a fan-out. */
+/** Session identity for one member of a fan-out. */
 export const fanOutMemberSessionId = (input: { readonly fanOutId: string; readonly key: string }): string =>
   `fanout:${encodeURIComponent(input.fanOutId)}:${digest(input.key)}`
 
-/** @experimental Shape one fan-out member into its admitted child form. */
+/** Shape one fan-out member into its admitted child form. */
 export const fanOutMember = <
   M extends {
     readonly key: string

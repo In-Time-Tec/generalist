@@ -1,15 +1,15 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/event.js"
-/** @experimental Typed operation-level adapter for LanguageModel.Service wrappers. */
+/** Typed operation-level adapter for LanguageModel.Service wrappers. */
 export { adapt } from "./service.js"
-/** @experimental Turn-scoped info handed to middleware. */
+/** Turn-scoped info handed to middleware. */
 export interface TurnContext {
   readonly agentName: string
   readonly turn: number
 }
 
-/** @experimental A single middleware. Both hooks are optional; omitted hooks are identity. */
+/** A single middleware. Both hooks are optional; omitted hooks are identity. */
 export interface Middleware {
   /** Transform the prompt for a turn before it is sent to the model. Recalled-memory messages must preserve lineage. */
   readonly transformPrompt?: (prompt: Prompt.Prompt, context: TurnContext) => Effect.Effect<Prompt.Prompt, AgentError>
@@ -25,14 +25,14 @@ export interface Middleware {
   ) => Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError>
 }
 
-/** @experimental Service holding the middleware chain, applied in array order. */
+/** Service holding the middleware chain, applied in array order. */
 export class ModelMiddleware extends Context.Service<ModelMiddleware, ReadonlyArray<Middleware>>()(
   "generalist/core/model/middleware/ModelMiddleware",
 ) {}
 
-/** @experimental Identity chain — the default. */
+/** Identity chain — the default. */
 export const layerIdentity: Layer.Layer<ModelMiddleware> = Layer.succeed(ModelMiddleware, [])
 
-/** @experimental Provide an explicit chain. */
+/** Provide an explicit chain. */
 export const layer = (middleware: ReadonlyArray<Middleware>): Layer.Layer<ModelMiddleware> =>
   Layer.succeed(ModelMiddleware, middleware)

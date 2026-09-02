@@ -5,7 +5,7 @@ import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "generalist/runtime"
-import { RunClient, Wire } from "generalist/transport"
+import { RunClient, Wire } from "generalist/unstable/transport"
 
 const encodeEvents = (value: ReadonlyArray<{ readonly _tag: string }>): string => JSON.stringify(value)
 

@@ -1,16 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import {
-  Agent,
-  AgentEvent,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Prompt,
-  Response,
-  Tool,
-  Toolkit,
-} from "generalist"
+import { Agent, AgentEvent, Approvals, ModelMiddleware, Permissions } from "generalist"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service to production",

@@ -10,14 +10,14 @@ import type { CapabilityPin } from "../durable/pin.js"
 import { ProgramSchemaFailure } from "./capabilities.js"
 import { ProgramRunner, type ExecutionFailure } from "./runner.js"
 
-/** @experimental An exact Agent Program paired with its input and output codecs. */
+/** An exact Agent Program paired with its input and output codecs. */
 export interface Program<I, IE, O, OE> {
   readonly pinned: PinnedProgram
   readonly input: Schema.Codec<I, IE>
   readonly output: Schema.Codec<O, OE>
 }
 
-/** @experimental Construct and pin an Agent Program without evaluating its source. */
+/** Construct and pin an Agent Program without evaluating its source. */
 export const make = <I, IE, O, OE>(input: {
   readonly name: string
   readonly source: string
@@ -44,7 +44,7 @@ export const make = <I, IE, O, OE>(input: {
   output: input.output,
 })
 
-/** @experimental Execute a trusted, caller-supplied Agent Program through the configured sandbox boundary. */
+/** Execute a trusted, caller-supplied Agent Program through the configured sandbox boundary. */
 export const run: {
   <I, IE, O, OE>(
     input: I,

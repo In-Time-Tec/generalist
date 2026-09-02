@@ -85,18 +85,14 @@ const ConfigSchema = Schema.Struct({
   promptVariables: Schema.optionalKey(Schema.Record(Schema.String, Schema.Struct({ text: Schema.String }))),
   requestMetadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
 })
-
-/** @experimental */
 export type Config = typeof ConfigSchema.Type
 
-/** @experimental Decodes persisted provider options into Bedrock request configuration. */
+/** Decodes persisted provider options into Bedrock request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
 const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema), { onExcessProperty: "error" })
 
 export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
   decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
-
-/** @experimental */
 export interface Options extends RegistrationOptions {
   readonly model: string
   readonly config?: Config
@@ -163,8 +159,6 @@ const registrationOptions = (input: Options) => {
   if (input.metadata !== undefined) return { ...required, metadata: input.metadata }
   return required
 }
-
-/** @experimental */
 export const make = Effect.fnUntraced(function* (input: Options) {
   const client = yield* Client
   const model = yield* LanguageModel.make({
@@ -199,16 +193,12 @@ export const make = Effect.fnUntraced(function* (input: Options) {
   })
   return conformImageSourceModel(model)
 })
-
-/** @experimental */
 export const layerLanguageModel = (input: Options) => Layer.effect(LanguageModel.LanguageModel, make(input))
 
-/** @experimental Model layer over the Bedrock `Client`; provide it to a run with `Effect.provide`. */
+/** Model layer over the Bedrock `Client`; provide it to a run with `Effect.provide`. */
 export const layerModel = (input: Options): Model.Model<"amazon-bedrock", LanguageModel.LanguageModel, Client> =>
   Model.make("amazon-bedrock", input.model, layerLanguageModel(input))
-/** @experimental */
 export const classifyFailure: FailureClassifier = classify
-/** @experimental */
 export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool),
@@ -221,6 +211,5 @@ export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
         }),
       }),
   })
-/** @experimental */
 export const layer = (input: Options & { readonly client?: ClientOptions }): Layer.Layer<ModelRegistry, never, never> =>
   modelRegistryLayer([registration(registrationOptions(input))]).pipe(Layer.provide(layerClient(input.client)))

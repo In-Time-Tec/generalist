@@ -59,7 +59,7 @@ const wrapSandbox = (
     })
   })
 
-/** @experimental Add framework-owned inactivity pausing and scope-close pausing to a provider. */
+/** Add framework-owned inactivity pausing and scope-close pausing to a provider. */
 export const autoPause: {
   (duration: Duration.Input): (provider: SandboxProviderService) => SandboxProviderService
   (provider: SandboxProviderService, duration: Duration.Input): SandboxProviderService

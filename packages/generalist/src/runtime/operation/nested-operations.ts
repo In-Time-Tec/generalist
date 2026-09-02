@@ -19,7 +19,7 @@ import type { AgentSuspended } from "../../core/agent/event.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStoreService } from "../run/store.js"
 import { approvalReason, type WaitReason } from "../run/wait.js"
 
-/** @experimental The persisted operation kind every nested host operation uses. */
+/** The persisted operation kind every nested host operation uses. */
 export const nestedOperationKind = "nested" as const
 
 interface PendingApproval {
@@ -29,18 +29,18 @@ interface PendingApproval {
   readonly input: unknown
 }
 
-/** @experimental Runtime-owned nested durable operations plus the waits they open. */
+/** Runtime-owned nested durable operations plus the waits they open. */
 export interface Service extends NestedOperationService {
   readonly waitFor: (
     wait: AgentSuspended["waits"][number],
   ) => Effect.Effect<{ readonly waitId: string; readonly reason: WaitReason } | undefined>
 }
 
-/** @experimental Persisted identity of one nested operation beneath an outer durable operation. */
+/** Persisted identity of one nested operation beneath an outer durable operation. */
 export const nestedOperationKey = (input: { readonly operationKey: string; readonly ordinal: number }): string =>
   `${input.operationKey}#${input.ordinal}`
 
-/** @experimental Stable approval identity for one nested operation. */
+/** Stable approval identity for one nested operation. */
 export const nestedApprovalId = (nestedKey: string): string => `nested-approval:${nestedKey}`
 
 const NestedInput = Schema.Struct({ kind: Schema.String, ordinal: Schema.Finite, payload: Schema.Unknown })
@@ -54,7 +54,7 @@ const errorFromCause = <E>(cause: Cause.Cause<E>): { readonly _tag: "Failed"; re
 }
 
 /**
- * @experimental Construct the Run-attempt scoped nested-operation executor.
+ * Construct the Run-attempt scoped nested-operation executor.
  *
  * A composite tool call crosses many authoritative boundaries. Each crossing is persisted under the
  * outer operation's identity plus a host-assigned ordinal before the handler runs, so a duplicate

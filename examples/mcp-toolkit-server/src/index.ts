@@ -1,9 +1,8 @@
 import { layer as layerBunHttp } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { Config, Effect, Layer, Schema } from "effect"
-import { McpProtocol, McpServer } from "effect/unstable/ai"
+import { McpProtocol, McpServer, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpRouter } from "effect/unstable/http"
-import { Tool, Toolkit } from "generalist"
 
 const greeting = Tool.make("greeting", {
   description: "Create a greeting for a person",

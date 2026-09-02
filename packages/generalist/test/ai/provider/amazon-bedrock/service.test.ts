@@ -24,7 +24,7 @@ import {
   type Credentials,
   type Service,
   type ClientOptions,
-} from "generalist/ai/amazon-bedrock"
+} from "generalist/providers/amazon-bedrock"
 import { Deferred, Effect, Fiber, Layer, Redacted, Ref, Schema, Stream } from "effect"
 import { AiError, Tool, Toolkit } from "effect/unstable/ai"
 
@@ -165,7 +165,7 @@ describe("Amazon Bedrock", () => {
 
   it.effect("keeps the explicit public runtime surface", () =>
     Effect.gen(function* () {
-      const module = yield* Effect.promise(() => import("generalist/ai/amazon-bedrock"))
+      const module = yield* Effect.promise(() => import("generalist/providers/amazon-bedrock"))
       expect(Object.keys(module).toSorted()).toEqual([
         "Client",
         "ClientFailure",

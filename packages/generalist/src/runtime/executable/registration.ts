@@ -8,23 +8,21 @@ const MAX_REGISTRATIONS = 128
 const MAX_TEXT_LENGTH = 255
 const MAX_PAYLOAD_BYTES = 65_536
 
-/** @experimental Bounded secret-free policy used to reconstruct a pinned compaction service. */
+/** Bounded secret-free policy used to reconstruct a pinned compaction service. */
 export const CompactionPolicy = Schema.Struct({
   keepRecentTokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   strategyIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_TEXT_LENGTH)),
   summaryPromptIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_TEXT_LENGTH)),
 })
-/** @experimental */
 export type CompactionPolicy = typeof CompactionPolicy.Type
 
-/** @experimental Secret-free application data used to reconstruct one opaque model or capability pin. */
+/** Secret-free application data used to reconstruct one opaque model or capability pin. */
 export const ExecutableRegistration = Schema.Struct({
   pin: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_TEXT_LENGTH)),
   codec: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_TEXT_LENGTH)),
   version: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_TEXT_LENGTH)),
   payload: Schema.Unknown,
 })
-/** @experimental */
 export type ExecutableRegistration = typeof ExecutableRegistration.Type
 
 export const requiredPins = (executable: PinnedExecutable): ReadonlySet<string> => {
@@ -109,7 +107,7 @@ const programPins = (
     .toSorted()
 }
 
-/** @experimental Exact pins one active executable requires, independent of the rest of its closure. */
+/** Exact pins one active executable requires, independent of the rest of its closure. */
 export const requiredPinsForActiveExecutable = (executable: PinnedExecutable): ReadonlySet<string> => {
   const byPin = new Map(executable.manifest.entries.map((entry) => [entry.pin, entry] as const))
   const profiles = new Map(executable.manifest.profiles.map((profile) => [profile.selection, profile.agent] as const))
@@ -181,7 +179,7 @@ const encoded = (registration: ExecutableRegistration): string =>
     payload: registration.payload,
   })
 
-/** @experimental Validate and canonicalize the complete registration set for one exact executable. */
+/** Validate and canonicalize the complete registration set for one exact executable. */
 export const validate: {
   (
     registrations: ReadonlyArray<ExecutableRegistration>,
@@ -290,12 +288,12 @@ export const validate: {
     }),
 )
 
-/** @experimental Stable persisted identity of one registration. */
+/** Stable persisted identity of one registration. */
 export const digest = (registration: ExecutableRegistration): string => pinDigest(registration)
 
 export const encodeJson = encoded
 
-/** @experimental Select and validate the exact registrations required by a narrowed executable. */
+/** Select and validate the exact registrations required by a narrowed executable. */
 export const narrow: {
   (
     registrations: ReadonlyArray<ExecutableRegistration>,

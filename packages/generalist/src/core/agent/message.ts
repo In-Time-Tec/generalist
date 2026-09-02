@@ -41,8 +41,6 @@ export const recalledMessages = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.Me
   prompt.content.filter(isMessageFromRecall).map(recalledMessageIdentity)
 
 export const messageJsonStringCodec = Schema.fromJsonString(Schema.toCodecJson(Prompt.Message))
-
-/** @experimental */
 export const encodeMessage: {
   (input: Prompt.Message, options?: ParseOptions): Effect.Effect<string, Schema.SchemaError, never>
   (options?: ParseOptions): (input: Prompt.Message) => Effect.Effect<string, Schema.SchemaError, never>
@@ -51,8 +49,6 @@ export const encodeMessage: {
   (input: Prompt.Message, options?: ParseOptions): Effect.Effect<string, Schema.SchemaError, never> =>
     Schema.encodeEffect(messageJsonStringCodec)(input, options),
 )
-
-/** @experimental */
 export const decodeMessage: {
   (input: string, options?: ParseOptions): Effect.Effect<Prompt.Message, Schema.SchemaError, never>
   (options?: ParseOptions): (input: string) => Effect.Effect<Prompt.Message, Schema.SchemaError, never>

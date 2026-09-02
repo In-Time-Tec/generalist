@@ -7,14 +7,12 @@ import {
   ModelMiddleware,
   ModelRegistry,
   Permissions,
-  Response,
   SkillCatalog,
-  Tool,
-  Toolkit,
 } from "generalist"
-import { Chat, Connection } from "generalist/foldkit"
+import { Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Chat, Connection } from "generalist/unstable/foldkit"
 import { WorkingMemory } from "generalist/memory"
-import { layer as deterministicLayer } from "generalist/ai/deterministic"
+import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { FileSystemCatalog } from "generalist/instructions/skills"
 import { ExecutableManifest } from "generalist/runtime"
 

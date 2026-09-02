@@ -15,7 +15,7 @@ interface OperationInput {
   readonly replayPolicy: ReplayPolicy
 }
 
-/** @experimental Operation scheduled at one agent-loop effect boundary. */
+/** Operation scheduled at one agent-loop effect boundary. */
 export interface OperationSpec<
   Success,
   Failure,

@@ -1,5 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
-import { Agent, LanguageModel, Response } from "generalist"
+import { Agent } from "generalist"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
 

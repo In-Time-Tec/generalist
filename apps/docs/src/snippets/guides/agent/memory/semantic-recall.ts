@@ -1,7 +1,7 @@
 import { Config, Layer } from "effect"
 import { Memory } from "generalist"
 import { SemanticRecall, VectorStore, WorkingMemory } from "generalist/memory"
-import { layer as openAiEmbeddingLayer } from "generalist/ai/openai-embedding"
+import { layer as openAiEmbeddingLayer } from "generalist/providers/openai-embedding"
 import { FetchHttpClient } from "effect/unstable/http"
 
 const embeddingLayer = openAiEmbeddingLayer({

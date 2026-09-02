@@ -4,7 +4,7 @@ import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable
 import { ProviderUsage, providerUsage } from "./attempt/observation.js"
 import { type ToolJsonSchemaCompiler, toolJsonSchemaCompiler } from "./registry.js"
 
-/** @experimental A model emitted parameters that do not satisfy the named Effect tool schema. */
+/** A model emitted parameters that do not satisfy the named Effect tool schema. */
 export class InvalidToolCallParameters extends Schema.TaggedError<InvalidToolCallParameters>()(
   "generalist/core/InvalidToolCallParameters",
   {
@@ -13,13 +13,13 @@ export class InvalidToolCallParameters extends Schema.TaggedError<InvalidToolCal
   },
 ) {}
 
-/** @experimental Tool correction was enabled for schema-backed tools, but the active model has no exact compiler. */
+/** Tool correction was enabled for schema-backed tools, but the active model has no exact compiler. */
 export class ToolJsonSchemaCompilerMissing extends Schema.TaggedError<ToolJsonSchemaCompilerMissing>()(
   "generalist/core/ToolJsonSchemaCompilerMissing",
   {},
 ) {}
 
-/** @experimental A model-facing toolkit whose parameter decoding is permissive. */
+/** A model-facing toolkit whose parameter decoding is permissive. */
 export interface ProjectedToolkit {
   readonly toolkit: Toolkit.Toolkit<BroadTools>
 }
@@ -112,7 +112,7 @@ const project = (
     return { toolkit: makeToolkit(tools) }
   })
 
-/** @experimental Project a toolkit with the active provider's exact JSON Schema compiler. */
+/** Project a toolkit with the active provider's exact JSON Schema compiler. */
 export const projectToolkit: {
   (compile: ToolJsonSchemaCompiler): (original: Toolkit.Any) => Effect.Effect<ProjectedToolkit, AiError.AiError>
   (original: Toolkit.Any, compile: ToolJsonSchemaCompiler): Effect.Effect<ProjectedToolkit, AiError.AiError>
@@ -146,7 +146,7 @@ interface InvalidToolCallFields {
   providerUsage?: ProviderUsage
 }
 
-/** @experimental Decode one raw model tool call with the original Effect parameter schema. */
+/** Decode one raw model tool call with the original Effect parameter schema. */
 export const decodeToolCall: {
   (
     part: Response.ToolCallPart<string, unknown>,
@@ -171,7 +171,7 @@ export const decodeToolCall: {
   },
 )
 
-/** @experimental Validate a middleware-produced call against the decoded side of its original schema. */
+/** Validate a middleware-produced call against the decoded side of its original schema. */
 export const validateDecodedToolCall: {
   (
     part: Response.ToolCallPart<string, unknown>,
@@ -255,7 +255,7 @@ const validatedStream = <R>(
     )
   })
 
-/** @experimental Wrap a model so Generalist can validate tool calls before output escapes. */
+/** Wrap a model so Generalist can validate tool calls before output escapes. */
 export const wrap: {
   (
     original: Toolkit.Any,
@@ -280,7 +280,7 @@ export const wrap: {
     ),
 )
 
-/** @experimental Prepare correction validation for the active direct or registered model. */
+/** Prepare correction validation for the active direct or registered model. */
 export const prepare: {
   (
     original: Toolkit.Any,
@@ -310,5 +310,5 @@ export const prepare: {
   },
 )
 
-/** @experimental Test whether a failure is the precise Generalist-owned correction signal. */
+/** Test whether a failure is the precise Generalist-owned correction signal. */
 export const isInvalidToolCallParameters = Schema.is(InvalidToolCallParameters)

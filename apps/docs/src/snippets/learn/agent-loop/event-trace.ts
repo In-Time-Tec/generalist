@@ -1,15 +1,6 @@
 import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import {
-  Agent,
-  Approvals,
-  LanguageModel,
-  ModelMiddleware,
-  Permissions,
-  Response,
-  Tool,
-  Toolkit,
-  type AgentEvent,
-} from "generalist"
+import { Agent, Approvals, ModelMiddleware, Permissions, type AgentEvent } from "generalist"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 
 const searchTool = Tool.make("search_docs", {
   description: "Search the project docs",

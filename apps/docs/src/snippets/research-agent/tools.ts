@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { Tool, Toolkit } from "generalist"
+import { Tool, Toolkit } from "effect/unstable/ai"
 import { SearchResult, WebSearch } from "./web-search"
 export const webSearchTool = Tool.make("web_search", {
   description: "Search the web for a query and return a short list of results with titles, URLs, and snippets.",

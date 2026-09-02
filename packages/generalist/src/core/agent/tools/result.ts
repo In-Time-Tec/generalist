@@ -10,8 +10,6 @@ export interface ToolCallIdState {
   readonly nextIndex: number
   readonly firstIndexes: HashMap.HashMap<string, number>
 }
-
-/** @experimental */
 export const successResult: {
   (outcome: Success): (call: AnyToolCall) => PendingToolResult
   (call: AnyToolCall, outcome: Success): PendingToolResult
@@ -28,8 +26,6 @@ export const successResult: {
       preliminary: false,
     }),
 )
-
-/** @experimental */
 export const domainFailureResult: {
   (outcome: DomainFailure): (call: AnyToolCall) => PendingToolResult
   (call: AnyToolCall, outcome: DomainFailure): PendingToolResult

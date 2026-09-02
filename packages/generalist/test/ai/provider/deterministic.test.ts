@@ -15,27 +15,27 @@ import {
   decodeConfig as decodeAnthropicConfig,
   layer as anthropicLayer,
   toolJsonSchemaCompiler as anthropicToolJsonSchemaCompiler,
-} from "generalist/ai/anthropic"
+} from "generalist/providers/anthropic"
 import {
   classifyFailure as classifyOpenAIFailure,
   decodeConfig as decodeOpenAIConfig,
   layer as openAiLayer,
   layerOrDeterministic as openAiLayerOrDeterministic,
   toolJsonSchemaCompiler as openAiToolJsonSchemaCompiler,
-} from "generalist/ai/openai"
-import { layer as openAiEmbeddingLayer } from "generalist/ai/openai-embedding"
-import { layer as openAiCompatibleEmbeddingLayer } from "generalist/ai/openai-compatible-embedding"
+} from "generalist/providers/openai"
+import { layer as openAiEmbeddingLayer } from "generalist/providers/openai-embedding"
+import { layer as openAiCompatibleEmbeddingLayer } from "generalist/providers/openai-compatible-embedding"
 import {
   decodeConfig as decodeChatCompletionsConfig,
   layer as chatCompletionsLayer,
   toolJsonSchemaCompiler as chatCompletionsToolJsonSchemaCompiler,
-} from "generalist/ai/openai-chat-completions"
-import { layer as responsesLayer } from "generalist/ai/openai-responses"
+} from "generalist/providers/openai-chat-completions"
+import { layer as responsesLayer } from "generalist/providers/openai-responses"
 import {
   classifyFailure as classifyOpenRouterFailure,
   layer as openRouterLayer,
   toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
-} from "generalist/ai/openrouter"
+} from "generalist/providers/openrouter"
 import {
   layerAzureOpenAI,
   layerDeepSeek,
@@ -44,7 +44,7 @@ import {
   layerMistral,
   layerOllama,
   layerXAI,
-} from "generalist/ai/openai-compatible"
+} from "generalist/providers/openai-compatible"
 import { layer as deterministicLayer } from "../../../src/ai/provider/deterministic.js"
 import { allowAllAuthorization } from "../../authorization.js"
 

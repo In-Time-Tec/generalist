@@ -2,7 +2,7 @@ import { Equal, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 
-/** @experimental First structurally divergent position between the Session projection and live Chat history. */
+/** First structurally divergent position between the Session projection and live Chat history. */
 export const Divergence = Schema.Struct({
   index: Schema.Finite,
   durableRole: Schema.optionalKey(Schema.String),
@@ -12,11 +12,9 @@ export const Divergence = Schema.Struct({
   durableDigest: Schema.optionalKey(Schema.String),
   authoritativeDigest: Schema.optionalKey(Schema.String),
 })
-
-/** @experimental */
 export type Divergence = typeof Divergence.Type
 
-/** @experimental Bounded structural evidence for a Session/Chat divergence. Carries counts, roles, part types, and digests only — never raw prompt, message, or tool payload text. */
+/** Bounded structural evidence for a Session/Chat divergence. Carries counts, roles, part types, and digests only — never raw prompt, message, or tool payload text. */
 export const Diagnostics = Schema.Struct({
   sessionId: Schema.String,
   durableEntryCount: Schema.Finite,
@@ -27,8 +25,6 @@ export const Diagnostics = Schema.Struct({
   lastDurableEntryTag: Schema.optionalKey(Schema.String),
   firstDivergence: Schema.optionalKey(Divergence),
 })
-
-/** @experimental */
 export type Diagnostics = typeof Diagnostics.Type
 
 const digest = (value: string): string => {
@@ -63,7 +59,7 @@ const coalesceParts = (parts: ReadonlyArray<Prompt.Part>): ReadonlyArray<Prompt.
 }
 
 /**
- * @experimental Merge consecutive text parts that share options within each message.
+ * Merge consecutive text parts that share options within each message.
  *
  * The provider-agnostic Chat export encodes a user message whose content is a
  * multi-text-part array by keeping only the first text part, silently dropping the
@@ -103,7 +99,7 @@ const canonicalValue = (value: Schema.Json): Schema.Json => {
 const messageJson = (message: Prompt.Message): Schema.Json =>
   Schema.decodeUnknownSync(Schema.Json)(JSON.parse(JSON.stringify(Schema.encodeSync(Prompt.Message)(message))))
 
-/** @experimental Compares prompt messages by canonical content across equivalent runtime representations. */
+/** Compares prompt messages by canonical content across equivalent runtime representations. */
 export const equivalentMessages: {
   (right: Prompt.Message): (left: Prompt.Message) => boolean
   (left: Prompt.Message, right: Prompt.Message): boolean
@@ -146,7 +142,7 @@ const commonPrefixLength = (
   }
 }
 
-/** @experimental Computes bounded divergence diagnostics for a failed Session synchronization. */
+/** Computes bounded divergence diagnostics for a failed Session synchronization. */
 export const diagnose = (input: {
   readonly sessionId: string
   readonly durableEntryTags: ReadonlyArray<string>

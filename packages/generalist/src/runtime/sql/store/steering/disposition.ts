@@ -9,7 +9,7 @@ const discardReason = (tag: string): SteeringDiscardReason | undefined => {
   return undefined
 }
 
-/** @experimental Atomically marks and describes pending steering when a Run terminalizes. */
+/** Atomically marks and describes pending steering when a Run terminalizes. */
 export const discardPendingSteering = (input: { readonly runId: string; readonly terminalTag: string }) =>
   Effect.gen(function* () {
     const reason = discardReason(input.terminalTag)

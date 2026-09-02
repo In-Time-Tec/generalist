@@ -10,7 +10,7 @@ import { Layer } from "effect"
 import { createClient, setup } from "rivetkit"
 import { Agent } from "generalist"
 import { ExecutableResolver } from "generalist/runtime"
-import { makeRuntimeActor } from "generalist/rivet/actors"
+import { makeRuntimeActor } from "generalist/unstable/rivet"
 
 const runtimePartition = makeRuntimeActor({
   addresses: [{ address, executable, registrations }],
@@ -74,7 +74,7 @@ increments the incarnation and recovers stale claims; never-replay work becomes
 - Sleep and destroy dispose the scoped `ManagedRuntime`; the adapter never closes Rivet's actor-owned SQL handle.
 - Raw statements and transactions serialize; nested transactions fail with `SqlError`.
 - SQL interruption waits for an in-flight statement or rollback to settle.
-- The published `generalist/rivet/actors` subpath is ESM-only.
+- The published `generalist/unstable/rivet` subpath is ESM-only.
 
 ## Related
 

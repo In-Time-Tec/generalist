@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import type { InvokeModelCommandInput } from "@aws-sdk/client-bedrock-runtime"
 import { Effect, Layer, Schema } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
-import { type Service, layerEmbedding } from "generalist/ai/amazon-bedrock"
+import { type Service, layerEmbedding } from "generalist/providers/amazon-bedrock"
 
 const json = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 

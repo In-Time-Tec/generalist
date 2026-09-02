@@ -1,4 +1,4 @@
-import { Connection } from "generalist/foldkit"
+import { Connection } from "generalist/unstable/foldkit"
 import { Layer } from "effect"
 import { Socket } from "effect/unstable/socket"
 import { makeApplication, run } from "foldkit/runtime"

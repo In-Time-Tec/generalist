@@ -4,9 +4,10 @@ Generalist is a TypeScript framework for building AI agents on [Effect](https://
 
 ```ts
 import { Config, Effect, Layer, Schema } from "effect"
+import { Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Approvals, Compaction, Permissions, Tool, Toolkit } from "generalist"
-import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/ai/openai"
+import { Agent, Approvals, Compaction, Permissions } from "generalist"
+import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/providers/openai"
 import { WorkingMemory } from "generalist/memory"
 
 const searchDocs = Tool.make("search_docs", {
@@ -118,16 +119,16 @@ Runnable examples live in [`examples/`](examples/), one README each.
 
 ## Capabilities at a glance
 
-| Area                                          | Import                                                                                    |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Agent loop, typed tools, approvals, steering  | `generalist`                                                                              |
-| Durable, addressable, replayable runs         | `generalist/runtime`                                                                      |
-| Model providers and a deterministic model     | `generalist/ai/*`                                                                         |
-| Memory, skills, versioned instructions        | `generalist/memory`, `generalist/instructions`                                            |
-| MCP, A2A, and AG-UI integrations              | `generalist/mcp`, `generalist/a2a`, `generalist/ag-ui`                                    |
-| SSE/WebSocket transport and FoldKit chat      | `generalist/transport`, `generalist/foldkit`                                              |
-| Durable stores                                | `generalist/pg`, `generalist/mysql`, `generalist/cloudflare/*`, `generalist/rivet/actors` |
-| Scripted models and public conformance suites | `generalist/testing`                                                                      |
+| Area                                          | Import                                                                                               |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Agent loop, typed tools, approvals, steering  | `generalist`                                                                                         |
+| Durable, addressable, replayable runs         | `generalist/runtime`                                                                                 |
+| Model providers and a deterministic model     | `generalist/providers/*`                                                                             |
+| Memory, skills, versioned instructions        | `generalist/memory`, `generalist/instructions`                                                       |
+| MCP, A2A, and AG-UI integrations              | `generalist/unstable/mcp`, `generalist/unstable/a2a`, `generalist/unstable/ag-ui`                    |
+| SSE/WebSocket transport and FoldKit chat      | `generalist/unstable/transport`, `generalist/unstable/foldkit`                                       |
+| Durable stores                                | `generalist/pg`, `generalist/mysql`, `generalist/unstable/cloudflare/*`, `generalist/unstable/rivet` |
+| Scripted models and public conformance suites | `generalist/testing`                                                                                 |
 
 ## Repository layout
 

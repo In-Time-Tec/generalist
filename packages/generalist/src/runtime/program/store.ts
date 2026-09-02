@@ -13,12 +13,9 @@ import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/stat
 import type { RunWait } from "../run/wait.js"
 import { OperationResolution } from "../operation/resolution.js"
 
-/** @experimental Program replay vocabulary persisted without translation. */
+/** Program replay vocabulary persisted without translation. */
 export const ProgramOperationKind = Schema.Literals(["tool", "step", "log", "agent", "agent-map", "agent-fan-out"])
-/** @experimental */
 export type ProgramOperationKind = typeof ProgramOperationKind.Type
-
-/** @experimental */
 export const ProgramOperationStatus = Schema.Literals([
   "reserved",
   "running",
@@ -27,10 +24,9 @@ export const ProgramOperationStatus = Schema.Literals([
   "failed",
   "unknown",
 ])
-/** @experimental */
 export type ProgramOperationStatus = typeof ProgramOperationStatus.Type
 
-/** @experimental Persisted counters and the fixed deadline for one Program Run. */
+/** Persisted counters and the fixed deadline for one Program Run. */
 export const ProgramRunState = Schema.Struct({
   runId: Schema.String,
   programPin: Schema.String,
@@ -42,10 +38,9 @@ export const ProgramRunState = Schema.Struct({
   logBytes: Schema.Int,
   activeSlots: Schema.Int,
 })
-/** @experimental */
 export type ProgramRunState = typeof ProgramRunState.Type
 
-/** @experimental Exact durable record for one Core Program operation. */
+/** Exact durable record for one Core Program operation. */
 export const ProgramOperationRecord = Schema.Struct({
   runId: Schema.String,
   operation: ProgramOperationName,
@@ -63,18 +58,15 @@ export const ProgramOperationRecord = Schema.Struct({
   resolutionIdempotencyKey: Schema.optionalKey(Schema.String),
   resolution: Schema.optionalKey(OperationResolution),
 })
-/** @experimental */
 export type ProgramOperationRecord = typeof ProgramOperationRecord.Type
 
-/** @experimental Resources atomically reserved with a Program operation. */
+/** Resources atomically reserved with a Program operation. */
 export interface ProgramReservation {
   readonly toolCalls?: number
   readonly agentRuns?: number
   readonly logBytes?: number
   readonly activeSlots?: number
 }
-
-/** @experimental */
 export interface ReserveProgramOperationInput extends ExecutionClaim {
   readonly programPin: string
   readonly budget: ProgramBudget
@@ -87,49 +79,43 @@ export interface ReserveProgramOperationInput extends ExecutionClaim {
   readonly replay: ProgramReplayPolicy
   readonly reservation: ProgramReservation
 }
-
-/** @experimental */
 export type ProgramOperationOutcome =
   | { readonly _tag: "Succeeded"; readonly value: unknown; readonly tokens?: number }
   | { readonly _tag: "Failed"; readonly error: unknown }
   | { readonly _tag: "Unknown" }
-
-/** @experimental */
 export interface SettleProgramOperationInput extends ExecutionClaim {
   readonly operation: ProgramOperationName
   readonly outcome: ProgramOperationOutcome
   readonly releaseSlots: number
 }
 
-/** @experimental Atomic Program operation, budget, and durable child admission. */
+/** Atomic Program operation, budget, and durable child admission. */
 export interface AdmitProgramAgentsInput extends ReserveProgramOperationInput {
   readonly fanOut: AdmitFanOutInput
   readonly suspension: ExecutionSuspension
   readonly wait: RunWait
 }
 
-/** @experimental Atomic Program operation reservation and wait creation. */
+/** Atomic Program operation reservation and wait creation. */
 export interface SuspendProgramOperationInput extends ReserveProgramOperationInput {
   readonly suspension: ExecutionSuspension
   readonly wait: RunWait
   readonly checkpoint?: ExecutionCheckpoint
 }
 
-/** @experimental Atomic Program log reservation, event append, and settlement. */
+/** Atomic Program log reservation, event append, and settlement. */
 export interface CommitProgramLogInput extends ReserveProgramOperationInput {
   readonly level: "debug" | "info" | "warn" | "error"
   readonly message: string
   readonly data?: Readonly<Record<string, Schema.Json>>
 }
-
-/** @experimental */
 export interface CompleteProgramInput extends ExecutionClaim {
   readonly output: unknown
   readonly outputBytes: number
   readonly outputLimit: number
 }
 
-/** @experimental Expected Program store decisions remain typed. */
+/** Expected Program store decisions remain typed. */
 export type ProgramStoreFailure =
   | InstanceType<typeof ProgramBudgetExhausted>
   | InstanceType<typeof ProgramReplayDivergence>

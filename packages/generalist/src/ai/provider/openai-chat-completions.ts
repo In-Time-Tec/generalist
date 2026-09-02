@@ -18,16 +18,12 @@ import {
 } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
 import type { RegistrationOptions } from "../model/registration.js"
-
-/** @experimental */
 export interface Options extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
   readonly config?: Config
   readonly classifyFailure?: FailureClassifier
 }
-
-/** @experimental */
 export type Config = Omit<typeof OpenAILanguageModel.Config.Service, "model">
 
 const ConfigSchema = Schema.Record(Schema.String, Schema.Json).pipe(
@@ -38,14 +34,12 @@ const ConfigSchema = Schema.Record(Schema.String, Schema.Json).pipe(
   ),
 )
 
-/** @experimental Decodes persisted OpenAI-compatible Chat Completions request configuration. */
+/** Decodes persisted OpenAI-compatible Chat Completions request configuration. */
 type ConfigInput = typeof Schema.Unknown.Type
 const decodeConfigInput = Schema.decodeUnknownEffect(Schema.NullOr(ConfigSchema))
 
 export const decodeConfig = (options: ConfigInput): Effect.Effect<Config, Schema.SchemaError> =>
   decodeConfigInput(options ?? null).pipe(Effect.map((config) => config ?? {}))
-
-/** @experimental */
 export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
   Effect.try({
     try: () => Tool.getJsonSchema(tool, { transformer: OpenAIStructuredOutput.toCodecOpenAI }),
@@ -58,8 +52,6 @@ export const toolJsonSchemaCompiler: ToolJsonSchemaCompiler = (tool) =>
         }),
       }),
   })
-
-/** @experimental */
 export interface ClientOptions extends Options {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly baseUrl?: string
@@ -73,7 +65,7 @@ const modelLayer = (input: Options) =>
       : OpenAILanguageModel.layer({ model: input.model, config: input.config }),
   )
 
-/** @experimental Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
+/** Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`. */
 export const layerModel = (
   input: Options,
 ): Model.Model<string, LanguageModel.LanguageModel, OpenAIClient.OpenAiClient> =>
@@ -98,12 +90,8 @@ const clientOptions = (input: ClientOptions) => {
   const configured = input.apiKey === undefined ? input.clientConfig : { ...input.clientConfig, apiKey: input.apiKey }
   return input.baseUrl === undefined ? configured : { ...configured, apiUrl: Config.succeed(input.baseUrl) }
 }
-
-/** @experimental */
 export const layer = (input: ClientOptions): Layer.Layer<ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
   modelRegistryLayer([registration(registrationOptions(input))]).pipe(
     Layer.provide(OpenAIClient.layerConfig(clientOptions(input))),
   )
-
-/** @experimental */
 export const layerConfig = OpenAIClient.layerConfig

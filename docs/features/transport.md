@@ -7,7 +7,7 @@ Transport projects Runtime-owned `RunEvent` history and live updates over SSE or
 ```ts
 import { Effect } from "effect"
 import { HttpRouter, HttpServerRequest } from "effect/unstable/http"
-import { SSE, WebSocket } from "generalist/transport"
+import { SSE, WebSocket } from "generalist/unstable/transport"
 
 const serveEvents = (runId: string) =>
   Effect.gen(function* () {

@@ -36,7 +36,7 @@ export const comparisons = definePage({
       ],
       [
         strong("You are streaming a run to a browser."),
-        " generalist/transport projects Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model on the client (",
+        " generalist/unstable/transport projects Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model on the client (",
         link("/docs/guides/serve-transport", "Serve over a transport"),
         ").",
       ],
