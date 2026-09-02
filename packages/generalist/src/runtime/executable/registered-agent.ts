@@ -19,6 +19,7 @@ import {
 import { make as makeExecutable } from "./manifest.js"
 import type { Input as ResolverInput, Resolution, Service as ResolverService } from "./resolver.js"
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
+import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js"
 
 const codec = "generalist/runtime/registered-agent"
 const version = "1"
@@ -36,6 +37,7 @@ export interface RegisteredAgent {
 /** @internal Process-local authority shared by one Runtime service and its executor. */
 export interface RegisteredAgents {
   readonly register: (registration: RegisteredAgent) => Effect.Effect<void, DuplicateAgent>
+  readonly registerAll: (registrations: ReadonlyArray<RegisteredAgent>) => Effect.Effect<void, DuplicateAgent>
   readonly get: (name: string) => Effect.Effect<Option.Option<RegisteredAgent>>
   readonly getFor: (agent: AnyAgent) => Effect.Effect<Option.Option<RegisteredAgent>>
 }
@@ -43,15 +45,21 @@ export interface RegisteredAgents {
 /** @internal Construct one registry synchronously so host Layers can share it without exposing another service. */
 export const make = (): RegisteredAgents => {
   const entries = new Map<string, RegisteredAgent>()
-  return {
-    register: (registration) =>
-      Effect.suspend(() => {
-        if (entries.has(registration.name)) {
+  const registerAll = (registrations: ReadonlyArray<RegisteredAgent>) =>
+    Effect.suspend(() => {
+      const names = new Set<string>()
+      for (const registration of registrations) {
+        if (names.has(registration.name) || entries.has(registration.name)) {
           return Effect.fail(DuplicateAgent.make({ name: registration.name }))
         }
-        entries.set(registration.name, registration)
-        return Effect.void
-      }),
+        names.add(registration.name)
+      }
+      for (const registration of registrations) entries.set(registration.name, registration)
+      return Effect.void
+    })
+  return {
+    register: (registration) => registerAll([registration]),
+    registerAll,
     get: (name) => Effect.sync(() => Option.fromUndefinedOr(entries.get(name))),
     getFor: (agent) =>
       Effect.sync(() => {
@@ -61,18 +69,56 @@ export const make = (): RegisteredAgents => {
   }
 }
 
-/** @internal Derive the persisted identity used for typed Agent admission and recovery tests. */
-export const durableIdentity = <
-  Tools extends Record<string, Tool.Any>,
-  R,
-  PolicyServices extends R,
-  AuthorizationServices extends R,
-  InputCodec extends Schema.Top,
-  OutputCodec extends Schema.Top,
->(
-  agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-) => {
-  const durable = fromLiveAgent(agent, {
+type ErasedAgent = Agent<Record<string, Tool.Any>, unknown, unknown, unknown, Schema.Top, Schema.Top>
+
+interface AgentGraph {
+  readonly agents: ReadonlyArray<AnyAgent>
+  readonly children: ReadonlyMap<AnyAgent, ReadonlyArray<{ readonly selection: string; readonly agent: AnyAgent }>>
+}
+
+const graphFor = (root: AnyAgent): AgentGraph => {
+  const agents: Array<AnyAgent> = []
+  const children = new Map<AnyAgent, ReadonlyArray<{ readonly selection: string; readonly agent: AnyAgent }>>()
+  const names = new Map<string, AnyAgent>()
+  const profiles = new Map<string, AnyAgent>()
+  const visited = new Set<AnyAgent>()
+  const visit = (agent: AnyAgent): void => {
+    if (visited.has(agent)) return
+    const named = names.get(agent.name)
+    if (named !== undefined && named !== agent)
+      throw new TypeError(`Duplicate Agent name in fan-out graph: ${agent.name}`)
+    names.set(agent.name, agent)
+    visited.add(agent)
+    agents.push(agent)
+    const declared: Array<{ readonly selection: string; readonly agent: AnyAgent }> = []
+    const selections = new Set<string>()
+    for (const tool of Object.values(agent.toolkit.tools)) {
+      const fanOut = fanOutDefinition(tool)
+      if (fanOut === undefined) continue
+      for (const [selection, child] of Object.entries(fanOut.agents)) {
+        const profiled = profiles.get(selection)
+        if (profiled !== undefined && profiled !== child) {
+          throw new TypeError(`Fan-out selection '${selection}' resolves to more than one Agent`)
+        }
+        profiles.set(selection, child)
+        if (!selections.has(selection)) {
+          declared.push({ selection, agent: child })
+          selections.add(selection)
+        }
+        visit(child)
+      }
+    }
+    children.set(agent, declared)
+  }
+  visit(root)
+  return { agents, children }
+}
+
+const pinnedAgent = (agent: AnyAgent, children: ReadonlyArray<{ readonly selection: string }>) => {
+  const hidden: unknown = agent
+  // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; every graph member originates from Agent.make.
+  const erased = hidden as ErasedAgent
+  return fromLiveAgent(erased, {
     model: makeModel({
       runtime: "registered-agent",
       agent: agent.name,
@@ -89,22 +135,59 @@ export const durableIdentity = <
         ? { _tag: "Pinned", pin: makeCapability({ runtime: "registered-agent", agent: agent.name, policy: "1" }) }
         : { _tag: "Portable", policy: agent.policy.snapshot },
     budget: agent.budget ?? {},
-    children: [],
+    children,
   })
-  const executable = makeExecutable({ root: durable.pin, entries: [{ _tag: "Agent", ...durable }] })
+}
+
+const graphIdentities = (root: AnyAgent) => {
+  const graph = graphFor(root)
+  const pinned = new Map(
+    graph.agents.map(
+      (agent) =>
+        [
+          agent,
+          pinnedAgent(
+            agent,
+            (graph.children.get(agent) ?? []).map(({ selection }) => ({ selection })),
+          ),
+        ] as const,
+    ),
+  )
+  const profiles = new Map<string, AnyAgent>()
+  for (const declared of graph.children.values()) {
+    for (const child of declared) profiles.set(child.selection, child.agent)
+  }
+  const executableInput = {
+    root: pinned.get(root)!.pin,
+    profiles: [...profiles].map(([selection, agent]) => ({ selection, agent: pinned.get(agent)!.pin })),
+    entries: graph.agents.map((agent) => ({ _tag: "Agent" as const, ...pinned.get(agent)! })),
+  }
+  const executable = makeExecutable(executableInput)
+  const registrations = [...requiredPins(executable)].map((pin) => ({
+    pin,
+    codec,
+    version,
+    payload: { agent: root.name },
+  }))
   return {
-    executable,
-    registrations: [...requiredPins(executable)].map((pin) => ({
-      pin,
-      codec,
-      version,
-      payload: { agent: agent.name },
-    })),
+    graph,
+    identities: new Map(
+      graph.agents.map(
+        (agent) =>
+          [
+            agent,
+            {
+              executable: makeExecutable({ ...executableInput, active: pinned.get(agent)!.pin }),
+              registrations,
+            },
+          ] as const,
+      ),
+    ),
   }
 }
 
-/** @internal Close an Agent over the registration call's exact environment and derive its durable admission identity. */
-const registered = <
+/** @internal Derive the persisted identity used for typed Agent admission and recovery tests. */
+export const durableIdentity = <
   Tools extends Record<string, Tool.Any>,
   R,
   PolicyServices extends R,
@@ -113,15 +196,27 @@ const registered = <
   OutputCodec extends Schema.Top,
 >(
   agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-  context: Context.Context<ClosedServices<Tools, R, InputCodec, OutputCodec>>,
+) => graphIdentities(agent).identities.get(agent)!
+
+/** @internal Close an Agent over the registration call's exact environment and derive its durable admission identity. */
+const registered = (
+  agent: AnyAgent,
+  context: Context.Context<unknown>,
+  identity: ReturnType<typeof durableIdentity>,
 ): RegisteredAgent => {
-  const identity = durableIdentity(agent)
+  const hiddenAgent: unknown = agent
+  // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; every registered member originates from Agent.make.
+  const erased = hiddenAgent as ErasedAgent
+  const hiddenEnvironment: unknown = Layer.succeedContext(context)
+  // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: capture obtains the root Agent's complete environment, including every declared fan-out child requirement, before graph erasure.
+  const environment = hiddenEnvironment as Layer.Layer<
+    ClosedServices<Record<string, Tool.Any>, unknown, Schema.Top, Schema.Top>
+  >
   return {
     name: agent.name,
     source: agent,
-    agent: close(agent, Layer.succeedContext(context)),
-    // The exact Agent object check in getFor confines this erased context to the schemas that declared its services.
-    context: Context.makeUnsafe<unknown>(context.mapUnsafe),
+    agent: close(erased, environment),
+    context,
     executable: identity.executable,
     registrations: identity.registrations,
   }
@@ -137,9 +232,13 @@ export const capture = <
   OutputCodec extends Schema.Top,
 >(
   agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-): Effect.Effect<RegisteredAgent, never, ClosedServices<Tools, R, InputCodec, OutputCodec>> =>
+): Effect.Effect<ReadonlyArray<RegisteredAgent>, never, ClosedServices<Tools, R, InputCodec, OutputCodec>> =>
   Effect.context<ClosedServices<Tools, R, InputCodec, OutputCodec>>().pipe(
-    Effect.map((context) => registered(agent, context)),
+    Effect.map((context) => {
+      const graph = graphIdentities(agent)
+      const erasedContext = Context.makeUnsafe<unknown>(context.mapUnsafe)
+      return graph.graph.agents.map((member) => registered(member, erasedContext, graph.identities.get(member)!))
+    }),
   )
 
 const registeredInput = (input: ResolverInput): boolean =>

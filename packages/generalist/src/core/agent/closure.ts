@@ -7,6 +7,7 @@ import type { ModelSelection } from "../model/registry.js"
 import type { ToolContext } from "../tools/tool-context.js"
 import type { Policy } from "../turn/policy.js"
 import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure-identity.js"
+import type { HandlersFor } from "./tool/fan-out.js"
 
 export { ClosedTypeId } from "./lifecycle/closure-identity.js"
 
@@ -31,7 +32,7 @@ export interface Any<PolicyServices = unknown> {
  */
 export type ClosedServices<Tools extends Record<string, Tool.Any>, R> =
   | R
-  | Tool.HandlersFor<Tools>
+  | HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 
 /** Consumer of one hidden Agent identity together with the exact environment that satisfies it. */

@@ -20,6 +20,7 @@ import type { RunInbox } from "../../turn/steering-inbox.js"
 import type { Input } from "../../turn/steering.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 import type { VerifierRunner } from "../gates/evaluation.js"
+import type { HandlersFor } from "../tool/fan-out.js"
 
 export type ObjectSchema = Schema.Codec<Record<string, Schema.Top["Type"]>, object, unknown, unknown>
 export interface RequiredFieldCodec<out T, out E, out RD, out RE> extends Schema.Codec<T, E, RD, RE> {
@@ -40,7 +41,7 @@ export interface StructuredRunConfig<S extends ObjectSchema, OutputValue> {
 export type SchemaServicesD<S extends ObjectSchema> = S["DecodingServices"]
 export type SchemaServicesE<S extends ObjectSchema> = S["EncodingServices"]
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
-  | Tool.HandlersFor<T>
+  | HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
 
 /** Every service one run loop turn requires. */

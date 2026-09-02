@@ -82,7 +82,8 @@ export const make = (options: {
     activate: boolean,
   ) => Effect.Effect<StartReceipt, StartExecutionError>
 }) => {
-  const register: RuntimeService["register"] = (agent) => capture(agent).pipe(Effect.flatMap(options.agents.register))
+  const register: RuntimeService["register"] = (agent) =>
+    capture(agent).pipe(Effect.flatMap(options.agents.registerAll))
   const schedule: RuntimeService["schedule"] = (agent, input, scheduleOptions) =>
     Effect.gen(function* () {
       const registration = yield* options.agents.getFor(agent)

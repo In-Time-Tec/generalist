@@ -11,7 +11,6 @@ import { ToolContext } from "../tools/tool-context.js"
 import { defaultPolicy, type Policy } from "../turn/policy.js"
 import type { RunId as RunIdType } from "../durable/run-id.js"
 import { RunError } from "./run/error.js"
-
 import {
   AgentTypeId,
   type Agent,
@@ -32,7 +31,8 @@ import {
   type Requirements as GateRequirements,
 } from "./gates/definition.js"
 import type { SandboxService } from "../../sandbox/service.js"
-
+import { make as makeFanOut, processRunner, ProcessRunner, type AgentRunner } from "./lifecycle/fan-out.js"
+import type { HandlersFor } from "./tool/fan-out.js"
 export {
   AgentTypeId,
   close,
@@ -71,6 +71,7 @@ export {
   type AwaitEventOptions,
 } from "./tools/wake-event.js"
 export { defaultObjectPrompt, type RunHandle }
+export { child } from "./lifecycle/fan-out.js"
 /** Allocate one scoped Run and its producer handle before consuming its event stream. */
 export { allocateRun }
 export type * from "./tool-calls.js"
@@ -133,7 +134,7 @@ type GateRequirement<O> = O extends { readonly gates: ReadonlyArray<infer G> }
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
-  | Tool.HandlersFor<Tools>
+  | HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | StaticToolServices<Tools>
@@ -335,13 +336,10 @@ export interface RunOptions {
     readonly key: Key
   }
 }
-
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 export { RunError }
-
 /** Per-invocation options after the Agent input has moved to the second argument. */
 export type InvocationOptions = Omit<RunOptions, "prompt">
-
 /** Services required by one run option set. */
 export type RunRequirements<
   Tools extends Record<string, Tool.Any>,
@@ -362,7 +360,6 @@ export type RunRequirements<
   | OutputCodec["EncodingServices"]
 
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
-
 interface StreamFunction {
   <InputValue, O extends InvocationOptions = Record<never, never>>(
     input: InputValue,
@@ -418,13 +415,13 @@ export const stream: StreamFunction = dual(
     options: InvocationOptions = {},
   ) =>
     Stream.unwrap(
-      encodeInput(agent.input, input).pipe(
-        Effect.map((prompt) =>
-          Stream.scoped(
-            Stream.unwrap(allocateRun(agent, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
-          ),
-        ),
-      ),
+      Effect.gen(function* () {
+        const context = yield* Effect.context<never>()
+        const prompt = yield* encodeInput(agent.input, input)
+        return Stream.scoped(
+          Stream.unwrap(allocateRun(agent, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
+        ).pipe(Stream.provideService(ProcessRunner, processRunner(context, agentRunner)))
+      }),
     ),
 )
 
@@ -494,3 +491,10 @@ export const run: RunFunction = dual(
       ),
     ),
 )
+const agentRunner: AgentRunner = {
+  run: (agent, input, budget) =>
+    // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- SAFETY: processRunner closes erased child requirements over the captured context; Agent.fanOut restores them in its public signature.
+    run(agent, input, budget === undefined ? {} : { budget }) as Effect.Effect<unknown, RunError>,
+}
+/** Run typed child Agents concurrently in-process without requiring a Runtime. */
+export const fanOut = makeFanOut(agentRunner)

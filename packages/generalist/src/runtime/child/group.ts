@@ -105,8 +105,10 @@ export const GroupChildResult = Schema.Struct({
   readiness: ChildReadiness,
   status: FanOutMemberStatus,
   text: Schema.optionalKey(Schema.String),
+  output: Schema.optionalKey(Schema.Unknown),
   turns: Schema.optionalKey(Schema.Finite),
   message: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.Unknown),
   reason: Schema.optionalKey(Schema.String),
 })
 export type GroupChildResult = typeof GroupChildResult.Type
@@ -183,7 +185,11 @@ const makeTools = (authority: Authority) => {
 export const Tools = { make: makeTools }
 
 const MessagePayload = Schema.Struct({ message: Schema.String })
-const ResultPayload = Schema.Struct({ text: Schema.String, turns: Schema.Finite })
+const ResultPayload = Schema.Struct({
+  text: Schema.String,
+  output: Schema.optionalKey(Schema.Unknown),
+  turns: Schema.Finite,
+})
 const ChildMetadata = Schema.Struct({
   childLabel: Schema.optionalKey(Label),
   codeMode: Schema.optionalKey(Schema.Boolean),
@@ -332,9 +338,11 @@ export const resultFromInspection = (inspection: FanOutInspection): GroupResult 
     if (member.label !== undefined) child.label = member.label
     if (result._tag === "Some") {
       child.text = result.value.text
+      if (result.value.output !== undefined) child.output = result.value.output
       child.turns = result.value.turns
     }
     if (message !== undefined) child.message = message
+    if (member.error !== undefined) child.error = member.error
     if (member.reason !== undefined) child.reason = member.reason
     return child
   }),
@@ -346,7 +354,10 @@ export const groupIdFromSuspension = <Suspension>(suspension: Suspension): strin
   if (decodedSuspension._tag === "None") return undefined
   for (const wait of decodedSuspension.value.waits) {
     if (wait.call.name === runGroupToolName) return wait.token
-    if (wait.call.name !== awaitGroupToolName) continue
+    if (wait.call.name !== awaitGroupToolName) {
+      if (wait.token.startsWith("fanout_")) return wait.token
+      continue
+    }
     const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(wait.call.params)
     if (decodedParameters._tag === "Some" && decodedParameters.value.groupId === wait.token) return wait.token
   }
@@ -361,7 +372,9 @@ export const groupWaitsFromSuspension = <Suspension>(
   if (decodedSuspension._tag === "None") return []
   return decodedSuspension.value.waits.flatMap((wait) => {
     if (wait.call.name === runGroupToolName) return [{ groupId: wait.token, waitId: wait.waitId }]
-    if (wait.call.name !== awaitGroupToolName) return []
+    if (wait.call.name !== awaitGroupToolName) {
+      return wait.token.startsWith("fanout_") ? [{ groupId: wait.token, waitId: wait.waitId }] : []
+    }
     const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(wait.call.params)
     return decodedParameters._tag === "Some" && decodedParameters.value.groupId === wait.token
       ? [{ groupId: wait.token, waitId: wait.waitId }]
@@ -379,7 +392,10 @@ export const waitIdForGroup: {
   for (const wait of decodedSuspension.value.waits) {
     if (wait.token !== groupId) continue
     if (wait.call.name === runGroupToolName) return wait.waitId
-    if (wait.call.name !== awaitGroupToolName) continue
+    if (wait.call.name !== awaitGroupToolName) {
+      if (wait.token.startsWith("fanout_")) return wait.waitId
+      continue
+    }
     const decodedParameters = Schema.decodeUnknownOption(AwaitGroupParameters)(wait.call.params)
     if (decodedParameters._tag === "Some" && decodedParameters.value.groupId === groupId) return wait.waitId
   }

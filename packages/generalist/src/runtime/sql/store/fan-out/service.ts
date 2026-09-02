@@ -44,8 +44,8 @@ import { activeChildCount, promoteChildCapacity } from "../child/capacity.js"
 import { FanOutJoinResolution } from "./join.js"
 import { transitionRunWait } from "../wait-transition.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
-import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
-import { split } from "../../../budget/state.js"
+import { Exhausted } from "../../../../core/durable/run-budget.js"
+import { allocateMemberBudgets } from "./budget.js"
 type FanOutEffect = Effect.Effect<
   FanOutReceipt,
   | ChildSelectionMissing
@@ -74,6 +74,7 @@ type FinalizeFn<E, R> = (hub: EventHub, run: AppendRun) => Effect.Effect<void, E
 type ReconcileEffect<E, R> = Effect.Effect<void, E | RuntimeUnavailable | SqlError, R | SqlClient.SqlClient>
 type FanOutVoidEffect = Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 type SettleFn2 = (hub: EventHub, run: AppendRun, eventId: string) => ReturnType<typeof defaultAfterTerminal>
+
 export const admitFanOut: {
   (input: AdmitFanOutInput): (hub: EventHub) => FanOutEffect
   (hub: EventHub, input: AdmitFanOutInput): FanOutEffect
@@ -133,7 +134,7 @@ export const admitFanOut: {
     if (available.children !== undefined && available.children < members.length) {
       return yield* Exhausted.make({ budget: "children", requested: members.length, remaining: available.children })
     }
-    const memberBudget = split(members.length)(childGrant(available, members.length))
+    const memberBudgets = yield* allocateMemberBudgets(available, input, members)
     const concurrency = Math.min(input.concurrency ?? members.length, members.length, parent.treePolicy.maxSubagents)
     const readyCount = Math.min(
       concurrency,
@@ -198,6 +199,7 @@ export const admitFanOut: {
         )
       `
       const currentParent = (yield* loadRun(parent.runId))!
+      const grantedBudget = memberBudgets.get(member.key)!
       const linked = {
         _tag: "ChildLinked",
         childRunId: member.childRunId,
@@ -207,7 +209,7 @@ export const admitFanOut: {
         childDepth: parent.depth + 1,
         readiness,
         key: member.key,
-        budget: memberBudget,
+        budget: grantedBudget,
       } satisfies AppendPartial
       if (member.label !== undefined) Object.assign(linked, { label: member.label })
       if (member.origin !== undefined) Object.assign(linked, { origin: member.origin })
@@ -216,7 +218,7 @@ export const admitFanOut: {
       yield* defaultAppendEvent(
         hub,
         child,
-        { _tag: "RunAccepted", messageId: message.id, address, budget: memberBudget },
+        { _tag: "RunAccepted", messageId: message.id, address, budget: grantedBudget },
         "queued",
       )
     }

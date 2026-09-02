@@ -1,13 +1,39 @@
 # Multi-agent
 
-An agent can call another agent as an isolated child Run, or hand the current Run to another active agent. Delegation isolates identity; handoff preserves it.
+An agent can fan out typed work to isolated child Runs, call one child as a tool, or hand the current Run to another active agent. Delegation isolates identity; handoff preserves it.
 
 ## Usage
 
 ```ts
-import { Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { Toolkit } from "effect/unstable/ai"
-import { Agent, AgentTool, Handoff, ToolExecutor } from "generalist"
+import { Agent, AgentTool, Handoff, RunBudget, ToolExecutor } from "generalist"
+import { Runtime } from "generalist/runtime"
+
+const researcher = Agent.make({ name: "researcher" })
+
+// Process-local typed children. Each tuple position retains its Agent output type.
+const local = Agent.fanOut([Agent.child(researcher, "Research A"), Agent.child(researcher, "Research B")] as const, {
+  concurrency: 2,
+  onFailure: "collect",
+})
+
+// Runtime-owned fan-out selected by the parent model. No static handler is required.
+const delegateResearch = AgentTool.fanOut({
+  name: "delegate_research",
+  description: "Run researchers in parallel on independent questions",
+  agents: { researcher },
+  maxChildren: 8,
+})
+const lead = Agent.make({ name: "lead", toolkit: Toolkit.make(delegateResearch) })
+
+const durable = Effect.gen(function* () {
+  const runtime = yield* Runtime.Runtime
+  yield* runtime.register(lead)
+  return yield* runtime.start(lead, "Research the alternatives", {
+    budget: RunBudget.make({ tokens: 80_000, children: 8 }),
+  })
+})
 
 const billingAgent = Agent.make({
   name: "billing",
@@ -28,18 +54,23 @@ const handoffLayer = Layer.mergeAll(ToolExecutor.layerToolkit(supervisor.toolkit
 const run = Agent.run(supervisor.agent, "Refund order 42")
 ```
 
-Provide `handoffLayer` with the model, permissions, approvals, middleware, and target requirements. The model calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`. A child's `model` option is any closed `Layer<LanguageModel>` — typically a provider's `layerModel` over its `layerConfig` client; omitting it means the child inherits the ambient model.
+Provide the local Effects and `handoffLayer` with the model, permissions, approvals, middleware, and Agent requirements. Provide `durable` with a Runtime host plus the same Agent requirements. The model calls `delegate_research` with ordered `{ agent, input, budget? }` members and optional `concurrency` and `onFailure`; it calls `handoff_to_billing` with `{ prompt: "Refund order 42", reason: "billing request" }`. A child's `model` option is any closed `Layer<LanguageModel>` — typically a provider's `layerModel` over its `layerConfig` client; omitting it means the child inherits the ambient model.
 
 ## What runs
 
 ```text
-Agent.run(front-desk)                      Run ID: run-1
-└── model turn: front-desk
-    └── tool call handoff_to_billing
-        ├── resolve Catalog["billing"]
-        ├── validate limits, target, and projected history
-        └── record "handoff"; commit active = "billing"
-            └── model turn: billing           Run ID: run-1
+Agent.fanOut([child(A), child(B)])
+├── scoped fiber -> Agent.run(A) -> Exit
+└── scoped fiber -> Agent.run(B) -> Exit
+    └── results retain authored order
+
+Runtime parent Run
+└── model call delegate_research
+    ├── admit one existing durable child group
+    ├── journal ChildLinked + reserved budget for each member
+    ├── suspend parent while children run
+    ├── FanOutJoined reactivates the same parent Run
+    └── encode ordered child Exits as the tool result
 
 Agent.run(parent)                          Run ID: run-2
 └── tool call ask_billing
@@ -47,9 +78,19 @@ Agent.run(parent)                          Run ID: run-2
     ├── Agent.run(billing)                  Run ID: run-3
     │   └── child-scoped DriverInterpreter and journal
     └── DriverInterpreter.refundChild(...)
+
+Agent.run(front-desk)                      Run ID: run-1
+└── handoff_to_billing
+    └── commit active = "billing"          Run ID: run-1
 ```
 
-`Handoff.delegateTool(registration)` follows the second path, names the tool `delegate_to_<agent>`, and runs `Registration.run`.
+`AgentTool.asTool` and `Handoff.delegateTool` run one isolated process-local child. Same-Run `Handoff.supervisor` changes the active Agent without creating a child Run.
+
+## Fan-out failures and budgets
+
+With `onFailure: "collect"`, every child settles and the result contains one `Exit` per authored member. A failed child is encoded into that tool result, so the parent model continues. With `"failFast"`, the first child failure fails the parent call; process-local sibling fibers are interrupted and a durable group requests cancellation of its unsettled children.
+
+A durable fan-out reserves one child slot and `parent remaining / maxChildren` for each admitted member. A member's optional `budget` may narrow that share but cannot widen it. The child's journaled usage remains charged and settlement returns its unused reservation. `Runtime.inspect(parentRunId)` returns the direct children and their current statuses alongside the journal-derived parent budget.
 
 ## Handoff data flow
 
@@ -87,6 +128,14 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 ## Invariants
 
 - Every inline child and fan-out member gets a fresh process-local Run ID, inbox, invocation identity, and its own telemetry.
+- Every durable `AgentTool.fanOut` member is admitted through the Runtime's existing child-group journal under the parent Run ID; there is no second child state machine.
+- `Agent.fanOut` requires explicit positive concurrency. Collect returns ordered typed `Exit` values; fail-fast interrupts sibling fibers.
+- `AgentTool.fanOut` accepts between one and `maxChildren` model-authored members and needs no caller-supplied handler.
+- Durable collect returns failed children as encoded `Exit` values. Durable fail-fast fails the parent and requests cancellation of unsettled siblings.
+- Durable child budget grants and refunds are derived from journal facts. A requested member budget can only narrow its `parent / maxChildren` share.
+- Runtime recovery resolves the registered child Agent graph from persisted executable pins and reattaches the parent's fan-out wait by `parentRunId` and group ID without redispatch.
+- Interrupting a durable parent closes child admission and cascades cancellation through its existing Run tree.
+- `Runtime.inspect(parent)` always includes its direct children with status and readiness.
 - Inherited Effect services, including `SessionDirectory`, do not confer inbox or active Session identity.
 - An inline child without `sessionId` has no Session.
 - Reusing the active parent's Session ID fails before the child model call; it does not wait on the parent's lane.
@@ -104,10 +153,10 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - Handoff operation IDs are deterministic; model-requirement rejection uses a separate deterministic `handoff:rejected` key.
 - State records source, target, optional reason, turn, edge and handoff counts, and the exact target pin when pinned.
 - The target's tools, permissions, model, and budget apply after handoff but cannot widen parent authority or budget.
-- `Handoff.register`, `Registration.run`, and `Handoff.fanOut` create isolated child Runs; fan-out has explicit concurrency and shares neither the parent driver seam nor same-run handoff state.
-- Durable or cross-process delegation belongs to a host Runtime.
+- `Handoff.register`, `Registration.run`, and the older policy-level `Handoff.fanOut` remain process-local isolated-child APIs; they share neither the parent driver seam nor same-run handoff state.
+- Durable or cross-process fan-out is owned by `AgentTool.fanOut` under a host Runtime.
 
 ## Related
 
-- Source: `packages/generalist/src/core/agent/handoff/`, `packages/generalist/src/core/agent/tool.ts`, `packages/generalist/src/core/policy/handoff.ts`, `packages/generalist/src/core/policy/handoff-*.ts`
+- Source: `packages/generalist/src/core/agent/lifecycle/fan-out.ts`, `packages/generalist/src/core/agent/tool/fan-out.ts`, `packages/generalist/src/runtime/child/`, `packages/generalist/src/core/agent/handoff/`, `packages/generalist/src/core/policy/handoff.ts`
 - Site: `/docs/guides/multi-agent`, `/docs/guides/addressed-messaging`

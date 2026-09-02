@@ -69,6 +69,7 @@ import type { AgentExecutionResult, ProgramExecutionResult } from "./execution/s
 import type { WaitResolution } from "./run/wait.js"
 import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
 import type { FanOutInput, FanOutMemberOrigin, InitialFanOutInput } from "./child/fan-out-internal.js"
+import type { ChildInspection } from "./child/admission.js"
 import type { ResolveOperationInput } from "./operation/resolution.js"
 import type { SteeringReceipt } from "./run/steering.js"
 import type {
@@ -217,6 +218,7 @@ export interface RuntimeInspection extends RunInspection {
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly budget: RemainingBudget
   readonly gates: ReadonlyArray<GateResult>
+  readonly children: ReadonlyArray<ChildInspection>
   readonly suspension?: import("./execution/state.js").ExecutionSuspension
 }
 

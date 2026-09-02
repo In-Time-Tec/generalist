@@ -10,6 +10,7 @@ import type { Policy } from "../../turn/policy.js"
 import type { ToolOrigin } from "../event.js"
 import type { Any as AnyGate, FailureMode as GateFailureMode } from "../gates/definition.js"
 import type { SandboxService } from "../../../sandbox/service.js"
+import type { HandlersFor } from "../tool/fan-out.js"
 
 export const AgentTypeId = "generalist/core/Agent"
 
@@ -99,7 +100,7 @@ export type ClosedServices<
   OutputCodec extends Schema.Top = typeof Schema.String,
 > =
   | R
-  | Tool.HandlersFor<Tools>
+  | HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
   | InputCodec["EncodingServices"]
   | OutputCodec["DecodingServices"]
@@ -138,6 +139,27 @@ export type Output<A> = A extends { readonly output: infer OutputCodec extends S
 export type EncodedOutput<A> = A extends { readonly output: infer OutputCodec extends Schema.Top }
   ? OutputCodec["Encoded"]
   : never
+
+/** Services required to run one Agent after its input has been decoded. */
+export type ExecutionServices<A> =
+  A extends Agent<
+    infer Tools,
+    infer R,
+    infer PolicyServices,
+    infer AuthorizationServices,
+    infer InputCodec,
+    infer OutputCodec
+  >
+    ?
+        | R
+        | PolicyServices
+        | AuthorizationServices
+        | HandlersFor<Tools>
+        | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
+        | InputCodec["EncodingServices"]
+        | OutputCodec["DecodingServices"]
+        | OutputCodec["EncodingServices"]
+    : never
 
 const hasSameTools = <Tools extends Record<string, Tool.Any>>(
   candidate: Toolkit.Any,

@@ -14,9 +14,10 @@ import type { Request } from "../../tools/tool-executor.js"
 import type { Registry } from "../../tools/tool-registry.js"
 import type { ToolContext } from "../../tools/tool-context.js"
 import type { ModelSource } from "./model-source.js"
+import type { HandlersFor } from "../tool/fan-out.js"
 
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
-  | Tool.HandlersFor<T>
+  | HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
 
 /** @internal Services required inside an already-selected active model scope. */

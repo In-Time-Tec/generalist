@@ -17,6 +17,7 @@ import type { Agent, ProgressOverflowPolicy, Resume, RunError, RunOptions } from
 import { setupStaticTools } from "./lifecycle/construction.js"
 import { validate as validateOptions } from "./lifecycle/options.js"
 import { setupToolAuthorizer } from "./lifecycle/setup.js"
+import type { HandlersFor } from "./tool/fan-out.js"
 import { providerOutputState } from "./message.js"
 import { scheduleBatch } from "./model-turn/tool-batch.js"
 import { promptDigest } from "./prompt-identity.js"
@@ -57,7 +58,7 @@ export interface ToolCallBatchResume {
 export type ToolCallBatchOptions = ToolCallBatchStart | ToolCallBatchResume
 
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
-  | Tool.HandlersFor<Tools>
+  | HandlersFor<Tools>
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 
 /** Services used by externally completed framework calls; no LanguageModel call is performed. */

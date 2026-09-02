@@ -32,6 +32,8 @@ import { memoizeRegistered } from "../../memo/tool.js"
 import { toolResult as applyToolResult } from "../lifecycle/hooks.js"
 import type { RunId } from "../../durable/run-id.js"
 import { make as makeToolAuthorization } from "./authorization.js"
+import { definition as fanOutDefinition, withoutFanOut } from "../tool/fan-out.js"
+import { execute as executeFanOut } from "./fan-out.js"
 
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
@@ -127,13 +129,12 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   const unlessBlocked = <E, R>(reason: string | undefined, execute: () => Effect.Effect<Outcome, E, R>) =>
     reason === undefined ? execute() : Effect.succeed(hookBlockedOutcome("ToolCall", reason))
 
-  const defaultExecute = (
-    request: Request,
-    registry: Registry,
-  ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>> => {
+  const defaultExecute = (request: Request, registry: Registry) => {
     const registered = get(registry, request.call.name)
     if (registered?.dispatch === "Static") {
-      return executeToolkit(staticToolkit, request)
+      const fanOut = fanOutDefinition(registered.tool)
+      if (fanOut !== undefined) return executeFanOut(fanOut, request)
+      return executeToolkit(withoutFanOut(staticToolkit), request)
     }
     return registered === undefined
       ? Effect.fail(

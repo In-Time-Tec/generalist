@@ -93,5 +93,6 @@ export const normalizedFanOutMember = (input: {
   }
   if (member.label !== undefined) normalized.label = member.label
   if (member.origin !== undefined) normalized.origin = member.origin
+  if (member.budget !== undefined) normalized.budget = member.budget
   return normalized
 }

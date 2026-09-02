@@ -26,6 +26,7 @@ import type {
   WorkerClaim,
 } from "./contract.js"
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
+import { registerChildRuns } from "./children/runs.js"
 
 export type * from "./contract.js"
 export * from "./model-response-fault.js"
@@ -437,6 +438,14 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
       open: (use) => provideLayer(options.layer, use),
       openPair: (use) => provideLayerPair(options.layer, use),
     })
+    if (options.capabilities["child-runs"] !== undefined) {
+      registerChildRuns({
+        options,
+        capability: options.capabilities["child-runs"],
+        prepare: (effect) => prepare(options, effect),
+        open: (use) => provideLayer(options.layer, use),
+      })
+    }
     registerOperator({ options, open: (use) => provide(options, use) })
   })
 }

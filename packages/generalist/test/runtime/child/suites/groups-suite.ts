@@ -52,6 +52,7 @@ const childRunsLayer = Layer.succeed(
     runGroup: () => Effect.die("unexpected blocking child-group invocation"),
     startGroup: () => Effect.die("invalid input reached child-group admission"),
     awaitGroup: () => Effect.die("unexpected child-group join"),
+    fanOut: () => Effect.die("unexpected Agent fan-out invocation"),
   }),
 )
 

@@ -128,6 +128,7 @@ Testing.runtimeDriver({
     "unknown-agent-on-recovery": { claim: conformanceClaim },
     "await-event": { claim: conformanceClaim, recovery: "rebuild" },
     schedules: { definition: scheduleDefinition, recovery: "rebuild" },
+    "child-runs": { claim: conformanceClaim, recovery: "rebuild" },
     "operator-explain": true,
     "operator-retry": { claim: conformanceClaim },
     "operator-resolve-unknown": { claim: conformanceClaim },

@@ -25,14 +25,13 @@ export const multiAgent = definePage({
   navTitle: "Coordinate multiple agents",
   group: "Guides",
   description:
-    "Fan out child runs with Handoff.fanOut, route through a transfer-tool supervisor, and expose any agent as a tool with AgentTool.asTool.",
+    "Fan out typed child Agents, delegate durable work from a parent model, route through a supervisor, and expose one Agent as a tool.",
   content: [
     p(
-      "generalist multi-agent helpers are same-process and non-durable: they compose ",
-      code("Agent.run"),
-      ", toolkits, and the ",
-      code("ToolExecutor"),
-      " seam rather than adding a second execution model. For durable, addressable parent and child Runs, use generalist/runtime; see ",
+      code("Agent.fanOut"),
+      " runs typed children in the current process. ",
+      code("AgentTool.fanOut"),
+      " gives the parent model the same fan-out shape and, under generalist/runtime, admits addressable child Runs through the existing durable child-group journal. See ",
       link("/docs/learn/native-runtime", "Core and Runtime"),
       ".",
     ),
@@ -86,12 +85,20 @@ export const multiAgent = definePage({
     ),
     h2("fan-out-child-runs", "1. Fan out child runs"),
     p(
-      code("Handoff.fanOut"),
-      " runs registered child agents concurrently with ",
+      code("Agent.fanOut"),
+      " runs ",
+      code("Agent.child(agent, input)"),
+      " values concurrently with ",
       code("Effect.forEach"),
-      " semantics: bounded concurrency (default 4) and results in input order. It is not a tool boundary, so child failures propagate to the caller as run errors.",
+      " semantics: explicit bounded concurrency and typed Exit results in input order. Collect keeps one failed Exit in the result; fail-fast interrupts sibling fibers and fails the effect.",
     ),
     codeBlock({ label: "fan-out.ts", source: fanOut, expectedOutput: fanOutExpected }),
+    p(
+      code("AgentTool.fanOut({ name, description, agents, maxChildren })"),
+      " declares a model-callable fan-out without a static handler. A Runtime reserves each durable child's share from the parent budget, reports children from ",
+      code("runtime.inspect(parentRunId)"),
+      ", and reattaches the parent to the same group after restart. Collect encodes child failures for the model; fail-fast requests sibling cancellation and fails the parent.",
+    ),
     h2("route-through-a-supervisor", "2. Route through a supervisor"),
     p(
       code("Handoff.supervisor"),
@@ -104,8 +111,8 @@ export const multiAgent = definePage({
     codeBlock({ label: "supervisor.ts", source: supervisor, expectedOutput: supervisorExpected }),
     callout(
       "info",
-      "Registrations close services",
-      "Register each specialist with Handoff.register(agent, layer) before passing it to fan-out or a supervisor. The registration provides the agent's required services and maps layer-construction failures to RegistrationError; run options remain explicit and are forwarded unchanged.",
+      "Handoff registrations close services",
+      "Register each Handoff specialist with Handoff.register(agent, layer) before passing it to a supervisor. The registration provides the agent's required services and maps layer-construction failures to RegistrationError; run options remain explicit and are forwarded unchanged.",
     ),
     p(
       "Specialists inherit the model provided to the supervisor's run. To route one specialist to a different model, pass a closed model layer — for example a provider's ",
@@ -157,6 +164,8 @@ export const multiAgent = definePage({
       "The runnable version of this page is ",
       link("https://github.com/In-Time-Tec/generalist/tree/main/examples/multi-agent", "examples/multi-agent"),
       "; contracts for ",
+      code("Agent"),
+      ", ",
       code("Handoff"),
       " and ",
       code("AgentTool"),
