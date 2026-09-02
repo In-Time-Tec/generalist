@@ -46,7 +46,7 @@ const program = Effect.gen(function* () {
 })
 
 const layer = CellTool.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, TestKernel.layerTestPool({ profile, script }))),
+  Layer.provideMerge(Layer.mergeAll(ToolContext.layerDefault, TestKernel.layerTestSandbox({ profile, script }))),
 )
 
 const runtime = ManagedRuntime.make(layer)

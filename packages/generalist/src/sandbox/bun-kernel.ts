@@ -1,6 +1,6 @@
 import { Duration, Effect, FileSystem, Layer, Path, Ref, Schema, Stream } from "effect"
 import type { CellEvent, CellFailure } from "../repl/cell.js"
-import { KernelPool, type Service as KernelPoolService } from "../repl/kernel-pool.js"
+import { KernelPool } from "../repl/kernel-pool.js"
 import {
   KernelSnapshotStore,
   type Service as KernelSnapshotStoreService,
@@ -100,7 +100,7 @@ export const makeBunKernelProvider = (
     const paused = yield* Ref.make<ReadonlySet<string>>(new Set())
     const nextId = yield* Ref.make(0)
     const configuredLimits = options.limits ?? {}
-    const sandboxFiles = rootedFileSystem(fileSystem, path, options.workspaceRoot)
+    const sandboxFiles = rootedFileSystem({ fileSystem, path, root: options.workspaceRoot })
 
     const freshId = Ref.updateAndGet(nextId, (value) => value + 1).pipe(Effect.map((value) => `bun-kernel-${value}`))
     const isPaused = (sessionId: string) => Ref.get(paused).pipe(Effect.map((all) => all.has(sessionId)))

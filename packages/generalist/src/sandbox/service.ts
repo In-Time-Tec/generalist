@@ -170,7 +170,7 @@ export interface SandboxService {
 }
 
 /** @experimental Acquired sandbox service tag. */
-export class Sandbox extends Context.Service<Sandbox, SandboxService>()("generalist/sandbox/Sandbox") {}
+export class Sandbox extends Context.Service<Sandbox, SandboxService>()("generalist/sandbox/service/Sandbox") {}
 
 /** @experimental Construct collected and streaming variants from one scoped command start operation. */
 export const make = (input: Omit<SandboxService, "exec" | "stream">): SandboxService =>
@@ -195,7 +195,7 @@ export interface SandboxProviderService {
 
 /** @experimental Sandbox provider service tag. */
 export class SandboxProvider extends Context.Service<SandboxProvider, SandboxProviderService>()(
-  "generalist/sandbox/SandboxProvider",
+  "generalist/sandbox/service/SandboxProvider",
 ) {}
 
 /** @experimental Normalize a configured wall-clock duration to milliseconds. */

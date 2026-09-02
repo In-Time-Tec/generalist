@@ -5,7 +5,6 @@ import { SandboxDeadlineExceeded, SandboxResourceExceeded } from "../core/progra
 import {
   type AcquireOptions,
   ExecutionFailed,
-  type JavaScriptModuleCommand,
   type Limits,
   LimitExceeded,
   make,
@@ -33,31 +32,28 @@ const mergeLimits = (
   configured: Limits,
   requested: Limits | undefined,
 ): Effect.Effect<Limits, LimitExceeded | Unsupported> => {
-  if (requested?.memoryMb !== undefined) {
+  const request = requested ?? {}
+  if (configured.memoryMb !== undefined || request.memoryMb !== undefined) {
     return Effect.fail(unsupported("limit:memory", "Worker Loader does not expose a per-isolate memory limit"))
   }
-  if (configured.cpuMs !== undefined && requested?.cpuMs !== undefined && requested.cpuMs > configured.cpuMs) {
+  if (configured.cpuMs !== undefined && request.cpuMs !== undefined && request.cpuMs > configured.cpuMs) {
     return Effect.fail(LimitExceeded.make({ resource: "cpu", limit: configured.cpuMs }))
   }
   const maximumWallClock = wallClockMillis(configured)
-  const requestedWallClock = requested === undefined ? undefined : wallClockMillis(requested)
+  const requestedWallClock = wallClockMillis(request)
   if (maximumWallClock !== undefined && requestedWallClock !== undefined && requestedWallClock > maximumWallClock) {
     return Effect.fail(LimitExceeded.make({ resource: "wall-clock", limit: maximumWallClock }))
   }
-  return Effect.succeed({
-    ...(configured.cpuMs === undefined ? {} : { cpuMs: configured.cpuMs }),
-    ...(configured.wallClock === undefined ? {} : { wallClock: configured.wallClock }),
-    ...(requested?.cpuMs === undefined ? {} : { cpuMs: requested.cpuMs }),
-    ...(requested?.wallClock === undefined ? {} : { wallClock: requested.wallClock }),
-  } satisfies Limits)
+  const limits: Limits = {}
+  const cpuMs = request.cpuMs ?? configured.cpuMs
+  const wallClock = request.wallClock ?? configured.wallClock
+  if (cpuMs !== undefined) Object.assign(limits, { cpuMs })
+  if (wallClock !== undefined) Object.assign(limits, { wallClock })
+  return Effect.succeed(limits)
 }
 
-const failureMessage = (cause: unknown): string => {
-  if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
-    return cause.message
-  }
-  return "Worker Loader execution failed"
-}
+const failureMessage = (cause: unknown): string =>
+  Error.isError(cause) ? cause.message : "Worker Loader execution failed"
 
 const executionFailure = (cause: unknown, limits: Limits): ExecutionFailed | LimitExceeded => {
   if (Schema.is(SandboxDeadlineExceeded)(cause)) {
@@ -76,21 +72,22 @@ const sandbox = (options: WorkerLoaderOptions, limits: Limits): SandboxService =
       const operation = command._tag === "Process" ? "exec:process" : "exec:typescript"
       return Effect.fail(unsupported(operation, `Worker Loader does not execute ${command._tag} commands`))
     }
-    const module = command as JavaScriptModuleCommand
     const result = Effect.gen(function* () {
-      if (limits.cpuMs !== undefined && module.request.limits.cpuMillis > limits.cpuMs) {
+      if (limits.cpuMs !== undefined && command.request.limits.cpuMillis > limits.cpuMs) {
         return yield* LimitExceeded.make({ resource: "cpu", limit: limits.cpuMs })
       }
       const wallClock = wallClockMillis(limits)
       if (wallClock !== undefined) {
         const now = yield* Clock.currentTimeMillis
-        if (module.request.deadlineMillis - now > wallClock) {
+        if (command.request.deadlineMillis - now > wallClock) {
           return yield* LimitExceeded.make({ resource: "wall-clock", limit: wallClock })
         }
       }
-      const value = yield* executeWorker(options, module.request, module.capabilities).pipe(
-        Effect.mapError((cause) => executionFailure(cause, limits)),
-      )
+      const value = yield* executeWorker({
+        options,
+        request: command.request,
+        capabilities: command.capabilities,
+      }).pipe(Effect.mapError((cause) => executionFailure(cause, limits)))
       return { stdout: "", stderr: "", exitCode: 0, value }
     })
     return Effect.succeed({ events: Stream.empty, result })

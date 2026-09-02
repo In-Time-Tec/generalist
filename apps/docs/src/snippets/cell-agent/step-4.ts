@@ -78,7 +78,7 @@ const layer = CellTool.layer.pipe(
     Layer.mergeAll(
       ToolContext.layerDefault,
       HostBindings.layer([workspace]),
-      TestKernel.layerTestPool({ profile, script }),
+      TestKernel.layerTestSandbox({ profile, script }),
     ),
   ),
 )

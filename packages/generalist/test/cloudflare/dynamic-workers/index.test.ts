@@ -3,8 +3,18 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { adjust as adjustTestClock } from "effect/testing/TestClock"
 import { CodeExecutor, ProgramCapabilities } from "generalist"
-import { make, makeUnavailable, type CapabilityRpc, type WorkerCode } from "generalist/cloudflare/dynamic-workers"
+import {
+  make as makeAdapter,
+  makeUnavailable,
+  type CapabilityRpc,
+  type Options,
+  type WorkerCode,
+} from "generalist/cloudflare/dynamic-workers"
+import { makeWorkerLoaderProvider } from "generalist/sandbox"
 import { runner } from "../../../src/cloudflare/dynamic-workers/source.js"
+
+const make = (options: Options) =>
+  makeAdapter({ compatibilityDate: options.compatibilityDate, provider: makeWorkerLoaderProvider(options) })
 
 const capabilities = ProgramCapabilities.ProgramCapabilities.of({
   discoverTools: Effect.succeed([]),

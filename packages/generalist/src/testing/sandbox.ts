@@ -43,7 +43,7 @@ const capabilities: ProgramCapabilitiesService = ProgramCapabilities.of({
 })
 
 let nextRequest = 0
-const moduleRequest = (source: string, input: unknown, deadlineMillis: number): ProgramRequest => {
+const moduleRequest = (source: string, deadlineMillis: number): ProgramRequest => {
   const modules = [{ name: "program.js", source }]
   const identity = { modules, entrypoint: "program.js", inputCodec: "testing:v1", outputCodec: "testing:v1" }
   return {
@@ -51,7 +51,7 @@ const moduleRequest = (source: string, input: unknown, deadlineMillis: number): 
     requestId: `sandbox-conformance-${++nextRequest}`,
     sourceDigest: sourceDigest(identity),
     ...identity,
-    input: input ?? null,
+    input: null,
     signal: new AbortController().signal,
     deadlineMillis,
     limits: { cpuMillis: 1_000, subrequests: 1, outputBytes: 4_096 },
@@ -90,7 +90,7 @@ const executeValue = (sandbox: SandboxService, source: string) =>
     }
     if (sandbox.capabilities.commands.includes("JavaScriptModule")) {
       const now = yield* Clock.currentTimeMillis
-      const request = moduleRequest(`export default () => (${source})`, undefined, now + 5_000)
+      const request = moduleRequest(`export default () => (${source})`, now + 5_000)
       const result = yield* sandbox.exec({ _tag: "JavaScriptModule", request, capabilities })
       return (yield* Schema.decodeUnknownEffect(ProgramResult)(result.value)).output
     }
@@ -109,7 +109,7 @@ const command = (tag: Command["_tag"]): Effect.Effect<Command> =>
         const now = yield* Clock.currentTimeMillis
         return {
           _tag: "JavaScriptModule",
-          request: moduleRequest("export default () => 42", undefined, now + 5_000),
+          request: moduleRequest("export default () => 42", now + 5_000),
           capabilities,
         }
       }
@@ -163,7 +163,7 @@ export const sandbox = <E>(options: Options<E>): void => {
             const events = yield* Stream.runCollect(
               service.stream({
                 _tag: "JavaScriptModule",
-                request: moduleRequest("export default () => 42", undefined, now + 5_000),
+                request: moduleRequest("export default () => 42", now + 5_000),
                 capabilities,
               }),
             )
@@ -250,6 +250,7 @@ export const sandbox = <E>(options: Options<E>): void => {
 
           if (!baseline.capabilities.limits.includes("wall-clock")) return
           const service = yield* provider.acquire({ limits: { wallClock: Duration.millis(25) } })
+          const now = yield* Clock.currentTimeMillis
           const failure = service.capabilities.commands.includes("TypeScript")
             ? yield* service
                 .exec({
@@ -258,16 +259,13 @@ export const sandbox = <E>(options: Options<E>): void => {
                   source: "await new Promise(() => {})",
                 })
                 .pipe(Effect.flip)
-            : yield* Effect.gen(function* () {
-                const now = yield* Clock.currentTimeMillis
-                return yield* service
-                  .exec({
-                    _tag: "JavaScriptModule",
-                    request: moduleRequest("export default () => new Promise(() => {})", undefined, now + 25),
-                    capabilities,
-                  })
-                  .pipe(Effect.flip)
-              })
+            : yield* service
+                .exec({
+                  _tag: "JavaScriptModule",
+                  request: moduleRequest("export default () => new Promise(() => {})", now + 25),
+                  capabilities,
+                })
+                .pipe(Effect.flip)
           expect(Schema.is(LimitExceeded)(failure)).toBe(true)
           if (Schema.is(LimitExceeded)(failure)) expect(failure.resource).toBe("wall-clock")
         }),

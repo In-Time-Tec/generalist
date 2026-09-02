@@ -1,11 +1,13 @@
 import { Effect, FileSystem, Path } from "effect"
 
+interface RootedFileSystemOptions {
+  readonly fileSystem: FileSystem.FileSystem
+  readonly path: Path.Path
+  readonly root: string
+}
+
 /** @internal Restrict Effect FileSystem path arguments to one sandbox-visible root. */
-export const rootedFileSystem = (
-  fileSystem: FileSystem.FileSystem,
-  path: Path.Path,
-  root: string,
-): FileSystem.FileSystem => {
+export const rootedFileSystem = ({ fileSystem, path, root }: RootedFileSystemOptions): FileSystem.FileSystem => {
   const resolvedRoot = path.resolve(root)
   const resolve = (input: string): string => path.join(resolvedRoot, path.resolve("/", input).slice(1))
   const visible = (input: string): string => `/${path.relative(resolvedRoot, input)}`

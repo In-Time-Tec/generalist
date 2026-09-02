@@ -8,7 +8,6 @@ import {
   type Outcome,
   type Request,
   ToolExecutor,
-  layerRouter,
   route as toolExecutorRoute,
 } from "../core/tools/tool-executor.js"
 import type { Route } from "../core/tools/tool-placement.js"
@@ -121,20 +120,6 @@ const sandboxFailure = (sessionId: string, cellId: string, failure: SandboxError
   return KernelProtocolViolation.make({ sessionId, cellId, message: failure.message })
 }
 
-const decodeEvent = (sessionId: string, cellId: string, value: unknown) =>
-  Schema.decodeUnknownEffect(CellEvent)(value).pipe(
-    Effect.mapError(() =>
-      KernelProtocolViolation.make({ sessionId, cellId, message: "sandbox emitted an invalid cell event" }),
-    ),
-  )
-
-const decodeResult = (sessionId: string, cellId: string, value: unknown) =>
-  Schema.decodeUnknownEffect(CellResult)(value).pipe(
-    Effect.mapError(() =>
-      KernelProtocolViolation.make({ sessionId, cellId, message: "sandbox returned an invalid cell result" }),
-    ),
-  )
-
 const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, ToolContext | SandboxProvider> =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -154,7 +139,17 @@ const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, Too
           .pipe(Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)))
         yield* execution.events.pipe(
           Stream.filter((event) => event._tag === "Metadata"),
-          Stream.mapEffect((event) => decodeEvent(request.sessionId, cellId, event.value)),
+          Stream.mapEffect((event) =>
+            Schema.decodeUnknownEffect(CellEvent)(event.value).pipe(
+              Effect.mapError(() =>
+                KernelProtocolViolation.make({
+                  sessionId: request.sessionId,
+                  cellId,
+                  message: "sandbox emitted an invalid cell event",
+                }),
+              ),
+            ),
+          ),
           Stream.runForEach((event) => progress(toolCallId, event).pipe(Effect.flatMap(context.emit))),
           Effect.mapError((failure) =>
             Schema.is(CellFailure)(failure) ? failure : sandboxFailure(request.sessionId, cellId, failure),
@@ -163,7 +158,15 @@ const execute = (request: Request): Effect.Effect<Outcome, FrameworkFailure, Too
         const result = yield* execution.result.pipe(
           Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)),
         )
-        const cell = yield* decodeResult(request.sessionId, cellId, result.value)
+        const cell = yield* Schema.decodeUnknownEffect(CellResult)(result.value).pipe(
+          Effect.mapError(() =>
+            KernelProtocolViolation.make({
+              sessionId: request.sessionId,
+              cellId,
+              message: "sandbox returned an invalid cell result",
+            }),
+          ),
+        )
         if (sandbox.capabilities.snapshot) {
           const snapshotId = yield* sandbox.snapshot.pipe(
             Effect.mapError((failure) => sandboxFailure(request.sessionId, cellId, failure)),

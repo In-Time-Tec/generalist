@@ -14,7 +14,14 @@ import {
 } from "../../core/program/code-executor.js"
 import { ProgramCapabilities } from "../../core/program/capabilities.js"
 import { identity } from "./identity.js"
-import { ExecutionFailed, LimitExceeded, makeWorkerLoaderProvider, type SandboxError } from "../../sandbox/index.js"
+import {
+  ExecutionFailed,
+  LimitExceeded,
+  type SandboxError,
+  SandboxProvider,
+  type SandboxProviderService,
+  layerWorkerLoader,
+} from "../../sandbox/index.js"
 import type { Options } from "./types.js"
 
 const codeExecutorFailure = (failure: SandboxError): ExecutionFailureType => {
@@ -34,16 +41,21 @@ const codeExecutorFailure = (failure: SandboxError): ExecutionFailureType => {
   return SandboxExecutionFailure.make({ message: "Worker Loader sandbox contract failed" })
 }
 
-/** @experimental Construct a production CodeExecutor as a thin Worker Loader Sandbox adapter. */
-export const make = (options: Options): CodeExecutorService => {
-  const provider = makeWorkerLoaderProvider(options)
-  return CodeExecutor.of({
+/** @experimental Inputs for adapting one Sandbox provider to the Worker Loader CodeExecutor identity. */
+export interface MakeOptions {
+  readonly compatibilityDate: string
+  readonly provider: SandboxProviderService
+}
+
+/** @experimental Construct a CodeExecutor as a thin adapter over an explicit Sandbox provider. */
+export const make = (options: MakeOptions): CodeExecutorService =>
+  CodeExecutor.of({
     identity: identity(options.compatibilityDate),
     execute: (request) =>
       Effect.gen(function* () {
         const capabilities = yield* ProgramCapabilities
         const now = yield* Clock.currentTimeMillis
-        const sandbox = yield* provider
+        const sandbox = yield* options.provider
           .acquire({
             limits: {
               cpuMs: request.limits.cpuMillis,
@@ -59,7 +71,6 @@ export const make = (options: Options): CodeExecutorService => {
         )
       }),
   })
-}
 
 /** @experimental Construct an explicitly disabled Worker Loader boundary. */
 export const makeUnavailable = (message = "Worker Loader is unavailable"): CodeExecutorService =>
@@ -89,7 +100,11 @@ export const makeUnavailable = (message = "Worker Loader is unavailable"): CodeE
   })
 
 /** @experimental Provide the Worker Loader CodeExecutor. */
-export const layer = (options: Options): Layer.Layer<CodeExecutor> => Layer.succeed(CodeExecutor, make(options))
+export const layer = (options: Options): Layer.Layer<CodeExecutor> =>
+  Layer.effect(
+    CodeExecutor,
+    Effect.map(SandboxProvider, (provider) => make({ compatibilityDate: options.compatibilityDate, provider })),
+  ).pipe(Layer.provide(layerWorkerLoader(options)))
 
 /** @experimental Provide an explicitly disabled Worker Loader boundary. */
 export const layerUnavailable = (message?: string): Layer.Layer<CodeExecutor> =>

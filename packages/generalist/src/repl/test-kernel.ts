@@ -17,6 +17,7 @@ import {
   KernelPool,
   type Restart,
 } from "./kernel-pool.js"
+import { ExecutionFailed, make as makeSandbox, SandboxProvider, Unsupported, Unavailable } from "../sandbox/service.js"
 import {
   type Service as KernelSnapshotStoreService,
   KernelSnapshotStore,
@@ -196,6 +197,75 @@ export const makeTest = (options: TestPoolOptions): Effect.Effect<KernelPoolServ
 /** @experimental */
 export const layerTestPool = (options: TestPoolOptions): Layer.Layer<KernelPool> =>
   Layer.effect(KernelPool, makeTest(options))
+
+const sandboxUnsupported = (operation: Unsupported["operation"]): Unsupported =>
+  Unsupported.make({ operation, message: `TestKernel does not support ${operation}` })
+
+/**
+ * @experimental A process-local Sandbox fake backed by TestKernel. It does not model an independent
+ * security boundary and must not be used to certify a production provider.
+ */
+export const layerTestSandbox = (options: TestPoolOptions): Layer.Layer<SandboxProvider> =>
+  Layer.effect(
+    SandboxProvider,
+    Effect.gen(function* () {
+      const pool = yield* makeTest(options)
+      const nextId = yield* Ref.make(0)
+      return SandboxProvider.of({
+        defaultImage: options.profile.image.reference,
+        acquire: (request = {}) => {
+          if (request.image !== undefined && request.image !== options.profile.image.reference) {
+            return Effect.fail(Unavailable.make({ message: `TestKernel image ${request.image} is unavailable` }))
+          }
+          let limit: Unsupported["operation"] | undefined
+          if (request.limits?.cpuMs !== undefined) limit = "limit:cpu"
+          else if (request.limits?.memoryMb !== undefined) limit = "limit:memory"
+          else if (request.limits?.wallClock !== undefined) limit = "limit:wall-clock"
+          if (limit !== undefined) return Effect.fail(sandboxUnsupported(limit))
+          return Ref.updateAndGet(nextId, (value) => value + 1).pipe(
+            Effect.map((id) => {
+              const sessionId = request.key ?? `test-kernel-${id}`
+              const unavailable = (operation: Unsupported["operation"]) => Effect.fail(sandboxUnsupported(operation))
+              return makeSandbox({
+                isolation: "process",
+                limits: {},
+                capabilities: {
+                  commands: ["TypeScript"],
+                  files: false,
+                  pause: false,
+                  resume: false,
+                  snapshot: false,
+                  fork: false,
+                  limits: [],
+                },
+                start: (command) =>
+                  command._tag !== "TypeScript"
+                    ? unavailable(command._tag === "Process" ? "exec:process" : "exec:javascript-module")
+                    : pool.execute({ sessionId, cellId: command.cellId, code: command.source }).pipe(
+                        Effect.mapError((cause) => ExecutionFailed.make({ message: cause.message, cause })),
+                        Effect.map((execution) => ({
+                          events: execution.events.pipe(
+                            Stream.map((value) => ({ _tag: "Metadata" as const, value })),
+                            Stream.mapError((cause) => ExecutionFailed.make({ message: cause.message, cause })),
+                          ),
+                          result: execution.result.pipe(
+                            Effect.map((value) => ({ stdout: value.stdout, stderr: value.stderr, exitCode: 0, value })),
+                            Effect.mapError((cause) => ExecutionFailed.make({ message: cause.message, cause })),
+                          ),
+                        })),
+                      ),
+                files: unavailable("files"),
+                pause: unavailable("pause"),
+                resume: unavailable("resume"),
+                snapshot: unavailable("snapshot"),
+                fork: () => unavailable("fork"),
+              })
+            }),
+          )
+        },
+      })
+    }),
+  )
 
 /** @experimental An in-memory snapshot store keyed by Session identity. */
 export const makeMemoryStore: Effect.Effect<KernelSnapshotStoreService> = Effect.gen(function* () {

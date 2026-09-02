@@ -312,12 +312,18 @@ const interruptionFailure = (request: Request, deadlineElapsed: boolean) => {
   return undefined
 }
 
+interface ExecutionInput {
+  readonly options: Options
+  readonly request: Request
+  readonly capabilities: ProgramCapabilitiesService
+}
+
 /** @internal Execute one admitted request in a fresh Cloudflare Worker Loader isolate. */
-export const execute = (
-  options: Options,
-  request: Request,
-  capabilities: ProgramCapabilitiesService,
-): Effect.Effect<import("../../core/program/code-executor.js").Result, ExecutionFailure> => {
+export const execute = ({
+  options,
+  request,
+  capabilities,
+}: ExecutionInput): Effect.Effect<import("../../core/program/code-executor.js").Result, ExecutionFailure> => {
   const executorIdentity = identity(options.compatibilityDate)
   return Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
