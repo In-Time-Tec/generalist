@@ -3,14 +3,14 @@ import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound } from "../../errors.js"
 import { projectRunSnapshot, projectTreeCheckpoint } from "../../execution/inspection.js"
 import { make as makeTreeCursor } from "../../tree/cursor.js"
-import { decodeEvent } from "../codec/codecs.js"
+import { decodeEvent, decodeSqlInteger } from "../codec/codecs.js"
 import { decodeRunEffect, loadRunWaitsByStatus } from "../store/statements.js"
 import type { EventRow, RunRow } from "../codec/rows.js"
 import type { ChildReadiness } from "../../child/readiness.js"
 
 interface FirstPositionRow {
   readonly run_id: string
-  readonly first_position: number
+  readonly first_position: number | string | bigint
 }
 
 const loadRuns = (rootRunId: string) =>
@@ -38,7 +38,7 @@ const loadRuns = (rootRunId: string) =>
       events.push(decodeEvent(row.event_json))
       byRun.set(row.run_id, events)
     }
-    const first = new Map(positions.map((row) => [row.run_id, row.first_position] as const))
+    const first = new Map(positions.map((row) => [row.run_id, decodeSqlInteger(row.first_position)] as const))
     const readiness = new Map(links.map((row) => [row.child_run_id, row.readiness] as const))
     return yield* Effect.forEach(rows, (row) =>
       Effect.gen(function* () {
@@ -89,11 +89,15 @@ export const loadRunSnapshot = (runId: string) =>
 export const loadTreeCheckpoint = (rootRunId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const roots = yield* sql<{ readonly last_position: number }>`
+    const roots = yield* sql<{ readonly last_position: number | string | bigint }>`
       SELECT last_position FROM generalist_tree_roots WHERE root_run_id = ${rootRunId}
     `
     const root = roots[0]
     if (root === undefined) return yield* RunNotFound.make({ runId: rootRunId })
     const runs = yield* loadRuns(rootRunId)
-    return yield* projectTreeCheckpoint(rootRunId, makeTreeCursor(rootRunId, root.last_position), runs)
+    return yield* projectTreeCheckpoint(
+      rootRunId,
+      makeTreeCursor(rootRunId, decodeSqlInteger(root.last_position)),
+      runs,
+    )
   })

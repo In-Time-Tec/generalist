@@ -7,6 +7,7 @@ import {
   SessionConflict,
   SessionStoreError,
 } from "../../../core/context/session.js"
+import { decodeSqlInteger } from "../codec/codecs.js"
 import { decodeSessionPayload, encodeSessionPayload, sessionPayloadEquivalence } from "./payload-codec.js"
 
 export interface EntryRow {
@@ -19,7 +20,7 @@ export interface EntryRow {
 
 export interface SessionRow {
   readonly leaf_id: string | null
-  readonly next_seq: number
+  readonly next_seq: number | string | bigint
   readonly writer_epoch: string | number | bigint
   readonly writer_run_id: string | null
   readonly writer_owner_id: string | null
@@ -85,6 +86,10 @@ const fromEntry = (entry: Entry | AppendInput): string => {
 
 /** @internal Shared SQL Session row codec used by dialect-native stores and atomic response commits. */
 export const SessionStorage = {
+  decodeSession: (row: SessionRow): SessionRow & { readonly next_seq: number } => ({
+    ...row,
+    next_seq: decodeSqlInteger(row.next_seq),
+  }),
   appendMatches: (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
     entry.parentId === parentId && sessionPayloadEquivalence(entry, input),
   entryPayloadEquivalence: sessionPayloadEquivalence,

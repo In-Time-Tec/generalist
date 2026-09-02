@@ -50,7 +50,7 @@ export const postgresDriver = (driverInput: {
   },
   claims: () =>
     postgresClaimMechanics({
-      config: driverInput.pg.config,
+      pg: driverInput.pg,
       source: driverInput.options.source ?? "postgres",
     }),
   events: (eventInput, context) =>

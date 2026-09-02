@@ -4,7 +4,7 @@ import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution/state.
 import { RuntimeUnavailable } from "../../errors.js"
 import { PendingRunOutcome } from "../../run/store.js"
 import { decodeContinuation } from "../../run/steering.js"
-import { decodeJson, decodeMessage, decodePinnedExecutable } from "../codec/codecs.js"
+import { decodeJson, decodeMessage, decodePinnedExecutable, decodeSqlInteger } from "../codec/codecs.js"
 import type { DecodedRun, RunRow } from "../codec/rows.js"
 
 const asBool = (value: number | boolean | string): boolean => value === true || value === "true" || Number(value) === 1
@@ -72,7 +72,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     lastSequence: row.last_sequence,
     lastTurnCompletedSequence: row.last_turn_completed_sequence,
     cancellationRequested: asBool(row.cancellation_requested),
-    acceptedSequence: row.accepted_sequence,
+    acceptedSequence: decodeSqlInteger(row.accepted_sequence),
   }
   assignRunOptionals(result, row, checkpoint)
   return result

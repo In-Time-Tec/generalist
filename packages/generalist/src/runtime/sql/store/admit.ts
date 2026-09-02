@@ -19,7 +19,7 @@ import { childDigest, startDigest } from "../../memory/digest.js"
 import type { AdmitProgramChildInput, AdmitStartInput } from "../../run/store.js"
 import type { SpawnInput } from "../../service.js"
 import { make as makeMessage, type Message } from "../../messaging/message.js"
-import { decodePinnedExecutable } from "../codec/codecs.js"
+import { decodePinnedExecutable, decodeSqlInteger } from "../codec/codecs.js"
 import type { RunRow } from "../codec/rows.js"
 import { appendEvent, insertRun, loadRun, nowIso } from "./statements.js"
 import { enforceChildAdmission, nextId } from "./admit-send.js"
@@ -169,7 +169,7 @@ const duplicateStart = (
     return {
       runId: prior.run_id,
       messageId: prior.message_id,
-      acceptedSequence: prior.accepted_sequence,
+      acceptedSequence: decodeSqlInteger(prior.accepted_sequence),
       duplicate: true,
       childRunIds,
       fanOuts,
@@ -315,7 +315,7 @@ export const admitSpawn: {
       return {
         runId: prior.run_id,
         messageId: prior.message_id,
-        acceptedSequence: prior.accepted_sequence,
+        acceptedSequence: decodeSqlInteger(prior.accepted_sequence),
         duplicate: true,
       }
     }
@@ -415,7 +415,7 @@ export const admitProgramChild: {
       return {
         runId: prior.run_id,
         messageId: prior.message_id,
-        acceptedSequence: prior.accepted_sequence,
+        acceptedSequence: decodeSqlInteger(prior.accepted_sequence),
         duplicate: true,
       }
     }

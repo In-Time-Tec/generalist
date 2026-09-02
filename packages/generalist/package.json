@@ -25,7 +25,6 @@
     "effect": "catalog:",
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:peer",
-    "pg": "catalog:",
     "rivetkit": "catalog:",
     "vitest": "catalog:"
   },
@@ -274,12 +273,10 @@
     "@smithy/types": "catalog:",
     "@standard-schema/spec": "catalog:",
     "@types/bun": "catalog:",
-    "@types/pg": "catalog:",
     "effect": "catalog:",
     "esbuild": "catalog:",
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:",
-    "pg": "catalog:",
     "rivetkit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
@@ -343,9 +340,6 @@
       "optional": true
     },
     "foldkit": {
-      "optional": true
-    },
-    "pg": {
       "optional": true
     },
     "rivetkit": {

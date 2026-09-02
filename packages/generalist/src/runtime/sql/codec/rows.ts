@@ -28,7 +28,7 @@ export interface RunRow {
   readonly cancellation_requested: number | boolean | string
   readonly cancel_reason: string | null
   readonly terminal_event_id: string | null
-  readonly accepted_sequence: number
+  readonly accepted_sequence: number | string | bigint
   readonly driver_checkpoint_json: string | null
   readonly suspension_json: string | null
   readonly continuation_json: string | null
@@ -66,7 +66,7 @@ export interface OperationRow {
 
 export interface LaneRow {
   readonly session_id: string
-  readonly accepted_sequence: number
+  readonly accepted_sequence: number | string | bigint
   readonly queue_json: string
 }
 

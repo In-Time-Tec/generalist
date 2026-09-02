@@ -198,10 +198,10 @@ describePostgres("PostgreSQL host transactions", () => {
         expect(first).toMatchObject({ runId: input.runId, duplicate: false })
         expect(duplicate).toEqual({ ...first, duplicate: true })
         expect(
-          yield* sql<{ count: number }>`
+          yield* sql<{ count: string }>`
           SELECT COUNT(*) AS count FROM host_transaction_rows WHERE row_id = 'host-idempotency'
         `,
-        ).toEqual([{ count: 1 }])
+        ).toEqual([{ count: "1" }])
       }),
     )
 

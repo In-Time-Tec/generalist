@@ -14,7 +14,7 @@ import { decodePinned, equals } from "../../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../../executable/manifest.js"
 import { rootDigest } from "../../memory/digest.js"
 import type { AdmitSendInput } from "../../run/store.js"
-import { decodePinnedExecutable, decodeQueue, encodeQueue } from "../codec/codecs.js"
+import { decodePinnedExecutable, decodeQueue, decodeSqlInteger, encodeQueue } from "../codec/codecs.js"
 import type { DecodedRun, RunRow } from "../codec/rows.js"
 import { appendEvent, insertRun, loadRun, promoteHead } from "./statements.js"
 import type { EventHub } from "../subscribers.js"
@@ -76,11 +76,14 @@ type SendEffect = Effect.Effect<
 >
 
 const appendLane = (
-  lane: { readonly accepted_sequence: number; readonly queue_json: string } | undefined,
+  lane: { readonly accepted_sequence: number | string | bigint; readonly queue_json: string } | undefined,
   runId: string,
 ) => {
   if (lane === undefined) return { acceptedSequence: 0, queue: [runId] }
-  return { acceptedSequence: lane.accepted_sequence + 1, queue: [...decodeQueue(lane.queue_json), runId] }
+  return {
+    acceptedSequence: decodeSqlInteger(lane.accepted_sequence) + 1,
+    queue: [...decodeQueue(lane.queue_json), runId],
+  }
 }
 
 const decodeExecutable = (value: PinnedExecutable) =>
@@ -159,7 +162,7 @@ export const admitSend: {
         return {
           runId: prior.run_id,
           messageId: prior.message_id,
-          acceptedSequence: prior.accepted_sequence,
+          acceptedSequence: decodeSqlInteger(prior.accepted_sequence),
           duplicate: true,
         }
       }
@@ -169,7 +172,7 @@ export const admitSend: {
           return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
       }
       const runId = input.runId ?? (yield* nextId("run"))
-      const lanes = yield* sql<{ accepted_sequence: number; queue_json: string }>`
+      const lanes = yield* sql<{ accepted_sequence: number | string | bigint; queue_json: string }>`
       SELECT accepted_sequence, queue_json FROM generalist_lanes
       WHERE session_id = ${input.message.sessionId}
     `

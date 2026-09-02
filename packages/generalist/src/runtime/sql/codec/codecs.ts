@@ -40,6 +40,12 @@ export const encodeJsonValue = <T>(value: T): string =>
 export const decodeJsonValue = (text: string): Schema.Json =>
   Schema.decodeSync(Schema.fromJsonString(Schema.Json))(text)
 
+export const decodeSqlInteger = (value: number | string | bigint): number => {
+  const decoded = Number(value)
+  if (!Number.isSafeInteger(decoded)) throw new RangeError(`SQL integer is outside JavaScript's safe range: ${value}`)
+  return decoded
+}
+
 export const encodeJsonEffect: {
   <T, E>(value: T): (schema: Schema.Codec<T, E, never, never>) => Effect.Effect<string, RuntimeUnavailable>
   <T, E>(schema: Schema.Codec<T, E, never, never>, value: T): Effect.Effect<string, RuntimeUnavailable>

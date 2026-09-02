@@ -17,8 +17,16 @@ import { StaleSessionClaim } from "../errors.js"
 import { requireSessionWriteClaim } from "./claim.js"
 import { type EntryRow, type SessionRow, SessionStorage } from "./storage.js"
 import { markSqlTransitionExactRetry } from "../store/kernel/observability.js"
-const { appendMatches, entryPayloadEquivalence, storeError, encodePayload, fromEntry, toEntry, pathFromRows } =
-  SessionStorage
+const {
+  appendMatches,
+  decodeSession,
+  entryPayloadEquivalence,
+  storeError,
+  encodePayload,
+  fromEntry,
+  toEntry,
+  pathFromRows,
+} = SessionStorage
 
 /** Append or verify one stable interrupted assistant projection inside the caller's SQL transaction. */
 export const appendInterruptedSessionEntry = (
@@ -35,7 +43,7 @@ export const appendInterruptedSessionEntry = (
       SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
       FROM generalist_sessions WHERE session_id = ${input.sessionId}
     `
-    const session = sessionRows[0]
+    const session = sessionRows[0] === undefined ? undefined : decodeSession(sessionRows[0])
     if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
     const payload: AppendInput = {
       _tag: "ModelResponse",
@@ -105,7 +113,7 @@ export const verifyInterruptedSessionEntry = (
       SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
       FROM generalist_sessions WHERE session_id = ${input.sessionId}
     `
-    const session = sessionRows[0]
+    const session = sessionRows[0] === undefined ? undefined : decodeSession(sessionRows[0])
     const existingRows = yield* sql<EntryRow>`
       SELECT entry_id, parent_id, seq, tag, payload_json FROM generalist_session_entries
       WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
@@ -177,7 +185,7 @@ export const claimedStore = (options: {
         SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
         FROM generalist_sessions WHERE session_id = ${sessionId}
       `
-      return rows[0]
+      return rows[0] === undefined ? undefined : decodeSession(rows[0])
     })
 
     const requireSession = sessionRow.pipe(
@@ -435,7 +443,7 @@ export const reader = (sessionId: string): Effect.Effect<SessionReader, never, S
         SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
         FROM generalist_sessions WHERE session_id = ${sessionId}
       `
-      return rows[0]
+      return rows[0] === undefined ? undefined : decodeSession(rows[0])
     })
     return {
       path: (leaf) =>

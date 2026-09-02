@@ -1,7 +1,7 @@
-import { Cause, Clock, DateTime, Duration, Effect, Queue, Redacted, Stream } from "effect"
-import type { PgClient } from "@effect/sql-pg"
+import { Clock, DateTime, Duration, Effect, Random, Schedule, Stream } from "effect"
+import { PgClient } from "@effect/sql-pg"
+import { Reactivity } from "effect/unstable/reactivity"
 import { SqlClient } from "effect/unstable/sql"
-import { Client, escapeIdentifier, type Notification } from "pg"
 import {
   acquireSessionWriteClaim,
   decodeRunEffect,
@@ -12,67 +12,58 @@ import {
 import { RuntimeUnavailable } from "../../runtime/errors.js"
 import { NOTIFY_CHANNEL } from "../schema.js"
 
-const wakeupChanges = (config: PgClient.PgClientConfig, source: string) =>
-  Stream.callback<void, RuntimeUnavailable>(
-    (queue) => {
-      const client = new Client({
-        connectionString: config.url === undefined ? undefined : Redacted.value(config.url),
-        user: config.username,
-        host: config.host,
-        database: config.database,
-        password: config.password === undefined ? undefined : Redacted.value(config.password),
-        ssl: config.ssl,
-        port: config.port,
-        ...(config.stream === undefined ? undefined : { stream: config.stream }),
-        connectionTimeoutMillis:
-          config.connectTimeout === undefined ? undefined : Duration.toMillis(config.connectTimeout),
-        application_name: `generalist-runtime-worker:${source}`.slice(0, 63),
-        types: config.types,
-      })
-      const failure = (cause: unknown) =>
-        RuntimeUnavailable.make({ message: `PostgreSQL RunClaims wakeup listener failed: ${String(cause)}` })
-      const onNotification = (notification: Notification) => {
-        if (notification.channel === NOTIFY_CHANNEL) Queue.offerUnsafe(queue, undefined)
-      }
-      const onFailure = (cause: unknown) => Queue.failCauseUnsafe(queue, Cause.fail(failure(cause)))
-      const onEnd = () => onFailure("PostgreSQL listener connection ended")
-      const close = Effect.tryPromise(() => client.end()).pipe(Effect.ignore)
-      const acquire = Effect.acquireRelease(
-        Effect.sync(() => {
-          client.on("notification", onNotification)
-          client.on("error", onFailure)
-          client.on("end", onEnd)
+const wakeupChanges = (pg: PgClient.PgClient, source: string) =>
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const listenerId = ((yield* Random.nextInt) >>> 0).toString(16)
+      const applicationName = `generalist-runtime-worker:${listenerId}:${source}`.slice(0, 63)
+      const listener = yield* PgClient.make({ ...pg.config, applicationName, maxConnections: 1 }).pipe(
+        Effect.provideServiceEffect(Reactivity.Reactivity, Reactivity.make),
+      )
+      // The pinned @effect/sql-pg swallows listener `error`/`end`, so liveness is probed through
+      // pg_stat_activity. PID discovery yields instead of sleeping because LISTEN is issued
+      // concurrently and callers may run under TestClock.
+      const health = Stream.unwrap(
+        Effect.gen(function* () {
+          let listenerPid: number | undefined
+          while (listenerPid === undefined) {
+            const rows = yield* pg<{ readonly pid: number }>`
+            SELECT pid FROM pg_stat_activity
+            WHERE application_name = ${applicationName} AND query LIKE ${`LISTEN %${NOTIFY_CHANNEL}%`}
+            ORDER BY backend_start DESC LIMIT 1
+          `
+            listenerPid = rows[0]?.pid
+            if (listenerPid === undefined) yield* Effect.yieldNow
+          }
+          const check = pg<{ readonly present: boolean }>`
+          SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = ${listenerPid}) AS present
+        `.pipe(
+            Effect.flatMap((rows) =>
+              rows[0]?.present === true
+                ? Effect.void
+                : RuntimeUnavailable.make({ message: `PostgreSQL RunClaims wakeup listener failed (${source})` }),
+            ),
+          )
+          return Stream.concat(
+            Stream.succeed(undefined),
+            Stream.fromEffect(check).pipe(Stream.repeat(Schedule.spaced("1 second")), Stream.drain),
+          )
         }),
-        () =>
-          Effect.sync(() => {
-            client.off("notification", onNotification)
-            client.off("error", onFailure)
-            client.off("end", onEnd)
-          }).pipe(Effect.andThen(close)),
       )
-      const connect = Effect.tryPromise({
-        try: () => client.connect(),
-        catch: failure,
-      }).pipe(
-        Effect.andThen(
-          Effect.tryPromise({
-            try: () => client.query(`LISTEN ${escapeIdentifier(NOTIFY_CHANNEL)}`),
-            catch: failure,
-          }),
-        ),
-        Effect.andThen(Effect.sync(() => Queue.offerUnsafe(queue, undefined))),
-      )
-      return acquire.pipe(Effect.andThen(connect))
-    },
-    { bufferSize: 1, strategy: "sliding" },
+      return Stream.merge(listener.listen(NOTIFY_CHANNEL).pipe(Stream.map(() => undefined)), health)
+    }),
+  ).pipe(
+    Stream.mapError((error) =>
+      RuntimeUnavailable.make({ message: `PostgreSQL RunClaims wakeup listener failed (${source}): ${error.message}` }),
+    ),
   )
 
 /** PostgreSQL's optimized claim/lease protocol; lifecycle transitions remain in Runtime. */
 export const postgresClaimMechanics = (input: {
-  readonly config: PgClient.PgClientConfig
+  readonly pg: PgClient.PgClient
   readonly source: string
 }): SqlClaimMechanics => ({
-  changes: wakeupChanges(input.config, input.source),
+  changes: wakeupChanges(input.pg, input.source),
   claimReadyRuns: (options) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
