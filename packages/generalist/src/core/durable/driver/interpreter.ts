@@ -113,7 +113,8 @@ export class DriverUnknownReplay extends ActionableTaggedError<DriverUnknownRepl
 export class DriverInterpreter extends Context.Service<DriverInterpreter, Service>()(
   "generalist/core/durable/driver/interpreter/DriverInterpreter",
 ) {}
-const noopJournal: Journal = {
+/** A process-local journal that records nothing; used when no host journal owns the operations. */
+export const journalNoop: Journal = {
   onScheduled: () => Effect.void,
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,
@@ -137,7 +138,7 @@ export const make = (input: {
     const checkpointRef = yield* Ref.make(input.initial)
     const recordedRef = yield* Ref.make<ReadonlyArray<RecordedOperation>>([])
     const commitSemaphore = yield* Semaphore.make(1)
-    const journal = input.journal ?? noopJournal
+    const journal = input.journal ?? journalNoop
     const schedule = scheduleOperations({ checkpointRef, driver: input.driver, journal, semaphore: commitSemaphore })
     const codecFailure = (spec: { readonly key: string }, branch: "success" | "failure", error: Schema.SchemaError) =>
       DriverStateInvalid.make({ message: `Operation ${spec.key} has an invalid ${branch} outcome: ${error.message}` })
@@ -486,7 +487,7 @@ export const layerInline = (input: {
     DriverInterpreter,
     Effect.gen(function* () {
       const hostJournal = yield* Effect.serviceOption(DriverJournal)
-      const journal = input.journal ?? Option.getOrElse(hostJournal, () => noopJournal)
+      const journal = input.journal ?? Option.getOrElse(hostJournal, () => journalNoop)
       return yield* make({ ...input, journal })
     }),
   )

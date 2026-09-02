@@ -14,7 +14,7 @@ import {
 } from "./event.js"
 import { PolicyError as TurnPolicyError } from "../turn/policy.js"
 
-import { DriverInterpreter } from "../durable/driver/interpreter.js"
+import { DriverInterpreter, DriverJournal, journalNoop } from "../durable/driver/interpreter.js"
 import { Exhausted, Invalid as BudgetInvalid, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "./tool/registration.js"
 import { DriverError, DriverStateInvalid } from "../durable/service.js"
@@ -350,6 +350,7 @@ export const asTool: {
           const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
           const childBudget = yield* interpreter.value.reserveChild(grant).pipe(Effect.mapError(errorMessage))
           result = yield* runChild(authoredPrompt, { inheritedBudget: childBudget }).pipe(
+            Effect.provideService(DriverJournal, journalNoop),
             Effect.ensuring(interpreter.value.refundChild(childBudget).pipe(Effect.orDie)),
           )
         }

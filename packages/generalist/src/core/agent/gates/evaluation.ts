@@ -3,7 +3,7 @@
 import { Cause, Effect, Layer, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { layerEmpty as emptySkills } from "../../context/skill-catalog.js"
-import { DriverInterpreter, DriverJournal, type Journal } from "../../durable/driver/interpreter.js"
+import { DriverInterpreter, DriverJournal, journalNoop } from "../../durable/driver/interpreter.js"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { DriverStateInvalid, type DriverError } from "../../durable/service.js"
 import { layerIdentity as identityMiddleware } from "../../model/middleware.js"
@@ -15,13 +15,8 @@ import type { RunError } from "../run/error.js"
 import { VerifierOutput, type Gate, type Result, type Verifier, type VerifierAgent } from "./definition.js"
 import { verifierPrompt } from "./prompt.js"
 
-const isolatedJournal: Journal = {
-  onScheduled: () => Effect.void,
-  onCompleted: () => Effect.void,
-  onCheckpoint: () => Effect.void,
-}
 const isolatedEnvironment = Layer.mergeAll(
-  Layer.succeed(DriverJournal, isolatedJournal),
+  Layer.succeed(DriverJournal, journalNoop),
   identityHooks,
   identityMiddleware,
   emptySkills,

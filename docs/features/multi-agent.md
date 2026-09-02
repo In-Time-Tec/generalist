@@ -45,6 +45,7 @@ Agent.run(parent)                          Run ID: run-2
 └── tool call ask_billing
     ├── DriverInterpreter.reserveChild(...)
     ├── Agent.run(billing)                  Run ID: run-3
+    │   └── child-scoped DriverInterpreter and journal
     └── DriverInterpreter.refundChild(...)
 ```
 
@@ -90,6 +91,7 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - An inline child without `sessionId` has no Session.
 - Reusing the active parent's Session ID fails before the child model call; it does not wait on the parent's lane.
 - Parent, child, and sibling control inputs never cross Run boundaries.
+- A durable Runtime journals an inline child as the parent's AgentTool operation. The child loop keeps its own process-local driver journal and never writes child checkpoints or model responses into the parent's Runtime journal or Session; replay of a completed parent tool operation returns the recorded child result without redispatch.
 - Same-run handoff retains the Run ID, inbox, Session identity, `DriverInterpreter`, tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event order.
 - On the target's first turn, its instructions are live system context only; the `Handoff` projection remains the active Session history, and the target's non-system conversation appends after it.
 - A producer holding the original `RunHandle` can keep steering after handoff.

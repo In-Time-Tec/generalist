@@ -8,16 +8,21 @@ import {
   AgentEvent,
   AgentTool,
   Approvals,
+  Hooks,
   Memory,
   ModelMiddleware,
   ToolContext,
   ToolExecutor,
   ToolPlacement,
 } from "../../../src/index"
+import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
+import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { withProviderFinish } from "../provider-finish"
 import { allowAllAuthorization } from "../../authorization.js"
+import { provideScoped } from "../../runtime/execution/scoped-provide"
+import { tempDbPath } from "../../runtime/sql/scenario"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type Equal<Left, Right> =
@@ -1058,6 +1063,102 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ).toBe(true)
       }),
     ] as const
+  })
+
+  it("runs an inline child durably and reopens without redispatch", () => {
+    const filename = tempDbPath("inline-agent-tool")
+    const child = Agent.make({ name: "inline-child" })
+    const childTool = AgentTool.asTool(child, { name: "ask_child" })
+    const parent = Agent.make({ name: "inline-parent", toolkit: Toolkit.make(childTool.tool) })
+    const childLifecycle = new Array<string>()
+    let modelCalls = 0
+    let parentCalls = 0
+    let parentFollowUp = ""
+    const model = modelLayer((options) => {
+      modelCalls += 1
+      if (options.tools.length === 0) return Stream.make(textDelta("child answer"))
+      parentCalls += 1
+      if (parentCalls === 1) return Stream.make(toolCallPart("call-child", "ask_child", { prompt: "child task" }))
+      parentFollowUp = Json.stringify(options.prompt.content)
+      return Stream.make(textDelta("parent answer"))
+    })
+    const hooks = Hooks.layer([
+      Hooks.onChildStart(({ child: started }) =>
+        Effect.sync(() => {
+          childLifecycle.push(`start:${started.selection}`)
+          return Hooks.Continue()
+        }),
+      ),
+      Hooks.onChildEnd(({ child: ended, result }) =>
+        Effect.sync(() => {
+          childLifecycle.push(`end:${ended.selection}:${String(result)}`)
+          return Hooks.Continue()
+        }),
+      ),
+    ])
+    const environment = Layer.mergeAll(
+      allowAllAuthorization,
+      model,
+      hooks,
+      ToolExecutor.layerToolkit(childTool).pipe(Layer.provide(Layer.merge(model, allowAllAuthorization))),
+    )
+    const runtimeLayer = () =>
+      Layer.merge(
+        SqliteRuntime.layerSqlite({
+          filename,
+          addresses: [],
+          scheduler: { pollInterval: "1 hour" },
+        }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
+        environment,
+      )
+    const startOptions = {
+      sessionId: "session:inline-agent-tool",
+      idempotencyKey: "inline-agent-tool",
+    }
+    let runId = ""
+    let firstHistory = new Array<readonly [number, string]>()
+
+    const execute = Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore.RunStore
+      yield* runtime.register(parent)
+      const handle = yield* runtime.start(parent, "delegate", startOptions)
+      runId = handle.runId
+      yield* host.execute(yield* store.claimExecution({ runId, ownerId: "inline-agent-tool:first" }))
+
+      expect(yield* handle.await).toBe("parent answer")
+      expect(parentFollowUp).toContain("child answer")
+      expect(childLifecycle).toEqual(["start:inline-child", "end:inline-child:child answer"])
+      expect(modelCalls).toBe(3)
+      const history = yield* runtime.history({ runId, limit: 100 })
+      const completed = history.find((event) => event._tag === "ToolExecutionCompleted")
+      expect(completed?._tag === "ToolExecutionCompleted" && completed.result.result).toBe("child answer")
+      expect(
+        yield* store.getOperationByKey({ runId, operationKey: "inline-child:model:0:0:conversation" }),
+      ).toBeUndefined()
+      expect(
+        yield* store.getOperationByKey({ runId, operationKey: `${runId}:tool:0:call-child:ask_child` }),
+      ).toMatchObject({ status: "succeeded", result: { _tag: "Success", result: "child answer" } })
+      firstHistory = history.map((event) => [event.sequence, event.eventId])
+    })
+
+    const reopen = Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      yield* runtime.register(parent)
+      const handle = yield* runtime.start(parent, "delegate", startOptions)
+
+      expect(handle.runId).toBe(runId)
+      expect(yield* handle.await).toBe("parent answer")
+      expect(modelCalls).toBe(3)
+      const history = yield* runtime.history({ runId, limit: 100 })
+      expect(history.filter((event) => event._tag === "ToolExecutionCompleted")).toHaveLength(1)
+      expect(history.map((event) => [event.sequence, event.eventId])).toEqual(firstHistory)
+    })
+
+    return Effect.scoped(provideScoped(runtimeLayer(), execute)).pipe(
+      Effect.andThen(Effect.scoped(provideScoped(runtimeLayer(), reopen))),
+    )
   })
 
   ItLayer.make(it, "runs the child on the model layer given to asTool instead of the ambient model", () => {
