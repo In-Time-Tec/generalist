@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.47.0
+
+- Publish `generalist/testing`, replacing `generalist/test`. `Testing.runtimeDriver(options)` runs the capability-based durable runtime driver suite against any driver, `Testing.memory({ layer })` and `Testing.ruleStore({ layer })` are conformance suites for `Memory` and `Permissions.RuleStore` adapters, `Testing.chaos.interruptAfter`, `Testing.chaos.dropConnection`, and `Testing.chaos.flakyModel` inject deterministic journal, transport, and model faults, and `Testing.report.write({ path })` writes a certification report of which suites a host ran. Import paths `generalist/test` and `generalist/test/runtime-driver` become `generalist/testing` and `generalist/testing/runtime-driver`; `docs/features/test-kit.md` becomes `docs/features/testing.md`. (#336)
+- Move `generalist/pg` onto `@effect/sql-pg` only and drop the `pg` and `@types/pg` optional peer dependencies. Shared SQL code decodes BIGINT columns whether the driver returns a number, string, or bigint. `RunClaims.changes` owns a dedicated scoped LISTEN connection and detects listener loss through `pg_stat_activity` because the pinned `@effect/sql-pg` swallows listener errors; a lost listener fails the stream so subscribers reacquire a fresh one. (#322)
+
 ## 0.46.1
 
 - Fix Bun kernel frame delivery silently dying mid-session. The fd-3 frame pump created a fresh `Bun.file(fd).stream().getReader()` per chunk and cancelled it between reads; on Bun 1.4.0/macOS that corrupts frames spanning multiple reads (bytes duplicated or dropped) and a parked read can report a spurious `done` during idle, ending the pump for a live worker. Either way the worker's frames vanished without a trace: cells then waited out their full deadline and the pool killed and rebooted the worker with no surfaced error. The pump now owns one persistent reader for the descriptor's lifetime, recreates the stream only when a `done` arrives while the worker is verifiably alive, and still terminates cleanly on real peer exit.
