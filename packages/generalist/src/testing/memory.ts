@@ -43,6 +43,18 @@ const content = (items: ReadonlyArray<Item>): string =>
     .map((part) => part.text)
     .join("\n")
 
+/** Find the versioned entry holding `text`; persistent stores recall entries left by earlier tests too. */
+const rememberedEntryId = (memory: Service, inputKey: Key, text: string) =>
+  recall(memory, inputKey, text).pipe(
+    Effect.flatMap((items) =>
+      Effect.forEach(
+        items.filter((item) => content([item]).includes(text)),
+        (item) => memory.history(item.id).pipe(Effect.map((history) => (history.length > 0 ? item.id : undefined))),
+      ),
+    ),
+    Effect.map((ids) => ids.find((id) => id !== undefined)),
+  )
+
 const provide = <A, E, LayerError>(options: Options<LayerError>, effect: Effect.Effect<A, E, Memory>) =>
   Effect.scoped(
     Layer.build(options.layer).pipe(
@@ -133,14 +145,7 @@ export const memory = <E>(options: Options<E>): void => {
             const firstEvidence = [{ runId: "run:memory-version-1" as const, turn: 0 }]
             const secondEvidence = [{ runId: "run:memory-version-2" as const, turn: 1 }]
             yield* remember(service, key, "original-version-marker", firstEvidence)
-            const recalled = yield* recall(service, key, "original-version-marker")
-            let entryId: string | undefined
-            for (const item of recalled) {
-              if ((yield* service.history(item.id)).length > 0) {
-                entryId = item.id
-                break
-              }
-            }
+            const entryId = yield* rememberedEntryId(service, key, "original-version-marker")
             expect(entryId).toBeDefined()
             if (entryId === undefined) return
             yield* service.remember({
@@ -176,14 +181,7 @@ export const memory = <E>(options: Options<E>): void => {
           Effect.gen(function* () {
             const service = yield* Memory
             yield* remember(service, key, "forgotten-version-one")
-            const recalled = yield* recall(service, key, "forgotten-version-one")
-            let entryId: string | undefined
-            for (const item of recalled) {
-              if ((yield* service.history(item.id)).length > 0) {
-                entryId = item.id
-                break
-              }
-            }
+            const entryId = yield* rememberedEntryId(service, key, "forgotten-version-one")
             expect(entryId).toBeDefined()
             if (entryId === undefined) return
             yield* service.remember({

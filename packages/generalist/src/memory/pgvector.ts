@@ -297,7 +297,9 @@ export const layer = (options: Options): Layer.Layer<VectorStore, VectorStoreErr
                     message: `entry ${input.entryId} has no version ${input.to}`,
                   })
                 }
-                yield* sql`UPDATE ${historyTable} SET active = (version = ${input.to}) WHERE id = ${input.entryId}`
+                // The partial unique index on active rows is checked per row, so deactivate before activating.
+                yield* sql`UPDATE ${historyTable} SET active = FALSE WHERE id = ${input.entryId} AND active`
+                yield* sql`UPDATE ${historyTable} SET active = TRUE WHERE id = ${input.entryId} AND version = ${input.to}`
                 yield* sql`
                 INSERT INTO ${table} (agent, subject, id, text, metadata, embedding)
                 VALUES (${target.agent}, ${target.subject}, ${target.id}, ${target.text},

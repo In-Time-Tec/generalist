@@ -1,7 +1,9 @@
+/* oxlint-disable effecttsgo/strict-effect-provide -- This adapter test is the Layer composition root. */
 import { describe, it } from "@effect/vitest"
 import { PgClient } from "@effect/sql-pg"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
+import { SqlClient } from "effect/unstable/sql"
 import { layerPgVector, SemanticRecall } from "generalist/memory"
 import { Testing } from "generalist/testing"
 
@@ -17,6 +19,14 @@ if (url === undefined || url.length === 0) {
   })
 } else {
   const client = PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })
+  // Version assertions need a table without entries left by earlier runs.
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql`DROP TABLE IF EXISTS generalist_memory_conformance_history`
+      yield* sql`DROP TABLE IF EXISTS generalist_memory_conformance`
+    }).pipe(Effect.provide(client)),
+  )
   const embedding = Layer.effect(
     EmbeddingModel.EmbeddingModel,
     EmbeddingModel.make({
