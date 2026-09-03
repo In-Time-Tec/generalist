@@ -10,6 +10,7 @@ import type { Result as CompletionGateResult } from "./gates/definition.js"
 import type { AwaitEvent } from "./tools/wake-event.js"
 import type { Items as TaskItems } from "../../tasks/item.js"
 import type { Source as CapabilitySource } from "../capability/state.js"
+import type { ArtifactReadJournal, EditResult as ArtifactEditResult } from "../artifact.js"
 /** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
@@ -106,6 +107,8 @@ export interface ToolExecutionCompleted {
     readonly taint: ReadonlyArray<CapabilitySource>
   }
   readonly tasksUpdated?: TaskItems
+  readonly artifactRead?: ArtifactReadJournal
+  readonly artifactUpdated?: ArtifactEditResult
   readonly metadata?: Metadata & {
     readonly toolProgress?: {
       readonly dropped: number

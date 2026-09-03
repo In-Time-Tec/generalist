@@ -2553,7 +2553,7 @@ The single logical SQL Runtime schema identity.
 
 ### SQL\_SCHEMA\_VERSION
 
-> `const` **SQL\_SCHEMA\_VERSION**: `9` = `9`
+> `const` **SQL\_SCHEMA\_VERSION**: `10` = `10`
 
 The single logical SQL Runtime schema version.
 

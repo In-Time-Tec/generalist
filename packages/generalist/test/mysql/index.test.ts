@@ -134,6 +134,7 @@ Testing.runtimeDriver({
     "operator-resolve-unknown": { claim: conformanceClaim },
     "operator-scan": { claim: conformanceClaim },
     "fork-rewind": { claim: conformanceClaim },
+    artifacts: true,
     steering: { claim: conformanceClaim, recovery: "rebuild" },
   },
 })

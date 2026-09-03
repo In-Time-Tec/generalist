@@ -114,6 +114,17 @@ import type {
 import type { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import type { DueAwaitEvent, WakeDisposition } from "../execution/trigger/wake.js"
 import type { ClaimedSchedule, ScheduleReceipt, ScheduleRecord } from "../execution/trigger/schedule.js"
+import type {
+  ArtifactAppend,
+  ArtifactCrdtMismatch,
+  ArtifactFork,
+  ArtifactHead,
+  ArtifactNotFound,
+  ArtifactSubscriberLagged,
+  ArtifactUpdate,
+  ArtifactVersionConflict,
+  ArtifactVersionNotFound,
+} from "../../core/artifact.js"
 export type {
   AdmitProgramChildAndSuspendInput,
   AdmitProgramChildInput,
@@ -366,6 +377,48 @@ export interface Service {
     HostSessionEvent,
     SessionNotFound | SessionCursorExpired | SessionSubscriberLagged | RuntimeUnavailable
   >
+  /** Create or load the main head for one shared artifact. */
+  readonly ensureArtifact: (input: {
+    readonly artifact: string
+    readonly crdt: string
+    readonly snapshot: import("../../media/ref.js").Ref
+  }) => Effect.Effect<ArtifactHead, ArtifactCrdtMismatch | RuntimeUnavailable>
+  /** Load the current head of one artifact branch. */
+  readonly artifactHead: (input: {
+    readonly artifact: string
+    readonly branch?: string
+  }) => Effect.Effect<ArtifactHead, ArtifactNotFound | RuntimeUnavailable>
+  /** Load one exact historical snapshot from the artifact operation log. */
+  readonly artifactSnapshot: (input: {
+    readonly artifact: string
+    readonly version: number
+    readonly branch?: string
+  }) => Effect.Effect<ArtifactHead, ArtifactNotFound | ArtifactVersionNotFound | RuntimeUnavailable>
+  /** Lazily create a forked Run's private artifact branch from its copied checkpoint. */
+  readonly forkArtifact: (
+    input: ArtifactFork,
+  ) => Effect.Effect<
+    ArtifactHead,
+    ArtifactNotFound | ArtifactVersionNotFound | ArtifactVersionConflict | ArtifactCrdtMismatch | RuntimeUnavailable
+  >
+  /** Append one CRDT operation if the expected branch head still matches. */
+  readonly appendArtifact: (
+    input: ArtifactAppend,
+  ) => Effect.Effect<
+    ArtifactUpdate,
+    ArtifactNotFound | ArtifactVersionNotFound | ArtifactCrdtMismatch | ArtifactVersionConflict | RuntimeUnavailable
+  >
+  /** Replay then follow committed artifact operations after an exclusive version. */
+  readonly artifactUpdates: (input: {
+    readonly artifact: string
+    readonly version: number
+    readonly branch?: string
+  }) => Stream.Stream<
+    ArtifactUpdate,
+    ArtifactNotFound | ArtifactVersionNotFound | ArtifactSubscriberLagged | RuntimeUnavailable
+  >
+  /** Whether this Run was created by Runtime fork or rewind branch retention. */
+  readonly artifactRunIsFork: (runId: string) => Effect.Effect<boolean, RunNotFound | RuntimeUnavailable>
   readonly treeCheckpoint: (
     rootRunId: string,
   ) => Effect.Effect<import("../tree.js").Checkpoint, RunNotFound | RuntimeUnavailable>

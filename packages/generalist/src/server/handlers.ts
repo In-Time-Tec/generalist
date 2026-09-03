@@ -5,6 +5,7 @@ import type { Host, RunStartOptions, SessionCreateOptions } from "../host/index.
 import { api, type EventStreamItem } from "./api.js"
 import { apiError, OperatorDisabled } from "./errors.js"
 import { handle as handleWebSocket } from "./websocket.js"
+import { handle as handleArtifactWebSocket } from "./artifact-websocket.js"
 
 const mapError = (operation: string) => Effect.mapError((error: Error) => apiError({ operation, error }))
 
@@ -61,6 +62,21 @@ const eventsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agent
             handleWebSocket({ host, sessionId: params.id, request, events }).pipe(Effect.orDie),
           ),
         ),
+      ),
+  )
+
+const artifactsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>) =>
+  HttpApiBuilder.group(api, "artifacts", (handlers) =>
+    handlers
+      .handle("read", ({ params }) => host.artifacts.read(params.name))
+      .handleRaw("connect", ({ params, query, request }) =>
+        host.artifacts
+          .subscribe(params.name, query.version)
+          .pipe(
+            Effect.flatMap((updates) =>
+              handleArtifactWebSocket({ host, name: params.name, request, updates }).pipe(Effect.orDie),
+            ),
+          ),
       ),
   )
 
@@ -134,6 +150,7 @@ export const layerHandlers = <Agents extends ReadonlyArray<AnyAgent>>(options: H
     sessionsHandlers(options.host),
     runsHandlers(options.host),
     eventsHandlers(options.host),
+    artifactsHandlers(options.host),
     approvalsHandlers(options.host),
     attachmentsHandlers(options.host),
     operatorHandlers(options.host, options.operator),

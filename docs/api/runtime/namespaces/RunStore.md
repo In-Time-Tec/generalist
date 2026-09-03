@@ -824,6 +824,122 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
 
+<a id="appendartifact"></a>
+
+##### appendArtifact
+
+> `readonly` **appendArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Append one CRDT operation if the expected branch head still matches.
+
+###### Parameters
+
+###### input
+
+`ArtifactAppend`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+<a id="artifacthead"></a>
+
+##### artifactHead
+
+> `readonly` **artifactHead**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound)\>
+
+Load the current head of one artifact branch.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound)\>
+
+<a id="artifactrunisfork"></a>
+
+##### artifactRunIsFork
+
+> `readonly` **artifactRunIsFork**: (`runId`) => `Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+
+Whether this Run was created by Runtime fork or rewind branch retention.
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+
+<a id="artifactsnapshot"></a>
+
+##### artifactSnapshot
+
+> `readonly` **artifactSnapshot**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Load one exact historical snapshot from the artifact operation log.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### version
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+<a id="artifactupdates"></a>
+
+##### artifactUpdates
+
+> `readonly` **artifactUpdates**: (`input`) => `Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Replay then follow committed artifact operations after an exclusive version.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### version
+
+`number`
+
+###### Returns
+
+`Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
 <a id="cancel"></a>
 
 ##### cancel
@@ -1111,6 +1227,50 @@ derived by parsing an Address or a Run id.
 
 `Effect`\<`void`, `WorkerMutationError`\>
 
+<a id="ensureartifact"></a>
+
+##### ensureArtifact
+
+> `readonly` **ensureArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch)\>
+
+Create or load the main head for one shared artifact.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### crdt
+
+`string`
+
+###### snapshot
+
+\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}
+
+###### snapshot.bytes
+
+`number`
+
+###### snapshot.filename?
+
+`string`
+
+###### snapshot.mediaType
+
+`string`
+
+###### snapshot.sha256
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch)\>
+
 <a id="events"></a>
 
 ##### events
@@ -1264,6 +1424,24 @@ derived by parsing an Address or a Run id.
 ###### Returns
 
 `Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`SubstitutionInvalid`](./Errors#substitutioninvalid)\>
+
+<a id="forkartifact"></a>
+
+##### forkArtifact
+
+> `readonly` **forkArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Lazily create a forked Run's private artifact branch from its copied checkpoint.
+
+###### Parameters
+
+###### input
+
+`ArtifactFork`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
 
 <a id="getoperation"></a>
 
@@ -2243,7 +2421,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### event
 
-\{ `dedupeKey`: `string`; `payload`: `Json`; `scheduledAt`: `string`; `scheduleId`: `string`; \} \| \{ `dedupeKey`: `string`; `headers`: \{\[`key`: `string`\]: `string`; \}; `payload`: `Json`; `source`: `string`; \} \| \{ `childRunId`: `string`; `dedupeKey`: `string`; `terminalEventId`: `string`; \} \| \{ `dedupeKey`: `string`; `kind`: `"create"` \| `"remove"` \| `"update"`; `path`: `string`; \} \| \{ `approvalId`: `string`; `decision`: \{ \} \| \{ `reason?`: `string`; \}; `dedupeKey`: `string`; \}
+\{ `dedupeKey`: `string`; `payload`: `Json`; `scheduledAt`: `string`; `scheduleId`: `string`; \} \| \{ `dedupeKey`: `string`; `headers`: \{\[`key`: `string`\]: `string`; \}; `payload`: `Json`; `source`: `string`; \} \| \{ `childRunId`: `string`; `dedupeKey`: `string`; `terminalEventId`: `string`; \} \| \{ `dedupeKey`: `string`; `kind`: `"update"` \| `"create"` \| `"remove"`; `path`: `string`; \} \| \{ `approvalId`: `string`; `decision`: \{ \} \| \{ `reason?`: `string`; \}; `dedupeKey`: `string`; \}
 
 ###### now
 

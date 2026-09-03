@@ -9,6 +9,7 @@ import type { Policy } from "../turn/policy.js"
 import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure-identity.js"
 import type { HandlersFor } from "./tool/fan-out.js"
 import type { Descriptor as CapabilityDescriptor } from "../capability/state.js"
+import type { ManagedArtifactTool } from "../artifact.js"
 
 export { ClosedTypeId } from "./lifecycle/closure-identity.js"
 
@@ -29,14 +30,14 @@ export interface Any<PolicyServices = unknown> {
   readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
 }
 
-/**
- * Every service one Agent needs to run: its declared requirements, its tool handlers, and the handler
- * services other than the per-call `ToolContext` that tool execution supplies.
- */
-export type ClosedServices<Tools extends Record<string, Tool.Any>, R> =
-  | R
-  | HandlersFor<Tools>
-  | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
+type ClosedToolServices<Tools extends Record<string, Tool.Any>> = {
+  [Name in keyof Tools]: Tools[Name] extends ManagedArtifactTool
+    ? never
+    : HandlersFor<Pick<Tools, Name>> | Exclude<Tool.HandlerServices<Tools[Name]>, ToolContext>
+}[keyof Tools]
+
+/** Every service one Agent needs to run, excluding self-contained managed tools. */
+export type ClosedServices<Tools extends Record<string, Tool.Any>, R> = R | ClosedToolServices<Tools>
 
 /** Consumer of one hidden Agent identity together with the exact environment that satisfies it. */
 export interface Opened<A> {

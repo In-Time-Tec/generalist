@@ -1,4 +1,4 @@
-import { api } from "./api.js"
+import { api, ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
 import { Authentication, layerBearer } from "./auth.js"
 import { client, defaultReconnectSchedule } from "./client.js"
 import {
@@ -14,7 +14,6 @@ import {
 import { layer } from "./layer.js"
 import { ClientCommand, CursorFromString, eventCodec } from "./wire.js"
 import { HostEvent } from "../host/event.js"
-
 export type {
   Client,
   ClientStreamError,
@@ -25,6 +24,7 @@ export type {
   ReconnectSchedule,
 } from "./client.js"
 export type { AttachmentDownload, EventStreamItem, RunStarted } from "./api.js"
+export type { ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
 export type { Options as LayerOptions } from "./layer.js"
 export type { ApiError } from "./errors.js"
 export type { ClientCommand, EventCodec } from "./wire.js"
@@ -40,6 +40,8 @@ export interface Server {
   readonly CursorFromString: typeof CursorFromString
   readonly eventCodec: typeof eventCodec
   readonly defaultReconnectSchedule: typeof defaultReconnectSchedule
+  readonly ArtifactClientCommand: typeof ArtifactClientCommand
+  readonly ArtifactServerEvent: typeof ArtifactServerEvent
   readonly ApiError: typeof ApiError
   readonly Unauthorized: typeof Unauthorized
   readonly OperatorDisabled: typeof OperatorDisabled
@@ -62,6 +64,8 @@ export const Server: Server = {
   CursorFromString,
   eventCodec,
   defaultReconnectSchedule,
+  ArtifactClientCommand,
+  ArtifactServerEvent,
   ApiError,
   Unauthorized,
   OperatorDisabled,

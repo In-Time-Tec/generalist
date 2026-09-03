@@ -68,6 +68,9 @@ export interface ForkRewindCapability {
   readonly claim: ClaimExecution
 }
 
+/** Shared Artifact head, operation-log, subscription, and branch capability. */
+export type ArtifactsCapability = true
+
 /** Inbox persistence and exactly-once delivery capability. */
 export interface SteeringCapability {
   readonly claim: ClaimExecution
@@ -146,6 +149,7 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly "unknown-agent-on-recovery"?: UnknownAgentOnRecoveryCapability
   readonly runTree?: RunTreeCapability
   readonly "fork-rewind"?: ForkRewindCapability
+  readonly artifacts?: ArtifactsCapability
   readonly steering?: SteeringCapability
   readonly sqlTransactions?: SqlTransactionCapability
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>

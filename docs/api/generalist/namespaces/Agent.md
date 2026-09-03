@@ -2421,7 +2421,7 @@ Result injected as the terminal result of the awaiting tool call.
 
 ### ClosedServices
 
-> **ClosedServices**\<`Tools`, `R`, `InputCodec`, `OutputCodec`\> = `R` \| `HandlersFor`\<`Tools`\> \| `Exclude`\<`Tool.HandlerServices`\<`Tools`\[keyof `Tools`\]\>, [`ToolContext`](./ToolContext#toolcontext)\> \| `InputCodec`\[`"EncodingServices"`\] \| `OutputCodec`\[`"DecodingServices"`\] \| `OutputCodec`\[`"EncodingServices"`\]
+> **ClosedServices**\<`Tools`, `R`, `InputCodec`, `OutputCodec`\> = `R` \| `ClosedToolServices`\<`Tools`\> \| `InputCodec`\[`"EncodingServices"`\] \| `OutputCodec`\[`"DecodingServices"`\] \| `OutputCodec`\[`"EncodingServices"`\]
 
 Services closed over with an Agent.
 

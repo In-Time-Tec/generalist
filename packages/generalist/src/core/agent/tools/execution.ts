@@ -1,9 +1,10 @@
-import { Cause, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Context, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event } from "../event.js"
 import {
   domainFailureResult,
   interrupted,
+  outcomeEvent as makeOutcomeEvent,
   outcomeFromResult,
   successResult,
   type AnyToolCall,
@@ -33,7 +34,6 @@ import { intercept } from "../../durable/driver/run.js"
 import { type DriverInterpreter, operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
-import { Exhausted } from "../../durable/run-budget.js"
 import { memoizeRegistered } from "../../memo/tool.js"
 import { toolResult as applyToolResult } from "../lifecycle/hooks.js"
 import type { RunId } from "../../durable/run-id.js"
@@ -41,9 +41,18 @@ import { make as makeToolAuthorization } from "./authorization.js"
 import { definition as fanOutDefinition, withoutFanOut } from "../tool/fan-out.js"
 import { execute as executeFanOut, withParentTasks } from "./fan-out.js"
 import type { RunInbox } from "../../turn/steering-inbox.js"
-import { eventFields as taskEventFields } from "../../../tasks/internal.js"
 import { taintForCall } from "../../capability/internal.js"
 import { make as makeToolProgress } from "../tool/progress.js"
+import { managedToolHandlers } from "../../artifact.js"
+
+const provideManagedHandlers = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  handlers: Context.Context<never>,
+): Effect.Effect<A, E, R> =>
+  Effect.contextWith((context: Context.Context<R>) =>
+    effect.pipe(Effect.provideContext(Context.merge(context, handlers))),
+  )
+
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
   readonly inbox?: RunInbox
@@ -97,46 +106,15 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     outcome: Outcome,
     droppedProgress: number,
     durableOperationKey: string,
-  ): Effect.Effect<Event, RunError> => {
-    const metadata = droppedProgress === 0 ? {} : { metadata: { toolProgress: { dropped: droppedProgress } } }
-    const completionEvent = (result: PendingToolResult): Effect.Effect<Event> =>
-      Effect.succeed({
-        _tag: "ToolExecutionCompleted",
-        turn,
-        call,
-        result,
-        ...taskEventFields({ name: call.name, isFailure: result.isFailure, result: result.result }),
-        ...metadata,
-      })
-    switch (outcome._tag) {
-      case "Success":
-        return completionEvent(successResult(call, outcome))
-      case "DomainFailure":
-        if (Schema.is(Exhausted)(outcome.failure)) return Effect.fail(outcome.failure)
-        return completionEvent(domainFailureResult(call, outcome))
-      case "Suspend":
-        return Effect.gen(function* () {
-          const propagation = options.suspensionPropagation ?? "propagate"
-          if (propagation === "collapse-to-domain-failure") {
-            const failure = {
-              reason: "suspended" as const,
-              message: `Tool ${call.name} suspended (${outcome.token})`,
-            }
-            return yield* completionEvent(
-              domainFailureResult(call, { _tag: "DomainFailure", failure, encodedFailure: failure }),
-            )
-          }
-          return {
-            _tag: "ToolExecutionWaiting",
-            turn,
-            call,
-            waitId: durableOperationKey,
-            token: outcome.token,
-            ...(outcome.awaitEvent === undefined ? undefined : { awaitEvent: outcome.awaitEvent }),
-          } satisfies Event
-        })
-    }
-  }
+  ): Effect.Effect<Event, RunError> =>
+    makeOutcomeEvent({
+      turn,
+      call,
+      outcome,
+      droppedProgress,
+      durableOperationKey,
+      suspensionPropagation: options.suspensionPropagation,
+    })
   const activateSkillOutcome = makeActivateSkillOutcome({ skillRuntime, toolState, skillError })
   const activeAgentName = (): Effect.Effect<string> =>
     handoffState === undefined
@@ -153,7 +131,15 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     if (registered?.dispatch === "Static") {
       const fanOut = fanOutDefinition(registered.tool)
       if (fanOut !== undefined) return executeFanOut(agent, fanOut, request)
-      return executeToolkit(withoutFanOut(staticToolkit), request)
+      const execution = executeToolkit(withoutFanOut(staticToolkit), request)
+      const handlers = managedToolHandlers(registered.tool)
+      const selected: unknown = handlers === undefined ? execution : provideManagedHandlers(execution, handlers)
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: unmanaged tool handlers remain in ClosedServices; a managed Artifact tool carries and receives its own exact handler Context above.
+      return selected as Effect.Effect<
+        Outcome,
+        FrameworkFailure,
+        ClosedServices<T, never> | ToolContext | DriverInterpreter
+      >
     }
     return registered === undefined
       ? Effect.fail(

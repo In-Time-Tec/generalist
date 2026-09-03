@@ -1351,6 +1351,50 @@ A tool call finished; `result` is the part re-fed to the model.
 
 > `readonly` **\_tag**: `"ToolExecutionCompleted"`
 
+<a id="artifactread"></a>
+
+##### artifactRead?
+
+> `readonly` `optional` **artifactRead?**: `object`
+
+###### artifact
+
+> `readonly` **artifact**: `string`
+
+###### branch?
+
+> `readonly` `optional` **branch?**: `string`
+
+###### version
+
+> `readonly` **version**: `number`
+
+<a id="artifactupdated"></a>
+
+##### artifactUpdated?
+
+> `readonly` `optional` **artifactUpdated?**: `object`
+
+###### artifact
+
+> `readonly` **artifact**: `string`
+
+###### attribution
+
+> `readonly` **attribution**: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}
+
+###### base
+
+> `readonly` **base**: `number`
+
+###### branch?
+
+> `readonly` `optional` **branch?**: `string`
+
+###### result
+
+> `readonly` **result**: `number`
+
 <a id="call-1"></a>
 
 ##### call
@@ -1459,7 +1503,7 @@ A tool reached a durable wait without disturbing admitted siblings.
 
 ###### filter
 
-> `readonly` **filter**: \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"create"` \| `"remove"` \| `"update"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
+> `readonly` **filter**: \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"update"` \| `"create"` \| `"remove"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
 
 <a id="call-3"></a>
 

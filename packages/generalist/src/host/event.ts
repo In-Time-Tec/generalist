@@ -3,6 +3,7 @@ import { Cursor } from "../runtime/cursor.js"
 import type { HostSessionEvent } from "../runtime/session/host.js"
 import { RunEvent } from "../runtime/run/event.js"
 import { Items as TaskItems } from "../tasks/item.js"
+import { EditResult as ArtifactEditResult } from "../core/artifact.js"
 
 type TaggedRunEvent<Tag extends RunEvent["_tag"]> = RunEvent & { readonly _tag: Tag }
 
@@ -42,6 +43,15 @@ export const TasksUpdated = Schema.TaggedStruct("TasksUpdated", {
 })
 export type TasksUpdated = typeof TasksUpdated.Type
 
+/** One Agent-authored shared artifact edit committed by this Run. */
+export const ArtifactUpdated = Schema.TaggedStruct("ArtifactUpdated", {
+  sessionId: Schema.String,
+  cursor: Cursor,
+  runId: Schema.String,
+  update: ArtifactEditResult,
+})
+export type ArtifactUpdated = typeof ArtifactUpdated.Type
+
 const ApprovalRequested = Schema.TaggedStruct("ApprovalRequested", {
   sessionId: Schema.String,
   cursor: Cursor,
@@ -72,6 +82,7 @@ export const HostEvent = Schema.Union([
   Turn,
   ToolCall,
   TasksUpdated,
+  ArtifactUpdated,
   ApprovalRequested,
   Compacted,
   Completed,
@@ -95,9 +106,12 @@ export const project: {
     case "ToolExecutionWaiting":
       return Option.some({ ...base, _tag: "ToolCall", event: entry.event })
     case "ToolExecutionCompleted":
-      return entry.event.tasksUpdated === undefined
+      if (entry.event.tasksUpdated !== undefined) {
+        return Option.some({ ...base, _tag: "TasksUpdated", items: entry.event.tasksUpdated })
+      }
+      return entry.event.artifactUpdated === undefined
         ? Option.some({ ...base, _tag: "ToolCall", event: entry.event })
-        : Option.some({ ...base, _tag: "TasksUpdated", items: entry.event.tasksUpdated })
+        : Option.some({ ...base, _tag: "ArtifactUpdated", update: entry.event.artifactUpdated })
     case "ApprovalRequested":
       return Option.some({ ...base, _tag: "ApprovalRequested", event: entry.event })
     case "CompactionApplied":

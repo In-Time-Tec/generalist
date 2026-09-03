@@ -34,6 +34,7 @@ import type { SandboxService } from "../../sandbox/service.js"
 import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner } from "./lifecycle/fan-out.js"
 import type { HandlersFor } from "./tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
+import type { ManagedArtifactTool } from "../artifact.js"
 export {
   AgentTypeId,
   close,
@@ -134,9 +135,11 @@ type GateRequirement<O> = O extends { readonly gates: ReadonlyArray<infer G> }
   : never
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
-type StaticToolServices<Tools extends Record<string, Tool.Any>> =
-  | HandlersFor<Tools>
-  | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
+type StaticToolServices<Tools extends Record<string, Tool.Any>> = {
+  [Name in keyof Tools]: Tools[Name] extends ManagedArtifactTool
+    ? never
+    : HandlersFor<Pick<Tools, Name>> | Exclude<Tool.HandlerServices<Tools[Name]>, ToolContext>
+}[keyof Tools]
 type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | StaticToolServices<Tools>
   | ModelRequirement<O>
@@ -169,7 +172,6 @@ type GateOutputConstraint<O> = {
       }
   >
 }
-
 /** Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
@@ -360,7 +362,6 @@ export type RunRequirements<
   | InputCodec["EncodingServices"]
   | OutputCodec["DecodingServices"]
   | OutputCodec["EncodingServices"]
-
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
 interface StreamFunction {
   <InputValue, O extends InvocationOptions = Record<never, never>>(
@@ -417,13 +418,12 @@ export const stream: StreamFunction = Function.dual(
   ) =>
     Stream.unwrap(
       Effect.gen(function* () {
-        const context = yield* Effect.context<never>()
         const prompt = yield* encodeInput(agent.input, input)
         const tasks = yield* Effect.serviceOption(Tasks)
         const configured = Option.isSome(tasks) ? withTools(agent, tasks.value.tools) : agent
         return Stream.scoped(
           Stream.unwrap(allocateRun(configured, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
-        ).pipe(Stream.provideService(ProcessRunner, processRunner(context, agentRunner)))
+        ).pipe(Stream.provideService(ProcessRunner, processRunner(yield* Effect.context<never>(), agentRunner)))
       }),
     ),
 )

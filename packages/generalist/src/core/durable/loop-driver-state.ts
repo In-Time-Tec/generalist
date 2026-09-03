@@ -7,6 +7,7 @@ import { Checkpoint as HookCheckpoint } from "../../hooks/index.js"
 import { Checkpoint as GateCheckpoint } from "../agent/gates/definition.js"
 import { Items as TaskItems } from "../../tasks/item.js"
 import { Checkpoint as CapabilityCheckpoint } from "../capability/state.js"
+import { ArtifactCheckpoints } from "../artifact.js"
 
 /** Pending operation the interpreter schedules before decide. */
 export const PendingOperation = Schema.Struct({
@@ -28,6 +29,7 @@ export const LoopDriverState = Schema.Struct({
   toolBatch: Schema.optionalKey(ToolBatchCheckpoint),
   tasks: Schema.optionalKey(TaskItems),
   capabilities: Schema.optionalKey(CapabilityCheckpoint),
+  artifacts: Schema.optionalKey(ArtifactCheckpoints),
   hooks: Schema.optionalKey(Schema.Array(HookCheckpoint)),
   gates: Schema.optionalKey(Schema.Array(GateCheckpoint)),
   postCommitFailure: Schema.optionalKey(Exhausted),

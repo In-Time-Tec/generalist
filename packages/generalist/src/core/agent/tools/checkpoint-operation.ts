@@ -10,6 +10,7 @@ import {
   accumulate,
   type Checkpoint as CapabilityCheckpoint,
 } from "../../capability/state.js"
+import { artifactEventFields } from "../../artifact.js"
 
 const PersistedToolOutcome = Schema.Union([
   Schema.TaggedStruct("Success", {
@@ -108,6 +109,19 @@ export const applyToolOutcome =
       return decoded._tag === "Success" ? Schema.decodeUnknownSync(TaskItems)(decoded.result) : state.tasks
     })()
     const capabilities = capabilityCheckpoint(state.capabilities, decoded)
+    const artifacts = (() => {
+      if (decoded?._tag !== "Success") return state.artifacts
+      const artifact = artifactEventFields({ name: input.call.name, isFailure: false, result: decoded.result })
+      const update = artifact.artifactRead ?? artifact.artifactUpdated
+      if (update === undefined) return state.artifacts
+      return {
+        ...state.artifacts,
+        [update.artifact]: {
+          version: "result" in update ? update.result : update.version,
+          ...(update.branch === undefined ? undefined : { branch: update.branch }),
+        },
+      }
+    })()
     return {
       ...checkpoint,
       state: {
@@ -115,6 +129,7 @@ export const applyToolOutcome =
         toolBatch: nextBatch,
         ...Object.assign({}, tasks === undefined ? undefined : { tasks }),
         ...Object.assign({}, capabilities === undefined ? undefined : { capabilities }),
+        ...Object.assign({}, artifacts === undefined ? undefined : { artifacts }),
       },
     }
   }

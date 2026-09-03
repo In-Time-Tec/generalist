@@ -88,6 +88,7 @@ import { fork, rewind } from "./store/fork/index.js"
 import { dueAwaitEvents, timeoutAwaitEvent, wake } from "./store/trigger/wake.js"
 import { advanceSchedule, claimSchedules, registerSchedule } from "./store/trigger/schedule.js"
 import { appendLifecycle } from "./append.js"
+import { make as makeArtifactStore, publish as publishArtifact } from "./store/artifact/index.js"
 
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -117,10 +118,16 @@ const makeStoreServices = (options: LayerOptions) =>
             if (changes.length > 0) yield* options.activationProjection.applyInTransaction(changes)
           }
           const publications = next.publications
-          const committed: MemoryState = { ...next, publications: [] }
+          const artifactPublications = next.artifactPublications
+          const committed: MemoryState = { ...next, publications: [], artifactPublications: [] }
           yield* Ref.set(stateRef.backing, committed)
           const published = yield* publish({ initial: committed, publications })
-          if (published !== committed) yield* Ref.set(stateRef.backing, published)
+          const withArtifacts = yield* Effect.reduce(
+            artifactPublications,
+            () => published,
+            (current, publication) => publishArtifact({ state: current, publication }),
+          )
+          if (withArtifacts !== committed) yield* Ref.set(stateRef.backing, withArtifacts)
           return result
         }).pipe(Effect.uninterruptible),
       )
@@ -289,6 +296,7 @@ const makeStoreServices = (options: LayerOptions) =>
       acknowledged: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadAcknowledged(state, runId))),
       ...makeHostSessionStore({ stateRef, modifyState }),
+      ...makeArtifactStore({ stateRef, modifyState, capacity: options.subscriberQueueCapacity ?? 64 }),
       sessionRoots: (sessionId) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.map((state) =>

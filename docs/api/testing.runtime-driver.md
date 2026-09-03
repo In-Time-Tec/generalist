@@ -80,6 +80,12 @@ Independently selectable Runtime driver conformance capabilities.
 
 > `readonly` `optional` **approval-suspend?**: [`ApprovalSuspendCapability`](#approvalsuspendcapability)
 
+<a id="artifacts"></a>
+
+##### artifacts?
+
+> `readonly` `optional` **artifacts?**: `true`
+
 <a id="await-event"></a>
 
 ##### await-event?
@@ -781,6 +787,16 @@ A multi-worker claim without the driver's decoded persisted Run representation.
 > `readonly` **workerId**: `string`
 
 ## Type Aliases
+
+<a id="artifactscapability"></a>
+
+### ArtifactsCapability
+
+> **ArtifactsCapability** = `true`
+
+Shared Artifact head, operation-log, subscription, and branch capability.
+
+***
 
 <a id="claimexecution"></a>
 

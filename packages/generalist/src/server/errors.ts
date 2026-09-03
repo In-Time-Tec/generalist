@@ -17,6 +17,17 @@ import {
   SessionNotFound,
   SessionSubscriberLagged,
 } from "../runtime/session/host.js"
+import {
+  ArtifactAlreadyOpen,
+  ArtifactBaseStale,
+  ArtifactCrdtMismatch,
+  ArtifactNotFound,
+  ArtifactRangeInvalid,
+  ArtifactStorageError,
+  ArtifactSubscriberLagged,
+  ArtifactVersionConflict,
+  ArtifactVersionNotFound,
+} from "../core/artifact.js"
 
 /** A request did not carry the bearer credential accepted by the configured server auth layer. */
 export class Unauthorized extends ActionableTaggedError<Unauthorized>()(
@@ -105,8 +116,20 @@ export const apiErrors = [
   SessionSubscriberLagged.pipe(conflict),
 ] as const
 
+export const artifactApiErrors = [
+  ArtifactAlreadyOpen.pipe(conflict),
+  ArtifactBaseStale.pipe(conflict),
+  ArtifactCrdtMismatch.pipe(conflict),
+  ArtifactNotFound.pipe(notFound),
+  ArtifactRangeInvalid.pipe(badRequest),
+  ArtifactStorageError.pipe(unavailable),
+  ArtifactSubscriberLagged.pipe(conflict),
+  ArtifactVersionConflict.pipe(conflict),
+  ArtifactVersionNotFound.pipe(conflict),
+] as const
+
 /** Errors encoded by the declared HttpApi endpoints and SSE stream. */
-export const ApiError = Schema.Union(apiErrors)
+export const ApiError = Schema.Union([...apiErrors, ...artifactApiErrors])
 export type ApiError = typeof ApiError.Type
 
 const dedicatedErrors = Schema.Union([
@@ -120,6 +143,7 @@ const dedicatedErrors = Schema.Union([
   BudgetInvalid,
   IllegalOperatorAction,
   OperatorDisabled,
+  RequestFailed,
   RunNotFound,
   RuntimeUnavailable,
   SessionConflict,
@@ -127,6 +151,7 @@ const dedicatedErrors = Schema.Union([
   SessionNotFound,
   SessionSubscriberLagged,
 ])
+type EndpointError = typeof dedicatedErrors.Type
 
 export interface ApiErrorOptions {
   readonly operation: string
@@ -134,7 +159,7 @@ export interface ApiErrorOptions {
 }
 
 /** Preserve known public failures and normalize the rest at the HTTP boundary. */
-export const apiError = (options: ApiErrorOptions): ApiError =>
+export const apiError = (options: ApiErrorOptions): EndpointError =>
   Schema.is(dedicatedErrors)(options.error)
     ? options.error
     : RequestFailed.make({ operation: options.operation, message: options.error.message })

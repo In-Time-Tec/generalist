@@ -2415,6 +2415,50 @@
                                 "additionalProperties": false
                               }
                             },
+                            "artifactRead": {
+                              "type": "object",
+                              "properties": {
+                                "artifact": { "type": "string" },
+                                "version": { "type": "integer", "minimum": 0 },
+                                "branch": { "type": "string" }
+                              },
+                              "required": ["artifact", "version"],
+                              "additionalProperties": false
+                            },
+                            "artifactUpdated": {
+                              "type": "object",
+                              "properties": {
+                                "artifact": { "type": "string" },
+                                "base": { "type": "integer", "minimum": 0 },
+                                "result": { "type": "integer", "minimum": 0 },
+                                "attribution": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Agent"] },
+                                        "actor": { "type": "string", "minLength": 1 },
+                                        "runId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "actor", "runId"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Human"] },
+                                        "actor": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "actor"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "branch": { "type": "string" }
+                              },
+                              "required": ["artifact", "base", "result", "attribution"],
+                              "additionalProperties": false
+                            },
                             "metadata": { "type": "object" }
                           },
                           "required": ["_tag", "turn", "call", "result"],
@@ -4137,6 +4181,142 @@
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
                   ]
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/artifacts/{name}": {
+      "get": {
+        "tags": ["artifacts"],
+        "operationId": "artifacts.read",
+        "parameters": [{ "name": "name", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "artifact": { "type": "string" },
+                    "version": { "type": "integer", "minimum": 0 },
+                    "content": { "type": "string" },
+                    "branch": { "type": "string" }
+                  },
+                  "required": ["artifact", "version", "content"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/artifact/ArtifactRangeInvalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_artifact_ArtifactRangeInvalidEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/artifact/ArtifactNotFound",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_artifact_ArtifactNotFoundEncoded" }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/artifact/ArtifactAlreadyOpen | generalist/artifact/ArtifactBaseStale | generalist/artifact/ArtifactCrdtMismatch | generalist/artifact/ArtifactSubscriberLagged | generalist/artifact/ArtifactVersionConflict | generalist/artifact/ArtifactVersionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactAlreadyOpenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactBaseStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactCrdtMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactSubscriberLaggedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactVersionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactVersionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/artifact/ArtifactStorageError",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_artifact_ArtifactStorageErrorEncoded" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/artifacts/{name}/ws": {
+      "get": {
+        "tags": ["artifacts"],
+        "operationId": "artifacts.connect",
+        "parameters": [
+          { "name": "name", "in": "path", "schema": { "type": "string" }, "required": true },
+          { "name": "version", "in": "query", "schema": { "type": "string" }, "required": false }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/artifact/ArtifactRangeInvalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_artifact_ArtifactRangeInvalidEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/artifact/ArtifactNotFound",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_artifact_ArtifactNotFoundEncoded" }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/artifact/ArtifactAlreadyOpen | generalist/artifact/ArtifactBaseStale | generalist/artifact/ArtifactCrdtMismatch | generalist/artifact/ArtifactSubscriberLagged | generalist/artifact/ArtifactVersionConflict | generalist/artifact/ArtifactVersionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactAlreadyOpenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactBaseStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactCrdtMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactSubscriberLaggedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactVersionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_artifact_ArtifactVersionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/artifact/ArtifactStorageError",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_artifact_ArtifactStorageErrorEncoded" }
               }
             }
           }
@@ -6303,6 +6483,112 @@
         "required": ["_tag", "token", "operationKey", "ordinal", "capability"],
         "additionalProperties": false
       },
+      "generalist_artifact_ArtifactAlreadyOpenEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactAlreadyOpen"] },
+          "artifact": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactBaseStaleEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactBaseStale"] },
+          "artifact": { "type": "string" },
+          "base": { "type": "integer", "minimum": 0 },
+          "expected": { "type": "integer", "minimum": 0 },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "base"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactCrdtMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactCrdtMismatch"] },
+          "artifact": { "type": "string" },
+          "expected": { "type": "string" },
+          "actual": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "expected", "actual"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactSubscriberLaggedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactSubscriberLagged"] },
+          "artifact": { "type": "string" },
+          "lastDeliveredVersion": { "type": "integer", "minimum": 0 },
+          "branch": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "lastDeliveredVersion"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactVersionConflictEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactVersionConflict"] },
+          "artifact": { "type": "string" },
+          "expected": { "type": "integer", "minimum": 0 },
+          "actual": { "type": "integer", "minimum": 0 },
+          "branch": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "expected", "actual"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactVersionNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactVersionNotFound"] },
+          "artifact": { "type": "string" },
+          "version": { "type": "integer", "minimum": 0 },
+          "branch": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "version"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactNotFound"] },
+          "artifact": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactRangeInvalidEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactRangeInvalid"] },
+          "artifact": { "type": "string" },
+          "length": { "type": "integer" },
+          "from": { "type": "integer" },
+          "to": { "type": "integer" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "length", "from", "to"],
+        "additionalProperties": false
+      },
+      "generalist_artifact_ArtifactStorageErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/artifact/ArtifactStorageError"] },
+          "artifact": { "type": "string" },
+          "operation": { "type": "string" },
+          "reason": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "artifact", "operation", "reason"],
+        "additionalProperties": false
+      },
       "GeneralistMediaRef": {
         "type": "object",
         "properties": {
@@ -6326,6 +6612,7 @@
     { "name": "sessions" },
     { "name": "runs" },
     { "name": "events" },
+    { "name": "artifacts" },
     { "name": "approvals" },
     { "name": "attachments" },
     { "name": "operator" }

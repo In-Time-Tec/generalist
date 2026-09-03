@@ -53,12 +53,14 @@ import { project, type HostEvent } from "./event.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
-
+import { ArtifactRegistry } from "../core/artifact.js"
+import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 export type { HostSession } from "../runtime/session/host.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
   HostEvent,
   TasksUpdated,
+  ArtifactUpdated,
   type ApprovalRequested,
   type Compacted,
   type Completed,
@@ -80,7 +82,6 @@ export interface Plugin<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<ne
   readonly skills?: ReadonlyArray<Skill>
   readonly hooks?: ReadonlyArray<HookDeclaration>
 }
-
 export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
   readonly name: string
   readonly tools?: Tools
@@ -88,7 +89,6 @@ export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyA
   readonly skills?: ReadonlyArray<Skill>
   readonly hooks?: ReadonlyArray<HookDeclaration>
 }
-
 export interface CreateOptions<
   Agents extends ReadonlyArray<AnyAgent>,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
@@ -96,12 +96,10 @@ export interface CreateOptions<
   readonly agents: Agents
   readonly plugins?: Plugins
 }
-
 export interface SessionCreateOptions {
   readonly id?: string
   readonly title?: string
 }
-
 export interface RunStartOptions {
   readonly idempotencyKey?: string
 }
@@ -109,6 +107,7 @@ export type EncodedAgentInput = Schema.Json
 export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
+  readonly artifacts: Artifacts
   readonly sessions: {
     readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
     readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
@@ -165,7 +164,6 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     ) => Effect.Effect<void, OperatorExtendBudgetError>
   }
 }
-
 type AgentDefinition<Value> =
   Value extends Agent<
     infer Tools,
@@ -381,6 +379,7 @@ const create = <
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)
     const currentHooks = yield* Effect.serviceOption(Hooks)
     const attachments = makeAttachments(yield* Effect.serviceOption(BlobStore))
+    const artifacts = makeArtifacts(yield* Effect.serviceOption(ArtifactRegistry))
     const contributions = yield* preparePlugins(plugins, options.agents)
     const instructions = mergedInstructions(currentInstructions, contributions.instructions)
     const skills = mergedSkills(currentSkills, contributions.skills)
@@ -403,6 +402,7 @@ const create = <
 
     const host: Host<Agents> = {
       attachments,
+      artifacts,
       sessions: {
         create: (sessionOptions = {}) =>
           Effect.gen(function* () {

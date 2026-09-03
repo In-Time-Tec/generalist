@@ -50,7 +50,7 @@
 
 ##### watch
 
-> `readonly` **watch**: (`options`) => `Stream`\<\{ `dedupeKey`: `string`; `kind`: `"create"` \| `"remove"` \| `"update"`; `path`: `string`; \}, `PlatformError`\>
+> `readonly` **watch**: (`options`) => `Stream`\<\{ `dedupeKey`: `string`; `kind`: `"update"` \| `"create"` \| `"remove"`; `path`: `string`; \}, `PlatformError`\>
 
 Stream typed file changes from the host FileSystem watch capability.
 
@@ -62,7 +62,7 @@ Stream typed file changes from the host FileSystem watch capability.
 
 ###### Returns
 
-`Stream`\<\{ `dedupeKey`: `string`; `kind`: `"create"` \| `"remove"` \| `"update"`; `path`: `string`; \}, `PlatformError`\>
+`Stream`\<\{ `dedupeKey`: `string`; `kind`: `"update"` \| `"create"` \| `"remove"`; `path`: `string`; \}, `PlatformError`\>
 
 ***
 
