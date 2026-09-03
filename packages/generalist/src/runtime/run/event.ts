@@ -36,6 +36,7 @@ import { AdmissionPolicy, MessageSource } from "./steering.js"
 import { Message as AddressedMessage, type Message } from "../messaging/message.js"
 import { Items as TaskItems } from "../../tasks/item.js"
 import { Source as CapabilitySource } from "../../core/capability/state.js"
+import { ArtifactReadJournal, EditResult as ArtifactEditResult } from "../../core/artifact.js"
 
 export type { AgentLoopEvent, ExecutionResult }
 export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
@@ -396,6 +397,8 @@ export const AgentLoopEventSchema = Schema.Union([
     call: ToolCall,
     result: CompletedToolResult,
     tasksUpdated: Schema.optionalKey(TaskItems),
+    artifactRead: Schema.optionalKey(ArtifactReadJournal),
+    artifactUpdated: Schema.optionalKey(ArtifactEditResult),
     ...optionalMetadata,
   }),
   Schema.TaggedStruct("ToolExecutionWaiting", {

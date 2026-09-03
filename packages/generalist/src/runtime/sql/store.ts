@@ -119,6 +119,7 @@ import type {
 import { dueAwaitEvents, timeoutAwaitEvent, wake } from "./store/trigger/wake.js"
 import { advanceSchedule, claimSchedules, registerSchedule } from "./store/trigger/schedule.js"
 import { layer as triggerSchedulerLayer } from "../execution/trigger/scheduler.js"
+import { make as makeArtifactStore } from "./store/artifact/index.js"
 
 export type {
   SqlClaimMechanics,
@@ -173,6 +174,12 @@ const makeSqlStoreServices = <DriverError>(
       input: import("../run/store.js").ExecutionClaim,
       effect: Effect.Effect<A, E, SqlClient.SqlClient>,
     ) => fencedWith(locks.fence(input.runId), input, effect)
+    const artifactStore = yield* makeArtifactStore({
+      locks,
+      locked,
+      runNoTransaction: runNoTxn,
+      capacity,
+    })
 
     const runStore = SqlObservability.observeRunStore(
       driver.backend,
@@ -363,6 +370,7 @@ const makeSqlStoreServices = <DriverError>(
         acknowledge: (input) => locked(locks.run(input.runId), acknowledge(input)),
         acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
         ...makeHostSessionStore({ driver, locks, locked, runNoTransaction: runNoTxn, hub, capacity }),
+        ...artifactStore,
         treeCheckpoint: (rootRunId) => runInspection(loadTreeCheckpoint(rootRunId)),
         sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
         history: (input) =>

@@ -1,4 +1,4 @@
-import { Effect, Function, Layer, Option, Schema } from "effect"
+import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { type Agent, type ClosedServices, withTools } from "../core/agent/service.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
@@ -13,6 +13,7 @@ import { digest } from "../core/durable/pin.js"
 import { type ProgramBudget, make as makeProgramManifest } from "../core/durable/manifest/program-manifest.js"
 import type { AgentSuspended } from "../core/agent/event.js"
 import type { ToolContext } from "../core/tools/tool-context.js"
+import { managedToolHandlers } from "../core/artifact.js"
 import {
   type CancellationRequest,
   FrameworkFailure,
@@ -455,16 +456,20 @@ const makeExecutor = <
       )
     }
     if (Option.isSome(options.upstream)) return options.upstream.value.execute(request)
-    return Effect.flatMap(Effect.context<ToolContext>(), (context) =>
+    const staticTool = options.agent.toolkit.tools[request.call.name]
+    const handlers = staticTool === undefined ? undefined : managedToolHandlers(staticTool)
+    const execution: unknown = Effect.flatMap(Effect.context<ToolContext>(), (context) =>
       Effect.scoped(
         Effect.flatMap(Layer.build(options.environment), (environment) =>
           executeToolkit(withoutFanOut(options.agent.toolkit), request).pipe(
-            Effect.provideContext(context),
+            Effect.provideContext(handlers === undefined ? context : Context.merge(context, handlers)),
             Effect.provideContext(environment),
           ),
         ),
       ),
     )
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: the environment contains every unmanaged handler; a managed Artifact tool contributes its selected handler Context above.
+    return execution as Effect.Effect<Outcome, FrameworkFailure, ToolContext>
   }
   return ToolExecutor.of({
     replayPolicy,

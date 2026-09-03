@@ -2,7 +2,7 @@
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
 /** The single logical SQL Runtime schema version. */
-export const SQL_SCHEMA_VERSION = 9
+export const SQL_SCHEMA_VERSION = 10
 
 export interface SqlLogicalTable {
   readonly name: string
@@ -143,6 +143,23 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
         "resolution_json",
         "checkpoint_json",
         "completed_sequence",
+      ],
+    },
+    {
+      name: "generalist_artifacts",
+      columns: ["artifact_name", "branch_id", "crdt", "base_version", "base_snapshot_json", "version", "snapshot_json"],
+    },
+    {
+      name: "generalist_artifact_operations",
+      columns: [
+        "artifact_name",
+        "branch_id",
+        "result",
+        "base",
+        "operation_json",
+        "attribution_json",
+        "update_base64",
+        "snapshot_json",
       ],
     },
     {
@@ -436,6 +453,11 @@ export const SQL_LOGICAL_SCHEMA: SqlLogicalSchemaContract = {
     { table: "generalist_run_events", kind: "foreign-key", columns: ["run_id"] },
     { table: "generalist_run_events", kind: "foreign-key", columns: ["host_session_id"] },
     { table: "generalist_run_operations", kind: "unique", columns: ["run_id", "operation_key"] },
+    {
+      table: "generalist_artifact_operations",
+      kind: "foreign-key",
+      columns: ["artifact_name", "branch_id"],
+    },
     { table: "generalist_run_wake_events", kind: "foreign-key", columns: ["run_id"] },
     { table: "generalist_run_links", kind: "unique", columns: ["child_run_id"] },
     {

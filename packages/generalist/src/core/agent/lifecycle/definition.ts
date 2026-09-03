@@ -12,6 +12,7 @@ import type { Any as AnyGate, FailureMode as GateFailureMode } from "../gates/de
 import type { SandboxService } from "../../../sandbox/service.js"
 import type { HandlersFor } from "../tool/fan-out.js"
 import type { Descriptor as CapabilityDescriptor } from "../../capability/state.js"
+import type { ManagedArtifactTool } from "../../artifact.js"
 
 export const AgentTypeId = "generalist/core/Agent"
 
@@ -98,6 +99,12 @@ export interface Any {
   readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
 }
 
+type ClosedToolServices<Tools extends Record<string, Tool.Any>> = {
+  [Name in keyof Tools]: Tools[Name] extends ManagedArtifactTool
+    ? never
+    : HandlersFor<Pick<Tools, Name>> | Exclude<Tool.HandlerServices<Tools[Name]>, ToolContext>
+}[keyof Tools]
+
 /** Services closed over with an Agent. */
 export type ClosedServices<
   Tools extends Record<string, Tool.Any>,
@@ -106,8 +113,7 @@ export type ClosedServices<
   OutputCodec extends Schema.Top = typeof Schema.String,
 > =
   | R
-  | HandlersFor<Tools>
-  | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
+  | ClosedToolServices<Tools>
   | InputCodec["EncodingServices"]
   | OutputCodec["DecodingServices"]
   | OutputCodec["EncodingServices"]

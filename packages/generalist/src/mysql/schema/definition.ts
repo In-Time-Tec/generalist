@@ -118,6 +118,29 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   KEY generalist_run_operations_status_idx (status),
   CONSTRAINT generalist_run_operations_run_fk FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_artifacts (
+  artifact_name VARCHAR(255) NOT NULL,
+  branch_id VARCHAR(255) NOT NULL,
+  crdt VARCHAR(64) NOT NULL,
+  base_version BIGINT NOT NULL,
+  base_snapshot_json LONGTEXT NOT NULL,
+  version BIGINT NOT NULL,
+  snapshot_json LONGTEXT NOT NULL,
+  PRIMARY KEY (artifact_name, branch_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS generalist_artifact_operations (
+  artifact_name VARCHAR(255) NOT NULL,
+  branch_id VARCHAR(255) NOT NULL,
+  result BIGINT NOT NULL,
+  base BIGINT NOT NULL,
+  operation_json LONGTEXT NOT NULL,
+  attribution_json LONGTEXT NOT NULL,
+  update_base64 LONGTEXT NOT NULL,
+  snapshot_json LONGTEXT NOT NULL,
+  PRIMARY KEY (artifact_name, branch_id, result),
+  CONSTRAINT generalist_artifact_operations_head_fk FOREIGN KEY (artifact_name, branch_id)
+    REFERENCES generalist_artifacts(artifact_name, branch_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS generalist_run_waits (
   run_id VARCHAR(255) NOT NULL,
   wait_id VARCHAR(255) NOT NULL,

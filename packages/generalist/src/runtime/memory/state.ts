@@ -23,11 +23,16 @@ import type { Point as AcknowledgementPoint } from "../run/acknowledgement.js"
 import type { HostSession, HostSessionEvent, SessionSubscriberLagged } from "../session/host.js"
 import type { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import type { ClaimedSchedule, ScheduleRecord } from "../execution/trigger/schedule.js"
+import type { ArtifactHead, ArtifactUpdate } from "../../core/artifact.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
 export type TreeSubscriberQueue = Queue.Queue<void, RuntimeUnavailable>
 export type HostSessionSubscriberQueue = Queue.Queue<HostSessionEvent, SessionSubscriberLagged | RuntimeUnavailable>
+export type ArtifactSubscriberQueue = Queue.Queue<
+  ArtifactUpdate,
+  import("../../core/artifact.js").ArtifactSubscriberLagged | RuntimeUnavailable
+>
 
 export interface HostSessionPublication {
   readonly sessionId: string
@@ -44,6 +49,12 @@ export interface MemoryPublication {
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly treeSubscribers: ReadonlyMap<number, TreeSubscriberQueue>
   readonly hostSession?: HostSessionPublication
+}
+
+export interface ArtifactPublication {
+  readonly key: string
+  readonly update: ArtifactUpdate
+  readonly subscribers: ReadonlyMap<number, ArtifactSubscriberQueue>
 }
 
 export interface IdempotencyEntry {
@@ -114,6 +125,14 @@ export interface StoredHostSession {
   readonly subscribers: ReadonlyMap<number, HostSessionSubscriberQueue>
 }
 
+export interface StoredArtifact {
+  readonly head: ArtifactHead
+  readonly baseVersion: number
+  readonly baseSnapshot: import("../../media/ref.js").Ref
+  readonly updates: ReadonlyArray<ArtifactUpdate>
+  readonly subscribers: ReadonlyMap<number, ArtifactSubscriberQueue>
+}
+
 export interface MemoryState {
   readonly closed: boolean
   readonly nextRunCounter: number
@@ -142,8 +161,10 @@ export interface MemoryState {
   readonly wakeEvents: ReadonlyMap<string, WakeEvent>
   readonly schedules: ReadonlyMap<string, ScheduleRecord>
   readonly scheduleClaims: ReadonlyMap<string, ClaimedSchedule>
+  readonly artifacts: ReadonlyMap<string, StoredArtifact>
   readonly subscriberQueueCapacity: number
   readonly publications: ReadonlyArray<MemoryPublication>
+  readonly artifactPublications: ReadonlyArray<ArtifactPublication>
 }
 
 export interface TreeRoot {
@@ -203,8 +224,10 @@ export const emptyState = (input: {
   wakeEvents: new Map(),
   schedules: new Map(),
   scheduleClaims: new Map(),
+  artifacts: new Map(),
   subscriberQueueCapacity: input.subscriberQueueCapacity,
   publications: [],
+  artifactPublications: [],
 })
 
 export const operationMapKey: {

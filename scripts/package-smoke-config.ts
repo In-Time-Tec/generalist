@@ -148,6 +148,17 @@ export const minimumConsumerProfiles = [
     imports: [{ specifier: "generalist/unstable/foldkit", runtimes: nodeAndBun }],
   },
   {
+    name: "artifact",
+    peers: ["yjs"],
+    imports: [
+      {
+        specifier: "generalist/unstable/artifact",
+        runtimes: nodeAndBun,
+        exports: ["Artifact", "ArtifactCrdt", "Yjs", "layer", "open", "readTool", "tool"],
+      },
+    ],
+  },
+  {
     name: "a2a",
     peers: ["@a2a-js/sdk"],
     imports: [{ specifier: "generalist/unstable/a2a", runtimes: nodeAndBun }],
@@ -322,6 +333,7 @@ export const exactPackageExports = [
   "./trajectory",
   "./unstable/a2a",
   "./unstable/ag-ui",
+  "./unstable/artifact",
   "./unstable/capability",
   "./unstable/cloudflare/durable-objects",
   "./unstable/cloudflare/dynamic-workers",

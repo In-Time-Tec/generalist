@@ -2,6 +2,6 @@ import { expect, it } from "vitest"
 import { SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
 
 it("freezes the logical SQL Runtime schema checksum", () => {
-  expect(SCHEMA_VERSION).toBe(9)
-  expect(schemaChecksum()).toBe("d5f76f5ec53632b3e0ab89cea4eee5d34d5a4062fa02af969239e14d0b18b9b0")
+  expect(SCHEMA_VERSION).toBe(10)
+  expect(schemaChecksum()).toBe("988a36dc0c951edaca0e2780a6c373344f5133102aee479b099ba334f051f43f")
 })

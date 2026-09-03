@@ -106,7 +106,7 @@ Internal typed child-group admission used by AgentTool.fanOut.
 
 ##### remainder
 
-> `readonly` **remainder**: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`
+> `readonly` **remainder**: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`
 
 <a id="tasks"></a>
 

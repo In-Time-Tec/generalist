@@ -378,7 +378,7 @@ The leaf does not implement the requested capability.
 
 ##### operation
 
-> `readonly` **operation**: `"pause"` \| `"fork"` \| `"snapshot"` \| `"resume"` \| `"exec:process"` \| `"exec:typescript"` \| `"exec:javascript-module"` \| `"files"` \| `"limit:cpu"` \| `"limit:memory"` \| `"limit:wall-clock"`
+> `readonly` **operation**: `"pause"` \| `"snapshot"` \| `"fork"` \| `"resume"` \| `"exec:process"` \| `"exec:typescript"` \| `"exec:javascript-module"` \| `"files"` \| `"limit:cpu"` \| `"limit:memory"` \| `"limit:wall-clock"`
 
 ###### Inherited from
 

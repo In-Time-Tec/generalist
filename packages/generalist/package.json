@@ -28,7 +28,8 @@
     "foldkit": "catalog:peer",
     "modal": "catalog:",
     "rivetkit": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yjs": "catalog:"
   },
   "files": [
     "dist",
@@ -249,6 +250,10 @@
       "types": "./dist/unstable/learning/index.d.ts",
       "import": "./dist/unstable/learning/index.js"
     },
+    "./unstable/artifact": {
+      "types": "./dist/unstable/artifact/index.d.ts",
+      "import": "./dist/unstable/artifact/index.js"
+    },
     "./unstable/a2a": {
       "types": "./dist/unstable/a2a/index.d.ts",
       "import": "./dist/unstable/a2a/index.js"
@@ -352,7 +357,8 @@
     "rivetkit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "workerd": "1.20260819.1"
+    "workerd": "1.20260819.1",
+    "yjs": "catalog:"
   },
   "repository": {
     "type": "git",
@@ -424,6 +430,9 @@
       "optional": true
     },
     "vitest": {
+      "optional": true
+    },
+    "yjs": {
       "optional": true
     }
   }

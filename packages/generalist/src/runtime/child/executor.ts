@@ -19,6 +19,7 @@ import {
 import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
+import { managedToolHandlers } from "../../core/artifact.js"
 import {
   type CancellationRequest,
   type DomainFailure,
@@ -336,16 +337,20 @@ const makeExecutor = <
       if (route.matches(request))
         return route.execute(request).pipe(Effect.provideService(ChildRuns, options.implementation))
       if (Option.isSome(options.upstream)) return options.upstream.value.execute(request)
-      return Effect.flatMap(Effect.context<ToolContext>(), (context) =>
+      const staticTool = options.agent.toolkit.tools[request.call.name]
+      const handlers = staticTool === undefined ? undefined : managedToolHandlers(staticTool)
+      const execution: unknown = Effect.flatMap(Effect.context<ToolContext>(), (context) =>
         Effect.scoped(
           Effect.flatMap(Layer.build(options.environment), (environment) =>
             executeToolkit(withoutFanOut(options.agent.toolkit), request).pipe(
-              Effect.provideContext(context),
+              Effect.provideContext(handlers === undefined ? context : Context.merge(context, handlers)),
               Effect.provideContext(environment),
             ),
           ),
         ),
       )
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: the environment contains every unmanaged handler; a managed Artifact tool contributes its selected handler Context above.
+      return execution as Effect.Effect<Outcome, FrameworkFailure, ToolContext>
     },
     transformResolved: (request, outcome) => {
       const fanOut = fanOutFor(request)

@@ -28,6 +28,7 @@ import type {
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 import { registerChildRuns } from "./children/runs.js"
 import { registerSteering } from "./steering/recovery.js"
+import { registerArtifacts } from "./artifact/index.js"
 
 export type * from "./contract.js"
 export * from "./model-response-fault.js"
@@ -415,6 +416,9 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
         open: (use) => provideLayer(options.layer, use),
         provide: (use) => provide(options, use),
       })
+    }
+    if (options.capabilities.artifacts === true) {
+      registerArtifacts({ options, provide: (use) => provide(options, use) })
     }
     if (options.capabilities.steering !== undefined) {
       registerSteering({

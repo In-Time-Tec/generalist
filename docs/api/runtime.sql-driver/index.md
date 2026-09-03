@@ -677,7 +677,7 @@
 
 ##### status
 
-> `readonly` **status**: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
+> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 <a id="suspension"></a>
 
@@ -1183,7 +1183,7 @@ readonly [`RunActivation`](#runactivation)[]
 
 ##### status
 
-> `readonly` **status**: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
+> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 <a id="suspension_json"></a>
 
@@ -2553,7 +2553,7 @@ The single logical SQL Runtime schema identity.
 
 ### SQL\_SCHEMA\_VERSION
 
-> `const` **SQL\_SCHEMA\_VERSION**: `9` = `9`
+> `const` **SQL\_SCHEMA\_VERSION**: `10` = `10`
 
 The single logical SQL Runtime schema version.
 

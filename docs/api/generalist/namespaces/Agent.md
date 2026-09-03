@@ -898,7 +898,7 @@ Caller-authored child inheritance options. Omitted fields use safe defaults.
 
 ##### memory?
 
-> `readonly` `optional` **memory?**: `"fresh"` \| `"inherit"`
+> `readonly` `optional` **memory?**: `"inherit"` \| `"fresh"`
 
 ###### Inherited from
 
@@ -908,7 +908,7 @@ Caller-authored child inheritance options. Omitted fields use safe defaults.
 
 ##### permissions?
 
-> `readonly` `optional` **permissions?**: `"fresh"` \| `"inherit"`
+> `readonly` `optional` **permissions?**: `"inherit"` \| `"fresh"`
 
 ###### Inherited from
 
@@ -918,7 +918,7 @@ Caller-authored child inheritance options. Omitted fields use safe defaults.
 
 ##### sandbox?
 
-> `readonly` `optional` **sandbox?**: `"fresh"` \| `"fork"` \| `"share"`
+> `readonly` `optional` **sandbox?**: `"fork"` \| `"fresh"` \| `"share"`
 
 ###### Inherited from
 
@@ -2421,7 +2421,7 @@ Result injected as the terminal result of the awaiting tool call.
 
 ### ClosedServices
 
-> **ClosedServices**\<`Tools`, `R`, `InputCodec`, `OutputCodec`\> = `R` \| `HandlersFor`\<`Tools`\> \| `Exclude`\<`Tool.HandlerServices`\<`Tools`\[keyof `Tools`\]\>, [`ToolContext`](./ToolContext#toolcontext)\> \| `InputCodec`\[`"EncodingServices"`\] \| `OutputCodec`\[`"DecodingServices"`\] \| `OutputCodec`\[`"EncodingServices"`\]
+> **ClosedServices**\<`Tools`, `R`, `InputCodec`, `OutputCodec`\> = `R` \| `ClosedToolServices`\<`Tools`\> \| `InputCodec`\[`"EncodingServices"`\] \| `OutputCodec`\[`"DecodingServices"`\] \| `OutputCodec`\[`"EncodingServices"`\]
 
 Services closed over with an Agent.
 
@@ -3106,7 +3106,7 @@ Admit one message to a process-local Run under an explicit policy.
 
 ###### policy
 
-`"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
+`"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 ##### Returns
 
@@ -3142,7 +3142,7 @@ Admit one message to a process-local Run under an explicit policy.
 
 ###### policy
 
-`"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
+`"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 ##### Returns
 

@@ -186,6 +186,7 @@ Testing.runtimeDriver({
     "operator-scan": { claim },
     runTree: { claim },
     "fork-rewind": { claim },
+    artifacts: true,
     steering: { claim, recovery: "rebuild" },
     sqlTransactions: { claim, forceRollback },
     multiWorkerClaims: { layer, expire },

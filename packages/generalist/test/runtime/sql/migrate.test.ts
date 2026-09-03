@@ -99,6 +99,8 @@ const inspect = (filename: string) => {
   expect(laneColumns).toEqual(["session_id", "accepted_sequence", "queue_json"])
   expect(tables).toEqual([
     "generalist_agent_names",
+    "generalist_artifact_operations",
+    "generalist_artifacts",
     "generalist_executable_registrations",
     "generalist_external_child_placements",
     "generalist_external_roots",

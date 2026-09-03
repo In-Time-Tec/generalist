@@ -103,6 +103,28 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   PRIMARY KEY (run_id, operation_id),
   UNIQUE (run_id, operation_key)
 )`,
+  `CREATE TABLE IF NOT EXISTS generalist_artifacts (
+  artifact_name TEXT NOT NULL,
+  branch_id TEXT NOT NULL,
+  crdt TEXT NOT NULL,
+  base_version BIGINT NOT NULL,
+  base_snapshot_json TEXT NOT NULL,
+  version BIGINT NOT NULL,
+  snapshot_json TEXT NOT NULL,
+  PRIMARY KEY (artifact_name, branch_id)
+)`,
+  `CREATE TABLE IF NOT EXISTS generalist_artifact_operations (
+  artifact_name TEXT NOT NULL,
+  branch_id TEXT NOT NULL,
+  result BIGINT NOT NULL,
+  base BIGINT NOT NULL,
+  operation_json TEXT NOT NULL,
+  attribution_json TEXT NOT NULL,
+  update_base64 TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL,
+  PRIMARY KEY (artifact_name, branch_id, result),
+  FOREIGN KEY (artifact_name, branch_id) REFERENCES generalist_artifacts(artifact_name, branch_id)
+)`,
   `CREATE TABLE IF NOT EXISTS generalist_run_waits (
   run_id TEXT NOT NULL REFERENCES generalist_runs(run_id),
   wait_id TEXT NOT NULL,

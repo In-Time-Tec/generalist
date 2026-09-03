@@ -44,6 +44,8 @@ rules:
         - "packages/generalist/test/memo/*.test.ts"
         # Learning acceptance spans the unstable leaf, Hooks, approvals, Runtime recovery, and storage drivers
         - "packages/generalist/test/learning/*.test.ts"
+        # Artifact acceptance spans the unstable CRDT leaf, Host, Server WebSockets, Runtime forks, and storage drivers
+        - "packages/generalist/test/artifact/*.test.ts"
         # RL export acceptance spans the unstable projection, Runtime journals, and deterministic model
         - "packages/generalist/test/trajectory/dag.test.ts"
         - "packages/generalist/test/trajectory/export.test.ts"
@@ -130,6 +132,14 @@ rules:
       childCase: kebab
       maxFiles: 12
       maxDirectories: 12
+      exclude:
+        - "packages/generalist/src/unstable"
+    # Every publicly unstable leaf is its own directory; artifact and capability took it past the default cap.
+    - pattern: "packages/generalist/src/unstable"
+      case: kebab
+      childCase: kebab
+      maxFiles: 12
+      maxDirectories: 13
     - pattern: "packages/*/src/*/**"
       case: kebab
       childCase: kebab
@@ -138,7 +148,8 @@ rules:
     - pattern: "packages/*/test"
       childCase: kebab
       maxFiles: 12
-      maxDirectories: 21
+      # Artifact acceptance adds the one required public-feature test directory.
+      maxDirectories: 22
     - pattern: "packages/*/test/*"
       case: kebab
       childCase: kebab

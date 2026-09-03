@@ -108,7 +108,7 @@
 
 ##### dimension
 
-> `readonly` **dimension**: `"toolCalls"` \| `"tokens"` \| `"outputBytes"` \| `"agentRuns"` \| `"concurrency"` \| `"wallClockMillis"` \| `"logBytes"` \| `"tools"` \| `"agents"` \| `"steps"` \| `"sourceBytes"`
+> `readonly` **dimension**: `"toolCalls"` \| `"tokens"` \| `"concurrency"` \| `"outputBytes"` \| `"agentRuns"` \| `"wallClockMillis"` \| `"logBytes"` \| `"tools"` \| `"agents"` \| `"steps"` \| `"sourceBytes"`
 
 ###### Inherited from
 

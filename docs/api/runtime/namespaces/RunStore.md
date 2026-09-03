@@ -428,7 +428,7 @@ RunStore public contract and process-local memory layer.
 
 ##### policy
 
-> `readonly` **policy**: `"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
+> `readonly` **policy**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 <a id="prompt"></a>
 
@@ -498,7 +498,7 @@ RunStore public contract and process-local memory layer.
 
 ##### kind
 
-> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"operator"` \| `"memory"` \| `"wait"` \| `"log"` \| `"handoff"` \| `"nested"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"operator"` \| `"memory"` \| `"log"` \| `"handoff"` \| `"nested"`
 
 <a id="operationkey"></a>
 
@@ -660,7 +660,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### admitProgramAgents
 
-> `readonly` **admitProgramAgents**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **admitProgramAgents**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -670,7 +670,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="admitprogramchild"></a>
 
@@ -824,6 +824,122 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
 
+<a id="appendartifact"></a>
+
+##### appendArtifact
+
+> `readonly` **appendArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Append one CRDT operation if the expected branch head still matches.
+
+###### Parameters
+
+###### input
+
+`ArtifactAppend`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+<a id="artifacthead"></a>
+
+##### artifactHead
+
+> `readonly` **artifactHead**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound)\>
+
+Load the current head of one artifact branch.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound)\>
+
+<a id="artifactrunisfork"></a>
+
+##### artifactRunIsFork
+
+> `readonly` **artifactRunIsFork**: (`runId`) => `Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+
+Whether this Run was created by Runtime fork or rewind branch retention.
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+
+<a id="artifactsnapshot"></a>
+
+##### artifactSnapshot
+
+> `readonly` **artifactSnapshot**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Load one exact historical snapshot from the artifact operation log.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### version
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+<a id="artifactupdates"></a>
+
+##### artifactUpdates
+
+> `readonly` **artifactUpdates**: (`input`) => `Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Replay then follow committed artifact operations after an exclusive version.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### version
+
+`number`
+
+###### Returns
+
+`Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
 <a id="cancel"></a>
 
 ##### cancel
@@ -968,7 +1084,7 @@ Session writer bound to one storage-issued execution claim.
 
 ##### commitProgramLog
 
-> `readonly` **commitProgramLog**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **commitProgramLog**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -978,7 +1094,7 @@ Session writer bound to one storage-issued execution claim.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="complete"></a>
 
@@ -1111,6 +1227,50 @@ derived by parsing an Address or a Run id.
 
 `Effect`\<`void`, `WorkerMutationError`\>
 
+<a id="ensureartifact"></a>
+
+##### ensureArtifact
+
+> `readonly` **ensureArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch)\>
+
+Create or load the main head for one shared artifact.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### crdt
+
+`string`
+
+###### snapshot
+
+\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}
+
+###### snapshot.bytes
+
+`number`
+
+###### snapshot.filename?
+
+`string`
+
+###### snapshot.mediaType
+
+`string`
+
+###### snapshot.sha256
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch)\>
+
 <a id="events"></a>
 
 ##### events
@@ -1137,7 +1297,7 @@ derived by parsing an Address or a Run id.
 
 ##### expireRunningOperation
 
-> `readonly` **expireRunningOperation**: (`input`) => `Effect`\<\{ `outcome`: `"unknown"` \| `"running"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
+> `readonly` **expireRunningOperation**: (`input`) => `Effect`\<\{ `outcome`: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
 
 ###### Parameters
 
@@ -1147,7 +1307,7 @@ derived by parsing an Address or a Run id.
 
 ###### Returns
 
-`Effect`\<\{ `outcome`: `"unknown"` \| `"running"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
+`Effect`\<\{ `outcome`: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
 
 <a id="extendbudget"></a>
 
@@ -1265,6 +1425,24 @@ derived by parsing an Address or a Run id.
 
 `Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`SubstitutionInvalid`](./Errors#substitutioninvalid)\>
 
+<a id="forkartifact"></a>
+
+##### forkArtifact
+
+> `readonly` **forkArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
+Lazily create a forked Run's private artifact branch from its copied checkpoint.
+
+###### Parameters
+
+###### input
+
+`ArtifactFork`
+
+###### Returns
+
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+
 <a id="getoperation"></a>
 
 ##### getOperation
@@ -1313,7 +1491,7 @@ derived by parsing an Address or a Run id.
 
 ##### getProgramOperation
 
-> `readonly` **getProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **getProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
 
 ###### Parameters
 
@@ -1329,7 +1507,7 @@ derived by parsing an Address or a Run id.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
 
 <a id="hasadmission"></a>
 
@@ -1469,7 +1647,7 @@ List root Runs admitted through one product-facing Session.
 
 ##### inspectFanOut
 
-> `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
+> `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
 
 ###### Parameters
 
@@ -1479,7 +1657,7 @@ List root Runs admitted through one product-facing Session.
 
 ###### Returns
 
-`Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
+`Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
 
 <a id="list"></a>
 
@@ -1509,7 +1687,7 @@ Order of the returned Runs. Defaults to "newest".
 
 ###### status?
 
-`"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
+`"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 ###### Returns
 
@@ -1759,7 +1937,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ##### reserveProgramOperation
 
-> `readonly` **reserveProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **reserveProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -1769,7 +1947,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="resolveaddress"></a>
 
@@ -2035,7 +2213,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### settleProgramOperation
 
-> `readonly` **settleProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **settleProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -2045,7 +2223,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="signal"></a>
 
@@ -2099,7 +2277,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### startProgramOperation
 
-> `readonly` **startProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
+> `readonly` **startProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
 ###### Parameters
 
@@ -2109,7 +2287,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
 <a id="suspend"></a>
 
@@ -2131,7 +2309,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### suspendProgramOperation
 
-> `readonly` **suspendProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **suspendProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -2141,7 +2319,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="timeoutawaitevent"></a>
 
@@ -2243,7 +2421,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### event
 
-\{ `dedupeKey`: `string`; `payload`: `Json`; `scheduledAt`: `string`; `scheduleId`: `string`; \} \| \{ `dedupeKey`: `string`; `headers`: \{\[`key`: `string`\]: `string`; \}; `payload`: `Json`; `source`: `string`; \} \| \{ `childRunId`: `string`; `dedupeKey`: `string`; `terminalEventId`: `string`; \} \| \{ `dedupeKey`: `string`; `kind`: `"create"` \| `"remove"` \| `"update"`; `path`: `string`; \} \| \{ `approvalId`: `string`; `decision`: \{ \} \| \{ `reason?`: `string`; \}; `dedupeKey`: `string`; \}
+\{ `dedupeKey`: `string`; `payload`: `Json`; `scheduledAt`: `string`; `scheduleId`: `string`; \} \| \{ `dedupeKey`: `string`; `headers`: \{\[`key`: `string`\]: `string`; \}; `payload`: `Json`; `source`: `string`; \} \| \{ `childRunId`: `string`; `dedupeKey`: `string`; `terminalEventId`: `string`; \} \| \{ `dedupeKey`: `string`; `kind`: `"update"` \| `"create"` \| `"remove"`; `path`: `string`; \} \| \{ `approvalId`: `string`; `decision`: \{ \} \| \{ `reason?`: `string`; \}; `dedupeKey`: `string`; \}
 
 ###### now
 

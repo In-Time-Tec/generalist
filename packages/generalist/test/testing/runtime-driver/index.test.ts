@@ -80,6 +80,7 @@ Testing.runtimeDriver({
     "operator-scan": { claim },
     runTree: { claim },
     "fork-rewind": { claim },
+    artifacts: true,
     steering: { claim, recovery: "reclaim" },
   },
 })
@@ -105,6 +106,7 @@ Testing.runtimeDriver({
     "operator-scan": { claim },
     runTree: { claim },
     "fork-rewind": { claim },
+    artifacts: true,
     steering: { claim, recovery: "rebuild" },
   },
 })

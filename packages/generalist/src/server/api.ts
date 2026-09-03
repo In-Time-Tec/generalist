@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Schema, SchemaTransformation } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Ref as MediaRef } from "../media/ref.js"
 import { BudgetLimits, Remaining as RemainingBudget } from "../core/durable/run-budget.js"
@@ -14,8 +14,15 @@ import { isInspectionEvent } from "../runtime/execution/agent/event.js"
 import { ChildReadiness } from "../runtime/child/readiness.js"
 import { ExecutionSuspension } from "../runtime/execution/state.js"
 import { Authentication } from "./auth.js"
-import { ApiError, apiErrors } from "./errors.js"
+import { apiErrors, artifactApiErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
+import {
+  ArtifactUpdate,
+  HumanAttribution,
+  RangeOperation,
+  ReadResult as ArtifactReadResult,
+  Version as ArtifactVersion,
+} from "../core/artifact.js"
 
 export const RunStarted = Schema.Struct({ id: Schema.String })
 export type RunStarted = typeof RunStarted.Type
@@ -48,10 +55,32 @@ export const EventStreamItem: Schema.Codec<EventStreamItem, EventStreamItemEncod
   data: Schema.fromJsonString(HostEvent),
 })
 
-export const eventStream: HttpApiSchema.StreamSse<typeof EventStreamItem, typeof ApiError> = HttpApiSchema.StreamSse({
-  events: EventStreamItem,
-  error: ApiError,
+const EndpointError = Schema.Union(apiErrors)
+export const eventStream: HttpApiSchema.StreamSse<typeof EventStreamItem, typeof EndpointError> =
+  HttpApiSchema.StreamSse({
+    events: EventStreamItem,
+    error: EndpointError,
+  })
+
+/** Browser-to-Host artifact edit command. @experimental */
+export const ArtifactClientCommand = Schema.Struct({
+  _tag: Schema.tag("Edit"),
+  base: ArtifactVersion,
+  operation: RangeOperation,
+  attribution: HumanAttribution,
 })
+export type ArtifactClientCommand = typeof ArtifactClientCommand.Type
+
+/** Initial document and attributed updates sent to artifact WebSocket peers. @experimental */
+export const ArtifactServerEvent = Schema.Union([
+  Schema.TaggedStruct("Snapshot", { document: ArtifactReadResult }),
+  Schema.TaggedStruct("Update", { update: ArtifactUpdate, document: ArtifactReadResult }),
+])
+export type ArtifactServerEvent = typeof ArtifactServerEvent.Type
+
+const ArtifactVersionFromString = Schema.String.pipe(
+  Schema.decodeTo(ArtifactVersion, SchemaTransformation.numberFromString),
+)
 
 const createSession = HttpApiEndpoint.post("create", "/sessions", {
   payload: Schema.Struct({ id: Schema.optionalKey(Schema.String), title: Schema.optionalKey(Schema.String) }),
@@ -135,6 +164,19 @@ const events: HttpApiGroup.HttpApiGroup<"events", typeof subscribeEvents | typeo
   "events",
 ).add(subscribeEvents, connectEvents)
 
+const readArtifact = HttpApiEndpoint.get("read", "/artifacts/:name", {
+  params: { name: Schema.String },
+  success: ArtifactReadResult,
+  error: artifactApiErrors,
+})
+const connectArtifact = HttpApiEndpoint.get("connect", "/artifacts/:name/ws", {
+  params: { name: Schema.String },
+  query: { version: Schema.optionalKey(ArtifactVersionFromString) },
+  error: artifactApiErrors,
+})
+const artifacts: HttpApiGroup.HttpApiGroup<"artifacts", typeof readArtifact | typeof connectArtifact> =
+  HttpApiGroup.make("artifacts").add(readArtifact, connectArtifact)
+
 const resolveApproval = HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:token", {
   params: { id: Schema.String, token: Schema.String },
   payload: Schema.Struct({ decision: Decision, operator: Schema.String }),
@@ -199,12 +241,19 @@ const operator: HttpApiGroup.HttpApiGroup<
   typeof explainRun | typeof retryRun | typeof wakeRun | typeof resolveUnknown | typeof extendBudget
 > = HttpApiGroup.make("operator").add(explainRun, retryRun, wakeRun, resolveUnknown, extendBudget)
 
-type Groups = typeof sessions | typeof runs | typeof events | typeof approvals | typeof attachments | typeof operator
+type Groups =
+  | typeof sessions
+  | typeof runs
+  | typeof events
+  | typeof artifacts
+  | typeof approvals
+  | typeof attachments
+  | typeof operator
 type AuthenticatedGroups = HttpApiGroup.AddMiddleware<Groups, Authentication>
 
 /** Schema-first public API. New ingress modules add one group to this value. */
 export const api: HttpApi.HttpApi<"generalist", AuthenticatedGroups> = HttpApi.make("generalist")
-  .add(sessions, runs, events, approvals, attachments, operator)
+  .add(sessions, runs, events, artifacts, approvals, attachments, operator)
   .middleware(Authentication)
   .annotateMerge(
     OpenApi.annotations({

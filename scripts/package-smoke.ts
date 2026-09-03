@@ -797,10 +797,12 @@ const program = Effect.gen(function* () {
       },
       /**
        * FoldKit 0.148.2 still declares rc.109, so its targeted override proves the current rc.112
-       * runtime instead of disabling peer resolution for the whole consumer.
+       * runtime instead of disabling peer resolution for the whole consumer. Vite DevTools declares
+       * a wildcard Vitest peer, so keep npm on the consumer's pinned Vitest instead of its latest peer graph.
        */
       overrides: {
         foldkit: { effect: effectVersion },
+        vitest: rootManifest.workspaces.catalog.vitest,
       },
     }),
   )
@@ -1057,10 +1059,15 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
       private: true,
       type: "module",
       dependencies: { effect: effectVersion, [packageName]: packageTarball, ...peerDependencies },
-      ...(profile.peers.includes("foldkit") && {
-        overrides: { foldkit: { effect: effectVersion } },
-      }),
     } satisfies Schema.Json
+    if (profile.peers.includes("foldkit") || profile.peers.includes("vitest")) {
+      Object.assign(profileManifest, {
+        overrides: {
+          ...(profile.peers.includes("foldkit") && { foldkit: { effect: effectVersion } }),
+          ...(profile.peers.includes("vitest") && { vitest: rootManifest.workspaces.catalog.vitest }),
+        },
+      })
+    }
     yield* fileSystem.writeFileString(path.join(profileDirectory, "package.json"), encodeJson(profileManifest))
     if (runtime === "node") {
       yield* runProfileCommand({
