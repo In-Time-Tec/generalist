@@ -1,6 +1,6 @@
 # Testing adapters
 
-`generalist/testing` gives adapter authors the same conformance suites used by Generalist itself. It also exports `TestModel`, the scripted Effect AI model fixture. The old `generalist/test` subpath does not exist.
+`generalist/testing` gives adapter authors the same conformance suites used by Generalist itself and exports the scripted Effect AI model fixture as `TestModel`. Import its named members from `generalist/testing/model` when no test runner is installed. The old `generalist/test` subpath does not exist.
 
 ## Register conformance suites
 
@@ -84,12 +84,9 @@ The repository's Vitest reporter writes passing runtime-driver suites to the com
 ## Scripted model fixtures
 
 ```ts
-import { TestModel } from "generalist/testing"
+import { layer as testModel, text, toolCall } from "generalist/testing/model"
 
-const model = TestModel.layer([
-  TestModel.toolCall("lookup", { orderId: "42" }, { id: "call-1" }),
-  TestModel.text("Order 42 shipped."),
-])
+const model = testModel([toolCall("lookup", { orderId: "42" }, { id: "call-1" }), text("Order 42 shipped.")])
 ```
 
-One fixture owns one atomic FIFO cursor shared by streaming and non-streaming calls. It captures normalized requests before delay or failure and exposes direct and `ModelRegistry` Layers.
+The model subpath depends on Effect but not `@effect/vitest` or `vitest`. One fixture owns one atomic FIFO cursor shared by streaming and non-streaming calls. It captures normalized requests before delay or failure and exposes direct and `ModelRegistry` Layers.

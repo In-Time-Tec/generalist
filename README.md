@@ -4,10 +4,10 @@ Generalist is an Effect-native TypeScript agent framework with a portable durabl
 
 ## Five-minute path
 
-Install Generalist, the Effect version it currently targets, and the testing, Bun platform, and SQLite peers used by this example:
+Install Generalist, the Effect version it currently targets, and the Bun platform and SQLite peers used by this example:
 
 ```bash
-bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @effect/sql-sqlite-bun@4.0.0-rc.112 @effect/vitest@4.0.0-rc.112
+bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @effect/sql-sqlite-bun@4.0.0-rc.112
 ```
 
 Save this as `index.ts`, then run `bun index.ts`. The scripted model is a real `LanguageModel` Layer that needs no credentials, so this path also runs unchanged in CI.
@@ -18,7 +18,7 @@ import { Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { Agent } from "generalist"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
-import { TestModel } from "generalist/testing"
+import { layer as testModel, object, text } from "generalist/testing/model"
 
 const assistant = Agent.make({
   name: "five-minute-assistant",
@@ -34,10 +34,7 @@ const startOptions = {
 }
 const expected = "A durable agent can continue an accepted run after its host restarts."
 
-const model = TestModel.layer([
-  TestModel.text("Preparing a summary."),
-  TestModel.object({ output: { summary: expected } }),
-])
+const model = testModel([text("Preparing a summary."), object({ output: { summary: expected } })])
 
 const program = Effect.gen(function* () {
   const local = yield* Effect.scoped(
