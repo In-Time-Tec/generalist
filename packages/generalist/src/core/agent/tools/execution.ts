@@ -1,7 +1,14 @@
 import { Cause, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
-import { domainFailureResult, interrupted, outcomeFromResult, successResult, type AnyToolCall } from "./result.js"
+import { AgentError, type Event } from "../event.js"
+import {
+  domainFailureResult,
+  interrupted,
+  outcomeFromResult,
+  successResult,
+  type AnyToolCall,
+  type PendingToolResult,
+} from "./result.js"
 import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "../service.js"
 import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
@@ -18,7 +25,7 @@ import {
 import { cancellableOperation, supportsCancellation } from "../../tools/tool-executor-cancellation.js"
 import { bound } from "../../tools/tool-output.js"
 import { type Registry, get } from "../../tools/tool-registry.js"
-import { ToolContext, type Progress } from "../../tools/tool-context.js"
+import { ToolContext } from "../../tools/tool-context.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
@@ -36,7 +43,7 @@ import { execute as executeFanOut, withParentTasks } from "./fan-out.js"
 import type { RunInbox } from "../../turn/steering-inbox.js"
 import { eventFields as taskEventFields } from "../../../tasks/internal.js"
 import { taintForCall } from "../../capability/internal.js"
-type PendingToolResult = import("./result.js").PendingToolResult
+import { make as makeToolProgress } from "../tool/progress.js"
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
   readonly inbox?: RunInbox
@@ -164,58 +171,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           }),
         )
   }
-  const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflow>> => {
-    switch (progressPolicy._tag) {
-      case "Backpressure":
-        return Queue.bounded(progressPolicy.capacity)
-      case "Dropping":
-      case "Fail":
-        return Queue.dropping(progressPolicy.capacity)
-      case "Sliding":
-        return Queue.sliding(progressPolicy.capacity)
-    }
-  }
-  const progressEvent = (turn: number, progress: Progress): ToolProgress => {
-    const base = { _tag: "ToolProgress" as const, turn, toolCallId: progress.toolCallId }
-    const { message, data } = progress
-    if (message === undefined) return data === undefined ? base : { ...base, data }
-    if (data === undefined) return { ...base, message }
-    return { ...base, message, data }
-  }
-  const emitProgress =
-    (
-      turn: number,
-      call: AnyToolCall,
-      progressQueue: Queue.Queue<ToolProgress, Cause.Done | ProgressOverflow>,
-      droppedProgress: Ref.Ref<number>,
-      emitSemaphore: Semaphore.Semaphore,
-    ) =>
-    (progress: Progress): Effect.Effect<boolean> => {
-      const event = progressEvent(turn, progress)
-      return emitSemaphore.withPermit(
-        Effect.gen(function* () {
-          if (progressPolicy._tag === "Sliding") {
-            const accepted = yield* Effect.sync(() => {
-              const full = Queue.isFullUnsafe(progressQueue)
-              const offered = Queue.offerUnsafe(progressQueue, event)
-              return { dropped: full && offered, offered }
-            })
-            if (accepted.dropped) yield* Ref.update(droppedProgress, (count) => count + 1)
-            return accepted.offered
-          }
-          const offered = yield* Queue.offer(progressQueue, event)
-          if (progressPolicy._tag === "Dropping" && !offered) {
-            yield* Ref.update(droppedProgress, (count) => count + 1)
-          } else if (progressPolicy._tag === "Fail" && !offered) {
-            yield* Queue.fail(
-              progressQueue,
-              ProgressOverflow.make({ turn, toolCallId: call.id, capacity: progressPolicy.capacity }),
-            )
-          }
-          return offered
-        }),
-      )
-    }
+  const { makeProgressQueue, emitProgress } = makeToolProgress(progressPolicy)
   const executionFor = (
     turn: number,
     call: AnyToolCall,

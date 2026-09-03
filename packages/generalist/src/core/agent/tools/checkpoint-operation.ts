@@ -5,7 +5,11 @@ import { domainFailureResult, successResult, type AnyToolCall } from "./result.j
 import { completed, effectiveCall, updateCall } from "./checkpoint.js"
 import { AwaitEvent } from "./wake-event.js"
 import { Items as TaskItems, writeToolName } from "../../../tasks/item.js"
-import { Source as CapabilitySource, accumulate } from "../../capability/state.js"
+import {
+  Source as CapabilitySource,
+  accumulate,
+  type Checkpoint as CapabilityCheckpoint,
+} from "../../capability/state.js"
 
 const PersistedToolOutcome = Schema.Union([
   Schema.TaggedStruct("Success", {
@@ -22,7 +26,7 @@ const PersistedToolOutcome = Schema.Union([
 ])
 
 const capabilityCheckpoint = (
-  current: typeof import("../../capability/state.js").Checkpoint.Type | undefined,
+  current: CapabilityCheckpoint | undefined,
   outcome: typeof PersistedToolOutcome.Type | undefined,
 ) => {
   if (outcome === undefined || outcome._tag === "Suspend" || outcome.taint === undefined) return current
