@@ -21,6 +21,11 @@ type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-1" }
 
+const noVersioning = {
+  history: () => Effect.succeed([]),
+  revert: () => Effect.void,
+} satisfies Pick<Memory.Service, "history" | "revert">
+
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
     LanguageModel.LanguageModel,
@@ -157,6 +162,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         ]),
         Memory.layerTest({
+          ...noVersioning,
           recall: () =>
             Effect.succeed([
               { id: "item-empty", content: [] },
@@ -207,6 +213,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "item-empty", content: [] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -251,6 +258,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         ]),
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () =>
             Effect.sync(() => {
@@ -310,6 +318,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         ]),
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () =>
             Effect.sync(() => {
@@ -362,6 +371,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         ]),
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -395,6 +405,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layer([Guardrail.redactInput({ pattern: /secret/g, replacement: "MASK" })]),
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled secret")] }]),
           remember: (input) =>
             Effect.sync(() => {
@@ -434,6 +445,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Memory.layerTest({
+          ...noVersioning,
           recall: () =>
             Effect.sync(() => {
               recalls += 1
@@ -485,6 +497,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Memory.layerTest({
+          ...noVersioning,
           recall: () =>
             Effect.sync(() => {
               recalls += 1
@@ -546,6 +559,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -594,6 +608,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Compaction.layer({}),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled before wait")] }]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -683,6 +698,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -739,6 +755,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () =>
             Effect.sync(() => {
@@ -790,6 +807,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -850,6 +868,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context"), bytes, url] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -927,6 +946,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -1010,6 +1030,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -1094,6 +1115,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -1164,6 +1186,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Compaction.layer({}),
         Session.layerMemory,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -1214,6 +1237,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.fail(memoryError),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -1249,6 +1273,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Memory.layerTest({
+          ...noVersioning,
           recall: () => Effect.succeed([]),
           remember: () => Effect.fail(memoryError),
           forget: () => Effect.void,
@@ -1297,12 +1322,14 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
   it.effect("merge calls both forget implementations", () => {
     const forgotten: Array<string> = []
     const first: Memory.Service = {
+      ...noVersioning,
       recall: () => Effect.succeed([]),
       remember: () => Effect.void,
       forget: (input) =>
         Effect.sync(() => forgotten.push(`first:${input.key.subject}:${input.id ?? "all"}`)).pipe(Effect.asVoid),
     }
     const second: Memory.Service = {
+      ...noVersioning,
       recall: () => Effect.succeed([]),
       remember: () => Effect.void,
       forget: (input) =>
@@ -1320,6 +1347,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     let forgotten: Memory.ForgetInput | undefined
     return [
       Memory.layerTest({
+        ...noVersioning,
         recall: () => Effect.succeed([]),
         remember: () => Effect.void,
         forget: (input) =>

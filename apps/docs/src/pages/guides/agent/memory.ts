@@ -73,14 +73,10 @@ export const memory = definePage({
     ),
     h2("recipe-pgvector", "Recipe: a pgvector VectorStore"),
     p(
-      code("VectorStore"),
-      " is provider-neutral: implement ",
-      code("upsert"),
-      " and ",
-      code("query"),
-      " and the rest of the memory stack rides on top. A pgvector adapter stores ",
-      code("(agent, subject, id, text, metadata, embedding)"),
-      " and filters on the key before ranking by cosine distance. Keep the adapter host-owned behind a client service you control:",
+      code("layerPgVector"),
+      " stores active vectors plus append-only version history and filters on the complete memory key before ranking by cosine distance. It uses the application's existing ",
+      code("effect/unstable/sql"),
+      " client:",
     ),
     codeBlock({ label: "pgvector-store.ts", source: pgvectorStore }),
     p(

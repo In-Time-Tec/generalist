@@ -64,6 +64,7 @@ layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.layerMemory), Layer.provid
           turn: 0,
           terminal: true,
           transcript: prompt(user("What color is the sky?"), assistant("blue")),
+          evidence: [],
         })
 
         const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })

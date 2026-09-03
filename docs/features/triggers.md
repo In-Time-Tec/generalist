@@ -36,13 +36,14 @@ const wake = runtime.wake(runId, {
 
 ## Recurring fresh Runs
 
-`runtime.schedule(agent, input, { rrule, sessionId, budget })` validates and encodes the Agent input when the schedule is registered. Each occurrence starts a fresh Run with idempotency key `schedule:<scheduleId>:<occurrence>` and the captured budget. A failed scheduler attempt retries that same occurrence identity before advancing the durable schedule.
+`runtime.schedule(agent, input, { rrule, sessionId, budget, scheduleId? })` validates and encodes the Agent input when the schedule is registered. Each occurrence starts a fresh Run with idempotency key `schedule:<scheduleId>:<occurrence>` and the captured budget. A failed scheduler attempt retries that same occurrence identity before advancing the durable schedule. Omit `scheduleId` for a generated identity. A caller-supplied stable id makes exact re-registration idempotent across restarts; reusing it with a different recurrence or captured definition fails instead of replacing live state.
 
 The supported recurrence subset is intentionally small and UTC-only:
 
 - `FREQ=SECONDLY`, `FREQ=MINUTELY`, `FREQ=HOURLY`, or `FREQ=DAILY`
 - optional positive integer `INTERVAL`, for example `FREQ=HOURLY;INTERVAL=6`
-- no calendar selectors, time zones, end dates, or exceptions
+- `FREQ=DAILY` may set one UTC hour with `BYHOUR=0..23`, for example `FREQ=DAILY;BYHOUR=3`
+- no other calendar selectors, time zones, end dates, or exceptions
 
 Memory, SQLite, PostgreSQL, and MySQL persist schedules in their Runtime store. The scheduler fiber belongs to the Runtime Layer scope. SQL schedule claims use leased transactional row claims so competing Runtime instances admit one occurrence. Timer input is Schema-validated through the scheduled Agent's input Schema before persistence.
 

@@ -1,4 +1,4 @@
-import { DateTime, Effect, Function } from "effect"
+import { DateTime, Effect, Equal, Function } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
 import type { ClaimedSchedule, ScheduleReceipt, ScheduleRecord } from "../../../execution/trigger/schedule.js"
 import type { MemoryState } from "../../state.js"
@@ -15,8 +15,13 @@ export const registerSchedule: {
   ): Effect.Effect<readonly [ScheduleReceipt, MemoryState], RuntimeUnavailable>
 } = Function.dual(2, (state: MemoryState, record: ScheduleRecord) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
-  if (state.schedules.has(record.scheduleId)) {
-    return Effect.fail(RuntimeUnavailable.make({ message: `Schedule ${record.scheduleId} already exists` }))
+  const existing = state.schedules.get(record.scheduleId)
+  if (existing !== undefined) {
+    return existing.rrule === record.rrule && Equal.equals(existing.definition, record.definition)
+      ? Effect.succeed([{ scheduleId: existing.scheduleId, nextAt: existing.nextAt }, state] as const)
+      : Effect.fail(
+          RuntimeUnavailable.make({ message: `Schedule ${record.scheduleId} already exists with another definition` }),
+        )
   }
   return Effect.succeed([
     { scheduleId: record.scheduleId, nextAt: record.nextAt },

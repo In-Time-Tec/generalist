@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect"
 import { AiError, EmbeddingModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "../../src/index.js"
 import { SemanticRecall, VectorStore } from "../../src/memory/index"
+import { Testing } from "../../src/testing/index.js"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 const otherKey: Memory.Key = { agent: "memory-agent", subject: "subject-b" }
@@ -32,10 +33,12 @@ const embeddingLayer = Layer.effect(
   }),
 )
 
-const memoryLayer = SemanticRecall.layer({ limit: 5 }).pipe(
+const memoryLayer = SemanticRecall.layer({ limit: 16 }).pipe(
   Layer.provideMerge(VectorStore.layerMemory),
   Layer.provideMerge(embeddingLayer),
 )
+
+Testing.memory({ layer: memoryLayer, versioning: true })
 
 layer(memoryLayer)("SemanticRecall", (it) => {
   it.effect("remembers a terminal user and assistant exchange for later recall", () =>
@@ -49,6 +52,7 @@ layer(memoryLayer)("SemanticRecall", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("What color is the sky?"), assistant("blue")),
+        evidence: [],
       })
 
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
@@ -69,6 +73,7 @@ layer(memoryLayer)("SemanticRecall", (it) => {
         turn: 0,
         terminal: false,
         transcript: prompt(user("What color is the sky?"), assistant("blue")),
+        evidence: [],
       })
 
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
@@ -88,6 +93,7 @@ layer(memoryLayer)("SemanticRecall", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("What color is the sky?"), assistant("blue")),
+        evidence: [],
       })
 
       const recalled = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("color")) })
@@ -107,18 +113,21 @@ layer(memoryLayer)("SemanticRecall", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("What color is the sky?"), assistant("blue")),
+        evidence: [],
       })
       yield* memory.remember({
         key,
         turn: 1,
         terminal: true,
         transcript: prompt(user("What color is the ocean?"), assistant("blue")),
+        evidence: [],
       })
       yield* memory.remember({
         key: otherKey,
         turn: 0,
         terminal: true,
         transcript: prompt(user("What color is the door?"), assistant("blue")),
+        evidence: [],
       })
 
       const beforeForget = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
@@ -169,6 +178,8 @@ const failingVectorStore = VectorStore.layerTest({
   upsert: () => Effect.void,
   query: () => Effect.fail(vectorError),
   delete: () => Effect.void,
+  history: () => Effect.succeed([]),
+  revert: () => Effect.void,
 })
 
 layer(

@@ -15,16 +15,20 @@ export type Frequency = typeof Frequency.Type
 export const RRule = Schema.Struct({
   frequency: Frequency,
   interval: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  hour: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(23))),
 })
 export type RRule = typeof RRule.Type
 
 /** A recurrence rule is outside Generalist's documented fixed UTC subset. */
 export class ScheduleInvalid extends ActionableTaggedError<ScheduleInvalid>()("generalist/runtime/ScheduleInvalid", {
   rrule: Schema.String,
-  hint: errorHint("Use FREQ=SECONDLY, MINUTELY, HOURLY, or DAILY with an optional positive integer INTERVAL."),
+  hint: errorHint(
+    "Use FREQ=SECONDLY, MINUTELY, HOURLY, or DAILY with an optional positive integer INTERVAL; DAILY may also set BYHOUR=0..23 UTC.",
+  ),
 }) {}
 
-const rulePattern = /^FREQ=(SECONDLY|MINUTELY|HOURLY|DAILY)(?:;INTERVAL=([1-9][0-9]*))?$/
+const rulePattern =
+  /^FREQ=(SECONDLY|MINUTELY|HOURLY|DAILY)(?:;INTERVAL=([1-9][0-9]*))?(?:;BYHOUR=([0-9]|1[0-9]|2[0-3]))?$/
 const parseFrequency = (value: string | undefined): Frequency | undefined => {
   switch (value) {
     case "SECONDLY":
@@ -44,10 +48,11 @@ export const parseRRule = (input: string): Effect.Effect<RRule, ScheduleInvalid>
     const match = rulePattern.exec(normalized)
     const interval = Number(match?.[2] ?? 1)
     const frequency = parseFrequency(match?.[1])
-    if (frequency === undefined || !Number.isSafeInteger(interval)) {
+    const hour = match?.[3] === undefined ? undefined : Number(match[3])
+    if (frequency === undefined || !Number.isSafeInteger(interval) || (hour !== undefined && frequency !== "DAILY")) {
       return yield* ScheduleInvalid.make({ rrule: input })
     }
-    return { frequency, interval }
+    return hour === undefined ? { frequency, interval } : { frequency, interval, hour }
   })
 
 const frequencyMillis = {
@@ -61,9 +66,15 @@ const frequencyMillis = {
 export const nextAt: {
   (afterMillis: number): (rule: RRule) => string
   (rule: RRule, afterMillis: number): string
-} = Function.dual(2, (rule: RRule, afterMillis: number): string =>
-  DateTime.formatIso(DateTime.makeUnsafe(afterMillis + frequencyMillis[rule.frequency] * rule.interval)),
-)
+} = Function.dual(2, (rule: RRule, afterMillis: number): string => {
+  if (rule.hour === undefined) {
+    return DateTime.formatIso(DateTime.makeUnsafe(afterMillis + frequencyMillis[rule.frequency] * rule.interval))
+  }
+  const after = DateTime.makeUnsafe(afterMillis)
+  const sameDay = DateTime.setPartsUtc(after, { hour: rule.hour, minute: 0, second: 0, millisecond: 0 })
+  const next = DateTime.toEpochMillis(sameDay) > afterMillis ? sameDay : DateTime.add(sameDay, { days: rule.interval })
+  return DateTime.formatIso(next)
+})
 
 /** Persisted fresh-Run admission data for one recurring schedule. */
 export interface ScheduleDefinition {

@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
-import { layer as layerMemory, VectorStore } from "generalist/memory"
+import { SemanticRecall, VectorStore } from "generalist/memory"
 import { Testing } from "generalist/testing"
 
 const embedding = Layer.effect(
@@ -23,8 +23,6 @@ const embedding = Layer.effect(
   }),
 )
 
-const memory = layerMemory({ semantic: { limit: 16 } }).pipe(
-  Layer.provide(Layer.merge(VectorStore.layerMemory, embedding)),
-)
+const memory = SemanticRecall.layer({ limit: 16 }).pipe(Layer.provide(Layer.merge(VectorStore.layerMemory, embedding)))
 
-Testing.memory({ layer: memory })
+Testing.memory({ layer: memory, versioning: true })

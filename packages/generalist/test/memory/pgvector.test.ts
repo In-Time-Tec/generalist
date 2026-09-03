@@ -1,8 +1,10 @@
+/* oxlint-disable effecttsgo/strict-effect-provide -- This adapter test is the Layer composition root. */
 import { describe, it } from "@effect/vitest"
 import { PgClient } from "@effect/sql-pg"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
-import { layer as layerMemory, layerPgVector } from "generalist/memory"
+import { SqlClient } from "effect/unstable/sql"
+import { layerPgVector, SemanticRecall } from "generalist/memory"
 import { Testing } from "generalist/testing"
 
 const url = Effect.runSync(
@@ -17,6 +19,14 @@ if (url === undefined || url.length === 0) {
   })
 } else {
   const client = PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })
+  // Version assertions need a table without entries left by earlier runs.
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql`DROP TABLE IF EXISTS generalist_memory_conformance_history`
+      yield* sql`DROP TABLE IF EXISTS generalist_memory_conformance`
+    }).pipe(Effect.provide(client)),
+  )
   const embedding = Layer.effect(
     EmbeddingModel.EmbeddingModel,
     EmbeddingModel.make({
@@ -31,7 +41,7 @@ if (url === undefined || url.length === 0) {
         }),
     }),
   )
-  const memory = layerMemory({ semantic: { limit: 16 } }).pipe(
+  const memory = SemanticRecall.layer({ limit: 16 }).pipe(
     Layer.provide(
       Layer.merge(
         layerPgVector({ table: "generalist_memory_conformance", dimensions: 2 }).pipe(Layer.provide(client)),
@@ -39,5 +49,5 @@ if (url === undefined || url.length === 0) {
       ),
     ),
   )
-  Testing.memory({ layer: memory, persistent: true })
+  Testing.memory({ layer: memory, persistent: true, versioning: true })
 }

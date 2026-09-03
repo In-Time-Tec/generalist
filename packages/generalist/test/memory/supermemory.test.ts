@@ -93,6 +93,34 @@ const memory = layerSupermemory({
 Testing.memory({ layer: memory, persistent: true })
 
 describe("Supermemory HTTP boundary", () => {
+  it.effect("rejects unsupported semantic-memory version operations without an HTTP request", () => {
+    const before = fixture.requests.length
+    const program = Effect.gen(function* () {
+      const service = yield* Memory.Memory
+      const rememberFailure = yield* service
+        .remember({
+          key: { agent: "agent", subject: "session" },
+          turn: 0,
+          terminal: true,
+          transcript: Prompt.make("replacement"),
+          entryId: "semantic-entry",
+          supersedes: 1,
+          evidence: [],
+        })
+        .pipe(Effect.flip)
+      const historyFailure = yield* service.history("semantic-entry").pipe(Effect.flip)
+      const revertFailure = yield* service.revert("semantic-entry", { to: 1 }).pipe(Effect.flip)
+
+      expect(rememberFailure.reason).toBe("unsupported")
+      expect(historyFailure.reason).toBe("unsupported")
+      expect(revertFailure.reason).toBe("unsupported")
+      expect(fixture.requests).toHaveLength(before)
+    })
+    return Effect.scoped(
+      Layer.build(memory).pipe(Effect.flatMap((context) => program.pipe(Effect.provideContext(context)))),
+    )
+  })
+
   it.effect("sends bearer-authenticated v4 requests and preserves typed status and body failures", () => {
     let authorization: string | undefined
     const failing = Layer.succeed(

@@ -233,6 +233,8 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
           recall: () => Effect.succeed([]),
           remember: (input) => Effect.sync(() => remembered.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
+          history: () => Effect.succeed([]),
+          revert: () => Effect.void,
         }),
         Compaction.layerTest({
           maybeCompact: (request) => Effect.sync(() => compactionRequests.push(request)).pipe(Effect.as(Option.none())),

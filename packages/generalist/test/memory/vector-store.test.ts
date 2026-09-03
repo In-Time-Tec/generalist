@@ -17,6 +17,9 @@ const document = (
   key: memoryKey,
   text,
   embedding,
+  version: 1,
+  evidence: [],
+  appliedAt: "2030-01-01T00:00:00.000Z",
 })
 
 layer(VectorStore.layerMemory)("VectorStore", (it) => {
@@ -48,9 +51,9 @@ layer(VectorStore.layerMemory)("VectorStore", (it) => {
       yield* store.delete({ key: otherAgent })
 
       yield* store.upsert([
-        document("same-id", key, "visible", [1, 0]),
-        document("same-id", otherSubject, "other subject", [1, 0]),
-        document("same-id", otherAgent, "other agent", [1, 0]),
+        document("primary-id", key, "visible", [1, 0]),
+        document("other-subject-id", otherSubject, "other subject", [1, 0]),
+        document("other-agent-id", otherAgent, "other agent", [1, 0]),
       ])
 
       const matches = yield* store.query({ key, embedding: [1, 0], limit: 10 })
@@ -64,7 +67,10 @@ layer(VectorStore.layerMemory)("VectorStore", (it) => {
       const store = yield* VectorStore.VectorStore
       yield* store.delete({ key })
 
-      yield* store.upsert([document("near", key, "near", [1, 0]), document("also-near", key, "also-near", [0.8, 0.2])])
+      yield* store.upsert([
+        document("limited-near", key, "near", [1, 0]),
+        document("limited-also-near", key, "also-near", [0.8, 0.2]),
+      ])
 
       const limited = yield* store.query({ key, embedding: [1, 0], limit: 1 })
       const thresholded = yield* store.query({ key, embedding: [1, 0], limit: 10, minScore: 0.99 })
@@ -95,8 +101,8 @@ layer(VectorStore.layerMemory)("VectorStore", (it) => {
       yield* store.delete({ key: otherSubject })
 
       yield* store.upsert([
-        document("same-id", key, "visible", [1, 0]),
-        document("same-id", otherSubject, "other subject", [1, 0]),
+        document("primary-delete-id", key, "visible", [1, 0]),
+        document("other-delete-id", otherSubject, "other subject", [1, 0]),
       ])
 
       yield* store.delete({ key })
@@ -118,7 +124,7 @@ layer(VectorStore.layerMemory)("VectorStore", (it) => {
       yield* store.upsert([
         document("first", key, "first", [1, 0]),
         document("second", key, "second", [0, 1]),
-        document("first", otherSubject, "other subject", [1, 0]),
+        document("other-first", otherSubject, "other subject", [1, 0]),
       ])
 
       yield* store.delete({ key, id: "first" })
@@ -128,6 +134,26 @@ layer(VectorStore.layerMemory)("VectorStore", (it) => {
 
       expect(deletedKeyMatches.map((match) => match.document.text)).toEqual(["second"])
       expect(otherSubjectMatches.map((match) => match.document.text)).toEqual(["other subject"])
+    }),
+  )
+
+  it.effect("retains the current version pointer while an entry is forgotten", () =>
+    Effect.gen(function* () {
+      const store = yield* VectorStore.VectorStore
+      const first = document("forgotten-version", key, "first", [1, 0])
+      const second = { ...first, text: "second", version: 2, supersedes: 1, appliedAt: "2030-01-02T00:00:00.000Z" }
+      yield* store.upsert([first, second])
+      yield* store.delete({ key, id: first.id })
+
+      const stale = { ...second, text: "stale", version: 3, supersedes: 1, appliedAt: "2030-01-03T00:00:00.000Z" }
+      const failure = yield* Effect.flip(store.upsert([stale]))
+      expect(failure.message).toContain("does not have active version 1")
+
+      const replacement = { ...stale, text: "replacement", supersedes: 2 }
+      yield* store.upsert([replacement])
+      const matches = yield* store.query({ key, embedding: [1, 0], limit: 10 })
+      expect(matches.some((match) => match.document.text === "replacement")).toBe(true)
+      expect(yield* store.history(first.id)).toHaveLength(3)
     }),
   )
 })

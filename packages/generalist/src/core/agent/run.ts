@@ -281,6 +281,7 @@ const streamInternalImpl = <
                     turn,
                     transcript: Option.isSome(activeSession) ? buildMemoryContext(path) : projectTranscript(transcript),
                     terminal,
+                    evidence: [{ runId: inbox.runId, turn }],
                   })
                   .pipe(Effect.mapError((error) => memoryError(turn, error)))
           const input: RememberInput = { turn, terminal }
