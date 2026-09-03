@@ -340,7 +340,9 @@ export const make = (input: {
 }) =>
   Effect.gen(function* () {
     const hub = yield* makeHub(input.capacity)
-    const lock = (artifact: string, branch?: string) => input.locks.mailbox(`artifact:${artifact}\0${branch ?? ""}`)
+    // JSON keeps the two names unambiguous without a NUL separator, which PostgreSQL rejects in text parameters.
+    const lock = (artifact: string, branch?: string) =>
+      input.locks.mailbox(`artifact:${JSON.stringify([artifact, branch ?? ""])}`)
     return {
       ensureArtifact: (request) => input.locked(lock(request.artifact), ensureArtifact(request)),
       artifactHead: (request) => input.runNoTransaction(loadHead(request.artifact, request.branch)),
