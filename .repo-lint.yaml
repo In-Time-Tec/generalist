@@ -47,6 +47,8 @@ rules:
         # RL export acceptance spans the unstable projection, Runtime journals, and deterministic model
         - "packages/generalist/test/trajectory/dag.test.ts"
         - "packages/generalist/test/trajectory/export.test.ts"
+        # Capability recovery acceptance spans the unstable facade, Agent inheritance, and hosted Runtime journal
+        - "packages/generalist/test/unstable/capability/runtime.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
       target: "packages/*/src/**/*.ts"
       pattern: "*.tui.test.ts -> *.ts"

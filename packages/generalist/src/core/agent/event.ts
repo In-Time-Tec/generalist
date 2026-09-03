@@ -9,6 +9,7 @@ import { ToolBatchCheckpoint, ToolBatchWait } from "./tools/checkpoint.js"
 import type { Result as CompletionGateResult } from "./gates/definition.js"
 import type { AwaitEvent } from "./tools/wake-event.js"
 import type { Items as TaskItems } from "../../tasks/item.js"
+import type { Source as CapabilitySource } from "../capability/state.js"
 /** Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, Schema.Json>>
 
@@ -101,7 +102,9 @@ export interface ToolExecutionCompleted {
   readonly _tag: "ToolExecutionCompleted"
   readonly turn: number
   readonly call: Response.ToolCallPart<string, unknown>
-  readonly result: Response.ToolResultPart<string, unknown, unknown>
+  readonly result: Response.ToolResultPart<string, unknown, unknown> & {
+    readonly taint: ReadonlyArray<CapabilitySource>
+  }
   readonly tasksUpdated?: TaskItems
   readonly metadata?: Metadata & {
     readonly toolProgress?: {

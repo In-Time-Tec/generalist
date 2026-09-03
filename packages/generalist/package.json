@@ -153,6 +153,10 @@
       "types": "./dist/unstable/rl-export/index.d.ts",
       "import": "./dist/unstable/rl-export/index.js"
     },
+    "./unstable/capability": {
+      "types": "./dist/unstable/capability/index.d.ts",
+      "import": "./dist/unstable/capability/index.js"
+    },
     "./providers/model-catalog": {
       "types": "./dist/ai/model-catalog.d.ts",
       "import": "./dist/ai/model-catalog.js"

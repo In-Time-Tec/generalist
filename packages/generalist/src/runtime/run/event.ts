@@ -35,6 +35,7 @@ import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
 import { AdmissionPolicy, MessageSource } from "./steering.js"
 import { Message as AddressedMessage, type Message } from "../messaging/message.js"
 import { Items as TaskItems } from "../../tasks/item.js"
+import { Source as CapabilitySource } from "../../core/capability/state.js"
 
 export type { AgentLoopEvent, ExecutionResult }
 export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
@@ -289,7 +290,9 @@ const ToolResult = Schema.Struct({
   "~effect/ai/Content/Part": PartTag,
   metadata: Response.ProviderMetadata,
   memoized: Schema.optionalKey(Schema.Struct({ fromRun: Schema.String, fromOperation: Schema.String })),
+  taint: Schema.optionalKey(Schema.Array(CapabilitySource)),
 })
+const CompletedToolResult = Schema.Struct({ ...ToolResult.fields, taint: Schema.Array(CapabilitySource) })
 const Usage = Schema.Struct({
   inputTokens: Schema.Struct({
     uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
@@ -391,7 +394,7 @@ export const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("ToolExecutionCompleted", {
     turn: Schema.Finite,
     call: ToolCall,
-    result: ToolResult,
+    result: CompletedToolResult,
     tasksUpdated: Schema.optionalKey(TaskItems),
     ...optionalMetadata,
   }),

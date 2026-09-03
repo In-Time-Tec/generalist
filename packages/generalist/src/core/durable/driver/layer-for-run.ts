@@ -6,6 +6,8 @@ import { make, type RunBudget } from "../run-budget.js"
 import { DriverError, DriverStateInvalid } from "../service.js"
 import { currentDriverVersion, type DriverCheckpoint } from "./contract.js"
 import { DriverInterpreter, layerInline } from "./interpreter.js"
+import { initialize as initializeCapabilities } from "../../capability/state.js"
+import { LoopDriverState } from "../loop-driver-state.js"
 
 const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
 
@@ -46,7 +48,15 @@ export const layerForRun: {
           budget: budget ?? make({}),
         }
         if (options.executableRef !== undefined) driverInput = { ...driverInput, executable: options.executableRef }
-        return yield* driver.initial(driverInput)
+        const checkpoint = yield* driver.initial(driverInput)
+        if (agent.capabilities === undefined) return checkpoint
+        const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state).pipe(
+          Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+        )
+        return {
+          ...checkpoint,
+          state: { ...state, capabilities: initializeCapabilities(state.capabilities, agent.capabilities) },
+        }
       }
       const checkpoint = options.driverCheckpoint
       if (options.executableRef === undefined || checkpoint.executable === undefined) {

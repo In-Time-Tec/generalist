@@ -160,6 +160,16 @@ A successful tool result after applying the output bound.
 
 [`Success`](./ToolExecutor#success).[`result`](./ToolExecutor#result)
 
+<a id="taint"></a>
+
+##### taint?
+
+> `readonly` `optional` **taint?**: readonly `object`[]
+
+###### Inherited from
+
+[`Success`](./ToolExecutor#success).[`taint`](./ToolExecutor#taint-1)
+
 ***
 
 <a id="output"></a>

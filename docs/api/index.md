@@ -46,6 +46,7 @@
 - [trajectory](./trajectory)
 - [unstable.a2a](./unstable.a2a/index)
 - [unstable.ag-ui](./unstable.ag-ui/index)
+- [unstable.capability](./unstable.capability)
 - [unstable.cloudflare.durable-objects](./unstable.cloudflare.durable-objects)
 - [unstable.cloudflare.dynamic-workers](./unstable.cloudflare.dynamic-workers)
 - [unstable.cloudflare.workers](./unstable.cloudflare.workers)

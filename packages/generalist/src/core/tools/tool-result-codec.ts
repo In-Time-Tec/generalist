@@ -3,6 +3,7 @@ import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { AwaitEvent } from "../agent/tools/wake-event.js"
 import type { Items as TaskItems } from "../../tasks/item.js"
+import { Source, type Source as CapabilitySource } from "../capability/state.js"
 
 type BoundaryValue = typeof Schema.Unknown.Type
 
@@ -10,6 +11,7 @@ export interface Success {
   readonly _tag: "Success"
   readonly result: BoundaryValue
   readonly encodedResult: BoundaryValue
+  readonly taint?: ReadonlyArray<CapabilitySource>
   readonly memoized?: {
     readonly fromRun: string
     readonly fromOperation: string
@@ -20,6 +22,7 @@ export interface DomainFailure {
   readonly _tag: "DomainFailure"
   readonly failure: BoundaryValue
   readonly encodedFailure: BoundaryValue
+  readonly taint?: ReadonlyArray<CapabilitySource>
 }
 
 export interface Request {
@@ -47,6 +50,7 @@ export const Outcome = Schema.Union([
     result: Schema.Unknown,
     encodedResult: Schema.Unknown,
     outputPaths: Schema.optionalKey(Schema.Array(Schema.String)),
+    taint: Schema.optionalKey(Schema.Array(Source)),
     memoized: Schema.optionalKey(
       Schema.Struct({
         fromRun: Schema.String,
@@ -54,7 +58,12 @@ export const Outcome = Schema.Union([
       }),
     ),
   }),
-  Schema.Struct({ _tag: Schema.tag("DomainFailure"), failure: Schema.Unknown, encodedFailure: Schema.Unknown }),
+  Schema.Struct({
+    _tag: Schema.tag("DomainFailure"),
+    failure: Schema.Unknown,
+    encodedFailure: Schema.Unknown,
+    taint: Schema.optionalKey(Schema.Array(Source)),
+  }),
   Schema.Struct({
     _tag: Schema.tag("Suspend"),
     token: Schema.String,

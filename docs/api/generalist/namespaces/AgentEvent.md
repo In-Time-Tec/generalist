@@ -308,6 +308,10 @@ The run did NOT finish; the host resolves waits out-of-band and re-enters via
 
 > `readonly` **activeTools**: readonly `string`[]
 
+###### argumentTaint?
+
+> `readonly` `optional` **argumentTaint?**: readonly `object`[]
+
 ###### authorizationContextDigest
 
 > `readonly` **authorizationContextDigest**: `string`
@@ -1373,7 +1377,13 @@ A tool call finished; `result` is the part re-fed to the model.
 
 ##### result
 
-> `readonly` **result**: `ToolResultPart`\<`string`, `unknown`, `unknown`\>
+> `readonly` **result**: `ToolResultPart`\<`string`, `unknown`, `unknown`\> & `object`
+
+###### Type Declaration
+
+###### taint
+
+> `readonly` **taint**: readonly `object`[]
 
 <a id="tasksupdated"></a>
 

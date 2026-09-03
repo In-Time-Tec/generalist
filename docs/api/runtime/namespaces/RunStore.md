@@ -498,7 +498,7 @@ RunStore public contract and process-local memory layer.
 
 ##### kind
 
-> `readonly` **kind**: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"operator"` \| `"memory"` \| `"wait"` \| `"log"` \| `"handoff"` \| `"nested"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"operator"` \| `"memory"` \| `"wait"` \| `"log"` \| `"handoff"` \| `"nested"`
 
 <a id="operationkey"></a>
 

@@ -58,31 +58,34 @@ const toolCall = Schema.decodeSync(Response.ToolCallPart("web_search", Schema.St
   providerExecuted: false,
 })
 
-const toolResult = Response.makePart("tool-result", {
-  id: "search-1",
-  name: "web_search",
-  result: {
-    results: [
-      {
-        title: "Generalist docs",
-        url: "https://generalist.test/docs",
-        snippet: "Generalist streams transport frames.",
-      },
-    ],
-  },
-  encodedResult: {
-    results: [
-      {
-        title: "Generalist docs",
-        url: "https://generalist.test/docs",
-        snippet: "Generalist streams transport frames.",
-      },
-    ],
-  },
-  isFailure: false,
-  providerExecuted: false,
-  preliminary: false,
-})
+const toolResult = Object.assign(
+  Response.makePart("tool-result", {
+    id: "search-1",
+    name: "web_search",
+    result: {
+      results: [
+        {
+          title: "Generalist docs",
+          url: "https://generalist.test/docs",
+          snippet: "Generalist streams transport frames.",
+        },
+      ],
+    },
+    encodedResult: {
+      results: [
+        {
+          title: "Generalist docs",
+          url: "https://generalist.test/docs",
+          snippet: "Generalist streams transport frames.",
+        },
+      ],
+    },
+    isFailure: false,
+    providerExecuted: false,
+    preliminary: false,
+  }),
+  { taint: [] },
+)
 
 const completionFrames: ReadonlyArray<Connection.Incoming> = [
   eventFrame(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),

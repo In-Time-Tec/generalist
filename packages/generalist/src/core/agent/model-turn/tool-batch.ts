@@ -31,12 +31,17 @@ export const scheduleBatch = <E, R>(input: {
   Stream.unwrap(
     Effect.gen(function* () {
       const logicalId = yield* logicalOperationId
+      const initial = yield* checkpoint
+      const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(initial.state).pipe(
+        Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+      )
       const batch = make({
         turn: input.turn,
         calls: input.calls,
         operationKeys: input.calls.map((call) => operationKey(logicalId, "tool", input.turn, call.id, call.name)),
         activeTools: input.activeTools,
         authorizationContextDigest: promptDigest(input.authorizationMessages),
+        argumentTaint: state.capabilities?.taint ?? [],
       })
       yield* setToolBatch(batch)
       return schedule(input.executions, input.toolScheduling, {

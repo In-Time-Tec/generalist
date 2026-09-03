@@ -1,7 +1,14 @@
 import { Cause, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError, type Event, type ToolProgress, ProgressOverflow } from "../event.js"
-import { type AnyToolCall, domainFailureResult, interrupted, successResult, type PendingToolResult } from "./result.js"
+import { AgentError, type Event } from "../event.js"
+import {
+  domainFailureResult,
+  interrupted,
+  outcomeFromResult,
+  successResult,
+  type AnyToolCall,
+  type PendingToolResult,
+} from "./result.js"
 import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "../service.js"
 import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
@@ -12,14 +19,13 @@ import {
   Outcome,
   type Request,
   RemoteRetryMisconfigured,
-  type SettledOutcome,
   ToolExecutor,
   executeToolkit,
 } from "../../tools/tool-executor.js"
 import { cancellableOperation, supportsCancellation } from "../../tools/tool-executor-cancellation.js"
 import { bound } from "../../tools/tool-output.js"
 import { type Registry, get } from "../../tools/tool-registry.js"
-import { ToolContext, type Progress } from "../../tools/tool-context.js"
+import { ToolContext } from "../../tools/tool-context.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
@@ -36,6 +42,8 @@ import { definition as fanOutDefinition, withoutFanOut } from "../tool/fan-out.j
 import { execute as executeFanOut, withParentTasks } from "./fan-out.js"
 import type { RunInbox } from "../../turn/steering-inbox.js"
 import { eventFields as taskEventFields } from "../../../tasks/internal.js"
+import { taintForCall } from "../../capability/internal.js"
+import { make as makeToolProgress } from "../tool/progress.js"
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
   readonly inbox?: RunInbox
@@ -134,6 +142,10 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     handoffState === undefined
       ? Effect.succeed(agent.name)
       : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.name))
+  const activeCapabilities = () =>
+    handoffState === undefined
+      ? Effect.succeed(agent.capabilities)
+      : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.agent.capabilities))
   const unlessBlocked = <E, R>(reason: string | undefined, execute: () => Effect.Effect<Outcome, E, R>) =>
     reason === undefined ? execute() : Effect.succeed(hookBlockedOutcome("ToolCall", reason))
   const defaultExecute = (request: Request, registry: Registry) => {
@@ -159,59 +171,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           }),
         )
   }
-  const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflow>> => {
-    switch (progressPolicy._tag) {
-      case "Backpressure":
-        return Queue.bounded(progressPolicy.capacity)
-      case "Dropping":
-      case "Fail":
-        return Queue.dropping(progressPolicy.capacity)
-      case "Sliding":
-        return Queue.sliding(progressPolicy.capacity)
-    }
-  }
-  const progressEvent = (turn: number, progress: Progress): ToolProgress => {
-    const base = { _tag: "ToolProgress" as const, turn, toolCallId: progress.toolCallId }
-    const { message, data } = progress
-    if (message === undefined) return data === undefined ? base : { ...base, data }
-    if (data === undefined) return { ...base, message }
-    return { ...base, message, data }
-  }
-  const emitProgress =
-    (
-      turn: number,
-      call: AnyToolCall,
-      progressQueue: Queue.Queue<ToolProgress, Cause.Done | ProgressOverflow>,
-      droppedProgress: Ref.Ref<number>,
-      emitSemaphore: Semaphore.Semaphore,
-    ) =>
-    (progress: Progress): Effect.Effect<boolean> => {
-      const event = progressEvent(turn, progress)
-      return emitSemaphore.withPermit(
-        Effect.gen(function* () {
-          if (progressPolicy._tag === "Sliding") {
-            const accepted = yield* Effect.sync(() => {
-              const full = Queue.isFullUnsafe(progressQueue)
-              const offered = Queue.offerUnsafe(progressQueue, event)
-              return { dropped: full && offered, offered }
-            })
-            if (accepted.dropped) yield* Ref.update(droppedProgress, (count) => count + 1)
-            return accepted.offered
-          }
-          const offered = yield* Queue.offer(progressQueue, event)
-          if (progressPolicy._tag === "Dropping" && !offered) {
-            yield* Ref.update(droppedProgress, (count) => count + 1)
-          } else if (progressPolicy._tag === "Fail" && !offered) {
-            yield* Queue.fail(
-              progressQueue,
-              ProgressOverflow.make({ turn, toolCallId: call.id, capacity: progressPolicy.capacity }),
-            )
-          }
-          return offered
-        }),
-      )
-    }
-
+  const { makeProgressQueue, emitProgress } = makeToolProgress(progressPolicy)
   const executionFor = (
     turn: number,
     call: AnyToolCall,
@@ -245,12 +205,10 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       resolvingToolCallIds: request.toolCallBatch.calls.map((entry) => entry.id),
     })
   }
-
   const hookBlockedOutcome = (event: "ToolCall" | "ToolResult", reason: string): Outcome => {
     const failure = { reason: "hook-blocked", message: `${event} hook blocked the tool: ${reason}` }
     return { _tag: "DomainFailure", failure, encodedFailure: failure }
   }
-
   const hookToolResult = (
     agentName: string,
     turn: number,
@@ -321,6 +279,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
         const invocationPath =
           handoffState === undefined ? [] : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
+        const capabilityTaint = yield* taintForCall(turn, call.name, call.id)
         const liveOutcome = unlessBlocked(blockedReason, () =>
           memoizeRegistered({
             registry,
@@ -348,6 +307,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const executionBase = start.pipe(
           Effect.andThen(inputContext.inbox?.interruptTool(liveOutcome, interrupted) ?? liveOutcome),
           Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)),
+          Effect.map((outcome) => (outcome._tag === "Suspend" ? outcome : { ...outcome, taint: capabilityTaint })),
         )
         const execution = intercept(
           {
@@ -432,9 +392,8 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     Effect.gen(function* () {
       const agentName = yield* activeAgentName()
       const request = { call, toolCallBatch, turn, toolCallIndex, agentName, sessionId }
-      const outcome: SettledOutcome = result.isFailure
-        ? { _tag: "DomainFailure", failure: result.result, encodedFailure: result.encodedResult }
-        : { _tag: "Success", result: result.result, encodedResult: result.encodedResult }
+      const outcome = outcomeFromResult(result)
+      const capabilityTaint = yield* taintForCall(turn, call.name, call.id)
       const transform = Option.isSome(executor) ? executor.value.transformResolved : undefined
       const transformed =
         transform !== undefined
@@ -469,7 +428,8 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       if (hooked._tag === "Suspend") {
         return yield* AgentError.make({ message: `Resolved tool ${call.name} suspended again`, turn })
       }
-      return hooked._tag === "Success" ? successResult(call, hooked) : domainFailureResult(call, hooked)
+      const tainted = { ...hooked, taint: capabilityTaint }
+      return tainted._tag === "Success" ? successResult(call, tainted) : domainFailureResult(call, tainted)
     })
   const toolCallEvents = makeToolAuthorization({
     runId,
@@ -479,6 +439,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
     toolState,
     handoffState,
     activeAgentName,
+    activeCapabilities,
     executeApproved,
   })
   return {

@@ -193,15 +193,18 @@ const scheduleToolCalls = (backend: "memory" | "sqlite", terminal: "cancelled" |
           _tag: "ToolExecutionCompleted",
           turn: 0,
           call: completedCall,
-          result: Response.toolResultPart({
-            id: completedCall.id,
-            name: completedCall.name,
-            isFailure: false,
-            result: "completed event result",
-            encodedResult: "completed event encoded result",
-            providerExecuted: false,
-            preliminary: false,
-          }),
+          result: Object.assign(
+            Response.toolResultPart({
+              id: completedCall.id,
+              name: completedCall.name,
+              isFailure: false,
+              result: "completed event result",
+              encodedResult: "completed event encoded result",
+              providerExecuted: false,
+              preliminary: false,
+            }),
+            { taint: [] },
+          ),
         },
       })
       yield* store.expireRunningOperation({ ...claim, operationId: operations[2]!.operationId })

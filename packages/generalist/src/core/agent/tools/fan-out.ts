@@ -7,7 +7,7 @@ import { AgentError } from "../event.js"
 import { childEnd as applyChildEnd, childStart as applyChildStart } from "../lifecycle/hooks.js"
 import { definition as fanOutDefinition, validateAuthority, type Definition } from "../tool/fan-out.js"
 import type { Any as AnyAgent } from "../lifecycle/definition.js"
-import { inheritedHistory, ProcessRunner, child, run, type AnyChild } from "../lifecycle/fan-out.js"
+import { inheritedHistory, ProcessRunner, run, type AnyChild } from "../lifecycle/fan-out.js"
 import { current as currentTasks } from "../../../tasks/internal.js"
 import { get, type Registry } from "../../tools/tool-registry.js"
 
@@ -61,7 +61,9 @@ export const execute = (parentAgent: AnyAgent, definition: Definition, request: 
         .pipe(Effect.mapError((error) => frameworkFailure(request, "decode-input", error.message)))
       const history = inheritedHistory(member.inherit.history, parentHistory)
       invocations.push({
-        ...child(agent, member.input, { inherit: member.inherit }),
+        agent,
+        input: member.input,
+        inherit: member.inherit,
         ...Object.assign({}, history === undefined ? undefined : { history }),
         ...Object.assign({}, member.inherit.tasks === "read" ? { tasks: parentTasks ?? [] } : undefined),
         lifecycle: {

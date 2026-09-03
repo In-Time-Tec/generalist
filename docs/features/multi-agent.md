@@ -60,18 +60,18 @@ Provide the local Effects and `handoffLayer` with the model, permissions, approv
 
 `Agent.child(agent, input, { inherit })` and each `AgentTool.fanOut` profile use the same normalized record. For example, declare `agents: { researcher: { agent: researcher, inherit: { history: "full", budget: { usd: 1 } } } }`. Omitted fields use these defaults:
 
-| Field          | Values                          | Default       | Behavior                                                                                                    |
-| -------------- | ------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
-| `history`      | `"none"`, `"summary"`, `"full"` | `"none"`      | Fresh transcript; latest user message; or the exact encoded parent prefix for provider prompt-cache reuse   |
-| `tools`        | `"attenuate"`, `"same"`         | `"attenuate"` | Child-declared subset of parent tools, or exactly the parent's tool set                                     |
-| `permissions`  | `"inherit"`, `"fresh"`          | `"inherit"`   | Parent authorization and remembered rules, or a fresh authorization context under the same parent authority |
-| `budget`       | `BudgetLimits`                  | parent share  | Narrows the reserved `parent remaining / maxChildren` share                                                 |
-| `sandbox`      | `"share"`, `"fork"`, `"fresh"`  | `"fork"`      | Parent sandbox, snapshot/fork of it, or the child profile's fresh sandbox                                   |
-| `instructions` | `"inherit"`, `"own"`            | `"inherit"`   | Parent instructions or the child Agent's instructions                                                       |
-| `memory`       | `"inherit"`, `"fresh"`          | `"inherit"`   | Parent memory key or no inherited memory                                                                    |
-| `tasks`        | `"read"`, `"none"`              | `"none"`      | Read-only admission-time snapshot of the parent's current task list, or no parent task context              |
+| Field          | Values                                         | Default       | Behavior                                                                                                    |
+| -------------- | ---------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `history`      | `"none"`, `"summary"`, `"full"`                | `"none"`      | Fresh transcript; latest user message; or the exact encoded parent prefix for provider prompt-cache reuse   |
+| `tools`        | `"attenuate"`, `"same"`, `Capability.Handle[]` | `"attenuate"` | Child subset, parent set, or exact scoped capability handles                                                |
+| `permissions`  | `"inherit"`, `"fresh"`                         | `"inherit"`   | Parent authorization and remembered rules, or a fresh authorization context under the same parent authority |
+| `budget`       | `BudgetLimits`                                 | parent share  | Narrows the reserved `parent remaining / maxChildren` share                                                 |
+| `sandbox`      | `"share"`, `"fork"`, `"fresh"`                 | `"fork"`      | Parent sandbox, snapshot/fork of it, or the child profile's fresh sandbox                                   |
+| `instructions` | `"inherit"`, `"own"`                           | `"inherit"`   | Parent instructions or the child Agent's instructions                                                       |
+| `memory`       | `"inherit"`, `"fresh"`                         | `"inherit"`   | Parent memory key or no inherited memory                                                                    |
+| `tasks`        | `"read"`, `"none"`                             | `"none"`      | Read-only admission-time snapshot of the parent's current task list, or no parent task context              |
 
-The declaration, not the model call, owns this policy. A child tool, custom authorization policy, or sandbox absent from the parent fails at spawn with `ChildExceedsParent { field }`; no child Run or model call is admitted. Durable fan-out includes the normalized record in its admission digest and `ChildLinked` event, so restart reattaches with the same history, authority, budget, sandbox, instructions, memory, and task choices. A `tasks: "read"` child receives an immutable snapshot; its own task writes remain local to its Run.
+The declaration, not the model call, owns this policy. `tools: [handle]` accepts only live values from `Capability.grant` or `Capability.attenuate`; it serializes their verified authority lineage for durable child recovery, never a model-authored rule or ID. Every child tool must have a distinct matching handle, and a constrained parent may pass only descendant handles. A child tool, custom authorization policy, or sandbox absent from the parent fails at spawn with `ChildExceedsParent { field }`; no child Run or model call is admitted. Durable fan-out includes the normalized record in its admission digest and `ChildLinked` event, so restart reattaches with the same history, authority, budget, sandbox, instructions, memory, task, and capability choices. A `tasks: "read"` child receives an immutable snapshot; its own task writes remain local to its Run.
 
 ## What runs
 
@@ -158,6 +158,7 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 - Reusing the active parent's Session ID fails before the child model call; it does not wait on the parent's lane.
 - Parent, child, and sibling control inputs never cross Run boundaries.
 - Parent tasks cross a child boundary only as the explicit `tasks: "read"` snapshot; children cannot mutate the parent's list.
+- Capability handles cross a child boundary only through explicit `tools: [handle]` inheritance; the child cannot widen scope or expiry, and its capability decisions stay in its own Run checkpoint.
 - A durable Runtime journals an inline child as the parent's AgentTool operation. The child loop keeps its own process-local driver journal and never writes child checkpoints or model responses into the parent's Runtime journal or Session; replay of a completed parent tool operation returns the recorded child result without redispatch.
 - Same-run handoff retains the Run ID, inbox, Session identity, `DriverInterpreter`, tree `RunBudget`, cancellation scope, approval context, accumulated usage, and event order.
 - On the target's first turn, its instructions are live system context only; the `Handoff` projection remains the active Session history, and the target's non-system conversation appends after it.
@@ -178,3 +179,4 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 
 - Source: `packages/generalist/src/core/agent/lifecycle/fan-out.ts`, `packages/generalist/src/core/agent/tool/fan-out.ts`, `packages/generalist/src/runtime/child/`, `packages/generalist/src/core/agent/handoff/`, `packages/generalist/src/core/policy/handoff.ts`
 - Site: `/docs/guides/multi-agent`, `/docs/guides/addressed-messaging`
+- Sibling feature docs: [`capabilities.md`](./capabilities.md), [`tasks.md`](./tasks.md)

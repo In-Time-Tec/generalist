@@ -250,6 +250,16 @@ An Agent definition carrying its tools, requirements, input, and output contract
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="capabilities"></a>
+
+##### capabilities?
+
+> `readonly` `optional` **capabilities?**: readonly `object`[]
+
+**`Internal`**
+
+Capability descriptors attached only by child inheritance.
+
 <a id="gates"></a>
 
 ##### gates
@@ -422,6 +432,16 @@ One Agent observed where its tool and requirement types are hidden.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="capabilities-1"></a>
+
+##### capabilities?
+
+> `readonly` `optional` **capabilities?**: readonly `object`[]
+
+**`Internal`**
+
+Capability descriptors attached only by child inheritance.
+
 <a id="gates-1"></a>
 
 ##### gates
@@ -579,6 +599,20 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`budget`](#budget-1)
+
+<a id="capabilities-2"></a>
+
+##### capabilities?
+
+> `readonly` `optional` **capabilities?**: readonly `object`[]
+
+**`Internal`**
+
+Capability descriptors attached only by child inheritance.
+
+###### Inherited from
+
+[`Any`](#any).[`capabilities`](#capabilities-1)
 
 <a id="gates-2"></a>
 
@@ -798,6 +832,116 @@ An agent definition: a plain value, not a service.
 
 ***
 
+<a id="inheritanceoptions"></a>
+
+### InheritanceOptions
+
+Caller-authored child inheritance options. Omitted fields use safe defaults.
+
+#### Extends
+
+- `Partial`\<`Omit`\<[`Inheritance`](#inheritance), `"tools"`\>\>
+
+#### Properties
+
+<a id="budget-3"></a>
+
+##### budget?
+
+> `readonly` `optional` **budget?**: `object`
+
+###### children?
+
+> `readonly` `optional` **children?**: `number`
+
+###### duration?
+
+> `readonly` `optional` **duration?**: `number`
+
+###### tokens?
+
+> `readonly` `optional` **tokens?**: `number`
+
+###### toolCalls?
+
+> `readonly` `optional` **toolCalls?**: `number`
+
+###### usd?
+
+> `readonly` `optional` **usd?**: `number`
+
+###### Inherited from
+
+`Partial.budget`
+
+<a id="history"></a>
+
+##### history?
+
+> `readonly` `optional` **history?**: `"none"` \| `"summary"` \| `"full"`
+
+###### Inherited from
+
+`Partial.history`
+
+<a id="instructions-3"></a>
+
+##### instructions?
+
+> `readonly` `optional` **instructions?**: `"inherit"` \| `"own"`
+
+###### Inherited from
+
+`Partial.instructions`
+
+<a id="memory-3"></a>
+
+##### memory?
+
+> `readonly` `optional` **memory?**: `"fresh"` \| `"inherit"`
+
+###### Inherited from
+
+`Partial.memory`
+
+<a id="permissions"></a>
+
+##### permissions?
+
+> `readonly` `optional` **permissions?**: `"fresh"` \| `"inherit"`
+
+###### Inherited from
+
+`Partial.permissions`
+
+<a id="sandbox-3"></a>
+
+##### sandbox?
+
+> `readonly` `optional` **sandbox?**: `"fresh"` \| `"fork"` \| `"share"`
+
+###### Inherited from
+
+`Partial.sandbox`
+
+<a id="tasks"></a>
+
+##### tasks?
+
+> `readonly` `optional` **tasks?**: `"none"` \| `"read"`
+
+###### Inherited from
+
+`Partial.tasks`
+
+<a id="tools-1"></a>
+
+##### tools?
+
+> `readonly` `optional` **tools?**: `"attenuate"` \| `"same"` \| readonly [`Handle`](../../unstable.capability#handle)\<`Any`\>[]
+
+***
+
 <a id="inspectionsnapshot"></a>
 
 ### InspectionSnapshot
@@ -966,7 +1110,7 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
 
-<a id="budget-3"></a>
+<a id="budget-4"></a>
 
 ##### budget?
 
@@ -1004,13 +1148,13 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **input?**: `InputSchema`
 
-<a id="instructions-3"></a>
+<a id="instructions-4"></a>
 
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
 
-<a id="memory-3"></a>
+<a id="memory-4"></a>
 
 ##### memory?
 
@@ -1052,7 +1196,7 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **policy?**: [`Policy`](./Policy-1#policy)\<`PolicyServices`\>
 
-<a id="sandbox-3"></a>
+<a id="sandbox-4"></a>
 
 ##### sandbox?
 
@@ -1070,7 +1214,7 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **toolkit?**: `Toolkit`\<`Tools`\>
 
-<a id="tools-2"></a>
+<a id="tools-3"></a>
 
 ##### tools?
 
@@ -1128,7 +1272,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.authorization`
 
-<a id="budget-4"></a>
+<a id="budget-5"></a>
 
 ##### budget?
 
@@ -1178,7 +1322,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.input`
 
-<a id="instructions-4"></a>
+<a id="instructions-5"></a>
 
 ##### instructions?
 
@@ -1188,7 +1332,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.instructions`
 
-<a id="memory-4"></a>
+<a id="memory-5"></a>
 
 ##### memory?
 
@@ -1258,7 +1402,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.policy`
 
-<a id="sandbox-4"></a>
+<a id="sandbox-5"></a>
 
 ##### sandbox?
 
@@ -1284,7 +1428,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 > `readonly` `optional` **toolkit?**: `undefined`
 
-<a id="tools-3"></a>
+<a id="tools-4"></a>
 
 ##### tools
 
@@ -1484,7 +1628,7 @@ Internal prompt-level options for an Agent run.
 
 #### Properties
 
-<a id="budget-5"></a>
+<a id="budget-6"></a>
 
 ##### budget?
 
@@ -1636,7 +1780,7 @@ Pinned identity admitted by a durable host.
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
 
-<a id="history"></a>
+<a id="history-1"></a>
 
 ##### history?
 
@@ -1760,7 +1904,7 @@ Authoritative invocation facts supplied by a durable host.
 
 Stable host identity for the logical model operations in this run.
 
-<a id="memory-5"></a>
+<a id="memory-6"></a>
 
 ##### memory?
 
@@ -1856,7 +2000,7 @@ Typed durable start identity. Budget admission is reserved for the RunBudget con
 
 #### Properties
 
-<a id="budget-6"></a>
+<a id="budget-7"></a>
 
 ##### budget?
 
@@ -2094,7 +2238,7 @@ Host facts required before a new externally completed tool-call batch is admitte
 
 > `readonly` **activeTools**: readonly `string`[]
 
-<a id="budget-7"></a>
+<a id="budget-8"></a>
 
 ##### budget?
 
@@ -2340,16 +2484,6 @@ Extract an Agent's encoded output type.
 > **Inheritance** = *typeof* `Inheritance.Type`
 
 Authority and context inherited by one child Run.
-
-***
-
-<a id="inheritanceoptions"></a>
-
-### InheritanceOptions
-
-> **InheritanceOptions** = `Partial`\<[`Inheritance`](#inheritance)\>
-
-Caller-authored child inheritance options. Omitted fields use safe defaults.
 
 ***
 
@@ -2904,7 +3038,7 @@ Normalize one child inheritance record before execution or journaling.
 
 ##### options?
 
-[`InheritanceOptions`](#inheritanceoptions)
+[`InheritanceOptions`](#inheritanceoptions) \| [`Inheritance`](#inheritance)
 
 #### Returns
 
@@ -2916,7 +3050,7 @@ Normalize one child inheritance record before execution or journaling.
 
 ### Inheritance
 
-> `const` **Inheritance**: `Schema.Struct`\<\{ `budget`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `history`: `Schema.Literals`\<readonly \[`"none"`, `"summary"`, `"full"`\]\>; `instructions`: `Schema.Literals`\<readonly \[`"inherit"`, `"own"`\]\>; `memory`: `Schema.Literals`\<readonly \[`"inherit"`, `"fresh"`\]\>; `permissions`: `Schema.Literals`\<readonly \[`"inherit"`, `"fresh"`\]\>; `sandbox`: `Schema.Literals`\<readonly \[`"share"`, `"fork"`, `"fresh"`\]\>; `tasks`: `Schema.Literals`\<readonly \[`"read"`, `"none"`\]\>; `tools`: `Schema.Literals`\<readonly \[`"attenuate"`, `"same"`\]\>; \}\>
+> `const` **Inheritance**: `Schema.Struct`\<\{ `budget`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `history`: `Schema.Literals`\<readonly \[`"none"`, `"summary"`, `"full"`\]\>; `instructions`: `Schema.Literals`\<readonly \[`"inherit"`, `"own"`\]\>; `memory`: `Schema.Literals`\<readonly \[`"inherit"`, `"fresh"`\]\>; `permissions`: `Schema.Literals`\<readonly \[`"inherit"`, `"fresh"`\]\>; `sandbox`: `Schema.Literals`\<readonly \[`"share"`, `"fork"`, `"fresh"`\]\>; `tasks`: `Schema.Literals`\<readonly \[`"read"`, `"none"`\]\>; `tools`: `Schema.Union`\<readonly \[`Schema.Literals`\<readonly \[`"attenuate"`, `"same"`\]\>, `Schema.$Array`\<`Schema.Struct`\<\{ `expiresAt`: `Schema.Finite`; `id`: `Schema.brand`\<`Schema.String`, `"generalist/capability/CapabilityId"`\>; `lineage`: `Schema.$Array`\<`Schema.Union`\<readonly ...\>\>; `scope`: `Schema.$Record`\<`Schema.String`, `Schema.$Array`\<`Schema.String`\>\>; `tool`: `Schema.String`; \}\>\>\]\>; \}\>
 
 Authority and context inherited by one child Run.
 
