@@ -12,6 +12,7 @@ Build local release evidence without changing a branch, tag, remote, registry, r
 - Resolve one full commit SHA before doing release work. Do not package a dirty checkout and call it commit evidence.
 - Write into a new artifact directory. Never reuse or overwrite a prior candidate.
 - `bun run package` is the consumer proof. It creates fresh Bun-isolated, core-only, and npm projects and installs the newly packed tarballs. Do not replace it with workspace imports or a build-directory smoke test.
+- The npm consumer needs npm 11.19.0 or newer on `PATH`. Older npm (10.9.8 and 11.5.1 confirmed) crashes in Arborist with `Cannot read properties of null (reading 'edgesOut')` while resolving the optional `vitest` peer chain; that is an npm bug, not package evidence. `.github/workflows/publish.yml` pins a Node release whose bundled npm passes.
 - Stop after local proof unless the user explicitly asks to create or push a tag, dispatch the release workflow, publish, or deploy. Never run `npm publish` locally.
 
 ## Build from the exact commit
