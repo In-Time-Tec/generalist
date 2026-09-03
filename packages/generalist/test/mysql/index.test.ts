@@ -53,10 +53,11 @@ const conformanceClaim: ClaimExecution = (services, { runId, workerId }) => {
   const claims = services.claims
   if (claims === undefined) return Effect.die("MySQL conformance layer does not provide RunClaims")
   return Effect.gen(function* () {
-    const claimed = yield* claims.claimReadyRuns({ workerId, limit: 16, lease: "10 seconds" })
-    const run = claimed.find((candidate) => candidate.run.runId === runId)
-    if (run === undefined) return yield* Effect.die(`MySQL did not claim conformance Run ${runId}`)
-    return { runId, ownerId: run.workerId, attemptFence: run.attemptFence, session: run.session }
+    const [claimed] = yield* claims.claimReadyRuns({ workerId, limit: 1, lease: "10 seconds" })
+    if (claimed === undefined || claimed.run.runId !== runId) {
+      return yield* Effect.die(`MySQL did not claim conformance Run ${runId}`)
+    }
+    return { runId, ownerId: claimed.workerId, attemptFence: claimed.attemptFence, session: claimed.session }
   }).pipe(Effect.orDie)
 }
 
@@ -117,6 +118,7 @@ Testing.runtimeDriver({
   name: "MySQL",
   address: assistantAddress,
   layer: conformanceLayer,
+  setup: conformanceDatabase.truncated.pipe(Effect.orDie),
   skip,
   capabilities: {
     runtime: { claim: conformanceClaim },

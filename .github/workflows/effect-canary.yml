@@ -17,7 +17,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: generalist
           POSTGRES_PASSWORD: generalist-canary
@@ -71,6 +71,8 @@ jobs:
           echo "Testing Effect cohort $candidate"
       - run: bun install
       - run: find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} +
+      - name: Configure PostgreSQL test database
+        run: psql "$GENERALIST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector"
       - run: bun run check
       - name: Configure MySQL test databases
         run: mysql -h 127.0.0.1 -P 33306 -uroot -pgeneralist-canary -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`generalist\_%\`.* TO 'generalist'@'%'; FLUSH PRIVILEGES;"
