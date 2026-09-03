@@ -68,7 +68,11 @@ export const checkpointFromHistory: {
         projectionClosed = true
         continue
       }
-      if (projectionClosed || entry.state._tag !== "Completed" || !Equal.equals(result, entry.state.result)) {
+      if (
+        projectionClosed ||
+        entry.state._tag !== "Completed" ||
+        !Equal.equals(result, Schema.decodeSync(Prompt.ToolResultPart)(entry.state.result))
+      ) {
         return undefined
       }
       matched += 1

@@ -141,15 +141,18 @@ describe("AG-UI event projection", () => {
             params: { q: "generalist" },
             providerExecuted: false,
           }),
-          result: Response.makePart("tool-result", {
-            id: "tool-1",
-            name: "search",
-            isFailure: false,
-            result: ["found"],
-            encodedResult: ["found"],
-            providerExecuted: false,
-            preliminary: false,
-          }),
+          result: Object.assign(
+            Response.makePart("tool-result", {
+              id: "tool-1",
+              name: "search",
+              isFailure: false,
+              result: ["found"],
+              encodedResult: ["found"],
+              providerExecuted: false,
+              preliminary: false,
+            }),
+            { taint: [] },
+          ),
         },
         { ...base, _tag: "TurnCompleted", turn: 0 },
         {
