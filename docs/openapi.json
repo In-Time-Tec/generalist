@@ -2372,6 +2372,19 @@
                                   },
                                   "required": ["fromRun", "fromOperation"],
                                   "additionalProperties": false
+                                },
+                                "taint": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "capabilityId": { "type": "string", "minLength": 1 },
+                                      "tool": { "type": "string", "minLength": 1 },
+                                      "toolCallId": { "type": "string", "minLength": 1 }
+                                    },
+                                    "required": ["capabilityId", "tool", "toolCallId"],
+                                    "additionalProperties": false
+                                  }
                                 }
                               },
                               "required": [
@@ -2383,7 +2396,8 @@
                                 "encodedResult",
                                 "providerExecuted",
                                 "preliminary",
-                                "metadata"
+                                "metadata",
+                                "taint"
                               ],
                               "additionalProperties": false
                             },
@@ -5506,26 +5520,6 @@
         "required": ["_tag", "message"],
         "additionalProperties": false
       },
-      "ToolResultPart": {
-        "type": "object",
-        "properties": {
-          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
-          "options": {
-            "anyOf": [
-              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
-              { "type": "null" }
-            ]
-          },
-          "type": { "type": "string", "enum": ["tool-result"] },
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "isFailure": { "type": "boolean" },
-          "result": {},
-          "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] }
-        },
-        "required": ["type", "id", "name", "isFailure", "result"],
-        "additionalProperties": false
-      },
       "generalist_core_AgentSuspendedEncoded": {
         "type": "object",
         "properties": {
@@ -5660,7 +5654,39 @@
                           "type": "object",
                           "properties": {
                             "_tag": { "type": "string", "enum": ["Completed"] },
-                            "result": { "$ref": "#/components/schemas/ToolResultPart" }
+                            "result": {
+                              "type": "object",
+                              "properties": {
+                                "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+                                "options": {
+                                  "anyOf": [
+                                    { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "type": { "type": "string", "enum": ["tool-result"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "isFailure": { "type": "boolean" },
+                                "result": {},
+                                "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] },
+                                "taint": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "capabilityId": { "type": "string", "minLength": 1 },
+                                      "tool": { "type": "string", "minLength": 1 },
+                                      "toolCallId": { "type": "string", "minLength": 1 }
+                                    },
+                                    "required": ["capabilityId", "tool", "toolCallId"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": ["type", "id", "name", "isFailure", "result", "taint"],
+                              "additionalProperties": false
+                            }
                           },
                           "required": ["_tag", "result"],
                           "additionalProperties": false
@@ -5692,6 +5718,19 @@
               },
               "activeTools": { "type": "array", "items": { "type": "string" } },
               "authorizationContextDigest": { "type": "string" },
+              "argumentTaint": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "capabilityId": { "type": "string", "minLength": 1 },
+                    "tool": { "type": "string", "minLength": 1 },
+                    "toolCallId": { "type": "string", "minLength": 1 }
+                  },
+                  "required": ["capabilityId", "tool", "toolCallId"],
+                  "additionalProperties": false
+                }
+              },
               "activatedSkills": { "type": "array", "items": { "type": "string" } },
               "invocationPath": { "type": "array", "items": { "type": "string" } }
             },
