@@ -1,8 +1,10 @@
+import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
 import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
+import { layerMemory as layerBlobStoreMemory } from "generalist/blob-store"
 import { Generalist } from "generalist/host"
 import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
 import { Server, type Client } from "generalist/server"
@@ -22,7 +24,8 @@ const model = Layer.effect(
 const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
   Layer.provide(ExecutableResolver.layerStatic([])),
 )
-const services = Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerAutoApprove)
+const blobStore = layerBlobStoreMemory().pipe(Layer.provide(BunCrypto.layer))
+const services = Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerAutoApprove, blobStore)
 
 const makeTransport = (handler: (request: Request) => Promise<Response>): HttpClient.HttpClient =>
   HttpClient.make((request) =>
@@ -116,6 +119,23 @@ layer(services)("Server", (it) => {
         const transport = makeTransport(app.handler)
         const client = yield* makeClient(transport, "secret")
 
+        const attachmentData = new TextEncoder().encode("attachment")
+        const attachment = yield* client.attachments.put({
+          data: attachmentData,
+          mediaType: "application/pdf",
+          filename: "report.pdf",
+        })
+        const downloaded = yield* client.attachments.get({ sha256: attachment.sha256 })
+        expect(downloaded.body).toEqual(attachmentData)
+        expect(downloaded.headers).toMatchObject({
+          "content-type": "application/pdf",
+          "x-filename": "report.pdf",
+        })
+        expect(yield* client.attachments.get({ sha256: "0".repeat(64) }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/blob-store/BlobNotFound",
+          sha256: "0".repeat(64),
+        })
+
         const session = yield* client.sessions.create({ id: "session:server", title: "Server test" })
         const started = yield* client.runs.start({
           sessionId: session.id,
@@ -157,7 +177,7 @@ layer(services)("Server", (it) => {
         expect(disabled).toMatchObject({ _tag: "generalist/server/OperatorDisabled", operation: "retry" })
 
         const unauthorized = yield* makeClient(transport, "wrong").pipe(
-          Effect.flatMap((rejected) => rejected.sessions.list()),
+          Effect.flatMap((rejected) => rejected.attachments.get({ sha256: attachment.sha256 })),
           Effect.flip,
         )
         expect(unauthorized).toMatchObject({ _tag: "generalist/server/Unauthorized" })

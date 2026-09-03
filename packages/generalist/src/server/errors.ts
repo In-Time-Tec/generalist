@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { HttpApiSchema } from "effect/unstable/httpapi"
 import { Invalid as BudgetInvalid } from "../core/durable/run-budget.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
+import { BlobNotFound, BlobStoreError, BlobTooLarge } from "../blob-store/index.js"
 import { AgentInputInvalid, AgentNotRegistered } from "../host/errors.js"
 import {
   ApprovalMismatch,
@@ -81,6 +82,7 @@ export class WireCodecFailed extends ActionableTaggedError<WireCodecFailed>()("g
 const badRequest = HttpApiSchema.status(400)
 const conflict = HttpApiSchema.status(409)
 const notFound = HttpApiSchema.status(404)
+const payloadTooLarge = HttpApiSchema.status(413)
 const unavailable = HttpApiSchema.status(503)
 
 export const apiErrors = [
@@ -88,6 +90,9 @@ export const apiErrors = [
   AgentNotRegistered.pipe(notFound),
   ApprovalMismatch.pipe(conflict),
   ApprovalStale.pipe(conflict),
+  BlobNotFound.pipe(notFound),
+  BlobStoreError.pipe(unavailable),
+  BlobTooLarge.pipe(payloadTooLarge),
   BudgetInvalid.pipe(badRequest),
   IllegalOperatorAction.pipe(conflict),
   OperatorDisabled,
@@ -109,6 +114,9 @@ const dedicatedErrors = Schema.Union([
   AgentNotRegistered,
   ApprovalMismatch,
   ApprovalStale,
+  BlobNotFound,
+  BlobStoreError,
+  BlobTooLarge,
   BudgetInvalid,
   IllegalOperatorAction,
   OperatorDisabled,

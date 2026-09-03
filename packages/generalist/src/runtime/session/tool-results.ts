@@ -3,6 +3,7 @@ import { digest as pinDigest } from "../../core/durable/pin.js"
 import { buildContext, type Entry, unresolvedToolCalls } from "../../core/context/session.js"
 import { Effect, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
+import { promptFromResponseParts } from "../../media/prompt.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { RunFailure, type RunEvent } from "../run/event.js"
 
@@ -117,7 +118,7 @@ const entryDigest = (
 
 const assistantMessage = (entry: Entry): Prompt.Message | undefined => {
   if (entry._tag === "ModelResponse") {
-    return Prompt.fromResponseParts(entry.content).content.find((candidate) => candidate.role === "assistant")
+    return promptFromResponseParts(entry.content).content.find((candidate) => candidate.role === "assistant")
   }
   return entry._tag === "Message" && entry.message.role === "assistant" ? entry.message : undefined
 }

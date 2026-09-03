@@ -24,7 +24,7 @@ export type {
   HttpError,
   ReconnectSchedule,
 } from "./client.js"
-export type { EventStreamItem, RunStarted } from "./api.js"
+export type { AttachmentDownload, EventStreamItem, RunStarted } from "./api.js"
 export type { Options as LayerOptions } from "./layer.js"
 export type { ApiError } from "./errors.js"
 export type { ClientCommand, EventCodec } from "./wire.js"

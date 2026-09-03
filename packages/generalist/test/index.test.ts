@@ -6,6 +6,27 @@ type FeatureEntry = readonly [subpath: string, load: () => Promise<object>, keys
 
 const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
+    "blob-store",
+    () => import("../src/blob-store/index.js"),
+    [
+      "Blob",
+      "BlobNotFound",
+      "BlobStore",
+      "BlobStoreError",
+      "BlobTooLarge",
+      "Put",
+      "layerFileSystem",
+      "layerMemory",
+      "layerS3",
+      "layerSql",
+    ],
+  ],
+  [
+    "media",
+    () => import("../src/media/index.js"),
+    ["File", "MediaReadError", "MediaTypeUnsupported", "Ref", "fromPath", "part", "resolve"],
+  ],
+  [
     "runtime",
     () => import("../src/runtime/index.js"),
     [
@@ -135,6 +156,7 @@ describe("generalist public surface", () => {
         "AgentProgram",
         "AgentTool",
         "Approvals",
+        "BlobStore",
         "CodeExecutor",
         "Compaction",
         "ContextOverflow",
@@ -145,6 +167,7 @@ describe("generalist public surface", () => {
         "Handoff",
         "Hooks",
         "Instructions",
+        "Media",
         "Memo",
         "Memory",
         "ModelMiddleware",

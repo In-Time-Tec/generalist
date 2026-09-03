@@ -41,13 +41,14 @@ Memory and permission rule stores have smaller service contracts:
 
 ```ts
 import { Testing } from "generalist/testing"
-import { MyMemory, MyRuleStore } from "my-generalist-driver"
+import { MyBlobStore, MyMemory, MyRuleStore } from "my-generalist-driver"
 
 Testing.memory({ layer: MyMemory.layerTest })
 Testing.ruleStore({ layer: MyRuleStore.layerTest })
+Testing.blobStore({ layer: MyBlobStore.layerTest, maxBytes: 1024, persistent: true })
 ```
 
-The Runtime `host-sessions` capability checks product Session metadata, root Run membership, and strict replay-then-live Session cursors. `memory` checks remember/recall, key isolation, whole-key deletion, and deletion by implementation-owned item id. `ruleStore` checks concurrent retention and replacement of an existing pattern. Each test gets a fresh Layer build.
+The Runtime `host-sessions` capability checks product Session metadata, root Run membership, and strict replay-then-live Session cursors. `memory` checks remember/recall, key isolation, whole-key deletion, and deletion by implementation-owned item id. `ruleStore` checks concurrent retention and replacement of an existing pattern. `blobStore` checks content hashes, byte round-trips, canonical deduplication, missing refs, upload limits, and, when `persistent: true`, a fresh-Layer close/reopen boundary. Each test gets a fresh Layer build.
 
 Sandbox leaves declare their factual isolation label and run supported and unsupported operations through the same suite:
 
@@ -77,7 +78,7 @@ const writeCertification = Testing.report.write({
 Effect.runPromise(writeCertification.pipe(Effect.provide(MyDriver.platformLayer)))
 ```
 
-The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; Sandbox entries use `sandbox:<provider-name>`; memory and rule-store entries use `memory` and `ruleStore`.
+The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; Sandbox entries use `sandbox:<provider-name>`; service suites use `blobStore`, `memory`, and `ruleStore`.
 
 The repository's Vitest reporter writes passing runtime-driver suites to the committed `docs/features/hosts-report.json`, preserving prior evidence for database suites skipped because their URL is unset. `scripts/render-hosts.ts` turns that report into `docs/features/hosts.md`; `bun run test` fails when the generated page has drifted.
 

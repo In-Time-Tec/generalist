@@ -1,3 +1,4 @@
+import { blobStore } from "./blob-store.js"
 import { memory } from "./memory.js"
 import { memo } from "./memo.js"
 import { write } from "./report.js"
@@ -15,6 +16,7 @@ export * as KernelProviderConformance from "./repl/kernel-provider.js"
 
 /** Public conformance suites and certification reporting. */
 export const Testing = {
+  blobStore,
   runtimeDriver,
   memory,
   memo,

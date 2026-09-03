@@ -58,6 +58,7 @@ const mine = Compaction.make({
     })
   },
   summarize: (plan) => Effect.succeed(`Replaced ${plan.compact.content.length} messages.`),
+  media: "elide",
 })
 ```
 
@@ -70,6 +71,7 @@ Every `Strategy` field has one owner:
 - `summarize(plan, request)` returns checkpoint text. It receives the full request, including IDs, turn, normalized usage, overflow state, current history and input prompt, and any tool-output byte bound. Failures remain typed as `CompactionError`; the Effect requires `LanguageModel` only when the implementation uses one.
 - `toolOutputMaxBytes`, when set, bounds successful tool results before semantic compaction. The service can return after this lossless step when the prompt fits.
 - `keepRecentTokens`, when set, overrides the Layer/default suffix target passed to `cut`.
+- `media` chooses reference handling during a compaction pass. `"elide"` (the default) replaces each file marker with one line containing its ref, `"keep"` preserves the marker, and `"describe"` preserves it while adding a one-line description request.
 
 `Compaction.strategy(parts, base?)` overlays ordered `StrategyPart` values on a complete strategy. The built-in parts are `toolOutputBound`, `keepRecent`, and `structuredSummary`. Later parts win.
 
@@ -98,3 +100,4 @@ The checkpoint and intercepted compaction result are journaled before execution 
 - Tool calls are never separated from their results at the recent-tail boundary.
 - Prompt-cache markers are derived only at provider send time and are not persisted by compaction.
 - Summary calls use the ordinary model telemetry path with purpose `compaction-summary` and the enclosing `compactionId`.
+- Media compaction operates on references and never loads blob bytes.

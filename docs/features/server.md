@@ -1,6 +1,6 @@
 # Server
 
-`generalist/server` is the stable HTTP boundary over one `Host`. One schema-first `Server.api` declares authenticated Session, Run, event, approval, and operator groups; `Server.layer` implements that API, serves its OpenAPI document, and delegates all state and execution to the Host.
+`generalist/server` is the stable HTTP boundary over one `Host`. One schema-first `Server.api` declares authenticated attachment, Session, Run, event, approval, and operator groups; `Server.layer` implements that API, serves its OpenAPI document, and delegates all state and execution to the Host.
 
 ## Usage
 
@@ -60,6 +60,8 @@ void program.pipe(Effect.provideService(HttpClient.HttpClient, authenticatedHttp
 `Server.client` is generated from the same `Server.api` declaration as the server. Its public surface is:
 
 ```text
+client.attachments.put({ data, mediaType, filename? })
+client.attachments.get({ sha256 }) -> { body: Uint8Array, headers }
 client.sessions.create/get/list
 client.runs.start/list/inspect/cancel
 client.events.subscribe({ sessionId, cursor?, reconnect? })
@@ -72,25 +74,29 @@ The caller provides an Effect `HttpClient`. Add the bearer token there with `Htt
 
 ## Routes
 
-| Group     | Method | Path                         | Client call               |
-| --------- | ------ | ---------------------------- | ------------------------- |
-| sessions  | POST   | `/sessions`                  | `sessions.create`         |
-| sessions  | GET    | `/sessions`                  | `sessions.list`           |
-| sessions  | GET    | `/sessions/:id`              | `sessions.get`            |
-| runs      | POST   | `/sessions/:sessionId/runs`  | `runs.start`              |
-| runs      | GET    | `/sessions/:sessionId/runs`  | `runs.list`               |
-| runs      | GET    | `/runs/:id`                  | `runs.inspect`            |
-| runs      | POST   | `/runs/:id/cancel`           | `runs.cancel`             |
-| events    | GET    | `/sessions/:id/events`       | `events.subscribe`        |
-| events    | GET    | `/sessions/:id/ws`           | `events.connect`          |
-| approvals | POST   | `/runs/:id/approvals/:token` | `approvals.resolve`       |
-| operator  | GET    | `/runs/:id/explain`          | `operator.explain`        |
-| operator  | POST   | `/runs/:id/retry`            | `operator.retry`          |
-| operator  | POST   | `/runs/:id/wake`             | `operator.wake`           |
-| operator  | POST   | `/runs/:id/resolve-unknown`  | `operator.resolveUnknown` |
-| operator  | POST   | `/runs/:id/extend-budget`    | `operator.extendBudget`   |
+| Group       | Method | Path                         | Client call               |
+| ----------- | ------ | ---------------------------- | ------------------------- |
+| attachments | POST   | `/attachments`               | `attachments.put`         |
+| attachments | GET    | `/attachments/:sha256`       | `attachments.get`         |
+| sessions    | POST   | `/sessions`                  | `sessions.create`         |
+| sessions    | GET    | `/sessions`                  | `sessions.list`           |
+| sessions    | GET    | `/sessions/:id`              | `sessions.get`            |
+| runs        | POST   | `/sessions/:sessionId/runs`  | `runs.start`              |
+| runs        | GET    | `/sessions/:sessionId/runs`  | `runs.list`               |
+| runs        | GET    | `/runs/:id`                  | `runs.inspect`            |
+| runs        | POST   | `/runs/:id/cancel`           | `runs.cancel`             |
+| events      | GET    | `/sessions/:id/events`       | `events.subscribe`        |
+| events      | GET    | `/sessions/:id/ws`           | `events.connect`          |
+| approvals   | POST   | `/runs/:id/approvals/:token` | `approvals.resolve`       |
+| operator    | GET    | `/runs/:id/explain`          | `operator.explain`        |
+| operator    | POST   | `/runs/:id/retry`            | `operator.retry`          |
+| operator    | POST   | `/runs/:id/wake`             | `operator.wake`           |
+| operator    | POST   | `/runs/:id/resolve-unknown`  | `operator.resolveUnknown` |
+| operator    | POST   | `/runs/:id/extend-budget`    | `operator.extendBudget`   |
 
 Future ingress features add one HttpApi group to `Server.api` and one matching implementation module. They do not create another router or wire contract.
+
+`POST /attachments` sends an `application/octet-stream` body with required `x-media-type` and optional `x-filename` headers, returning `Media.Ref` as JSON. `GET /attachments/:sha256` returns the bytes with their stored `content-type` and optional `x-filename`. The generated client constructs upload headers and decodes the buffered download. Both routes use the same Authentication middleware as every other declared route.
 
 ## SSE and WebSocket
 
@@ -117,4 +123,4 @@ Browser WebSocket constructors cannot attach an Authorization header. A bearer-p
 
 - Source: `packages/generalist/src/server/`
 - OpenAPI: [`../openapi.json`](../openapi.json)
-- Sibling features: [`host.md`](./host.md), [`transport.md`](./transport.md), [`recovery.md`](./recovery.md)
+- Sibling features: [`media.md`](./media.md), [`host.md`](./host.md), [`transport.md`](./transport.md), [`recovery.md`](./recovery.md)

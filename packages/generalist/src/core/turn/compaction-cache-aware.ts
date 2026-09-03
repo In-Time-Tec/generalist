@@ -9,6 +9,7 @@ export interface Options {
   readonly stablePrefixTurns: number
   readonly keepRecentTokens?: number
   readonly summarize: Strategy["summarize"]
+  readonly media?: Strategy["media"]
 }
 
 const safeNonNegativeInteger = (name: string, value: number): number => {
@@ -52,5 +53,6 @@ export const cacheAware = (options: Options): Strategy => {
       })
     },
     summarize: options.summarize,
+    media: options.media ?? "elide",
   }
 }

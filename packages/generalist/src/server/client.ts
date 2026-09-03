@@ -4,6 +4,7 @@ import { HttpApiClient } from "effect/unstable/httpapi"
 import { Retry as SseRetry, type SseError } from "effect/unstable/encoding/Sse"
 import { Socket } from "effect/unstable/socket"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
+import type { Put as BlobPut } from "../blob-store/index.js"
 import type { EncodedAgentInput, SessionCreateOptions } from "../host/index.js"
 import { HostEvent } from "../host/event.js"
 import type { Decision } from "../runtime/operation/approval.js"
@@ -47,6 +48,10 @@ export type HttpError =
   | SseError
 
 export interface Client {
+  readonly attachments: {
+    readonly put: (input: BlobPut) => ReturnType<RawClient["attachments"]["put"]>
+    readonly get: (options: { readonly sha256: string }) => ReturnType<RawClient["attachments"]["get"]>
+  }
   readonly sessions: {
     readonly create: (options?: SessionCreateOptions) => ReturnType<RawClient["sessions"]["create"]>
     readonly get: (options: { readonly sessionId: string }) => ReturnType<RawClient["sessions"]["get"]>
@@ -311,6 +316,17 @@ export const client = (options: {
       )
 
     const value: Client = {
+      attachments: {
+        put: (input) =>
+          raw.attachments.put({
+            headers: {
+              "x-media-type": input.mediaType,
+              ...(input.filename === undefined ? undefined : { "x-filename": input.filename }),
+            },
+            payload: input.data,
+          }),
+        get: ({ sha256 }) => raw.attachments.get({ params: { sha256 } }),
+      },
       sessions: {
         create: (sessionOptions = {}) => {
           const payload: Types.Mutable<SessionCreateOptions> = {}

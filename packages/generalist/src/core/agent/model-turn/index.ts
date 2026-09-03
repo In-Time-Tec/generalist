@@ -1,7 +1,7 @@
-import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
+import { Cause, Channel, Effect, Exit, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { DriverInterpreter } from "../../durable/driver/interpreter.js"
-import { AgentError, DuplicateToolCallId, MiddlewareViolation, type Event } from "../event.js"
+import { AgentError, MiddlewareViolation, type Event } from "../event.js"
 import { coalesceAdjacentText } from "../../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "../message.js"
 import { type Registry, select } from "../../tools/tool-registry.js"
@@ -9,7 +9,7 @@ import type { Request } from "../../tools/tool-executor.js"
 import { classifyFailure as classifyModelFailure } from "../../model/registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type CallPurpose } from "../../model/telemetry/events.js"
 import { withWireCache } from "../../model/prompt-cache.js"
-import type { AnyToolCall, ToolCallIdState } from "../tools/result.js"
+import type { AnyToolCall } from "../tools/result.js"
 import type { ActiveModelServices, ModelTurnServices, RuntimeContext } from "./context.js"
 import {
   InvalidToolCallParameters,
@@ -23,7 +23,16 @@ import type { TurnOverrides } from "../../turn/policy.js"
 import { wrapDriverAttempt } from "./driver.js"
 import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "../../model/operation.js"
 import { captureFinishPart, captureStructuredUsage, modelBudgetCharge } from "./finish.js"
-import { classifyOtherFailure, isPassThroughFailure, providerOutput, singleFailure } from "./parts.js"
+import {
+  classifyOtherFailure,
+  initialToolCallIdState,
+  isPassThroughFailure,
+  persistMediaPart,
+  providerOutput,
+  resolveMediaPrompt,
+  singleFailure,
+  validateToolCallId,
+} from "./parts.js"
 import { projectCommittedResponse } from "./commit.js"
 import { attemptResponse, replayMessages } from "./response.js"
 import { make as makeActiveTurn } from "./active.js"
@@ -138,34 +147,6 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
         }),
       ),
     )
-  const validateToolCallId = (
-    idState: Ref.Ref<ToolCallIdState>,
-    part: Response.StreamPart<Record<string, Tool.Any>>,
-  ): Effect.Effect<void, DuplicateToolCallId> => {
-    if (part.type !== "tool-call") return Effect.void
-    return Ref.modify(idState, (current) => {
-      const existingFirstIndex = HashMap.get(current.firstIndexes, part.id)
-      const duplicate = Option.map(existingFirstIndex, (index) =>
-        DuplicateToolCallId.make({ id: part.id, firstIndex: index, duplicateIndex: current.nextIndex }),
-      )
-      return [
-        duplicate,
-        {
-          nextIndex: current.nextIndex + 1,
-          firstIndexes: Option.isSome(existingFirstIndex)
-            ? current.firstIndexes
-            : HashMap.set(current.firstIndexes, part.id, current.nextIndex),
-        },
-      ]
-    }).pipe(
-      Effect.flatMap(
-        Option.match({
-          onNone: () => Effect.void,
-          onSome: Effect.fail,
-        }),
-      ),
-    )
-  }
   const modelTurn = (
     turn: number,
     prompt: Prompt.RawInput,
@@ -253,10 +234,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
         Effect.succeed(
           Stream.fromChannel(
             Channel.acquireUseRelease(
-              Ref.make<ToolCallIdState>({
-                nextIndex: 0,
-                firstIndexes: HashMap.empty(),
-              }),
+              Ref.make(initialToolCallIdState),
               (toolCallIds) =>
                 Stream.unwrap(
                   Effect.gen(function* () {
@@ -292,10 +270,14 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                       state.currentContext = responsePrompt
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     }
+                    const cachedPrompt = yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock)
+                    yield* Ref.set(context.lastWirePrompt, cachedPrompt)
+                    const wirePrompt = yield* resolveMediaPrompt({
+                      prompt: cachedPrompt,
+                      turn,
+                    })
                     const rawParts = LanguageModel.streamText({
-                      prompt: yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock).pipe(
-                        Effect.tap((wire) => Ref.set(context.lastWirePrompt, wire)),
-                      ),
+                      prompt: wirePrompt,
                       toolkit: activeRegistry.toolkit,
                       disableToolCallResolution: true,
                     }).pipe(
@@ -336,8 +318,9 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                     return rawParts.pipe(
                       Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
                       Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
+                      Stream.mapEffect((part) => persistMediaPart({ part, turn })),
                       Stream.mapEffect((part) =>
-                        validateToolCallId(toolCallIds, part).pipe(
+                        validateToolCallId({ idState: toolCallIds, part }).pipe(
                           Effect.andThen(
                             Effect.sync((): AttemptEvent => {
                               const identity = telemetryIdentity.current
