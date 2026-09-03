@@ -199,6 +199,15 @@ type ProgramLog = RunEventBase & {
   readonly message: string
   readonly data?: Readonly<Record<string, Schema.Json>>
 }
+/** Scalar reward assigned to one exported trajectory leaf. */
+export type Rewarded = RunEventBase & {
+  readonly _tag: "Rewarded"
+  readonly leaf: string
+  readonly value: number
+  readonly source: string
+}
+/** Reward payload accepted by the Runtime journal. */
+export type RewardInput = Pick<Rewarded, "runId" | "leaf" | "value" | "source">
 
 export type LifecycleEvent =
   | TriggerEvent
@@ -224,6 +233,7 @@ export type LifecycleEvent =
   | RunCancellationRequested
   | RunCancelled
   | ProgramLog
+  | Rewarded
 
 export type RunEvent = (RunEventBase & DurableAgentLoopEvent) | LifecycleEvent
 
@@ -251,6 +261,7 @@ export const LifecycleTag = Schema.Literals([
   "RunCancellationRequested",
   "RunCancelled",
   "ProgramLog",
+  "Rewarded",
 ])
 
 const Metadata = Schema.Record(Schema.String, Schema.Json)
@@ -525,6 +536,11 @@ const LifecycleEventSchema = Schema.Union([
     level: Schema.Literals(["debug", "info", "warn", "error"]),
     message: Schema.String,
     data: Schema.optionalKey(Metadata),
+  }),
+  Schema.TaggedStruct("Rewarded", {
+    leaf: Schema.String,
+    value: Schema.Finite,
+    source: Schema.String,
   }),
 ])
 const EventPayload = Schema.Union([AgentLoopEventSchema, LifecycleEventSchema])

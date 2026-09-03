@@ -161,6 +161,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     schedule: () => Effect.die("not used"),
     startExecution: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
+    recordReward: () => Effect.die("not used"),
     activate: ({ runId }) =>
       Effect.sync(() => {
         activatedRunIds.push(runId)

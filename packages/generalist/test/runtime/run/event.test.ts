@@ -153,6 +153,18 @@ it("round-trips a completion gate result", () => {
   expect(decodeEvent(encodeEvent(event))).toEqual(event)
 })
 
+it("round-trips an exported trajectory reward", () => {
+  const { error: _, ...base } = failedEvent(failures[0]!)
+  const event: RunEvent.RunEvent = {
+    ...base,
+    _tag: "Rewarded",
+    leaf: "run:codec:leaf",
+    value: 0.75,
+    source: "eval:quality",
+  }
+  expect(decodeEvent(encodeEvent(event))).toEqual(event)
+})
+
 it("round-trips the canonical ApprovalRequested identity and payload", () => {
   const call = Response.makePart("tool-call", {
     id: "call:delete",
@@ -214,14 +226,21 @@ it.live("keeps memory and SQLite failure history and inspection in parity", () =
         })
         const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: `codec-${backend}` })
         yield* store.fail({ ...claim, error: failure })
+        yield* runtime.recordReward({
+          runId: receipt.runId,
+          leaf: `${receipt.runId}:leaf`,
+          value: 0.75,
+          source: "eval:quality",
+        })
         const snapshot = yield* runtime.snapshot(receipt.runId)
-        const terminal = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 20 })).find(
-          (event) => event._tag === "RunFailed",
-        )
+        const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 20 })
+        const terminal = history.find((event) => event._tag === "RunFailed")
+        const rewarded = history.find((event) => event._tag === "Rewarded")
         expect(snapshot.run.status).toBe("failed")
         expect(snapshot.outcome?._tag).toBe("Failed")
         if (terminal?._tag !== "RunFailed") throw new Error("expected RunFailed")
         expect(terminal.error.constructor).toBe(failure.constructor)
+        expect(rewarded).toMatchObject({ _tag: "Rewarded", value: 0.75, source: "eval:quality" })
         return yield* Schema.encodeEffect(RunEvent.RunFailure)(terminal.error)
       }),
     )

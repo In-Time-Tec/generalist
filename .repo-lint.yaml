@@ -44,6 +44,9 @@ rules:
         - "packages/generalist/test/memo/*.test.ts"
         # Learning acceptance spans the unstable leaf, Hooks, approvals, Runtime recovery, and storage drivers
         - "packages/generalist/test/learning/*.test.ts"
+        # RL export acceptance spans the unstable projection, Runtime journals, and deterministic model
+        - "packages/generalist/test/trajectory/dag.test.ts"
+        - "packages/generalist/test/trajectory/export.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
       target: "packages/*/src/**/*.ts"
       pattern: "*.tui.test.ts -> *.ts"

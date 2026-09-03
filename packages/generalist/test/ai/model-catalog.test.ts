@@ -8,6 +8,7 @@ const metadata: Metadata = {
   model: "small",
   contextWindow: 8_192,
   maxOutput: 1_024,
+  logprobs: false,
   pricing: {
     inputPerMTok: 2,
     outputPerMTok: 8,

@@ -87,6 +87,7 @@ import { explain as explainRecovery } from "../execution/recovery/operator.js"
 import { fork, rewind } from "./store/fork/index.js"
 import { dueAwaitEvents, timeoutAwaitEvent, wake } from "./store/trigger/wake.js"
 import { advanceSchedule, claimSchedules, registerSchedule } from "./store/trigger/schedule.js"
+import { appendLifecycle } from "./append.js"
 
 const makeStoreServices = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -341,6 +342,18 @@ const makeStoreServices = (options: LayerOptions) =>
             ),
           ),
         ),
+      recordReward: (input) =>
+        modifyState((state) =>
+          Effect.gen(function* () {
+            if (!state.runs.has(input.runId)) return yield* RunNotFound.make({ runId: input.runId })
+            return yield* appendLifecycle(state, input.runId, {
+              _tag: "Rewarded",
+              leaf: input.leaf,
+              value: input.value,
+              source: input.source,
+            })
+          }),
+        ).pipe(Effect.asVoid),
       treeReplay: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>

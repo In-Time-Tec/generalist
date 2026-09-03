@@ -36,7 +36,7 @@ import {
 } from "./store/operation/operations.js"
 import { recoverRunningOperations } from "./store/operation/recovery.js"
 import { resolveOperation } from "./store/operation/resolution.js"
-import { hasAdmission, loadEventsAfter, loadRun, loadRunWaitsByStatus } from "./store/statements.js"
+import { appendEvent, hasAdmission, loadEventsAfter, loadRun, loadRunWaitsByStatus } from "./store/statements.js"
 import { commitInterruptedModelResponse } from "./model-response/interrupted-model-response.js"
 import { encodeContinuation } from "../run/steering.js"
 import {
@@ -374,6 +374,20 @@ const makeSqlStoreServices = <DriverError>(
                 return yield* CursorExpired.make({ runId: input.runId, cursor: input.cursor, earliestSequence: 0 })
               }
               return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
+            }),
+          ),
+        recordReward: (input) =>
+          locked(
+            locks.run(input.runId),
+            Effect.gen(function* () {
+              const loaded = yield* loadRun(input.runId)
+              if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+              yield* appendEvent(transactionHub, loaded, {
+                _tag: "Rewarded",
+                leaf: input.leaf,
+                value: input.value,
+                source: input.source,
+              })
             }),
           ),
         treeReplay: (input) => runNoTxn(loadTreeReplay(input)),

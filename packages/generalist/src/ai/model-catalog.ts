@@ -19,6 +19,8 @@ export interface Metadata {
   readonly model: string
   readonly contextWindow: number
   readonly maxOutput: number
+  /** Whether Generalist's provider adapter preserves output token log probabilities. */
+  readonly logprobs: boolean
   readonly pricing?: {
     readonly inputPerMTok?: number
     readonly outputPerMTok?: number
@@ -59,6 +61,7 @@ export const bundled: ReadonlyArray<Metadata> = [
     model: "gpt-4o-mini",
     contextWindow: 128_000,
     maxOutput: 16_384,
+    logprobs: false,
     pricing: {
       inputPerMTok: 0.15,
       outputPerMTok: 0.6,
@@ -71,6 +74,7 @@ export const bundled: ReadonlyArray<Metadata> = [
     model: "gpt-4.1-mini",
     contextWindow: 1_047_576,
     maxOutput: 32_768,
+    logprobs: false,
     pricing: {
       inputPerMTok: 0.4,
       outputPerMTok: 1.6,
@@ -83,6 +87,7 @@ export const bundled: ReadonlyArray<Metadata> = [
     model: "gpt-4.1",
     contextWindow: 1_047_576,
     maxOutput: 32_768,
+    logprobs: false,
     pricing: {
       inputPerMTok: 2,
       outputPerMTok: 8,
@@ -95,6 +100,7 @@ export const bundled: ReadonlyArray<Metadata> = [
     model: "claude-3-5-haiku-latest",
     contextWindow: 200_000,
     maxOutput: 8_192,
+    logprobs: false,
     pricing: {
       inputPerMTok: 0.8,
       outputPerMTok: 4,
@@ -107,6 +113,7 @@ export const bundled: ReadonlyArray<Metadata> = [
     model: "llama-3.3-70b-versatile",
     contextWindow: 131_072,
     maxOutput: 32_768,
+    logprobs: false,
     modalities: ["text"],
   },
   {
@@ -114,6 +121,7 @@ export const bundled: ReadonlyArray<Metadata> = [
     model: "mistral-large-latest",
     contextWindow: 131_072,
     maxOutput: 8_192,
+    logprobs: false,
     modalities: ["text"],
   },
 ]

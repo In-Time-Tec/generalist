@@ -149,6 +149,10 @@
       "types": "./dist/trajectory/index.d.ts",
       "import": "./dist/trajectory/index.js"
     },
+    "./unstable/rl-export": {
+      "types": "./dist/unstable/rl-export/index.d.ts",
+      "import": "./dist/unstable/rl-export/index.js"
+    },
     "./providers/model-catalog": {
       "types": "./dist/ai/model-catalog.d.ts",
       "import": "./dist/ai/model-catalog.js"

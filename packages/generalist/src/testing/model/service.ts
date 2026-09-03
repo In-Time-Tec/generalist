@@ -29,6 +29,10 @@ export type Part = TextPart | ReasoningPart | ToolCallPart
 export interface StepOptions {
   readonly finishReason?: Response.FinishReason
   readonly usage?: Response.Usage
+  /** Provider output token ids exposed to trajectory exporters. */
+  readonly tokens?: ReadonlyArray<number>
+  /** Provider output token log probabilities exposed to trajectory exporters. */
+  readonly logprobs?: ReadonlyArray<number>
   readonly delay?: Duration.Input
   readonly streamPartDelay?: Duration.Input
 }
@@ -182,7 +186,7 @@ const executeGenerate = (
       )
       return [
         { type: "text", text: encoded },
-        compile.finish(step.finishReason ?? "stop", step.usage ?? compile.emptyUsage()),
+        compile.finish(step.finishReason ?? "stop", step.usage ?? compile.emptyUsage(), step),
       ]
     }
     if (options.responseFormat.type === "json") {
@@ -279,6 +283,8 @@ export const truncated: {
 const StepOptionsInput = Schema.Struct({
   finishReason: Schema.optionalKey(Schema.Unknown),
   usage: Schema.optionalKey(Schema.Unknown),
+  tokens: Schema.optionalKey(Schema.Unknown),
+  logprobs: Schema.optionalKey(Schema.Unknown),
   delay: Schema.optionalKey(Schema.Unknown),
   streamPartDelay: Schema.optionalKey(Schema.Unknown),
 })
@@ -287,6 +293,8 @@ const isStepOptionsLike = (value: typeof Schema.Unknown.Type): value is StepOpti
   Schema.is(StepOptionsInput)(value) &&
   (value.finishReason !== undefined ||
     value.usage !== undefined ||
+    value.tokens !== undefined ||
+    value.logprobs !== undefined ||
     value.delay !== undefined ||
     value.streamPartDelay !== undefined)
 export const object: {
