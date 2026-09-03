@@ -195,6 +195,7 @@ const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExe
           correlationId: context.contextId,
           prompt,
         })
+        yield* runtime.activate({ runId: receipt.runId })
         const task = yield* fromRuntime(runtime, receipt.runId)
         bus.publish(AgentEvent.task(task))
         yield* follow(runtime, task, origin, bus)

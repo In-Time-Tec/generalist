@@ -55,6 +55,31 @@
         "vitest": "catalog:",
       },
     },
+    "examples/a2a": {
+      "name": "generalist-example-a2a",
+      "dependencies": {
+        "@a2a-js/sdk": "catalog:",
+        "effect": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "examples/ag-ui": {
+      "name": "generalist-example-ag-ui",
+      "dependencies": {
+        "@ag-ui/core": "catalog:",
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/capstone-local-assistant": {
       "name": "generalist-example-capstone-local-assistant",
       "dependencies": {
@@ -1541,6 +1566,10 @@
     "generalist": ["generalist@workspace:packages/generalist"],
 
     "generalist-docs": ["generalist-docs@workspace:apps/docs"],
+
+    "generalist-example-a2a": ["generalist-example-a2a@workspace:examples/a2a"],
+
+    "generalist-example-ag-ui": ["generalist-example-ag-ui@workspace:examples/ag-ui"],
 
     "generalist-example-capstone-local-assistant": ["generalist-example-capstone-local-assistant@workspace:examples/capstone-local-assistant"],
 

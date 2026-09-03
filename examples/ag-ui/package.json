@@ -1,0 +1,19 @@
+{
+  "name": "generalist-example-ag-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@ag-ui/core": "catalog:",
+    "@effect/platform-bun": "catalog:",
+    "effect": "catalog:",
+    "generalist": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

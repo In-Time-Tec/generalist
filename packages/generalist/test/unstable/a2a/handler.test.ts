@@ -99,6 +99,7 @@ interface StoredRun {
 const makeRuntime = (acceptedSequence = 0) => {
   const runs = new Map<string, StoredRun>()
   const sentRunIds: Array<string> = []
+  const activatedRunIds: Array<string> = []
   const observedCursors: Array<number> = []
 
   const inspection = (runId: string, run: StoredRun): Run.RunInspection => {
@@ -160,7 +161,11 @@ const makeRuntime = (acceptedSequence = 0) => {
     schedule: () => Effect.die("not used"),
     startExecution: () => Effect.die("not used"),
     admit: () => Effect.die("not used"),
-    activate: () => Effect.die("not used"),
+    activate: ({ runId }) =>
+      Effect.sync(() => {
+        activatedRunIds.push(runId)
+        return inspection(runId, runs.get(runId)!)
+      }),
     fork: () => Effect.die("not used"),
     rewind: () => Effect.die("not used"),
     send,
@@ -283,7 +288,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       }),
     extendBudget: () => Effect.die("not used"),
   }
-  return { runtime, runs, sentRunIds, observedCursors }
+  return { runtime, runs, sentRunIds, activatedRunIds, observedCursors }
 }
 
 const message = (messageId: string, taskId = ""): Message => ({
@@ -327,6 +332,7 @@ describe("DefaultRequestHandler projection", () => {
       expect(responses[0]?.payload?.$case).toBe("task")
       const taskId = responses[0]?.payload?.$case === "task" ? responses[0].payload.value.id : ""
       expect(fixture.sentRunIds).toEqual([taskId])
+      expect(fixture.activatedRunIds).toEqual([taskId])
       expect(responses.map((item) => item.payload?.$case)).toEqual([
         "task",
         "statusUpdate",
