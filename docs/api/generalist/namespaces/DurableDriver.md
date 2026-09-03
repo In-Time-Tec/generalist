@@ -516,7 +516,7 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ##### decide
 
-> `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"memory"` \| `"wait"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ###### Parameters
 
@@ -600,7 +600,7 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ###### Returns
 
-`Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+`Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"memory"` \| `"wait"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 <a id="initial"></a>
 
@@ -748,7 +748,7 @@ Host hook surface for durable operation journaling without runtime imports.
 
 ###### kind
 
-`"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`
+`"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"memory"` \| `"wait"` \| `"handoff"`
 
 ###### replayPolicy
 
@@ -864,7 +864,7 @@ Host hook surface for durable operation journaling without runtime imports.
 
 ###### kind
 
-`"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`
+`"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"memory"` \| `"wait"` \| `"handoff"`
 
 ###### replayPolicy
 
@@ -1192,7 +1192,7 @@ Operation scheduled at one agent-loop effect boundary.
 
 ##### kind
 
-> `readonly` **kind**: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"memory"` \| `"wait"` \| `"handoff"`
 
 ###### Inherited from
 
@@ -1332,7 +1332,7 @@ Recorded operation for tests and future runtime journaling.
 
 ###### kind
 
-> `readonly` **kind**: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"memory"` \| `"wait"` \| `"handoff"`
 
 ###### replayPolicy
 
@@ -2848,7 +2848,7 @@ Internal tracer state serialized in DriverCheckpoint.state.
 
 ### updateToolBatch
 
-> `const` **updateToolBatch**: (`update`) => `Effect.Effect`\<\{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid), [`DriverInterpreter`](#driverinterpreter)\>
+> `const` **updateToolBatch**: (`update`) => `Effect.Effect`\<\{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `argumentTaint?`: readonly `object`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid), [`DriverInterpreter`](#driverinterpreter)\>
 
 **`Internal`**
 
@@ -2862,7 +2862,7 @@ Apply one exact tool-call state transition to the current batch checkpoint.
 
 #### Returns
 
-`Effect.Effect`\<\{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid), [`DriverInterpreter`](#driverinterpreter)\>
+`Effect.Effect`\<\{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `argumentTaint?`: readonly `object`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
 
