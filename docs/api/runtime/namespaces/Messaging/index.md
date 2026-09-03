@@ -181,7 +181,7 @@ Input for one addressed send. Sender identity is a Run id, never caller-supplied
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: `"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
+> `readonly` `optional` **policy?**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 <a id="prompt"></a>
 

@@ -50,7 +50,7 @@ Store-neutral facts read atomically from one Run journal.
 
 ##### status
 
-> `readonly` **status**: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
+> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 <a id="suspension"></a>
 
@@ -96,7 +96,7 @@ One operation fact needed to derive recovery from the authoritative journal.
 
 ##### status
 
-> `readonly` **status**: `"unknown"` \| `"running"` \| `"waiting"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"requested"` \| `"reserved"`
+> `readonly` **status**: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"cancelling"` \| `"requested"` \| `"reserved"`
 
 ***
 

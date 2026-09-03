@@ -192,7 +192,7 @@
 
 ##### dimension
 
-> `readonly` **dimension**: `"toolCalls"` \| `"tokens"` \| `"outputBytes"` \| `"agentRuns"` \| `"concurrency"` \| `"wallClockMillis"` \| `"logBytes"`
+> `readonly` **dimension**: `"toolCalls"` \| `"tokens"` \| `"concurrency"` \| `"outputBytes"` \| `"agentRuns"` \| `"wallClockMillis"` \| `"logBytes"`
 
 ###### Inherited from
 

@@ -2304,7 +2304,7 @@ A reject-policy message arrived while its target Run was executing.
 
 ##### status
 
-> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"`
+> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"succeeded"`
 
 ###### Inherited from
 

@@ -60,7 +60,7 @@
 
 ##### kind
 
-> `readonly` **kind**: `"timeout"` \| `"network"` \| `"cancelled"` \| `"protocol"` \| `"host"` \| `"account-mismatch"` \| `"login-required"`
+> `readonly` **kind**: `"timeout"` \| `"cancelled"` \| `"network"` \| `"protocol"` \| `"host"` \| `"account-mismatch"` \| `"login-required"`
 
 **`Experimental`**
 

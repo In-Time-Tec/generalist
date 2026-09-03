@@ -428,7 +428,7 @@ RunStore public contract and process-local memory layer.
 
 ##### policy
 
-> `readonly` **policy**: `"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
+> `readonly` **policy**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 <a id="prompt"></a>
 
@@ -498,7 +498,7 @@ RunStore public contract and process-local memory layer.
 
 ##### kind
 
-> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"operator"` \| `"memory"` \| `"wait"` \| `"log"` \| `"handoff"` \| `"nested"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"operator"` \| `"memory"` \| `"log"` \| `"handoff"` \| `"nested"`
 
 <a id="operationkey"></a>
 
@@ -660,7 +660,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### admitProgramAgents
 
-> `readonly` **admitProgramAgents**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **admitProgramAgents**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -670,7 +670,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="admitprogramchild"></a>
 
@@ -1084,7 +1084,7 @@ Session writer bound to one storage-issued execution claim.
 
 ##### commitProgramLog
 
-> `readonly` **commitProgramLog**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **commitProgramLog**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -1094,7 +1094,7 @@ Session writer bound to one storage-issued execution claim.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="complete"></a>
 
@@ -1297,7 +1297,7 @@ Create or load the main head for one shared artifact.
 
 ##### expireRunningOperation
 
-> `readonly` **expireRunningOperation**: (`input`) => `Effect`\<\{ `outcome`: `"unknown"` \| `"running"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
+> `readonly` **expireRunningOperation**: (`input`) => `Effect`\<\{ `outcome`: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
 
 ###### Parameters
 
@@ -1307,7 +1307,7 @@ Create or load the main head for one shared artifact.
 
 ###### Returns
 
-`Effect`\<\{ `outcome`: `"unknown"` \| `"running"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
+`Effect`\<\{ `outcome`: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
 
 <a id="extendbudget"></a>
 
@@ -1491,7 +1491,7 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ##### getProgramOperation
 
-> `readonly` **getProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **getProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
 
 ###### Parameters
 
@@ -1507,7 +1507,7 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
 
 <a id="hasadmission"></a>
 
@@ -1647,7 +1647,7 @@ List root Runs admitted through one product-facing Session.
 
 ##### inspectFanOut
 
-> `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
+> `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
 
 ###### Parameters
 
@@ -1657,7 +1657,7 @@ List root Runs admitted through one product-facing Session.
 
 ###### Returns
 
-`Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
+`Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
 
 <a id="list"></a>
 
@@ -1687,7 +1687,7 @@ Order of the returned Runs. Defaults to "newest".
 
 ###### status?
 
-`"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
+`"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 ###### Returns
 
@@ -1937,7 +1937,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ##### reserveProgramOperation
 
-> `readonly` **reserveProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **reserveProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -1947,7 +1947,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="resolveaddress"></a>
 
@@ -2213,7 +2213,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### settleProgramOperation
 
-> `readonly` **settleProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **settleProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -2223,7 +2223,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="signal"></a>
 
@@ -2277,7 +2277,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### startProgramOperation
 
-> `readonly` **startProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
+> `readonly` **startProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
 ###### Parameters
 
@@ -2287,7 +2287,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
 <a id="suspend"></a>
 
@@ -2309,7 +2309,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### suspendProgramOperation
 
-> `readonly` **suspendProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **suspendProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -2319,7 +2319,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"running"` \| `"waiting"` \| `"succeeded"` \| `"failed"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="timeoutawaitevent"></a>
 
