@@ -10,7 +10,7 @@ Use `generalist` for process-local agents and chat streaming. Add `generalist/ru
 bun add generalist @effect/ai-openai # or the provider you use
 ```
 
-`effect` is a peer dependency — install it only if your project does not have it already. Requires `effect@4.0.0-rc.112`, Node 22+ or Bun 1.4+. Everything ships as this single package: names like `generalist/runtime`, `generalist/pg`, or `generalist/providers/openai` are import subpaths, not separate packages. Each adapter's host dependencies are optional peers, so you install only what you import.
+`effect` is a peer dependency — install it only if your project does not have it already. Requires `effect@4.0.0-rc.112`, Node 22+ or Bun 1.4+. Everything ships as this single package: names like `generalist/runtime`, `generalist/testing/model`, `generalist/pg`, or `generalist/providers/openai` are import subpaths, not separate packages. Each adapter's host dependencies are optional peers, so you install only what you import.
 
 ## Example
 

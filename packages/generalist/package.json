@@ -129,6 +129,10 @@
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js"
     },
+    "./testing/model": {
+      "types": "./dist/testing/model/service.d.ts",
+      "import": "./dist/testing/model/service.js"
+    },
     "./testing/runtime-driver": {
       "types": "./dist/testing/runtime-driver/index.d.ts",
       "import": "./dist/testing/runtime-driver/index.js"

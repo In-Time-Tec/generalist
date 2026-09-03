@@ -4,7 +4,7 @@ import { Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { Agent } from "generalist"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
-import { TestModel } from "generalist/testing"
+import { layer as testModel, object, text } from "generalist/testing/model"
 
 const assistant = Agent.make({
   name: "five-minute-assistant",
@@ -20,10 +20,7 @@ const startOptions = {
 }
 const expected = "A durable agent can continue an accepted run after its host restarts."
 
-const model = TestModel.layer([
-  TestModel.text("Preparing a summary."),
-  TestModel.object({ output: { summary: expected } }),
-])
+const model = testModel([text("Preparing a summary."), object({ output: { summary: expected } })])
 
 const program = Effect.gen(function* () {
   const local = yield* Effect.scoped(
