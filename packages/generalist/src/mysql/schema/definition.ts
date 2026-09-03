@@ -119,7 +119,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   CONSTRAINT generalist_run_operations_run_fk FOREIGN KEY (run_id) REFERENCES generalist_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS generalist_artifacts (
-  artifact_name VARCHAR(512) NOT NULL,
+  artifact_name VARCHAR(255) NOT NULL,
   branch_id VARCHAR(255) NOT NULL,
   crdt VARCHAR(64) NOT NULL,
   base_version BIGINT NOT NULL,
@@ -129,7 +129,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   PRIMARY KEY (artifact_name, branch_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS generalist_artifact_operations (
-  artifact_name VARCHAR(512) NOT NULL,
+  artifact_name VARCHAR(255) NOT NULL,
   branch_id VARCHAR(255) NOT NULL,
   result BIGINT NOT NULL,
   base BIGINT NOT NULL,
