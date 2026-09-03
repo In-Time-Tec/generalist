@@ -5,6 +5,7 @@ import { type Agent, type ClosedServices, withTools } from "../../core/agent/ser
 import { AgentError, type Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
 import { applyInheritance, Inheritance } from "../../core/agent/lifecycle/fan-out.js"
+import { trustJournaled } from "../../core/capability/internal.js"
 import { type DriverCheckpoint, DriverJournal, type DriverOperation, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim, type Service as RunStoreService } from "../run/store.js"
@@ -55,6 +56,7 @@ import { make as makeMessaging, Policy as MessagingPolicy } from "../messaging/s
 import { RuntimeUnavailable } from "../errors.js"
 import { withInherited as withInheritedTasks } from "../../tasks/internal.js"
 import { Items as TaskItems } from "../../tasks/item.js"
+import { Descriptor as CapabilityDescriptor } from "../../core/capability/state.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
@@ -523,7 +525,10 @@ const makeFor = (
                 if (Option.isNone(policy) || Option.isNone(parentName)) return yield* runClosed(agent, environment)
                 const parent = yield* agents.get(parentName.value)
                 if (Option.isNone(parent)) return yield* runClosed(agent, environment)
-                const inherited = yield* applyInheritance(parent.value.source, agent, policy.value)
+                const inheritedPolicy = Schema.is(Schema.Array(CapabilityDescriptor))(policy.value.tools)
+                  ? { ...policy.value, tools: trustJournaled(policy.value.tools) }
+                  : policy.value
+                const inherited = yield* applyInheritance(parent.value.source, agent, inheritedPolicy)
                 const tasks = Schema.decodeUnknownOption(TaskItems)(claimed.message.metadata.parentTasks)
                 const child =
                   policy.value.tasks === "read" && Option.isSome(tasks)

@@ -20,6 +20,7 @@ import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from
 import { scheduleOperations } from "./schedule.js"
 import type { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
 import type { Checkpoint as GateCheckpoint } from "../../agent/gates/definition.js"
+import { capabilityCheckpointMethods, type CapabilityCheckpointService } from "./capability-checkpoint.js"
 export type { OperationSpec } from "./operation.js"
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
 /** Recorded operation for tests and future runtime journaling. */
@@ -53,7 +54,6 @@ export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServi
   readonly complete: () => Success
   readonly replay: (success: Success) => Stream.Stream<A, ReplayError, ReplayServices>
 }
-
 /** Collect and replay one stream as its emitted values. */
 export const arrayStreamCodec = <A>(): StreamSuccessCodec<A, ReadonlyArray<A>> => {
   const values = new Array<A>()
@@ -63,11 +63,10 @@ export const arrayStreamCodec = <A>(): StreamSuccessCodec<A, ReadonlyArray<A>> =
     replay: Stream.fromIterable,
   }
 }
-
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
 type OperationSpecServices<SRD, SRE, FRD, FRE> = SRD | SRE | FRD | FRE
 /** Inline interpreter executing driver operations through Effect services. */
-export interface Service {
+export interface Service extends CapabilityCheckpointService {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
   readonly run: <A, E, R, SRD, SRE, FRD, FRE>(
     spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
@@ -374,6 +373,7 @@ export const make = (input: {
             return toolBatch
           }),
         ),
+      ...capabilityCheckpointMethods({ checkpointRef, commitSemaphore, onCheckpoint: journal.onCheckpoint }),
       recordHookDecisions: (hookCheckpoint) =>
         commitSemaphore.withPermit(
           Effect.gen(function* () {

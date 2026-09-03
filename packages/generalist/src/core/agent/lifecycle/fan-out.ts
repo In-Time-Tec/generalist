@@ -14,11 +14,24 @@ import { BudgetLimits } from "../../durable/run-budget.js"
 import { ToolContext } from "../../tools/tool-context.js"
 import { withInherited as withInheritedTasks } from "../../../tasks/internal.js"
 import type { Items as TaskItems } from "../../../tasks/item.js"
+import {
+  descriptorDescendsFrom,
+  descriptorsFromHandles,
+  validateDescriptor,
+  type Handle as CapabilityHandle,
+} from "../../capability/internal.js"
+import {
+  Descriptor as CapabilityDescriptor,
+  type Descriptor as CapabilityDescriptorValue,
+} from "../../capability/state.js"
+
+const CapabilityDescriptors = Schema.Array(CapabilityDescriptor)
+const isCapabilityDescriptors = Schema.is(CapabilityDescriptors)
 
 /** Authority and context inherited by one child Run. */
 export const Inheritance = Schema.Struct({
   history: Schema.Literals(["none", "summary", "full"]),
-  tools: Schema.Literals(["attenuate", "same"]),
+  tools: Schema.Union([Schema.Literals(["attenuate", "same"]), CapabilityDescriptors]),
   permissions: Schema.Literals(["inherit", "fresh"]),
   budget: Schema.optionalKey(BudgetLimits),
   sandbox: Schema.Literals(["share", "fork", "fresh"]),
@@ -29,7 +42,9 @@ export const Inheritance = Schema.Struct({
 export type Inheritance = typeof Inheritance.Type
 
 /** Caller-authored child inheritance options. Omitted fields use safe defaults. */
-export type InheritanceOptions = Partial<Inheritance>
+export interface InheritanceOptions extends Partial<Omit<Inheritance, "tools">> {
+  readonly tools?: "attenuate" | "same" | ReadonlyArray<CapabilityHandle>
+}
 
 /** Safe child inheritance defaults. */
 export const defaultInheritance: Inheritance = {
@@ -43,7 +58,22 @@ export const defaultInheritance: Inheritance = {
 }
 
 /** Normalize one child inheritance record before execution or journaling. */
-export const inheritance = (options?: InheritanceOptions): Inheritance => ({ ...defaultInheritance, ...options })
+export const inheritance = (options?: InheritanceOptions | Inheritance): Inheritance => {
+  const { tools, ...rest } = options ?? {}
+  let normalizedTools: Inheritance["tools"] = defaultInheritance.tools
+  if (tools !== undefined) {
+    if (Schema.is(Schema.Literals(["attenuate", "same"]))(tools)) {
+      normalizedTools = tools
+    } else {
+      normalizedTools = isCapabilityDescriptors(tools) ? tools : descriptorsFromHandles(tools)
+    }
+  }
+  return {
+    ...defaultInheritance,
+    ...rest,
+    tools: normalizedTools,
+  }
+}
 
 const closePendingToolCalls = (parent: Prompt.Prompt): Prompt.Prompt => {
   const pending = new Map<string, Prompt.ToolCallPart>()
@@ -81,6 +111,34 @@ export const inheritedHistory = (
   return latest === undefined ? undefined : Prompt.fromMessages([latest])
 }
 
+const validCapabilityTools = (
+  parent: AnyAgent,
+  child: AnyAgent,
+  descriptors: ReadonlyArray<CapabilityDescriptorValue>,
+): boolean => {
+  try {
+    for (const descriptor of descriptors) {
+      const tool = child.toolkit.tools[descriptor.tool]
+      if (tool === undefined) return false
+      validateDescriptor(descriptor, tool)
+    }
+  } catch {
+    return false
+  }
+  const parentTools = Object.keys(parent.toolkit.tools)
+  const childTools = Object.keys(child.toolkit.tools)
+  const handleTools = descriptors.map((descriptor) => descriptor.tool)
+  if (!childTools.every((name) => handleTools.includes(name))) return false
+  if (!handleTools.every((name) => childTools.includes(name) && parentTools.includes(name))) return false
+  const parentCapabilities = parent.capabilities
+  return (
+    parentCapabilities === undefined ||
+    descriptors.every((descriptor) =>
+      parentCapabilities.some((parentDescriptor) => descriptorDescendsFrom(descriptor, parentDescriptor)),
+    )
+  )
+}
+
 /** @internal Reject child authority that the parent does not hold. Shared by process-local and durable spawn paths. */
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal authority check with three required direct-style arguments.
 export const validateAuthority = (
@@ -90,6 +148,9 @@ export const validateAuthority = (
 ): Effect.Effect<void, ChildExceedsParent> => {
   const parentTools = Object.keys(parent.toolkit.tools)
   const childTools = Object.keys(child.toolkit.tools)
+  if (isCapabilityDescriptors(inherit.tools) && !validCapabilityTools(parent, child, inherit.tools)) {
+    return ChildExceedsParent.make({ field: "tools" })
+  }
   if (inherit.tools === "attenuate" && !childTools.every((name) => parentTools.includes(name))) {
     return ChildExceedsParent.make({ field: "tools" })
   }
@@ -115,6 +176,17 @@ const inheritedSandbox = (parent: AnyAgent, child: AnyAgent, policy: Inheritance
   )
 }
 
+const inheritedCapabilities = (
+  parent: AnyAgent,
+  child: AnyAgent,
+  tools: Inheritance["tools"],
+): ReadonlyArray<CapabilityDescriptorValue> | undefined => {
+  if (isCapabilityDescriptors(tools)) return tools
+  if (parent.capabilities === undefined) return undefined
+  if (tools === "same") return parent.capabilities
+  return parent.capabilities.filter((descriptor) => Object.hasOwn(child.toolkit.tools, descriptor.tool))
+}
+
 /** @internal Apply process-local child inheritance after authority validation. */
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal inheritance boundary with three required direct-style arguments.
 export const applyInheritance = <A extends AnyAgent>(
@@ -125,9 +197,11 @@ export const applyInheritance = <A extends AnyAgent>(
   Effect.gen(function* () {
     yield* validateAuthority(parent, child, inherit)
     const sandbox = yield* inheritedSandbox(parent, child, inherit.sandbox)
+    const capabilities = inheritedCapabilities(parent, child, inherit.tools)
     const inherited = {
       ...child,
       ...Object.assign({}, inherit.tools === "same" ? { toolkit: parent.toolkit } : undefined),
+      ...Object.assign({}, capabilities === undefined ? undefined : { capabilities }),
       ...Object.assign(
         {},
         inherit.permissions === "inherit" && parent.authorization !== undefined
@@ -214,7 +288,11 @@ export const recursiveAgentRunner = (execute: RunChild): AgentRunner => ({
     Effect.gen(function* () {
       const context = yield* Effect.serviceOption(ToolContext)
       const parent = Option.isSome(context) ? context.value : undefined
-      const inheritedAgent = parent?.agent === undefined ? agent : yield* applyInheritance(parent.agent, agent, inherit)
+      let inheritedAgent = agent
+      if (parent?.agent !== undefined) inheritedAgent = yield* applyInheritance(parent.agent, agent, inherit)
+      else if (isCapabilityDescriptors(inherit.tools)) {
+        inheritedAgent = yield* applyInheritance(agent, agent, { ...inherit, sandbox: "share" })
+      }
       const parentHistory = history ?? (parent?.history === undefined ? undefined : yield* parent.history)
       const historyProjection = inheritedHistory(inherit.history, parentHistory)
       return yield* execute(tasks === undefined ? inheritedAgent : withInheritedTasks(inheritedAgent, tasks), input, {

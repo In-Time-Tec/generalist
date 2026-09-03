@@ -10,7 +10,12 @@ import {
   withoutFanOut,
 } from "../../core/agent/tool/fan-out.js"
 import { Exhausted } from "../../core/durable/run-budget.js"
-import { inheritedHistory, inheritance, type InheritanceOptions } from "../../core/agent/lifecycle/fan-out.js"
+import {
+  inheritedHistory,
+  inheritance,
+  type Inheritance,
+  type InheritanceOptions,
+} from "../../core/agent/lifecycle/fan-out.js"
 import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
@@ -75,7 +80,7 @@ export interface FanOutGroupInput {
     readonly selection: string
     readonly label?: string
     readonly prompt: Prompt.RawInput
-    readonly inherit?: InheritanceOptions
+    readonly inherit?: InheritanceOptions | Inheritance
     readonly history?: Prompt.Prompt
   }>
   readonly concurrency?: number

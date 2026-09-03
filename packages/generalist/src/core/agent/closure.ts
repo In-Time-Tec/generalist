@@ -8,6 +8,7 @@ import type { ToolContext } from "../tools/tool-context.js"
 import type { Policy } from "../turn/policy.js"
 import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure-identity.js"
 import type { HandlersFor } from "./tool/fan-out.js"
+import type { Descriptor as CapabilityDescriptor } from "../capability/state.js"
 
 export { ClosedTypeId } from "./lifecycle/closure-identity.js"
 
@@ -24,6 +25,8 @@ export interface Any<PolicyServices = unknown> {
   readonly metadata?: Agent<never, never>["metadata"]
   readonly budget?: BudgetLimits
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
+  /** @internal Capability descriptors attached only by child inheritance. */
+  readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
 }
 
 /**

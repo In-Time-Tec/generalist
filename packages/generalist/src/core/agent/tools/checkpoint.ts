@@ -4,6 +4,12 @@ import { ReplayPolicy } from "../../durable/driver/contract.js"
 import type { ResumeResolution } from "../lifecycle/resume.js"
 import type { PendingToolResult } from "./result.js"
 import { AwaitEvent } from "./wake-event.js"
+import { Source as CapabilitySource, type Source } from "../../capability/state.js"
+
+const CheckpointToolResult = Schema.Struct({
+  ...Prompt.ToolResultPart.fields,
+  taint: Schema.Array(CapabilitySource),
+})
 
 /** Canonical model-authored framework call persisted in one tool-batch checkpoint. */
 export const CanonicalToolCall = Schema.Struct({
@@ -29,7 +35,7 @@ export const ToolCallCheckpointState = Schema.Union([
     token: Schema.String,
     awaitEvent: Schema.optionalKey(AwaitEvent),
   }),
-  Schema.TaggedStruct("Completed", { result: Prompt.ToolResultPart }),
+  Schema.TaggedStruct("Completed", { result: CheckpointToolResult }),
   Schema.TaggedStruct("Unknown", { operationId: Schema.String }),
   Schema.TaggedStruct("Cancelled", { reason: Schema.optionalKey(Schema.String) }),
 ])
@@ -50,6 +56,7 @@ export const ToolBatchCheckpoint = Schema.Struct({
   calls: Schema.Array(ToolCallCheckpoint),
   activeTools: Schema.Array(Schema.String),
   authorizationContextDigest: Schema.String,
+  argumentTaint: Schema.optionalKey(Schema.Array(CapabilitySource)),
   activatedSkills: Schema.Array(Schema.String),
   invocationPath: Schema.Array(Schema.String),
 })
@@ -101,6 +108,7 @@ export const make = (input: {
   readonly operationKeys: ReadonlyArray<string>
   readonly activeTools: ReadonlyArray<string>
   readonly authorizationContextDigest: string
+  readonly argumentTaint?: ReadonlyArray<Source>
 }): ToolBatchCheckpoint => ({
   turn: input.turn,
   calls: input.calls.map((call, index) => ({
@@ -110,6 +118,7 @@ export const make = (input: {
   })),
   activeTools: [...input.activeTools],
   authorizationContextDigest: input.authorizationContextDigest,
+  argumentTaint: [...(input.argumentTaint ?? [])],
   activatedSkills: [],
   invocationPath: [],
 })
@@ -169,29 +178,35 @@ export const completed: {
     callIndex,
     state: {
       _tag: "Completed",
-      result: Prompt.makePart("tool-result", {
-        id: result.id,
-        name: result.name,
-        isFailure: result.isFailure,
-        result: result.encodedResult,
-        providerExecuted: result.providerExecuted,
-        options: result.metadata,
-      }),
+      result: Object.assign(
+        Prompt.makePart("tool-result", {
+          id: result.id,
+          name: result.name,
+          isFailure: result.isFailure,
+          result: result.encodedResult,
+          providerExecuted: result.providerExecuted,
+          options: result.metadata,
+        }),
+        { taint: result.taint },
+      ),
     },
   }),
 )
 
-export const pendingResult = (result: Prompt.ToolResultPart): PendingToolResult =>
-  Response.toolResultPart({
-    id: result.id,
-    name: result.name,
-    isFailure: result.isFailure,
-    result: result.result,
-    encodedResult: result.result,
-    providerExecuted: result.providerExecuted,
-    preliminary: false,
-    metadata: result.options,
-  })
+export const pendingResult = (result: typeof CheckpointToolResult.Type): PendingToolResult =>
+  Object.assign(
+    Response.toolResultPart({
+      id: result.id,
+      name: result.name,
+      isFailure: result.isFailure,
+      result: result.result,
+      encodedResult: result.result,
+      providerExecuted: result.providerExecuted,
+      preliminary: false,
+      metadata: result.options,
+    }),
+    { taint: result.taint },
+  )
 
 /** Completed results that can now extend the authored-order transcript prefix. */
 export const projectableResults: {

@@ -40,6 +40,7 @@ import {
   retain as retainTasks,
   withCurrent as withCurrentTasks,
 } from "../../tasks/internal.js"
+import { clearTaint } from "../capability/internal.js"
 type CompactionContext = {
   readonly runId: RunId
   readonly activeSession: Option.Option<SessionStore>
@@ -508,6 +509,7 @@ export const make = (context: CompactionContext) => {
             yield* applyCompactionResult(turn, result, path.at(-1)?.id ?? null, compactionId, commit, () => {
               applicationCommitted = true
             })
+            yield* clearTaint(turn, compactionId)
             return {
               prompt: Option.isNone(activeSession) ? Prompt.fromMessages([]) : result.prompt,
               changed: true,

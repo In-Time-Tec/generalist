@@ -11,6 +11,7 @@ import type { ToolOrigin } from "../event.js"
 import type { Any as AnyGate, FailureMode as GateFailureMode } from "../gates/definition.js"
 import type { SandboxService } from "../../../sandbox/service.js"
 import type { HandlersFor } from "../tool/fan-out.js"
+import type { Descriptor as CapabilityDescriptor } from "../../capability/state.js"
 
 export const AgentTypeId = "generalist/core/Agent"
 
@@ -55,6 +56,8 @@ export interface Agent<
   readonly gates: ReadonlyArray<AnyGate>
   readonly onGateFailure: GateFailureMode
   readonly sandbox?: SandboxService
+  /** @internal Capability descriptors attached only by child inheritance. */
+  readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
 }
 
 /**
@@ -91,6 +94,8 @@ export interface Any {
   readonly gates: ReadonlyArray<AnyGate>
   readonly onGateFailure: GateFailureMode
   readonly sandbox?: SandboxService
+  /** @internal Capability descriptors attached only by child inheritance. */
+  readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
 }
 
 /** Services closed over with an Agent. */

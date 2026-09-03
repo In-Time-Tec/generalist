@@ -3,7 +3,7 @@ import type { Prompt } from "effect/unstable/ai"
 import { AgentError, type Event } from "../event.js"
 import type { HandoffRunState } from "../handoff/state.js"
 import type { RunError } from "../run/error.js"
-import type { AnyToolCall } from "./result.js"
+import { domainFailureResult, type AnyToolCall } from "./result.js"
 import {
   AuthorizationError,
   type Authorizer,
@@ -14,9 +14,13 @@ import { type Registry, get } from "../../tools/tool-registry.js"
 import type { ToolState } from "./skill-activation.js"
 import { updateToolBatch } from "../../durable/driver/run.js"
 import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
-import { replaceCall, updateCall } from "./checkpoint.js"
+import { completed, replaceCall, updateCall } from "./checkpoint.js"
 import { approvalRequest as applyApprovalRequest, toolCall as applyToolCall } from "../lifecycle/hooks.js"
 import type { RunId } from "../../durable/run-id.js"
+import type { Descriptor as CapabilityDescriptor } from "../../capability/state.js"
+import { requiredUntaintedArguments } from "../../capability/annotation.js"
+import { checkCall } from "../../capability/internal.js"
+import { Denied } from "../../capability/errors.js"
 
 interface AuthorizationContext<AuthorizationR, ExecuteR> {
   readonly runId: RunId
@@ -26,6 +30,7 @@ interface AuthorizationContext<AuthorizationR, ExecuteR> {
   readonly toolState: Ref.Ref<ToolState>
   readonly handoffState: Ref.Ref<HandoffRunState> | undefined
   readonly activeAgentName: () => Effect.Effect<string>
+  readonly activeCapabilities: () => Effect.Effect<ReadonlyArray<CapabilityDescriptor> | undefined>
   readonly executeApproved: (
     turn: number,
     call: AnyToolCall,
@@ -58,6 +63,26 @@ export const make = <AuthorizationR, ExecuteR>(input: AuthorizationContext<Autho
     const activeTools = registry.entries.map((entry) => Schema.decodeUnknownSync(Schema.String)(entry.tool.name))
     return Stream.unwrap(
       Effect.gen(function* () {
+        const capability = yield* checkCall({
+          descriptors: yield* input.activeCapabilities(),
+          tool: call.name,
+          toolCallId: call.id,
+          turn,
+          arguments: call.params,
+          untaintedArguments: requiredUntaintedArguments(candidate.tool),
+        })
+        if (capability._tag === "Denied") {
+          const encodedFailure = yield* Schema.encodeEffect(Denied)(capability.error).pipe(Effect.orDie)
+          const result = domainFailureResult(call, {
+            _tag: "DomainFailure",
+            failure: capability.error,
+            encodedFailure,
+            taint: capability.taint,
+          })
+          yield* updateToolBatch((checkpoint) => completed(checkpoint, toolCallIndex, result))
+          const event: Event = { _tag: "ToolExecutionCompleted", turn, call, result }
+          return Stream.succeed(event)
+        }
         const agentName = yield* input.activeAgentName()
         const hook = yield* applyToolCall({
           runId: input.runId,

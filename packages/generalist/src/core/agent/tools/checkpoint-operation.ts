@@ -5,12 +5,29 @@ import { domainFailureResult, successResult, type AnyToolCall } from "./result.j
 import { completed, effectiveCall, updateCall } from "./checkpoint.js"
 import { AwaitEvent } from "./wake-event.js"
 import { Items as TaskItems, writeToolName } from "../../../tasks/item.js"
+import { Source as CapabilitySource, accumulate } from "../../capability/state.js"
 
 const PersistedToolOutcome = Schema.Union([
-  Schema.TaggedStruct("Success", { result: Schema.Unknown, encodedResult: Schema.Unknown }),
-  Schema.TaggedStruct("DomainFailure", { failure: Schema.Unknown, encodedFailure: Schema.Unknown }),
+  Schema.TaggedStruct("Success", {
+    result: Schema.Unknown,
+    encodedResult: Schema.Unknown,
+    taint: Schema.optionalKey(Schema.Array(CapabilitySource)),
+  }),
+  Schema.TaggedStruct("DomainFailure", {
+    failure: Schema.Unknown,
+    encodedFailure: Schema.Unknown,
+    taint: Schema.optionalKey(Schema.Array(CapabilitySource)),
+  }),
   Schema.TaggedStruct("Suspend", { token: Schema.String, awaitEvent: Schema.optionalKey(AwaitEvent) }),
 ])
+
+const capabilityCheckpoint = (
+  current: typeof import("../../capability/state.js").Checkpoint.Type | undefined,
+  outcome: typeof PersistedToolOutcome.Type | undefined,
+) => {
+  if (outcome === undefined || outcome._tag === "Suspend" || outcome.taint === undefined) return current
+  return accumulate(current, outcome.taint)
+}
 
 /** Apply one durable operation outcome to its exact authored call checkpoint. */
 export const applyToolOutcome =
@@ -38,6 +55,8 @@ export const applyToolOutcome =
     ) {
       throw new TypeError(`Tool operation ${input.operationKey} does not match its batch checkpoint`)
     }
+    const decoded =
+      outcome._tag === "Succeeded" ? Schema.decodeUnknownSync(PersistedToolOutcome)(outcome.value) : undefined
     const nextBatch = (() => {
       if (outcome._tag === "Unknown") {
         return updateCall(batch, {
@@ -51,7 +70,7 @@ export const applyToolOutcome =
           state: { _tag: "Cancelled", reason: "execution-failed" },
         })
       }
-      const decoded = Schema.decodeUnknownSync(PersistedToolOutcome)(outcome.value)
+      if (decoded === undefined) throw new TypeError(`Tool operation ${input.operationKey} has no persisted outcome`)
       if (decoded._tag === "Success") return completed(batch, input.callIndex, successResult(input.call, decoded))
       if (decoded._tag === "DomainFailure") {
         return completed(batch, input.callIndex, domainFailureResult(input.call, decoded))
@@ -81,16 +100,17 @@ export const applyToolOutcome =
       })
     })()
     const tasks = (() => {
-      if (input.call.name !== writeToolName || outcome._tag !== "Succeeded") return state.tasks
-      const decoded = Schema.decodeUnknownSync(PersistedToolOutcome)(outcome.value)
+      if (input.call.name !== writeToolName || decoded === undefined) return state.tasks
       return decoded._tag === "Success" ? Schema.decodeUnknownSync(TaskItems)(decoded.result) : state.tasks
     })()
+    const capabilities = capabilityCheckpoint(state.capabilities, decoded)
     return {
       ...checkpoint,
       state: {
         ...state,
         toolBatch: nextBatch,
         ...Object.assign({}, tasks === undefined ? undefined : { tasks }),
+        ...Object.assign({}, capabilities === undefined ? undefined : { capabilities }),
       },
     }
   }

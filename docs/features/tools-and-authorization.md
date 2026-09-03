@@ -49,8 +49,10 @@ agent.run({ prompt: "Find authorization docs" })
 ├── LanguageModel generates ToolCall
 │   └── { id: "call-1", name: "search_docs",
 │        params: { query: "authorization" } }
+├── active-registry membership
+├── Capability.check() when scoped authority or untainted arguments apply
+├── Hooks.onToolCall()
 ├── ToolAuthorizer.authorize()
-│   ├── active-registry membership
 │   ├── Permissions.evaluate() -> Ask
 │   └── Approvals.resolve(Pending) -> Approved
 ├── toolkit handler -> ["Result for authorization"]
@@ -79,6 +81,7 @@ Only an idempotent `remote` placement helper opts in automatically to bounded in
 
 ```text
 tool call
+├── capability denial -> typed DomainFailure -> model
 ├── declared handler failure -> DomainFailure -> model
 ├── decode/route/placement/authorization fault
 │   └── FrameworkFailure (typed Effect error channel)
@@ -97,7 +100,8 @@ Successful output is JSON-sized at the common post-codec boundary before durable
 - Recovery accepts only the persisted driver checkpoint, matching executable identity and authorization-message digest, plus an exact suspension resolution when resolving a wait.
 - The checkpoint is authoritative for calls, indexes, keys, active tools, turn, and remaining budget; hosts cannot inject a scheduler, authorizer, executor, toolkit, call index, or provider payload at recovery.
 - Resuming an authored-order batch skips waits resolved by the supplied resume and reaches each later barrier once; unresolved sibling waits remain suspended.
-- Authorization checks active membership, evaluates base permissions with remembered `RuleStore` rules as a last-match overlay, then calls `Approvals.resolve(Pending)` once for `Ask` or `needsApproval`.
+- Authorization checks active membership, then capability scope/expiry/revocation/taint, then `Hooks.onToolCall`, then base permissions with remembered `RuleStore` rules as a last-match overlay, and finally calls `Approvals.resolve(Pending)` once for `Ask` or `needsApproval`.
+- Capability denial is a completed typed tool failure before hooks, permissions, approvals, or dispatch. Capability allow never bypasses the coarse Permissions layer.
 - `Approved` executes and remembers only an explicit `remember` rule; `Denied` fails; `Pending` suspends once.
 - `ApprovalRequested` contains canonical `{ approvalId, operation, capability, input }`; standalone IDs are the permission token or `approval:<tool-call-id>`, while hosted IDs add an encoded Run identity for durable token-only resolution. Adapters never replace the ID.
 - `Permissions.layerFailClosed` asks on unmatched calls; `layerRuleset` also defaults to `ask` unless `fallback` says otherwise; `layerAllowAll` is the explicit trusted-job, development, or test posture.
@@ -122,4 +126,5 @@ Successful output is JSON-sized at the common post-codec boundary before durable
 - Source: `packages/generalist/src/core/tools/`, `packages/generalist/src/core/policy/permissions.ts`, `packages/generalist/src/core/policy/approvals.ts`
 - Test: [`core/tools/tool-authorization.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/tools/tool-authorization.test.ts)
 - Site: `/docs/guides/define-tools`, `/docs/guides/permissions`, `/docs/guides/approvals`, `/docs/guides/durable-composite-tools`, `/docs/reference/core-tools`
+- Sibling feature docs: [`capabilities.md`](./capabilities.md), [`hooks.md`](./hooks.md)
 - Decisions/tradeoffs: [Typed tool boundaries](../decisions/typed-tool-boundaries.md), [Strict tool registry](../tradeoffs/strict-tool-registry.md)
