@@ -9,48 +9,23 @@ import {
   SchemaVersionUnsupported,
 } from "generalist/runtime/sql-driver"
 import { apply as applyRunSchema } from "../../../src/mysql/schema/migrations.js"
-import { SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "../../../src/mysql/schema/definition.js"
+import {
+  SCHEMA_STATEMENTS,
+  SCHEMA_TABLES,
+  SCHEMA_VERSION,
+  schemaChecksum,
+} from "../../../src/mysql/schema/definition.js"
 import { inspectLogicalSqlSchema } from "../../../../generalist/test/runtime/sql/schema-conformance.js"
 import { mysqlAvailable, mysqlDatabase } from "../runtime/environment.js"
 
 const describeMysql = describe.runIf(mysqlAvailable)
 const database = mysqlDatabase("migration")
 const client = database.client
-const tables = [
-  "generalist_session_entries",
-  "generalist_sessions",
-  "generalist_run_registrations",
-  "generalist_executable_registrations",
-  "generalist_program_operations",
-  "generalist_program_runs",
-  "generalist_tree_event_index",
-  "generalist_tree_roots",
-  "generalist_fan_out_members",
-  "generalist_fan_outs",
-  "generalist_run_steering",
-  "generalist_messages",
-  "generalist_agent_names",
-  "generalist_external_child_placements",
-  "generalist_external_roots",
-  "generalist_run_links",
-  "generalist_run_waits",
-  "generalist_run_operations",
-  "generalist_run_acknowledgements",
-  "generalist_run_events",
-  "generalist_runs",
-  "generalist_host_sessions",
-  "generalist_lanes",
-  "generalist_memo_entries",
-  "generalist_permission_rules",
-  "generalist_runtime_locks",
-  "generalist_sql_migrations",
-  "generalist_schema_meta",
-] as const
 
 const resetSchema = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=0")
-  for (const table of tables) yield* sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
+  for (const table of SCHEMA_TABLES) yield* sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
   yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=1")
 })
 
