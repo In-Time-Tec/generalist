@@ -192,11 +192,13 @@ export interface StartOptions {
   readonly budget?: RunBudget
 }
 
-/** Durable fixed-interval fresh-Run recurrence. */
+/** Durable UTC fresh-Run recurrence. */
 export interface ScheduleOptions {
   readonly rrule: string
   readonly sessionId: string
   readonly budget?: RunBudget
+  /** Stable identity for idempotent registration across Runtime restarts. */
+  readonly scheduleId?: string
 }
 
 type StartedAgentResult<Output> = Omit<AgentExecutionResult, "output"> & { readonly output: Output }

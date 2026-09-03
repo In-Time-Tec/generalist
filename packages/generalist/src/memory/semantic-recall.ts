@@ -1,7 +1,7 @@
-import { Effect, Layer } from "effect"
+import { DateTime, Effect, Layer } from "effect"
 import { EmbeddingModel, IdGenerator, Prompt } from "effect/unstable/ai"
-import { type Item, Memory, MemoryError, type Service } from "../core/context/memory.js"
-import { VectorStore, type Match, type Query } from "./vector-store.js"
+import { type HistoryEntry, type Item, Memory, MemoryError, type Service } from "../core/context/memory.js"
+import { VectorStore, type Embedded, type Match, type Query } from "./vector-store.js"
 export interface Options {
   readonly limit?: number
   readonly minScore?: number
@@ -51,8 +51,25 @@ const finalExchangeText = (prompt: Prompt.Prompt): string | undefined => {
 const itemFromMatch = (match: Match): Item => ({
   id: match.document.id,
   content: [textPart(match.document.text)],
-  metadata: { ...match.document.metadata, score: match.score },
+  metadata: {
+    ...match.document.metadata,
+    score: match.score,
+    version: match.document.version,
+    evidence: match.document.evidence,
+    ...(match.document.supersedes === undefined ? undefined : { supersedes: match.document.supersedes }),
+    appliedAt: match.document.appliedAt,
+  },
 })
+
+const historyEntry = (document: Embedded): HistoryEntry => ({
+  version: document.version,
+  text: document.text,
+  evidence: document.evidence,
+  ...(document.supersedes === undefined ? undefined : { supersedes: document.supersedes }),
+  appliedAt: document.appliedAt,
+})
+
+const versionError = (message: string): MemoryError => MemoryError.make({ reason: "version", message })
 export const make = (
   options: Options = {},
 ): Effect.Effect<Service, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
@@ -88,17 +105,44 @@ export const make = (
         if (!input.terminal) return Effect.void
         const text = finalExchangeText(input.transcript)
         if (text === undefined) return Effect.void
-        return embeddingModel.embed(text).pipe(
-          Effect.mapError((error) => memoryError("embedding", error)),
-          Effect.flatMap((embedding) =>
-            IdGenerator.defaultIdGenerator.generateId().pipe(
-              Effect.flatMap((id) => store.upsert([{ id, key: input.key, text, embedding: embedding.vector }])),
-              Effect.mapError((error) => memoryError("vector-store", error)),
-            ),
-          ),
-        )
+        if ((input.entryId === undefined) !== (input.supersedes === undefined)) {
+          return Effect.fail(versionError("entryId and supersedes must be provided together"))
+        }
+        return Effect.gen(function* () {
+          const embedding = yield* embeddingModel
+            .embed(text)
+            .pipe(Effect.mapError((error) => memoryError("embedding", error)))
+          const id = input.entryId ?? (yield* IdGenerator.defaultIdGenerator.generateId())
+          const history = yield* store.history(id).pipe(Effect.mapError((error) => memoryError("vector-store", error)))
+          if (input.supersedes !== undefined && !history.some((version) => version.version === input.supersedes)) {
+            return yield* versionError(`entry ${id} has no version ${input.supersedes}`)
+          }
+          const version = (history.at(-1)?.version ?? 0) + 1
+          const appliedAt = DateTime.formatIso(yield* DateTime.now)
+          yield* store
+            .upsert([
+              {
+                id,
+                key: input.key,
+                text,
+                embedding: embedding.vector,
+                version,
+                evidence: input.evidence,
+                ...(input.supersedes === undefined ? undefined : { supersedes: input.supersedes }),
+                appliedAt,
+              },
+            ])
+            .pipe(Effect.mapError((error) => memoryError("vector-store", error)))
+        })
       },
       forget: (input) => store.delete(input).pipe(Effect.mapError((error) => memoryError("vector-store", error))),
+      history: (entryId) =>
+        store.history(entryId).pipe(
+          Effect.map((history) => history.map(historyEntry)),
+          Effect.mapError((error) => memoryError("vector-store", error)),
+        ),
+      revert: (entryId, input) =>
+        store.revert({ entryId, to: input.to }).pipe(Effect.mapError((error) => memoryError("vector-store", error))),
     }
   })
 export const layer = (options: Options = {}): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel> =>

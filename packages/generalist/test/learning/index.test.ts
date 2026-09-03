@@ -72,6 +72,7 @@ const handlers = (apply: (proposal: Proposal) => Effect.Effect<void>): ApplyHand
   RefineInstruction: apply,
   AuthorSkill: apply,
   Remember: apply,
+  Forget: apply,
   ExportTrajectory: apply,
 })
 

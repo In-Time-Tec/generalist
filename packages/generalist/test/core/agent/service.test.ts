@@ -1306,6 +1306,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               rememberedKey = input.key
             }),
           forget: () => Effect.void,
+          history: () => Effect.succeed([]),
+          revert: () => Effect.void,
         }),
       ),
       Effect.gen(function* () {
@@ -5801,6 +5803,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               remembered.push(input)
             }),
           forget: () => Effect.void,
+          history: () => Effect.succeed([]),
+          revert: () => Effect.void,
         }),
         Session.layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),

@@ -52,6 +52,27 @@ it.effect("fires fixed UTC recurrences from the Runtime-scoped scheduler under T
   ),
 )
 
+it.effect("registers a stable schedule idempotently", () =>
+  provideScoped(
+    runtimeLayer,
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      yield* runtime.register(agent)
+      const options = {
+        rrule: "FREQ=SECONDLY",
+        sessionId: "stable-schedule-session",
+        scheduleId: "schedule_stable_test",
+      } as const
+      const first = yield* runtime.schedule(agent, "run", options)
+      const second = yield* runtime.schedule(agent, "run", options)
+
+      expect(second).toEqual(first)
+      yield* TestClock.adjust("1100 millis")
+      expect(yield* runtime.list({ limit: 10 })).toHaveLength(1)
+    }),
+  ),
+)
+
 it.effect("rejects recurrence rules outside the documented interval subset", () =>
   provideScoped(
     runtimeLayer,

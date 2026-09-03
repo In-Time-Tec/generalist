@@ -2,7 +2,7 @@ import { describe, it } from "@effect/vitest"
 import { PgClient } from "@effect/sql-pg"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
-import { layer as layerMemory, layerPgVector } from "generalist/memory"
+import { layerPgVector, SemanticRecall } from "generalist/memory"
 import { Testing } from "generalist/testing"
 
 const url = Effect.runSync(
@@ -31,7 +31,7 @@ if (url === undefined || url.length === 0) {
         }),
     }),
   )
-  const memory = layerMemory({ semantic: { limit: 16 } }).pipe(
+  const memory = SemanticRecall.layer({ limit: 16 }).pipe(
     Layer.provide(
       Layer.merge(
         layerPgVector({ table: "generalist_memory_conformance", dimensions: 2 }).pipe(Layer.provide(client)),
@@ -39,5 +39,5 @@ if (url === undefined || url.length === 0) {
       ),
     ),
   )
-  Testing.memory({ layer: memory, persistent: true })
+  Testing.memory({ layer: memory, persistent: true, versioning: true })
 }

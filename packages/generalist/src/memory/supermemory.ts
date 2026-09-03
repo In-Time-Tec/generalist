@@ -70,6 +70,12 @@ const finalExchangeText = (prompt: Prompt.Prompt): string | undefined => {
 const memoryError = (cause: SupermemoryError): MemoryError =>
   MemoryError.make({ message: `Supermemory request failed with status ${cause.status}`, cause })
 
+const versioningUnsupported = (): MemoryError =>
+  MemoryError.make({
+    reason: "unsupported",
+    message: "Supermemory's remote API does not expose version history or atomic reversion",
+  })
+
 const boundedBody = (response: HttpClientResponse.HttpClientResponse) =>
   response.text.pipe(
     Effect.map((body) => body.slice(0, 16_384)),
@@ -143,6 +149,9 @@ export const layer = (options: Options): Layer.Layer<Memory, Config.ConfigError,
           )
         },
         remember: (input) => {
+          if (input.entryId !== undefined || input.supersedes !== undefined) {
+            return Effect.fail(versioningUnsupported())
+          }
           if (!input.terminal) return Effect.void
           const content = finalExchangeText(input.transcript)
           if (content === undefined) return Effect.void
@@ -183,6 +192,8 @@ export const layer = (options: Options): Layer.Layer<Memory, Config.ConfigError,
                 { id: input.id, containerTag: containerTag(input.key) },
                 Schema.Unknown,
               ).pipe(Effect.asVoid, Effect.mapError(memoryError)),
+        history: () => Effect.fail(versioningUnsupported()),
+        revert: () => Effect.fail(versioningUnsupported()),
       }
       return Memory.of(service)
     }),

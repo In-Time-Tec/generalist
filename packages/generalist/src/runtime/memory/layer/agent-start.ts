@@ -104,12 +104,12 @@ export const make = (options: {
         Effect.provideContext(registration.value.context),
       )
       const rule = yield* parseRRule(scheduleOptions.rrule)
-      const scheduleId = `schedule_${yield* generateId}`
+      const scheduleId = scheduleOptions.scheduleId ?? `schedule_${yield* generateId}`
       const now = yield* Clock.currentTimeMillis
       const createdAt = DateTime.formatIso(DateTime.makeUnsafe(now))
       return yield* options.store.registerSchedule({
         scheduleId,
-        rrule: `FREQ=${rule.frequency}${rule.interval === 1 ? "" : `;INTERVAL=${rule.interval}`}`,
+        rrule: `FREQ=${rule.frequency}${rule.interval === 1 ? "" : `;INTERVAL=${rule.interval}`}${rule.hour === undefined ? "" : `;BYHOUR=${rule.hour}`}`,
         rule,
         definition: {
           executable: registration.value.executable,

@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
-import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
+import { AiError, LanguageModel } from "effect/unstable/ai"
+import { Memory, type MemoryError } from "../../core/context/memory.js"
+import { ModelRegistry } from "../../core/model/registry.js"
 import { Approvals, type Service as ApprovalsService } from "../../core/policy/approvals.js"
-import { RunId } from "../../core/durable/run-id.js"
-import { GuidanceId } from "../../instructions/entry.js"
 import { type Declaration, Hooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
 import {
   Denied as NestedOperationDenied,
@@ -10,92 +10,77 @@ import {
   type Service as OperationsService,
 } from "../../core/tools/nested-operation.js"
 import { ToolContext, type Service as ToolContextService } from "../../core/tools/tool-context.js"
-import { Runtime, type Service as RuntimeService } from "../../runtime/service.js"
+import { DuplicateAgent } from "../../runtime/errors.js"
+import { Runtime, type ScheduleError, type Service as RuntimeService } from "../../runtime/service.js"
 import { Trajectory, fromJournal, type Trajectory as TrajectoryValue } from "../../trajectory/index.js"
+import {
+  agent as consolidationAgent,
+  configurationOf,
+  consolidate,
+  ConsolidationInvalid,
+  type ConsolidationProposer,
+  isConsolidationAgent,
+  resolveModel,
+  runStartDeclaration,
+} from "./consolidate.js"
+import {
+  type ApplyHandlers,
+  AuthorSkill,
+  type ConsolidationApplyHandlers,
+  ExportTrajectory,
+  Forget,
+  ForgetEntry,
+  handlerFor,
+  MemoryEntry,
+  Proposal,
+  Proposals,
+  RefineInstruction,
+  Remember,
+  TrajectoryRef,
+} from "./proposal.js"
 
-/** @experimental One exact run turn supporting a proposed change. */
-export const TrajectoryRef = Schema.Struct({
-  runId: RunId,
-  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-})
-
-/** @experimental */
-export type TrajectoryRef = typeof TrajectoryRef.Type
-
-/** @experimental Memory input that an application handler may adapt to its Memory service. */
-export const MemoryEntry = Schema.Struct({
-  key: Schema.Struct({ agent: Schema.String, subject: Schema.String }),
-  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  transcript: Prompt.Prompt,
-  terminal: Schema.Boolean,
-})
-
-/** @experimental */
-export type MemoryEntry = typeof MemoryEntry.Type
-
-/** @experimental A proposed instruction change plus the trajectory turns supporting it. */
-export const RefineInstruction = Schema.TaggedStruct("RefineInstruction", {
-  target: GuidanceId,
-  diff: Schema.String,
-  evidence: Schema.Array(TrajectoryRef),
-})
-
-/** @experimental */
-export type RefineInstruction = typeof RefineInstruction.Type
-
-/** @experimental A proposed skill plus the trajectory turns supporting it. */
-export const AuthorSkill = Schema.TaggedStruct("AuthorSkill", {
-  name: Schema.String,
-  content: Schema.String,
-  evidence: Schema.Array(TrajectoryRef),
-})
-
-/** @experimental */
-export type AuthorSkill = typeof AuthorSkill.Type
-
-/** @experimental A proposed memory entry plus the trajectory turns supporting it. */
-export const Remember = Schema.TaggedStruct("Remember", {
-  memory: MemoryEntry,
-  evidence: Schema.Array(TrajectoryRef),
-})
-
-/** @experimental */
-export type Remember = typeof Remember.Type
-
-/** @experimental A proposed JSON Lines export of one recorded run. */
-export const ExportTrajectory = Schema.TaggedStruct("ExportTrajectory", {
-  runId: RunId,
-  format: Schema.Literal("jsonl"),
-})
-
-/** @experimental */
-export type ExportTrajectory = typeof ExportTrajectory.Type
-
-/** @experimental One reviewable change proposed after a run. */
-export const Proposal = Schema.Union([RefineInstruction, AuthorSkill, Remember, ExportTrajectory])
-
-/** @experimental */
-export type Proposal = typeof Proposal.Type
-
-const Proposals = Schema.Array(Proposal)
+export {
+  AuthorSkill,
+  consolidate,
+  ConsolidationInvalid,
+  ExportTrajectory,
+  Forget,
+  ForgetEntry,
+  MemoryEntry,
+  Proposal,
+  RefineInstruction,
+  Remember,
+  TrajectoryRef,
+}
+export type { ConsolidateOptions } from "./consolidate.js"
+export type {
+  ApplyHandlers,
+  AuthorSkill as AuthorSkillProposal,
+  ConsolidationApplyHandlers,
+  ExportTrajectory as ExportTrajectoryProposal,
+  Forget as ForgetProposal,
+  ForgetEntry as ForgetEntryInput,
+  MemoryEntry as MemoryEntryInput,
+  RefineInstruction as RefineInstructionProposal,
+  Remember as RememberProposal,
+  TrajectoryRef as TrajectoryReference,
+} from "./proposal.js"
 
 /** @experimental Produce reviewable changes from one completed trajectory. */
 export interface Proposer<R = never, E = never> {
   readonly propose: (trajectory: TrajectoryValue) => Effect.Effect<ReadonlyArray<Proposal>, E, R>
 }
 
-/** @experimental Plain Effect handlers selected only by proposal tag. */
-export interface ApplyHandlers<R = never, E = never> {
-  readonly RefineInstruction: (proposal: RefineInstruction) => Effect.Effect<void, E, R>
-  readonly AuthorSkill: (proposal: AuthorSkill) => Effect.Effect<void, E, R>
-  readonly Remember: (proposal: Remember) => Effect.Effect<void, E, R>
-  readonly ExportTrajectory: (proposal: ExportTrajectory) => Effect.Effect<void, E, R>
-}
-
 /** @experimental */
 export interface LayerOptions<ProposeR = never, ProposeE = never, ApplyR = never, ApplyE = never> {
   readonly propose: Proposer<ProposeR, ProposeE>["propose"]
   readonly apply: ApplyHandlers<ApplyR, ApplyE>
+}
+
+/** @experimental */
+export interface ConsolidationLayerOptions<ApplyR = never, ApplyE = never> {
+  readonly propose: ConsolidationProposer
+  readonly apply: ConsolidationApplyHandlers<ApplyR, ApplyE>
 }
 
 /** @experimental */
@@ -147,18 +132,21 @@ const toolContext = (input: RunEndInput): ToolContextService => ({
   operationKey: `learning:${input.runId}`,
 })
 
-const handlerFor = <R, E>(handlers: ApplyHandlers<R, E>, proposal: Proposal): Effect.Effect<void, E, R> => {
-  switch (proposal._tag) {
-    case "RefineInstruction":
-      return handlers.RefineInstruction(proposal)
-    case "AuthorSkill":
-      return handlers.AuthorSkill(proposal)
-    case "Remember":
-      return handlers.Remember(proposal)
-    case "ExportTrajectory":
-      return handlers.ExportTrajectory(proposal)
-  }
-}
+const completeApplyHandlers = <R, E>(
+  handlers: ApplyHandlers<R, E> | ConsolidationApplyHandlers<R, E>,
+): ApplyHandlers<R, E> => ({
+  RefineInstruction: handlers.RefineInstruction,
+  Remember: handlers.Remember,
+  Forget: handlers.Forget,
+  AuthorSkill:
+    "AuthorSkill" in handlers
+      ? handlers.AuthorSkill
+      : () => Effect.die("Scheduled consolidation cannot propose AuthorSkill"),
+  ExportTrajectory:
+    "ExportTrajectory" in handlers
+      ? handlers.ExportTrajectory
+      : () => Effect.die("Scheduled consolidation cannot propose ExportTrajectory"),
+})
 
 const applyProposal = <R, E>(options: {
   readonly operations: OperationsService
@@ -168,22 +156,23 @@ const applyProposal = <R, E>(options: {
   readonly handlers: ApplyHandlers<R, E>
   readonly proposal: Proposal
 }) =>
-  options.operations
-    .run(
+  Effect.gen(function* () {
+    const payload = yield* Schema.encodeEffect(Proposal)(options.proposal)
+    yield* options.operations.run(
       {
         kind: `learning.${options.proposal._tag}`,
-        payload: options.proposal,
+        payload,
         replayPolicy: "never",
         success: Schema.Void,
-        approval: { capability: "learning", request: options.proposal },
+        approval: { capability: "learning", request: payload },
       },
       handlerFor(options.handlers, options.proposal).pipe(Effect.provide(options.context)),
     )
-    .pipe(
-      Effect.provideService(Approvals, options.approvals),
-      Effect.provideService(ToolContext, options.toolContext),
-      Effect.catchIf(Schema.is(NestedOperationDenied), () => Effect.void),
-    )
+  }).pipe(
+    Effect.provideService(Approvals, options.approvals),
+    Effect.provideService(ToolContext, options.toolContext),
+    Effect.catchIf(Schema.is(NestedOperationDenied), () => Effect.void),
+  )
 
 const runLearning = <ProposeR, ProposeE, ApplyR, ApplyE>(options: {
   readonly input: RunEndInput
@@ -194,8 +183,20 @@ const runLearning = <ProposeR, ProposeE, ApplyR, ApplyE>(options: {
   readonly configured: LayerOptions<ProposeR, ProposeE, ApplyR, ApplyE>
 }) =>
   Effect.gen(function* () {
-    const projected = yield* fromJournal(options.runtime, options.input.runId)
-    const trajectory = completedTrajectory(projected, options.input)
+    const consolidation = configurationOf(options.configured.propose)
+    if (consolidation !== undefined && !isConsolidationAgent(options.input.agentName)) return
+    const trajectory: TrajectoryValue =
+      consolidation === undefined
+        ? completedTrajectory(yield* fromJournal(options.runtime, options.input.runId), options.input)
+        : {
+            runId: options.input.runId,
+            agent: options.input.agentName,
+            input: options.input.transcript,
+            output: options.input.output,
+            gates: [],
+            turns: [],
+            stopReason: "completed",
+          }
     const context = toolContext(options.input)
     const proposals = yield* options.operations
       .run(
@@ -258,10 +259,50 @@ export const declaration = <ProposeR, ProposeE, ApplyR, ApplyE>(
  * @experimental Provide `Hooks` consisting of the learning declaration alone. Use `declaration` when the environment
  * already has other hook declarations.
  */
-export const layer = <ProposeR, ProposeE, ApplyR, ApplyE>(
+export function layer<ApplyR, ApplyE>(
+  options: ConsolidationLayerOptions<ApplyR, ApplyE>,
+): Layer.Layer<
+  Hooks,
+  ConsolidationInvalid | DuplicateAgent | ScheduleError,
+  Runtime | Approvals | Memory | ModelRegistry | ApplyR
+>
+export function layer<ProposeR, ProposeE, ApplyR, ApplyE>(
   options: LayerOptions<ProposeR, ProposeE, ApplyR, ApplyE>,
-): Layer.Layer<Hooks, never, Runtime | Approvals | ProposeR | ApplyR> =>
-  Layer.effect(
+): Layer.Layer<Hooks, never, Runtime | Approvals | ProposeR | ApplyR>
+export function layer<ProposeR, ProposeE, ApplyR, ApplyE>(
+  options: LayerOptions<ProposeR, ProposeE, ApplyR, ApplyE> | ConsolidationLayerOptions<ApplyR, ApplyE>,
+) {
+  const configured = { propose: options.propose, apply: completeApplyHandlers(options.apply) }
+  return Layer.effect(
     Hooks,
-    Effect.map(declaration(options), (learning) => Hooks.of({ declarations: [learning] })),
+    Effect.gen(function* () {
+      const learning = yield* declaration<
+        ProposeR | Memory,
+        ProposeE | ConsolidationInvalid | MemoryError | Schema.SchemaError,
+        ApplyR,
+        ApplyE
+      >(configured)
+      const configuration = configurationOf(configured.propose)
+      if (configuration === undefined) return Hooks.of({ declarations: [learning] })
+      const runtime = yield* Runtime
+      const memory = yield* Memory
+      const models = yield* ModelRegistry
+      const hooks = Hooks.of({ declarations: [runStartDeclaration(runtime, memory, configuration), learning] })
+      const background = consolidationAgent(
+        configuration,
+        yield* resolveModel(configuration.model, yield* models.registrations),
+      )
+      const context = yield* Effect.context<Runtime | Approvals | ProposeR | ApplyR>()
+      yield* runtime
+        .register(background)
+        .pipe(Effect.provideContext(Context.add(Context.add(context, Hooks, hooks), ModelRegistry, models)))
+      yield* runtime.schedule(background, "Consolidate recent journal episodes.", {
+        rrule: configuration.schedule,
+        sessionId: "learning",
+        budget: configuration.budget,
+        scheduleId: "schedule_generalist_learning_consolidation",
+      })
+      return hooks
+    }),
   )
+}

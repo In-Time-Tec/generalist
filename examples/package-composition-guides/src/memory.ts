@@ -14,6 +14,7 @@ const program = Memory.Memory.use((memory) =>
       turn: 0,
       terminal: true,
       transcript: Prompt.fromMessages([message("user", "My name is Ada."), message("assistant", "Hello Ada.")]),
+      evidence: [],
     })
     const recalled = yield* memory.recall({
       key,

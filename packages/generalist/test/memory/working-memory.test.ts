@@ -68,6 +68,28 @@ expectTypeOf(WorkingMemory.layer({ summarize: { model: summaryModel } })).toEqua
 expectTypeOf(WorkingMemory.layer({ maxMessages: 2 })).toEqualTypeOf<Layer.Layer<Memory.Memory, never, never>>()
 
 layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
+  it.effect("rejects semantic-memory version operations", () =>
+    Effect.gen(function* () {
+      const memory = yield* Memory.Memory
+      const rememberFailure = yield* memory
+        .remember({
+          key,
+          turn: 0,
+          terminal: true,
+          transcript: prompt(user("replacement")),
+          entryId: "semantic-entry",
+          supersedes: 1,
+          evidence: [],
+        })
+        .pipe(Effect.flip)
+      const revertFailure = yield* memory.revert("semantic-entry", { to: 1 }).pipe(Effect.flip)
+
+      expect(rememberFailure.reason).toBe("unsupported")
+      expect(yield* memory.history("semantic-entry")).toEqual([])
+      expect(revertFailure.reason).toBe("unsupported")
+    }),
+  )
+
   it.effect("does not recursively remember recalled context while retaining identical authored text", () =>
     Effect.gen(function* () {
       const memory = yield* WorkingMemory.make({ maxMessages: 20 })
@@ -119,6 +141,7 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("one"), assistant("two"), user("three")),
+        evidence: [],
       })
 
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
@@ -136,6 +159,7 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("one"), assistant("two")),
+        evidence: [],
       })
 
       const recalled = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("current")) })
@@ -153,12 +177,14 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("one"), assistant("two")),
+        evidence: [],
       })
       yield* memory.remember({
         key: otherKey,
         turn: 0,
         terminal: true,
         transcript: prompt(user("three"), assistant("four")),
+        evidence: [],
       })
 
       yield* memory.forget({ key })
@@ -180,12 +206,14 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
         turn: 0,
         terminal: true,
         transcript: prompt(user("one"), assistant("two")),
+        evidence: [],
       })
       yield* memory.remember({
         key: otherKey,
         turn: 0,
         terminal: true,
         transcript: prompt(user("three"), assistant("four")),
+        evidence: [],
       })
 
       yield* memory.forget({ key, id: "working-1" })
@@ -258,6 +286,7 @@ layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }
         turn: 0,
         terminal: true,
         transcript: prompt(user("one"), assistant("two"), user("three"), assistant("four")),
+        evidence: [],
       })
 
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
@@ -280,7 +309,7 @@ const modelFailure = AiError.make({
 })
 
 const rememberOverflow = (memory: Memory.Service, transcript: Prompt.Prompt) =>
-  memory.remember({ key, turn: 0, terminal: true, transcript })
+  memory.remember({ key, turn: 0, terminal: true, transcript, evidence: [] })
 
 layer(Layer.empty)((it) => {
   it.effect("acquires the composed summary model once, reuses it across overflows, and releases it once", () =>
@@ -469,6 +498,7 @@ layer(Layer.empty)((it) => {
                 turn: 0,
                 terminal: true,
                 transcript: prompt(user("other")),
+                evidence: [],
               })
               const remembering = yield* Effect.forkChild(
                 rememberOverflow(memory, prompt(user("one"), assistant("two"))),

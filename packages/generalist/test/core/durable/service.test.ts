@@ -1241,6 +1241,8 @@ describe("DurableDriver Agent.stream integration", () => {
           remembered.push(input.transcript)
         }),
       forget: () => Effect.void,
+      history: () => Effect.succeed([]),
+      revert: () => Effect.void,
     })
     const modelLayer = Layer.effect(
       LanguageModel.LanguageModel,

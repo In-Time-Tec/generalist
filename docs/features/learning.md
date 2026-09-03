@@ -17,7 +17,7 @@ const proposal: Learning.Proposal = {
 }
 ```
 
-`TrajectoryRef` names one recorded `runId` and zero-based turn. A `Remember` proposal carries the same key, turn, transcript, and terminal fields accepted by the core Memory service. The learning seam dispatches only on `_tag`; it does not interpret instruction diffs, skill content, memories, or exports. Applications own those effects.
+`TrajectoryRef` names one recorded `runId` and zero-based turn. A `Remember` proposal carries the same key, turn, transcript, terminal, optional `entryId`, and optional `supersedes` fields accepted by the core Memory service; its `evidence` is passed separately to the handler. `Forget` removes one identified memory from active recall and also carries evidence. The learning seam dispatches only on `_tag`; except for consolidation's contradiction validation, it does not interpret instruction diffs, skill content, memories, or exports. Applications own those effects.
 
 ## Layer
 
@@ -34,7 +34,8 @@ const learning = Learning.layer({
   apply: {
     RefineInstruction: ({ target, diff }) => Effect.logInfo("Apply instruction diff", { target, diff }),
     AuthorSkill: ({ name, content }) => Effect.logInfo("Write skill", { name, content }),
-    Remember: ({ memory }) => Memory.Memory.use((service) => service.remember(memory)),
+    Remember: ({ memory, evidence }) => Memory.Memory.use((service) => service.remember({ ...memory, evidence })),
+    Forget: ({ memory }) => Memory.Memory.use((service) => service.forget(memory)),
     ExportTrajectory: ({ runId, format }) => Effect.logInfo("Export trajectory", { runId, format }),
   },
 })
@@ -64,6 +65,12 @@ If `Approvals` returns `Pending`, Runtime persists the nested-operation suspensi
 
 `proposeWithModel` uses Effect AI structured output with the exported `Proposal` Schema. `maxProposals` defaults to `3`; the output Schema rejects a larger list. Custom proposers receive the same completed `Trajectory` and return a plain Effect, so products may replace the model with deterministic rules or another reviewer without changing approval or recovery behavior.
 
+## Scheduled consolidation
+
+`consolidate({ schedule, window, model, maxProposals, budget? })` is a proposer that `Learning.layer` recognizes as a scheduled background Agent. It runs in the `learning` session with its own Run budget, projects recent successful journal episodes, recalls the `learning` semantic-memory key, and returns only `Remember`, `Forget`, or `RefineInstruction` proposals. Model names resolve against one registered model; an exact `ModelSelection` removes ambiguity.
+
+Contradictory memory changes must be `Forget` + superseding `Remember` pairs. Consolidation merges both proposal evidence sets with the old version's evidence before the ordinary `learning` / `ask` approval operations are journaled. See [consolidation](./consolidation.md) for setup, validation, scheduling, and adapter requirements.
+
 ## Related
 
 - Lifecycle trigger: [`hooks.md`](./hooks.md)
@@ -71,3 +78,4 @@ If `Approvals` returns `Pending`, Runtime persists the nested-operation suspensi
 - Durable operation behavior: [`nested-operations.md`](./nested-operations.md)
 - Operator recovery: [`recovery.md`](./recovery.md)
 - Trajectories: [`evals.md`](./evals.md)
+- Sleep-time consolidation: [`consolidation.md`](./consolidation.md)

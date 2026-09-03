@@ -1,7 +1,7 @@
-import { DateTime, Effect } from "effect"
+import { DateTime, Effect, Equal, Result } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import type { RuntimeUnavailable } from "../../../errors.js"
+import { RuntimeUnavailable } from "../../../errors.js"
 import {
   ScheduleRecord as ScheduleRecordSchema,
   type ClaimedSchedule,
@@ -36,14 +36,37 @@ export const registerSchedule = (
 ): Effect.Effect<ScheduleReceipt, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`
+    const findExisting = () =>
+      sql<ScheduleRow>`SELECT * FROM generalist_schedules WHERE schedule_id = ${record.scheduleId}`.pipe(
+        Effect.map((rows) => (rows[0] === undefined ? undefined : decodeRecord(rows[0]))),
+      )
+    const existing = yield* findExisting()
+    if (existing !== undefined) {
+      if (existing.rrule !== record.rrule || !Equal.equals(existing.definition, record.definition)) {
+        return yield* RuntimeUnavailable.make({
+          message: `Schedule ${record.scheduleId} already exists with another definition`,
+        })
+      }
+      return { scheduleId: existing.scheduleId, nextAt: existing.nextAt }
+    }
+    const inserted = yield* Effect.result(sql`
       INSERT INTO generalist_schedules
         (schedule_id, definition_json, rrule, next_at, occurrence, status,
          owner_worker_id, lease_expires_at, created_at, updated_at)
       VALUES
         (${record.scheduleId}, ${encodeJson(ScheduleRecordSchema, record)}, ${record.rrule}, ${record.nextAt},
          ${record.occurrence}, 'active', NULL, NULL, ${record.createdAt}, ${record.createdAt})
-    `
+    `)
+    if (Result.isFailure(inserted)) {
+      const raced = yield* findExisting()
+      if (raced === undefined) return yield* inserted.failure
+      if (raced.rrule !== record.rrule || !Equal.equals(raced.definition, record.definition)) {
+        return yield* RuntimeUnavailable.make({
+          message: `Schedule ${record.scheduleId} already exists with another definition`,
+        })
+      }
+      return { scheduleId: raced.scheduleId, nextAt: raced.nextAt }
+    }
     return { scheduleId: record.scheduleId, nextAt: record.nextAt }
   })
 

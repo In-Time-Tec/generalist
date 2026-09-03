@@ -54,6 +54,12 @@ const defaultSummaryPrompt = "Summarize the conversation memory while preserving
 
 const memoryError = (message: string): MemoryError => MemoryError.make({ message })
 
+const versioningUnsupported = (): MemoryError =>
+  MemoryError.make({
+    reason: "unsupported",
+    message: "WorkingMemory is a bounded prompt window and does not retain semantic-memory versions",
+  })
+
 const keyId = (key: Key): string => JSON.stringify([key.agent, key.subject])
 
 const textPart = (text: string) => Prompt.makePart("text", { text })
@@ -186,6 +192,9 @@ const makeImpl = (options: Options): Effect.Effect<MemoryService, never, Languag
           Effect.map((state) => (state._tag === "Some" ? recallItems(state.value) : [])),
         ),
       remember: (input) => {
+        if (input.entryId !== undefined || input.supersedes !== undefined) {
+          return Effect.fail(versioningUnsupported())
+        }
         const incoming = normalize(input.transcript)
         if (incoming.length === 0) return Effect.void
         return SynchronizedRef.updateEffect(states, (current) =>
@@ -229,6 +238,8 @@ const makeImpl = (options: Options): Effect.Effect<MemoryService, never, Languag
               : { recent, counter: existing.value.counter, summary }
           return HashMap.set(current, id, nextState)
         }),
+      history: () => Effect.succeed([]),
+      revert: () => Effect.fail(versioningUnsupported()),
     }
   })
 export function make(): Effect.Effect<MemoryService>

@@ -143,7 +143,11 @@ export const registerSchedules = <LayerError, ClaimsLayerError>(input: {
       status: "active",
       createdAt: "2029-12-31T23:59:59.000Z",
     }
-    const register = (services: Services) => services.store.registerSchedule(record)
+    const register = (services: Services) =>
+      Effect.gen(function* () {
+        const first = yield* services.store.registerSchedule(record)
+        expect(yield* services.store.registerSchedule(record)).toEqual(first)
+      })
     const compete = (left: Services, right: Services) =>
       Effect.gen(function* () {
         const [leftClaims, rightClaims] = yield* Effect.all(
