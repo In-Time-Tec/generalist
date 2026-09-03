@@ -13,3 +13,6 @@ bun.lockb
 .pi-subagents
 release
 .rika
+
+# TypeDoc scratch directories created by scripts/docs-api.ts.
+.typedoc-*
