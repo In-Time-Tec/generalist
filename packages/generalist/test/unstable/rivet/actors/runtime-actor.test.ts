@@ -96,12 +96,14 @@ const addCrashWindowAction = (definition: RuntimeActorDefinition) => {
   ): Promise<{ readonly runId: string }> => {
     const host = c.vars.host
     if (host === undefined) throw new Error("Runtime host is not awake")
-    const receipt = await host.runtime.runPromise(
-      Effect.flatMap(Runtime.Runtime, (runtime) => runtime.send(input)),
-      { signal: c.abortSignal },
+    return c.keepAwake(
+      host.runtime.runPromise(
+        Effect.flatMap(Runtime.Runtime, (runtime) => runtime.send(input)),
+        {
+          signal: c.abortSignal,
+        },
+      ),
     )
-    c.sleep()
-    return receipt
   }
   Object.assign(actions, { test: { admitWithoutDoorbell } })
 }
@@ -172,31 +174,35 @@ test("startup drain closes the committed-activation/doorbell crash window exactl
       },
     }),
   )
-  const definition = makeDefinition(countingModel, 60_000)
-  addCrashWindowAction(definition)
-  const sleepCount = observeSleepCleanup(definition)
-  const registry = registerShutdown(context, setup({ use: { runtimeCrashWindow: definition } }))
-  const { client } = await setupTest(context, registry)
-  const handle = client.runtimeCrashWindow.getOrCreate(partitionKey("crash-window"))
+  const key = partitionKey("crash-window")
+  const firstDefinition = makeDefinition(countingModel, 60_000)
+  addCrashWindowAction(firstDefinition)
+  const firstSleepCount = observeSleepCleanup(firstDefinition)
+  const firstRegistry = registerShutdown(context, setup({ use: { runtimeCrashWindow: firstDefinition } }))
+  const { client: firstClient } = await setupTest(context, firstRegistry)
+  const firstHandle = firstClient.runtimeCrashWindow.getOrCreate(key)
   // SAFETY: addCrashWindowAction installed this exact test-only action on the definition registered above.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const partition = handle as typeof handle & CrashWindowPartition
+  const firstPartition = firstHandle as typeof firstHandle & CrashWindowPartition
 
   const runId = `run:crash-window:${process.pid}`
-  // Forced sleep may also drop this post-commit action response; the supplied Run ID remains authoritative.
-  await partition.test
-    .admitWithoutDoorbell({
-      runId,
-      to: address,
-      sessionId: "session:crash-window",
-      idempotencyKey: "crash-window",
-      prompt: "execute after wake",
-    })
-    .catch(() => undefined)
+  await firstPartition.test.admitWithoutDoorbell({
+    runId,
+    to: address,
+    sessionId: "session:crash-window",
+    idempotencyKey: "crash-window",
+    prompt: "execute after wake",
+  })
+  await firstRegistry.shutdown()
+  expect(firstSleepCount()).toBeGreaterThanOrEqual(1)
+
+  const secondDefinition = makeDefinition(countingModel, 60_000)
+  const secondRegistry = registerShutdown(context, setup({ use: { runtimeCrashWindow: secondDefinition } }))
+  const { client: secondClient } = await setupTest(context, secondRegistry)
+  const partition = secondClient.runtimeCrashWindow.getOrCreate(key)
   const inspection = await partition.runtime.inspect(runId)
   expect(inspection.status).toBe("succeeded")
   expect(executions).toBe(1)
-  expect(sleepCount()).toBeGreaterThanOrEqual(1)
 
   await partition.runtime.drain()
   await partition.runtime.drain()
