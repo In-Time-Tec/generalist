@@ -26,6 +26,12 @@ export interface Metadata {
     readonly cacheWritePerMTok?: number
   }
   readonly modalities?: ReadonlyArray<"text" | "image" | "audio">
+  /** Provider media capabilities and preferred reference resolution. @experimental */
+  readonly media?: {
+    readonly input: ReadonlyArray<"image" | "audio" | "video" | "pdf">
+    readonly output?: ReadonlyArray<"image" | "audio" | "video" | "pdf">
+    readonly preferredInput: "bytes" | "url"
+  }
 }
 
 export class NotFound extends ActionableTaggedError<NotFound>()("generalist/ai/ModelMetadataNotFound", {
@@ -58,6 +64,7 @@ export const bundled: ReadonlyArray<Metadata> = [
       outputPerMTok: 0.6,
     },
     modalities: ["text", "image"],
+    media: { input: ["image"], preferredInput: "bytes" },
   },
   {
     provider: "openai",
@@ -69,6 +76,7 @@ export const bundled: ReadonlyArray<Metadata> = [
       outputPerMTok: 1.6,
     },
     modalities: ["text", "image"],
+    media: { input: ["image", "pdf"], preferredInput: "bytes" },
   },
   {
     provider: "openai",
@@ -80,6 +88,7 @@ export const bundled: ReadonlyArray<Metadata> = [
       outputPerMTok: 8,
     },
     modalities: ["text", "image"],
+    media: { input: ["image", "pdf"], preferredInput: "bytes" },
   },
   {
     provider: "anthropic",
@@ -91,6 +100,7 @@ export const bundled: ReadonlyArray<Metadata> = [
       outputPerMTok: 4,
     },
     modalities: ["text", "image"],
+    media: { input: ["image", "pdf"], preferredInput: "bytes" },
   },
   {
     provider: "groq",

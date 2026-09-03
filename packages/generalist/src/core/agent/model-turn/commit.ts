@@ -10,6 +10,7 @@ import { coalesceAdjacentText } from "../../context/session-sync.js"
 import { text as modelResponseText } from "../../model/response/builder.js"
 import type { RunError } from "../service.js"
 import { clearCommittedResponse, type ResponseAuthority } from "./response.js"
+import { promptFromResponseParts } from "../../../media/prompt.js"
 
 /** @internal Public semantic event derived from the canonical model operation result. */
 export const committedEvent = (input: {
@@ -44,7 +45,7 @@ export const projectCommittedResponse = (input: {
       input.chat.history,
       Prompt.concat(
         Prompt.fromMessages(input.attempt.messages),
-        Prompt.fromMessages(Prompt.fromResponseParts(input.attempt.response.content).content.map(coalesceAdjacentText)),
+        Prompt.fromMessages(promptFromResponseParts(input.attempt.response.content).content.map(coalesceAdjacentText)),
       ),
     )
     clearCommittedResponse({ service: input.activeModelResponse, authority: input.responseAuthority })

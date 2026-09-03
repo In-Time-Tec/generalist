@@ -1,6 +1,7 @@
 import { ModelResponseContent, type ModelResponseEntry } from "../../../core/context/session.js"
 import { Schema } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
+import { promptFromResponseParts } from "../../../media/prompt.js"
 
 export const decodeAuthoredModelResponseContent = (
   input: typeof ModelResponseContent.Encoded,
@@ -29,7 +30,7 @@ export const decodeAuthoredModelResponseContent = (
     }
     return part
   })
-  const prompt = Prompt.fromResponseParts(content)
+  const prompt = promptFromResponseParts(content)
   if (prompt.content.length !== 1 || prompt.content[0]?.role !== "assistant") {
     throw new TypeError("model response did not project one assistant message")
   }

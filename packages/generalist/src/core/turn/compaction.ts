@@ -9,6 +9,7 @@ import { buildContext } from "../context/session.js"
 import { make as makeSummaryModelProvider } from "../model/result/summary-model.js"
 import type { Success } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
+import { compactPrompt as compactMediaPrompt, type Strategy as MediaStrategy } from "../../media/compaction.js"
 import {
   Compaction,
   CompactionError,
@@ -67,6 +68,8 @@ export interface Strategy {
   ) => Effect.Effect<string, CompactionError, LanguageModel.LanguageModel>
   readonly toolOutputMaxBytes?: number
   readonly keepRecentTokens?: number
+  /** Reference-only media handling during compaction. @experimental */
+  readonly media: MediaStrategy
 }
 
 /** One independently composable compaction capability. */
@@ -76,6 +79,8 @@ export interface StrategyPart {
   readonly summarize?: Strategy["summarize"]
   readonly toolOutputMaxBytes?: number
   readonly keepRecentTokens?: number
+  /** Reference-only media handling during compaction. @experimental */
+  readonly media?: MediaStrategy
 }
 
 /** Options for the default compaction implementation. */
@@ -85,6 +90,8 @@ export interface DefaultOptions {
   readonly contextWindow?: number
   readonly summaryModel?: Layer.Layer<LanguageModel.LanguageModel>
   readonly summaryPrompt?: string
+  /** Reference-only media handling during compaction. @experimental */
+  readonly media?: MediaStrategy
 }
 
 /** Options accepted by the Compaction layer. */
@@ -275,6 +282,7 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
       })
     },
     summarize: summarizeWithModel(summarizeOptions),
+    media: options.media ?? "elide",
   }
 }
 
@@ -293,8 +301,10 @@ export const strategy: {
       }
       const toolOutputMaxBytes = part.toolOutputMaxBytes ?? current.toolOutputMaxBytes
       const keepRecentTokens = part.keepRecentTokens ?? current.keepRecentTokens
+      const media = part.media ?? current.media
       const withOutput = toolOutputMaxBytes === undefined ? required : { ...required, toolOutputMaxBytes }
-      return keepRecentTokens === undefined ? withOutput : { ...withOutput, keepRecentTokens }
+      const withRecent = keepRecentTokens === undefined ? withOutput : { ...withOutput, keepRecentTokens }
+      return { ...withRecent, media }
     }, base),
 )
 
@@ -381,6 +391,10 @@ export const make: {
   },
 )
 
+const anyChanged = (...values: ReadonlyArray<boolean>): boolean => values.includes(true)
+const fitsAfterChange = (changed: boolean, history: Prompt.Prompt, prompt: Prompt.Prompt, usage: Usage): boolean =>
+  changed && fits(history, prompt, usage)
+
 const compact = (
   compactionStrategy: Strategy,
   input: Request,
@@ -393,13 +407,24 @@ const compact = (
     let changed = false
     const toolOutputMaxBytes = input.toolOutputMaxBytes ?? compactionStrategy.toolOutputMaxBytes
 
+    const [mediaHistory, mediaHistoryChanged] = compactMediaPrompt(history, compactionStrategy.media)
+    const [mediaPrompt, mediaPromptChanged] = compactMediaPrompt(prompt, compactionStrategy.media)
+    history = mediaHistory
+    prompt = mediaPrompt
+    changed = anyChanged(mediaHistoryChanged, mediaPromptChanged)
+    if (fitsAfterChange(changed, history, prompt, usage)) {
+      return Option.some(microcompactResult({ history, prompt }))
+    }
+
     if (toolOutputMaxBytes !== undefined) {
       const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, toolOutputMaxBytes)
       const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, toolOutputMaxBytes)
       history = compactedHistoryPrompt
       prompt = compactedPrompt
-      changed = historyChanged || promptChanged
-      if (changed && fits(history, prompt, usage)) return Option.some(microcompactResult({ history, prompt }))
+      changed = anyChanged(changed, historyChanged, promptChanged)
+      if (fitsAfterChange(changed, history, prompt, usage)) {
+        return Option.some(microcompactResult({ history, prompt }))
+      }
     }
 
     const strategyPrompt = history.content.length === 0 ? buildContext(input.path ?? []) : history

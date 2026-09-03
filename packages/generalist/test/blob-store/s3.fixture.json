@@ -1,0 +1,8 @@
+{
+  "bucket": "attachments",
+  "keyPrefix": "sha256/",
+  "publicBaseUrl": "https://fixtures.example.test/attachments/",
+  "body": "blob",
+  "mediaType": "image/png",
+  "sha256": "fa2c8cc4f28176bbeed4b736df569a34c79cd3723e9ec42f9674b4d46ac6b8b8"
+}

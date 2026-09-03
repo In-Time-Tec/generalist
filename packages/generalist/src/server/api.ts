@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
+import { Ref as MediaRef } from "../media/ref.js"
 import { BudgetLimits, Remaining as RemainingBudget } from "../core/durable/run-budget.js"
 import { Result as GateResult } from "../core/agent/gates/definition.js"
 import { HostEvent } from "../host/event.js"
@@ -142,6 +143,32 @@ const resolveApproval = HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:to
 const approvals: HttpApiGroup.HttpApiGroup<"approvals", typeof resolveApproval> =
   HttpApiGroup.make("approvals").add(resolveApproval)
 
+const AttachmentBytes = Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array({ contentType: "application/octet-stream" }))
+/** Buffered attachment response with stored content headers. @experimental */
+export const AttachmentDownload = HttpApiSchema.WithHeaders(AttachmentBytes, {
+  "content-type": Schema.String,
+  "x-filename": Schema.optionalKey(Schema.String),
+})
+/** Buffered attachment response with stored content headers. @experimental */
+export type AttachmentDownload = typeof AttachmentDownload.Type
+
+const putAttachment = HttpApiEndpoint.post("put", "/attachments", {
+  headers: {
+    "x-media-type": Schema.String,
+    "x-filename": Schema.optionalKey(Schema.String),
+  },
+  payload: AttachmentBytes,
+  success: MediaRef,
+  error: apiErrors,
+})
+const getAttachment = HttpApiEndpoint.get("get", "/attachments/:sha256", {
+  params: { sha256: MediaRef.fields.sha256 },
+  success: AttachmentDownload,
+  error: apiErrors,
+})
+const attachments: HttpApiGroup.HttpApiGroup<"attachments", typeof putAttachment | typeof getAttachment> =
+  HttpApiGroup.make("attachments").add(putAttachment, getAttachment)
+
 const explainRun = HttpApiEndpoint.get("explain", "/runs/:id/explain", {
   params: { id: Schema.String },
   success: Explanation,
@@ -172,12 +199,12 @@ const operator: HttpApiGroup.HttpApiGroup<
   typeof explainRun | typeof retryRun | typeof wakeRun | typeof resolveUnknown | typeof extendBudget
 > = HttpApiGroup.make("operator").add(explainRun, retryRun, wakeRun, resolveUnknown, extendBudget)
 
-type Groups = typeof sessions | typeof runs | typeof events | typeof approvals | typeof operator
+type Groups = typeof sessions | typeof runs | typeof events | typeof approvals | typeof attachments | typeof operator
 type AuthenticatedGroups = HttpApiGroup.AddMiddleware<Groups, Authentication>
 
 /** Schema-first public API. New ingress modules add one group to this value. */
 export const api: HttpApi.HttpApi<"generalist", AuthenticatedGroups> = HttpApi.make("generalist")
-  .add(sessions, runs, events, approvals, operator)
+  .add(sessions, runs, events, approvals, attachments, operator)
   .middleware(Authentication)
   .annotateMerge(
     OpenApi.annotations({

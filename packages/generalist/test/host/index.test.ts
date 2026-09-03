@@ -1,7 +1,8 @@
+import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Hooks, Instructions, Permissions } from "generalist"
+import { Agent, Approvals, BlobStore, Hooks, Instructions, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
 import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
 import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
@@ -24,6 +25,7 @@ const modelLayer = (streamText: Parameters<typeof LanguageModel.make>[0]["stream
   )
 const resolver = ExecutableResolver.layerStatic([])
 const authorization = Layer.mergeAll(Permissions.layerAllowAll, Approvals.layerAutoApprove)
+const blobStore = BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer))
 const memoryRuntime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
   Layer.provide(resolver),
 )
@@ -46,6 +48,7 @@ for (const [backend, runtimeLayer] of [
       runtimeLayer,
       modelLayer(() => textResponse(`${backend} complete`)),
       authorization,
+      blobStore,
     ),
   )(`${backend} host`, (test) => {
     test.effect("creates Sessions, starts typed Runs, replays events, and lists state", () => {
@@ -84,6 +87,15 @@ for (const [backend, runtimeLayer] of [
         expect(events.at(-1)).toMatchObject({ _tag: "Completed", runId: run.id })
       })
     })
+
+    test.effect("puts and gets attachments through BlobStore", () =>
+      Effect.gen(function* () {
+        const host = yield* Generalist.create({ agents: [] })
+        const data = new TextEncoder().encode(`${backend} attachment`)
+        const ref = yield* host.attachments.put({ data, mediaType: "application/pdf", filename: "report.pdf" })
+        expect(yield* host.attachments.get(ref.sha256)).toEqual({ ref, data })
+      }),
+    )
   })
 }
 
@@ -94,6 +106,17 @@ layer(
     authorization,
   ),
 )("host cancellation", (test) => {
+  test.effect("keeps BlobStore optional for Hosts that do not use attachments", () =>
+    Effect.gen(function* () {
+      const host = yield* Generalist.create({ agents: [] })
+      expect(
+        yield* host.attachments
+          .put({ data: new Uint8Array([1]), mediaType: "application/octet-stream" })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/blob-store/BlobStoreError", operation: "host attachment" })
+    }),
+  )
+
   test.effect("cancels a Session Run through Runtime", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "host-cancel" })

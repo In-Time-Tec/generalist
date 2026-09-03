@@ -3,6 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import { projectTranscript } from "./memory.js"
 import type { Entry, SkillEntry } from "./session.js"
+import { promptFromResponseParts } from "../../media/prompt.js"
 
 /** Model context cannot be admitted while framework tool calls lack outcomes. */
 export class ContextInvalid extends ActionableTaggedError<ContextInvalid>()("generalist/core/ContextInvalid", {
@@ -83,7 +84,7 @@ const messagesFromEntry = (entry: Entry): ReadonlyArray<Prompt.Message> => {
     case "Steering":
       return [entry.message]
     case "ModelResponse":
-      return Prompt.fromResponseParts(entry.content).content
+      return promptFromResponseParts(entry.content).content
     case "ToolCall":
       return [Prompt.makeMessage("assistant", { content: [entry.part] })]
     case "ToolResult":
@@ -124,7 +125,7 @@ export const buildMemoryContext = (path: ReadonlyArray<Entry>): Prompt.Prompt =>
       case "Message":
         return [entry.message]
       case "ModelResponse":
-        return Prompt.fromResponseParts(entry.content).content
+        return promptFromResponseParts(entry.content).content
       case "ToolCall":
         return [Prompt.makeMessage("assistant", { content: [entry.part] })]
       case "ToolResult":

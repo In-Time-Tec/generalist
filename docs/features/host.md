@@ -7,7 +7,7 @@
 ```ts
 import { Effect, Layer, Schema } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
-import { Agent, Approvals, Permissions } from "generalist"
+import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 
@@ -19,6 +19,11 @@ const triage = Agent.make({
 
 const program = Effect.gen(function* () {
   const host = yield* Generalist.create({ agents: [triage] })
+  const attachment = yield* host.attachments.put({
+    data: new TextEncoder().encode("attachment"),
+    mediaType: "application/pdf",
+    filename: "attachment.pdf",
+  })
   const session = yield* host.sessions.create({ title: "Support inbox" })
   const run = yield* host.runs.start(session.id, triage, { ticket: "Cannot sign in" })
 
@@ -29,9 +34,12 @@ const program = Effect.gen(function* () {
 
 const runtime = Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
 declare const model: Layer.Layer<LanguageModel.LanguageModel>
+declare const blobStore: Layer.Layer<BlobStore.BlobStore>
 
 Effect.runPromise(
-  program.pipe(Effect.provide(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerAutoApprove))),
+  program.pipe(
+    Effect.provide(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerAutoApprove, blobStore)),
+  ),
 )
 ```
 
@@ -40,6 +48,9 @@ Effect.runPromise(
 ## Surface
 
 ```text
+host.attachments.put({ data, mediaType, filename? }) -> Media.Ref
+host.attachments.get(sha256)                         -> { ref, data }
+
 host.sessions.create({ id?, title? }) -> HostSession
 host.sessions.get(sessionId)          -> HostSession
 host.sessions.list()                  -> HostSession[]
@@ -71,6 +82,8 @@ host.operator.extendBudget(runId, delta, operator) -> void
 `runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
 
 `runs.startByName` is the serialized-host boundary used by `generalist/server`. It finds one configured Agent by name and decodes the unknown input with that Agent's input Schema before starting it. Unknown names and invalid inputs remain typed Host failures. Approval and operator methods are the same Runtime operations with no second decision or recovery authority; every mutation requires the caller identity recorded by Runtime.
+
+Attachments delegate to an optional ambient `BlobStore`. Provide one of the Layers from `generalist/blob-store` when creating the Host to enable upload and download. Existing Hosts can still be constructed without storage; attachment calls then fail with `BlobStoreError` instead of adding a BlobStore requirement to unrelated Host operations.
 
 Session run lists contain root Runs only. Runtime child Runs contribute events to their root Run's product Session but do not appear as separate entries in that list.
 
@@ -119,5 +132,5 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 
 ## Related
 
-- Source: `packages/generalist/src/host/index.ts`, `packages/generalist/src/runtime/session/host.ts`
-- Sibling feature docs: [`server.md`](./server.md), [`runtime.md`](./runtime.md), [`durable-stores.md`](./durable-stores.md), [`testing.md`](./testing.md)
+- Source: `packages/generalist/src/host/index.ts`, `packages/generalist/src/host/attachments.ts`, `packages/generalist/src/runtime/session/host.ts`
+- Sibling feature docs: [`media.md`](./media.md), [`server.md`](./server.md), [`runtime.md`](./runtime.md), [`durable-stores.md`](./durable-stores.md), [`testing.md`](./testing.md)

@@ -58,12 +58,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -89,11 +90,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -165,12 +179,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -196,11 +211,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -259,12 +287,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -290,11 +319,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -349,12 +391,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -380,11 +423,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -1186,12 +1242,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -1217,11 +1274,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -3385,12 +3455,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -3416,11 +3487,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -3463,12 +3547,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -3494,11 +3579,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -3602,6 +3700,38 @@
                                     "hint": { "type": "string" }
                                   },
                                   "required": ["_tag", "runId", "approvalId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/blob-store/BlobNotFound"] },
+                                    "sha256": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "sha256"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/blob-store/BlobStoreError"] },
+                                    "operation": { "type": "string" },
+                                    "reason": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "operation", "reason"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/blob-store/BlobTooLarge"] },
+                                    "bytes": { "type": "integer" },
+                                    "maxBytes": { "type": "integer" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "bytes", "maxBytes"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3800,6 +3930,9 @@
                       { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                      { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                      { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                      { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
                       { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
                       { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
@@ -3845,12 +3978,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -3876,11 +4010,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -3926,12 +4073,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -3957,11 +4105,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4007,12 +4168,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -4038,11 +4200,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4080,6 +4255,215 @@
             }
           },
           "required": true
+        }
+      }
+    },
+    "/attachments": {
+      "post": {
+        "tags": ["attachments"],
+        "operationId": "attachments.put",
+        "parameters": [
+          { "name": "x-media-type", "in": "header", "schema": { "type": "string" }, "required": true },
+          { "name": "x-filename", "in": "header", "schema": { "type": "string" }, "required": false }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "GeneralistMediaRef",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GeneralistMediaRef" } } }
+          },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } },
+          "required": true
+        }
+      }
+    },
+    "/attachments/{sha256}": {
+      "get": {
+        "tags": ["attachments"],
+        "operationId": "attachments.get",
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Lowercase hexadecimal SHA-256 digest"
+            },
+            "required": true
+          }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": { "x-filename": { "schema": { "type": "string" }, "required": false } },
+            "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+            }
+          },
+          "403": {
+            "description": "generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -4263,12 +4647,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -4294,11 +4679,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4341,12 +4739,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -4372,11 +4771,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4432,12 +4844,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -4463,11 +4876,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4523,12 +4949,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -4554,11 +4981,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4633,12 +5073,13 @@
             }
           },
           "404": {
-            "description": "generalist/host/AgentNotRegistered | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
                   ]
@@ -4664,11 +5105,24 @@
               }
             }
           },
-          "503": {
-            "description": "generalist/runtime/RuntimeUnavailable",
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
               }
             }
           }
@@ -4733,6 +5187,16 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "name"],
+        "additionalProperties": false
+      },
+      "generalist_blob-store_BlobNotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/blob-store/BlobNotFound"] },
+          "sha256": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "sha256"],
         "additionalProperties": false
       },
       "generalist_runtime_RunNotFoundEncoded": {
@@ -4889,14 +5353,15 @@
         "required": ["_tag", "sessionId", "lastDeliveredCursor"],
         "additionalProperties": false
       },
-      "generalist_server_OperatorDisabledEncoded": {
+      "generalist_blob-store_BlobStoreErrorEncoded": {
         "type": "object",
         "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
+          "_tag": { "type": "string", "enum": ["generalist/blob-store/BlobStoreError"] },
           "operation": { "type": "string" },
+          "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation"],
+        "required": ["_tag", "operation", "reason"],
         "additionalProperties": false
       },
       "generalist_runtime_RuntimeUnavailableEncoded": {
@@ -4907,6 +5372,27 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "generalist_blob-store_BlobTooLargeEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/blob-store/BlobTooLarge"] },
+          "bytes": { "type": "integer" },
+          "maxBytes": { "type": "integer" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "bytes", "maxBytes"],
+        "additionalProperties": false
+      },
+      "generalist_server_OperatorDisabledEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
+          "operation": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation"],
         "additionalProperties": false
       },
       "generalist_server_UnauthorizedEncoded": {
@@ -5777,6 +6263,21 @@
         },
         "required": ["_tag", "token", "operationKey", "ordinal", "capability"],
         "additionalProperties": false
+      },
+      "GeneralistMediaRef": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Lowercase hexadecimal SHA-256 digest"
+          },
+          "mediaType": { "type": "string" },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "filename": { "type": "string" }
+        },
+        "required": ["sha256", "mediaType", "bytes"],
+        "additionalProperties": false
       }
     },
     "securitySchemes": { "bearer": { "type": "http", "scheme": "Bearer" } }
@@ -5787,6 +6288,7 @@
     { "name": "runs" },
     { "name": "events" },
     { "name": "approvals" },
+    { "name": "attachments" },
     { "name": "operator" }
   ]
 }

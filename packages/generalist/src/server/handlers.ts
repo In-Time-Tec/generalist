@@ -1,5 +1,5 @@
 import { Effect, Layer, Stream, Types } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
 import { api, type EventStreamItem } from "./api.js"
@@ -73,6 +73,33 @@ const approvalsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Ag
     ),
   )
 
+const attachmentsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>) =>
+  HttpApiBuilder.group(api, "attachments", (handlers) =>
+    handlers.handleAll({
+      put: ({ headers, payload }) =>
+        host.attachments
+          .put({
+            data: payload,
+            mediaType: headers["x-media-type"],
+            ...(headers["x-filename"] === undefined ? undefined : { filename: headers["x-filename"] }),
+          })
+          .pipe(mapError("attachments.put")),
+      get: ({ params }) =>
+        host.attachments.get(params.sha256).pipe(
+          Effect.map(({ data, ref }) =>
+            HttpApiSchema.withHeaders({
+              body: data,
+              headers: {
+                "content-type": ref.mediaType,
+                ...(ref.filename === undefined ? undefined : { "x-filename": ref.filename }),
+              },
+            }),
+          ),
+          mapError("attachments.get"),
+        ),
+    }),
+  )
+
 const operatorHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, enabled: boolean) => {
   const write = <A, E>(operation: string, effect: Effect.Effect<A, E>): Effect.Effect<A, E | OperatorDisabled> =>
     enabled ? effect : Effect.fail(OperatorDisabled.make({ operation }))
@@ -108,5 +135,6 @@ export const layerHandlers = <Agents extends ReadonlyArray<AnyAgent>>(options: H
     runsHandlers(options.host),
     eventsHandlers(options.host),
     approvalsHandlers(options.host),
+    attachmentsHandlers(options.host),
     operatorHandlers(options.host, options.operator),
   )

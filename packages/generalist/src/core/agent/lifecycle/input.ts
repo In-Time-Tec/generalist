@@ -2,6 +2,7 @@ import { Effect, Predicate, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 import { AgentError } from "../event.js"
+import { promptWithRefs } from "../../../media/prompt.js"
 
 interface EncodeFunction {
   <InputValue>(
@@ -23,7 +24,13 @@ export const encode: EncodeFunction = dual(
       Effect.flatMap((encoded) =>
         Predicate.isString(encoded) || Prompt.isPrompt(encoded)
           ? Effect.succeed<Prompt.RawInput>(encoded)
-          : Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Json))(encoded),
+          : Schema.decodeUnknownEffect(Schema.Json)(encoded).pipe(
+              Effect.flatMap((jsonValue) =>
+                Schema.encodeEffect(Schema.fromJsonString(Schema.Json))(jsonValue).pipe(
+                  Effect.map((json) => promptWithRefs({ encoded: jsonValue, json })),
+                ),
+              ),
+            ),
       ),
       Effect.mapError((error) =>
         AgentError.make({ message: `Agent input cannot be encoded: ${String(error)}`, turn: 0 }),

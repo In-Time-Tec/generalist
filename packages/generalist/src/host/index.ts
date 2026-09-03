@@ -51,6 +51,8 @@ import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "
 import { resolveApproval } from "./approval.js"
 import { project, type HostEvent } from "./event.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
+import { type Attachments, make as makeAttachments } from "./attachments.js"
+import { BlobStore } from "../blob-store/index.js"
 
 export type { HostSession } from "../runtime/session/host.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
@@ -70,7 +72,6 @@ export {
   SessionCursorExpired,
   SessionSubscriberLagged,
 } from "../runtime/session/host.js"
-
 /** One deterministic collection of host-owned Agent contributions. */
 export interface Plugin<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
   readonly name: string
@@ -104,12 +105,10 @@ export interface SessionCreateOptions {
 export interface RunStartOptions {
   readonly idempotencyKey?: string
 }
-
 export type EncodedAgentInput = Schema.Json
-
 export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
-
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
+  readonly attachments: Attachments
   readonly sessions: {
     readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
     readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
@@ -257,7 +256,6 @@ const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
   events: handle.events,
   send: handle.send,
 })
-
 const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService => {
   const all = [...skills]
   const byName = new Map(all.map((skill) => [skill.name, skill]))
@@ -382,6 +380,7 @@ const create = <
     const currentInstructions = yield* Effect.serviceOption(Instructions)
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)
     const currentHooks = yield* Effect.serviceOption(Hooks)
+    const attachments = makeAttachments(yield* Effect.serviceOption(BlobStore))
     const contributions = yield* preparePlugins(plugins, options.agents)
     const instructions = mergedInstructions(currentInstructions, contributions.instructions)
     const skills = mergedSkills(currentSkills, contributions.skills)
@@ -403,6 +402,7 @@ const create = <
     }
 
     const host: Host<Agents> = {
+      attachments,
       sessions: {
         create: (sessionOptions = {}) =>
           Effect.gen(function* () {

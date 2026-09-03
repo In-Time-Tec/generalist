@@ -41,6 +41,11 @@ export const minimumConsumerProfiles = [
     imports: [
       { specifier: "generalist", runtimes: nodeAndBun, exports: ["Agent", "Session", "Tasks"] },
       { specifier: "generalist/approvals", runtimes: nodeAndBun },
+      {
+        specifier: "generalist/blob-store",
+        runtimes: ["bun", "node", "worker"],
+        exports: ["BlobStore", "layerFileSystem", "layerMemory", "layerS3", "layerSql"],
+      },
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
       { specifier: "generalist/hooks", runtimes: nodeAndBun, exports: ["Hooks", "onToolCall"] },
       { specifier: "generalist/eval", runtimes: nodeAndBun, exports: ["score", "runSuite"] },
@@ -59,6 +64,7 @@ export const minimumConsumerProfiles = [
         exports: ["Proposal", "declaration", "layer", "proposeWithModel"],
       },
       { specifier: "generalist/memory", runtimes: nodeAndBun },
+      { specifier: "generalist/media", runtimes: ["bun", "node", "worker"], exports: ["File", "Ref", "fromPath"] },
       { specifier: "generalist/repl", runtimes: nodeAndBun },
       { specifier: "generalist/repl/bun", runtimes: bunOnly },
       { specifier: "generalist/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
@@ -222,6 +228,7 @@ export const minimumConsumerProfiles = [
 
 export const workerSafePackageExports = [
   "generalist",
+  "generalist/blob-store",
   "generalist/hooks",
   "generalist/host",
   "generalist/server",
@@ -237,6 +244,7 @@ export const workerSafePackageExports = [
   "generalist/sandbox",
   "generalist/eval",
   "generalist/memo",
+  "generalist/media",
   "generalist/tasks",
   "generalist/trajectory",
 ] as const
@@ -265,12 +273,14 @@ export const forbiddenPackageExports = [
 export const exactPackageExports = [
   ".",
   "./approvals",
+  "./blob-store",
   "./compaction",
   "./eval",
   "./hooks",
   "./host",
   "./instructions",
   "./instructions/skills",
+  "./media",
   "./memo",
   "./memory",
   "./mysql",

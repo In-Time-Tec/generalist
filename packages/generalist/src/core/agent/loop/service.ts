@@ -44,6 +44,7 @@ import { runEnd as applyRunEnd, steer as applySteer, turnStart as applyTurnStart
 import { GateFailed } from "../gates/definition.js"
 import { evaluate as evaluateGates } from "../gates/evaluation.js"
 import { retryPrompt as gateRetryPrompt } from "../gates/prompt.js"
+import { persistResponsePart, promptFromResponseParts, resolvePrompt } from "../../../media/prompt.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
@@ -130,12 +131,22 @@ export const make = <
             success: structuredResponseSchema(config.schema),
             failure: StructuredOutputError,
           },
-          LanguageModel.generateObject({
-            prompt: Prompt.concat(history, transformedPrompt),
-            schema: config.schema,
-            objectName: config.objectName,
-            toolChoice: "none",
-          }).pipe(
+          resolvePrompt(Prompt.concat(history, transformedPrompt)).pipe(
+            Effect.mapError((cause) =>
+              AgentError.make({
+                message: "Structured output prompt media cannot be resolved",
+                turn: structuredTurn,
+                cause,
+              }),
+            ),
+            Effect.flatMap((prompt) =>
+              LanguageModel.generateObject({
+                prompt,
+                schema: config.schema,
+                objectName: config.objectName,
+                toolChoice: "none",
+              }),
+            ),
             withModelTelemetry(structuredTurn, "structured-output"),
             withAgentModel,
             Effect.catchCause(
@@ -163,7 +174,15 @@ export const make = <
               },
             ),
             Effect.flatMap((generated) =>
-              Schema.encodeEffect(ModelResponseContent)(generated.content).pipe(
+              Effect.forEach(generated.content, persistResponsePart).pipe(
+                Effect.mapError((cause) =>
+                  AgentError.make({
+                    message: "Structured output generated media cannot be persisted",
+                    turn: structuredTurn,
+                    cause,
+                  }),
+                ),
+                Effect.flatMap((storedContent) => Schema.encodeEffect(ModelResponseContent)(storedContent)),
                 Effect.map((content) => ({ value: generated.value, content })),
                 Effect.mapError((error) =>
                   AgentError.make({
@@ -187,7 +206,7 @@ export const make = <
           return part
         })
         yield* captureStructuredUsage(content)
-        const transcript = Prompt.concat(Prompt.concat(history, transformedPrompt), Prompt.fromResponseParts(content))
+        const transcript = Prompt.concat(Prompt.concat(history, transformedPrompt), promptFromResponseParts(content))
         yield* applyCompactionResult(
           structuredTurn,
           { _tag: "Microcompact", history: transcript, prompt: Prompt.empty },

@@ -211,6 +211,7 @@ it.effect("answers from context moved into the sandbox by rlmOffload", () =>
       shouldCompact: () => true,
       cut: () => Option.some({ keep: Prompt.empty, compact, recent }),
       summarize: () => Effect.die("rlmOffload must replace the base summarizer"),
+      media: "elide",
     }
     const strategy = Compaction.strategy([rlmOffload({ keepRecentTokens: 128 })], base)
     const services = Layer.merge(

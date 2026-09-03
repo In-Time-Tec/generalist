@@ -57,6 +57,10 @@
       "types": "./dist/approvals.d.ts",
       "import": "./dist/approvals.js"
     },
+    "./blob-store": {
+      "types": "./dist/blob-store/index.d.ts",
+      "import": "./dist/blob-store/index.js"
+    },
     "./compaction": {
       "types": "./dist/core/turn/compaction.d.ts",
       "import": "./dist/core/turn/compaction.js"
@@ -108,6 +112,10 @@
     "./memory": {
       "types": "./dist/memory/index.d.ts",
       "import": "./dist/memory/index.js"
+    },
+    "./media": {
+      "types": "./dist/media/index.d.ts",
+      "import": "./dist/media/index.js"
     },
     "./memo": {
       "types": "./dist/memo.d.ts",
