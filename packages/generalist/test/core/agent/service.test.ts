@@ -3740,8 +3740,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const contextWindows: Array<number> = []
     const prompts = new Map<string, string>()
     const catalog = modelCatalogLayerTest([
-      { provider: "test", model: "small", contextWindow: 1, maxOutput: 1_000 },
-      { provider: "test", model: "large", contextWindow: 200_000, maxOutput: 1_000 },
+      { provider: "test", model: "small", contextWindow: 1, maxOutput: 1_000, logprobs: false },
+      { provider: "test", model: "large", contextWindow: 200_000, maxOutput: 1_000, logprobs: false },
     ])
     const model = (name: string) =>
       Layer.mergeAll(

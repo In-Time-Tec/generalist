@@ -52,7 +52,7 @@ import type { EmittableAgentLoopEvent } from "../execution/agent/event.js"
 import type { CommitModelResponseInput } from "../execution/model-response/commit.js"
 import type { CommitInterruptedModelResponseInput } from "../execution/model-response/interrupted.js"
 import { ExecutionResult, type ExecutionCheckpoint, type ExecutionSuspension } from "../execution/state.js"
-import { RunFailure, type RunEvent } from "./event.js"
+import { RunFailure, type RewardInput, type RunEvent } from "./event.js"
 import type { CancelInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "../service.js"
 import type { ResolveOperationInput } from "../operation/resolution.js"
 import type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
@@ -375,6 +375,7 @@ export interface Service {
     readonly cursor: Cursor
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | CursorExpired | RuntimeUnavailable>
+  readonly recordReward: (input: RewardInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
   readonly treeReplay: (input: {
     readonly rootRunId: string
     readonly position: number

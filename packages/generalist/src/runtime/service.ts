@@ -62,7 +62,14 @@ import type { MailboxEntry, MessageReceipt } from "./messaging/mailbox.js"
 import type { MessagingPolicy } from "./messaging/service.js"
 import type { RawUsageFact, RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { Result as GateResult } from "../core/agent/gates/definition.js"
-import type { CompletedModelResponse, RunCancelled, RunCompleted, RunEvent, RunFailed } from "./run/event.js"
+import type {
+  CompletedModelResponse,
+  RewardInput,
+  RunCancelled,
+  RunCompleted,
+  RunEvent,
+  RunFailed,
+} from "./run/event.js"
 import type { AgentExecutionResult, ProgramExecutionResult } from "./execution/state.js"
 import type { WaitResolution } from "./run/wait.js"
 import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
@@ -457,6 +464,7 @@ export type OperatorApprovalError = ResolveDurableApprovalError | IllegalOperato
 export type OperatorExtendBudgetError = ExtendBudgetError | IllegalOperatorAction
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable
 export type ResolveModelResponseError = SessionEntryError
+export type RecordRewardError = RunNotFound | RuntimeUnavailable
 export type FanOutError =
   | ChildDepthExceeded
   | ChildLimitExceeded
@@ -560,6 +568,8 @@ export interface Service extends RuntimeHostSessions {
   readonly resolveModelResponse: (
     event: ModelResponseEvent,
   ) => Effect.Effect<CompletedModelResponse, ResolveModelResponseError>
+  /** @internal Journal one scalar reward assigned by an export policy. */
+  readonly recordReward: (input: RewardInput) => Effect.Effect<void, RecordRewardError>
   /** Read one bounded, ordered page strictly after an opaque root-bound cursor. */
   readonly treeReplay: (
     input: import("./tree.js").ReplayInput,

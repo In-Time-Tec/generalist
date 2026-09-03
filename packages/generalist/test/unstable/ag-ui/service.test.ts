@@ -129,6 +129,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     acknowledged: () => unused(),
     sessionEntry: () => unused(),
     resolveModelResponse: () => unused(),
+    recordReward: () => unused(),
     treeReplay: () => unused(),
     treeChanges: () => Stream.empty,
     treeCheckpoint: () => unused(),

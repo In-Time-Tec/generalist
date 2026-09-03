@@ -71,6 +71,11 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/tasks", runtimes: nodeAndBun, exports: ["layer", "update"] },
       { specifier: "generalist/testing/model", runtimes: nodeAndBun, exports: ["layer", "object", "text"] },
       { specifier: "generalist/trajectory", runtimes: nodeAndBun, exports: ["fromJournal", "export"] },
+      {
+        specifier: "generalist/unstable/rl-export",
+        runtimes: ["bun", "node", "worker"],
+        exports: ["Reward", "dag", "export"],
+      },
       { specifier: "generalist/unstable/runtime/external-child-placement", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/runtime/external-child-store", runtimes: nodeAndBun },
       { specifier: "generalist/runtime/sql-driver", runtimes: nodeAndBun },
@@ -247,6 +252,7 @@ export const workerSafePackageExports = [
   "generalist/media",
   "generalist/tasks",
   "generalist/trajectory",
+  "generalist/unstable/rl-export",
 ] as const
 
 export const wildcardExportExamples = [] as const
@@ -326,6 +332,7 @@ export const exactPackageExports = [
   "./unstable/providers/openai-account-auth",
   "./unstable/providers/openai-account-auth-http",
   "./unstable/rivet",
+  "./unstable/rl-export",
   "./unstable/rlm",
   "./unstable/runtime/external-child-placement",
   "./unstable/runtime/external-child-store",

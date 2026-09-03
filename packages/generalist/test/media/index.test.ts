@@ -106,6 +106,7 @@ describe("Media", () => {
         model: "test-model",
         contextWindow: 1_000,
         maxOutput: 100,
+        logprobs: false,
         media: { input: ["image"], preferredInput: "url" },
       },
     ])

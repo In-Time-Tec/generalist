@@ -1,6 +1,6 @@
-import { Duration, Effect, Stream } from "effect"
+import { Duration, Effect, Stream, Types } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
-import type { Operation, Part, ToolCallPart, TruncatedStep, TruncationPoint, TurnStep } from "./service.js"
+import type { Operation, Part, StepOptions, ToolCallPart, TruncatedStep, TruncationPoint, TurnStep } from "./service.js"
 export const emptyUsage = (): Response.Usage =>
   Response.Usage.make({
     inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
@@ -17,12 +17,23 @@ const invalidRequest = (method: Operation, description: string): AiError.AiError
 const finishReason = (step: TurnStep): Response.FinishReason =>
   step.finishReason ?? (step.parts.some((part) => part._tag === "ToolCall") ? "tool-calls" : "stop")
 
-const finish = (reason: Response.FinishReason, usage: Response.Usage): Response.FinishPartEncoded => ({
-  type: "finish",
-  reason,
-  usage,
-  response: undefined,
-})
+const finish = (
+  reason: Response.FinishReason,
+  usage: Response.Usage,
+  tokenData: Pick<StepOptions, "tokens" | "logprobs"> = {},
+): Response.FinishPartEncoded => {
+  const metadata: Types.Mutable<Pick<StepOptions, "tokens" | "logprobs">> = {}
+  if (tokenData.tokens !== undefined) metadata.tokens = tokenData.tokens
+  if (tokenData.logprobs !== undefined) metadata.logprobs = tokenData.logprobs
+  const part: Types.Mutable<Response.FinishPartEncoded> = {
+    type: "finish",
+    reason,
+    usage,
+    response: undefined,
+  }
+  if (metadata.tokens !== undefined || metadata.logprobs !== undefined) part.metadata = { generalist: metadata }
+  return part
+}
 
 const compileToolCall = (
   part: ToolCallPart,
@@ -44,7 +55,7 @@ const compilePart = (part: Part, requestIndex: number, partIndex: number): Respo
 
 const compileGenerate = (step: TurnStep, requestIndex: number): Array<Response.PartEncoded> => [
   ...step.parts.map((part, partIndex) => compilePart(part, requestIndex, partIndex)),
-  finish(finishReason(step), step.usage ?? emptyUsage()),
+  finish(finishReason(step), step.usage ?? emptyUsage(), step),
 ]
 
 const compileStream = (step: TurnStep, requestIndex: number): Array<Response.StreamPartEncoded> => {
@@ -60,7 +71,7 @@ const compileStream = (step: TurnStep, requestIndex: number): Array<Response.Str
     output.push({ type: `${kind}-delta`, id, delta: part.text })
     output.push({ type: `${kind}-end`, id })
   }
-  output.push(finish(finishReason(step), step.usage ?? emptyUsage()))
+  output.push(finish(finishReason(step), step.usage ?? emptyUsage(), step))
   return output
 }
 

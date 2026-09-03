@@ -502,6 +502,7 @@ const makeRuntimeWith = (
       acknowledged: store.acknowledged,
       sessionEntry: readEntry(store),
       resolveModelResponse: resolveModelResponse(store),
+      recordReward: store.recordReward,
       treeReplay: (input) =>
         Effect.gen(function* () {
           const position = yield* parseCursor(input.rootRunId, input.cursor)
