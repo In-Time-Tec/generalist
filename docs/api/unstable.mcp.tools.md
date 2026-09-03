@@ -8,17 +8,23 @@
 
 ## Interfaces
 
+<a id="mcptools"></a>
+
 ### MCPTools
 
 **`Experimental`**
 
 #### Properties
 
+<a id="executorlayer"></a>
+
 ##### executorLayer
 
 > `readonly` **executorLayer**: `Layer`\<`Handler`\<`string`\> \| [`ToolExecutor`](./generalist/namespaces/ToolExecutor#toolexecutor)\>
 
 **`Experimental`**
+
+<a id="toolkit"></a>
 
 ##### toolkit
 
@@ -28,11 +34,15 @@
 
 ***
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
 
 #### Properties
+
+<a id="calltimeout"></a>
 
 ##### callTimeout?
 
@@ -40,11 +50,15 @@
 
 **`Experimental`**
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
 **`Experimental`**
+
+<a id="transport"></a>
 
 ##### transport
 
@@ -53,6 +67,8 @@
 **`Experimental`**
 
 ## Variables
+
+<a id="connect"></a>
 
 ### connect
 
@@ -74,6 +90,8 @@ Acquires one MCP connection and assembles its complete Generalist tool integrati
 
 ***
 
+<a id="layertoolkit"></a>
+
 ### layerToolkit
 
 > `const` **layerToolkit**: (`client`) => `Layer.Layer`\<`Tool.Handler`\<`string`\>\>
@@ -93,6 +111,8 @@ Effect AI handler layer that proxies MCP tool calls to the MCP server.
 `Layer.Layer`\<`Tool.Handler`\<`string`\>\>
 
 ***
+
+<a id="toolkit-1"></a>
 
 ### toolkit
 

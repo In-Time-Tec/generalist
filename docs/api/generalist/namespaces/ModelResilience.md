@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="misconfigured"></a>
+
 ### Misconfigured
 
 A model resilience policy contains an unsafe correction bound.
@@ -17,6 +19,8 @@ A model resilience policy contains an unsafe correction bound.
 - `Misconfigured_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A model resilience policy contains an unsafe correction bound.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ A model resilience policy contains an unsafe correction bound.
 
 `Misconfigured_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -53,6 +61,8 @@ A model resilience policy contains an unsafe correction bound.
 ###### Inherited from
 
 `Misconfigured_base.message`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -64,6 +74,8 @@ A model resilience policy contains an unsafe correction bound.
 
 ***
 
+<a id="modelresilience"></a>
+
 ### ModelResilience
 
 #### Extends
@@ -71,6 +83,8 @@ A model resilience policy contains an unsafe correction bound.
 - `ModelResilience_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -92,13 +106,19 @@ A model resilience policy contains an unsafe correction bound.
 
 ## Interfaces
 
+<a id="failureinput"></a>
+
 ### FailureInput
 
 #### Properties
 
+<a id="error"></a>
+
 ##### error
 
 > `readonly` **error**: `unknown`
+
+<a id="method"></a>
 
 ##### method
 
@@ -106,11 +126,15 @@ A model resilience policy contains an unsafe correction bound.
 
 ***
 
+<a id="policy"></a>
+
 ### Policy
 
 Retry and correction policy for one logical model call.
 
 #### Properties
+
+<a id="classify"></a>
 
 ##### classify
 
@@ -126,23 +150,33 @@ Retry and correction policy for one logical model call.
 
 [`Classification`](#classification)
 
+<a id="invalidtoolcallcorrectionlimit"></a>
+
 ##### invalidToolCallCorrectionLimit
 
 > `readonly` **invalidToolCallCorrectionLimit**: `number`
+
+<a id="resolve"></a>
 
 ##### resolve
 
 > `readonly` **resolve**: [`FailureResolver`](#failureresolver)
 
+<a id="retryschedule"></a>
+
 ##### retrySchedule
 
 > `readonly` **retrySchedule**: `Schedule`\<`unknown`\>
+
+<a id="streamidletimeout"></a>
 
 ##### streamIdleTimeout?
 
 > `readonly` `optional` **streamIdleTimeout?**: `Input`
 
 ## Type Aliases
+
+<a id="classification"></a>
 
 ### Classification
 
@@ -151,6 +185,8 @@ Retry and correction policy for one logical model call.
 Classification of a model-call failure.
 
 ***
+
+<a id="failureresolver"></a>
 
 ### FailureResolver
 
@@ -167,6 +203,8 @@ Classification of a model-call failure.
 `AiError.AiError`
 
 ## Variables
+
+<a id="apply"></a>
 
 ### apply
 
@@ -206,6 +244,8 @@ Classification of a model-call failure.
 
 ***
 
+<a id="defaultclassify"></a>
+
 ### defaultClassify
 
 > `const` **defaultClassify**: (`cause`) => [`Classification`](#classification)
@@ -226,17 +266,23 @@ that would duplicate the consumer's transcript.
 
 ***
 
+<a id="defaultpolicy"></a>
+
 ### defaultPolicy
 
 > `const` **defaultPolicy**: [`Policy`](#policy)
 
 ***
 
+<a id="defaultresolvefailure"></a>
+
 ### defaultResolveFailure
 
 > `const` **defaultResolveFailure**: [`FailureResolver`](#failureresolver)
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -254,6 +300,8 @@ that would duplicate the consumer's transcript.
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`ModelResilience`](#modelresilience), [`Misconfigured`](#misconfigured)\>
@@ -269,6 +317,8 @@ that would duplicate the consumer's transcript.
 `Layer.Layer`\<[`ModelResilience`](#modelresilience), [`Misconfigured`](#misconfigured)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 
@@ -286,11 +336,15 @@ that would duplicate the consumer's transcript.
 
 ***
 
+<a id="none"></a>
+
 ### none
 
 > `const` **none**: [`Policy`](#policy)
 
 ***
+
+<a id="validate"></a>
 
 ### validate
 

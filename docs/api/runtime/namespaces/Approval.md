@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="approvalid"></a>
+
 ### ApprovalId
 
 > **ApprovalId** = *typeof* `ApprovalId.Type`
@@ -15,6 +17,8 @@
 Stable identity for one approval request.
 
 ***
+
+<a id="approveinput"></a>
 
 ### ApproveInput
 
@@ -24,6 +28,8 @@ Approve exactly one pending authorization request.
 
 ***
 
+<a id="decision"></a>
+
 ### Decision
 
 > **Decision** = *typeof* `Decision.Type`
@@ -31,6 +37,8 @@ Approve exactly one pending authorization request.
 One terminal response to an approval request.
 
 ***
+
+<a id="denyinput"></a>
 
 ### DenyInput
 
@@ -40,6 +48,8 @@ Deny exactly one pending authorization request.
 
 ***
 
+<a id="request"></a>
+
 ### Request
 
 > **Request** = *typeof* `Request.Type`
@@ -47,6 +57,8 @@ Deny exactly one pending authorization request.
 The exact operation and capability awaiting authorization.
 
 ***
+
+<a id="respondinput"></a>
 
 ### RespondInput
 
@@ -56,6 +68,8 @@ Respond to exactly one stable approval request.
 
 ## Variables
 
+<a id="approvalid-1"></a>
+
 ### ApprovalId
 
 > `const` **ApprovalId**: `Schema.String`
@@ -63,6 +77,8 @@ Respond to exactly one stable approval request.
 Stable identity for one approval request.
 
 ***
+
+<a id="approve"></a>
 
 ### approve
 
@@ -82,6 +98,8 @@ Approve through the active Runtime service.
 
 ***
 
+<a id="approveinput-1"></a>
+
 ### ApproveInput
 
 > `const` **ApproveInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `runId`: `Schema.String`; \}\>
@@ -90,6 +108,8 @@ Approve exactly one pending authorization request.
 
 ***
 
+<a id="decision-1"></a>
+
 ### Decision
 
 > `const` **Decision**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>
@@ -97,6 +117,8 @@ Approve exactly one pending authorization request.
 One terminal response to an approval request.
 
 ***
+
+<a id="deny"></a>
 
 ### deny
 
@@ -116,6 +138,8 @@ Deny through the active Runtime service.
 
 ***
 
+<a id="denyinput-1"></a>
+
 ### DenyInput
 
 > `const` **DenyInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `runId`: `Schema.String`; \}\>
@@ -124,6 +148,8 @@ Deny exactly one pending authorization request.
 
 ***
 
+<a id="request-1"></a>
+
 ### Request
 
 > `const` **Request**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `capability`: `Schema.String`; `input`: `Schema.Unknown`; `operation`: `Schema.String`; \}\>
@@ -131,6 +157,8 @@ Deny exactly one pending authorization request.
 The exact operation and capability awaiting authorization.
 
 ***
+
+<a id="resolvewith"></a>
 
 ### resolveWith
 
@@ -164,6 +192,8 @@ Resolve one exact durable approval token through the supplied Runtime.
 
 ***
 
+<a id="respondinput-1"></a>
+
 ### RespondInput
 
 > `const` **RespondInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>; `operator`: `Schema.optionalKey`\<`Schema.String`\>; `runId`: `Schema.String`; \}\>
@@ -172,11 +202,15 @@ Respond to exactly one stable approval request.
 
 ## References
 
+<a id="approvaltokeninvalid"></a>
+
 ### ApprovalTokenInvalid
 
 Re-exports [ApprovalTokenInvalid](../../approvals#approvaltokeninvalid)
 
 ***
+
+<a id="resolve"></a>
 
 ### resolve
 
@@ -184,11 +218,15 @@ Re-exports [resolve](../../approvals#resolve-1)
 
 ***
 
+<a id="resolveerror"></a>
+
 ### ResolveError
 
 Re-exports [ResolveError](../../approvals#resolveerror)
 
 ***
+
+<a id="resolveoptions"></a>
 
 ### ResolveOptions
 

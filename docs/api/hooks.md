@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="hookfailed"></a>
+
 ### HookFailed
 
 A lifecycle hook failed instead of returning a decision.
@@ -17,6 +19,8 @@ A lifecycle hook failed instead of returning a decision.
 - `HookFailed_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A lifecycle hook failed instead of returning a decision.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause
 
 > `readonly` **cause**: `unknown`
@@ -46,6 +52,8 @@ A lifecycle hook failed instead of returning a decision.
 
 `HookFailed_base.cause`
 
+<a id="event"></a>
+
 ##### event
 
 > `readonly` **event**: `"RunStart"` \| `"TurnStart"` \| `"ModelCall"` \| `"ToolCall"` \| `"ToolResult"` \| `"ApprovalRequest"` \| `"Compaction"` \| `"ChildStart"` \| `"ChildEnd"` \| `"Steer"` \| `"RunEnd"`
@@ -53,6 +61,8 @@ A lifecycle hook failed instead of returning a decision.
 ###### Inherited from
 
 `HookFailed_base.event`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -64,6 +74,8 @@ A lifecycle hook failed instead of returning a decision.
 
 ***
 
+<a id="hooks"></a>
+
 ### Hooks
 
 Optional ordered lifecycle interceptor service.
@@ -73,6 +85,8 @@ Optional ordered lifecycle interceptor service.
 - `Hooks_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -94,15 +108,21 @@ Optional ordered lifecycle interceptor service.
 
 ## Interfaces
 
+<a id="addcontext"></a>
+
 ### AddContext
 
 Append prompt context at a prompt-bearing boundary.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"AddContext"`
+
+<a id="prompt"></a>
 
 ##### prompt
 
@@ -110,29 +130,41 @@ Append prompt context at a prompt-bearing boundary.
 
 ***
 
+<a id="approval"></a>
+
 ### Approval
 
 Stable approval identity exposed before Approvals resolves it.
 
 #### Properties
 
+<a id="approvalid"></a>
+
 ##### approvalId
 
 > `readonly` **approvalId**: `string`
+
+<a id="capability"></a>
 
 ##### capability
 
 > `readonly` **capability**: `string`
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `unknown`
+
+<a id="operation"></a>
 
 ##### operation
 
 > `readonly` **operation**: `string`
 
 ***
+
+<a id="approvalrequestinput"></a>
 
 ### ApprovalRequestInput
 
@@ -144,6 +176,8 @@ Input observed before an approval request is resolved.
 
 #### Properties
 
+<a id="agentname"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -152,13 +186,19 @@ Input observed before an approval request is resolved.
 
 `RunContext.agentName`
 
+<a id="call"></a>
+
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
 
+<a id="request"></a>
+
 ##### request
 
 > `readonly` **request**: [`Approval`](#approval)
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -168,11 +208,15 @@ Input observed before an approval request is resolved.
 
 `RunContext.runId`
 
+<a id="turn"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="ask"></a>
 
 ### Ask
 
@@ -180,11 +224,15 @@ Defer the guarded operation to the configured Approvals service.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Ask"`
 
 ***
+
+<a id="block"></a>
 
 ### Block
 
@@ -192,9 +240,13 @@ Stop the guarded operation before it crosses its boundary.
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Block"`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -202,33 +254,47 @@ Stop the guarded operation before it crosses its boundary.
 
 ***
 
+<a id="child"></a>
+
 ### Child
 
 Process-local or durable child identity exposed to child hooks.
 
 #### Properties
 
+<a id="childrunid"></a>
+
 ##### childRunId?
 
 > `readonly` `optional` **childRunId?**: `string`
+
+<a id="label"></a>
 
 ##### label?
 
 > `readonly` `optional` **label?**: `string`
 
+<a id="operation-1"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
 
+<a id="prompt-1"></a>
+
 ##### prompt?
 
 > `readonly` `optional` **prompt?**: `Prompt`
+
+<a id="selection"></a>
 
 ##### selection
 
 > `readonly` **selection**: `string`
 
 ***
+
+<a id="childendinput"></a>
 
 ### ChildEndInput
 
@@ -240,6 +306,8 @@ Input observed after a child reaches a result visible to its parent.
 
 #### Properties
 
+<a id="agentname-1"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -248,13 +316,19 @@ Input observed after a child reaches a result visible to its parent.
 
 `RunContext.agentName`
 
+<a id="child-1"></a>
+
 ##### child
 
 > `readonly` **child**: [`Child`](#child)
 
+<a id="result"></a>
+
 ##### result
 
 > `readonly` **result**: `unknown`
+
+<a id="runid-1"></a>
 
 ##### runId
 
@@ -264,11 +338,15 @@ Input observed after a child reaches a result visible to its parent.
 
 `RunContext.runId`
 
+<a id="turn-1"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="childstartinput"></a>
 
 ### ChildStartInput
 
@@ -280,6 +358,8 @@ Input observed before a child is started or admitted.
 
 #### Properties
 
+<a id="agentname-2"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -288,9 +368,13 @@ Input observed before a child is started or admitted.
 
 `RunContext.agentName`
 
+<a id="child-2"></a>
+
 ##### child
 
 > `readonly` **child**: [`Child`](#child)
+
+<a id="runid-2"></a>
 
 ##### runId
 
@@ -300,11 +384,15 @@ Input observed before a child is started or admitted.
 
 `RunContext.runId`
 
+<a id="turn-2"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="compactioninput"></a>
 
 ### CompactionInput
 
@@ -316,6 +404,8 @@ Input observed when the loop has decided to attempt compaction.
 
 #### Properties
 
+<a id="agentname-3"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -324,13 +414,19 @@ Input observed when the loop has decided to attempt compaction.
 
 `RunContext.agentName`
 
+<a id="before"></a>
+
 ##### before
 
 > `readonly` **before**: `Prompt`
 
+<a id="overflow"></a>
+
 ##### overflow
 
 > `readonly` **overflow**: `boolean`
+
+<a id="runid-3"></a>
 
 ##### runId
 
@@ -340,11 +436,15 @@ Input observed when the loop has decided to attempt compaction.
 
 `RunContext.runId`
 
+<a id="turn-3"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="continue"></a>
 
 ### Continue
 
@@ -352,11 +452,15 @@ Continue the guarded operation unchanged.
 
 #### Properties
 
+<a id="_tag-3"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Continue"`
 
 ***
+
+<a id="declaration"></a>
 
 ### Declaration
 
@@ -364,15 +468,21 @@ Plugin-facing type-erased declaration shape accepted by Hooks.layer.
 
 #### Properties
 
+<a id="event-1"></a>
+
 ##### event
 
 > `readonly` **event**: `"RunStart"` \| `"TurnStart"` \| `"ModelCall"` \| `"ToolCall"` \| `"ToolResult"` \| `"ApprovalRequest"` \| `"Compaction"` \| `"ChildStart"` \| `"ChildEnd"` \| `"Steer"` \| `"RunEnd"`
+
+<a id="hook"></a>
 
 ##### hook
 
 > `readonly` **hook**: [`Hook`](#hook-1)\<`never`\>
 
 ***
+
+<a id="modelcallinput"></a>
 
 ### ModelCallInput
 
@@ -384,6 +494,8 @@ Input observed at the ModelMiddleware prompt boundary.
 
 #### Properties
 
+<a id="agentname-4"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -392,9 +504,13 @@ Input observed at the ModelMiddleware prompt boundary.
 
 `RunContext.agentName`
 
+<a id="prompt-2"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
+
+<a id="runid-4"></a>
 
 ##### runId
 
@@ -404,11 +520,15 @@ Input observed at the ModelMiddleware prompt boundary.
 
 `RunContext.runId`
 
+<a id="turn-4"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="replace"></a>
 
 ### Replace
 
@@ -422,15 +542,21 @@ Replace the event-specific mutable value.
 
 #### Properties
 
+<a id="_tag-4"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Replace"`
+
+<a id="value-1"></a>
 
 ##### value
 
 > `readonly` **value**: `Value`
 
 ***
+
+<a id="runendinput"></a>
 
 ### RunEndInput
 
@@ -448,6 +574,8 @@ Input observed immediately before the terminal Completed event.
 
 #### Properties
 
+<a id="agentname-5"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -456,9 +584,13 @@ Input observed immediately before the terminal Completed event.
 
 `RunContext.agentName`
 
+<a id="output-1"></a>
+
 ##### output
 
 > `readonly` **output**: `Output`
+
+<a id="runid-5"></a>
 
 ##### runId
 
@@ -468,19 +600,27 @@ Input observed immediately before the terminal Completed event.
 
 `RunContext.runId`
 
+<a id="text"></a>
+
 ##### text
 
 > `readonly` **text**: `string`
 
+<a id="transcript"></a>
+
 ##### transcript
 
 > `readonly` **transcript**: `Prompt`
+
+<a id="turns"></a>
 
 ##### turns
 
 > `readonly` **turns**: `number`
 
 ***
+
+<a id="runstartinput"></a>
 
 ### RunStartInput
 
@@ -492,6 +632,8 @@ Input observed before a Run begins.
 
 #### Properties
 
+<a id="agentname-6"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -500,9 +642,13 @@ Input observed before a Run begins.
 
 `RunContext.agentName`
 
+<a id="input-1"></a>
+
 ##### input
 
 > `readonly` **input**: `Prompt`
+
+<a id="runid-6"></a>
 
 ##### runId
 
@@ -514,17 +660,23 @@ Input observed before a Run begins.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Ordered lifecycle hook declarations for one Agent execution context.
 
 #### Properties
 
+<a id="declarations"></a>
+
 ##### declarations
 
 > `readonly` **declarations**: readonly [`Declaration`](#declaration)[]
 
 ***
+
+<a id="steerinput"></a>
 
 ### SteerInput
 
@@ -536,6 +688,8 @@ Input observed when queued steering enters the next prompt.
 
 #### Properties
 
+<a id="agentname-7"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -544,17 +698,25 @@ Input observed when queued steering enters the next prompt.
 
 `RunContext.agentName`
 
+<a id="count"></a>
+
 ##### count
 
 > `readonly` **count**: `number`
+
+<a id="prompt-3"></a>
 
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
 
+<a id="queue"></a>
+
 ##### queue
 
 > `readonly` **queue**: `"steering"` \| `"followUp"`
+
+<a id="runid-7"></a>
 
 ##### runId
 
@@ -564,11 +726,15 @@ Input observed when queued steering enters the next prompt.
 
 `RunContext.runId`
 
+<a id="turn-5"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="toolcallinput"></a>
 
 ### ToolCallInput
 
@@ -580,6 +746,8 @@ Input observed before authorization and tool execution.
 
 #### Properties
 
+<a id="agentname-8"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -588,13 +756,19 @@ Input observed before authorization and tool execution.
 
 `RunContext.agentName`
 
+<a id="args"></a>
+
 ##### args
 
 > `readonly` **args**: `unknown`
 
+<a id="call-1"></a>
+
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
+
+<a id="runid-8"></a>
 
 ##### runId
 
@@ -604,15 +778,21 @@ Input observed before authorization and tool execution.
 
 `RunContext.runId`
 
+<a id="tool"></a>
+
 ##### tool
 
 > `readonly` **tool**: `string`
+
+<a id="turn-6"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="toolresultinput"></a>
 
 ### ToolResultInput
 
@@ -624,6 +804,8 @@ Input observed after tool execution and before its result is committed.
 
 #### Properties
 
+<a id="agentname-9"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -632,17 +814,25 @@ Input observed after tool execution and before its result is committed.
 
 `RunContext.agentName`
 
+<a id="args-1"></a>
+
 ##### args
 
 > `readonly` **args**: `unknown`
+
+<a id="call-2"></a>
 
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
 
+<a id="result-1"></a>
+
 ##### result
 
 > `readonly` **result**: `unknown`
+
+<a id="runid-9"></a>
 
 ##### runId
 
@@ -652,15 +842,21 @@ Input observed after tool execution and before its result is committed.
 
 `RunContext.runId`
 
+<a id="tool-1"></a>
+
 ##### tool
 
 > `readonly` **tool**: `string`
+
+<a id="turn-7"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="turnstartinput"></a>
 
 ### TurnStartInput
 
@@ -672,6 +868,8 @@ Input observed before one zero-based turn begins.
 
 #### Properties
 
+<a id="agentname-10"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -680,9 +878,13 @@ Input observed before one zero-based turn begins.
 
 `RunContext.agentName`
 
+<a id="prompt-4"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
+
+<a id="runid-10"></a>
 
 ##### runId
 
@@ -692,17 +894,23 @@ Input observed before one zero-based turn begins.
 
 `RunContext.runId`
 
+<a id="turn-8"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ## Type Aliases
 
+<a id="approvalrequest"></a>
+
 ### ApprovalRequest
 
 > **ApprovalRequest** = `HookDeclaration`\<`"ApprovalRequest"`, [`ApprovalRequestInput`](#approvalrequestinput), `ApprovalDecision`\>
 
 ***
+
+<a id="checkpoint"></a>
 
 ### Checkpoint
 
@@ -714,11 +922,15 @@ One completed declaration chain stored in the driver checkpoint.
 
 ***
 
+<a id="childend"></a>
+
 ### ChildEnd
 
 > **ChildEnd** = `HookDeclaration`\<`"ChildEnd"`, [`ChildEndInput`](#childendinput), `ChildEndDecision`\>
 
 ***
+
+<a id="childstart"></a>
 
 ### ChildStart
 
@@ -726,11 +938,15 @@ One completed declaration chain stored in the driver checkpoint.
 
 ***
 
+<a id="compaction"></a>
+
 ### Compaction
 
 > **Compaction** = `HookDeclaration`\<`"Compaction"`, [`CompactionInput`](#compactioninput), `PromptDecision`\>
 
 ***
+
+<a id="decision"></a>
 
 ### Decision
 
@@ -746,6 +962,8 @@ Serializable decision recorded in the durable driver checkpoint.
 
 ***
 
+<a id="event-2"></a>
+
 ### Event
 
 > **Event** = *typeof* `Event.Type`
@@ -753,6 +971,8 @@ Serializable decision recorded in the durable driver checkpoint.
 Typed lifecycle boundary exposed to a hook declaration.
 
 ***
+
+<a id="hook-1"></a>
 
 ### Hook
 
@@ -782,11 +1002,15 @@ One Effectful typed lifecycle interceptor. `void` is shorthand for Continue.
 
 ***
 
+<a id="modelcall"></a>
+
 ### ModelCall
 
 > **ModelCall** = `HookDeclaration`\<`"ModelCall"`, [`ModelCallInput`](#modelcallinput), `PromptDecision`\>
 
 ***
+
+<a id="runend"></a>
 
 ### RunEnd
 
@@ -800,11 +1024,15 @@ One Effectful typed lifecycle interceptor. `void` is shorthand for Continue.
 
 ***
 
+<a id="runstart"></a>
+
 ### RunStart
 
 > **RunStart** = `HookDeclaration`\<`"RunStart"`, [`RunStartInput`](#runstartinput), `PromptDecision`\>
 
 ***
+
+<a id="steer"></a>
 
 ### Steer
 
@@ -812,11 +1040,15 @@ One Effectful typed lifecycle interceptor. `void` is shorthand for Continue.
 
 ***
 
+<a id="toolcall"></a>
+
 ### ToolCall
 
 > **ToolCall** = `HookDeclaration`\<`"ToolCall"`, [`ToolCallInput`](#toolcallinput), `ToolCallDecision`\>
 
 ***
+
+<a id="toolresult"></a>
 
 ### ToolResult
 
@@ -824,11 +1056,15 @@ One Effectful typed lifecycle interceptor. `void` is shorthand for Continue.
 
 ***
 
+<a id="turnstart"></a>
+
 ### TurnStart
 
 > **TurnStart** = `HookDeclaration`\<`"TurnStart"`, [`TurnStartInput`](#turnstartinput), `PromptDecision`\>
 
 ## Variables
+
+<a id="addcontext-1"></a>
 
 ### AddContext
 
@@ -848,6 +1084,8 @@ Append context to the prompt at a prompt-bearing boundary.
 
 ***
 
+<a id="ask-1"></a>
+
 ### Ask
 
 > **Ask**: () => [`Ask`](#ask)
@@ -859,6 +1097,8 @@ Defer the guarded operation to the configured Approvals service.
 [`Ask`](#ask)
 
 ***
+
+<a id="block-1"></a>
 
 ### Block
 
@@ -880,6 +1120,8 @@ Stop the guarded operation before it crosses its boundary.
 
 ***
 
+<a id="checkpoint-1"></a>
+
 ### Checkpoint
 
 > `const` **Checkpoint**: `Schema.Struct`\<\{ `complete`: `Schema.Boolean`; `decisions`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Continue"`, \{ \}\>, `Schema.TaggedStruct`\<`"Block"`, \{ `reason`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Replace"`, \{ `value`: `Schema.Unknown`; \}\>, `Schema.TaggedStruct`\<`"AddContext"`, \{ `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Ask"`, \{ \}\>\]\>\>; `event`: `Schema.Literals`\<readonly \[`"RunStart"`, `"TurnStart"`, `"ModelCall"`, `"ToolCall"`, `"ToolResult"`, `"ApprovalRequest"`, `"Compaction"`, `"ChildStart"`, `"ChildEnd"`, `"Steer"`, `"RunEnd"`\]\>; `key`: `Schema.String`; \}\>
@@ -889,6 +1131,8 @@ Stop the guarded operation before it crosses its boundary.
 One completed declaration chain stored in the driver checkpoint.
 
 ***
+
+<a id="continue-1"></a>
 
 ### Continue
 
@@ -902,6 +1146,8 @@ Continue the guarded operation unchanged.
 
 ***
 
+<a id="decision-1"></a>
+
 ### Decision
 
 > `const` **Decision**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Continue"`, \{ \}\>, `Schema.TaggedStruct`\<`"Block"`, \{ `reason`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Replace"`, \{ `value`: `Schema.Unknown`; \}\>, `Schema.TaggedStruct`\<`"AddContext"`, \{ `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Ask"`, \{ \}\>\]\>
@@ -910,6 +1156,8 @@ Serializable decision recorded in the durable driver checkpoint.
 
 ***
 
+<a id="event-3"></a>
+
 ### Event
 
 > `const` **Event**: `Schema.Literals`\<readonly \[`"RunStart"`, `"TurnStart"`, `"ModelCall"`, `"ToolCall"`, `"ToolResult"`, `"ApprovalRequest"`, `"Compaction"`, `"ChildStart"`, `"ChildEnd"`, `"Steer"`, `"RunEnd"`\]\>
@@ -917,6 +1165,8 @@ Serializable decision recorded in the durable driver checkpoint.
 Typed lifecycle boundary exposed to a hook declaration.
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -936,6 +1186,8 @@ Provide an explicit ordered hook declaration list.
 
 ***
 
+<a id="layeridentity"></a>
+
 ### layerIdentity
 
 > `const` **layerIdentity**: `Layer.Layer`\<[`Hooks`](#hooks)\>
@@ -943,6 +1195,8 @@ Provide an explicit ordered hook declaration list.
 Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
+
+<a id="onapprovalrequest"></a>
 
 ### onApprovalRequest
 
@@ -960,6 +1214,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="onchildend"></a>
+
 ### onChildEnd
 
 > `const` **onChildEnd**: (`hook`) => [`ChildEnd`](#childend)
@@ -975,6 +1231,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 [`ChildEnd`](#childend)
 
 ***
+
+<a id="onchildstart"></a>
 
 ### onChildStart
 
@@ -992,6 +1250,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="oncompaction"></a>
+
 ### onCompaction
 
 > `const` **onCompaction**: (`hook`) => [`Compaction`](#compaction)
@@ -1008,6 +1268,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="onmodelcall"></a>
+
 ### onModelCall
 
 > `const` **onModelCall**: (`hook`) => [`ModelCall`](#modelcall)
@@ -1023,6 +1285,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 [`ModelCall`](#modelcall)
 
 ***
+
+<a id="onrunend"></a>
 
 ### onRunEnd
 
@@ -1046,6 +1310,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="onrunstart"></a>
+
 ### onRunStart
 
 > `const` **onRunStart**: (`hook`) => [`RunStart`](#runstart)
@@ -1061,6 +1327,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 [`RunStart`](#runstart)
 
 ***
+
+<a id="onsteer"></a>
 
 ### onSteer
 
@@ -1078,6 +1346,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="ontoolcall"></a>
+
 ### onToolCall
 
 > `const` **onToolCall**: (`hook`) => [`ToolCall`](#toolcall)
@@ -1093,6 +1363,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 [`ToolCall`](#toolcall)
 
 ***
+
+<a id="ontoolresult"></a>
 
 ### onToolResult
 
@@ -1110,6 +1382,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="onturnstart"></a>
+
 ### onTurnStart
 
 > `const` **onTurnStart**: (`hook`) => [`TurnStart`](#turnstart)
@@ -1125,6 +1399,8 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 [`TurnStart`](#turnstart)
 
 ***
+
+<a id="replace-1"></a>
 
 ### Replace
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="contextinvalid"></a>
+
 ### ContextInvalid
 
 Model context cannot be admitted while framework tool calls lack outcomes.
@@ -17,6 +19,8 @@ Model context cannot be admitted while framework tool calls lack outcomes.
 - `ContextInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ Model context cannot be admitted while framework tool calls lack outcomes.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -45,6 +51,8 @@ Model context cannot be admitted while framework tool calls lack outcomes.
 ###### Inherited from
 
 `ContextInvalid_base.hint`
+
+<a id="issues"></a>
 
 ##### issues
 
@@ -56,6 +64,8 @@ Model context cannot be admitted while framework tool calls lack outcomes.
 
 ***
 
+<a id="sessionconflict"></a>
+
 ### SessionConflict
 
 Session append conflict with the active path or entry identity.
@@ -65,6 +75,8 @@ Session append conflict with the active path or entry identity.
 - `SessionConflict_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -86,6 +98,8 @@ Session append conflict with the active path or entry identity.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -94,6 +108,8 @@ Session append conflict with the active path or entry identity.
 
 `SessionConflict_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -101,6 +117,8 @@ Session append conflict with the active path or entry identity.
 ###### Inherited from
 
 `SessionConflict_base.message`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -112,6 +130,8 @@ Session append conflict with the active path or entry identity.
 
 ***
 
+<a id="sessiondirectory"></a>
+
 ### SessionDirectory
 
 #### Extends
@@ -119,6 +139,8 @@ Session append conflict with the active path or entry identity.
 - `SessionDirectory_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -140,6 +162,8 @@ Session append conflict with the active path or entry identity.
 
 ***
 
+<a id="sessionstoreerror"></a>
+
 ### SessionStoreError
 
 Session store operation failure.
@@ -149,6 +173,8 @@ Session store operation failure.
 - `SessionStoreError_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -170,6 +196,8 @@ Session store operation failure.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -177,6 +205,8 @@ Session store operation failure.
 ###### Inherited from
 
 `SessionStoreError_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -188,19 +218,27 @@ Session store operation failure.
 
 ## Interfaces
 
+<a id="checkpointappend"></a>
+
 ### CheckpointAppend
 
 Authoritative result of an idempotent checkpoint append.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Appended"` \| `"AlreadyPresent"`
 
+<a id="checkpoint"></a>
+
 ##### checkpoint
 
 > `readonly` **checkpoint**: [`CompactionEntry`](#compactionentry)
+
+<a id="leafid"></a>
 
 ##### leafId
 
@@ -208,11 +246,15 @@ Authoritative result of an idempotent checkpoint append.
 
 ***
 
+<a id="directory"></a>
+
 ### Directory
 
 Keyed Session storage and same-Session Run admission.
 
 #### Properties
+
+<a id="acquire"></a>
 
 ##### acquire
 
@@ -230,11 +272,15 @@ Keyed Session storage and same-Session Run admission.
 
 ***
 
+<a id="preparedcheckpoint"></a>
+
 ### PreparedCheckpoint
 
 Exact idempotent projection. Atomically persist projection, telemetry, and commit; remote failure is ambiguous.
 
 #### Properties
+
+<a id="compactioncommit"></a>
 
 ##### compactionCommit?
 
@@ -268,21 +314,31 @@ Exact idempotent projection. Atomically persist projection, telemetry, and commi
 
 > `readonly` `optional` **summaryModelCallId?**: `string`
 
+<a id="id"></a>
+
 ##### id
 
 > `readonly` **id**: `string`
+
+<a id="parentid"></a>
 
 ##### parentId
 
 > `readonly` **parentId**: `string` \| `null`
 
+<a id="projectedhistory"></a>
+
 ##### projectedHistory
 
 > `readonly` **projectedHistory**: `Prompt`
 
+<a id="summary"></a>
+
 ##### summary?
 
 > `readonly` `optional` **summary?**: `string`
+
+<a id="telemetry"></a>
 
 ##### telemetry
 
@@ -290,11 +346,15 @@ Exact idempotent projection. Atomically persist projection, telemetry, and commi
 
 ***
 
+<a id="sessionstore"></a>
+
 ### SessionStore
 
 Session event-log service boundary.
 
 #### Properties
+
+<a id="append"></a>
 
 ##### append
 
@@ -314,6 +374,8 @@ Session event-log service boundary.
 
 `Effect`\<[`Entry`](#entry), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
 
+<a id="appendcheckpoint"></a>
+
 ##### appendCheckpoint
 
 > `readonly` **appendCheckpoint**: (`checkpoint`) => `Effect`\<[`CheckpointAppend`](#checkpointappend), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
@@ -330,9 +392,13 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 `Effect`\<[`CheckpointAppend`](#checkpointappend), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
 
+<a id="leaf"></a>
+
 ##### leaf
 
 > `readonly` **leaf**: `Effect`\<`string` \| `null`\>
+
+<a id="path"></a>
 
 ##### path
 
@@ -348,9 +414,13 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 `Effect`\<readonly [`Entry`](#entry)[], [`SessionStoreError`](#sessionstoreerror)\>
 
+<a id="reserveentryid"></a>
+
 ##### reserveEntryId
 
 > `readonly` **reserveEntryId**: `Effect`\<`string`, [`SessionStoreError`](#sessionstoreerror)\>
+
+<a id="setleaf"></a>
 
 ##### setLeaf
 
@@ -368,6 +438,8 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 ## Type Aliases
 
+<a id="appendinput"></a>
+
 ### AppendInput
 
 > **AppendInput** = `AppendEntryInput`\<[`Entry`](#entry)\>
@@ -375,6 +447,8 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 Session entry input appended by a store implementation.
 
 ***
+
+<a id="appendoptions"></a>
 
 ### AppendOptions
 
@@ -384,6 +458,8 @@ Identity and expected active leaf for a normal Session append.
 
 ***
 
+<a id="baseentry"></a>
+
 ### BaseEntry
 
 > **BaseEntry** = `object`
@@ -392,19 +468,27 @@ Common fields for session entries.
 
 #### Properties
 
+<a id="id-1"></a>
+
 ##### id
 
 > `readonly` **id**: [`EntryId`](#entryid)
 
+<a id="metadata"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: [`Metadata`](#metadata-1)
+
+<a id="parentid-1"></a>
 
 ##### parentId
 
 > `readonly` **parentId**: [`EntryId`](#entryid) \| `null`
 
 ***
+
+<a id="branchsummaryentry"></a>
 
 ### BranchSummaryEntry
 
@@ -423,6 +507,8 @@ A summary of an abandoned branch.
 > `readonly` **summary**: `string`
 
 ***
+
+<a id="compactionentry"></a>
 
 ### CompactionEntry
 
@@ -454,6 +540,8 @@ An exact point-in-time compaction projection.
 
 ***
 
+<a id="entry"></a>
+
 ### Entry
 
 > **Entry** = [`MessageEntry`](#messageentry) \| [`ModelResponseEntry`](#modelresponseentry) \| [`ToolCallEntry`](#toolcallentry) \| [`ToolResultEntry`](#toolresultentry) \| [`MemoryEntry`](#memoryentry) \| [`SkillEntry`](#skillentry) \| [`SteeringEntry`](#steeringentry) \| [`HandoffEntry`](#handoffentry) \| [`CompactionEntry`](#compactionentry) \| [`BranchSummaryEntry`](#branchsummaryentry)
@@ -462,6 +550,8 @@ Closed union of session entries.
 
 ***
 
+<a id="entryid"></a>
+
 ### EntryId
 
 > **EntryId** = `string`
@@ -469,6 +559,8 @@ Closed union of session entries.
 Opaque session entry id.
 
 ***
+
+<a id="entrypayload"></a>
 
 ### EntryPayload
 
@@ -481,6 +573,8 @@ shared encoding rather than each backend inventing its own. Entry ids and parent
 as columns by the owning store; only the tag-specific payload is encoded here.
 
 ***
+
+<a id="handoffentry"></a>
 
 ### HandoffEntry
 
@@ -508,6 +602,8 @@ A self-contained conversation projection imported by a durable handoff.
 
 ***
 
+<a id="memoryentry"></a>
+
 ### MemoryEntry
 
 > **MemoryEntry** = [`BaseEntry`](#baseentry) & `object`
@@ -525,6 +621,8 @@ Recalled or persisted memory context.
 > `readonly` **items**: `ReadonlyArray`\<`string`\>
 
 ***
+
+<a id="messageentry"></a>
 
 ### MessageEntry
 
@@ -544,6 +642,8 @@ A verbatim conversation message.
 
 ***
 
+<a id="metadata-1"></a>
+
 ### Metadata
 
 > **Metadata** = `Readonly`\<`Record`\<`string`, *typeof* `Schema.Unknown.Type`\>\>
@@ -551,6 +651,8 @@ A verbatim conversation message.
 Host-defined metadata carried by session entries.
 
 ***
+
+<a id="modelresponseentry"></a>
 
 ### ModelResponseEntry
 
@@ -567,6 +669,8 @@ Host-defined metadata carried by session entries.
 > `readonly` **content**: `ReadonlyArray`\<`Response.Part`\<`Record`\<`string`, `Tool.Any`\>\>\>
 
 ***
+
+<a id="skillentry"></a>
 
 ### SkillEntry
 
@@ -590,6 +694,8 @@ An activated skill body.
 
 ***
 
+<a id="steeringentry"></a>
+
 ### SteeringEntry
 
 > **SteeringEntry** = [`BaseEntry`](#baseentry) & `object`
@@ -607,6 +713,8 @@ Live steering input preserved as a prompt message.
 > `readonly` **message**: `Prompt.Message`
 
 ***
+
+<a id="toolcallentry"></a>
 
 ### ToolCallEntry
 
@@ -626,6 +734,8 @@ A model-requested tool call.
 
 ***
 
+<a id="toolresultentry"></a>
+
 ### ToolResultEntry
 
 > **ToolResultEntry** = [`BaseEntry`](#baseentry) & `object`
@@ -643,6 +753,8 @@ A tool execution result.
 > `readonly` **part**: `Prompt.ToolResultPart`
 
 ## Variables
+
+<a id="acquire-1"></a>
 
 ### acquire
 
@@ -662,6 +774,8 @@ Acquire one exact Session store for the current Scope.
 
 ***
 
+<a id="buildcontext"></a>
+
 ### buildContext
 
 > `const` **buildContext**: (`path`) => `Prompt.Prompt`
@@ -680,6 +794,8 @@ Purely projects a root-to-leaf session path into model context.
 
 ***
 
+<a id="buildmemorycontext"></a>
+
 ### buildMemoryContext
 
 > `const` **buildMemoryContext**: (`path`) => `Prompt.Prompt`
@@ -697,6 +813,8 @@ Purely projects a lossless path for memory retention.
 `Prompt.Prompt`
 
 ***
+
+<a id="checkpointmatches"></a>
 
 ### checkpointMatches
 
@@ -738,6 +856,8 @@ Canonical exact checkpoint equivalence.
 
 ***
 
+<a id="entrypayload-1"></a>
+
 ### EntryPayload
 
 > `const` **EntryPayload**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Message"`, \{ `message`: `Schema.Codec`\<`Prompt.Message`, `Prompt.MessageEncoded`, `never`, `never`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"ModelResponse"`, \{ `content`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `text`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `text`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `approvalId`: ...; `metadata`: ...; `toolCallId`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `data`: ...; `mediaType`: ...; `metadata`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `fileName`: ...; `id`: ...; `mediaType`: ...; `metadata`: ...; `sourceType`: ...; `title`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `sourceType`: ...; `title`: ...; `type`: ...; `url`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `modelId`: ...; `request`: ...; `timestamp`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `reason`: ...; `response`: ...; `type`: ...; `usage`: ...; \}\>, `Schema.Struct`\<\{ `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `encodedResult`: ...; `id`: ...; `isFailure`: ...; `metadata`: ...; `name`: ...; `preliminary`: ...; `providerExecuted`: ...; `result`: ...; `type`: ...; \}\>\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"ToolCall"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `part`: `Schema.Struct`\<\{ `~effect/ai/Prompt/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Prompt/Part"`\>\>; `id`: `Schema.String`; `name`: `Schema.String`; `options`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<...\>\>\>\>; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.withDecodingDefault`\<`Schema.Boolean`\>; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"ToolResult"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `part`: `Schema.Struct`\<\{ `~effect/ai/Prompt/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Prompt/Part"`\>\>; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `name`: `Schema.String`; `options`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<...\>\>\>\>; `providerExecuted`: `Schema.withDecodingDefault`\<`Schema.Boolean`\>; `result`: `Schema.Unknown`; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"Memory"`, \{ `items`: `Schema.$Array`\<`Schema.String`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"Skill"`, \{ `body`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `name`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Steering"`, \{ `message`: `Schema.Codec`\<`Prompt.Message`, `Prompt.MessageEncoded`, `never`, `never`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"Handoff"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `target`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Compaction"`, \{ `compactionCommit`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `summaryModelCallId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `summary`: `Schema.optionalKey`\<`Schema.String`\>; `telemetry`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `model`: ...; `modelCallId`: ...; `provider`: ...; `purpose`: ...; `startedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `deliveryId`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `registrationKey`: ...; `startedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `deliveryId`: ...; `kind`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `completedAt`: ...; `deliveryId`: ...; `finishReason`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `providerMetadata`: ...; `registrationKey`: ...; `requestId`: ...; `responseModel`: ...; `serviceTier`: ...; `turn`: ...; `usage`: ...; `usageAt`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `category`: ...; `classification`: ...; `deliveryId`: ...; `disposition`: ...; `failedAt`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `providerUsage`: ...; `registrationKey`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `category`: ...; `delayMillis`: ...; `deliveryId`: ...; `modelCallId`: ...; `reason`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `category`: ...; `deliveryId`: ...; `fromCandidate`: ...; `fromModel`: ...; `fromProvider`: ...; `fromRegistrationKey`: ...; `modelCallId`: ...; `toCandidate`: ...; `toModel`: ...; `toProvider`: ...; `toRegistrationKey`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempts`: ...; `completedAt`: ...; `deliveryId`: ...; `failedAttemptUsage`: ...; `finishReason`: ...; `modelCallId`: ...; `purpose`: ...; `turn`: ...; `usage`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempts`: ...; `category`: ...; `classification`: ...; `deliveryId`: ...; `failedAt`: ...; `failedAttemptUsage`: ...; `modelCallId`: ...; `purpose`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `contextTokensBefore`: ...; `deliveryId`: ...; `entriesBefore`: ...; `startedAt`: ...; `trigger`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `skippedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `appliedAt`: ...; `checkpointId`: ...; `commit`: ...; `compactionId`: ...; `deliveryId`: ...; `kind`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `failedAt`: ...; `turn`: ...; \}\>\]\>\>; \}\>, `Schema.TaggedStruct`\<`"BranchSummary"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `summary`: `Schema.String`; \}\>\]\>
@@ -750,6 +870,8 @@ as columns by the owning store; only the tag-specific payload is encoded here.
 
 ***
 
+<a id="layermemory"></a>
+
 ### layerMemory
 
 > `const` **layerMemory**: `Layer.Layer`\<[`SessionDirectory`](#sessiondirectory)\>
@@ -757,6 +879,8 @@ as columns by the owning store; only the tag-specific payload is encoded here.
 Ref-backed non-durable Session directory with one linear lane per Session ID.
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -774,11 +898,15 @@ Ref-backed non-durable Session directory with one linear lane per Session ID.
 
 ***
 
+<a id="modelresponsecontent"></a>
+
 ### ModelResponseContent
 
 > `const` **ModelResponseContent**: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"text"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"reasoning"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `approvalId`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `toolCallId`: `Schema.String`; `type`: `Schema.tag`\<`"tool-approval-request"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `data`: `Schema.Uint8ArrayFromBase64`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `type`: `Schema.tag`\<`"file"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `fileName`: `Schema.optionalKey`\<`Schema.String`\>; `id`: `Schema.String`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `sourceType`: `Schema.tag`\<`"document"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `sourceType`: `Schema.tag`\<`"url"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; `url`: `Schema.URLFromString`; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.optional`\<`Schema.String`\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `modelId`: `Schema.optional`\<`Schema.String`\>; `request`: `Schema.optional`\<*typeof* `Response.HttpRequestDetails`\>; `timestamp`: `Schema.optional`\<`Schema.DateTimeUtcFromString`\>; `type`: `Schema.tag`\<`"response-metadata"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `reason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `response`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Struct`\<\{ `headers`: `Schema.$Record`\<..., ...\>; `status`: `Schema.Int`; \}\>\>\>; `type`: `Schema.tag`\<`"finish"`\>; `usage`: `Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<...\>; `cacheWrite`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; `uncached`: `Schema.optionalKey`\<...\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<...\>; `text`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; \}\>; \}\>; \}\>, `Schema.Struct`\<\{ `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>, `Schema.Struct`\<\{ `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>\]\>\>
 
 ***
+
+<a id="unresolvedtoolcalls"></a>
 
 ### unresolvedToolCalls
 
@@ -797,6 +925,8 @@ Framework tool calls in model context that do not yet have a corresponding resul
 `ReadonlyArray`\<`Prompt.ToolCallPart`\>
 
 ***
+
+<a id="validatecontext"></a>
 
 ### validateContext
 

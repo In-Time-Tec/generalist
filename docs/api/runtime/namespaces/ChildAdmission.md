@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="agentchildren"></a>
+
 ### AgentChildren
 
 #### Effect-expect-leaking
@@ -22,6 +24,8 @@ exactly the forgery this contract exists to prevent.
 - `AgentChildren_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -43,6 +47,8 @@ exactly the forgery this contract exists to prevent.
 
 ***
 
+<a id="childparentageinvalid"></a>
+
 ### ChildParentageInvalid
 
 A Run addressed a child it does not own.
@@ -55,6 +61,8 @@ Run that did not admit it.
 - `ChildParentageInvalid_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -76,6 +84,8 @@ Run that did not admit it.
 
 #### Properties
 
+<a id="childrunid"></a>
+
 ##### childRunId
 
 > `readonly` **childRunId**: `string`
@@ -84,6 +94,8 @@ Run that did not admit it.
 
 `ChildParentageInvalid_base.childRunId`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -91,6 +103,8 @@ Run that did not admit it.
 ###### Inherited from
 
 `ChildParentageInvalid_base.hint`
+
+<a id="parentrunid"></a>
 
 ##### parentRunId
 
@@ -102,19 +116,27 @@ Run that did not admit it.
 
 ## Interfaces
 
+<a id="childadmissionidentity"></a>
+
 ### ChildAdmissionIdentity
 
 The complete admission identity one invocation id carries.
 
 #### Properties
 
+<a id="key"></a>
+
 ##### key
 
 > `readonly` **key**: `string`
 
+<a id="origin"></a>
+
 ##### origin?
 
 > `readonly` `optional` **origin?**: [`ChildOrigin`](#childorigin)
+
+<a id="toolcallid"></a>
 
 ##### toolCallId
 
@@ -122,37 +144,53 @@ The complete admission identity one invocation id carries.
 
 ***
 
+<a id="childinspection"></a>
+
 ### ChildInspection
 
 One direct child as the parent may observe it.
 
 #### Properties
 
+<a id="childrunid-1"></a>
+
 ##### childRunId
 
 > `readonly` **childRunId**: `string`
+
+<a id="invocationid"></a>
 
 ##### invocationId?
 
 > `readonly` `optional` **invocationId?**: `string`
 
+<a id="origin-1"></a>
+
 ##### origin?
 
 > `readonly` `optional` **origin?**: [`ChildOrigin`](#childorigin)
+
+<a id="outcome"></a>
 
 ##### outcome?
 
 > `readonly` `optional` **outcome?**: [`RunOutcome`](./Run#runoutcome)
 
+<a id="readiness"></a>
+
 ##### readiness
 
 > `readonly` **readiness**: `"queued"` \| `"ready"` \| `"settled"`
+
+<a id="status"></a>
 
 ##### status
 
 > `readonly` **status**: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
 
 ***
+
+<a id="childorigin"></a>
 
 ### ChildOrigin
 
@@ -166,9 +204,13 @@ counter, never from model-authored text.
 
 #### Properties
 
+<a id="operationkey"></a>
+
 ##### operationKey
 
 > `readonly` **operationKey**: `string`
+
+<a id="ordinal"></a>
 
 ##### ordinal
 
@@ -176,9 +218,13 @@ counter, never from model-authored text.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="admit"></a>
 
 ##### admit
 
@@ -216,6 +262,8 @@ counter, never from model-authored text.
 
 `Effect`\<\{ `childRunId`: `string`; `duplicate`: `boolean`; `key`: `string`; \}, [`AdmitChildError`](#admitchilderror)\>
 
+<a id="cancel"></a>
+
 ##### cancel
 
 > `readonly` **cancel**: (`input`) => `Effect`\<`void`, [`ChildLookupError`](#childlookuperror)\>
@@ -240,6 +288,8 @@ counter, never from model-authored text.
 
 `Effect`\<`void`, [`ChildLookupError`](#childlookuperror)\>
 
+<a id="inspect"></a>
+
 ##### inspect
 
 > `readonly` **inspect**: (`input`) => `Effect`\<[`ChildInspection`](#childinspection), [`ChildLookupError`](#childlookuperror)\>
@@ -259,6 +309,8 @@ counter, never from model-authored text.
 ###### Returns
 
 `Effect`\<[`ChildInspection`](#childinspection), [`ChildLookupError`](#childlookuperror)\>
+
+<a id="join"></a>
 
 ##### join
 
@@ -283,6 +335,8 @@ handle never carries an answer, so a caller that must wait polls this or follows
 
 `Effect`\<[`ChildInspection`](#childinspection), [`ChildLookupError`](#childlookuperror)\>
 
+<a id="listdirect"></a>
+
 ##### listDirect
 
 > `readonly` **listDirect**: (`parentRunId`) => `Effect`\<readonly [`ChildInspection`](#childinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
@@ -299,6 +353,8 @@ handle never carries an answer, so a caller that must wait polls this or follows
 
 ## Type Aliases
 
+<a id="admitchilderror"></a>
+
 ### AdmitChildError
 
 > **AdmitChildError** = [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted)
@@ -311,6 +367,8 @@ that does not own it.
 
 ***
 
+<a id="admitparameters"></a>
+
 ### AdmitParameters
 
 > **AdmitParameters** = *typeof* `AdmitParameters.Type`
@@ -318,6 +376,8 @@ that does not own it.
 Parameters for one non-blocking child admission.
 
 ***
+
+<a id="admitreceipt"></a>
 
 ### AdmitReceipt
 
@@ -330,11 +390,15 @@ wants the answer joins explicitly, so a crash between admission and join never l
 
 ***
 
+<a id="childlookuperror"></a>
+
 ### ChildLookupError
 
 > **ChildLookupError** = [`ChildParentageInvalid`](#childparentageinvalid) \| [`RunNotFound`](./Errors#runnotfound) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ## Variables
+
+<a id="admissionof"></a>
 
 ### admissionOf
 
@@ -354,6 +418,8 @@ Read the admission identity an invocation id encodes, if it is one.
 
 ***
 
+<a id="admitparameters-1"></a>
+
 ### AdmitParameters
 
 > `const` **AdmitParameters**: `Schema.Struct`\<\{ `key`: `Schema.String`; `prompt`: `Schema.String`; `selection`: `Schema.String`; \}\>
@@ -361,6 +427,8 @@ Read the admission identity an invocation id encodes, if it is one.
 Parameters for one non-blocking child admission.
 
 ***
+
+<a id="admitreceipt-1"></a>
 
 ### AdmitReceipt
 
@@ -372,6 +440,8 @@ Admission answers "which durable child owns this work", not "what did it produce
 wants the answer joins explicitly, so a crash between admission and join never loses the child.
 
 ***
+
+<a id="invocationidfor"></a>
 
 ### invocationIdFor
 
@@ -406,6 +476,8 @@ reconstruction from cell source.
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`store`) => [`Service`](#service)
@@ -427,6 +499,8 @@ blocking route exactly as before.
 [`Service`](#service)
 
 ***
+
+<a id="makeagentchildren"></a>
 
 ### makeAgentChildren
 
@@ -458,6 +532,8 @@ over speed here and the read must not be optimised away.
 
 ***
 
+<a id="originof"></a>
+
 ### originOf
 
 > `const` **originOf**: (`invocationId`) => [`ChildOrigin`](#childorigin) \| `undefined`
@@ -475,6 +551,8 @@ Read the origin an invocation id carries, if it carries one.
 [`ChildOrigin`](#childorigin) \| `undefined`
 
 ***
+
+<a id="parentrunid-1"></a>
 
 ### parentRunId
 

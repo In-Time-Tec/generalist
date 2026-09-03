@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="agenterror"></a>
+
 ### AgentError
 
 The loop failed. `turn` is the 0-based turn that failed.
@@ -17,6 +19,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 - `AgentError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -45,6 +51,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 ###### Inherited from
 
 `AgentError_base.cause`
+
+<a id="diagnostics"></a>
 
 ##### diagnostics?
 
@@ -114,6 +122,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 
 `AgentError_base.diagnostics`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -122,6 +132,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 
 `AgentError_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -129,6 +141,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 ###### Inherited from
 
 `AgentError_base.message`
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -139,6 +153,8 @@ The loop failed. `turn` is the 0-based turn that failed.
 `AgentError_base.turn`
 
 #### Methods
+
+<a id="make"></a>
 
 ##### make()
 
@@ -242,6 +258,8 @@ readonly `string`[]
 
 ***
 
+<a id="agentsuspended"></a>
+
 ### AgentSuspended
 
 The run suspended with one or more exact authored-order waits.
@@ -253,6 +271,8 @@ The run did NOT finish; the host resolves waits out-of-band and re-enters via
 - `AgentSuspended_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -273,6 +293,8 @@ The run did NOT finish; the host resolves waits out-of-band and re-enters via
 `AgentSuspended_base.constructor`
 
 #### Properties
+
+<a id="checkpoint"></a>
 
 ##### checkpoint
 
@@ -306,6 +328,8 @@ The run did NOT finish; the host resolves waits out-of-band and re-enters via
 
 `AgentSuspended_base.checkpoint`
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -313,6 +337,8 @@ The run did NOT finish; the host resolves waits out-of-band and re-enters via
 ###### Inherited from
 
 `AgentSuspended_base.hint`
+
+<a id="waits"></a>
 
 ##### waits
 
@@ -324,6 +350,8 @@ The run did NOT finish; the host resolves waits out-of-band and re-enters via
 
 ***
 
+<a id="childexceedsparent"></a>
+
 ### ChildExceedsParent
 
 A child requested authority unavailable to its parent.
@@ -333,6 +361,8 @@ A child requested authority unavailable to its parent.
 - `ChildExceedsParent_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -354,6 +384,8 @@ A child requested authority unavailable to its parent.
 
 #### Properties
 
+<a id="field"></a>
+
 ##### field
 
 > `readonly` **field**: `"tools"` \| `"sandbox"` \| `"permissions"`
@@ -361,6 +393,8 @@ A child requested authority unavailable to its parent.
 ###### Inherited from
 
 `ChildExceedsParent_base.field`
+
+<a id="hint-2"></a>
 
 ##### hint
 
@@ -372,6 +406,8 @@ A child requested authority unavailable to its parent.
 
 ***
 
+<a id="duplicatetoolcallid"></a>
+
 ### DuplicateToolCallId
 
 A transformed model response reused a tool-call identifier.
@@ -381,6 +417,8 @@ A transformed model response reused a tool-call identifier.
 - `DuplicateToolCallId_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -402,6 +440,8 @@ A transformed model response reused a tool-call identifier.
 
 #### Properties
 
+<a id="duplicateindex"></a>
+
 ##### duplicateIndex
 
 > `readonly` **duplicateIndex**: `number`
@@ -409,6 +449,8 @@ A transformed model response reused a tool-call identifier.
 ###### Inherited from
 
 `DuplicateToolCallId_base.duplicateIndex`
+
+<a id="firstindex"></a>
 
 ##### firstIndex
 
@@ -418,6 +460,8 @@ A transformed model response reused a tool-call identifier.
 
 `DuplicateToolCallId_base.firstIndex`
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -425,6 +469,8 @@ A transformed model response reused a tool-call identifier.
 ###### Inherited from
 
 `DuplicateToolCallId_base.hint`
+
+<a id="id"></a>
 
 ##### id
 
@@ -436,6 +482,8 @@ A transformed model response reused a tool-call identifier.
 
 ***
 
+<a id="invalidoutput"></a>
+
 ### InvalidOutput
 
 The model's terminal value did not satisfy the Agent output Schema.
@@ -445,6 +493,8 @@ The model's terminal value did not satisfy the Agent output Schema.
 - `InvalidOutput_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -466,6 +516,8 @@ The model's terminal value did not satisfy the Agent output Schema.
 
 #### Properties
 
+<a id="hint-4"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -473,6 +525,8 @@ The model's terminal value did not satisfy the Agent output Schema.
 ###### Inherited from
 
 `InvalidOutput_base.hint`
+
+<a id="issues"></a>
 
 ##### issues
 
@@ -484,6 +538,8 @@ The model's terminal value did not satisfy the Agent output Schema.
 
 ***
 
+<a id="middlewareviolation"></a>
+
 ### MiddlewareViolation
 
 A ModelMiddleware hook violated the loop contract.
@@ -493,6 +549,8 @@ A ModelMiddleware hook violated the loop contract.
 - `MiddlewareViolation_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -514,6 +572,8 @@ A ModelMiddleware hook violated the loop contract.
 
 #### Properties
 
+<a id="detail"></a>
+
 ##### detail
 
 > `readonly` **detail**: `string`
@@ -522,6 +582,8 @@ A ModelMiddleware hook violated the loop contract.
 
 `MiddlewareViolation_base.detail`
 
+<a id="hint-5"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -529,6 +591,8 @@ A ModelMiddleware hook violated the loop contract.
 ###### Inherited from
 
 `MiddlewareViolation_base.hint`
+
+<a id="turn-1"></a>
 
 ##### turn
 
@@ -540,6 +604,8 @@ A ModelMiddleware hook violated the loop contract.
 
 ***
 
+<a id="policystopped"></a>
+
 ### PolicyStopped
 
 A turn policy successfully stopped for a reason other than a configured turn limit.
@@ -549,6 +615,8 @@ A turn policy successfully stopped for a reason other than a configured turn lim
 - `PolicyStopped_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -570,6 +638,8 @@ A turn policy successfully stopped for a reason other than a configured turn lim
 
 #### Properties
 
+<a id="hint-6"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -577,6 +647,8 @@ A turn policy successfully stopped for a reason other than a configured turn lim
 ###### Inherited from
 
 `PolicyStopped_base.hint`
+
+<a id="pending"></a>
 
 ##### pending
 
@@ -586,6 +658,8 @@ A turn policy successfully stopped for a reason other than a configured turn lim
 
 `PolicyStopped_base.pending`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: \{ `_tag`: `"TurnLimit"`; `limit`: `number`; \} \| \{ `_tag`: `"GoalSatisfied"`; \} \| \{ `_tag`: `"BudgetExhausted"`; `budget`: `string`; \} \| \{ `_tag`: `"Policy"`; `detail`: `string`; \}
@@ -593,6 +667,8 @@ A turn policy successfully stopped for a reason other than a configured turn lim
 ###### Inherited from
 
 `PolicyStopped_base.reason`
+
+<a id="turn-2"></a>
 
 ##### turn
 
@@ -604,6 +680,8 @@ A turn policy successfully stopped for a reason other than a configured turn lim
 
 ***
 
+<a id="progressoverflow"></a>
+
 ### ProgressOverflow
 
 An explicitly failing tool progress queue reached capacity.
@@ -613,6 +691,8 @@ An explicitly failing tool progress queue reached capacity.
 - `ProgressOverflow_base`
 
 #### Constructors
+
+<a id="constructor-7"></a>
 
 ##### Constructor
 
@@ -634,6 +714,8 @@ An explicitly failing tool progress queue reached capacity.
 
 #### Properties
 
+<a id="capacity"></a>
+
 ##### capacity
 
 > `readonly` **capacity**: `number`
@@ -641,6 +723,8 @@ An explicitly failing tool progress queue reached capacity.
 ###### Inherited from
 
 `ProgressOverflow_base.capacity`
+
+<a id="hint-7"></a>
 
 ##### hint
 
@@ -650,6 +734,8 @@ An explicitly failing tool progress queue reached capacity.
 
 `ProgressOverflow_base.hint`
 
+<a id="toolcallid"></a>
+
 ##### toolCallId
 
 > `readonly` **toolCallId**: `string`
@@ -657,6 +743,8 @@ An explicitly failing tool progress queue reached capacity.
 ###### Inherited from
 
 `ProgressOverflow_base.toolCallId`
+
+<a id="turn-3"></a>
 
 ##### turn
 
@@ -668,6 +756,8 @@ An explicitly failing tool progress queue reached capacity.
 
 ***
 
+<a id="resumemismatch"></a>
+
 ### ResumeMismatch
 
 A resume identity did not match the current authoritative suspension checkpoint.
@@ -677,6 +767,8 @@ A resume identity did not match the current authoritative suspension checkpoint.
 - `ResumeMismatch_base`
 
 #### Constructors
+
+<a id="constructor-8"></a>
 
 ##### Constructor
 
@@ -698,6 +790,8 @@ A resume identity did not match the current authoritative suspension checkpoint.
 
 #### Properties
 
+<a id="expected"></a>
+
 ##### expected?
 
 > `readonly` `optional` **expected?**: [`AgentSuspended`](#agentsuspended)
@@ -705,6 +799,8 @@ A resume identity did not match the current authoritative suspension checkpoint.
 ###### Inherited from
 
 `ResumeMismatch_base.expected`
+
+<a id="hint-8"></a>
 
 ##### hint
 
@@ -714,6 +810,8 @@ A resume identity did not match the current authoritative suspension checkpoint.
 
 `ResumeMismatch_base.hint`
 
+<a id="reason-1"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"checkpoint-not-found"` \| `"identity-mismatch"`
@@ -721,6 +819,8 @@ A resume identity did not match the current authoritative suspension checkpoint.
 ###### Inherited from
 
 `ResumeMismatch_base.reason`
+
+<a id="received"></a>
 
 ##### received
 
@@ -731,6 +831,8 @@ A resume identity did not match the current authoritative suspension checkpoint.
 `ResumeMismatch_base.received`
 
 ***
+
+<a id="runendedwithoutoutput"></a>
 
 ### RunEndedWithoutOutput
 
@@ -750,6 +852,8 @@ or the attempt that streamed it was discarded before release.
 - `RunEndedWithoutOutput_base`
 
 #### Constructors
+
+<a id="constructor-9"></a>
 
 ##### Constructor
 
@@ -771,6 +875,8 @@ or the attempt that streamed it was discarded before release.
 
 #### Properties
 
+<a id="finishreason"></a>
+
 ##### finishReason?
 
 > `readonly` `optional` **finishReason?**: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`
@@ -778,6 +884,8 @@ or the attempt that streamed it was discarded before release.
 ###### Inherited from
 
 `RunEndedWithoutOutput_base.finishReason`
+
+<a id="hint-9"></a>
 
 ##### hint
 
@@ -787,6 +895,8 @@ or the attempt that streamed it was discarded before release.
 
 `RunEndedWithoutOutput_base.hint`
 
+<a id="providertextcharacters"></a>
+
 ##### providerTextCharacters
 
 > `readonly` **providerTextCharacters**: `number`
@@ -795,6 +905,8 @@ or the attempt that streamed it was discarded before release.
 
 `RunEndedWithoutOutput_base.providerTextCharacters`
 
+<a id="reasoningcharacters"></a>
+
 ##### reasoningCharacters
 
 > `readonly` **reasoningCharacters**: `number`
@@ -802,6 +914,8 @@ or the attempt that streamed it was discarded before release.
 ###### Inherited from
 
 `RunEndedWithoutOutput_base.reasoningCharacters`
+
+<a id="turn-4"></a>
 
 ##### turn
 
@@ -813,6 +927,8 @@ or the attempt that streamed it was discarded before release.
 
 ***
 
+<a id="toolnamecollision"></a>
+
 ### ToolNameCollision
 
 The advertised tool set contains more than one declaration for a name.
@@ -822,6 +938,8 @@ The advertised tool set contains more than one declaration for a name.
 - `ToolNameCollision_base`
 
 #### Constructors
+
+<a id="constructor-10"></a>
 
 ##### Constructor
 
@@ -843,6 +961,8 @@ The advertised tool set contains more than one declaration for a name.
 
 #### Properties
 
+<a id="hint-10"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -851,6 +971,8 @@ The advertised tool set contains more than one declaration for a name.
 
 `ToolNameCollision_base.hint`
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -858,6 +980,8 @@ The advertised tool set contains more than one declaration for a name.
 ###### Inherited from
 
 `ToolNameCollision_base.name`
+
+<a id="origins"></a>
 
 ##### origins
 
@@ -869,6 +993,8 @@ The advertised tool set contains more than one declaration for a name.
 
 ***
 
+<a id="turnlimitexceeded"></a>
+
 ### TurnLimitExceeded
 
 The turn policy declined another turn while tool results were still pending.
@@ -878,6 +1004,8 @@ The turn policy declined another turn while tool results were still pending.
 - `TurnLimitExceeded_base`
 
 #### Constructors
+
+<a id="constructor-11"></a>
 
 ##### Constructor
 
@@ -899,6 +1027,8 @@ The turn policy declined another turn while tool results were still pending.
 
 #### Properties
 
+<a id="hint-11"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -906,6 +1036,8 @@ The turn policy declined another turn while tool results were still pending.
 ###### Inherited from
 
 `TurnLimitExceeded_base.hint`
+
+<a id="limit"></a>
 
 ##### limit
 
@@ -915,6 +1047,8 @@ The turn policy declined another turn while tool results were still pending.
 
 `TurnLimitExceeded_base.limit`
 
+<a id="pending-1"></a>
+
 ##### pending
 
 > `readonly` **pending**: readonly `object`[]
@@ -922,6 +1056,8 @@ The turn policy declined another turn while tool results were still pending.
 ###### Inherited from
 
 `TurnLimitExceeded_base.pending`
+
+<a id="turn-5"></a>
 
 ##### turn
 
@@ -933,23 +1069,33 @@ The turn policy declined another turn while tool results were still pending.
 
 ## Interfaces
 
+<a id="approvalrequested"></a>
+
 ### ApprovalRequested
 
 Emitted before resolving a permission ask or needsApproval tool.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"ApprovalRequested"`
+
+<a id="call"></a>
 
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
 
+<a id="metadata"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
+
+<a id="request"></a>
 
 ##### request
 
@@ -971,11 +1117,15 @@ Emitted before resolving a permission ask or needsApproval tool.
 
 > `readonly` **operation**: `string`
 
+<a id="turn-6"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="completed"></a>
 
 ### Completed
 
@@ -989,35 +1139,51 @@ Terminal event: the run finished without suspension.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Completed"`
+
+<a id="metadata-1"></a>
 
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
 
+<a id="output-1"></a>
+
 ##### output
 
 > `readonly` **output**: `Output`
+
+<a id="text"></a>
 
 ##### text
 
 > `readonly` **text**: `string`
 
+<a id="transcript"></a>
+
 ##### transcript
 
 > `readonly` **transcript**: `Prompt`
 
+<a id="turns"></a>
+
 ##### turns
 
 > `readonly` **turns**: `number`
+
+<a id="usage"></a>
 
 ##### usage?
 
 > `readonly` `optional` **usage?**: `Usage`
 
 ***
+
+<a id="gateresult"></a>
 
 ### GateResult
 
@@ -1029,9 +1195,13 @@ One ordered completion gate verdict for a proposed terminal output.
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"GateResult"`
+
+<a id="evidence"></a>
 
 ##### evidence
 
@@ -1041,6 +1211,8 @@ One ordered completion gate verdict for a proposed terminal output.
 
 `CompletionGateResult.evidence`
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -1049,9 +1221,13 @@ One ordered completion gate verdict for a proposed terminal output.
 
 `CompletionGateResult.name`
 
+<a id="turn-7"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
+
+<a id="verdict"></a>
 
 ##### verdict
 
@@ -1063,6 +1239,8 @@ One ordered completion gate verdict for a proposed terminal output.
 
 ***
 
+<a id="modelpart"></a>
+
 ### ModelPart
 
 A raw model stream part, passed through unchanged.
@@ -1071,35 +1249,51 @@ model-call and attempt lifecycle events.
 
 #### Properties
 
+<a id="_tag-3"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"ModelPart"`
+
+<a id="attempt"></a>
 
 ##### attempt
 
 > `readonly` **attempt**: `number`
 
+<a id="metadata-2"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
+
+<a id="modelattemptid"></a>
 
 ##### modelAttemptId
 
 > `readonly` **modelAttemptId**: `string`
 
+<a id="modelcallid"></a>
+
 ##### modelCallId
 
 > `readonly` **modelCallId**: `string`
 
+<a id="part"></a>
+
 ##### part
 
 > `readonly` **part**: `StreamPart`\<`Record`\<`string`, `Any`\>\>
+
+<a id="turn-8"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="steeringdrained"></a>
 
 ### SteeringDrained
 
@@ -1107,21 +1301,31 @@ A steering or follow-up queue was drained into the next prompt.
 
 #### Properties
 
+<a id="_tag-4"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"SteeringDrained"`
+
+<a id="count"></a>
 
 ##### count
 
 > `readonly` **count**: `number`
 
+<a id="metadata-3"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
 
+<a id="queue"></a>
+
 ##### queue
 
 > `readonly` **queue**: [`SteeringQueueName`](#steeringqueuename)
+
+<a id="turn-9"></a>
 
 ##### turn
 
@@ -1129,19 +1333,27 @@ A steering or follow-up queue was drained into the next prompt.
 
 ***
 
+<a id="toolexecutioncompleted"></a>
+
 ### ToolExecutionCompleted
 
 A tool call finished; `result` is the part re-fed to the model.
 
 #### Properties
 
+<a id="_tag-5"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"ToolExecutionCompleted"`
 
+<a id="call-1"></a>
+
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
+
+<a id="metadata-4"></a>
 
 ##### metadata?
 
@@ -1157,19 +1369,27 @@ A tool call finished; `result` is the part re-fed to the model.
 
 > `readonly` **dropped**: `number`
 
+<a id="result"></a>
+
 ##### result
 
 > `readonly` **result**: `ToolResultPart`\<`string`, `unknown`, `unknown`\>
 
+<a id="tasksupdated"></a>
+
 ##### tasksUpdated?
 
 > `readonly` `optional` **tasksUpdated?**: readonly `object`[]
+
+<a id="turn-10"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="toolexecutionstarted"></a>
 
 ### ToolExecutionStarted
 
@@ -1177,17 +1397,25 @@ A tool call is about to execute via the ToolExecutor service.
 
 #### Properties
 
+<a id="_tag-6"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"ToolExecutionStarted"`
+
+<a id="call-2"></a>
 
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
 
+<a id="metadata-5"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
+
+<a id="turn-11"></a>
 
 ##### turn
 
@@ -1195,15 +1423,21 @@ A tool call is about to execute via the ToolExecutor service.
 
 ***
 
+<a id="toolexecutionwaiting"></a>
+
 ### ToolExecutionWaiting
 
 A tool reached a durable wait without disturbing admitted siblings.
 
 #### Properties
 
+<a id="_tag-7"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"ToolExecutionWaiting"`
+
+<a id="awaitevent"></a>
 
 ##### awaitEvent?
 
@@ -1217,21 +1451,31 @@ A tool reached a durable wait without disturbing admitted siblings.
 
 > `readonly` **filter**: \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"create"` \| `"remove"` \| `"update"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
 
+<a id="call-3"></a>
+
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
+
+<a id="metadata-6"></a>
 
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
 
+<a id="token"></a>
+
 ##### token
 
 > `readonly` **token**: `string`
 
+<a id="turn-12"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
+
+<a id="waitid"></a>
 
 ##### waitId
 
@@ -1239,37 +1483,53 @@ A tool reached a durable wait without disturbing admitted siblings.
 
 ***
 
+<a id="toolprogress"></a>
+
 ### ToolProgress
 
 An in-flight progress update from a running tool.
 
 #### Properties
 
+<a id="_tag-8"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"ToolProgress"`
+
+<a id="data"></a>
 
 ##### data?
 
 > `readonly` `optional` **data?**: `Record`\<`string`, `Json`\>
 
+<a id="message-1"></a>
+
 ##### message?
 
 > `readonly` `optional` **message?**: `string`
+
+<a id="metadata-7"></a>
 
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
 
+<a id="toolcallid-1"></a>
+
 ##### toolCallId
 
 > `readonly` **toolCallId**: `string`
+
+<a id="turn-13"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="turncompleted"></a>
 
 ### TurnCompleted
 
@@ -1280,25 +1540,37 @@ from here.
 
 #### Properties
 
+<a id="_tag-9"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"TurnCompleted"`
+
+<a id="finishreason-1"></a>
 
 ##### finishReason?
 
 > `readonly` `optional` **finishReason?**: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`
 
+<a id="metadata-8"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
+
+<a id="transcript-1"></a>
 
 ##### transcript
 
 > `readonly` **transcript**: `Prompt`
 
+<a id="turn-14"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
+
+<a id="usage-1"></a>
 
 ##### usage?
 
@@ -1306,25 +1578,35 @@ from here.
 
 ***
 
+<a id="turnstarted"></a>
+
 ### TurnStarted
 
 A model turn has started. `turn` is 0-based.
 
 #### Properties
 
+<a id="_tag-10"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"TurnStarted"`
 
+<a id="metadata-9"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
+
+<a id="turn-15"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ## Type Aliases
+
+<a id="approvalid"></a>
 
 ### ApprovalId
 
@@ -1334,6 +1616,8 @@ Stable identity for one authorization request.
 
 ***
 
+<a id="approvalrequest"></a>
+
 ### ApprovalRequest
 
 > **ApprovalRequest** = *typeof* `ApprovalRequest.Type`
@@ -1341,6 +1625,8 @@ Stable identity for one authorization request.
 Canonical identity and payload for one authorization request.
 
 ***
+
+<a id="event"></a>
 
 ### Event
 
@@ -1356,6 +1642,8 @@ Closed union of Generalist loop events.
 
 ***
 
+<a id="metadata-10"></a>
+
 ### Metadata
 
 > **Metadata** = `Readonly`\<`Record`\<`string`, `Schema.Json`\>\>
@@ -1363,6 +1651,8 @@ Closed union of Generalist loop events.
 Escape-hatch metadata carried by loop events.
 
 ***
+
+<a id="steeringqueuename"></a>
 
 ### SteeringQueueName
 
@@ -1372,6 +1662,8 @@ Steering queue whose inputs were consumed at a turn boundary.
 
 ***
 
+<a id="toolorigin"></a>
+
 ### ToolOrigin
 
 > **ToolOrigin** = *typeof* `ToolOrigin.Type`
@@ -1379,6 +1671,8 @@ Steering queue whose inputs were consumed at a turn boundary.
 The origin of one tool declaration in an Agent run.
 
 ## Variables
+
+<a id="addusage"></a>
 
 ### addUsage
 
@@ -1420,6 +1714,8 @@ Fieldwise sum of upstream model usage values.
 
 ***
 
+<a id="approvalid-1"></a>
+
 ### ApprovalId
 
 > `const` **ApprovalId**: `Schema.String`
@@ -1428,6 +1724,8 @@ Stable identity for one authorization request.
 
 ***
 
+<a id="approvalrequest-1"></a>
+
 ### ApprovalRequest
 
 > `const` **ApprovalRequest**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `capability`: `Schema.String`; `input`: `Schema.Unknown`; `operation`: `Schema.String`; \}\>
@@ -1435,6 +1733,8 @@ Stable identity for one authorization request.
 Canonical identity and payload for one authorization request.
 
 ***
+
+<a id="toolorigin-1"></a>
 
 ### ToolOrigin
 

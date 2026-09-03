@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="registrationerror"></a>
+
 ### RegistrationError
 
 #### Extends
@@ -15,6 +17,8 @@
 - `RegistrationError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="agent"></a>
+
 ##### agent
 
 > `readonly` **agent**: `string`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `RegistrationError_base.agent`
+
+<a id="cause"></a>
 
 ##### cause
 
@@ -52,6 +60,8 @@
 
 `RegistrationError_base.cause`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -59,6 +69,8 @@
 ###### Inherited from
 
 `RegistrationError_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -69,6 +81,8 @@
 `RegistrationError_base.message`
 
 ## Interfaces
+
+<a id="agenttooltoolkit"></a>
 
 ### AgentToolToolkit
 
@@ -92,6 +106,8 @@
 
 #### Properties
 
+<a id="invoke"></a>
+
 ##### invoke
 
 > `readonly` **invoke**: (`params`) => `Effect`\<`Success`\[`"Type"`\], `string` \| [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror), `R`\>
@@ -106,13 +122,19 @@
 
 `Effect`\<`Success`\[`"Type"`\], `string` \| [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror), `R`\>
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="parametersschema"></a>
+
 ##### parametersSchema
 
 > `readonly` **parametersSchema**: `Top`
+
+<a id="requirements"></a>
 
 ##### requirements
 
@@ -128,13 +150,19 @@
 
 `R`
 
+<a id="successschema"></a>
+
 ##### successSchema
 
 > `readonly` **successSchema**: `Top`
 
+<a id="tool"></a>
+
 ##### tool
 
 > `readonly` **tool**: `AgentToolTool`\<`Parameters`, `Success`\>
+
+<a id="tools"></a>
 
 ##### tools
 
@@ -145,6 +173,8 @@
 \[`name`: `string`\]: `AgentToolTool`\<`Parameters`, `Success`\>
 
 ***
+
+<a id="astooloptions"></a>
 
 ### AsToolOptions
 
@@ -168,9 +198,13 @@
 
 #### Properties
 
+<a id="description"></a>
+
 ##### description?
 
 > `readonly` `optional` **description?**: `string`
+
+<a id="fromresult"></a>
 
 ##### fromResult?
 
@@ -186,23 +220,33 @@
 
 `Success`\[`"Type"`\]
 
+<a id="model"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: `Layer`\<`LanguageModel`, `never`, `ModelR`\>
 
 Model layer for the child run. Omit to inherit the model provided to the parent run.
 
+<a id="name-2"></a>
+
 ##### name?
 
 > `readonly` `optional` **name?**: `Name`
+
+<a id="parameters-2"></a>
 
 ##### parameters?
 
 > `readonly` `optional` **parameters?**: `Parameters`
 
+<a id="success-2"></a>
+
 ##### success?
 
 > `readonly` `optional` **success?**: `Success`
+
+<a id="toprompt"></a>
 
 ##### toPrompt?
 
@@ -220,6 +264,8 @@ Model layer for the child run. Omit to inherit the model provided to the parent 
 
 ***
 
+<a id="fanoutoptions"></a>
+
 ### FanOutOptions
 
 #### Type Parameters
@@ -234,23 +280,33 @@ Model layer for the child run. Omit to inherit the model provided to the parent 
 
 #### Properties
 
+<a id="agents"></a>
+
 ##### agents
 
 > `readonly` **agents**: `Entries`
+
+<a id="description-1"></a>
 
 ##### description
 
 > `readonly` **description**: `string`
 
+<a id="maxchildren"></a>
+
 ##### maxChildren
 
 > `readonly` **maxChildren**: `number`
+
+<a id="name-4"></a>
 
 ##### name
 
 > `readonly` **name**: `Name`
 
 ***
+
+<a id="fanoutparameters"></a>
 
 ### FanOutParameters
 
@@ -264,19 +320,27 @@ Model-facing parameters of a fan-out tool.
 
 #### Properties
 
+<a id="children"></a>
+
 ##### children
 
 > `readonly` **children**: readonly [`FanOutMember`](#fanoutmember)\<`Entries`\>[]
 
+<a id="concurrency"></a>
+
 ##### concurrency?
 
 > `readonly` `optional` **concurrency?**: `number`
+
+<a id="onfailure"></a>
 
 ##### onFailure?
 
 > `readonly` `optional` **onFailure?**: `"collect"` \| `"failFast"`
 
 ***
+
+<a id="fanouttool"></a>
 
 ### FanOutTool
 
@@ -298,11 +362,15 @@ A Runtime-owned fan-out declaration; callers do not provide a separate handler.
 
 #### Properties
 
+<a id="generalistcoreagent-toolfanout"></a>
+
 ##### generalist/core/agent-tool/FanOut
 
 > `readonly` **generalist/core/agent-tool/FanOut**: `true`
 
 ## Type Aliases
+
+<a id="fanoutmember"></a>
 
 ### FanOutMember
 
@@ -317,6 +385,8 @@ One model-authored child request. Array order is the result order.
 `Entries` *extends* `Profiles`
 
 ## Variables
+
+<a id="astool"></a>
 
 ### asTool
 
@@ -408,6 +478,8 @@ One model-authored child request. Array order is the result order.
 
 ***
 
+<a id="fanout"></a>
+
 ### fanOut
 
 > `const` **fanOut**: *typeof* `makeFanOut`
@@ -415,6 +487,8 @@ One model-authored child request. Array order is the result order.
 Declare a model-callable fan-out over an exact set of child Agents.
 
 ***
+
+<a id="register"></a>
 
 ### register
 

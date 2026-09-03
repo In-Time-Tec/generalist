@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="diagnostics"></a>
+
 ### Diagnostics
 
 > **Diagnostics** = *typeof* `Diagnostics.Type`
@@ -16,6 +18,8 @@ Bounded structural evidence for a Session/Chat divergence. Carries counts, roles
 
 ***
 
+<a id="divergence"></a>
+
 ### Divergence
 
 > **Divergence** = *typeof* `Divergence.Type`
@@ -23,6 +27,8 @@ Bounded structural evidence for a Session/Chat divergence. Carries counts, roles
 First structurally divergent position between the Session projection and live Chat history.
 
 ## Variables
+
+<a id="coalesceadjacenttext"></a>
 
 ### coalesceAdjacentText
 
@@ -49,6 +55,8 @@ live Chat projection and the authoritative Session history never reads as diverg
 `Prompt.Message`
 
 ***
+
+<a id="diagnose"></a>
 
 ### diagnose
 
@@ -82,6 +90,8 @@ Computes bounded divergence diagnostics for a failed Session synchronization.
 
 ***
 
+<a id="diagnostics-1"></a>
+
 ### Diagnostics
 
 > `const` **Diagnostics**: `Schema.Struct`\<\{ `alignmentCount`: `Schema.Finite`; `authoritativeMessageCount`: `Schema.Finite`; `commonPrefixLength`: `Schema.Finite`; `durableEntryCount`: `Schema.Finite`; `durableMessageCount`: `Schema.Finite`; `firstDivergence`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `authoritativeDigest`: `Schema.optionalKey`\<`Schema.String`\>; `authoritativePartTypes`: `Schema.$Array`\<`Schema.String`\>; `authoritativeRole`: `Schema.optionalKey`\<`Schema.String`\>; `durableDigest`: `Schema.optionalKey`\<`Schema.String`\>; `durablePartTypes`: `Schema.$Array`\<`Schema.String`\>; `durableRole`: `Schema.optionalKey`\<`Schema.String`\>; `index`: `Schema.Finite`; \}\>\>; `lastDurableEntryTag`: `Schema.optionalKey`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>
@@ -90,6 +100,8 @@ Bounded structural evidence for a Session/Chat divergence. Carries counts, roles
 
 ***
 
+<a id="divergence-1"></a>
+
 ### Divergence
 
 > `const` **Divergence**: `Schema.Struct`\<\{ `authoritativeDigest`: `Schema.optionalKey`\<`Schema.String`\>; `authoritativePartTypes`: `Schema.$Array`\<`Schema.String`\>; `authoritativeRole`: `Schema.optionalKey`\<`Schema.String`\>; `durableDigest`: `Schema.optionalKey`\<`Schema.String`\>; `durablePartTypes`: `Schema.$Array`\<`Schema.String`\>; `durableRole`: `Schema.optionalKey`\<`Schema.String`\>; `index`: `Schema.Finite`; \}\>
@@ -97,6 +109,8 @@ Bounded structural evidence for a Session/Chat divergence. Carries counts, roles
 First structurally divergent position between the Session projection and live Chat history.
 
 ***
+
+<a id="equivalentmessages"></a>
 
 ### equivalentMessages
 

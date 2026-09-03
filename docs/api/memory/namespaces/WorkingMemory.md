@@ -8,13 +8,19 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 #### Properties
 
+<a id="maxmessages"></a>
+
 ##### maxMessages?
 
 > `readonly` `optional` **maxMessages?**: `number`
+
+<a id="summarize"></a>
 
 ##### summarize?
 
@@ -22,9 +28,13 @@
 
 ***
 
+<a id="summarizeoptions"></a>
+
 ### SummarizeOptions
 
 #### Properties
+
+<a id="model"></a>
 
 ##### model?
 
@@ -32,11 +42,15 @@
 
 Model layer for summary calls; omit to use the model provided where this layer is built.
 
+<a id="prompt"></a>
+
 ##### prompt?
 
 > `readonly` `optional` **prompt?**: `string`
 
 ## Type Aliases
+
+<a id="summaryrequirement"></a>
 
 ### SummaryRequirement
 
@@ -53,6 +67,8 @@ The ambient LanguageModel is required only when summarizing without an explicit 
 `O`
 
 ## Functions
+
+<a id="layer"></a>
 
 ### layer()
 
@@ -85,6 +101,8 @@ The ambient LanguageModel is required only when summarizing without an explicit 
 `Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
 
 ***
+
+<a id="make"></a>
 
 ### make()
 

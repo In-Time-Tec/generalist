@@ -8,29 +8,41 @@
 
 ## Interfaces
 
+<a id="overviewoptions"></a>
+
 ### OverviewOptions
 
 Bounds every prompt overview must respect.
 
 #### Properties
 
+<a id="maxcontentlength"></a>
+
 ##### maxContentLength?
 
 > `readonly` `optional` **maxContentLength?**: `number`
+
+<a id="maxentriesperkind"></a>
 
 ##### maxEntriesPerKind?
 
 > `readonly` `optional` **maxEntriesPerKind?**: `number`
 
+<a id="maxrefinements"></a>
+
 ##### maxRefinements?
 
 > `readonly` `optional` **maxRefinements?**: `number`
+
+<a id="maxtitlelength"></a>
 
 ##### maxTitleLength?
 
 > `readonly` `optional` **maxTitleLength?**: `number`
 
 ## Variables
+
+<a id="defaults"></a>
 
 ### defaults
 
@@ -40,23 +52,33 @@ Default overview bounds.
 
 #### Type Declaration
 
+<a id="maxcontentlength-1"></a>
+
 ##### maxContentLength
 
 > `readonly` **maxContentLength**: `240`
+
+<a id="maxentriesperkind-1"></a>
 
 ##### maxEntriesPerKind
 
 > `readonly` **maxEntriesPerKind**: `8`
 
+<a id="maxrefinements-1"></a>
+
 ##### maxRefinements
 
 > `readonly` **maxRefinements**: `5`
+
+<a id="maxtitlelength-1"></a>
 
 ##### maxTitleLength
 
 > `readonly` **maxTitleLength**: `80`
 
 ***
+
+<a id="format"></a>
 
 ### format
 

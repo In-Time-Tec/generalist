@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="catalog"></a>
+
 ### Catalog
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Catalog_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="fanoutunsatisfied"></a>
+
 ### FanOutUnsatisfied
 
 #### Extends
@@ -43,6 +49,8 @@
 - `FanOutUnsatisfied_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -64,6 +72,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -71,6 +81,8 @@
 ###### Inherited from
 
 `FanOutUnsatisfied_base.hint`
+
+<a id="join"></a>
 
 ##### join
 
@@ -80,6 +92,8 @@
 
 `FanOutUnsatisfied_base.join`
 
+<a id="required"></a>
+
 ##### required
 
 > `readonly` **required**: `number`
@@ -87,6 +101,8 @@
 ###### Inherited from
 
 `FanOutUnsatisfied_base.required`
+
+<a id="settled"></a>
 
 ##### settled
 
@@ -96,6 +112,8 @@
 
 `FanOutUnsatisfied_base.settled`
 
+<a id="succeeded"></a>
+
 ##### succeeded
 
 > `readonly` **succeeded**: `number`
@@ -103,6 +121,8 @@
 ###### Inherited from
 
 `FanOutUnsatisfied_base.succeeded`
+
+<a id="total"></a>
 
 ##### total
 
@@ -114,6 +134,8 @@
 
 ***
 
+<a id="projectioninvalid"></a>
+
 ### ProjectionInvalid
 
 #### Extends
@@ -121,6 +143,8 @@
 - `ProjectionInvalid_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -142,6 +166,8 @@
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -149,6 +175,8 @@
 ###### Inherited from
 
 `ProjectionInvalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -160,6 +188,8 @@
 
 ***
 
+<a id="rejected"></a>
+
 ### Rejected
 
 A same-run handoff rejected before its target became active.
@@ -169,6 +199,8 @@ A same-run handoff rejected before its target became active.
 - `Rejected_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -190,6 +222,8 @@ A same-run handoff rejected before its target became active.
 
 #### Properties
 
+<a id="handoffid"></a>
+
 ##### handoffId
 
 > `readonly` **handoffId**: `string`
@@ -197,6 +231,8 @@ A same-run handoff rejected before its target became active.
 ###### Inherited from
 
 `Rejected_base.handoffId`
+
+<a id="hint-2"></a>
 
 ##### hint
 
@@ -206,6 +242,8 @@ A same-run handoff rejected before its target became active.
 
 `Rejected_base.hint`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: `string`
@@ -213,6 +251,8 @@ A same-run handoff rejected before its target became active.
 ###### Inherited from
 
 `Rejected_base.reason`
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -223,6 +263,8 @@ A same-run handoff rejected before its target became active.
 `Rejected_base.turn`
 
 ## Interfaces
+
+<a id="delegateoptions"></a>
 
 ### DelegateOptions
 
@@ -238,9 +280,13 @@ A same-run handoff rejected before its target became active.
 
 #### Properties
 
+<a id="description"></a>
+
 ##### description?
 
 > `readonly` `optional` **description?**: `string`
+
+<a id="fromresult"></a>
 
 ##### fromResult?
 
@@ -256,17 +302,25 @@ A same-run handoff rejected before its target became active.
 
 `Success`\[`"Type"`\]
 
+<a id="nameoverride"></a>
+
 ##### nameOverride?
 
 > `readonly` `optional` **nameOverride?**: `string`
+
+<a id="parameters-1"></a>
 
 ##### parameters?
 
 > `readonly` `optional` **parameters?**: `Parameters`
 
+<a id="success-1"></a>
+
 ##### success?
 
 > `readonly` `optional` **success?**: `Success`
+
+<a id="toprompt"></a>
 
 ##### toPrompt?
 
@@ -284,6 +338,8 @@ A same-run handoff rejected before its target became active.
 
 ***
 
+<a id="fanoutallsuccessoptions"></a>
+
 ### FanOutAllSuccessOptions
 
 #### Extends
@@ -291,6 +347,8 @@ A same-run handoff rejected before its target became active.
 - `FanOutBaseOptions`
 
 #### Properties
+
+<a id="concurrency"></a>
 
 ##### concurrency?
 
@@ -300,6 +358,8 @@ A same-run handoff rejected before its target became active.
 
 `FanOutBaseOptions.concurrency`
 
+<a id="join-1"></a>
+
 ##### join?
 
 > `readonly` `optional` **join?**: `object`
@@ -307,6 +367,8 @@ A same-run handoff rejected before its target became active.
 ###### \_tag
 
 > `readonly` **\_tag**: `"AllSuccess"`
+
+<a id="remainder"></a>
 
 ##### remainder?
 
@@ -317,6 +379,8 @@ A same-run handoff rejected before its target became active.
 `FanOutBaseOptions.remainder`
 
 ***
+
+<a id="fanoutchild"></a>
 
 ### FanOutChild
 
@@ -332,19 +396,27 @@ A same-run handoff rejected before its target became active.
 
 #### Properties
 
+<a id="options"></a>
+
 ##### options?
 
 > `readonly` `optional` **options?**: `Omit`\<[`InvocationOptions`](./Agent#invocationoptions), `"memory"`\>
 
+<a id="prompt"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `string`
+
+<a id="registration"></a>
 
 ##### registration
 
 > `readonly` **registration**: [`Registration`](#registration-1)\<`Tools`, `R`\>
 
 ***
+
+<a id="fanoutcollectoptions"></a>
 
 ### FanOutCollectOptions
 
@@ -354,6 +426,8 @@ A same-run handoff rejected before its target became active.
 
 #### Properties
 
+<a id="concurrency-1"></a>
+
 ##### concurrency?
 
 > `readonly` `optional` **concurrency?**: `number`
@@ -362,9 +436,13 @@ A same-run handoff rejected before its target became active.
 
 `FanOutBaseOptions.concurrency`
 
+<a id="join-2"></a>
+
 ##### join
 
 > `readonly` **join**: \{ `_tag`: `"AllSettled"`; \} \| \{ `_tag`: `"FirstSuccess"`; \} \| \{ `_tag`: `"Quorum"`; `required`: `number`; \} \| \{ `_tag`: `"BestEffort"`; \}
+
+<a id="remainder-1"></a>
 
 ##### remainder?
 
@@ -376,27 +454,39 @@ A same-run handoff rejected before its target became active.
 
 ***
 
+<a id="handofftooloptions"></a>
+
 ### HandoffToolOptions
 
 #### Properties
+
+<a id="description-1"></a>
 
 ##### description?
 
 > `readonly` `optional` **description?**: `string`
 
+<a id="maxrepeatededge"></a>
+
 ##### maxRepeatedEdge?
 
 > `readonly` `optional` **maxRepeatedEdge?**: `number`
 
+<a id="nameoverride-1"></a>
+
 ##### nameOverride?
 
 > `readonly` `optional` **nameOverride?**: `string`
+
+<a id="projection"></a>
 
 ##### projection?
 
 > `readonly` `optional` **projection?**: `ContextProjection`
 
 ***
+
+<a id="registration-1"></a>
 
 ### Registration
 
@@ -412,9 +502,13 @@ A same-run handoff rejected before its target became active.
 
 #### Properties
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="requirements"></a>
 
 ##### requirements
 
@@ -429,6 +523,8 @@ A same-run handoff rejected before its target became active.
 ###### Returns
 
 `R`
+
+<a id="run"></a>
 
 ##### run
 
@@ -456,6 +552,8 @@ A same-run handoff rejected before its target became active.
 
 ***
 
+<a id="supervisor"></a>
+
 ### Supervisor
 
 #### Type Parameters
@@ -470,13 +568,19 @@ A same-run handoff rejected before its target became active.
 
 #### Properties
 
+<a id="agent"></a>
+
 ##### agent
 
 > `readonly` **agent**: [`Agent`](./Agent#agent)\<`Tools`, `LanguageModel` \| `R`\>
 
+<a id="catalog-1"></a>
+
 ##### catalog
 
 > `readonly` **catalog**: `Layer`\<[`Catalog`](#catalog)\>
+
+<a id="toolkit"></a>
 
 ##### toolkit
 
@@ -484,25 +588,37 @@ A same-run handoff rejected before its target became active.
 
 ***
 
+<a id="supervisoroptions"></a>
+
 ### SupervisorOptions
 
 #### Properties
+
+<a id="handoffoptions"></a>
 
 ##### handoffOptions?
 
 > `readonly` `optional` **handoffOptions?**: [`HandoffToolOptions`](#handofftooloptions)
 
+<a id="instructions"></a>
+
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
+
+<a id="name-1"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="policy"></a>
+
 ##### policy?
 
 > `readonly` `optional` **policy?**: [`Policy`](./Policy-1#policy)\<`never`\>
+
+<a id="specialists"></a>
 
 ##### specialists
 
@@ -510,15 +626,21 @@ A same-run handoff rejected before its target became active.
 
 ***
 
+<a id="target"></a>
+
 ### Target
 
 One catalog entry. The catalog never provides a target's requirements; `HandoffRequirementsMissing` reports them.
 
 #### Properties
 
+<a id="agent-1"></a>
+
 ##### agent
 
 > `readonly` **agent**: `Any`
+
+<a id="model"></a>
 
 ##### model?
 
@@ -526,9 +648,13 @@ One catalog entry. The catalog never provides a target's requirements; `HandoffR
 
 Model layer the specialist runs on after the handoff. Wins over the active registry selection.
 
+<a id="name-2"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="pin"></a>
 
 ##### pin?
 
@@ -536,11 +662,15 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 
 ## Type Aliases
 
+<a id="commit"></a>
+
 ### Commit
 
 > **Commit** = *typeof* `Commit.Type`
 
 ***
+
+<a id="controlstate"></a>
 
 ### ControlState
 
@@ -548,11 +678,15 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 
 ***
 
+<a id="fanoutjoin"></a>
+
 ### FanOutJoin
 
 > **FanOutJoin** = \{ `_tag`: `"AllSuccess"`; \} \| \{ `_tag`: `"AllSettled"`; \} \| \{ `_tag`: `"FirstSuccess"`; \} \| \{ `_tag`: `"Quorum"`; `required`: `number`; \} \| \{ `_tag`: `"BestEffort"`; \}
 
 ***
+
+<a id="fanoutmemberresult"></a>
 
 ### FanOutMemberResult
 
@@ -560,11 +694,15 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 
 ***
 
+<a id="fanoutoptions"></a>
+
 ### FanOutOptions
 
 > **FanOutOptions** = [`FanOutAllSuccessOptions`](#fanoutallsuccessoptions) \| [`FanOutCollectOptions`](#fanoutcollectoptions)
 
 ***
+
+<a id="fanoutremainder"></a>
 
 ### FanOutRemainder
 
@@ -572,11 +710,15 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 
 ***
 
+<a id="input"></a>
+
 ### Input
 
 > **Input** = *typeof* `Input.Type`
 
 ***
+
+<a id="output"></a>
 
 ### Output
 
@@ -584,17 +726,23 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 
 ## Variables
 
+<a id="commit-1"></a>
+
 ### Commit
 
 > `const` **Commit**: `Schema.TaggedStruct`\<`"Commit"`, \{ `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `sessionEntryId`: `Schema.String`; `sessionParentId`: `Schema.NullOr`\<`Schema.String`\>; `state`: `Schema.Struct`\<\{ `active`: `Schema.String`; `edgeCounts`: `Schema.$Array`\<`Schema.Struct`\<\{ `count`: `Schema.Finite`; `source`: `Schema.String`; `target`: `Schema.String`; \}\>\>; `handoffCount`: `Schema.Finite`; `path`: `Schema.$Array`\<`Schema.Struct`\<\{ `handoffId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.String`; `target`: `Schema.String`; `turn`: `Schema.Finite`; \}\>\>; `pendingContinuation`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `instructions`: `Schema.optionalKey`\<`Schema.String`\>; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>\>; `root`: `Schema.String`; \}\>; `targetAgentPin`: `Schema.optionalKey`\<`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>\>; \}\>
 
 ***
 
+<a id="controlstate-1"></a>
+
 ### ControlState
 
 > `const` **ControlState**: `Schema.Struct`\<\{ `active`: `Schema.String`; `edgeCounts`: `Schema.$Array`\<`Schema.Struct`\<\{ `count`: `Schema.Finite`; `source`: `Schema.String`; `target`: `Schema.String`; \}\>\>; `handoffCount`: `Schema.Finite`; `path`: `Schema.$Array`\<`Schema.Struct`\<\{ `handoffId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.String`; `target`: `Schema.String`; `turn`: `Schema.Finite`; \}\>\>; `pendingContinuation`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `instructions`: `Schema.optionalKey`\<`Schema.String`\>; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>\>; `root`: `Schema.String`; \}\>
 
 ***
+
+<a id="defaultcontextprojection"></a>
 
 ### defaultContextProjection
 
@@ -653,6 +801,8 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 `Effect`\<\{ `history`: `Prompt.Prompt`; `prompt`: `Prompt.RawInput`; \}, [`ProjectionInvalid`](#projectioninvalid)\>
 
 ***
+
+<a id="delegatetool"></a>
 
 ### delegateTool
 
@@ -727,6 +877,8 @@ Model layer the specialist runs on after the handoff. Wins over the active regis
 [`AgentToolToolkit`](./AgentTool#agenttooltoolkit)\<`string`, `Parameters`, `Success`, [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, \{ `prompt`: `Prompt.RawInput`; \}\> \| `Parameters`\[`"DecodingServices"`\]\>
 
 ***
+
+<a id="fanout"></a>
 
 ### fanOut
 
@@ -908,6 +1060,8 @@ readonly [`FanOutChild`](#fanoutchild)\<`Tools`, `R`\>[]
 
 ***
 
+<a id="filtercontextprojection"></a>
+
 ### filterContextProjection
 
 > `const` **filterContextProjection**: (`predicate`) => `ContextProjection`
@@ -924,11 +1078,15 @@ readonly [`FanOutChild`](#fanoutchild)\<`Tools`, `R`\>[]
 
 ***
 
+<a id="input-1"></a>
+
 ### Input
 
 > `const` **Input**: `Schema.Struct`\<\{ `context`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `prompt`: `Schema.optionalKey`\<`Schema.String`\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
 
 ***
+
+<a id="layercatalog"></a>
 
 ### layerCatalog
 
@@ -946,11 +1104,15 @@ readonly [`FanOutChild`](#fanoutchild)\<`Tools`, `R`\>[]
 
 ***
 
+<a id="output-1"></a>
+
 ### Output
 
 > `const` **Output**: `Schema.Struct`\<\{ `summary`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
 
 ***
+
+<a id="supervisor-1"></a>
 
 ### supervisor
 
@@ -967,6 +1129,8 @@ readonly [`FanOutChild`](#fanoutchild)\<`Tools`, `R`\>[]
 [`Supervisor`](#supervisor)\<`Tool.Handler`\<`string`\> \| `LanguageModel.LanguageModel`, `Record`\<`string`, `Tool.Tool`\<`string`, \{ `failure`: *typeof* `Schema.String`; `failureMode`: `"return"`; `parameters`: [`Input`](#input); `success`: *typeof* `HandoffAccepted`; \}, `never`\>\>\>
 
 ***
+
+<a id="target-1"></a>
 
 ### target
 
@@ -1006,6 +1170,8 @@ readonly [`FanOutChild`](#fanoutchild)\<`Tools`, `R`\>[]
 
 ***
 
+<a id="transfertool"></a>
+
 ### transferTool
 
 > `const` **transferTool**: \{(`options?`): (`handoffTarget`) => `HandoffToolkit`; (`handoffTarget`, `options?`): `HandoffToolkit`; \}
@@ -1044,11 +1210,15 @@ readonly [`FanOutChild`](#fanoutchild)\<`Tools`, `R`\>[]
 
 ## References
 
+<a id="register"></a>
+
 ### register
 
 Re-exports [register](./AgentTool#register)
 
 ***
+
+<a id="registrationerror"></a>
 
 ### RegistrationError
 

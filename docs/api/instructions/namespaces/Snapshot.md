@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="snapshotinvalid"></a>
+
 ### SnapshotInvalid
 
 A pinned snapshot payload is not a valid guidance state.
@@ -17,6 +19,8 @@ A pinned snapshot payload is not a valid guidance state.
 - `SnapshotInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A pinned snapshot payload is not a valid guidance state.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -45,6 +51,8 @@ A pinned snapshot payload is not a valid guidance state.
 ###### Inherited from
 
 `SnapshotInvalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -56,6 +64,8 @@ A pinned snapshot payload is not a valid guidance state.
 
 ***
 
+<a id="snapshotmismatch"></a>
+
 ### SnapshotMismatch
 
 A pinned snapshot payload does not reconstruct the snapshot it claims.
@@ -65,6 +75,8 @@ A pinned snapshot payload does not reconstruct the snapshot it claims.
 - `SnapshotMismatch_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -86,6 +98,8 @@ A pinned snapshot payload does not reconstruct the snapshot it claims.
 
 #### Properties
 
+<a id="actual"></a>
+
 ##### actual
 
 > `readonly` **actual**: `string`
@@ -94,6 +108,8 @@ A pinned snapshot payload does not reconstruct the snapshot it claims.
 
 `SnapshotMismatch_base.actual`
 
+<a id="expected"></a>
+
 ##### expected
 
 > `readonly` **expected**: `string`
@@ -101,6 +117,8 @@ A pinned snapshot payload does not reconstruct the snapshot it claims.
 ###### Inherited from
 
 `SnapshotMismatch_base.expected`
+
+<a id="hint-1"></a>
 
 ##### hint
 
@@ -112,6 +130,8 @@ A pinned snapshot payload does not reconstruct the snapshot it claims.
 
 ## Type Aliases
 
+<a id="guidancesnapshot"></a>
+
 ### GuidanceSnapshot
 
 > **GuidanceSnapshot** = *typeof* `GuidanceSnapshot.Type`
@@ -119,6 +139,8 @@ A pinned snapshot payload does not reconstruct the snapshot it claims.
 One content-addressed guidance snapshot and the payload that reconstructs it.
 
 ***
+
+<a id="snapshotpayload"></a>
 
 ### SnapshotPayload
 
@@ -129,6 +151,8 @@ complete state; refinement history is deliberately excluded because it is audit 
 
 ## Variables
 
+<a id="codec"></a>
+
 ### codec
 
 > `const` **codec**: `"generalist/instructions/snapshot"` = `"generalist/instructions/snapshot"`
@@ -136,6 +160,8 @@ complete state; refinement history is deliberately excluded because it is audit 
 Codec name a durable host records alongside a pinned guidance snapshot.
 
 ***
+
+<a id="decode"></a>
 
 ### decode
 
@@ -197,6 +223,8 @@ Reconstruct the exact state one pinned snapshot identifies.
 
 ***
 
+<a id="encode"></a>
+
 ### encode
 
 > `const` **encode**: (`state`) => *typeof* `SnapshotPayload.Encoded`
@@ -215,6 +243,8 @@ Encode one snapshot payload as the closed JSON a registration carries.
 
 ***
 
+<a id="guidancesnapshot-1"></a>
+
 ### GuidanceSnapshot
 
 > `const` **GuidanceSnapshot**: `Schema.Struct`\<\{ `id`: `Schema.String`; `payload`: `Schema.Struct`\<\{ `entries`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `schemaVersion`: `Schema.Literal`\<`"1"`\>; `scope`: `Schema.String`; \}\>; \}\>
@@ -222,6 +252,8 @@ Encode one snapshot payload as the closed JSON a registration carries.
 One content-addressed guidance snapshot and the payload that reconstructs it.
 
 ***
+
+<a id="make"></a>
 
 ### make
 
@@ -241,6 +273,8 @@ Pin one exact state as a content-addressed snapshot.
 
 ***
 
+<a id="snapshotpayload-1"></a>
+
 ### SnapshotPayload
 
 > `const` **SnapshotPayload**: `Schema.Struct`\<\{ `entries`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `schemaVersion`: `Schema.Literal`\<`"1"`\>; `scope`: `Schema.String`; \}\>
@@ -249,6 +283,8 @@ The exact secret-free payload a durable host pins into an executable registratio
 complete state; refinement history is deliberately excluded because it is audit data, not executable identity.
 
 ***
+
+<a id="version"></a>
 
 ### version
 

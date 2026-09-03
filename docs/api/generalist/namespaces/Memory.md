@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="memory"></a>
+
 ### Memory
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Memory_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="memoryerror"></a>
+
 ### MemoryError
 
 #### Extends
@@ -43,6 +49,8 @@
 - `MemoryError_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -64,6 +72,8 @@
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -71,6 +81,8 @@
 ###### Inherited from
 
 `MemoryError_base.cause`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -80,6 +92,8 @@
 
 `MemoryError_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -87,6 +101,8 @@
 ###### Inherited from
 
 `MemoryError_base.message`
+
+<a id="reason"></a>
 
 ##### reason?
 
@@ -98,13 +114,19 @@
 
 ## Interfaces
 
+<a id="forgetinput"></a>
+
 ### ForgetInput
 
 #### Properties
 
+<a id="id"></a>
+
 ##### id?
 
 > `readonly` `optional` **id?**: `string`
+
+<a id="key"></a>
 
 ##### key
 
@@ -112,25 +134,37 @@
 
 ***
 
+<a id="historyentry"></a>
+
 ### HistoryEntry
 
 #### Properties
+
+<a id="appliedat"></a>
 
 ##### appliedAt
 
 > `readonly` **appliedAt**: `string`
 
+<a id="evidence"></a>
+
 ##### evidence
 
 > `readonly` **evidence**: readonly `object`[]
+
+<a id="supersedes"></a>
 
 ##### supersedes?
 
 > `readonly` `optional` **supersedes?**: `number`
 
+<a id="text"></a>
+
 ##### text
 
 > `readonly` **text**: `string`
+
+<a id="version"></a>
 
 ##### version
 
@@ -138,17 +172,25 @@
 
 ***
 
+<a id="item"></a>
+
 ### Item
 
 #### Properties
+
+<a id="content"></a>
 
 ##### content
 
 > `readonly` **content**: readonly `UserMessagePart`[]
 
+<a id="id-1"></a>
+
 ##### id
 
 > `readonly` **id**: `string`
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -156,13 +198,19 @@
 
 ***
 
+<a id="key-1"></a>
+
 ### Key
 
 #### Properties
 
+<a id="agent"></a>
+
 ##### agent
 
 > `readonly` **agent**: `string`
+
+<a id="subject"></a>
 
 ##### subject
 
@@ -170,51 +218,75 @@
 
 ***
 
+<a id="recallinput"></a>
+
 ### RecallInput
 
 #### Properties
 
+<a id="key-2"></a>
+
 ##### key
 
 > `readonly` **key**: [`Key`](#key-1)
+
+<a id="prompt"></a>
 
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
 
+<a id="turn"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="rememberinput"></a>
 
 ### RememberInput
 
 #### Properties
 
+<a id="entryid"></a>
+
 ##### entryId?
 
 > `readonly` `optional` **entryId?**: `string`
+
+<a id="evidence-1"></a>
 
 ##### evidence
 
 > `readonly` **evidence**: readonly `object`[]
 
+<a id="key-3"></a>
+
 ##### key
 
 > `readonly` **key**: [`Key`](#key-1)
+
+<a id="supersedes-1"></a>
 
 ##### supersedes?
 
 > `readonly` `optional` **supersedes?**: `number`
 
+<a id="terminal"></a>
+
 ##### terminal
 
 > `readonly` **terminal**: `boolean`
 
+<a id="transcript"></a>
+
 ##### transcript
 
 > `readonly` **transcript**: `Prompt`
+
+<a id="turn-1"></a>
 
 ##### turn
 
@@ -222,9 +294,13 @@
 
 ***
 
+<a id="revertinput"></a>
+
 ### RevertInput
 
 #### Properties
+
+<a id="to"></a>
 
 ##### to
 
@@ -232,9 +308,13 @@
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="forget"></a>
 
 ##### forget
 
@@ -250,6 +330,8 @@
 
 `Effect`\<`void`, [`MemoryError`](#memoryerror)\>
 
+<a id="history"></a>
+
 ##### history
 
 > `readonly` **history**: (`entryId`) => `Effect`\<readonly [`HistoryEntry`](#historyentry)[], [`MemoryError`](#memoryerror)\>
@@ -263,6 +345,8 @@
 ###### Returns
 
 `Effect`\<readonly [`HistoryEntry`](#historyentry)[], [`MemoryError`](#memoryerror)\>
+
+<a id="recall"></a>
 
 ##### recall
 
@@ -278,6 +362,8 @@
 
 `Effect`\<readonly [`Item`](#item)[], [`MemoryError`](#memoryerror)\>
 
+<a id="remember"></a>
+
 ##### remember
 
 > `readonly` **remember**: (`input`) => `Effect`\<`void`, [`MemoryError`](#memoryerror)\>
@@ -291,6 +377,8 @@
 ###### Returns
 
 `Effect`\<`void`, [`MemoryError`](#memoryerror)\>
+
+<a id="revert"></a>
 
 ##### revert
 
@@ -312,11 +400,15 @@
 
 ## Type Aliases
 
+<a id="itempart"></a>
+
 ### ItemPart
 
 > **ItemPart** = `Prompt.UserMessagePart`
 
 ***
+
+<a id="metadata-1"></a>
 
 ### Metadata
 
@@ -324,17 +416,23 @@
 
 ***
 
+<a id="operationref"></a>
+
 ### OperationRef
 
 > **OperationRef** = *typeof* `OperationRef.Type`
 
 ***
 
+<a id="version-1"></a>
+
 ### Version
 
 > **Version** = *typeof* `Version.Type`
 
 ## Variables
+
+<a id="ismessagefromrecall"></a>
 
 ### isMessageFromRecall
 
@@ -352,6 +450,8 @@
 
 ***
 
+<a id="itemfrompromptpart"></a>
+
 ### itemFromPromptPart
 
 > `const` **itemFromPromptPart**: (`a`) => `Option.Option`\<`Prompt.UserMessagePart`\>
@@ -368,6 +468,8 @@
 
 ***
 
+<a id="layernoop"></a>
+
 ### layerNoop
 
 > `const` **layerNoop**: `Layer.Layer`\<[`Memory`](#memory)\>
@@ -375,6 +477,8 @@
 Memory implementation that recalls and records nothing.
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -391,6 +495,8 @@ Memory implementation that recalls and records nothing.
 `Layer.Layer`\<[`Memory`](#memory)\>
 
 ***
+
+<a id="merge"></a>
 
 ### merge
 
@@ -430,6 +536,8 @@ Memory implementation that recalls and records nothing.
 
 ***
 
+<a id="messagefromrecall"></a>
+
 ### messageFromRecall
 
 > `const` **messageFromRecall**: (`content`) => `Prompt.UserMessage`
@@ -446,11 +554,15 @@ Memory implementation that recalls and records nothing.
 
 ***
 
+<a id="operationref-1"></a>
+
 ### OperationRef
 
 > `const` **OperationRef**: `Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>
 
 ***
+
+<a id="projecttranscript"></a>
 
 ### projectTranscript
 
@@ -468,6 +580,8 @@ Memory implementation that recalls and records nothing.
 
 ***
 
+<a id="recalledmessageidentity"></a>
+
 ### recalledMessageIdentity
 
 > `const` **recalledMessageIdentity**: (`message`) => `Prompt.Message`
@@ -483,6 +597,8 @@ Memory implementation that recalls and records nothing.
 `Prompt.Message`
 
 ***
+
+<a id="replacerecalledmessage"></a>
 
 ### replaceRecalledMessage
 
@@ -521,6 +637,8 @@ readonly `UserMessagePart`[]
 `UserMessage`
 
 ***
+
+<a id="version-2"></a>
 
 ### Version
 

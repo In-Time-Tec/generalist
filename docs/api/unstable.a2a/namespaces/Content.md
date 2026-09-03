@@ -8,6 +8,8 @@
 
 ## Variables
 
+<a id="decode"></a>
+
 ### decode
 
 > `const` **decode**: (`message`) => `Effect.Effect`\<`Prompt.Prompt`, [`MessageRejected`](./Errors#messagerejected)\>

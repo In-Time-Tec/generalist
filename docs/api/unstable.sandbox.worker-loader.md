@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="workerloaderoptions"></a>
+
 ### WorkerLoaderOptions
 
 **`Experimental`**
@@ -19,6 +21,8 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 - [`Options`](./unstable.cloudflare.dynamic-workers#options)
 
 #### Properties
+
+<a id="capabilitybinding"></a>
 
 ##### capabilityBinding
 
@@ -40,6 +44,8 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 [`Options`](./unstable.cloudflare.dynamic-workers#options).[`capabilityBinding`](./unstable.cloudflare.dynamic-workers#capabilitybinding)
 
+<a id="compatibilitydate"></a>
+
 ##### compatibilityDate
 
 > `readonly` **compatibilityDate**: `string`
@@ -50,11 +56,15 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 [`Options`](./unstable.cloudflare.dynamic-workers#options).[`compatibilityDate`](./unstable.cloudflare.dynamic-workers#compatibilitydate-1)
 
+<a id="image"></a>
+
 ##### image?
 
 > `readonly` `optional` **image?**: `string`
 
 **`Experimental`**
+
+<a id="limits"></a>
 
 ##### limits?
 
@@ -74,6 +84,8 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 > `readonly` `optional` **wallClock?**: `Duration`
 
+<a id="loader"></a>
+
 ##### loader
 
 > `readonly` **loader**: [`WorkerLoader`](./unstable.cloudflare.dynamic-workers#workerloader)
@@ -85,6 +97,8 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 [`Options`](./unstable.cloudflare.dynamic-workers#options).[`loader`](./unstable.cloudflare.dynamic-workers#loader)
 
 ## Variables
+
+<a id="layerworkerloader"></a>
 
 ### layerWorkerLoader
 
@@ -105,6 +119,8 @@ Provide the v8-isolate Worker Loader Sandbox leaf.
 `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
 
 ***
+
+<a id="makeworkerloaderprovider"></a>
 
 ### makeWorkerLoaderProvider
 

@@ -8,19 +8,27 @@
 
 ## Interfaces
 
+<a id="pinnedregistration"></a>
+
 ### PinnedRegistration
 
 One named capability and the exact secret-free payload that reconstructs its pinned snapshot.
 
 #### Properties
 
+<a id="capability"></a>
+
 ##### capability
 
 > `readonly` **capability**: [`NamedCapability`](../../generalist/namespaces/AgentManifest#namedcapability)
 
+<a id="id"></a>
+
 ##### id
 
 > `readonly` **id**: `string`
+
+<a id="payload"></a>
 
 ##### payload
 
@@ -39,6 +47,8 @@ One named capability and the exact secret-free payload that reconstructs its pin
 > `readonly` **scope**: `string`
 
 ## Variables
+
+<a id="make"></a>
 
 ### make
 

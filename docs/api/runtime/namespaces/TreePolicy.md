@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="treepolicy"></a>
+
 ### TreePolicy
 
 > **TreePolicy** = *typeof* `TreePolicy.Type`
@@ -15,6 +17,8 @@
 Root-pinned bounds for recursive child admission. Root depth is zero.
 
 ## Variables
+
+<a id="defaulttreepolicy"></a>
 
 ### defaultTreePolicy
 
@@ -27,6 +31,8 @@ durable — it is stored in integer columns and feeds the root digest, so a non-
 would not survive serialization or keep idempotency stable.
 
 ***
+
+<a id="normalize"></a>
 
 ### normalize
 
@@ -46,6 +52,8 @@ Decode and detach one root policy before its authoritative admission.
 
 ***
 
+<a id="tree_policy_max"></a>
+
 ### TREE\_POLICY\_MAX
 
 > `const` **TREE\_POLICY\_MAX**: `1024` = `1024`
@@ -53,6 +61,8 @@ Decode and detach one root policy before its authoritative admission.
 Fixed upper bound for each recursive Run tree policy dimension.
 
 ***
+
+<a id="treepolicy-1"></a>
 
 ### TreePolicy
 

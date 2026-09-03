@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="rewardinvalid"></a>
+
 ### RewardInvalid
 
 **`Experimental`**
@@ -19,6 +21,8 @@ A reward policy returned a value that cannot be journaled.
 - `RewardInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@ A reward policy returned a value that cannot be journaled.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -51,6 +57,8 @@ A reward policy returned a value that cannot be journaled.
 ###### Inherited from
 
 `RewardInvalid_base.hint`
+
+<a id="leaf"></a>
 
 ##### leaf
 
@@ -62,6 +70,8 @@ A reward policy returned a value that cannot be journaled.
 
 `RewardInvalid_base.leaf`
 
+<a id="source"></a>
+
 ##### source
 
 > `readonly` **source**: `string`
@@ -71,6 +81,8 @@ A reward policy returned a value that cannot be journaled.
 ###### Inherited from
 
 `RewardInvalid_base.source`
+
+<a id="value"></a>
 
 ##### value
 
@@ -84,6 +96,8 @@ A reward policy returned a value that cannot be journaled.
 
 ## Interfaces
 
+<a id="input"></a>
+
 ### Input
 
 **`Experimental`**
@@ -92,11 +106,15 @@ Facts available to one scalar reward policy.
 
 #### Properties
 
+<a id="leaf-1"></a>
+
 ##### leaf
 
 > `readonly` **leaf**: `string`
 
 **`Experimental`**
+
+<a id="messages"></a>
 
 ##### messages
 
@@ -104,11 +122,15 @@ Facts available to one scalar reward policy.
 
 **`Experimental`**
 
+<a id="runid"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
 
 **`Experimental`**
+
+<a id="trajectory"></a>
 
 ##### trajectory
 
@@ -172,6 +194,8 @@ Agent budget allocation when the journal's executable manifest declares one.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
@@ -190,6 +214,8 @@ A directly supplied reward service.
 
 #### Properties
 
+<a id="evaluate"></a>
+
 ##### evaluate
 
 > `readonly` **evaluate**: (`input`) => `Effect`\<`number`, `E`, `R`\>
@@ -206,6 +232,8 @@ A directly supplied reward service.
 
 `Effect`\<`number`, `E`, `R`\>
 
+<a id="source-1"></a>
+
 ##### source
 
 > `readonly` **source**: `string`
@@ -213,6 +241,8 @@ A directly supplied reward service.
 **`Experimental`**
 
 ## Variables
+
+<a id="fromeval"></a>
 
 ### fromEval
 
@@ -244,6 +274,8 @@ Average existing eval scorer values into one scalar reward.
 
 ***
 
+<a id="fromgates"></a>
+
 ### fromGates
 
 > `const` **fromGates**: [`Service`](#service)
@@ -253,6 +285,8 @@ Average existing eval scorer values into one scalar reward.
 Score one when every completion gate's latest verdict passes, otherwise zero.
 
 ***
+
+<a id="make"></a>
 
 ### make
 

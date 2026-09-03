@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="denied"></a>
+
 ### Denied
 
 The host denied the nested operation's approval request.
@@ -17,6 +19,8 @@ The host denied the nested operation's approval request.
 - `Denied_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ The host denied the nested operation's approval request.
 
 #### Properties
 
+<a id="capability"></a>
+
 ##### capability
 
 > `readonly` **capability**: `string`
@@ -45,6 +51,8 @@ The host denied the nested operation's approval request.
 ###### Inherited from
 
 `Denied_base.capability`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -54,6 +62,8 @@ The host denied the nested operation's approval request.
 
 `Denied_base.hint`
 
+<a id="operationkey"></a>
+
 ##### operationKey
 
 > `readonly` **operationKey**: `string`
@@ -62,6 +72,8 @@ The host denied the nested operation's approval request.
 
 `Denied_base.operationKey`
 
+<a id="ordinal"></a>
+
 ##### ordinal
 
 > `readonly` **ordinal**: `number`
@@ -69,6 +81,8 @@ The host denied the nested operation's approval request.
 ###### Inherited from
 
 `Denied_base.ordinal`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -80,6 +94,8 @@ The host denied the nested operation's approval request.
 
 ***
 
+<a id="divergence"></a>
+
 ### Divergence
 
 The same nested identity was reused with different content.
@@ -89,6 +105,8 @@ The same nested identity was reused with different content.
 - `Divergence_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -110,6 +128,8 @@ The same nested identity was reused with different content.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -117,6 +137,8 @@ The same nested identity was reused with different content.
 ###### Inherited from
 
 `Divergence_base.hint`
+
+<a id="operationkey-1"></a>
 
 ##### operationKey
 
@@ -126,6 +148,8 @@ The same nested identity was reused with different content.
 
 `Divergence_base.operationKey`
 
+<a id="ordinal-1"></a>
+
 ##### ordinal
 
 > `readonly` **ordinal**: `number`
@@ -133,6 +157,8 @@ The same nested identity was reused with different content.
 ###### Inherited from
 
 `Divergence_base.ordinal`
+
+<a id="recordeddigest"></a>
 
 ##### recordedDigest
 
@@ -142,6 +168,8 @@ The same nested identity was reused with different content.
 
 `Divergence_base.recordedDigest`
 
+<a id="recordedkind"></a>
+
 ##### recordedKind
 
 > `readonly` **recordedKind**: `string`
@@ -150,6 +178,8 @@ The same nested identity was reused with different content.
 
 `Divergence_base.recordedKind`
 
+<a id="requesteddigest"></a>
+
 ##### requestedDigest
 
 > `readonly` **requestedDigest**: `string`
@@ -157,6 +187,8 @@ The same nested identity was reused with different content.
 ###### Inherited from
 
 `Divergence_base.requestedDigest`
+
+<a id="requestedkind"></a>
 
 ##### requestedKind
 
@@ -168,6 +200,8 @@ The same nested identity was reused with different content.
 
 ***
 
+<a id="operations"></a>
+
 ### Operations
 
 #### Extends
@@ -175,6 +209,8 @@ The same nested identity was reused with different content.
 - `Operations_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -196,6 +232,8 @@ The same nested identity was reused with different content.
 
 ***
 
+<a id="suspended"></a>
+
 ### Suspended
 
 The run must suspend until the host resolves the nested operation's approval.
@@ -205,6 +243,8 @@ The run must suspend until the host resolves the nested operation's approval.
 - `Suspended_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -226,6 +266,8 @@ The run must suspend until the host resolves the nested operation's approval.
 
 #### Properties
 
+<a id="capability-1"></a>
+
 ##### capability
 
 > `readonly` **capability**: `string`
@@ -233,6 +275,8 @@ The run must suspend until the host resolves the nested operation's approval.
 ###### Inherited from
 
 `Suspended_base.capability`
+
+<a id="hint-2"></a>
 
 ##### hint
 
@@ -242,6 +286,8 @@ The run must suspend until the host resolves the nested operation's approval.
 
 `Suspended_base.hint`
 
+<a id="operationkey-2"></a>
+
 ##### operationKey
 
 > `readonly` **operationKey**: `string`
@@ -250,6 +296,8 @@ The run must suspend until the host resolves the nested operation's approval.
 
 `Suspended_base.operationKey`
 
+<a id="ordinal-2"></a>
+
 ##### ordinal
 
 > `readonly` **ordinal**: `number`
@@ -257,6 +305,8 @@ The run must suspend until the host resolves the nested operation's approval.
 ###### Inherited from
 
 `Suspended_base.ordinal`
+
+<a id="token"></a>
 
 ##### token
 
@@ -268,6 +318,8 @@ The run must suspend until the host resolves the nested operation's approval.
 
 ***
 
+<a id="unknown"></a>
+
 ### Unknown
 
 A non-idempotent nested operation crossed its boundary with an unobserved outcome.
@@ -277,6 +329,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 - `Unknown_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -298,6 +352,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 
 #### Properties
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -305,6 +361,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 ###### Inherited from
 
 `Unknown_base.hint`
+
+<a id="operationid"></a>
 
 ##### operationId
 
@@ -314,6 +372,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 
 `Unknown_base.operationId`
 
+<a id="operationkey-3"></a>
+
 ##### operationKey
 
 > `readonly` **operationKey**: `string`
@@ -321,6 +381,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 ###### Inherited from
 
 `Unknown_base.operationKey`
+
+<a id="ordinal-3"></a>
 
 ##### ordinal
 
@@ -331,6 +393,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 `Unknown_base.ordinal`
 
 ## Interfaces
+
+<a id="request"></a>
 
 ### Request
 
@@ -346,6 +410,8 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 
 #### Properties
 
+<a id="approval"></a>
+
 ##### approval?
 
 > `readonly` `optional` **approval?**: `object`
@@ -358,17 +424,25 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 
 > `readonly` `optional` **request?**: `unknown`
 
+<a id="failure"></a>
+
 ##### failure?
 
 > `readonly` `optional` **failure?**: `Codec`\<`E`, `unknown`, `never`, `never`\>
+
+<a id="kind"></a>
 
 ##### kind
 
 > `readonly` **kind**: `string`
 
+<a id="payload"></a>
+
 ##### payload
 
 > `readonly` **payload**: `unknown`
+
+<a id="render"></a>
 
 ##### render?
 
@@ -384,15 +458,21 @@ A non-idempotent nested operation crossed its boundary with an unobserved outcom
 
 \{ `_tag`: `"Artifact"`; `byteSize`: `number`; `height?`: `number`; `mimeType`: `string`; `path`: `string`; `width?`: `number`; \} \| \{ `_tag`: `"Diff"`; `patch`: `string`; `path`: `string`; \}
 
+<a id="replaypolicy"></a>
+
 ##### replayPolicy
 
 > `readonly` **replayPolicy**: `"pure"` \| `"provider-idempotent"` \| `"never"`
+
+<a id="success"></a>
 
 ##### success?
 
 > `readonly` `optional` **success?**: `Codec`\<`A`, `unknown`, `never`, `never`\>
 
 ***
+
+<a id="service"></a>
 
 ### Service
 
@@ -403,6 +483,8 @@ host assigns the ordinal, so cell or tool code cannot forge, reorder, or collide
 call's journal.
 
 #### Properties
+
+<a id="run"></a>
 
 ##### run
 
@@ -438,6 +520,8 @@ call's journal.
 
 ## Type Aliases
 
+<a id="approvalrequirement"></a>
+
 ### ApprovalRequirement
 
 > **ApprovalRequirement** = *typeof* `ApprovalRequirement.Type`
@@ -446,11 +530,15 @@ Authorization the host must settle before the handler crosses its boundary.
 
 ***
 
+<a id="failure-1"></a>
+
 ### Failure
 
 > **Failure** = [`Divergence`](#divergence) \| [`Unknown`](#unknown) \| [`Denied`](#denied) \| [`Suspended`](#suspended)
 
 ***
+
+<a id="identity"></a>
 
 ### Identity
 
@@ -460,6 +548,8 @@ Derived identity of one nested operation beneath a composite tool call.
 
 ***
 
+<a id="progress"></a>
+
 ### Progress
 
 > **Progress** = *typeof* `Progress.Type`
@@ -468,6 +558,8 @@ One nested-operation progress record a host projects.
 
 ***
 
+<a id="progressstatus"></a>
+
 ### ProgressStatus
 
 > **ProgressStatus** = *typeof* `ProgressStatus.Type`
@@ -475,6 +567,8 @@ One nested-operation progress record a host projects.
 Lifecycle of one nested operation as the host observes it.
 
 ***
+
+<a id="render-1"></a>
 
 ### Render
 
@@ -488,6 +582,8 @@ the host displays.
 
 ***
 
+<a id="replaypolicy-1"></a>
+
 ### ReplayPolicy
 
 > **ReplayPolicy** = *typeof* `ReplayPolicy.Type`
@@ -496,6 +592,8 @@ Replay policy for one nested durable operation.
 
 ## Variables
 
+<a id="approvalrequirement-1"></a>
+
 ### ApprovalRequirement
 
 > `const` **ApprovalRequirement**: `Schema.Struct`\<\{ `capability`: `Schema.String`; `request`: `Schema.optionalKey`\<`Schema.Unknown`\>; \}\>
@@ -503,6 +601,8 @@ Replay policy for one nested durable operation.
 Authorization the host must settle before the handler crosses its boundary.
 
 ***
+
+<a id="catchsuspension"></a>
 
 ### catchSuspension
 
@@ -532,6 +632,8 @@ Translate a nested-operation approval suspension into the tool executor's Suspen
 
 ***
 
+<a id="identity-1"></a>
+
 ### Identity
 
 > `const` **Identity**: `Schema.Struct`\<\{ `kind`: `Schema.String`; `operationKey`: `Schema.String`; `ordinal`: `Schema.Int`; `payloadDigest`: `Schema.String`; \}\>
@@ -539,6 +641,8 @@ Translate a nested-operation approval suspension into the tool executor's Suspen
 Derived identity of one nested operation beneath a composite tool call.
 
 ***
+
+<a id="layerdirect"></a>
 
 ### layerDirect
 
@@ -550,6 +654,8 @@ Identity, duplicate return, and divergence hold for the life of the run; approva
 because a process-local host owns no resolution seam.
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -567,6 +673,8 @@ because a process-local host owns no resolution seam.
 
 ***
 
+<a id="maxrenderbytes"></a>
+
 ### maxRenderBytes
 
 > `const` **maxRenderBytes**: `number`
@@ -574,6 +682,8 @@ because a process-local host owns no resolution seam.
 A projection larger than this is withheld whole rather than truncated.
 
 ***
+
+<a id="operationid-1"></a>
 
 ### operationId
 
@@ -598,6 +708,8 @@ Derived operation id for one nested operation.
 `string`
 
 ***
+
+<a id="payloaddigest"></a>
 
 ### payloadDigest
 
@@ -639,6 +751,8 @@ Canonical payload digest shared by every nested-operation implementation.
 
 ***
 
+<a id="progress-1"></a>
+
 ### Progress
 
 > `const` **Progress**: `Schema.Struct`\<\{ `kind`: `Schema.String`; `ordinal`: `Schema.Int`; `render`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Artifact"`\>; `byteSize`: `Schema.Int`; `height`: `Schema.optionalKey`\<`Schema.Int`\>; `mimeType`: `Schema.String`; `path`: `Schema.String`; `width`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Diff"`\>; `patch`: `Schema.String`; `path`: `Schema.String`; \}\>\]\>\>; `renderWithheldBytes`: `Schema.optionalKey`\<`Schema.Int`\>; `status`: `Schema.Literals`\<readonly \[`"running"`, `"succeeded"`, `"failed"`, `"unknown"`\]\>; \}\>
@@ -646,6 +760,8 @@ Canonical payload digest shared by every nested-operation implementation.
 One nested-operation progress record a host projects.
 
 ***
+
+<a id="progressdata"></a>
 
 ### progressData
 
@@ -683,6 +799,8 @@ missing one, so the operation still succeeds while the projection is dropped.
 
 ***
 
+<a id="progresskey"></a>
+
 ### progressKey
 
 > `const` **progressKey**: `"nestedOperation"` = `"nestedOperation"`
@@ -691,6 +809,8 @@ The `ToolContext.Progress` data key nested-operation progress travels under.
 
 ***
 
+<a id="progressstatus-1"></a>
+
 ### ProgressStatus
 
 > `const` **ProgressStatus**: `Schema.Literals`\<readonly \[`"running"`, `"succeeded"`, `"failed"`, `"unknown"`\]\>
@@ -698,6 +818,8 @@ The `ToolContext.Progress` data key nested-operation progress travels under.
 Lifecycle of one nested operation as the host observes it.
 
 ***
+
+<a id="render-2"></a>
 
 ### Render
 
@@ -711,6 +833,8 @@ the host displays.
 
 ***
 
+<a id="replaypolicy-2"></a>
+
 ### ReplayPolicy
 
 > `const` **ReplayPolicy**: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>
@@ -718,6 +842,8 @@ the host displays.
 Replay policy for one nested durable operation.
 
 ***
+
+<a id="run-1"></a>
 
 ### run
 

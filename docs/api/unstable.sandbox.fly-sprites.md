@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
@@ -15,6 +17,8 @@
 Fly Sprites hosted microVM configuration.
 
 #### Properties
+
+<a id="app"></a>
 
 ##### app
 
@@ -24,6 +28,8 @@ Fly Sprites hosted microVM configuration.
 
 Prefix for fresh Sprite names. Acquire keys address an exact existing Sprite name.
 
+<a id="token"></a>
+
 ##### token
 
 > `readonly` **token**: `Config`\<`Redacted`\<`string`\>\>
@@ -31,6 +37,8 @@ Prefix for fresh Sprite names. Acquire keys address an exact existing Sprite nam
 **`Experimental`**
 
 ***
+
+<a id="provideroptions"></a>
 
 ### ProviderOptions
 
@@ -44,6 +52,8 @@ Resolved Fly Sprites configuration used by recorded fixtures.
 
 #### Properties
 
+<a id="app-1"></a>
+
 ##### app
 
 > `readonly` **app**: `string`
@@ -56,6 +66,8 @@ Prefix for fresh Sprite names. Acquire keys address an exact existing Sprite nam
 
 [`Options`](#options).[`app`](#app)
 
+<a id="token-1"></a>
+
 ##### token
 
 > `readonly` **token**: `Redacted`\<`string`\>
@@ -63,6 +75,8 @@ Prefix for fresh Sprite names. Acquire keys address an exact existing Sprite nam
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -83,6 +97,8 @@ Provide the hosted Fly Sprites microVM Sandbox leaf.
 `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="makeprovider"></a>
 
 ### makeProvider
 

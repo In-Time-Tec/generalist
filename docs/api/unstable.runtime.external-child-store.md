@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="externalchildstore"></a>
+
 ### ExternalChildStore
 
 Atomic cross-partition child placement capability.
@@ -17,6 +19,8 @@ Atomic cross-partition child placement capability.
 - `ExternalChildStore_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,11 +42,15 @@ Atomic cross-partition child placement capability.
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 Cross-partition child placement operations supported by single-partition stores.
 
 #### Properties
+
+<a id="acknowledge"></a>
 
 ##### acknowledge
 
@@ -57,6 +65,8 @@ Cross-partition child placement operations supported by single-partition stores.
 ###### Returns
 
 `Effect`\<\{ `acknowledged`: `boolean`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `invocationId`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parentRunId`: `string`; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `settled`: `boolean`; `settlementId?`: `string`; `suspensionIdentity?`: `string`; `waitId?`: `string`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalChildPlacementNotFound`](./unstable.runtime.external-child-placement#externalchildplacementnotfound)\>
+
+<a id="acknowledgerootsettlement"></a>
 
 ##### acknowledgeRootSettlement
 
@@ -80,6 +90,8 @@ Acknowledge exactly the terminal identity received by the parent.
 
 `Effect`\<\{ `acknowledged`: `boolean`; `outcome`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `settlementId`: `string`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalChildSettlementConflict`](./unstable.runtime.external-child-placement#externalchildsettlementconflict) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
 
+<a id="activateroot"></a>
+
 ##### activateRoot
 
 > `readonly` **activateRoot**: (`placementId`) => `Effect`\<\{ `activated`: `boolean`; `admissionDigest`: `string`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parent`: \{ `partition`: `string`; `runId`: `string`; \}; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `sessionId`: `string`; `settlementAcknowledged`: `boolean`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
@@ -95,6 +107,8 @@ Release one admitted root's durable execution gate. Exact retries are no-ops.
 ###### Returns
 
 `Effect`\<\{ `activated`: `boolean`; `admissionDigest`: `string`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parent`: \{ `partition`: `string`; `runId`: `string`; \}; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `sessionId`: `string`; `settlementAcknowledged`: `boolean`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
+
+<a id="admitroot"></a>
 
 ##### admitRoot
 
@@ -150,6 +164,8 @@ Admit an independently executable depth-zero root, initially fenced from executi
 
 `Effect`\<\{ `activated`: `boolean`; `admissionDigest`: `string`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parent`: \{ `partition`: `string`; `runId`: `string`; \}; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `sessionId`: `string`; `settlementAcknowledged`: `boolean`; \}, [`StartError`](./runtime/namespaces/Runtime#starterror) \| [`ExternalRootConflict`](./unstable.runtime.external-child-placement#externalrootconflict) \| [`ExternalRootExecutableMismatch`](./unstable.runtime.external-child-placement#externalrootexecutablemismatch)\>
 
+<a id="cancel"></a>
+
 ##### cancel
 
 > `readonly` **cancel**: (`placementId`) => `Effect`\<\{ `acknowledged`: `boolean`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `invocationId`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parentRunId`: `string`; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `settled`: `boolean`; `settlementId?`: `string`; `suspensionIdentity?`: `string`; `waitId?`: `string`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalChildPlacementNotFound`](./unstable.runtime.external-child-placement#externalchildplacementnotfound)\>
@@ -163,6 +179,8 @@ Admit an independently executable depth-zero root, initially fenced from executi
 ###### Returns
 
 `Effect`\<\{ `acknowledged`: `boolean`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `invocationId`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parentRunId`: `string`; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `settled`: `boolean`; `settlementId?`: `string`; `suspensionIdentity?`: `string`; `waitId?`: `string`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalChildPlacementNotFound`](./unstable.runtime.external-child-placement#externalchildplacementnotfound)\>
+
+<a id="cancelroot"></a>
 
 ##### cancelRoot
 
@@ -184,6 +202,8 @@ Request authoritative cancellation on the child partition, including before acti
 
 `Effect`\<\{ `activated`: `boolean`; `admissionDigest`: `string`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parent`: \{ `partition`: `string`; `runId`: `string`; \}; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `sessionId`: `string`; `settlementAcknowledged`: `boolean`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
 
+<a id="inspectroot"></a>
+
 ##### inspectRoot
 
 > `readonly` **inspectRoot**: (`placementId`) => `Effect`\<\{ `activated`: `boolean`; `admissionDigest`: `string`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parent`: \{ `partition`: `string`; `runId`: `string`; \}; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `sessionId`: `string`; `settlementAcknowledged`: `boolean`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
@@ -197,6 +217,8 @@ Request authoritative cancellation on the child partition, including before acti
 ###### Returns
 
 `Effect`\<\{ `activated`: `boolean`; `admissionDigest`: `string`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parent`: \{ `partition`: `string`; `runId`: `string`; \}; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `sessionId`: `string`; `settlementAcknowledged`: `boolean`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
+
+<a id="reserve"></a>
 
 ##### reserve
 
@@ -318,6 +340,8 @@ Request authoritative cancellation on the child partition, including before acti
 
 `Effect`\<\{ `acknowledged`: `boolean`; `cancelRequested`: `boolean`; `executableDigest`: `string`; `invocationId`: `string`; `outcome?`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `parentRunId`: `string`; `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `requestDigest`: `string`; `settled`: `boolean`; `settlementId?`: `string`; `suspensionIdentity?`: `string`; `waitId?`: `string`; \}, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](./runtime/namespaces/Errors#runnotfound) \| [`ExternalChildCapacityUnavailable`](./unstable.runtime.external-child-placement#externalchildcapacityunavailable) \| [`ExternalChildPlacementConflict`](./unstable.runtime.external-child-placement#externalchildplacementconflict) \| [`RunTerminal`](./runtime/namespaces/Errors#runterminal) \| [`StaleClaim`](./runtime/namespaces/Errors#staleclaim) \| `StaleSessionClaim`\>
 
+<a id="rootsettlement"></a>
+
 ##### rootSettlement
 
 > `readonly` **rootSettlement**: (`placementId`) => `Effect`\<`Option`\<\{ `acknowledged`: `boolean`; `outcome`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `settlementId`: `string`; \}\>, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
@@ -333,6 +357,8 @@ Read the stable terminal delivery. None means the root is not terminal yet.
 ###### Returns
 
 `Effect`\<`Option`\<\{ `acknowledged`: `boolean`; `outcome`: [`RunOutcome`](./runtime/namespaces/Run#runoutcome); `placementId`: `string`; `ref`: \{ `partition`: `string`; `runId`: `string`; \}; `settlementId`: `string`; \}\>, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`ExternalRootNotFound`](./unstable.runtime.external-child-placement#externalrootnotfound)\>
+
+<a id="settle"></a>
 
 ##### settle
 

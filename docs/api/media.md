@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="mediareaderror"></a>
+
 ### MediaReadError
 
 **`Experimental`**
@@ -19,6 +21,8 @@ Media bytes could not be read from the requested platform path.
 - `MediaReadError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@ Media bytes could not be read from the requested platform path.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -52,6 +58,8 @@ Media bytes could not be read from the requested platform path.
 
 `MediaReadError_base.hint`
 
+<a id="path"></a>
+
 ##### path
 
 > `readonly` **path**: `string`
@@ -61,6 +69,8 @@ Media bytes could not be read from the requested platform path.
 ###### Inherited from
 
 `MediaReadError_base.path`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -74,6 +84,8 @@ Media bytes could not be read from the requested platform path.
 
 ***
 
+<a id="mediatypeunsupported"></a>
+
 ### MediaTypeUnsupported
 
 **`Experimental`**
@@ -85,6 +97,8 @@ A file extension cannot be mapped to a supported media type.
 - `MediaTypeUnsupported_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -108,6 +122,8 @@ A file extension cannot be mapped to a supported media type.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -117,6 +133,8 @@ A file extension cannot be mapped to a supported media type.
 ###### Inherited from
 
 `MediaTypeUnsupported_base.hint`
+
+<a id="path-1"></a>
 
 ##### path
 
@@ -130,6 +148,8 @@ A file extension cannot be mapped to a supported media type.
 
 ## Interfaces
 
+<a id="frompathoptions"></a>
+
 ### FromPathOptions
 
 **`Experimental`**
@@ -138,11 +158,15 @@ Optional media metadata overrides for `Media.fromPath`.
 
 #### Properties
 
+<a id="filename"></a>
+
 ##### filename?
 
 > `readonly` `optional` **filename?**: `string`
 
 **`Experimental`**
+
+<a id="mediatype"></a>
 
 ##### mediaType?
 
@@ -151,6 +175,8 @@ Optional media metadata overrides for `Media.fromPath`.
 **`Experimental`**
 
 ## Type Aliases
+
+<a id="frompatherror"></a>
 
 ### FromPathError
 
@@ -162,6 +188,8 @@ Typed failures returned by `Media.fromPath`.
 
 ***
 
+<a id="ref"></a>
+
 ### Ref
 
 > **Ref** = *typeof* `Ref.Type`
@@ -171,6 +199,8 @@ Typed failures returned by `Media.fromPath`.
 Content-addressed reference persisted in prompts, journals, and API payloads.
 
 ## Variables
+
+<a id="file"></a>
 
 ### File
 
@@ -200,6 +230,8 @@ Schema for a typed Agent field containing media of one declared media type.
 
 ***
 
+<a id="frompath"></a>
+
 ### fromPath
 
 > `const` **fromPath**: (`pathValue`, `options?`) => `Effect.Effect`\<\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}, [`BlobStoreError`](./blob-store#blobstoreerror) \| [`BlobTooLarge`](./blob-store#blobtoolarge) \| [`MediaReadError`](#mediareaderror) \| [`MediaTypeUnsupported`](#mediatypeunsupported), [`BlobStore`](./blob-store#blobstore) \| `FileSystem.FileSystem` \| `Path.Path`\>
@@ -224,6 +256,8 @@ Reads one platform file into BlobStore and returns its durable content reference
 
 ***
 
+<a id="part"></a>
+
 ### part
 
 > `const` **part**: *typeof* `makePart`
@@ -234,6 +268,8 @@ Create a durable Effect AI file part containing only a Media.Ref marker.
 
 ***
 
+<a id="ref-1"></a>
+
 ### Ref
 
 > `const` **Ref**: `Schema.Struct`\<\{ `bytes`: `Schema.Int`; `filename`: `Schema.optionalKey`\<`Schema.String`\>; `mediaType`: `Schema.String`; `sha256`: `Schema.String`; \}\>
@@ -243,6 +279,8 @@ Create a durable Effect AI file part containing only a Media.Ref marker.
 Content-addressed reference persisted in prompts, journals, and API payloads.
 
 ***
+
+<a id="resolve"></a>
 
 ### resolve
 
@@ -281,6 +319,8 @@ Resolve a Media.Ref to provider-ready bytes or a URL from BlobStore.
 `Effect.Effect`\<`FilePart`, [`BlobNotFound`](./blob-store#blobnotfound) \| [`BlobStoreError`](./blob-store#blobstoreerror), [`BlobStore`](./blob-store#blobstore)\>
 
 ## References
+
+<a id="refvalue"></a>
 
 ### RefValue
 

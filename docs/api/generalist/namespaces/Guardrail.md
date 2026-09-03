@@ -8,6 +8,8 @@
 
 ## Variables
 
+<a id="filteroutput"></a>
+
 ### filterOutput
 
 > `const` **filterOutput**: (`keep`) => [`Middleware`](./ModelMiddleware#middleware)
@@ -25,6 +27,8 @@ Drop streamed non-tool-call parts when `keep` returns false.
 [`Middleware`](./ModelMiddleware#middleware)
 
 ***
+
+<a id="redactinput"></a>
 
 ### redactInput
 
@@ -44,6 +48,8 @@ Redact matches in text-bearing prompt fields before the model sees them.
 
 ***
 
+<a id="redactoutput"></a>
+
 ### redactOutput
 
 > `const` **redactOutput**: (`options`) => [`Middleware`](./ModelMiddleware#middleware)
@@ -61,6 +67,8 @@ Redact matches in streamed text deltas before Generalist folds or emits them.
 [`Middleware`](./ModelMiddleware#middleware)
 
 ***
+
+<a id="validateinput"></a>
 
 ### validateInput
 

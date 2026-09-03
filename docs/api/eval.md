@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="invalidsuiteoptions"></a>
+
 ### InvalidSuiteOptions
 
 #### Extends
@@ -15,6 +17,8 @@
 - `InvalidSuiteOptions_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `InvalidSuiteOptions_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -54,9 +62,13 @@
 
 ## Interfaces
 
+<a id="judgeoptions"></a>
+
 ### JudgeOptions
 
 #### Properties
+
+<a id="model"></a>
 
 ##### model
 
@@ -64,11 +76,15 @@
 
 Stable label for the supplied LanguageModel, included in score output.
 
+<a id="rubric"></a>
+
 ##### rubric
 
 > `readonly` **rubric**: `string`
 
 ***
+
+<a id="scorer"></a>
 
 ### Scorer
 
@@ -83,6 +99,8 @@ Stable label for the supplied LanguageModel, included in score output.
 `E` = `never`
 
 #### Properties
+
+<a id="evaluate"></a>
 
 ##### evaluate
 
@@ -150,15 +168,21 @@ readonly `object`[]
 
 `Effect`\<\{ `message?`: `string`; `passed`: `boolean`; `scorer`: `string`; `value`: `number`; \}, `E`, `R`\>
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
 ***
 
+<a id="suiteoptions"></a>
+
 ### SuiteOptions
 
 #### Properties
+
+<a id="concurrency"></a>
 
 ##### concurrency
 
@@ -166,13 +190,19 @@ readonly `object`[]
 
 ***
 
+<a id="usagelimit"></a>
+
 ### UsageLimit
 
 #### Properties
 
+<a id="tokens"></a>
+
 ##### tokens?
 
 > `readonly` `optional` **tokens?**: `number`
+
+<a id="usd"></a>
 
 ##### usd?
 
@@ -180,11 +210,15 @@ readonly `object`[]
 
 ## Type Aliases
 
+<a id="score"></a>
+
 ### Score
 
 > **Score** = *typeof* `Score.Type`
 
 ***
+
+<a id="suiteresult"></a>
 
 ### SuiteResult
 
@@ -192,11 +226,15 @@ readonly `object`[]
 
 ***
 
+<a id="suiterow"></a>
+
 ### SuiteRow
 
 > **SuiteRow** = *typeof* `SuiteRow.Type`
 
 ## Variables
+
+<a id="gatespassed"></a>
 
 ### gatesPassed
 
@@ -209,6 +247,8 @@ Score whether the latest verdict for every completion gate passed.
 [`Scorer`](#scorer)
 
 ***
+
+<a id="judge"></a>
 
 ### judge
 
@@ -227,6 +267,8 @@ Score with the LanguageModel supplied in the Effect environment.
 [`Scorer`](#scorer)\<`LanguageModel.LanguageModel`, `AiError.AiError`\>
 
 ***
+
+<a id="outputmatches"></a>
 
 ### outputMatches
 
@@ -250,6 +292,8 @@ Score with the LanguageModel supplied in the Effect environment.
 
 ***
 
+<a id="runsuite"></a>
+
 ### runSuite
 
 > `const` **runSuite**: `RunSuite`
@@ -257,6 +301,8 @@ Score with the LanguageModel supplied in the Effect environment.
 Run a typed Agent over a dataset through Runtime, score each journal, and print a plain-text table.
 
 ***
+
+<a id="score-1"></a>
 
 ### score
 
@@ -350,11 +396,15 @@ readonly [`Scorer`](#scorer)\<`R`, `E`\>[]
 
 ***
 
+<a id="score-2"></a>
+
 ### Score
 
 > `const` **Score**: `Schema.Struct`\<\{ `message`: `Schema.optionalKey`\<`Schema.String`\>; `passed`: `Schema.Boolean`; `scorer`: `Schema.String`; `value`: `Schema.Finite`; \}\>
 
 ***
+
+<a id="suiteresult-1"></a>
 
 ### SuiteResult
 
@@ -362,11 +412,15 @@ readonly [`Scorer`](#scorer)\<`R`, `E`\>[]
 
 ***
 
+<a id="suiterow-1"></a>
+
 ### SuiteRow
 
 > `const` **SuiteRow**: `Schema.Struct`\<\{ `index`: `Schema.Int`; `output`: `Schema.Unknown`; `runId`: `Schema.String`; `scores`: `Schema.$Array`\<`Schema.Struct`\<\{ `message`: `Schema.optionalKey`\<`Schema.String`\>; `passed`: `Schema.Boolean`; `scorer`: `Schema.String`; `value`: `Schema.Finite`; \}\>\>; \}\>
 
 ***
+
+<a id="toolcalledatmost"></a>
 
 ### toolCalledAtMost
 
@@ -405,6 +459,8 @@ readonly [`Scorer`](#scorer)\<`R`, `E`\>[]
 [`Scorer`](#scorer)
 
 ***
+
+<a id="usageunder"></a>
 
 ### usageUnder
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="executableresolver"></a>
+
 ### ExecutableResolver
 
 #### Extends
@@ -15,6 +17,8 @@
 - `ExecutableResolver_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ## Interfaces
 
+<a id="agentcapabilityrequest"></a>
+
 ### AgentCapabilityRequest
 
 Exact persisted authority for one reconstructed Program Agent handler.
@@ -46,13 +52,19 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 #### Properties
 
+<a id="agent"></a>
+
 ##### agent
 
 > `readonly` **agent**: `string` & `Brand`\<`"generalist/agent-pin"`\>
 
+<a id="agentmanifest"></a>
+
 ##### agentManifest
 
 > `readonly` **agentManifest**: [`AgentManifest`](../../generalist/namespaces/AgentManifest#agentmanifest)
+
+<a id="manifest"></a>
 
 ##### manifest
 
@@ -62,6 +74,8 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`manifest`](#manifest-2)
 
+<a id="pin"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
@@ -70,6 +84,8 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`pin`](#pin-1)
 
+<a id="program"></a>
+
 ##### program
 
 > `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
@@ -77,6 +93,8 @@ Exact persisted authority for one reconstructed Program Agent handler.
 ###### Inherited from
 
 [`CapabilityRequest`](#capabilityrequest).[`program`](#program-1)
+
+<a id="ref"></a>
 
 ##### ref
 
@@ -93,6 +111,8 @@ Exact persisted authority for one reconstructed Program Agent handler.
 ###### Inherited from
 
 [`CapabilityRequest`](#capabilityrequest).[`ref`](#ref-2)
+
+<a id="registration"></a>
 
 ##### registration
 
@@ -118,6 +138,8 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`registration`](#registration-1)
 
+<a id="runid"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -126,11 +148,15 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`runId`](#runid-1)
 
+<a id="selection"></a>
+
 ##### selection
 
 > `readonly` **selection**: `string`
 
 ***
+
+<a id="agentresolution"></a>
 
 ### AgentResolution
 
@@ -138,17 +164,25 @@ Live executable resources owned by the caller's scope.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Agent"`
+
+<a id="agent-1"></a>
 
 ##### agent
 
 > `readonly` **agent**: [`Closed`](../../generalist/namespaces/Agent#closed)
 
+<a id="attestation"></a>
+
 ##### attestation
 
 > `readonly` **attestation**: [`Attestation`](#attestation-1)
+
+<a id="runoptions"></a>
 
 ##### runOptions?
 
@@ -156,15 +190,21 @@ Live executable resources owned by the caller's scope.
 
 ***
 
+<a id="attestation-1"></a>
+
 ### Attestation
 
 Resolver-owned proof of the reconstructed executable identity.
 
 #### Properties
 
+<a id="manifest-1"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+
+<a id="ref-1"></a>
 
 ##### ref
 
@@ -179,6 +219,8 @@ Resolver-owned proof of the reconstructed executable identity.
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
 
 ***
+
+<a id="capabilityrequest"></a>
 
 ### CapabilityRequest
 
@@ -192,17 +234,25 @@ Exact persisted authority for one reconstructed Program capability pin.
 
 #### Properties
 
+<a id="manifest-2"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+
+<a id="pin-1"></a>
 
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
 
+<a id="program-1"></a>
+
 ##### program
 
 > `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+
+<a id="ref-2"></a>
 
 ##### ref
 
@@ -215,6 +265,8 @@ Exact persisted authority for one reconstructed Program capability pin.
 ###### executable
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
+
+<a id="registration-1"></a>
 
 ##### registration
 
@@ -236,11 +288,15 @@ Exact persisted authority for one reconstructed Program capability pin.
 
 > `readonly` **version**: `string`
 
+<a id="runid-1"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
 
 ***
+
+<a id="codecrequest"></a>
 
 ### CodecRequest
 
@@ -252,9 +308,13 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 #### Properties
 
+<a id="boundary"></a>
+
 ##### boundary
 
 > `readonly` **boundary**: `"input"` \| `"output"`
+
+<a id="manifest-3"></a>
 
 ##### manifest
 
@@ -264,6 +324,8 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 [`CapabilityRequest`](#capabilityrequest).[`manifest`](#manifest-2)
 
+<a id="pin-2"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
@@ -272,6 +334,8 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 [`CapabilityRequest`](#capabilityrequest).[`pin`](#pin-1)
 
+<a id="program-2"></a>
+
 ##### program
 
 > `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
@@ -279,6 +343,8 @@ Exact persisted authority for one reconstructed Program boundary codec.
 ###### Inherited from
 
 [`CapabilityRequest`](#capabilityrequest).[`program`](#program-1)
+
+<a id="ref-3"></a>
 
 ##### ref
 
@@ -295,6 +361,8 @@ Exact persisted authority for one reconstructed Program boundary codec.
 ###### Inherited from
 
 [`CapabilityRequest`](#capabilityrequest).[`ref`](#ref-2)
+
+<a id="registration-2"></a>
 
 ##### registration
 
@@ -320,6 +388,8 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 [`CapabilityRequest`](#capabilityrequest).[`registration`](#registration-1)
 
+<a id="runid-2"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -330,15 +400,21 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 ***
 
+<a id="input"></a>
+
 ### Input
 
 Exact persisted identity supplied to executable reconstruction.
 
 #### Properties
 
+<a id="manifest-4"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+
+<a id="ref-4"></a>
 
 ##### ref
 
@@ -352,15 +428,21 @@ Exact persisted identity supplied to executable reconstruction.
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
 
+<a id="registrations"></a>
+
 ##### registrations
 
 > `readonly` **registrations**: readonly `object`[]
+
+<a id="runid-3"></a>
 
 ##### runId
 
 > `readonly` **runId**: `string`
 
 ***
+
+<a id="namedcapabilityrequest"></a>
 
 ### NamedCapabilityRequest
 
@@ -372,6 +454,8 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 #### Properties
 
+<a id="manifest-5"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
@@ -380,9 +464,13 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`manifest`](#manifest-2)
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="pin-3"></a>
 
 ##### pin
 
@@ -392,6 +480,8 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`pin`](#pin-1)
 
+<a id="program-3"></a>
+
 ##### program
 
 > `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
@@ -399,6 +489,8 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 ###### Inherited from
 
 [`CapabilityRequest`](#capabilityrequest).[`program`](#program-1)
+
+<a id="ref-5"></a>
 
 ##### ref
 
@@ -415,6 +507,8 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 ###### Inherited from
 
 [`CapabilityRequest`](#capabilityrequest).[`ref`](#ref-2)
+
+<a id="registration-3"></a>
 
 ##### registration
 
@@ -440,6 +534,8 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 [`CapabilityRequest`](#capabilityrequest).[`registration`](#registration-1)
 
+<a id="runid-4"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -450,6 +546,8 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 ***
 
+<a id="programreconstruction"></a>
+
 ### ProgramReconstruction
 
 Application-owned reconstruction of one admitted Agent Program from its exact persisted
@@ -457,6 +555,8 @@ registrations. Every member owns its codec, version, and credential dereference,
 resources finalized with the resolver scope.
 
 #### Properties
+
+<a id="agent-2"></a>
 
 ##### agent
 
@@ -472,6 +572,8 @@ resources finalized with the resolver scope.
 
 `Effect`\<[`AnyAgent`](../../generalist/namespaces/ProgramHandlers#anyagent), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
+<a id="codec"></a>
+
 ##### codec
 
 > `readonly` **codec**: (`request`) => `Effect`\<`Codec`\<`unknown`, `unknown`, `never`, `never`\>, [`ReconstructionError`](#reconstructionerror), `Scope`\>
@@ -485,6 +587,8 @@ resources finalized with the resolver scope.
 ###### Returns
 
 `Effect`\<`Codec`\<`unknown`, `unknown`, `never`, `never`\>, [`ReconstructionError`](#reconstructionerror), `Scope`\>
+
+<a id="executor"></a>
 
 ##### executor
 
@@ -500,6 +604,8 @@ resources finalized with the resolver scope.
 
 `Effect`\<[`Service`](../../generalist/namespaces/CodeExecutor#service), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
+<a id="services"></a>
+
 ##### services?
 
 > `readonly` `optional` **services?**: (`request`) => `Effect`\<`Layer`\<`never`, `never`, `never`\>, [`ReconstructionError`](#reconstructionerror), `Scope`\>
@@ -514,6 +620,8 @@ resources finalized with the resolver scope.
 
 `Effect`\<`Layer`\<`never`, `never`, `never`\>, [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
+<a id="step"></a>
+
 ##### step
 
 > `readonly` **step**: (`request`) => `Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
@@ -527,6 +635,8 @@ resources finalized with the resolver scope.
 ###### Returns
 
 `Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+
+<a id="tool"></a>
 
 ##### tool
 
@@ -544,31 +654,45 @@ resources finalized with the resolver scope.
 
 ***
 
+<a id="programresolution"></a>
+
 ### ProgramResolution
 
 Live Agent Program resources owned by the caller's scope.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Program"`
+
+<a id="attestation-2"></a>
 
 ##### attestation
 
 > `readonly` **attestation**: [`Attestation`](#attestation-1)
 
+<a id="executor-1"></a>
+
 ##### executor
 
 > `readonly` **executor**: [`Service`](../../generalist/namespaces/CodeExecutor#service)
+
+<a id="handlers"></a>
 
 ##### handlers
 
 > `readonly` **handlers**: [`Handlers`](../../generalist/namespaces/ProgramHandlers#handlers)
 
+<a id="program-4"></a>
+
 ##### program
 
 > `readonly` **program**: [`Program`](../../generalist/namespaces/AgentProgram#program)\<`unknown`, `unknown`, `unknown`, `unknown`\>
+
+<a id="services-1"></a>
 
 ##### services?
 
@@ -576,9 +700,13 @@ Live Agent Program resources owned by the caller's scope.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="resolve"></a>
 
 ##### resolve
 
@@ -596,19 +724,27 @@ Live Agent Program resources owned by the caller's scope.
 
 ***
 
+<a id="servicesrequest"></a>
+
 ### ServicesRequest
 
 Exact persisted authority for the Run-scoped services of one reconstructed Program.
 
 #### Properties
 
+<a id="manifest-6"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
 
+<a id="program-5"></a>
+
 ##### program
 
 > `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+
+<a id="ref-6"></a>
 
 ##### ref
 
@@ -622,9 +758,13 @@ Exact persisted authority for the Run-scoped services of one reconstructed Progr
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
 
+<a id="registrations-1"></a>
+
 ##### registrations
 
 > `readonly` **registrations**: readonly `object`[]
+
+<a id="runid-5"></a>
 
 ##### runId
 
@@ -632,23 +772,33 @@ Exact persisted authority for the Run-scoped services of one reconstructed Progr
 
 ***
 
+<a id="staticagentexecutable"></a>
+
 ### StaticAgentExecutable
 
 One exact static Agent executable bound to its persisted Agent pin.
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag?
 
 > `readonly` `optional` **\_tag?**: `"Agent"`
+
+<a id="agent-3"></a>
 
 ##### agent
 
 > `readonly` **agent**: [`Closed`](../../generalist/namespaces/Agent#closed)
 
+<a id="executable"></a>
+
 ##### executable
 
 > `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+
+<a id="runoptions-1"></a>
 
 ##### runOptions?
 
@@ -656,31 +806,45 @@ One exact static Agent executable bound to its persisted Agent pin.
 
 ***
 
+<a id="staticprogramexecutable"></a>
+
 ### StaticProgramExecutable
 
 One exact static Program executable bound to its persisted Program pin.
 
 #### Properties
 
+<a id="_tag-3"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Program"`
+
+<a id="executable-1"></a>
 
 ##### executable
 
 > `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
 
+<a id="executor-2"></a>
+
 ##### executor
 
 > `readonly` **executor**: [`Service`](../../generalist/namespaces/CodeExecutor#service)
+
+<a id="handlers-1"></a>
 
 ##### handlers
 
 > `readonly` **handlers**: [`Handlers`](../../generalist/namespaces/ProgramHandlers#handlers)
 
+<a id="program-6"></a>
+
 ##### program
 
 > `readonly` **program**: [`Program`](../../generalist/namespaces/AgentProgram#program)\<`unknown`, `unknown`, `unknown`, `unknown`\>
+
+<a id="services-2"></a>
 
 ##### services?
 
@@ -688,11 +852,15 @@ One exact static Program executable bound to its persisted Program pin.
 
 ***
 
+<a id="staticrunoptions"></a>
+
 ### StaticRunOptions
 
 Resolver-owned static options attested by the persisted Agent manifest.
 
 #### Properties
+
+<a id="compaction"></a>
 
 ##### compaction?
 
@@ -708,6 +876,8 @@ Resolver-owned static options attested by the persisted Agent manifest.
 
 ## Type Aliases
 
+<a id="reconstructionerror"></a>
+
 ### ReconstructionError
 
 > **ReconstructionError** = [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)
@@ -715,6 +885,8 @@ Resolver-owned static options attested by the persisted Agent manifest.
 Typed failures allowed while reconstructing an admitted executable.
 
 ***
+
+<a id="resolution"></a>
 
 ### Resolution
 
@@ -724,6 +896,8 @@ Exactly one reconstructed executable kind.
 
 ***
 
+<a id="resolveerror"></a>
+
 ### ResolveError
 
 > **ResolveError** = [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)
@@ -731,6 +905,8 @@ Exactly one reconstructed executable kind.
 Typed failures allowed while resolving one executable.
 
 ***
+
+<a id="staticexecutable"></a>
 
 ### StaticExecutable
 
@@ -740,17 +916,23 @@ One exact static executable used by tests and process-local hosts.
 
 ## Variables
 
+<a id="attestation-3"></a>
+
 ### Attestation
 
 > **Attestation**: `Codec`\<[`Attestation`](#attestation-1), `unknown`, `never`, `never`\>
 
 ***
 
+<a id="input-1"></a>
+
 ### Input
 
 > **Input**: `Codec`\<[`Input`](#input), `unknown`, `never`, `never`\>
 
 ***
+
+<a id="layerdynamic"></a>
 
 ### layerDynamic
 
@@ -776,6 +958,8 @@ Canonical resolver Layer helper.
 
 ***
 
+<a id="layerstatic"></a>
+
 ### layerStatic
 
 > `const` **layerStatic**: (`executables`) => `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
@@ -793,6 +977,8 @@ Exact static resolver Layer helper.
 `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
 
 ***
+
+<a id="makedynamic"></a>
 
 ### makeDynamic
 
@@ -819,6 +1005,8 @@ every admitted Agent Program reconstructed from its exact manifest and persisted
 
 ***
 
+<a id="makestatic"></a>
+
 ### makeStatic
 
 > `const` **makeStatic**: (`executables`) => `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
@@ -836,6 +1024,8 @@ Construct an exact static resolver without resolving at admission or startup.
 `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
 
 ***
+
+<a id="matchesactiverunoptions"></a>
 
 ### matchesActiveRunOptions
 
@@ -891,6 +1081,8 @@ Verify resolver-owned static options against the persisted active Agent.
 
 ***
 
+<a id="verifyattestation"></a>
+
 ### verifyAttestation
 
 > `const` **verifyAttestation**: (`attestation`) => [`Attestation`](#attestation-1)
@@ -908,6 +1100,8 @@ Verify resolver attestation against pinned identity.
 [`Attestation`](#attestation-1)
 
 ***
+
+<a id="verifyinput"></a>
 
 ### verifyInput
 

@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="item"></a>
+
 ### Item
 
 > **Item** = *typeof* `Item.Type`
@@ -17,6 +19,8 @@
 One model-owned task list entry.
 
 ***
+
+<a id="items"></a>
 
 ### Items
 
@@ -28,6 +32,8 @@ The complete journaled task list.
 
 ***
 
+<a id="status"></a>
+
 ### Status
 
 > **Status** = *typeof* `Status.Type`
@@ -37,6 +43,8 @@ The complete journaled task list.
 Lifecycle state of one journaled task.
 
 ***
+
+<a id="update"></a>
 
 ### Update
 
@@ -48,6 +56,8 @@ One partial task edit sent through Runtime steering.
 
 ## Variables
 
+<a id="item-1"></a>
+
 ### Item
 
 > `const` **Item**: `Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>; `title`: `Schema.String`; \}\>
@@ -58,6 +68,8 @@ One model-owned task list entry.
 
 ***
 
+<a id="items-1"></a>
+
 ### Items
 
 > `const` **Items**: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>; `title`: `Schema.String`; \}\>\>
@@ -67,6 +79,8 @@ One model-owned task list entry.
 The complete journaled task list.
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -82,6 +96,8 @@ Add `tasks_read` and `tasks_write` to Agents running in this environment.
 
 ***
 
+<a id="status-1"></a>
+
 ### Status
 
 > `const` **Status**: `Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>
@@ -91,6 +107,8 @@ Add `tasks_read` and `tasks_write` to Agents running in this environment.
 Lifecycle state of one journaled task.
 
 ***
+
+<a id="update-1"></a>
 
 ### update
 
@@ -112,6 +130,8 @@ Build a steering prompt that applies partial edits through one complete `tasks_w
 
 ***
 
+<a id="update-2"></a>
+
 ### Update
 
 > `const` **Update**: `Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.NullOr`\<`Schema.String`\>\>; `status`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>\>; `title`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
@@ -122,17 +142,23 @@ One partial task edit sent through Runtime steering.
 
 ## References
 
+<a id="taskitem"></a>
+
 ### TaskItem
 
 Renames and re-exports [Item](#item-1)
 
 ***
 
+<a id="taskitems"></a>
+
 ### TaskItems
 
 Renames and re-exports [Items](#items-1)
 
 ***
+
+<a id="taskstatus"></a>
 
 ### TaskStatus
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="client"></a>
+
 ### Client
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Client_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="clientfailure"></a>
+
 ### ClientFailure
 
 #### Extends
@@ -43,6 +49,8 @@
 - `ClientFailure_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -64,6 +72,8 @@
 
 #### Properties
 
+<a id="awserrorcode"></a>
+
 ##### awsErrorCode?
 
 > `readonly` `optional` **awsErrorCode?**: `string`
@@ -71,6 +81,8 @@
 ###### Inherited from
 
 `ClientFailure_base.awsErrorCode`
+
+<a id="awserrorname"></a>
 
 ##### awsErrorName?
 
@@ -80,6 +92,8 @@
 
 `ClientFailure_base.awsErrorName`
 
+<a id="description"></a>
+
 ##### description
 
 > `readonly` **description**: `string`
@@ -87,6 +101,8 @@
 ###### Inherited from
 
 `ClientFailure_base.description`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -96,6 +112,8 @@
 
 `ClientFailure_base.hint`
 
+<a id="httpstatus"></a>
+
 ##### httpStatus?
 
 > `readonly` `optional` **httpStatus?**: `number`
@@ -104,6 +122,8 @@
 
 `ClientFailure_base.httpStatus`
 
+<a id="operation"></a>
+
 ##### operation
 
 > `readonly` **operation**: `"converse"` \| `"converseStream"` \| `"invokeModel"`
@@ -111,6 +131,8 @@
 ###### Inherited from
 
 `ClientFailure_base.operation`
+
+<a id="requestid"></a>
 
 ##### requestId?
 
@@ -122,6 +144,8 @@
 
 ***
 
+<a id="credentialfailure"></a>
+
 ### CredentialFailure
 
 #### Extends
@@ -129,6 +153,8 @@
 - `CredentialFailure_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -150,6 +176,8 @@
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -157,6 +185,8 @@
 ###### Inherited from
 
 `CredentialFailure_base.hint`
+
+<a id="operation-1"></a>
 
 ##### operation
 
@@ -168,6 +198,8 @@
 
 ***
 
+<a id="recoveryfailure"></a>
+
 ### RecoveryFailure
 
 #### Extends
@@ -175,6 +207,8 @@
 - `RecoveryFailure_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -196,6 +230,8 @@
 
 #### Properties
 
+<a id="description-1"></a>
+
 ##### description
 
 > `readonly` **description**: `string`
@@ -203,6 +239,8 @@
 ###### Inherited from
 
 `RecoveryFailure_base.description`
+
+<a id="hint-2"></a>
 
 ##### hint
 
@@ -214,41 +252,61 @@
 
 ## Interfaces
 
+<a id="clientoptions"></a>
+
 ### ClientOptions
 
 #### Properties
+
+<a id="authmode"></a>
 
 ##### authMode?
 
 > `readonly` `optional` **authMode?**: `"default"` \| `"bearer"`
 
+<a id="bearertoken"></a>
+
 ##### bearerToken?
 
 > `readonly` `optional` **bearerToken?**: `Redacted`\<`string`\>
+
+<a id="client-1"></a>
 
 ##### client?
 
 > `readonly` `optional` **client?**: [`Service`](#service)
 
+<a id="credentials"></a>
+
 ##### credentials?
 
 > `readonly` `optional` **credentials?**: [`Credentials`](#credentials-1)
+
+<a id="endpoint"></a>
 
 ##### endpoint?
 
 > `readonly` `optional` **endpoint?**: `string`
 
+<a id="profile"></a>
+
 ##### profile?
 
 > `readonly` `optional` **profile?**: `string`
+
+<a id="recovery"></a>
 
 ##### recovery?
 
 > `readonly` `optional` **recovery?**: [`Recovery`](#recovery-1)
 
+<a id="region"></a>
+
 ##### region?
 
 > `readonly` `optional` **region?**: `string`
+
+<a id="requesthandler"></a>
 
 ##### requestHandler?
 
@@ -256,25 +314,37 @@
 
 ***
 
+<a id="credential"></a>
+
 ### Credential
 
 #### Properties
+
+<a id="accesskeyid"></a>
 
 ##### accessKeyId
 
 > `readonly` **accessKeyId**: `string`
 
+<a id="expiration"></a>
+
 ##### expiration?
 
 > `readonly` `optional` **expiration?**: `Date`
+
+<a id="generation"></a>
 
 ##### generation
 
 > `readonly` **generation**: `string`
 
+<a id="secretaccesskey"></a>
+
 ##### secretAccessKey
 
 > `readonly` **secretAccessKey**: `Redacted`\<`string`\>
+
+<a id="sessiontoken"></a>
 
 ##### sessionToken?
 
@@ -282,13 +352,19 @@
 
 ***
 
+<a id="credentials-1"></a>
+
 ### Credentials
 
 #### Properties
 
+<a id="acquire"></a>
+
 ##### acquire
 
 > `readonly` **acquire**: `Effect`\<[`Credential`](#credential), [`CredentialFailure`](#credentialfailure)\>
+
+<a id="refreshrejected"></a>
 
 ##### refreshRejected
 
@@ -306,25 +382,35 @@
 
 ***
 
+<a id="embeddingoptions"></a>
+
 ### EmbeddingOptions
 
 Amazon Bedrock embedding model configuration.
 
 #### Properties
 
+<a id="dimensions"></a>
+
 ##### dimensions?
 
 > `readonly` `optional` **dimensions?**: `256` \| `512` \| `1024`
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
+
+<a id="normalize"></a>
 
 ##### normalize?
 
 > `readonly` `optional` **normalize?**: `boolean`
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -333,6 +419,8 @@ Amazon Bedrock embedding model configuration.
 - [`RegistrationOptions`](./providers.openai#registrationoptions)
 
 #### Properties
+
+<a id="config"></a>
 
 ##### config?
 
@@ -406,6 +494,8 @@ Amazon Bedrock embedding model configuration.
 
 > `readonly` `optional` **topP?**: `number`
 
+<a id="metadata"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `object`
@@ -418,9 +508,13 @@ Amazon Bedrock embedding model configuration.
 
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
 
+<a id="model-1"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -432,9 +526,13 @@ Amazon Bedrock embedding model configuration.
 
 ***
 
+<a id="recovery-1"></a>
+
 ### Recovery
 
 #### Properties
+
+<a id="recover"></a>
 
 ##### recover
 
@@ -452,9 +550,13 @@ Amazon Bedrock embedding model configuration.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="converse"></a>
 
 ##### converse
 
@@ -470,6 +572,8 @@ Amazon Bedrock embedding model configuration.
 
 `Effect`\<`ConverseCommandOutput`, [`ClientFailure`](#clientfailure)\>
 
+<a id="conversestream"></a>
+
 ##### converseStream
 
 > `readonly` **converseStream**: (`input`) => `Effect`\<`ConverseStreamCommandOutput`, [`ClientFailure`](#clientfailure)\>
@@ -483,6 +587,8 @@ Amazon Bedrock embedding model configuration.
 ###### Returns
 
 `Effect`\<`ConverseStreamCommandOutput`, [`ClientFailure`](#clientfailure)\>
+
+<a id="invokemodel"></a>
 
 ##### invokeModel
 
@@ -500,17 +606,23 @@ Amazon Bedrock embedding model configuration.
 
 ## Type Aliases
 
+<a id="config-1"></a>
+
 ### Config
 
 > **Config** = *typeof* `ConfigSchema.Type`
 
 ## Variables
 
+<a id="classifyfailure"></a>
+
 ### classifyFailure
 
 > `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
 
 ***
+
+<a id="decodeconfig"></a>
 
 ### decodeConfig
 
@@ -527,6 +639,8 @@ Amazon Bedrock embedding model configuration.
 `Effect.Effect`\<[`Config`](#config-1), `Schema.SchemaError`\>
 
 ***
+
+<a id="defaultchain"></a>
 
 ### defaultChain
 
@@ -548,6 +662,8 @@ identity, ECS and EC2 instance metadata. Values are resolved for every call.
 
 ***
 
+<a id="isrecoverablecredentialfailure"></a>
+
 ### isRecoverableCredentialFailure
 
 > `const` **isRecoverableCredentialFailure**: (`failure`) => `boolean`
@@ -563,6 +679,8 @@ identity, ECS and EC2 instance metadata. Values are resolved for every call.
 `boolean`
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -580,6 +698,8 @@ identity, ECS and EC2 instance metadata. Values are resolved for every call.
 
 ***
 
+<a id="layerclient"></a>
+
 ### layerClient
 
 > `const` **layerClient**: (`options?`) => `Layer.Layer`\<[`Client`](#client), `never`, `never`\>
@@ -595,6 +715,8 @@ identity, ECS and EC2 instance metadata. Values are resolved for every call.
 `Layer.Layer`\<[`Client`](#client), `never`, `never`\>
 
 ***
+
+<a id="layerembedding"></a>
 
 ### layerEmbedding
 
@@ -614,6 +736,8 @@ EmbeddingModel layer backed by an owned Bedrock client.
 
 ***
 
+<a id="layerlanguagemodel"></a>
+
 ### layerLanguageModel
 
 > `const` **layerLanguageModel**: (`input`) => `Layer.Layer`\<`LanguageModel.LanguageModel`, `never`, [`Client`](#client)\>
@@ -629,6 +753,8 @@ EmbeddingModel layer backed by an owned Bedrock client.
 `Layer.Layer`\<`LanguageModel.LanguageModel`, `never`, [`Client`](#client)\>
 
 ***
+
+<a id="layermodel"></a>
 
 ### layerModel
 
@@ -648,6 +774,8 @@ Model layer over the Bedrock `Client`; provide it to a run with `Effect.provide`
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`input`) => `Effect.Effect`\<`LanguageModel.Service`, `never`, [`Client`](#client)\>
@@ -663,6 +791,8 @@ Model layer over the Bedrock `Client`; provide it to a run with `Effect.provide`
 `Effect.Effect`\<`LanguageModel.Service`, `never`, [`Client`](#client)\>
 
 ***
+
+<a id="makeembedding"></a>
 
 ### makeEmbedding
 
@@ -681,6 +811,8 @@ Effect AI EmbeddingModel backed by Bedrock InvokeModel.
 `Effect.Effect`\<`EmbeddingModel.Service`, `never`, [`Client`](#client)\>
 
 ***
+
+<a id="tooljsonschemacompiler"></a>
 
 ### toolJsonSchemaCompiler
 

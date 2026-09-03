@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="workercontext"></a>
+
 ### WorkerContext
 
 **`Experimental`**
@@ -17,6 +19,8 @@
 - `WorkerContext_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -40,11 +44,15 @@
 
 ## Interfaces
 
+<a id="executioncontext"></a>
+
 ### ExecutionContext
 
 **`Experimental`**
 
 #### Properties
+
+<a id="passthroughonexception"></a>
 
 ##### passThroughOnException
 
@@ -55,6 +63,8 @@
 ###### Returns
 
 `void`
+
+<a id="waituntil"></a>
 
 ##### waitUntil
 
@@ -74,17 +84,23 @@
 
 ***
 
+<a id="requestcontext"></a>
+
 ### RequestContext
 
 **`Experimental`**
 
 #### Properties
 
+<a id="bindings"></a>
+
 ##### bindings
 
 > `readonly` **bindings**: `object`
 
 **`Experimental`**
+
+<a id="executioncontext-1"></a>
 
 ##### executionContext
 
@@ -93,6 +109,8 @@
 **`Experimental`**
 
 ***
+
+<a id="worker"></a>
 
 ### Worker
 
@@ -105,6 +123,8 @@
 `Bindings` *extends* `object`
 
 #### Properties
+
+<a id="fetch"></a>
 
 ##### fetch
 
@@ -132,6 +152,8 @@
 
 ## Type Aliases
 
+<a id="bindingvalue"></a>
+
 ### BindingValue
 
 > **BindingValue** = `string` \| `number` \| `boolean` \| `null` \| `undefined` \| `object`
@@ -141,6 +163,8 @@
 Values exposed by Cloudflare Worker bindings.
 
 ## Variables
+
+<a id="make"></a>
 
 ### make
 
@@ -169,6 +193,8 @@ Values exposed by Cloudflare Worker bindings.
 [`Worker`](#worker)\<`Bindings`\>
 
 ***
+
+<a id="makeconfigprovider"></a>
 
 ### makeConfigProvider
 

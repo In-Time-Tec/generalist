@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="programhandlermismatch"></a>
+
 ### ProgramHandlerMismatch
 
 #### Extends
@@ -15,6 +17,8 @@
 - `ProgramHandlerMismatch_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `ProgramHandlerMismatch_base.hint`
+
+<a id="kind"></a>
 
 ##### kind
 
@@ -52,6 +60,8 @@
 
 `ProgramHandlerMismatch_base.kind`
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -59,6 +69,8 @@
 ###### Inherited from
 
 `ProgramHandlerMismatch_base.name`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -70,6 +82,8 @@
 
 ***
 
+<a id="programidentitymismatch"></a>
+
 ### ProgramIdentityMismatch
 
 #### Extends
@@ -77,6 +91,8 @@
 - `ProgramIdentityMismatch_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -98,6 +114,8 @@
 
 #### Properties
 
+<a id="actual"></a>
+
 ##### actual
 
 > `readonly` **actual**: `string`
@@ -106,6 +124,8 @@
 
 `ProgramIdentityMismatch_base.actual`
 
+<a id="expected"></a>
+
 ##### expected
 
 > `readonly` **expected**: `string`
@@ -113,6 +133,8 @@
 ###### Inherited from
 
 `ProgramIdentityMismatch_base.expected`
+
+<a id="hint-1"></a>
 
 ##### hint
 
@@ -124,6 +146,8 @@
 
 ***
 
+<a id="programrunner"></a>
+
 ### ProgramRunner
 
 Owner of Agent Program execution and its host policy.
@@ -133,6 +157,8 @@ Owner of Agent Program execution and its host policy.
 - `ProgramRunner_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -154,15 +180,21 @@ Owner of Agent Program execution and its host policy.
 
 ## Interfaces
 
+<a id="request"></a>
+
 ### Request
 
 Encoded execution request used by direct and durable hosts.
 
 #### Properties
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `unknown`
+
+<a id="program"></a>
 
 ##### program
 
@@ -170,9 +202,13 @@ Encoded execution request used by direct and durable hosts.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="execute"></a>
 
 ##### execute
 
@@ -190,11 +226,15 @@ Encoded execution request used by direct and durable hosts.
 
 ## Type Aliases
 
+<a id="executionfailure"></a>
+
 ### ExecutionFailure
 
 > **ExecutionFailure** = *typeof* `ExecutionFailure.Type`
 
 ## Variables
+
+<a id="executionfailure-1"></a>
 
 ### ExecutionFailure
 
@@ -203,6 +243,8 @@ Encoded execution request used by direct and durable hosts.
 Failures returned by Core-owned Program execution.
 
 ***
+
+<a id="layerdirect"></a>
 
 ### layerDirect
 
@@ -227,6 +269,8 @@ Direct process-local runner for an explicitly supplied code executor and live ha
 `Layer.Layer`\<[`ProgramRunner`](#programrunner)\>
 
 ***
+
+<a id="validatehandlers"></a>
 
 ### validateHandlers
 

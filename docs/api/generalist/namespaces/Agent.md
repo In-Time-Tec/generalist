@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="awaiteventinvalid"></a>
+
 ### AwaitEventInvalid
 
 The requested event timeout is not finite and positive.
@@ -17,6 +19,8 @@ The requested event timeout is not finite and positive.
 - `AwaitEventInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ The requested event timeout is not finite and positive.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -45,6 +51,8 @@ The requested event timeout is not finite and positive.
 ###### Inherited from
 
 `AwaitEventInvalid_base.hint`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -56,6 +64,8 @@ The requested event timeout is not finite and positive.
 
 ***
 
+<a id="inspector"></a>
+
 ### Inspector
 
 #### Extends
@@ -63,6 +73,8 @@ The requested event timeout is not finite and positive.
 - `Inspector_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -84,6 +96,8 @@ The requested event timeout is not finite and positive.
 
 #### Accessors
 
+<a id="layermemory"></a>
+
 ##### layerMemory
 
 ###### Get Signature
@@ -95,6 +109,8 @@ The requested event timeout is not finite and positive.
 `Layer`\<[`Inspector`](#inspector)\>
 
 #### Methods
+
+<a id="layertest"></a>
 
 ##### layerTest()
 
@@ -112,6 +128,8 @@ The requested event timeout is not finite and positive.
 
 ***
 
+<a id="inspectorrunnotfound"></a>
+
 ### InspectorRunNotFound
 
 The requested process-local Run is not known to this Inspector.
@@ -121,6 +139,8 @@ The requested process-local Run is not known to this Inspector.
 - `RunNotFound_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -142,6 +162,8 @@ The requested process-local Run is not known to this Inspector.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -149,6 +171,8 @@ The requested process-local Run is not known to this Inspector.
 ###### Inherited from
 
 `RunNotFound_base.hint`
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -159,6 +183,8 @@ The requested process-local Run is not known to this Inspector.
 `RunNotFound_base.runId`
 
 ## Interfaces
+
+<a id="agent"></a>
 
 ### Agent
 
@@ -192,9 +218,13 @@ An Agent definition carrying its tools, requirements, input, and output contract
 
 #### Properties
 
+<a id="authorization"></a>
+
 ##### authorization?
 
 > `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
+
+<a id="budget"></a>
 
 ##### budget?
 
@@ -220,9 +250,13 @@ An Agent definition carrying its tools, requirements, input, and output contract
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="gates"></a>
+
 ##### gates
 
 > `readonly` **gates**: readonly [`Any`](./Gate#any)[]
+
+<a id="generalistcoreagent"></a>
 
 ##### generalist/core/Agent
 
@@ -235,6 +269,8 @@ An Agent definition carrying its tools, requirements, input, and output contract
 ###### tools
 
 > `readonly` **tools**: `Invariant`\<`Tools`\>
+
+<a id="handoff"></a>
 
 ##### handoff
 
@@ -256,63 +292,93 @@ An Agent definition carrying its tools, requirements, input, and output contract
 
 `A`
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `InputSchema`
+
+<a id="instructions"></a>
 
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
 
+<a id="memory"></a>
+
 ##### memory?
 
 > `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+
+<a id="metadata"></a>
 
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
 
+<a id="model"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+
+<a id="name"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="ongatefailure"></a>
+
 ##### onGateFailure
 
 > `readonly` **onGateFailure**: [`FailureMode`](./Gate#failuremode)
+
+<a id="output"></a>
 
 ##### output
 
 > `readonly` **output**: `OutputSchema`
 
+<a id="policy"></a>
+
 ##### policy
 
 > `readonly` **policy**: [`Policy`](./Policy-1#policy)\<`PolicyServices`\>
+
+<a id="sandbox"></a>
 
 ##### sandbox?
 
 > `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
 
+<a id="supplemental"></a>
+
 ##### supplemental?
 
 > `readonly` `optional` **supplemental?**: `string`
+
+<a id="tooldeclarations"></a>
 
 ##### toolDeclarations?
 
 > `readonly` `optional` **toolDeclarations?**: readonly [`ToolDeclaration`](#tooldeclaration)[]
 
+<a id="toolkit"></a>
+
 ##### toolkit
 
 > `readonly` **toolkit**: `Toolkit`\<`Tools`\>
+
+<a id="toolscheduling"></a>
 
 ##### toolScheduling
 
 > `readonly` **toolScheduling**: [`ToolSchedulingPolicy`](#toolschedulingpolicy)
 
 ***
+
+<a id="any"></a>
 
 ### Any
 
@@ -324,9 +390,13 @@ One Agent observed where its tool and requirement types are hidden.
 
 #### Properties
 
+<a id="authorization-1"></a>
+
 ##### authorization?
 
 > `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`unknown`\>
+
+<a id="budget-1"></a>
 
 ##### budget?
 
@@ -352,61 +422,91 @@ One Agent observed where its tool and requirement types are hidden.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="gates-1"></a>
+
 ##### gates
 
 > `readonly` **gates**: readonly [`Any`](./Gate#any)[]
+
+<a id="generalistcoreagent-1"></a>
 
 ##### generalist/core/Agent
 
 > `readonly` **generalist/core/Agent**: `unknown`
 
+<a id="input-1"></a>
+
 ##### input
 
 > `readonly` **input**: `Top`
+
+<a id="instructions-1"></a>
 
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
 
+<a id="memory-1"></a>
+
 ##### memory?
 
 > `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+
+<a id="metadata-1"></a>
 
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
 
+<a id="model-1"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+
+<a id="name-1"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="ongatefailure-1"></a>
+
 ##### onGateFailure
 
 > `readonly` **onGateFailure**: [`FailureMode`](./Gate#failuremode)
+
+<a id="output-1"></a>
 
 ##### output
 
 > `readonly` **output**: `Top`
 
+<a id="policy-1"></a>
+
 ##### policy
 
 > `readonly` **policy**: [`Policy`](./Policy-1#policy)\<`unknown`\>
+
+<a id="sandbox-1"></a>
 
 ##### sandbox?
 
 > `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
 
+<a id="tooldeclarations-1"></a>
+
 ##### toolDeclarations?
 
 > `readonly` `optional` **toolDeclarations?**: readonly [`ToolDeclaration`](#tooldeclaration)[]
 
+<a id="toolkit-1"></a>
+
 ##### toolkit
 
 > `readonly` **toolkit**: `Any`
+
+<a id="toolscheduling-1"></a>
 
 ##### toolScheduling
 
@@ -414,15 +514,21 @@ One Agent observed where its tool and requirement types are hidden.
 
 ***
 
+<a id="awaiteventoptions"></a>
+
 ### AwaitEventOptions
 
 #### Properties
+
+<a id="timeout"></a>
 
 ##### timeout
 
 > `readonly` **timeout**: `Input`
 
 ***
+
+<a id="closed"></a>
 
 ### Closed
 
@@ -434,6 +540,8 @@ An Agent closed over its exact environment.
 
 #### Properties
 
+<a id="authorization-2"></a>
+
 ##### authorization?
 
 > `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`unknown`\>
@@ -441,6 +549,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`authorization`](#authorization-1)
+
+<a id="budget-2"></a>
 
 ##### budget?
 
@@ -470,6 +580,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`budget`](#budget-1)
 
+<a id="gates-2"></a>
+
 ##### gates
 
 > `readonly` **gates**: readonly [`Any`](./Gate#any)[]
@@ -477,6 +589,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`gates`](#gates-1)
+
+<a id="generalistcoreagent-2"></a>
 
 ##### generalist/core/Agent
 
@@ -486,6 +600,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`generalist/core/Agent`](#generalistcoreagent-1)
 
+<a id="input-2"></a>
+
 ##### input
 
 > `readonly` **input**: `Top`
@@ -493,6 +609,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`input`](#input-1)
+
+<a id="instructions-2"></a>
 
 ##### instructions?
 
@@ -502,6 +620,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`instructions`](#instructions-1)
 
+<a id="memory-2"></a>
+
 ##### memory?
 
 > `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
@@ -509,6 +629,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`memory`](#memory-1)
+
+<a id="metadata-2"></a>
 
 ##### metadata?
 
@@ -518,6 +640,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`metadata`](#metadata-1)
 
+<a id="model-2"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
@@ -525,6 +649,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`model`](#model-1)
+
+<a id="name-2"></a>
 
 ##### name
 
@@ -534,6 +660,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`name`](#name-1)
 
+<a id="ongatefailure-2"></a>
+
 ##### onGateFailure
 
 > `readonly` **onGateFailure**: [`FailureMode`](./Gate#failuremode)
@@ -541,6 +669,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`onGateFailure`](#ongatefailure-1)
+
+<a id="open"></a>
 
 ##### open
 
@@ -562,6 +692,8 @@ An Agent closed over its exact environment.
 
 `A`
 
+<a id="output-2"></a>
+
 ##### output
 
 > `readonly` **output**: `Top`
@@ -569,6 +701,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`output`](#output-1)
+
+<a id="policy-2"></a>
 
 ##### policy
 
@@ -578,6 +712,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`policy`](#policy-1)
 
+<a id="sandbox-2"></a>
+
 ##### sandbox?
 
 > `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
@@ -585,6 +721,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`sandbox`](#sandbox-1)
+
+<a id="tooldeclarations-2"></a>
 
 ##### toolDeclarations?
 
@@ -594,6 +732,8 @@ An Agent closed over its exact environment.
 
 [`Any`](#any).[`toolDeclarations`](#tooldeclarations-1)
 
+<a id="toolkit-2"></a>
+
 ##### toolkit
 
 > `readonly` **toolkit**: `Any`
@@ -601,6 +741,8 @@ An Agent closed over its exact environment.
 ###### Inherited from
 
 [`Any`](#any).[`toolkit`](#toolkit-1)
+
+<a id="toolscheduling-2"></a>
 
 ##### toolScheduling
 
@@ -611,6 +753,8 @@ An Agent closed over its exact environment.
 [`Any`](#any).[`toolScheduling`](#toolscheduling-1)
 
 ***
+
+<a id="handoffagent"></a>
 
 ### HandoffAgent
 
@@ -624,13 +768,19 @@ An agent definition: a plain value, not a service.
 
 #### Properties
 
+<a id="description"></a>
+
 ##### description?
 
 > `readonly` `optional` **description?**: `string`
 
+<a id="name-3"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="requirements"></a>
 
 ##### requirements
 
@@ -648,31 +798,45 @@ An agent definition: a plain value, not a service.
 
 ***
 
+<a id="inspectionsnapshot"></a>
+
 ### InspectionSnapshot
 
 Point-in-time process-local state for one Agent Run.
 
 #### Properties
 
+<a id="activetools"></a>
+
 ##### activeTools
 
 > `readonly` **activeTools**: readonly `string`[]
+
+<a id="elapsed"></a>
 
 ##### elapsed
 
 > `readonly` **elapsed**: `number`
 
+<a id="lastevent"></a>
+
 ##### lastEvent?
 
 > `readonly` `optional` **lastEvent?**: [`Event`](./AgentEvent#event)
+
+<a id="runid-1"></a>
 
 ##### runId
 
 > `readonly` **runId**: `string`
 
+<a id="turn"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
+
+<a id="usage"></a>
 
 ##### usage
 
@@ -680,15 +844,21 @@ Point-in-time process-local state for one Agent Run.
 
 ***
 
+<a id="inspectionusage"></a>
+
 ### InspectionUsage
 
 Process-local token totals reported by completed model turns.
 
 #### Properties
 
+<a id="inputtokens"></a>
+
 ##### inputTokens
 
 > `readonly` **inputTokens**: `number`
+
+<a id="outputtokens"></a>
 
 ##### outputTokens
 
@@ -696,11 +866,15 @@ Process-local token totals reported by completed model turns.
 
 ***
 
+<a id="inspectorservice"></a>
+
 ### InspectorService
 
 Process-local Agent Run inspection seam.
 
 #### Properties
+
+<a id="publish"></a>
 
 ##### publish
 
@@ -722,6 +896,8 @@ Process-local Agent Run inspection seam.
 
 `Effect`\<`void`\>
 
+<a id="snapshot"></a>
+
 ##### snapshot
 
 > `readonly` **snapshot**: (`runId`) => `Effect`\<[`InspectionSnapshot`](#inspectionsnapshot), [`InspectorRunNotFound`](#inspectorrunnotfound)\>
@@ -735,6 +911,8 @@ Process-local Agent Run inspection seam.
 ###### Returns
 
 `Effect`\<[`InspectionSnapshot`](#inspectionsnapshot), [`InspectorRunNotFound`](#inspectorrunnotfound)\>
+
+<a id="start"></a>
 
 ##### start
 
@@ -753,6 +931,8 @@ Process-local Agent Run inspection seam.
 `Effect`\<`void`\>
 
 ***
+
+<a id="makeoptions"></a>
 
 ### MakeOptions
 
@@ -780,9 +960,13 @@ Process-local Agent Run inspection seam.
 
 #### Properties
 
+<a id="authorization-3"></a>
+
 ##### authorization?
 
 > `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
+
+<a id="budget-3"></a>
 
 ##### budget?
 
@@ -808,67 +992,99 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="gates-3"></a>
+
 ##### gates?
 
 > `readonly` `optional` **gates?**: readonly [`Gate`](./Gate#gate-1)\<`OutputSchema`\[`"Type"`\], `unknown`\>[]
+
+<a id="input-3"></a>
 
 ##### input?
 
 > `readonly` `optional` **input?**: `InputSchema`
 
+<a id="instructions-3"></a>
+
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
+
+<a id="memory-3"></a>
 
 ##### memory?
 
 > `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
 
+<a id="metadata-3"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
+
+<a id="model-3"></a>
 
 ##### model?
 
 > `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
 
+<a id="name-4"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="ongatefailure-3"></a>
 
 ##### onGateFailure?
 
 > `readonly` `optional` **onGateFailure?**: [`FailureMode`](./Gate#failuremode)
 
+<a id="output-3"></a>
+
 ##### output?
 
 > `readonly` `optional` **output?**: `OutputSchema`
+
+<a id="policy-3"></a>
 
 ##### policy?
 
 > `readonly` `optional` **policy?**: [`Policy`](./Policy-1#policy)\<`PolicyServices`\>
 
+<a id="sandbox-3"></a>
+
 ##### sandbox?
 
 > `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
+
+<a id="supplemental-1"></a>
 
 ##### supplemental?
 
 > `readonly` `optional` **supplemental?**: `string`
 
+<a id="toolkit-3"></a>
+
 ##### toolkit?
 
 > `readonly` `optional` **toolkit?**: `Toolkit`\<`Tools`\>
 
+<a id="tools-2"></a>
+
 ##### tools?
 
 > `readonly` `optional` **tools?**: `undefined`
+
+<a id="toolscheduling-3"></a>
 
 ##### toolScheduling?
 
 > `readonly` `optional` **toolScheduling?**: [`ToolSchedulingPolicy`](#toolschedulingpolicy)
 
 ***
+
+<a id="maketoolsoptions"></a>
 
 ### MakeToolsOptions
 
@@ -902,6 +1118,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 #### Properties
 
+<a id="authorization-4"></a>
+
 ##### authorization?
 
 > `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
@@ -909,6 +1127,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.authorization`
+
+<a id="budget-4"></a>
 
 ##### budget?
 
@@ -938,6 +1158,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.budget`
 
+<a id="gates-4"></a>
+
 ##### gates?
 
 > `readonly` `optional` **gates?**: readonly [`Gate`](./Gate#gate-1)\<`OutputSchema`\[`"Type"`\], `unknown`\>[]
@@ -945,6 +1167,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.gates`
+
+<a id="input-4"></a>
 
 ##### input?
 
@@ -954,6 +1178,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.input`
 
+<a id="instructions-4"></a>
+
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
@@ -961,6 +1187,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.instructions`
+
+<a id="memory-4"></a>
 
 ##### memory?
 
@@ -970,6 +1198,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.memory`
 
+<a id="metadata-4"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `Json`\>\>
@@ -977,6 +1207,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.metadata`
+
+<a id="model-4"></a>
 
 ##### model?
 
@@ -986,6 +1218,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.model`
 
+<a id="name-5"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -993,6 +1227,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.name`
+
+<a id="ongatefailure-4"></a>
 
 ##### onGateFailure?
 
@@ -1002,6 +1238,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.onGateFailure`
 
+<a id="output-4"></a>
+
 ##### output?
 
 > `readonly` `optional` **output?**: `OutputSchema`
@@ -1009,6 +1247,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.output`
+
+<a id="policy-4"></a>
 
 ##### policy?
 
@@ -1018,6 +1258,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.policy`
 
+<a id="sandbox-4"></a>
+
 ##### sandbox?
 
 > `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
@@ -1025,6 +1267,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.sandbox`
+
+<a id="supplemental-2"></a>
 
 ##### supplemental?
 
@@ -1034,13 +1278,19 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 `Omit.supplemental`
 
+<a id="toolkit-4"></a>
+
 ##### toolkit?
 
 > `readonly` `optional` **toolkit?**: `undefined`
 
+<a id="tools-3"></a>
+
 ##### tools
 
 > `readonly` **tools**: `StaticTools`
+
+<a id="toolscheduling-4"></a>
 
 ##### toolScheduling?
 
@@ -1051,6 +1301,8 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 `Omit.toolScheduling`
 
 ***
+
+<a id="opened"></a>
 
 ### Opened()
 
@@ -1100,19 +1352,27 @@ Consumer of a hidden Agent identity and its environment.
 
 ***
 
+<a id="resume"></a>
+
 ### Resume
 
 #### Properties
 
+<a id="resolutions"></a>
+
 ##### resolutions?
 
 > `readonly` `optional` **resolutions?**: readonly `ToolBatchResolution`[]
+
+<a id="suspension"></a>
 
 ##### suspension
 
 > `readonly` **suspension**: [`AgentSuspended`](./AgentEvent#agentsuspended)
 
 ***
+
+<a id="runhandle"></a>
 
 ### RunHandle
 
@@ -1142,6 +1402,8 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 #### Properties
 
+<a id="runcontroltypeid"></a>
+
 ##### \[RunControlTypeId\]
 
 > `readonly` **\[RunControlTypeId\]**: `object`
@@ -1168,9 +1430,13 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 `Effect`\<`ControlReceipt`, [`RunBusy`](./Steering#runbusy) \| `ControlError`\>
 
+<a id="events"></a>
+
 ##### events
 
 > `readonly` **events**: `Stream`\<`EventValue`, `EventError`, `EventServices`\>
+
+<a id="followup"></a>
 
 ##### followUp
 
@@ -1186,9 +1452,13 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 `Effect`\<`ControlReceipt`, `ControlError`\>
 
+<a id="runid-2"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
+
+<a id="steer"></a>
 
 ##### steer
 
@@ -1206,11 +1476,15 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 ***
 
+<a id="runoptions"></a>
+
 ### RunOptions
 
 Internal prompt-level options for an Agent run.
 
 #### Properties
+
+<a id="budget-5"></a>
 
 ##### budget?
 
@@ -1238,6 +1512,8 @@ Per-run budget narrowing; dimensions omitted inherit the agent default.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="compaction"></a>
+
 ##### compaction?
 
 > `readonly` `optional` **compaction?**: `object`
@@ -1251,6 +1527,8 @@ Context-window hint for optional compaction.
 ###### reserveTokens?
 
 > `readonly` `optional` **reserveTokens?**: `number`
+
+<a id="drivercheckpoint"></a>
 
 ##### driverCheckpoint?
 
@@ -1334,11 +1612,15 @@ Runtime-owned checkpoint used to reconstruct the same durable driver.
 
 > `readonly` **turn**: `number`
 
+<a id="executablemanifest"></a>
+
 ##### executableManifest?
 
 > `readonly` `optional` **executableManifest?**: [`ExecutableManifest`](./ExecutableManifest#executablemanifest)
 
 Complete pinned closure used to resolve same-run handoffs exactly.
+
+<a id="executableref"></a>
 
 ##### executableRef?
 
@@ -1354,6 +1636,8 @@ Pinned identity admitted by a durable host.
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
 
+<a id="history"></a>
+
 ##### history?
 
 > `readonly` `optional` **history?**: `RawInput`
@@ -1361,6 +1645,8 @@ Pinned identity admitted by a durable host.
 Prior transcript. When set it is used VERBATIM as the initial chat
 history (no system message is prepended); otherwise the chat starts
 with a system message derived from the agent (see below).
+
+<a id="inheritedbudget"></a>
 
 ##### inheritedBudget?
 
@@ -1416,6 +1702,8 @@ Pre-reserved child grant from a parent run; not for direct caller use.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="initialsteering"></a>
+
 ##### initialSteering?
 
 > `readonly` `optional` **initialSteering?**: `object`
@@ -1435,6 +1723,8 @@ Runtime-owned inbox drain entering this hosted execution.
 ###### turn
 
 > `readonly` **turn**: `number`
+
+<a id="invocation"></a>
 
 ##### invocation?
 
@@ -1462,11 +1752,15 @@ Authoritative invocation facts supplied by a durable host.
 
 > `readonly` **runId**: `string`
 
+<a id="logicaloperationid"></a>
+
 ##### logicalOperationId?
 
 > `readonly` `optional` **logicalOperationId?**: `string`
 
 Stable host identity for the logical model operations in this run.
+
+<a id="memory-5"></a>
 
 ##### memory?
 
@@ -1478,11 +1772,15 @@ Consult the Memory service for this run.
 
 > `readonly` **key**: [`Key`](./Memory#key-1)
 
+<a id="modelcallordinalstart"></a>
+
 ##### modelCallOrdinalStart?
 
 > `readonly` `optional` **modelCallOrdinalStart?**: `number`
 
 First model-call ordinal for a host resuming from a durable checkpoint.
+
+<a id="prompt"></a>
 
 ##### prompt
 
@@ -1490,9 +1788,13 @@ First model-call ordinal for a host resuming from a durable checkpoint.
 
 Schema-encoded Agent input for the first turn. Ignored when `resume` is set.
 
+<a id="resume-1"></a>
+
 ##### resume?
 
 > `readonly` `optional` **resume?**: [`Resume`](#resume)
+
+<a id="sessionid"></a>
 
 ##### sessionId?
 
@@ -1500,15 +1802,21 @@ Schema-encoded Agent input for the first turn. Ignored when `resume` is set.
 
 Opaque host-assigned identity for this run/session.
 
+<a id="steering"></a>
+
 ##### steering?
 
 > `readonly` `optional` **steering?**: [`Options`](./Steering#options)
 
 Finite process-local input policy for this Run.
 
+<a id="suspensionpropagation"></a>
+
 ##### suspensionPropagation?
 
 > `readonly` `optional` **suspensionPropagation?**: `"propagate"` \| `"collapse-to-domain-failure"`
+
+<a id="system"></a>
 
 ##### system?
 
@@ -1516,15 +1824,21 @@ Finite process-local input policy for this Run.
 
 Overrides the derived system message when `history` is not set.
 
+<a id="tooloutputmaxbytes"></a>
+
 ##### toolOutputMaxBytes?
 
 > `readonly` `optional` **toolOutputMaxBytes?**: `number`
+
+<a id="toolprogress"></a>
 
 ##### toolProgress?
 
 > `readonly` `optional` **toolProgress?**: [`ProgressOverflowPolicy`](#progressoverflowpolicy)
 
 Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64.
+
+<a id="turnstart"></a>
 
 ##### turnStart?
 
@@ -1534,11 +1848,15 @@ First turn number for a host continuing an existing transcript.
 
 ***
 
+<a id="startoptions"></a>
+
 ### StartOptions
 
 Typed durable start identity. Budget admission is reserved for the RunBudget contract.
 
 #### Properties
+
+<a id="budget-6"></a>
 
 ##### budget?
 
@@ -1592,9 +1910,13 @@ Typed durable start identity. Budget admission is reserved for the RunBudget con
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="idempotencykey"></a>
+
 ##### idempotencyKey?
 
 > `readonly` `optional` **idempotencyKey?**: `string`
+
+<a id="sessionid-1"></a>
 
 ##### sessionId?
 
@@ -1602,15 +1924,21 @@ Typed durable start identity. Budget admission is reserved for the RunBudget con
 
 ***
 
+<a id="toolcallbatchresume"></a>
+
 ### ToolCallBatchResume
 
 Host facts required to recover or resolve one persisted tool-call batch.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Resume"`
+
+<a id="drivercheckpoint-1"></a>
 
 ##### driverCheckpoint
 
@@ -1692,6 +2020,8 @@ Host facts required to recover or resolve one persisted tool-call batch.
 
 > `readonly` **turn**: `number`
 
+<a id="executableref-1"></a>
+
 ##### executableRef
 
 > `readonly` **executableRef**: `object`
@@ -1703,6 +2033,8 @@ Host facts required to recover or resolve one persisted tool-call batch.
 ###### executable
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
+
+<a id="invocation-1"></a>
 
 ##### invocation?
 
@@ -1728,9 +2060,13 @@ Host facts required to recover or resolve one persisted tool-call batch.
 
 > `readonly` **runId**: `string`
 
+<a id="messages"></a>
+
 ##### messages
 
 > `readonly` **messages**: readonly `Message`[]
+
+<a id="resume-2"></a>
 
 ##### resume?
 
@@ -1738,19 +2074,27 @@ Host facts required to recover or resolve one persisted tool-call batch.
 
 ***
 
+<a id="toolcallbatchstart"></a>
+
 ### ToolCallBatchStart
 
 Host facts required before a new externally completed tool-call batch is admitted.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Start"`
 
+<a id="activetools-1"></a>
+
 ##### activeTools
 
 > `readonly` **activeTools**: readonly `string`[]
+
+<a id="budget-7"></a>
 
 ##### budget?
 
@@ -1776,9 +2120,13 @@ Host facts required before a new externally completed tool-call batch is admitte
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="calls"></a>
+
 ##### calls
 
 > `readonly` **calls**: readonly \[`ToolCallPartEncoded`, `ToolCallPartEncoded`\]
+
+<a id="executableref-2"></a>
 
 ##### executableRef?
 
@@ -1791,6 +2139,8 @@ Host facts required before a new externally completed tool-call batch is admitte
 ###### executable
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
+
+<a id="invocation-2"></a>
 
 ##### invocation?
 
@@ -1816,17 +2166,25 @@ Host facts required before a new externally completed tool-call batch is admitte
 
 > `readonly` **runId**: `string`
 
+<a id="logicaloperationid-1"></a>
+
 ##### logicalOperationId
 
 > `readonly` **logicalOperationId**: `string`
+
+<a id="messages-1"></a>
 
 ##### messages
 
 > `readonly` **messages**: readonly `Message`[]
 
+<a id="sessionid-2"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="turn-1"></a>
 
 ##### turn
 
@@ -1834,21 +2192,29 @@ Host facts required before a new externally completed tool-call batch is admitte
 
 ***
 
+<a id="tooldeclaration"></a>
+
 ### ToolDeclaration
 
 One origin-preserving static or Handoff tool declaration.
 
 #### Properties
 
+<a id="origin"></a>
+
 ##### origin
 
 > `readonly` **origin**: \{ `agent`: `string`; \} \| \{ `mode`: `"same-run"` \| `"delegate"`; `specialist`: `string`; \}
+
+<a id="tool"></a>
 
 ##### tool
 
 > `readonly` **tool**: `Any`
 
 ***
+
+<a id="toolschedulingpolicy"></a>
 
 ### ToolSchedulingPolicy
 
@@ -1857,9 +2223,13 @@ listed as parallel-safe execute as authored-order exclusive barriers.
 
 #### Properties
 
+<a id="maxconcurrency"></a>
+
 ##### maxConcurrency
 
 > `readonly` **maxConcurrency**: `number`
+
+<a id="parallelsafe"></a>
 
 ##### parallelSafe
 
@@ -1867,17 +2237,23 @@ listed as parallel-safe execute as authored-order exclusive barriers.
 
 ***
 
+<a id="withmodeldefault"></a>
+
 ### WithModelDefault
 
 Agent options known to contain a model selection.
 
 #### Properties
 
+<a id="model-5"></a>
+
 ##### model
 
 > `readonly` **model**: [`ModelSelection`](./ModelRegistry#modelselection)
 
 ## Type Aliases
+
+<a id="awaitevent"></a>
 
 ### AwaitEvent
 
@@ -1887,6 +2263,8 @@ Durable metadata carried by a tool suspension created by `Agent.awaitEvent`.
 
 ***
 
+<a id="awaiteventresult"></a>
+
 ### AwaitEventResult
 
 > **AwaitEventResult** = *typeof* `AwaitEventResult.Type`
@@ -1894,6 +2272,8 @@ Durable metadata carried by a tool suspension created by `Agent.awaitEvent`.
 Result injected as the terminal result of the awaiting tool call.
 
 ***
+
+<a id="closedservices"></a>
 
 ### ClosedServices
 
@@ -1921,6 +2301,8 @@ Services closed over with an Agent.
 
 ***
 
+<a id="encodedinput"></a>
+
 ### EncodedInput
 
 > **EncodedInput**\<`A`\> = `A` *extends* `object` ? `InputCodec`\[`"Encoded"`\] : `never`
@@ -1934,6 +2316,8 @@ Extract an Agent's encoded input type.
 `A`
 
 ***
+
+<a id="encodedoutput"></a>
 
 ### EncodedOutput
 
@@ -1949,6 +2333,8 @@ Extract an Agent's encoded output type.
 
 ***
 
+<a id="inheritance"></a>
+
 ### Inheritance
 
 > **Inheritance** = *typeof* `Inheritance.Type`
@@ -1957,6 +2343,8 @@ Authority and context inherited by one child Run.
 
 ***
 
+<a id="inheritanceoptions"></a>
+
 ### InheritanceOptions
 
 > **InheritanceOptions** = `Partial`\<[`Inheritance`](#inheritance)\>
@@ -1964,6 +2352,8 @@ Authority and context inherited by one child Run.
 Caller-authored child inheritance options. Omitted fields use safe defaults.
 
 ***
+
+<a id="input-5"></a>
 
 ### Input
 
@@ -1979,6 +2369,8 @@ Extract an Agent's decoded input type.
 
 ***
 
+<a id="invocationoptions"></a>
+
 ### InvocationOptions
 
 > **InvocationOptions** = `Omit`\<[`RunOptions`](#runoptions), `"prompt"`\>
@@ -1986,6 +2378,8 @@ Extract an Agent's decoded input type.
 Per-invocation options after the Agent input has moved to the second argument.
 
 ***
+
+<a id="output-5"></a>
 
 ### Output
 
@@ -2001,6 +2395,8 @@ Extract an Agent's decoded output type.
 
 ***
 
+<a id="progressoverflowpolicy"></a>
+
 ### ProgressOverflowPolicy
 
 > **ProgressOverflowPolicy** = \{ `_tag`: `"Backpressure"`; `capacity`: `number`; \} \| \{ `_tag`: `"Dropping"`; `capacity`: `number`; \} \| \{ `_tag`: `"Sliding"`; `capacity`: `number`; \} \| \{ `_tag`: `"Fail"`; `capacity`: `number`; \}
@@ -2008,6 +2404,8 @@ Extract an Agent's decoded output type.
 Bounded buffering behavior for tool progress events.
 
 ***
+
+<a id="requirements-1"></a>
 
 ### Requirements
 
@@ -2023,6 +2421,8 @@ Extract an agent's runtime requirements.
 
 ***
 
+<a id="resumeresolution"></a>
+
 ### ResumeResolution
 
 > **ResumeResolution** = *typeof* `ResumeResolution.Type`
@@ -2031,6 +2431,8 @@ Decoded re-entry resolution for an authoritative suspension checkpoint.
 
 ***
 
+<a id="runerror"></a>
+
 ### RunError
 
 > **RunError** = *typeof* `RunError.Type`
@@ -2038,6 +2440,8 @@ Decoded re-entry resolution for an authoritative suspension checkpoint.
 The error channel and durable codec of `Agent.run` and `Agent.stream`.
 
 ***
+
+<a id="runrequirements"></a>
 
 ### RunRequirements
 
@@ -2077,11 +2481,15 @@ Services required by one run option set.
 
 ***
 
+<a id="senderror"></a>
+
 ### SendError
 
 > **SendError** = [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed) \| [`RollbackRequiresRuntime`](./Steering#rollbackrequiresruntime) \| [`RunBusy`](./Steering#runbusy)
 
 ***
+
+<a id="startevent"></a>
 
 ### StartEvent
 
@@ -2097,6 +2505,8 @@ Durable Runtime event with Agent completion decoded through its output Schema.
 
 ***
 
+<a id="toolcallbatch"></a>
+
 ### ToolCallBatch
 
 > **ToolCallBatch** = readonly \[`Response.ToolCallPartEncoded`, `...ReadonlyArray<Response.ToolCallPartEncoded>`\]
@@ -2105,6 +2515,8 @@ One non-empty externally completed, authored-order framework tool-call batch.
 
 ***
 
+<a id="toolcallbatchoptions"></a>
+
 ### ToolCallBatchOptions
 
 > **ToolCallBatchOptions** = [`ToolCallBatchStart`](#toolcallbatchstart) \| [`ToolCallBatchResume`](#toolcallbatchresume)
@@ -2112,6 +2524,8 @@ One non-empty externally completed, authored-order framework tool-call batch.
 One fresh or persisted externally completed framework tool-call batch.
 
 ***
+
+<a id="toolcallbatchrequirements"></a>
 
 ### ToolCallBatchRequirements
 
@@ -2131,6 +2545,8 @@ Services used by externally completed framework calls; no LanguageModel call is 
 
 ***
 
+<a id="wakeevent"></a>
+
 ### WakeEvent
 
 > **WakeEvent** = *typeof* `WakeEvent.Type`
@@ -2138,6 +2554,8 @@ Services used by externally completed framework calls; no LanguageModel call is 
 A typed environmental fact that can resume an awaiting Agent tool call.
 
 ***
+
+<a id="wakeeventfilter"></a>
 
 ### WakeEventFilter
 
@@ -2147,11 +2565,15 @@ Serializable selector persisted with an `Agent.awaitEvent` obligation.
 
 ## Variables
 
+<a id="agenttypeid"></a>
+
 ### AgentTypeId
 
 > `const` **AgentTypeId**: `"generalist/core/Agent"` = `"generalist/core/Agent"`
 
 ***
+
+<a id="allocaterun"></a>
 
 ### allocateRun
 
@@ -2231,6 +2653,8 @@ Allocate one scoped Run and its producer handle before consuming its event strea
 
 ***
 
+<a id="awaitevent-1"></a>
+
 ### awaitEvent
 
 > `const` **awaitEvent**: \{(`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>; (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>; \}
@@ -2274,6 +2698,8 @@ call's result rather than re-running JavaScript after this Effect.
 
 ***
 
+<a id="awaitevent-2"></a>
+
 ### AwaitEvent
 
 > `const` **AwaitEvent**: `Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `scheduleId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `kind`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ...\]\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>; \}\>
@@ -2282,6 +2708,8 @@ Durable metadata carried by a tool suspension created by `Agent.awaitEvent`.
 
 ***
 
+<a id="awaiteventresult-1"></a>
+
 ### AwaitEventResult
 
 > `const` **AwaitEventResult**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Event"`, \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \}\>, `Schema.TaggedStruct`\<`"TimedOut"`, \{ `deadline`: `Schema.String`; \}\>\]\>
@@ -2289,6 +2717,8 @@ Durable metadata carried by a tool suspension created by `Agent.awaitEvent`.
 Result injected as the terminal result of the awaiting tool call.
 
 ***
+
+<a id="child"></a>
 
 ### child
 
@@ -2353,6 +2783,8 @@ Construct one lazy typed child invocation.
 `Child`\<`A`\>
 
 ***
+
+<a id="close"></a>
 
 ### close
 
@@ -2430,6 +2862,8 @@ Close one Agent over the exact environment it requires.
 
 ***
 
+<a id="defaultinheritance"></a>
+
 ### defaultInheritance
 
 > `const` **defaultInheritance**: [`Inheritance`](#inheritance)
@@ -2437,6 +2871,8 @@ Close one Agent over the exact environment it requires.
 Safe child inheritance defaults.
 
 ***
+
+<a id="defaultobjectprompt"></a>
 
 ### defaultObjectPrompt
 
@@ -2446,6 +2882,8 @@ Default prompt for the terminal structured-output turn.
 
 ***
 
+<a id="fanout"></a>
+
 ### fanOut
 
 > `const` **fanOut**: `FanOut`
@@ -2453,6 +2891,8 @@ Default prompt for the terminal structured-output turn.
 Run typed child Agents concurrently in-process without requiring a Runtime.
 
 ***
+
+<a id="inheritance-1"></a>
 
 ### inheritance
 
@@ -2472,6 +2912,8 @@ Normalize one child inheritance record before execution or journaling.
 
 ***
 
+<a id="inheritance-2"></a>
+
 ### Inheritance
 
 > `const` **Inheritance**: `Schema.Struct`\<\{ `budget`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `history`: `Schema.Literals`\<readonly \[`"none"`, `"summary"`, `"full"`\]\>; `instructions`: `Schema.Literals`\<readonly \[`"inherit"`, `"own"`\]\>; `memory`: `Schema.Literals`\<readonly \[`"inherit"`, `"fresh"`\]\>; `permissions`: `Schema.Literals`\<readonly \[`"inherit"`, `"fresh"`\]\>; `sandbox`: `Schema.Literals`\<readonly \[`"share"`, `"fork"`, `"fresh"`\]\>; `tasks`: `Schema.Literals`\<readonly \[`"read"`, `"none"`\]\>; `tools`: `Schema.Literals`\<readonly \[`"attenuate"`, `"same"`\]\>; \}\>
@@ -2479,6 +2921,8 @@ Normalize one child inheritance record before execution or journaling.
 Authority and context inherited by one child Run.
 
 ***
+
+<a id="resumeresolution-1"></a>
 
 ### ResumeResolution
 
@@ -2488,6 +2932,8 @@ Re-entry resolution for an authoritative suspension checkpoint.
 
 ***
 
+<a id="run"></a>
+
 ### run
 
 > `const` **run**: `RunFunction`
@@ -2496,6 +2942,8 @@ Run an Agent to its schema-decoded output.
 
 ***
 
+<a id="runerror-1"></a>
+
 ### RunError
 
 > `const` **RunError**: `Schema.Union`\<readonly \[*typeof* [`SinkFailed`](./ModelTelemetry#sinkfailed), *typeof* [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed), *typeof* [`HookFailed`](../../hooks#hookfailed), *typeof* [`GateFailed`](./Gate#gatefailed), *typeof* [`AgentError`](./AgentEvent#agenterror), *typeof* [`ChildExceedsParent`](./AgentEvent#childexceedsparent), *typeof* [`InvalidOutput`](./AgentEvent#invalidoutput), *typeof* [`AgentSuspended`](./AgentEvent#agentsuspended), *typeof* [`ResumeMismatch`](./AgentEvent#resumemismatch), *typeof* [`PolicyError`](./Policy-1#policyerror), *typeof* [`PolicyStopped`](./AgentEvent#policystopped), *typeof* [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded), *typeof* [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput), *typeof* [`MiddlewareViolation`](./AgentEvent#middlewareviolation), *typeof* [`Misconfigured`](./ModelResilience#misconfigured), *typeof* [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters), *typeof* [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing), *typeof* [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid), *typeof* [`ProgressOverflow`](./AgentEvent#progressoverflow), *typeof* [`ToolNameCollision`](./AgentEvent#toolnamecollision), *typeof* `AiError.AiError`, *typeof* [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered), *typeof* [`PermissionDenied`](./ToolAuthorization#permissiondenied), *typeof* [`FrameworkFailure`](./ToolExecutor#frameworkfailure), *typeof* [`DriverError`](./DurableDriver#drivererror), *typeof* [`DriverStateInvalid`](./DurableDriver#driverstateinvalid), *typeof* [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay), *typeof* [`Suspended`](./NestedOperation#suspended), *typeof* [`Exhausted`](./RunBudget#exhausted), *typeof* `TargetMissing`, *typeof* `HandoffLimitExceeded`, *typeof* `HandoffRequirementsMissing`, *typeof* [`ProjectionInvalid`](./Handoff#projectioninvalid), *typeof* [`Rejected`](./Handoff#rejected), *typeof* [`PolicyInvalid`](./Steering#policyinvalid)\]\>
@@ -2503,6 +2951,8 @@ Run an Agent to its schema-decoded output.
 The error channel and durable codec of `Agent.run` and `Agent.stream`.
 
 ***
+
+<a id="send"></a>
 
 ### send
 
@@ -2566,6 +3016,8 @@ Admit one message to a process-local Run under an explicit policy.
 
 ***
 
+<a id="start-1"></a>
+
 ### start
 
 > `const` **start**: `StartFunction`
@@ -2574,6 +3026,8 @@ Start an Agent previously registered with the durable Runtime.
 
 ***
 
+<a id="stream"></a>
+
 ### stream
 
 > `const` **stream**: `StreamFunction`
@@ -2581,6 +3035,8 @@ Start an Agent previously registered with the durable Runtime.
 Stream an Agent run as Events ending in `Completed { output }`.
 
 ***
+
+<a id="streamtoolcalls"></a>
 
 ### streamToolCalls
 
@@ -2640,6 +3096,8 @@ Execute one externally completed tool-call batch without invoking a LanguageMode
 
 ***
 
+<a id="wakeevent-1"></a>
+
 ### WakeEvent
 
 > `const` **WakeEvent**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"create"`, `"update"`, `"remove"`\]\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<...\>; \}\>\]\>; `dedupeKey`: `Schema.String`; \}\>\]\>
@@ -2648,6 +3106,8 @@ A typed environmental fact that can resume an awaiting Agent tool call.
 
 ***
 
+<a id="wakeeventfilter-1"></a>
+
 ### WakeEventFilter
 
 > `const` **WakeEventFilter**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `scheduleId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `kind`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"create"`, `"update"`, `"remove"`\]\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>
@@ -2655,6 +3115,8 @@ A typed environmental fact that can resume an awaiting Agent tool call.
 Serializable selector persisted with an `Agent.awaitEvent` obligation.
 
 ***
+
+<a id="withtools"></a>
 
 ### withTools
 
@@ -2731,6 +3193,8 @@ readonly `Any`[]
 [`Agent`](#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
 
 ## Functions
+
+<a id="make"></a>
 
 ### make()
 

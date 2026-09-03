@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
@@ -34,11 +36,15 @@ RLM model layers and recursion limits.
 
 #### Properties
 
+<a id="leaf"></a>
+
 ##### leaf
 
 > `readonly` **leaf**: `Layer`\<`LanguageModel`, `LeafError`, `LeafRequirements`\>
 
 **`Experimental`**
+
+<a id="maxdepth"></a>
 
 ##### maxDepth
 
@@ -46,11 +52,15 @@ RLM model layers and recursion limits.
 
 **`Experimental`**
 
+<a id="maxsubcalls"></a>
+
 ##### maxSubCalls
 
 > `readonly` **maxSubCalls**: `number`
 
 **`Experimental`**
+
+<a id="root"></a>
 
 ##### root
 
@@ -60,6 +70,8 @@ RLM model layers and recursion limits.
 
 ***
 
+<a id="rlmoffloadoptions"></a>
+
 ### RlmOffloadOptions
 
 **`Experimental`**
@@ -68,6 +80,8 @@ Options for retaining recent context while moving older turns into the RLM Sandb
 
 #### Properties
 
+<a id="keeprecenttokens"></a>
+
 ##### keepRecentTokens
 
 > `readonly` **keepRecentTokens**: `number`
@@ -75,6 +89,8 @@ Options for retaining recent context while moving older turns into the RLM Sandb
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -113,6 +129,8 @@ Provide a Recursive Language Model as an Effect AI LanguageModel.
 `Layer.Layer`\<`LanguageModel.LanguageModel`, `RootError` \| `LeafError`, [`SandboxProvider`](./sandbox#sandboxprovider) \| `RootRequirements` \| `LeafRequirements`\>
 
 ***
+
+<a id="rlmoffload"></a>
 
 ### rlmOffload
 

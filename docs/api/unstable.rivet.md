@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="runtimeactoroptions"></a>
+
 ### RuntimeActorOptions
 
 **`Experimental`**
@@ -18,6 +20,8 @@
 
 #### Properties
 
+<a id="actoroptions"></a>
+
 ##### actorOptions?
 
 > `readonly` `optional` **actorOptions?**: `object`
@@ -25,6 +29,8 @@
 **`Experimental`**
 
 Rivet process-lifecycle tuning; it never carries Runtime authority.
+
+<a id="addresses"></a>
 
 ##### addresses
 
@@ -36,6 +42,8 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 
 [`LayerOptions`](./runtime/namespaces/Runtime#layeroptions).[`addresses`](./runtime/namespaces/Runtime#addresses)
 
+<a id="drainfuel"></a>
+
 ##### drainFuel?
 
 > `readonly` `optional` **drainFuel?**: `number`
@@ -43,6 +51,8 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 **`Experimental`**
 
 Bounded authoritative candidates processed per wake.
+
+<a id="messagingpolicy"></a>
 
 ##### messagingPolicy?
 
@@ -56,6 +66,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`LayerOptions`](./runtime/namespaces/Runtime#layeroptions).[`messagingPolicy`](./runtime/namespaces/Runtime#messagingpolicy)
 
+<a id="multiworker"></a>
+
 ##### multiWorker?
 
 > `readonly` `optional` **multiWorker?**: `boolean`
@@ -66,6 +78,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`SqliteStoreOptions`](./runtime.sql-driver/index#sqlitestoreoptions).[`multiWorker`](./runtime.sql-driver/index#multiworker)
 
+<a id="recoveryintervalmillis"></a>
+
 ##### recoveryIntervalMillis?
 
 > `readonly` `optional` **recoveryIntervalMillis?**: `number`
@@ -73,6 +87,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 **`Experimental`**
 
 Durable fallback doorbell interval. Rivet requires at least 5 seconds.
+
+<a id="recoverypagesize"></a>
 
 ##### recoveryPageSize?
 
@@ -82,6 +98,8 @@ Durable fallback doorbell interval. Rivet requires at least 5 seconds.
 
 Bounded stale claims recovered per startup transaction.
 
+<a id="resolver"></a>
+
 ##### resolver
 
 > `readonly` **resolver**: `Layer`\<[`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>
@@ -89,6 +107,8 @@ Bounded stale claims recovered per startup transaction.
 **`Experimental`**
 
 Application-owned executable reconstruction composed into each actor incarnation.
+
+<a id="scheduler"></a>
 
 ##### scheduler?
 
@@ -108,6 +128,8 @@ Application-owned executable reconstruction composed into each actor incarnation
 
 [`LayerOptions`](./runtime/namespaces/Runtime#layeroptions).[`scheduler`](./runtime/namespaces/Runtime#scheduler)
 
+<a id="subscriberqueuecapacity"></a>
+
 ##### subscriberQueueCapacity?
 
 > `readonly` `optional` **subscriberQueueCapacity?**: `number`
@@ -117,6 +139,8 @@ Application-owned executable reconstruction composed into each actor incarnation
 ###### Inherited from
 
 [`LayerOptions`](./runtime/namespaces/Runtime#layeroptions).[`subscriberQueueCapacity`](./runtime/namespaces/Runtime#subscriberqueuecapacity)
+
+<a id="workers"></a>
 
 ##### workers?
 
@@ -130,6 +154,8 @@ Application-owned executable reconstruction composed into each actor incarnation
 
 ## Type Aliases
 
+<a id="runtimeactordefinition"></a>
+
 ### RuntimeActorDefinition
 
 > **RuntimeActorDefinition** = `ActorDefinition`\<`undefined`, `undefined`, `undefined`, `Vars`, `undefined`, `ReturnType`\<*typeof* `db`\>, `Record`\<`never`, `never`\>, `Record`\<`never`, `never`\>, `RuntimeActions`\>
@@ -139,6 +165,8 @@ Application-owned executable reconstruction composed into each actor incarnation
 One typed Rivet Actor definition owning one Runtime partition.
 
 ## Variables
+
+<a id="makeruntimeactor"></a>
 
 ### makeRuntimeActor
 

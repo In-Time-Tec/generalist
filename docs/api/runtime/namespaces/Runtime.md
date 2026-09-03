@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="runtime"></a>
+
 ### Runtime
 
 Hosted Runtime public contract and memory-backed layers.
@@ -17,6 +19,8 @@ Hosted Runtime public contract and memory-backed layers.
 - `Runtime_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ Hosted Runtime public contract and memory-backed layers.
 
 ***
 
+<a id="scheduleinvalid"></a>
+
 ### ScheduleInvalid
 
 A recurrence rule is outside Generalist's documented fixed UTC subset.
@@ -47,6 +53,8 @@ A recurrence rule is outside Generalist's documented fixed UTC subset.
 - `ScheduleInvalid_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -68,6 +76,8 @@ A recurrence rule is outside Generalist's documented fixed UTC subset.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -75,6 +85,8 @@ A recurrence rule is outside Generalist's documented fixed UTC subset.
 ###### Inherited from
 
 `ScheduleInvalid_base.hint`
+
+<a id="rrule"></a>
 
 ##### rrule
 
@@ -86,6 +98,8 @@ A recurrence rule is outside Generalist's documented fixed UTC subset.
 
 ***
 
+<a id="wakeeventinvalid"></a>
+
 ### WakeEventInvalid
 
 A Runtime wake value failed the public `WakeEvent` Schema.
@@ -95,6 +109,8 @@ A Runtime wake value failed the public `WakeEvent` Schema.
 - `WakeEventInvalid_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -116,6 +132,8 @@ A Runtime wake value failed the public `WakeEvent` Schema.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -123,6 +141,8 @@ A Runtime wake value failed the public `WakeEvent` Schema.
 ###### Inherited from
 
 `WakeEventInvalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -134,11 +154,15 @@ A Runtime wake value failed the public `WakeEvent` Schema.
 
 ## Interfaces
 
+<a id="activateinput"></a>
+
 ### ActivateInput
 
 Release one admitted root's durable execution gate.
 
 #### Properties
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -146,17 +170,25 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="addressbinding"></a>
+
 ### AddressBinding
 
 #### Properties
+
+<a id="address"></a>
 
 ##### address
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
 
+<a id="executable"></a>
+
 ##### executable
 
 > `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+
+<a id="registrations"></a>
 
 ##### registrations
 
@@ -164,13 +196,19 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="awaitchildsettlementinput"></a>
+
 ### AwaitChildSettlementInput
 
 #### Properties
 
+<a id="childrunid"></a>
+
 ##### childRunId
 
 > `readonly` **childRunId**: `string`
+
+<a id="parentrunid"></a>
 
 ##### parentRunId
 
@@ -178,9 +216,13 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="awaitsessionterminalinput"></a>
+
 ### AwaitSessionTerminalInput
 
 #### Properties
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -188,13 +230,19 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="cancelinput"></a>
+
 ### CancelInput
 
 #### Properties
 
+<a id="reason"></a>
+
 ##### reason?
 
 > `readonly` `optional` **reason?**: `string`
+
+<a id="runid-1"></a>
 
 ##### runId
 
@@ -202,13 +250,19 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="cancelsessioninput"></a>
+
 ### CancelSessionInput
 
 #### Properties
 
+<a id="reason-1"></a>
+
 ##### reason?
 
 > `readonly` `optional` **reason?**: `string`
+
+<a id="sessionid-1"></a>
 
 ##### sessionId
 
@@ -216,37 +270,53 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="childsettlementchangesinput"></a>
+
 ### ChildSettlementChangesInput
 
 #### Properties
 
+<a id="aftersequence"></a>
+
 ##### afterSequence?
 
 > `readonly` `optional` **afterSequence?**: `number`
+
+<a id="parentrunid-1"></a>
 
 ##### parentRunId
 
 > `readonly` **parentRunId**: `string`
 
 ***
+
+<a id="childsettlementsinput"></a>
 
 ### ChildSettlementsInput
 
 #### Properties
 
+<a id="aftersequence-1"></a>
+
 ##### afterSequence?
 
 > `readonly` `optional` **afterSequence?**: `number`
 
+<a id="limit"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
+
+<a id="parentrunid-2"></a>
 
 ##### parentRunId
 
 > `readonly` **parentRunId**: `string`
 
 ***
+
+<a id="eventsinput"></a>
 
 ### EventsInput
 
@@ -256,9 +326,13 @@ Release one admitted root's durable execution gate.
 
 #### Properties
 
+<a id="cursor"></a>
+
 ##### cursor?
 
 > `readonly` `optional` **cursor?**: `number`
+
+<a id="runid-2"></a>
 
 ##### runId
 
@@ -266,29 +340,43 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="fanoutinput"></a>
+
 ### FanOutInput
 
 #### Properties
+
+<a id="concurrency"></a>
 
 ##### concurrency?
 
 > `readonly` `optional` **concurrency?**: `number`
 
+<a id="idempotencykey"></a>
+
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
+
+<a id="join"></a>
 
 ##### join
 
 > `readonly` **join**: \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \} \| \{ \}
 
+<a id="members"></a>
+
 ##### members
 
 > `readonly` **members**: readonly [`FanOutMemberInput`](#fanoutmemberinput)[]
 
+<a id="parentrunid-3"></a>
+
 ##### parentRunId
 
 > `readonly` **parentRunId**: `string`
+
+<a id="remainder"></a>
 
 ##### remainder
 
@@ -296,25 +384,37 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="fanoutmemberinput"></a>
+
 ### FanOutMemberInput
 
 #### Properties
+
+<a id="inherit"></a>
 
 ##### inherit?
 
 > `readonly` `optional` **inherit?**: `Partial`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `history`: `"none"` \| `"summary"` \| `"full"`; `instructions`: `"inherit"` \| `"own"`; `memory`: `"fresh"` \| `"inherit"`; `permissions`: `"fresh"` \| `"inherit"`; `sandbox`: `"fresh"` \| `"fork"` \| `"share"`; `tasks`: `"none"` \| `"read"`; `tools`: `"attenuate"` \| `"same"`; \}\>
 
+<a id="key"></a>
+
 ##### key
 
 > `readonly` **key**: `string`
+
+<a id="label"></a>
 
 ##### label?
 
 > `readonly` `optional` **label?**: `string`
 
+<a id="metadata"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `Readonly`\<`Record`\<`string`, `unknown`\>\>
+
+<a id="origin"></a>
 
 ##### origin?
 
@@ -328,19 +428,27 @@ Release one admitted root's durable execution gate.
 
 > `readonly` `optional` **parentToolCallId?**: `string`
 
+<a id="prompt"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
 
+<a id="selection"></a>
+
 ##### selection
 
 > `readonly` **selection**: `string`
+
+<a id="sessionid-2"></a>
 
 ##### sessionId?
 
 > `readonly` `optional` **sessionId?**: `string`
 
 ***
+
+<a id="historyinput"></a>
 
 ### HistoryInput
 
@@ -350,6 +458,8 @@ Release one admitted root's durable execution gate.
 
 #### Properties
 
+<a id="cursor-1"></a>
+
 ##### cursor?
 
 > `readonly` `optional` **cursor?**: `number`
@@ -358,9 +468,13 @@ Release one admitted root's durable execution gate.
 
 [`EventsInput`](#eventsinput).[`cursor`](#cursor)
 
+<a id="limit-1"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
+
+<a id="runid-3"></a>
 
 ##### runId
 
@@ -372,25 +486,37 @@ Release one admitted root's durable execution gate.
 
 ***
 
+<a id="initialchildinput"></a>
+
 ### InitialChildInput
 
 #### Properties
+
+<a id="correlationid"></a>
 
 ##### correlationId?
 
 > `readonly` `optional` **correlationId?**: `string`
 
+<a id="idempotencykey-1"></a>
+
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
+
+<a id="invocationid"></a>
 
 ##### invocationId
 
 > `readonly` **invocationId**: `string`
 
+<a id="messageid"></a>
+
 ##### messageId?
 
 > `readonly` `optional` **messageId?**: `string`
+
+<a id="metadata-1"></a>
 
 ##### metadata?
 
@@ -400,19 +526,27 @@ Release one admitted root's durable execution gate.
 
 \[`key`: `string`\]: `unknown`
 
+<a id="prompt-1"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
 
+<a id="selection-1"></a>
+
 ##### selection
 
 > `readonly` **selection**: `string`
+
+<a id="sessionid-3"></a>
 
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
 
 ***
+
+<a id="layeroptions"></a>
 
 ### LayerOptions
 
@@ -423,21 +557,29 @@ Release one admitted root's durable execution gate.
 
 #### Properties
 
+<a id="activationprojection"></a>
+
 ##### activationProjection?
 
 > `readonly` `optional` **activationProjection?**: [`RunActivationProjection`](../../runtime.sql-driver/index#runactivationprojection)
 
 Final-state callback executed synchronously inside each authoritative store transaction.
 
+<a id="addresses"></a>
+
 ##### addresses
 
 > `readonly` **addresses**: readonly [`AddressBinding`](#addressbinding)[]
+
+<a id="messagingpolicy"></a>
 
 ##### messagingPolicy?
 
 > `readonly` `optional` **messagingPolicy?**: [`Service`](./Messaging/namespaces/MessagingPolicy#service)
 
 Host policy for addressing beyond Generalist's derived relationships. Absent means relationships only.
+
+<a id="scheduler"></a>
 
 ##### scheduler?
 
@@ -451,19 +593,27 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 > `readonly` `optional` **pollInterval?**: `Input`
 
+<a id="subscriberqueuecapacity"></a>
+
 ##### subscriberQueueCapacity?
 
 > `readonly` `optional` **subscriberQueueCapacity?**: `number`
 
 ***
 
+<a id="listinput"></a>
+
 ### ListInput
 
 #### Properties
 
+<a id="limit-2"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
+
+<a id="status"></a>
 
 ##### status?
 
@@ -471,13 +621,19 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ***
 
+<a id="messagesinput"></a>
+
 ### MessagesInput
 
 #### Properties
 
+<a id="limit-3"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
+
+<a id="runid-4"></a>
 
 ##### runId
 
@@ -485,9 +641,13 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ***
 
+<a id="operatorservice"></a>
+
 ### OperatorService
 
 #### Properties
+
+<a id="explain"></a>
 
 ##### explain
 
@@ -502,6 +662,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Returns
 
 `Effect`\<\{ `decision`: \{ \} \| \{ `attempt`: `number`; `operationId`: `string`; \} \| \{ `token`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; \} \| \{ `operationId`: `string`; `reason`: `string`; \} \| \{ `error`: `unknown`; \}; `lastSequence`: `number`; `obligations`: readonly (\{ \} \| \{ `attempt`: `number`; `operationId`: `string`; \} \| \{ `token`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; \} \| \{ `operationId`: `string`; `reason`: `string`; \} \| \{ `error`: `unknown`; \})[]; `status`: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`InspectError`](#inspecterror)\>
+
+<a id="extendbudget"></a>
 
 ##### extendBudget
 
@@ -525,6 +687,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 `Effect`\<`void`, [`OperatorExtendBudgetError`](#operatorextendbudgeterror)\>
 
+<a id="resolveapproval"></a>
+
 ##### resolveApproval
 
 > `readonly` **resolveApproval**: (`token`, `decision`, `operator`) => `Effect`\<`void`, [`OperatorApprovalError`](#operatorapprovalerror), [`RuleStore`](../../permissions#rulestore)\>
@@ -546,6 +710,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Returns
 
 `Effect`\<`void`, [`OperatorApprovalError`](#operatorapprovalerror), [`RuleStore`](../../permissions#rulestore)\>
+
+<a id="resolveunknown"></a>
 
 ##### resolveUnknown
 
@@ -573,6 +739,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 `Effect`\<`void`, [`OperatorActionError`](#operatoractionerror)\>
 
+<a id="retry"></a>
+
 ##### retry
 
 > `readonly` **retry**: (`runId`, `operator`) => `Effect`\<`void`, [`OperatorActionError`](#operatoractionerror)\>
@@ -591,6 +759,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 `Effect`\<`void`, [`OperatorActionError`](#operatoractionerror)\>
 
+<a id="scanobligations"></a>
+
 ##### scanObligations
 
 > `readonly` **scanObligations**: () => `Stream`\<\{ `decision`: \{ \} \| \{ `attempt`: `number`; `operationId`: `string`; \} \| \{ `token`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; \} \| \{ `operationId`: `string`; `reason`: `string`; \} \| \{ `error`: `unknown`; \}; `runId`: `string`; \}, [`InspectError`](#inspecterror)\>
@@ -598,6 +768,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Returns
 
 `Stream`\<\{ `decision`: \{ \} \| \{ `attempt`: `number`; `operationId`: `string`; \} \| \{ `token`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; \} \| \{ `operationId`: `string`; `reason`: `string`; \} \| \{ `error`: `unknown`; \}; `runId`: `string`; \}, [`InspectError`](#inspecterror)\>
+
+<a id="verify"></a>
 
 ##### verify
 
@@ -612,6 +784,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Returns
 
 `Effect`\<\{ `decision`: \{ \} \| \{ `attempt`: `number`; `operationId`: `string`; \} \| \{ `token`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; \} \| \{ `operationId`: `string`; `reason`: `string`; \} \| \{ `error`: `unknown`; \}; `drift`: readonly `string`[]; `lastSequence`: `number`; `obligations`: readonly (\{ \} \| \{ `attempt`: `number`; `operationId`: `string`; \} \| \{ `token`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; \} \| \{ `operationId`: `string`; `reason`: `string`; \} \| \{ `error`: `unknown`; \})[]; `status`: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`InspectError`](#inspecterror)\>
+
+<a id="wake"></a>
 
 ##### wake
 
@@ -633,25 +807,35 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ***
 
+<a id="previewsinput"></a>
+
 ### PreviewsInput
 
 Select the memory-only live preview lane for one Run.
 
 #### Properties
 
+<a id="runid-5"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
 
 ***
+
+<a id="registeragentnameinput"></a>
 
 ### RegisterAgentNameInput
 
 #### Properties
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string` & `Brand`\<`"generalist/runtime/AgentName"`\>
+
+<a id="runid-6"></a>
 
 ##### runId
 
@@ -659,23 +843,33 @@ Select the memory-only live preview lane for one Run.
 
 ***
 
+<a id="respondinput"></a>
+
 ### RespondInput
 
 #### Properties
+
+<a id="resolution"></a>
 
 ##### resolution
 
 > `readonly` **resolution**: \{ \} \| \{ `reason?`: `string`; \} \| \{ `encodedResult`: `unknown`; `result`: `unknown`; \}
 
+<a id="runid-7"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
+
+<a id="waitid"></a>
 
 ##### waitId
 
 > `readonly` **waitId**: `string`
 
 ***
+
+<a id="runhandle"></a>
 
 ### RunHandle
 
@@ -689,17 +883,25 @@ One typed durable Run and its replay-then-live event stream.
 
 #### Properties
 
+<a id="await"></a>
+
 ##### await
 
 > `readonly` **await**: `Effect`\<`Output`, [`RunFailed`](./RunEvent#runfailed) \| [`RunCancelled`](./RunEvent#runcancelled) \| [`EventsError`](#eventserror) \| [`InvalidOutput`](../../generalist/namespaces/AgentEvent#invalidoutput)\>
+
+<a id="events"></a>
 
 ##### events
 
 > `readonly` **events**: `Stream`\<[`StartEvent`](../../generalist/namespaces/Agent#startevent)\<`Output`\>, [`EventsError`](#eventserror) \| [`InvalidOutput`](../../generalist/namespaces/AgentEvent#invalidoutput)\>
 
+<a id="runid-8"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
+
+<a id="send"></a>
 
 ##### send
 
@@ -721,25 +923,35 @@ One typed durable Run and its replay-then-live event stream.
 
 ***
 
+<a id="runsendoptions"></a>
+
 ### RunSendOptions
 
 Admission options for a message sent to one existing Run.
 
 #### Properties
 
+<a id="from"></a>
+
 ##### from?
 
 > `readonly` `optional` **from?**: \{ `runId`: `string`; \} \| \{ `user`: `string`; \} \| \{ `system`: `true`; \}
 
+<a id="idempotencykey-2"></a>
+
 ##### idempotencyKey?
 
 > `readonly` `optional` **idempotencyKey?**: `string`
+
+<a id="policy"></a>
 
 ##### policy?
 
 > `readonly` `optional` **policy?**: `"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
 
 ***
+
+<a id="runtimeinspection"></a>
 
 ### RuntimeInspection
 
@@ -751,9 +963,13 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 #### Properties
 
+<a id="activetools"></a>
+
 ##### activeTools
 
 > `readonly` **activeTools**: readonly `string`[]
+
+<a id="branches"></a>
 
 ##### branches
 
@@ -762,6 +978,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 ###### Inherited from
 
 [`RunInspection`](./Run#runinspection).[`branches`](./Run#branches)
+
+<a id="budget"></a>
 
 ##### budget
 
@@ -787,6 +1005,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 > `readonly` `optional` **usd?**: `number` \| `"unknown"`
 
+<a id="childreadiness"></a>
+
 ##### childReadiness?
 
 > `readonly` `optional` **childReadiness?**: `"queued"` \| `"ready"` \| `"settled"`
@@ -795,9 +1015,13 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`childReadiness`](./Run#childreadiness)
 
+<a id="children"></a>
+
 ##### children
 
 > `readonly` **children**: readonly [`ChildInspection`](./ChildAdmission#childinspection)[]
+
+<a id="depth"></a>
 
 ##### depth
 
@@ -807,6 +1031,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`depth`](./Run#depth-1)
 
+<a id="durability"></a>
+
 ##### durability
 
 > `readonly` **durability**: `"ephemeral"` \| `"durable"`
@@ -815,9 +1041,13 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`durability`](./Run#durability)
 
+<a id="elapsed"></a>
+
 ##### elapsed
 
 > `readonly` **elapsed**: `number`
+
+<a id="executablemanifest"></a>
 
 ##### executableManifest
 
@@ -826,6 +1056,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 ###### Inherited from
 
 [`RunInspection`](./Run#runinspection).[`executableManifest`](./Run#executablemanifest-1)
+
+<a id="executableref"></a>
 
 ##### executableRef
 
@@ -843,13 +1075,19 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`executableRef`](./Run#executableref-1)
 
+<a id="gates"></a>
+
 ##### gates
 
 > `readonly` **gates**: readonly `object`[]
 
+<a id="lastevent"></a>
+
 ##### lastEvent?
 
 > `readonly` `optional` **lastEvent?**: `InspectionEvent`
+
+<a id="lastsequence"></a>
 
 ##### lastSequence
 
@@ -859,6 +1097,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`lastSequence`](./Run#lastsequence-1)
 
+<a id="parentrunid-4"></a>
+
 ##### parentRunId?
 
 > `readonly` `optional` **parentRunId?**: `string`
@@ -866,6 +1106,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 ###### Inherited from
 
 [`RunInspection`](./Run#runinspection).[`parentRunId`](./Run#parentrunid-1)
+
+<a id="runid-9"></a>
 
 ##### runId
 
@@ -875,6 +1117,8 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`runId`](./Run#runid-1)
 
+<a id="status-1"></a>
+
 ##### status
 
 > `readonly` **status**: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
@@ -883,9 +1127,13 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`status`](./Run#status-1)
 
+<a id="suspension"></a>
+
 ##### suspension?
 
 > `readonly` `optional` **suspension?**: [`ExecutionSuspension`](./ExecutionState#executionsuspension)
+
+<a id="treepolicy"></a>
 
 ##### treePolicy
 
@@ -903,9 +1151,13 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run#runinspection).[`treePolicy`](./Run#treepolicy-1)
 
+<a id="turn"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
+
+<a id="usage"></a>
 
 ##### usage
 
@@ -919,9 +1171,13 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 > `readonly` **outputTokens**: `number`
 
+<a id="usagefacts"></a>
+
 ##### usageFacts
 
 > `readonly` **usageFacts**: readonly [`RawUsageFact`](./Run#rawusagefact)[]
+
+<a id="waits"></a>
 
 ##### waits
 
@@ -933,11 +1189,15 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 ***
 
+<a id="scheduleoptions"></a>
+
 ### ScheduleOptions
 
 Durable UTC fresh-Run recurrence.
 
 #### Properties
+
+<a id="budget-1"></a>
 
 ##### budget?
 
@@ -991,9 +1251,13 @@ Durable UTC fresh-Run recurrence.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="rrule-1"></a>
+
 ##### rrule
 
 > `readonly` **rrule**: `string`
+
+<a id="scheduleid"></a>
 
 ##### scheduleId?
 
@@ -1001,39 +1265,57 @@ Durable UTC fresh-Run recurrence.
 
 Stable identity for idempotent registration across Runtime restarts.
 
+<a id="sessionid-4"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
 
 ***
 
+<a id="sendinput"></a>
+
 ### SendInput
 
 #### Properties
+
+<a id="causationid"></a>
 
 ##### causationId?
 
 > `readonly` `optional` **causationId?**: `string`
 
+<a id="correlationid-1"></a>
+
 ##### correlationId?
 
 > `readonly` `optional` **correlationId?**: `string`
+
+<a id="from-1"></a>
 
 ##### from?
 
 > `readonly` `optional` **from?**: `string` & `Brand`\<`"Address"`\>
 
+<a id="idempotencykey-3"></a>
+
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
+
+<a id="inreplyto"></a>
 
 ##### inReplyTo?
 
 > `readonly` `optional` **inReplyTo?**: `string`
 
+<a id="messageid-1"></a>
+
 ##### messageId?
 
 > `readonly` `optional` **messageId?**: `string`
+
+<a id="metadata-2"></a>
 
 ##### metadata?
 
@@ -1043,21 +1325,31 @@ Stable identity for idempotent registration across Runtime restarts.
 
 \[`key`: `string`\]: `unknown`
 
+<a id="prompt-2"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
+
+<a id="runid-10"></a>
 
 ##### runId?
 
 > `readonly` `optional` **runId?**: `string`
 
+<a id="sessionid-5"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
 
+<a id="to"></a>
+
 ##### to
 
 > `readonly` **to**: `string` & `Brand`\<`"Address"`\>
+
+<a id="treepolicy-1"></a>
 
 ##### treePolicy?
 
@@ -1073,6 +1365,8 @@ Stable identity for idempotent registration across Runtime restarts.
 
 ***
 
+<a id="sendmessageinput"></a>
+
 ### SendMessageInput
 
 One addressed send between agents.
@@ -1082,29 +1376,43 @@ durable Run record, so callers cannot forge a sender by supplying an Address.
 
 #### Properties
 
+<a id="causationid-1"></a>
+
 ##### causationId?
 
 > `readonly` `optional` **causationId?**: `string`
+
+<a id="correlationid-2"></a>
 
 ##### correlationId?
 
 > `readonly` `optional` **correlationId?**: `string`
 
+<a id="fromrunid"></a>
+
 ##### fromRunId
 
 > `readonly` **fromRunId**: `string`
+
+<a id="idempotencykey-4"></a>
 
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
 
+<a id="inreplyto-1"></a>
+
 ##### inReplyTo?
 
 > `readonly` `optional` **inReplyTo?**: `string`
 
+<a id="messageid-2"></a>
+
 ##### messageId?
 
 > `readonly` `optional` **messageId?**: `string`
+
+<a id="metadata-3"></a>
 
 ##### metadata?
 
@@ -1114,19 +1422,27 @@ durable Run record, so callers cannot forge a sender by supplying an Address.
 
 \[`key`: `string`\]: `unknown`
 
+<a id="policy-1"></a>
+
 ##### policy?
 
 > `readonly` `optional` **policy?**: `"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
 
+<a id="prompt-3"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
+
+<a id="to-1"></a>
 
 ##### to
 
 > `readonly` **to**: `string` & `Brand`\<`"Address"`\>
 
 ***
+
+<a id="service"></a>
 
 ### Service
 
@@ -1137,6 +1453,8 @@ Runtime operations that persist and observe product-facing Sessions.
 - [`RuntimeHostSessions`](./HostSession#runtimehostsessions)
 
 #### Properties
+
+<a id="acknowledge"></a>
 
 ##### acknowledge
 
@@ -1160,6 +1478,8 @@ Durably advance the host processed-through point to an exact committed model cyc
 
 `Effect`\<`void`, [`AckError`](#ackerror)\>
 
+<a id="acknowledged"></a>
+
 ##### acknowledged
 
 > `readonly` **acknowledged**: (`runId`) => `Effect`\<\{ `acknowledgedAt?`: `string`; `runId`: `string`; `sequence`: `number`; \}, [`InspectError`](#inspecterror)\>
@@ -1175,6 +1495,8 @@ Read the durable host processed-through point; -1 means no cycle is acknowledged
 ###### Returns
 
 `Effect`\<\{ `acknowledgedAt?`: `string`; `runId`: `string`; `sequence`: `number`; \}, [`InspectError`](#inspecterror)\>
+
+<a id="activate"></a>
 
 ##### activate
 
@@ -1192,6 +1514,8 @@ Idempotently activate an admitted root and return its authoritative current stat
 
 `Effect`\<[`RunInspection`](./Run#runinspection), [`ActivateError`](#activateerror)\>
 
+<a id="admit"></a>
+
 ##### admit
 
 > `readonly` **admit**: (`input`) => `Effect`\<[`RunReceipt`](./Run#runreceipt), [`StartExecutionError`](#startexecutionerror)\>
@@ -1207,6 +1531,8 @@ Durably admit one exact root without making it executable.
 ###### Returns
 
 `Effect`\<[`RunReceipt`](./Run#runreceipt), [`StartExecutionError`](#startexecutionerror)\>
+
+<a id="awaitchildsettlement"></a>
 
 ##### awaitChildSettlement
 
@@ -1224,6 +1550,8 @@ Wait for one child's durable settlement without executing or scheduling the pare
 
 `Effect`\<\{ `_tag`: `"ChildSettlement"`; `admittedAtMillis`: `number`; `childRunId`: `string`; `joined?`: `boolean`; `notificationId`: `string`; `parentRunId`: `string`; `resultBytes`: `number`; `resultText`: `string`; `resultTruncated`: `boolean`; `sequence`: `number`; `status`: `"succeeded"` \| `"failed"` \| `"cancelled"`; `terminalEventId`: `string`; \}, [`ChildSettlementError`](#childsettlementerror)\>
 
+<a id="awaitfanout"></a>
+
 ##### awaitFanOut
 
 > `readonly` **awaitFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, `AwaitFanOutError`\>
@@ -1238,6 +1566,8 @@ Wait for one child's durable settlement without executing or scheduling the pare
 
 `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, `AwaitFanOutError`\>
 
+<a id="awaitsessionterminal"></a>
+
 ##### awaitSessionTerminal
 
 > `readonly` **awaitSessionTerminal**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
@@ -1251,6 +1581,8 @@ Wait for one child's durable settlement without executing or scheduling the pare
 ###### Returns
 
 `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+
+<a id="cancel"></a>
 
 ##### cancel
 
@@ -1270,6 +1602,8 @@ the caller must know whether owned work exited and external outcomes became defi
 
 `Effect`\<`void`, [`CancelError`](#cancelerror)\>
 
+<a id="cancelsession"></a>
+
 ##### cancelSession
 
 > `readonly` **cancelSession**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
@@ -1283,6 +1617,8 @@ the caller must know whether owned work exited and external outcomes became defi
 ###### Returns
 
 `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+
+<a id="childsettlementchanges"></a>
 
 ##### childSettlementChanges
 
@@ -1300,6 +1636,8 @@ Subscribe to durable child settlements, replaying entries after the requested se
 
 `Stream`\<\{ `_tag`: `"ChildSettlement"`; `admittedAtMillis`: `number`; `childRunId`: `string`; `joined?`: `boolean`; `notificationId`: `string`; `parentRunId`: `string`; `resultBytes`: `number`; `resultText`: `string`; `resultTruncated`: `boolean`; `sequence`: `number`; `status`: `"succeeded"` \| `"failed"` \| `"cancelled"`; `terminalEventId`: `string`; \}, [`ChildSettlementError`](#childsettlementerror)\>
 
+<a id="childsettlements"></a>
+
 ##### childSettlements
 
 > `readonly` **childSettlements**: (`input`) => `Effect`\<readonly `object`[], [`ChildSettlementError`](#childsettlementerror)\>
@@ -1315,6 +1653,8 @@ Read ordered durable child settlements for one exact parent Run.
 ###### Returns
 
 `Effect`\<readonly `object`[], [`ChildSettlementError`](#childsettlementerror)\>
+
+<a id="createsession"></a>
 
 ##### createSession
 
@@ -1334,6 +1674,8 @@ Read ordered durable child settlements for one exact parent Run.
 
 [`RuntimeHostSessions`](./HostSession#runtimehostsessions).[`createSession`](./HostSession#createsession)
 
+<a id="directory"></a>
+
 ##### directory
 
 > `readonly` **directory**: (`runId`) => `Effect`\<readonly [`DirectoryEntry`](./AgentDirectory#directoryentry)[], [`DirectoryError`](#directoryerror)\>
@@ -1350,6 +1692,8 @@ Addresses this Run may reach under Generalist relationships plus host policy.
 
 `Effect`\<readonly [`DirectoryEntry`](./AgentDirectory#directoryentry)[], [`DirectoryError`](#directoryerror)\>
 
+<a id="events-1"></a>
+
 ##### events
 
 > `readonly` **events**: (`input`) => `Stream`\<[`RunEvent`](./RunEvent#runevent), [`EventsError`](#eventserror)\>
@@ -1363,6 +1707,8 @@ Addresses this Run may reach under Generalist relationships plus host policy.
 ###### Returns
 
 `Stream`\<[`RunEvent`](./RunEvent#runevent), [`EventsError`](#eventserror)\>
+
+<a id="extendbudget-1"></a>
 
 ##### extendBudget
 
@@ -1384,6 +1730,8 @@ Primitive used by the operator API to journal a budget top-up and resume budget 
 
 `Effect`\<`void`, [`ExtendBudgetError`](#extendbudgeterror)\>
 
+<a id="fanout"></a>
+
 ##### fanOut
 
 > `readonly` **fanOut**: (`input`) => `Effect`\<\{ `childRunIds`: readonly `string`[]; `duplicate`: `boolean`; `fanOutId`: `string`; `parentRunId`: `string`; \}, [`FanOutError`](#fanouterror)\>
@@ -1397,6 +1745,8 @@ Primitive used by the operator API to journal a budget top-up and resume budget 
 ###### Returns
 
 `Effect`\<\{ `childRunIds`: readonly `string`[]; `duplicate`: `boolean`; `fanOutId`: `string`; `parentRunId`: `string`; \}, [`FanOutError`](#fanouterror)\>
+
+<a id="fork"></a>
 
 ##### fork
 
@@ -1418,6 +1768,8 @@ Start a new Run from one committed journal prefix.
 
 `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, `ForkError`\>
 
+<a id="history"></a>
+
 ##### history
 
 > `readonly` **history**: (`input`) => `Effect`\<readonly [`RunEvent`](./RunEvent#runevent)[], [`EventsError`](#eventserror)\>
@@ -1431,6 +1783,8 @@ Start a new Run from one committed journal prefix.
 ###### Returns
 
 `Effect`\<readonly [`RunEvent`](./RunEvent#runevent)[], [`EventsError`](#eventserror)\>
+
+<a id="inspect"></a>
 
 ##### inspect
 
@@ -1446,6 +1800,8 @@ Start a new Run from one committed journal prefix.
 
 `Effect`\<[`RuntimeInspection`](#runtimeinspection), [`InspectError`](#inspecterror)\>
 
+<a id="inspectfanout"></a>
+
 ##### inspectFanOut
 
 > `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`InspectFanOutError`](#inspectfanouterror)\>
@@ -1459,6 +1815,8 @@ Start a new Run from one committed journal prefix.
 ###### Returns
 
 `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`; `status`: `"running"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`; \}, [`InspectFanOutError`](#inspectfanouterror)\>
+
+<a id="list"></a>
 
 ##### list
 
@@ -1474,6 +1832,8 @@ Start a new Run from one committed journal prefix.
 
 `Effect`\<readonly [`RunInspection`](./Run#runinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
 
+<a id="listsessions"></a>
+
 ##### listSessions
 
 > `readonly` **listSessions**: `Effect`\<readonly `object`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
@@ -1481,6 +1841,8 @@ Start a new Run from one committed journal prefix.
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession#runtimehostsessions).[`listSessions`](./HostSession#listsessions)
+
+<a id="messages"></a>
 
 ##### messages
 
@@ -1498,9 +1860,13 @@ Pending addressed-message projections for this exact Run.
 
 `Effect`\<readonly [`MailboxEntry`](./Mailbox#mailboxentry)[], [`DirectoryError`](#directoryerror)\>
 
+<a id="operator"></a>
+
 ##### operator
 
 > `readonly` **operator**: [`OperatorService`](#operatorservice)
+
+<a id="previews"></a>
 
 ##### previews
 
@@ -1521,6 +1887,8 @@ frame. Preview events are memory-only and never durable RunEvents.
 
 `Stream`\<[`Event`](./ModelPreview#event)\>
 
+<a id="recordreward"></a>
+
 ##### recordReward
 
 > `readonly` **recordReward**: (`input`) => `Effect`\<`void`, `RecordRewardError`\>
@@ -1538,6 +1906,8 @@ Journal one scalar reward assigned by an export policy.
 ###### Returns
 
 `Effect`\<`void`, `RecordRewardError`\>
+
+<a id="register"></a>
 
 ##### register
 
@@ -1581,6 +1951,8 @@ Register one Agent name and its exact environment for start and recovery.
 
 `Effect`\<`void`, [`DuplicateAgent`](./Errors#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
+<a id="registeragentname"></a>
+
 ##### registerAgentName
 
 > `readonly` **registerAgentName**: (`input`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), [`RegisterAgentNameError`](#registeragentnameerror)\>
@@ -1597,6 +1969,8 @@ Bind one host-assigned name, unique within the Run's naming scope.
 
 `Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), [`RegisterAgentNameError`](#registeragentnameerror)\>
 
+<a id="resolvemodelresponse"></a>
+
 ##### resolveModelResponse
 
 > `readonly` **resolveModelResponse**: (`event`) => `Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \}, [`SessionEntryError`](#sessionentryerror)\>
@@ -1610,6 +1984,8 @@ Bind one host-assigned name, unique within the Run's naming scope.
 ###### Returns
 
 `Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \}, [`SessionEntryError`](#sessionentryerror)\>
+
+<a id="resolveoperation"></a>
 
 ##### resolveOperation
 
@@ -1639,6 +2015,8 @@ Bind one host-assigned name, unique within the Run's naming scope.
 
 `Effect`\<`void`, `ResolveOperationError`\>
 
+<a id="respond"></a>
+
 ##### respond
 
 > `readonly` **respond**: (`input`) => `Effect`\<`void`, [`RespondError`](#responderror)\>
@@ -1652,6 +2030,8 @@ Bind one host-assigned name, unique within the Run's naming scope.
 ###### Returns
 
 `Effect`\<`void`, [`RespondError`](#responderror)\>
+
+<a id="respondapproval"></a>
 
 ##### respondApproval
 
@@ -1681,6 +2061,8 @@ Bind one host-assigned name, unique within the Run's naming scope.
 
 `Effect`\<`void`, [`RespondApprovalError`](#respondapprovalerror)\>
 
+<a id="rewind"></a>
+
 ##### rewind
 
 > `readonly` **rewind**: (`runId`, `options`) => `Effect`\<`void`, `RewindError`\>
@@ -1700,6 +2082,8 @@ Continue this Run from an earlier prefix while retaining its old suffix as a bra
 ###### Returns
 
 `Effect`\<`void`, `RewindError`\>
+
+<a id="schedule"></a>
 
 ##### schedule
 
@@ -1751,9 +2135,13 @@ Register recurring fresh Runs for one registered Agent.
 
 `Effect`\<\{ `nextAt`: `string`; `scheduleId`: `string`; \}, [`ScheduleError`](#scheduleerror)\>
 
+<a id="send-1"></a>
+
 ##### send
 
 > `readonly` **send**: `SendFunction`
+
+<a id="sendmessage"></a>
 
 ##### sendMessage
 
@@ -1774,6 +2162,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 `Effect`\<[`MessageReceipt`](./Mailbox#messagereceipt), [`SendMessageError`](#sendmessageerror)\>
 
+<a id="session"></a>
+
 ##### session
 
 > `readonly` **session**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./HostSession#sessionerror)\>
@@ -1792,6 +2182,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 [`RuntimeHostSessions`](./HostSession#runtimehostsessions).[`session`](./HostSession#session)
 
+<a id="sessionentry"></a>
+
 ##### sessionEntry
 
 > `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../../generalist/namespaces/Session#entry), [`SessionEntryError`](#sessionentryerror)\>
@@ -1805,6 +2197,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Returns
 
 `Effect`\<[`Entry`](../../generalist/namespaces/Session#entry), [`SessionEntryError`](#sessionentryerror)\>
+
+<a id="sessionevents"></a>
 
 ##### sessionEvents
 
@@ -1824,6 +2218,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 [`RuntimeHostSessions`](./HostSession#runtimehostsessions).[`sessionEvents`](./HostSession#sessionevents)
 
+<a id="sessionruns"></a>
+
 ##### sessionRuns
 
 > `readonly` **sessionRuns**: (`sessionId`) => `Effect`\<readonly [`RunInspection`](./Run#runinspection)[], [`SessionError`](./HostSession#sessionerror)\>
@@ -1842,6 +2238,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 [`RuntimeHostSessions`](./HostSession#runtimehostsessions).[`sessionRuns`](./HostSession#sessionruns)
 
+<a id="signal"></a>
+
 ##### signal
 
 > `readonly` **signal**: (`input`) => `Effect`\<`void`, [`SignalError`](#signalerror)\>
@@ -1855,6 +2253,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Returns
 
 `Effect`\<`void`, [`SignalError`](#signalerror)\>
+
+<a id="snapshot"></a>
 
 ##### snapshot
 
@@ -1870,6 +2270,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 `Effect`\<[`RunSnapshot`](./Run#runsnapshot), [`InspectError`](#inspecterror)\>
 
+<a id="spawn"></a>
+
 ##### spawn
 
 > `readonly` **spawn**: (`input`) => `Effect`\<[`RunReceipt`](./Run#runreceipt), [`SpawnError`](#spawnerror)\>
@@ -1883,6 +2285,8 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Returns
 
 `Effect`\<[`RunReceipt`](./Run#runreceipt), [`SpawnError`](#spawnerror)\>
+
+<a id="start"></a>
 
 ##### start
 
@@ -1934,6 +2338,8 @@ Start one registered Agent with Schema-derived input and output.
 
 `Effect`\<[`RunHandle`](#runhandle)\<`OutputCodec`\[`"Type"`\]\>, [`StartError`](#starterror), `never`\>
 
+<a id="startexecution"></a>
+
 ##### startExecution
 
 > `readonly` **startExecution**: (`input`) => `Effect`\<[`StartReceipt`](#startreceipt), [`StartExecutionError`](#startexecutionerror)\>
@@ -1952,6 +2358,8 @@ Begin one already-normalized pinned execution.
 
 `Effect`\<[`StartReceipt`](#startreceipt), [`StartExecutionError`](#startexecutionerror)\>
 
+<a id="treechanges"></a>
+
 ##### treeChanges
 
 > `readonly` **treeChanges**: (`rootRunId`) => `Stream`\<`void`, [`TreeReplayError`](#treereplayerror)\>
@@ -1965,6 +2373,8 @@ Begin one already-normalized pinned execution.
 ###### Returns
 
 `Stream`\<`void`, [`TreeReplayError`](#treereplayerror)\>
+
+<a id="treecheckpoint"></a>
 
 ##### treeCheckpoint
 
@@ -1982,6 +2392,8 @@ Atomically pair a point-in-time tree inspection with its exclusive replay cursor
 
 `Effect`\<[`Checkpoint`](./RunTree#checkpoint), [`InspectError`](#inspecterror)\>
 
+<a id="treereplay"></a>
+
 ##### treeReplay
 
 > `readonly` **treeReplay**: (`input`) => `Effect`\<[`ReplayPage`](./RunTree#replaypage), [`TreeReplayError`](#treereplayerror)\>
@@ -1997,6 +2409,8 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 ###### Returns
 
 `Effect`\<[`ReplayPage`](./RunTree#replaypage), [`TreeReplayError`](#treereplayerror)\>
+
+<a id="wake-1"></a>
 
 ##### wake
 
@@ -2020,13 +2434,19 @@ Journal one validated environmental event and resume one matching wait at most o
 
 ***
 
+<a id="sessionentryinput"></a>
+
 ### SessionEntryInput
 
 #### Properties
 
+<a id="entryid"></a>
+
 ##### entryId
 
 > `readonly` **entryId**: `string`
+
+<a id="sessionid-6"></a>
 
 ##### sessionId
 
@@ -2034,17 +2454,25 @@ Journal one validated environmental event and resume one matching wait at most o
 
 ***
 
+<a id="signalinput"></a>
+
 ### SignalInput
 
 #### Properties
+
+<a id="name-1"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="payload"></a>
+
 ##### payload?
 
 > `readonly` `optional` **payload?**: `unknown`
+
+<a id="runid-11"></a>
 
 ##### runId
 
@@ -2052,29 +2480,43 @@ Journal one validated environmental event and resume one matching wait at most o
 
 ***
 
+<a id="spawninput"></a>
+
 ### SpawnInput
 
 #### Properties
+
+<a id="correlationid-3"></a>
 
 ##### correlationId?
 
 > `readonly` `optional` **correlationId?**: `string`
 
+<a id="idempotencykey-5"></a>
+
 ##### idempotencyKey?
 
 > `readonly` `optional` **idempotencyKey?**: `string`
+
+<a id="invocationid-1"></a>
 
 ##### invocationId
 
 > `readonly` **invocationId**: `string`
 
+<a id="label-1"></a>
+
 ##### label?
 
 > `readonly` `optional` **label?**: `string`
 
+<a id="messageid-3"></a>
+
 ##### messageId?
 
 > `readonly` `optional` **messageId?**: `string`
+
+<a id="metadata-4"></a>
 
 ##### metadata?
 
@@ -2083,6 +2525,8 @@ Journal one validated environmental event and resume one matching wait at most o
 ###### Index Signature
 
 \[`key`: `string`\]: `unknown`
+
+<a id="origin-1"></a>
 
 ##### origin?
 
@@ -2096,23 +2540,33 @@ Journal one validated environmental event and resume one matching wait at most o
 
 > `readonly` `optional` **parentToolCallId?**: `string`
 
+<a id="parentrunid-5"></a>
+
 ##### parentRunId
 
 > `readonly` **parentRunId**: `string`
+
+<a id="prompt-4"></a>
 
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
 
+<a id="selection-2"></a>
+
 ##### selection
 
 > `readonly` **selection**: `string`
+
+<a id="sessionid-7"></a>
 
 ##### sessionId?
 
 > `readonly` `optional` **sessionId?**: `string`
 
 ***
+
+<a id="startexecutioninput"></a>
 
 ### StartExecutionInput
 
@@ -2121,6 +2575,8 @@ Journal one validated environmental event and resume one matching wait at most o
 Exact root execution admission used below the typed Agent API.
 
 #### Properties
+
+<a id="budget-2"></a>
 
 ##### budget?
 
@@ -2174,33 +2630,49 @@ Exact root execution admission used below the typed Agent API.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="causationid-2"></a>
+
 ##### causationId?
 
 > `readonly` `optional` **causationId?**: `string`
+
+<a id="correlationid-4"></a>
 
 ##### correlationId?
 
 > `readonly` `optional` **correlationId?**: `string`
 
+<a id="executable-1"></a>
+
 ##### executable
 
 > `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+
+<a id="idempotencykey-6"></a>
 
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
 
+<a id="initialchildren"></a>
+
 ##### initialChildren?
 
 > `readonly` `optional` **initialChildren?**: readonly [`InitialChildInput`](#initialchildinput)[]
+
+<a id="initialfanouts"></a>
 
 ##### initialFanOuts?
 
 > `readonly` `optional` **initialFanOuts?**: readonly `InitialFanOutInput`[]
 
+<a id="messageid-4"></a>
+
 ##### messageId?
 
 > `readonly` `optional` **messageId?**: `string`
+
+<a id="metadata-5"></a>
 
 ##### metadata?
 
@@ -2210,21 +2682,31 @@ Exact root execution admission used below the typed Agent API.
 
 \[`key`: `string`\]: `unknown`
 
+<a id="prompt-5"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
+
+<a id="registrations-1"></a>
 
 ##### registrations
 
 > `readonly` **registrations**: readonly `object`[]
 
+<a id="runid-12"></a>
+
 ##### runId?
 
 > `readonly` `optional` **runId?**: `string`
 
+<a id="sessionid-8"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="treepolicy-2"></a>
 
 ##### treePolicy?
 
@@ -2240,6 +2722,8 @@ Exact root execution admission used below the typed Agent API.
 
 ***
 
+<a id="startreceipt"></a>
+
 ### StartReceipt
 
 #### Extends
@@ -2247,6 +2731,8 @@ Exact root execution admission used below the typed Agent API.
 - [`RunReceipt`](./Run#runreceipt)
 
 #### Properties
+
+<a id="acceptedsequence"></a>
 
 ##### acceptedSequence
 
@@ -2256,9 +2742,13 @@ Exact root execution admission used below the typed Agent API.
 
 [`RunReceipt`](./Run#runreceipt).[`acceptedSequence`](./Run#acceptedsequence)
 
+<a id="childrunids"></a>
+
 ##### childRunIds
 
 > `readonly` **childRunIds**: readonly `string`[]
+
+<a id="duplicate"></a>
 
 ##### duplicate
 
@@ -2268,9 +2758,13 @@ Exact root execution admission used below the typed Agent API.
 
 [`RunReceipt`](./Run#runreceipt).[`duplicate`](./Run#duplicate)
 
+<a id="fanouts"></a>
+
 ##### fanOuts
 
 > `readonly` **fanOuts**: readonly `object`[]
+
+<a id="messageid-5"></a>
 
 ##### messageId
 
@@ -2279,6 +2773,8 @@ Exact root execution admission used below the typed Agent API.
 ###### Inherited from
 
 [`RunReceipt`](./Run#runreceipt).[`messageId`](./Run#messageid-1)
+
+<a id="runid-13"></a>
 
 ##### runId
 
@@ -2290,6 +2786,8 @@ Exact root execution admission used below the typed Agent API.
 
 ## Type Aliases
 
+<a id="ackerror"></a>
+
 ### AckError
 
 > **AckError** = [`RunNotFound`](./Errors#runnotfound) \| [`AckInvalid`](./Errors#ackinvalid) \| [`AckBeyondCommitted`](./Errors#ackbeyondcommitted) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
@@ -2297,6 +2795,8 @@ Exact root execution admission used below the typed Agent API.
 Durable host acknowledgement failures.
 
 ***
+
+<a id="ackpoint"></a>
 
 ### AckPoint
 
@@ -2306,6 +2806,8 @@ One durable host processed-through point on the Run event sequence.
 
 ***
 
+<a id="ackpoint-1"></a>
+
 ### AckPoint
 
 > **AckPoint** = *typeof* `Point.Type`
@@ -2313,6 +2815,8 @@ One durable host processed-through point on the Run event sequence.
 One durable host processed-through point on the Run event sequence.
 
 ***
+
+<a id="activateerror"></a>
 
 ### ActivateError
 
@@ -2322,6 +2826,8 @@ Staged root activation failures.
 
 ***
 
+<a id="admiterror"></a>
+
 ### AdmitError
 
 > **AdmitError** = [`StartExecutionError`](#startexecutionerror)
@@ -2329,6 +2835,8 @@ Staged root activation failures.
 Exact-root staged admission failures.
 
 ***
+
+<a id="admitinput"></a>
 
 ### AdmitInput
 
@@ -2338,11 +2846,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="cancelerror"></a>
+
 ### CancelError
 
 > **CancelError** = [`RunNotFound`](./Errors#runnotfound) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="childsettlementerror"></a>
 
 ### ChildSettlementError
 
@@ -2350,11 +2862,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="directoryerror"></a>
+
 ### DirectoryError
 
 > **DirectoryError** = [`RunNotFound`](./Errors#runnotfound) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="eventserror"></a>
 
 ### EventsError
 
@@ -2362,11 +2878,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="extendbudgeterror"></a>
+
 ### ExtendBudgetError
 
 > **ExtendBudgetError** = [`InspectError`](#inspecterror) \| [`Invalid`](../../generalist/namespaces/RunBudget#invalid)
 
 ***
+
+<a id="fanouterror"></a>
 
 ### FanOutError
 
@@ -2374,11 +2894,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="inspecterror"></a>
+
 ### InspectError
 
 > **InspectError** = [`RunNotFound`](./Errors#runnotfound) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="inspectfanouterror"></a>
 
 ### InspectFanOutError
 
@@ -2386,11 +2910,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="modelresponseevent"></a>
+
 ### ModelResponseEvent
 
 > **ModelResponseEvent** = `Extract`\<[`RunEvent`](./RunEvent#runevent), \{ `_tag`: `"ModelResponseCommitted"` \| `"ModelResponseInterrupted"`; \}\>
 
 ***
+
+<a id="operatoractionerror"></a>
 
 ### OperatorActionError
 
@@ -2398,11 +2926,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="operatorapprovalerror"></a>
+
 ### OperatorApprovalError
 
 > **OperatorApprovalError** = [`ResolveError`](../../approvals#resolveerror) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)
 
 ***
+
+<a id="operatorextendbudgeterror"></a>
 
 ### OperatorExtendBudgetError
 
@@ -2410,11 +2942,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="registeragentnameerror"></a>
+
 ### RegisterAgentNameError
 
 > **RegisterAgentNameError** = [`RunNotFound`](./Errors#runnotfound) \| [`AgentNameConflict`](./Errors#agentnameconflict) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="resolvemodelresponseerror"></a>
 
 ### ResolveModelResponseError
 
@@ -2422,11 +2958,15 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="respondapprovalerror"></a>
+
 ### RespondApprovalError
 
 > **RespondApprovalError** = [`RunNotFound`](./Errors#runnotfound) \| [`ApprovalStale`](./Errors#approvalstale) \| [`ApprovalMismatch`](./Errors#approvalmismatch) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="responderror"></a>
 
 ### RespondError
 
@@ -2434,17 +2974,23 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ***
 
+<a id="runsenderror"></a>
+
 ### RunSendError
 
 > **RunSendError** = [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`RunBusy`](./Errors#runbusy) \| [`NotInFamily`](./Errors#notinfamily) \| [`SteeringConflict`](./Errors#steeringconflict) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`CursorExpired`](./Errors#cursorexpired) \| [`InboxFull`](../../generalist/namespaces/Steering#inboxfull) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
 
+<a id="scheduleerror"></a>
+
 ### ScheduleError
 
 > **ScheduleError** = [`UnknownAgent`](./Errors#unknownagent) \| [`AgentError`](../../generalist/namespaces/AgentEvent#agenterror) \| [`ScheduleInvalid`](#scheduleinvalid) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="schedulereceipt"></a>
 
 ### ScheduleReceipt
 
@@ -2454,11 +3000,15 @@ Durable identity and first firing instant of a registered recurrence.
 
 ***
 
+<a id="senderror"></a>
+
 ### SendError
 
 > **SendError** = [`AddressNotFound`](./Errors#addressnotfound) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing) \| [`TreePolicyInvalid`](./Errors#treepolicyinvalid) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="sendmessageerror"></a>
 
 ### SendMessageError
 
@@ -2466,11 +3016,15 @@ Durable identity and first firing instant of a registered recurrence.
 
 ***
 
+<a id="sessionentryerror"></a>
+
 ### SessionEntryError
 
 > **SessionEntryError** = [`SessionEntryNotFound`](./Errors#sessionentrynotfound) \| [`SessionEntryCorrupt`](./Errors#sessionentrycorrupt) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="signalerror"></a>
 
 ### SignalError
 
@@ -2478,11 +3032,15 @@ Durable identity and first firing instant of a registered recurrence.
 
 ***
 
+<a id="spawnerror"></a>
+
 ### SpawnError
 
 > **SpawnError** = [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted)
 
 ***
+
+<a id="starterror"></a>
 
 ### StartError
 
@@ -2492,11 +3050,15 @@ Typed Agent start failures before a Run handle exists.
 
 ***
 
+<a id="startexecutionerror"></a>
+
 ### StartExecutionError
 
 > **StartExecutionError** = [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`StartInvalid`](./Errors#startinvalid) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors#treepolicyinvalid) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted)
 
 ***
+
+<a id="treeeventserror"></a>
 
 ### TreeEventsError
 
@@ -2504,11 +3066,15 @@ Typed Agent start failures before a Run handle exists.
 
 ***
 
+<a id="treereplayerror"></a>
+
 ### TreeReplayError
 
 > **TreeReplayError** = [`RunNotFound`](./Errors#runnotfound) \| [`TreeCursorInvalid`](./Errors#treecursorinvalid) \| [`TreeCursorRootMismatch`](./Errors#treecursorrootmismatch) \| [`TreeCursorExpired`](./Errors#treecursorexpired) \| [`TreeCursorFuture`](./Errors#treecursorfuture) \| [`TreeReplayLimitInvalid`](./Errors#treereplaylimitinvalid) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
+
+<a id="wakedisposition"></a>
 
 ### WakeDisposition
 
@@ -2518,11 +3084,15 @@ Result of admitting one validated wake event to a Run.
 
 ***
 
+<a id="wakeerror"></a>
+
 ### WakeError
 
 > **WakeError** = [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`WakeEventInvalid`](#wakeeventinvalid)
 
 ## Variables
+
+<a id="layermemory"></a>
 
 ### layerMemory
 
@@ -2540,6 +3110,8 @@ Result of admitting one validated wake event to a Run.
 
 ***
 
+<a id="schedulereceipt-1"></a>
+
 ### ScheduleReceipt
 
 > `const` **ScheduleReceipt**: `Schema.Struct`\<\{ `nextAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>
@@ -2547,6 +3119,8 @@ Result of admitting one validated wake event to a Run.
 Durable identity and first firing instant of a registered recurrence.
 
 ***
+
+<a id="wakedisposition-1"></a>
 
 ### WakeDisposition
 
@@ -2556,11 +3130,15 @@ Result of admitting one validated wake event to a Run.
 
 ## References
 
+<a id="createsessionerror"></a>
+
 ### CreateSessionError
 
 Re-exports [CreateSessionError](./HostSession#createsessionerror)
 
 ***
+
+<a id="createsessioninput"></a>
 
 ### CreateSessionInput
 
@@ -2568,11 +3146,15 @@ Re-exports [CreateSessionInput](./HostSession#createsessioninput)
 
 ***
 
+<a id="hostsession"></a>
+
 ### HostSession
 
 Re-exports [HostSession](../../host#hostsession)
 
 ***
+
+<a id="hostsessionevent"></a>
 
 ### HostSessionEvent
 
@@ -2580,11 +3162,15 @@ Re-exports [HostSessionEvent](./HostSession#hostsessionevent)
 
 ***
 
+<a id="modelpreviewchange"></a>
+
 ### ModelPreviewChange
 
 Renames and re-exports [Change](./ModelPreview#change)
 
 ***
+
+<a id="modelpreviewcleared"></a>
 
 ### ModelPreviewCleared
 
@@ -2592,11 +3178,15 @@ Renames and re-exports [Cleared](./ModelPreview#cleared)
 
 ***
 
+<a id="modelpreviewevent"></a>
+
 ### ModelPreviewEvent
 
 Renames and re-exports [Event](./ModelPreview#event)
 
 ***
+
+<a id="modelpreviewframe"></a>
 
 ### ModelPreviewFrame
 
@@ -2604,11 +3194,15 @@ Renames and re-exports [Frame](./ModelPreview#frame)
 
 ***
 
+<a id="recoverydecision"></a>
+
 ### RecoveryDecision
 
 Re-exports [RecoveryDecision](./Recovery#recoverydecision-1)
 
 ***
+
+<a id="recoveryexplanation"></a>
 
 ### RecoveryExplanation
 
@@ -2616,11 +3210,15 @@ Renames and re-exports [Explanation](./Recovery#explanation-1)
 
 ***
 
+<a id="recoveryobligation"></a>
+
 ### RecoveryObligation
 
 Renames and re-exports [Obligation](./Recovery#obligation-1)
 
 ***
+
+<a id="recoveryverification"></a>
 
 ### RecoveryVerification
 
@@ -2628,11 +3226,15 @@ Renames and re-exports [Verification](./Recovery#verification-1)
 
 ***
 
+<a id="respondapprovalinput"></a>
+
 ### RespondApprovalInput
 
 Renames and re-exports [RespondInput](./Approval#respondinput-1)
 
 ***
+
+<a id="sessionconflict"></a>
 
 ### SessionConflict
 
@@ -2640,11 +3242,15 @@ Re-exports [SessionConflict](../../host#sessionconflict)
 
 ***
 
+<a id="sessioncursorexpired"></a>
+
 ### SessionCursorExpired
 
 Re-exports [SessionCursorExpired](../../host#sessioncursorexpired)
 
 ***
+
+<a id="sessionerror"></a>
 
 ### SessionError
 
@@ -2652,11 +3258,15 @@ Re-exports [SessionError](./HostSession#sessionerror)
 
 ***
 
+<a id="sessioneventserror"></a>
+
 ### SessionEventsError
 
 Re-exports [SessionEventsError](./HostSession#sessioneventserror)
 
 ***
+
+<a id="sessioneventsinput"></a>
 
 ### SessionEventsInput
 
@@ -2664,11 +3274,15 @@ Re-exports [SessionEventsInput](./HostSession#sessioneventsinput)
 
 ***
 
+<a id="sessionnotfound"></a>
+
 ### SessionNotFound
 
 Re-exports [SessionNotFound](../../host#sessionnotfound)
 
 ***
+
+<a id="sessionsubscriberlagged"></a>
 
 ### SessionSubscriberLagged
 
@@ -2676,11 +3290,15 @@ Re-exports [SessionSubscriberLagged](../../host#sessionsubscriberlagged)
 
 ***
 
+<a id="startevent"></a>
+
 ### StartEvent
 
 Re-exports [StartEvent](../../generalist/namespaces/Agent#startevent)
 
 ***
+
+<a id="startoptions"></a>
 
 ### StartOptions
 
@@ -2688,11 +3306,15 @@ Re-exports [StartOptions](../../generalist/namespaces/Agent#startoptions)
 
 ***
 
+<a id="steeringreceipt"></a>
+
 ### SteeringReceipt
 
 Re-exports [SteeringReceipt](./Steering#steeringreceipt-1)
 
 ***
+
+<a id="unknownresolution"></a>
 
 ### UnknownResolution
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="agentinputinvalid"></a>
+
 ### AgentInputInvalid
 
 An untyped Host start input did not satisfy the configured Agent's input Schema.
@@ -17,6 +19,8 @@ An untyped Host start input did not satisfy the configured Agent's input Schema.
 - `AgentInputInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ An untyped Host start input did not satisfy the configured Agent's input Schema.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ An untyped Host start input did not satisfy the configured Agent's input Schema.
 
 `AgentInputInvalid_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -53,6 +61,8 @@ An untyped Host start input did not satisfy the configured Agent's input Schema.
 ###### Inherited from
 
 `AgentInputInvalid_base.message`
+
+<a id="name"></a>
 
 ##### name
 
@@ -64,6 +74,8 @@ An untyped Host start input did not satisfy the configured Agent's input Schema.
 
 ***
 
+<a id="agentnotregistered"></a>
+
 ### AgentNotRegistered
 
 A Run start used an Agent that was not configured on this host.
@@ -73,6 +85,8 @@ A Run start used an Agent that was not configured on this host.
 - `AgentNotRegistered_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -94,6 +108,8 @@ A Run start used an Agent that was not configured on this host.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -101,6 +117,8 @@ A Run start used an Agent that was not configured on this host.
 ###### Inherited from
 
 `AgentNotRegistered_base.hint`
+
+<a id="name-1"></a>
 
 ##### name
 
@@ -112,6 +130,8 @@ A Run start used an Agent that was not configured on this host.
 
 ***
 
+<a id="pluginnameconflict"></a>
+
 ### PluginNameConflict
 
 A plugin name was declared more than once in one host.
@@ -121,6 +141,8 @@ A plugin name was declared more than once in one host.
 - `PluginNameConflict_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -142,6 +164,8 @@ A plugin name was declared more than once in one host.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -149,6 +173,8 @@ A plugin name was declared more than once in one host.
 ###### Inherited from
 
 `PluginNameConflict_base.hint`
+
+<a id="name-2"></a>
 
 ##### name
 
@@ -160,6 +186,8 @@ A plugin name was declared more than once in one host.
 
 ***
 
+<a id="plugintoolconflict"></a>
+
 ### PluginToolConflict
 
 Two host declarations attempted to install the same static tool name.
@@ -169,6 +197,8 @@ Two host declarations attempted to install the same static tool name.
 - `PluginToolConflict_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -190,6 +220,8 @@ Two host declarations attempted to install the same static tool name.
 
 #### Properties
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -198,6 +230,8 @@ Two host declarations attempted to install the same static tool name.
 
 `PluginToolConflict_base.hint`
 
+<a id="name-3"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -205,6 +239,8 @@ Two host declarations attempted to install the same static tool name.
 ###### Inherited from
 
 `PluginToolConflict_base.name`
+
+<a id="sources"></a>
 
 ##### sources
 
@@ -216,6 +252,8 @@ Two host declarations attempted to install the same static tool name.
 
 ***
 
+<a id="sessionconflict"></a>
+
 ### SessionConflict
 
 A host Session already owns the requested identity.
@@ -225,6 +263,8 @@ A host Session already owns the requested identity.
 - `SessionConflict_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -246,6 +286,8 @@ A host Session already owns the requested identity.
 
 #### Properties
 
+<a id="hint-4"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -253,6 +295,8 @@ A host Session already owns the requested identity.
 ###### Inherited from
 
 `SessionConflict_base.hint`
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -264,6 +308,8 @@ A host Session already owns the requested identity.
 
 ***
 
+<a id="sessioncursorexpired"></a>
+
 ### SessionCursorExpired
 
 A Session replay cursor is outside the driver's retained event range.
@@ -273,6 +319,8 @@ A Session replay cursor is outside the driver's retained event range.
 - `SessionCursorExpired_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -294,6 +342,8 @@ A Session replay cursor is outside the driver's retained event range.
 
 #### Properties
 
+<a id="cursor"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `number`
@@ -301,6 +351,8 @@ A Session replay cursor is outside the driver's retained event range.
 ###### Inherited from
 
 `SessionCursorExpired_base.cursor`
+
+<a id="earliestcursor"></a>
 
 ##### earliestCursor
 
@@ -310,6 +362,8 @@ A Session replay cursor is outside the driver's retained event range.
 
 `SessionCursorExpired_base.earliestCursor`
 
+<a id="hint-5"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -318,6 +372,8 @@ A Session replay cursor is outside the driver's retained event range.
 
 `SessionCursorExpired_base.hint`
 
+<a id="latestcursor"></a>
+
 ##### latestCursor
 
 > `readonly` **latestCursor**: `number`
@@ -325,6 +381,8 @@ A Session replay cursor is outside the driver's retained event range.
 ###### Inherited from
 
 `SessionCursorExpired_base.latestCursor`
+
+<a id="sessionid-1"></a>
 
 ##### sessionId
 
@@ -336,6 +394,8 @@ A Session replay cursor is outside the driver's retained event range.
 
 ***
 
+<a id="sessionnotfound"></a>
+
 ### SessionNotFound
 
 A requested host Session does not exist.
@@ -345,6 +405,8 @@ A requested host Session does not exist.
 - `SessionNotFound_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -366,6 +428,8 @@ A requested host Session does not exist.
 
 #### Properties
 
+<a id="hint-6"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -373,6 +437,8 @@ A requested host Session does not exist.
 ###### Inherited from
 
 `SessionNotFound_base.hint`
+
+<a id="sessionid-2"></a>
 
 ##### sessionId
 
@@ -384,6 +450,8 @@ A requested host Session does not exist.
 
 ***
 
+<a id="sessionsubscriberlagged"></a>
+
 ### SessionSubscriberLagged
 
 A Session event subscriber could not keep up with its bounded live queue.
@@ -393,6 +461,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 - `SessionSubscriberLagged_base`
 
 #### Constructors
+
+<a id="constructor-7"></a>
 
 ##### Constructor
 
@@ -414,6 +484,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 #### Properties
 
+<a id="hint-7"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -422,6 +494,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `SessionSubscriberLagged_base.hint`
 
+<a id="lastdeliveredcursor"></a>
+
 ##### lastDeliveredCursor
 
 > `readonly` **lastDeliveredCursor**: `number`
@@ -429,6 +503,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 ###### Inherited from
 
 `SessionSubscriberLagged_base.lastDeliveredCursor`
+
+<a id="sessionid-3"></a>
 
 ##### sessionId
 
@@ -439,6 +515,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 `SessionSubscriberLagged_base.sessionId`
 
 ## Interfaces
+
+<a id="createoptions"></a>
 
 ### CreateOptions
 
@@ -454,15 +532,21 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 #### Properties
 
+<a id="agents-1"></a>
+
 ##### agents
 
 > `readonly` **agents**: `Agents`
+
+<a id="plugins-1"></a>
 
 ##### plugins?
 
 > `readonly` `optional` **plugins?**: `Plugins`
 
 ***
+
+<a id="host"></a>
 
 ### Host
 
@@ -473,6 +557,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 `Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent#any)\>
 
 #### Properties
+
+<a id="approvals"></a>
 
 ##### approvals
 
@@ -504,9 +590,13 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](./runtime/namespaces/Errors#runnotfound) \| [`ApprovalStale`](./runtime/namespaces/Errors#approvalstale) \| [`ApprovalMismatch`](./runtime/namespaces/Errors#approvalmismatch) \| [`IllegalOperatorAction`](./runtime/namespaces/Errors#illegaloperatoraction)\>
 
+<a id="attachments"></a>
+
 ##### attachments
 
 > `readonly` **attachments**: `Attachments`
+
+<a id="events"></a>
 
 ##### events
 
@@ -529,6 +619,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 ###### Returns
 
 `Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: `object` & `object` & `object`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & `TurnCompleted` & `object` \| `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent#turnstarted) & `object`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent#toolexecutionstarted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent#toolexecutionwaiting) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent#toolprogress) & `object`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`ApprovalRequested`](./generalist/namespaces/AgentEvent#approvalrequested) & `object`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & `object` & `object`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & `object` & `object` \| `object` & `object` & `object` \| `object` & `object` & `object`; `runId`: `string`; `sessionId`: `string`; \}, [`SessionEventsError`](./runtime/namespaces/HostSession#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession#sessionerror)\>
+
+<a id="operator"></a>
 
 ##### operator
 
@@ -649,6 +741,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 ###### Returns
 
 `Effect`\<`void`, [`OperatorActionError`](./runtime/namespaces/Runtime#operatoractionerror)\>
+
+<a id="runs"></a>
 
 ##### runs
 
@@ -780,6 +874,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](#sessionnotfound) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget#exhausted) \| [`UnknownAgent`](./runtime/namespaces/Errors#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent#agenterror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`AgentInputInvalid`](#agentinputinvalid)\>
 
+<a id="sessions"></a>
+
 ##### sessions
 
 > `readonly` **sessions**: `object`
@@ -840,6 +936,8 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ***
 
+<a id="plugin"></a>
+
 ### Plugin
 
 One deterministic collection of host-owned Agent contributions.
@@ -852,27 +950,39 @@ One deterministic collection of host-owned Agent contributions.
 
 #### Properties
 
+<a id="hooks"></a>
+
 ##### hooks?
 
 > `readonly` `optional` **hooks?**: readonly [`Declaration`](./hooks#declaration)[]
+
+<a id="instructions"></a>
 
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: readonly [`Provider`](./instructions/index#provider)\<`never`\>[]
 
+<a id="name-4"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="skills"></a>
+
 ##### skills?
 
 > `readonly` `optional` **skills?**: readonly [`Skill`](./generalist/namespaces/SkillCatalog#skill)[]
+
+<a id="tools-1"></a>
 
 ##### tools?
 
 > `readonly` `optional` **tools?**: `Tools`
 
 ***
+
+<a id="pluginoptions"></a>
 
 ### PluginOptions
 
@@ -884,21 +994,31 @@ One deterministic collection of host-owned Agent contributions.
 
 #### Properties
 
+<a id="hooks-1"></a>
+
 ##### hooks?
 
 > `readonly` `optional` **hooks?**: readonly [`Declaration`](./hooks#declaration)[]
+
+<a id="instructions-1"></a>
 
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: readonly [`Provider`](./instructions/index#provider)\<`never`\>[]
 
+<a id="name-5"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="skills-1"></a>
+
 ##### skills?
 
 > `readonly` `optional` **skills?**: readonly [`Skill`](./generalist/namespaces/SkillCatalog#skill)[]
+
+<a id="tools-3"></a>
 
 ##### tools?
 
@@ -906,9 +1026,13 @@ One deterministic collection of host-owned Agent contributions.
 
 ***
 
+<a id="runstartoptions"></a>
+
 ### RunStartOptions
 
 #### Properties
+
+<a id="idempotencykey"></a>
 
 ##### idempotencyKey?
 
@@ -916,13 +1040,19 @@ One deterministic collection of host-owned Agent contributions.
 
 ***
 
+<a id="sessioncreateoptions"></a>
+
 ### SessionCreateOptions
 
 #### Properties
 
+<a id="id"></a>
+
 ##### id?
 
 > `readonly` `optional` **id?**: `string`
+
+<a id="title"></a>
 
 ##### title?
 
@@ -930,11 +1060,15 @@ One deterministic collection of host-owned Agent contributions.
 
 ## Type Aliases
 
+<a id="approvalrequested"></a>
+
 ### ApprovalRequested
 
 > **ApprovalRequested** = *typeof* `ApprovalRequested.Type`
 
 ***
+
+<a id="compacted"></a>
 
 ### Compacted
 
@@ -942,17 +1076,23 @@ One deterministic collection of host-owned Agent contributions.
 
 ***
 
+<a id="completed"></a>
+
 ### Completed
 
 > **Completed** = *typeof* `Completed.Type`
 
 ***
 
+<a id="createerror"></a>
+
 ### CreateError
 
 > **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict)
 
 ***
+
+<a id="createrequirements"></a>
 
 ### CreateRequirements
 
@@ -970,11 +1110,15 @@ One deterministic collection of host-owned Agent contributions.
 
 ***
 
+<a id="encodedagentinput"></a>
+
 ### EncodedAgentInput
 
 > **EncodedAgentInput** = `Schema.Json`
 
 ***
+
+<a id="hostevent"></a>
 
 ### HostEvent
 
@@ -983,6 +1127,8 @@ One deterministic collection of host-owned Agent contributions.
 One product-facing event at its exclusive Session cursor.
 
 ***
+
+<a id="hostrun"></a>
 
 ### HostRun
 
@@ -1002,6 +1148,8 @@ One product-facing event at its exclusive Session cursor.
 
 ***
 
+<a id="hostsession"></a>
+
 ### HostSession
 
 > **HostSession** = `Struct`\<\{ `createdAt`: `String`; `id`: `String`; `title`: `optionalKey`\<`String`\>; \}\>
@@ -1009,6 +1157,8 @@ One product-facing event at its exclusive Session cursor.
 Durable product-facing Session metadata owned by a Runtime driver.
 
 ***
+
+<a id="hostsession-1"></a>
 
 ### HostSession
 
@@ -1018,11 +1168,15 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 ***
 
+<a id="runstarted"></a>
+
 ### RunStarted
 
 > **RunStarted** = *typeof* `RunStarted.Type`
 
 ***
+
+<a id="tasksupdated"></a>
 
 ### TasksUpdated
 
@@ -1032,17 +1186,23 @@ The authoritative journaled task list changed.
 
 ***
 
+<a id="toolcall"></a>
+
 ### ToolCall
 
 > **ToolCall** = *typeof* `ToolCall.Type`
 
 ***
 
+<a id="turn"></a>
+
 ### Turn
 
 > **Turn** = *typeof* `Turn.Type`
 
 ## Variables
+
+<a id="generalist"></a>
 
 ### Generalist
 
@@ -1052,15 +1212,21 @@ Stable process-local product host.
 
 #### Type Declaration
 
+<a id="create"></a>
+
 ##### create
 
 > `readonly` **create**: *typeof* `create`
+
+<a id="plugin-1"></a>
 
 ##### plugin
 
 > `readonly` **plugin**: *typeof* `plugin`
 
 ***
+
+<a id="hostevent-1"></a>
 
 ### HostEvent
 
@@ -1069,6 +1235,8 @@ Stable process-local product host.
 One product-facing event at its exclusive Session cursor.
 
 ***
+
+<a id="tasksupdated-1"></a>
 
 ### TasksUpdated
 

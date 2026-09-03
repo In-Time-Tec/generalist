@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="a2a"></a>
+
 ### A2A
 
 **`Experimental`**
@@ -19,6 +21,8 @@ A2A adapter service.
 - `A2A_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@ A2A adapter service.
 
 ## Interfaces
 
+<a id="deployment"></a>
+
 ### Deployment
 
 **`Experimental`**
@@ -50,11 +56,15 @@ One explicit A2A endpoint deployment.
 
 #### Properties
 
+<a id="address"></a>
+
 ##### address
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
 
 **`Experimental`**
+
+<a id="card"></a>
 
 ##### card
 
@@ -64,6 +74,8 @@ One explicit A2A endpoint deployment.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
@@ -72,11 +84,15 @@ A configured A2A v1 request handler.
 
 #### Properties
 
+<a id="deployment-1"></a>
+
 ##### deployment
 
 > `readonly` **deployment**: [`Deployment`](#deployment)
 
 **`Experimental`**
+
+<a id="handler"></a>
 
 ##### handler
 
@@ -85,6 +101,8 @@ A configured A2A v1 request handler.
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -105,6 +123,8 @@ Provide one explicit A2A deployment over the caller's Runtime.
 `Layer.Layer`\<[`A2A`](#a2a), `never`, [`Runtime`](../../runtime/namespaces/Runtime#runtime)\>
 
 ***
+
+<a id="makehandler"></a>
 
 ### makeHandler
 

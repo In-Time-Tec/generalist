@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="consolidationinvalid"></a>
+
 ### ConsolidationInvalid
 
 A consolidation model returned a memory rewrite that could not preserve version history.
@@ -17,6 +19,8 @@ A consolidation model returned a memory rewrite that could not preserve version 
 - `ConsolidationInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A consolidation model returned a memory rewrite that could not preserve version 
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -45,6 +51,8 @@ A consolidation model returned a memory rewrite that could not preserve version 
 ###### Inherited from
 
 `ConsolidationInvalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -55,6 +63,8 @@ A consolidation model returned a memory rewrite that could not preserve version 
 `ConsolidationInvalid_base.message`
 
 ## Interfaces
+
+<a id="applyhandlers"></a>
 
 ### ApplyHandlers
 
@@ -73,6 +83,8 @@ Plain Effect handlers selected only by proposal tag.
 `E` = `never`
 
 #### Properties
+
+<a id="authorskill"></a>
 
 ##### AuthorSkill
 
@@ -100,6 +112,8 @@ readonly `object`[]
 
 `Effect`\<`void`, `E`, `R`\>
 
+<a id="exporttrajectory"></a>
+
 ##### ExportTrajectory
 
 > `readonly` **ExportTrajectory**: (`proposal`) => `Effect`\<`void`, `E`, `R`\>
@@ -122,6 +136,8 @@ readonly `object`[]
 
 `Effect`\<`void`, `E`, `R`\>
 
+<a id="forget"></a>
+
 ##### Forget
 
 > `readonly` **Forget**: (`proposal`) => `Effect`\<`void`, `E`, `R`\>
@@ -160,6 +176,8 @@ readonly `object`[]
 
 `Effect`\<`void`, `E`, `R`\>
 
+<a id="refineinstruction"></a>
+
 ##### RefineInstruction
 
 > `readonly` **RefineInstruction**: (`proposal`) => `Effect`\<`void`, `E`, `R`\>
@@ -185,6 +203,8 @@ readonly `object`[]
 ###### Returns
 
 `Effect`\<`void`, `E`, `R`\>
+
+<a id="remember"></a>
 
 ##### Remember
 
@@ -242,6 +262,8 @@ readonly `object`[]
 
 ***
 
+<a id="consolidateoptions"></a>
+
 ### ConsolidateOptions
 
 **`Experimental`**
@@ -250,11 +272,15 @@ Scheduled semantic-memory consolidation configuration.
 
 #### Properties
 
+<a id="budget"></a>
+
 ##### budget?
 
 > `readonly` `optional` **budget?**: [`Input`](./generalist/namespaces/RunBudget#input)
 
 **`Experimental`**
+
+<a id="maxproposals"></a>
 
 ##### maxProposals
 
@@ -262,17 +288,23 @@ Scheduled semantic-memory consolidation configuration.
 
 **`Experimental`**
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string` \| [`ModelSelection`](./generalist/namespaces/ModelRegistry#modelselection)
 
 **`Experimental`**
 
+<a id="schedule"></a>
+
 ##### schedule
 
 > `readonly` **schedule**: `string`
 
 **`Experimental`**
+
+<a id="window"></a>
 
 ##### window
 
@@ -281,6 +313,8 @@ Scheduled semantic-memory consolidation configuration.
 **`Experimental`**
 
 ***
+
+<a id="consolidationapplyhandlers"></a>
 
 ### ConsolidationApplyHandlers
 
@@ -300,6 +334,8 @@ Handlers for the proposal kinds emitted by scheduled consolidation.
 
 #### Properties
 
+<a id="forget-1"></a>
+
 ##### Forget
 
 > `readonly` **Forget**: (`proposal`) => `Effect`\<`void`, `E`, `R`\>
@@ -338,6 +374,8 @@ readonly `object`[]
 
 `Effect`\<`void`, `E`, `R`\>
 
+<a id="refineinstruction-1"></a>
+
 ##### RefineInstruction
 
 > `readonly` **RefineInstruction**: (`proposal`) => `Effect`\<`void`, `E`, `R`\>
@@ -363,6 +401,8 @@ readonly `object`[]
 ###### Returns
 
 `Effect`\<`void`, `E`, `R`\>
+
+<a id="remember-1"></a>
 
 ##### Remember
 
@@ -420,6 +460,8 @@ readonly `object`[]
 
 ***
 
+<a id="consolidationlayeroptions"></a>
+
 ### ConsolidationLayerOptions
 
 **`Experimental`**
@@ -436,11 +478,15 @@ readonly `object`[]
 
 #### Properties
 
+<a id="apply"></a>
+
 ##### apply
 
 > `readonly` **apply**: [`ConsolidationApplyHandlers`](#consolidationapplyhandlers)\<`ApplyR`, `ApplyE`\>
 
 **`Experimental`**
+
+<a id="propose"></a>
 
 ##### propose
 
@@ -449,6 +495,8 @@ readonly `object`[]
 **`Experimental`**
 
 ***
+
+<a id="layeroptions"></a>
 
 ### LayerOptions
 
@@ -474,11 +522,15 @@ readonly `object`[]
 
 #### Properties
 
+<a id="apply-1"></a>
+
 ##### apply
 
 > `readonly` **apply**: [`ApplyHandlers`](#applyhandlers)\<`ApplyR`, `ApplyE`\>
 
 **`Experimental`**
+
+<a id="propose-1"></a>
 
 ##### propose
 
@@ -550,6 +602,8 @@ readonly `object`[]
 
 ***
 
+<a id="proposer-1"></a>
+
 ### Proposer
 
 **`Experimental`**
@@ -567,6 +621,8 @@ Produce reviewable changes from one completed trajectory.
 `E` = `never`
 
 #### Properties
+
+<a id="propose-2"></a>
 
 ##### propose
 
@@ -638,6 +694,8 @@ readonly `object`[]
 
 ***
 
+<a id="proposewithmodeloptions"></a>
+
 ### ProposeWithModelOptions
 
 **`Experimental`**
@@ -650,11 +708,15 @@ readonly `object`[]
 
 #### Properties
 
+<a id="maxproposals-1"></a>
+
 ##### maxProposals?
 
 > `readonly` `optional` **maxProposals?**: `number`
 
 **`Experimental`**
+
+<a id="model-1"></a>
 
 ##### model
 
@@ -664,6 +726,8 @@ readonly `object`[]
 
 ## Type Aliases
 
+<a id="authorskill-1"></a>
+
 ### AuthorSkill
 
 > **AuthorSkill** = *typeof* `AuthorSkill.Type`
@@ -671,6 +735,8 @@ readonly `object`[]
 **`Experimental`**
 
 ***
+
+<a id="exporttrajectory-1"></a>
 
 ### ExportTrajectory
 
@@ -680,6 +746,8 @@ readonly `object`[]
 
 ***
 
+<a id="forget-2"></a>
+
 ### Forget
 
 > **Forget** = *typeof* `Forget.Type`
@@ -687,6 +755,8 @@ readonly `object`[]
 **`Experimental`**
 
 ***
+
+<a id="forgetentry"></a>
 
 ### ForgetEntry
 
@@ -696,6 +766,8 @@ readonly `object`[]
 
 ***
 
+<a id="memoryentry"></a>
+
 ### MemoryEntry
 
 > **MemoryEntry** = *typeof* `MemoryEntry.Type`
@@ -703,6 +775,8 @@ readonly `object`[]
 **`Experimental`**
 
 ***
+
+<a id="proposal"></a>
 
 ### Proposal
 
@@ -712,6 +786,8 @@ readonly `object`[]
 
 ***
 
+<a id="refineinstruction-2"></a>
+
 ### RefineInstruction
 
 > **RefineInstruction** = *typeof* `RefineInstruction.Type`
@@ -719,6 +795,8 @@ readonly `object`[]
 **`Experimental`**
 
 ***
+
+<a id="remember-2"></a>
 
 ### Remember
 
@@ -728,6 +806,8 @@ readonly `object`[]
 
 ***
 
+<a id="trajectoryref"></a>
+
 ### TrajectoryRef
 
 > **TrajectoryRef** = *typeof* `TrajectoryRef.Type`
@@ -735,6 +815,8 @@ readonly `object`[]
 **`Experimental`**
 
 ## Variables
+
+<a id="authorskill-2"></a>
 
 ### AuthorSkill
 
@@ -745,6 +827,8 @@ readonly `object`[]
 A proposed skill plus the trajectory turns supporting it.
 
 ***
+
+<a id="consolidate"></a>
 
 ### consolidate
 
@@ -765,6 +849,8 @@ Build the scheduled journal-backed consolidation proposer used by `Learning.laye
 `ConsolidationProposer`
 
 ***
+
+<a id="declaration"></a>
 
 ### declaration
 
@@ -805,6 +891,8 @@ journal. Compose it with other declarations through `Hooks.layer([...])` or a Ho
 
 ***
 
+<a id="exporttrajectory-2"></a>
+
 ### ExportTrajectory
 
 > `const` **ExportTrajectory**: `Schema.TaggedStruct`\<`"ExportTrajectory"`, \{ `format`: `Schema.Literal`\<`"jsonl"`\>; `runId`: `Schema.String`; \}\>
@@ -814,6 +902,8 @@ journal. Compose it with other declarations through `Hooks.layer([...])` or a Ho
 A proposed JSON Lines export of one recorded run.
 
 ***
+
+<a id="forget-3"></a>
 
 ### Forget
 
@@ -825,6 +915,8 @@ A proposed removal from active semantic recall.
 
 ***
 
+<a id="forgetentry-1"></a>
+
 ### ForgetEntry
 
 > `const` **ForgetEntry**: `Schema.Struct`\<\{ `id`: `Schema.String`; `key`: `Schema.Struct`\<\{ `agent`: `Schema.String`; `subject`: `Schema.String`; \}\>; \}\>
@@ -834,6 +926,8 @@ A proposed removal from active semantic recall.
 Memory entry selected for removal from active recall.
 
 ***
+
+<a id="memoryentry-1"></a>
 
 ### MemoryEntry
 
@@ -845,6 +939,8 @@ Memory input that an application handler may adapt to its Memory service.
 
 ***
 
+<a id="proposal-1"></a>
+
 ### Proposal
 
 > `const` **Proposal**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"RefineInstruction"`, \{ `diff`: `Schema.String`; `evidence`: `Schema.$Array`\<`Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>\>; `target`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"AuthorSkill"`, \{ `content`: `Schema.String`; `evidence`: `Schema.$Array`\<`Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>\>; `name`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Remember"`, \{ `evidence`: `Schema.$Array`\<`Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>\>; `memory`: `Schema.Struct`\<\{ `entryId`: `Schema.optionalKey`\<`Schema.String`\>; `key`: `Schema.Struct`\<\{ `agent`: `Schema.String`; `subject`: `Schema.String`; \}\>; `supersedes`: `Schema.optionalKey`\<`Schema.Int`\>; `terminal`: `Schema.Boolean`; `transcript`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `turn`: `Schema.Int`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Forget"`, \{ `evidence`: `Schema.$Array`\<`Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>\>; `memory`: `Schema.Struct`\<\{ `id`: `Schema.String`; `key`: `Schema.Struct`\<\{ `agent`: `Schema.String`; `subject`: `Schema.String`; \}\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"ExportTrajectory"`, \{ `format`: `Schema.Literal`\<`"jsonl"`\>; `runId`: `Schema.String`; \}\>\]\>
@@ -854,6 +950,8 @@ Memory input that an application handler may adapt to its Memory service.
 One reviewable change proposed after a run.
 
 ***
+
+<a id="proposewithmodel"></a>
 
 ### proposeWithModel
 
@@ -881,6 +979,8 @@ Ask one Effect AI model for a bounded, Schema-decoded proposal list.
 
 ***
 
+<a id="refineinstruction-3"></a>
+
 ### RefineInstruction
 
 > `const` **RefineInstruction**: `Schema.TaggedStruct`\<`"RefineInstruction"`, \{ `diff`: `Schema.String`; `evidence`: `Schema.$Array`\<`Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>\>; `target`: `Schema.String`; \}\>
@@ -890,6 +990,8 @@ Ask one Effect AI model for a bounded, Schema-decoded proposal list.
 A proposed instruction change plus the trajectory turns supporting it.
 
 ***
+
+<a id="remember-3"></a>
 
 ### Remember
 
@@ -901,6 +1003,8 @@ A proposed memory entry plus the trajectory turns supporting it.
 
 ***
 
+<a id="trajectoryref-1"></a>
+
 ### TrajectoryRef
 
 > `const` **TrajectoryRef**: `Schema.Struct`\<\{ `runId`: `Schema.String`; `turn`: `Schema.Int`; \}\>
@@ -910,6 +1014,8 @@ A proposed memory entry plus the trajectory turns supporting it.
 One exact run turn supporting a proposed change.
 
 ## Functions
+
+<a id="layer"></a>
 
 ### layer()
 
@@ -981,11 +1087,15 @@ already has other hook declarations.
 
 ## References
 
+<a id="authorskillproposal"></a>
+
 ### AuthorSkillProposal
 
 Renames and re-exports [AuthorSkill](#authorskill-2)
 
 ***
+
+<a id="exporttrajectoryproposal"></a>
 
 ### ExportTrajectoryProposal
 
@@ -993,11 +1103,15 @@ Renames and re-exports [ExportTrajectory](#exporttrajectory-2)
 
 ***
 
+<a id="forgetentryinput"></a>
+
 ### ForgetEntryInput
 
 Renames and re-exports [ForgetEntry](#forgetentry-1)
 
 ***
+
+<a id="forgetproposal"></a>
 
 ### ForgetProposal
 
@@ -1005,11 +1119,15 @@ Renames and re-exports [Forget](#forget-3)
 
 ***
 
+<a id="memoryentryinput"></a>
+
 ### MemoryEntryInput
 
 Renames and re-exports [MemoryEntry](#memoryentry-1)
 
 ***
+
+<a id="refineinstructionproposal"></a>
 
 ### RefineInstructionProposal
 
@@ -1017,11 +1135,15 @@ Renames and re-exports [RefineInstruction](#refineinstruction-3)
 
 ***
 
+<a id="rememberproposal"></a>
+
 ### RememberProposal
 
 Renames and re-exports [Remember](#remember-3)
 
 ***
+
+<a id="trajectoryreference"></a>
 
 ### TrajectoryReference
 

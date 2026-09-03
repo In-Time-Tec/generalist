@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="policyerror"></a>
+
 ### PolicyError
 
 A turn policy could not evaluate its decision.
@@ -17,6 +19,8 @@ A turn policy could not evaluate its decision.
 - `PolicyError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A turn policy could not evaluate its decision.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -46,6 +52,8 @@ A turn policy could not evaluate its decision.
 
 `PolicyError_base.cause`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -53,6 +61,8 @@ A turn policy could not evaluate its decision.
 ###### Inherited from
 
 `PolicyError_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -64,19 +74,27 @@ A turn policy could not evaluate its decision.
 
 ## Interfaces
 
+<a id="bothsnapshot"></a>
+
 ### BothSnapshot
 
 Portable constructor data for two composed portable policies.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Both"`
 
+<a id="first"></a>
+
 ##### first
 
 > `readonly` **first**: [`Snapshot`](#snapshot-1)
+
+<a id="second"></a>
 
 ##### second
 
@@ -84,15 +102,21 @@ Portable constructor data for two composed portable policies.
 
 ***
 
+<a id="budgetexhausted"></a>
+
 ### BudgetExhausted
 
 A named policy budget was exhausted.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"BudgetExhausted"`
+
+<a id="budget"></a>
 
 ##### budget
 
@@ -100,13 +124,19 @@ A named policy budget was exhausted.
 
 ***
 
+<a id="continue"></a>
+
 ### Continue
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Continue"`
+
+<a id="overrides"></a>
 
 ##### overrides?
 
@@ -114,15 +144,21 @@ A named policy budget was exhausted.
 
 ***
 
+<a id="customreason"></a>
+
 ### CustomReason
 
 A custom policy stopped for a host-defined detail.
 
 #### Properties
 
+<a id="_tag-3"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Policy"`
+
+<a id="detail"></a>
 
 ##### detail
 
@@ -130,11 +166,15 @@ A custom policy stopped for a host-defined detail.
 
 ***
 
+<a id="foreversnapshot"></a>
+
 ### ForeverSnapshot
 
 Portable constructor data for unbounded continuation.
 
 #### Properties
+
+<a id="_tag-4"></a>
 
 ##### \_tag
 
@@ -142,17 +182,23 @@ Portable constructor data for unbounded continuation.
 
 ***
 
+<a id="goalsatisfied"></a>
+
 ### GoalSatisfied
 
 The policy determined that the run's goal is satisfied.
 
 #### Properties
 
+<a id="_tag-5"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"GoalSatisfied"`
 
 ***
+
+<a id="policy"></a>
 
 ### Policy
 
@@ -165,6 +211,8 @@ A turn policy in the spirit of `Schedule`.
 `R` = `never`
 
 #### Properties
+
+<a id="decide"></a>
 
 ##### decide
 
@@ -180,11 +228,15 @@ A turn policy in the spirit of `Schedule`.
 
 `Effect`\<[`Decision`](#decision), [`PolicyError`](#policyerror), `R`\>
 
+<a id="snapshot"></a>
+
 ##### snapshot?
 
 > `readonly` `optional` **snapshot?**: [`Snapshot`](#snapshot-1)
 
 ***
+
+<a id="recurssnapshot"></a>
 
 ### RecursSnapshot
 
@@ -192,9 +244,13 @@ Portable constructor data for a recursive follow-up cap.
 
 #### Properties
 
+<a id="_tag-6"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Recurs"`
+
+<a id="count"></a>
 
 ##### count
 
@@ -202,13 +258,19 @@ Portable constructor data for a recursive follow-up cap.
 
 ***
 
+<a id="stop"></a>
+
 ### Stop
 
 #### Properties
 
+<a id="_tag-7"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Stop"`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -216,11 +278,15 @@ Portable constructor data for a recursive follow-up cap.
 
 ***
 
+<a id="turninfo"></a>
+
 ### TurnInfo
 
 Snapshot given to a policy before each follow-up turn.
 
 #### Properties
+
+<a id="budget-1"></a>
 
 ##### budget
 
@@ -246,13 +312,19 @@ Snapshot given to a policy before each follow-up turn.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="history"></a>
+
 ##### history
 
 > `readonly` **history**: `Prompt`
 
+<a id="pendingtoolresults"></a>
+
 ##### pendingToolResults
 
 > `readonly` **pendingToolResults**: readonly `ToolResultPart`\<`string`, `unknown`, `unknown`\>[]
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -260,15 +332,21 @@ Snapshot given to a policy before each follow-up turn.
 
 ***
 
+<a id="turnlimit"></a>
+
 ### TurnLimit
 
 A configured follow-up turn cap was exhausted.
 
 #### Properties
 
+<a id="_tag-8"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"TurnLimit"`
+
+<a id="limit"></a>
 
 ##### limit
 
@@ -276,19 +354,27 @@ A configured follow-up turn cap was exhausted.
 
 ***
 
+<a id="turnoverrides"></a>
+
 ### TurnOverrides
 
 Per-turn overrides applied when a policy continues.
 
 #### Properties
 
+<a id="activetools"></a>
+
 ##### activeTools?
 
 > `readonly` `optional` **activeTools?**: readonly `string`[]
 
+<a id="instructions"></a>
+
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
+
+<a id="model"></a>
 
 ##### model?
 
@@ -296,15 +382,21 @@ Per-turn overrides applied when a policy continues.
 
 ***
 
+<a id="untiltoolcallsnapshot"></a>
+
 ### UntilToolCallSnapshot
 
 Portable constructor data for a named-tool stop policy.
 
 #### Properties
 
+<a id="_tag-9"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"UntilToolCall"`
+
+<a id="name"></a>
 
 ##### name
 
@@ -312,11 +404,15 @@ Portable constructor data for a named-tool stop policy.
 
 ## Type Aliases
 
+<a id="decision"></a>
+
 ### Decision
 
 > **Decision** = [`Continue`](#continue) \| [`Stop`](#stop)
 
 ***
+
+<a id="snapshot-1"></a>
 
 ### Snapshot
 
@@ -326,6 +422,8 @@ Portable constructor data exposed by built-in turn policies.
 
 ***
 
+<a id="stopreason-1"></a>
+
 ### StopReason
 
 > **StopReason** = *typeof* `StopReason.Type`
@@ -333,6 +431,8 @@ Portable constructor data exposed by built-in turn policies.
 Schema-backed reason for a successful policy stop.
 
 ## Variables
+
+<a id="both"></a>
 
 ### both
 
@@ -390,11 +490,15 @@ Both must continue; overrides merge with `second` winning.
 
 ***
 
+<a id="decision-1"></a>
+
 ### decision
 
 > `const` **decision**: `object`
 
 #### Type Declaration
+
+<a id="continue-1"></a>
 
 ##### continue
 
@@ -409,6 +513,8 @@ Both must continue; overrides merge with `second` winning.
 ###### Returns
 
 [`Continue`](#continue)
+
+<a id="stop-1"></a>
 
 ##### stop
 
@@ -426,6 +532,8 @@ Both must continue; overrides merge with `second` winning.
 
 ***
 
+<a id="defaultpolicy"></a>
+
 ### defaultPolicy
 
 > `const` **defaultPolicy**: [`Policy`](#policy)
@@ -434,6 +542,8 @@ Default policy: `forever` — no framework-imposed follow-up cap.
 
 ***
 
+<a id="forever"></a>
+
 ### forever
 
 > `const` **forever**: [`Policy`](#policy)
@@ -441,6 +551,8 @@ Default policy: `forever` — no framework-imposed follow-up cap.
 Continue after every turn; a run still completes naturally without pending tool results.
 
 ***
+
+<a id="make"></a>
 
 ### make
 
@@ -466,6 +578,8 @@ Construct a policy from a decide function.
 
 ***
 
+<a id="recurs"></a>
+
 ### recurs
 
 > `const` **recurs**: (`n`) => [`Policy`](#policy)
@@ -484,6 +598,8 @@ Continue for at most `n` follow-up turns after the first.
 
 ***
 
+<a id="stopreason-2"></a>
+
 ### StopReason
 
 > `const` **StopReason**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"TurnLimit"`\>; `limit`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"GoalSatisfied"`\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"BudgetExhausted"`\>; `budget`: `Schema.String`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Policy"`\>; `detail`: `Schema.String`; \}\>\]\>
@@ -491,6 +607,8 @@ Continue for at most `n` follow-up turns after the first.
 Schema-backed reason for a successful policy stop.
 
 ***
+
+<a id="untiltoolcall"></a>
 
 ### untilToolCall
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="modelcatalog"></a>
+
 ### ModelCatalog
 
 #### Extends
@@ -15,6 +17,8 @@
 - `ModelCatalog_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="notfound"></a>
+
 ### NotFound
 
 #### Extends
@@ -43,6 +49,8 @@
 - `NotFound_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -64,6 +72,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -72,6 +82,8 @@
 
 `NotFound_base.hint`
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
@@ -79,6 +91,8 @@
 ###### Inherited from
 
 `NotFound_base.model`
+
+<a id="provider"></a>
 
 ##### provider
 
@@ -90,13 +104,19 @@
 
 ## Interfaces
 
+<a id="metadata"></a>
+
 ### Metadata
 
 #### Properties
 
+<a id="contextwindow"></a>
+
 ##### contextWindow
 
 > `readonly` **contextWindow**: `number`
+
+<a id="logprobs"></a>
 
 ##### logprobs
 
@@ -104,9 +124,13 @@
 
 Whether Generalist's provider adapter preserves output token log probabilities.
 
+<a id="maxoutput"></a>
+
 ##### maxOutput
 
 > `readonly` **maxOutput**: `number`
+
+<a id="media"></a>
 
 ##### media?
 
@@ -128,13 +152,19 @@ Provider media capabilities and preferred reference resolution.
 
 > `readonly` **preferredInput**: `"bytes"` \| `"url"`
 
+<a id="modalities"></a>
+
 ##### modalities?
 
 > `readonly` `optional` **modalities?**: readonly (`"text"` \| `"image"` \| `"audio"`)[]
 
+<a id="model-1"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
+
+<a id="pricing"></a>
 
 ##### pricing?
 
@@ -156,19 +186,27 @@ Provider media capabilities and preferred reference resolution.
 
 > `readonly` `optional` **outputPerMTok?**: `number`
 
+<a id="provider-1"></a>
+
 ##### provider
 
 > `readonly` **provider**: `string`
 
 ***
+
+<a id="selection"></a>
 
 ### Selection
 
 #### Properties
 
+<a id="model-2"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
+
+<a id="provider-2"></a>
 
 ##### provider
 
@@ -176,9 +214,13 @@ Provider media capabilities and preferred reference resolution.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="contextwindow-1"></a>
 
 ##### contextWindow
 
@@ -193,6 +235,8 @@ Provider media capabilities and preferred reference resolution.
 ###### Returns
 
 `Effect`\<`Option`\<`number`\>\>
+
+<a id="cost"></a>
 
 ##### cost
 
@@ -212,6 +256,8 @@ Provider media capabilities and preferred reference resolution.
 
 `Effect`\<`Option`\<`number`\>\>
 
+<a id="find"></a>
+
 ##### find
 
 > `readonly` **find**: (`selection`) => `Effect`\<[`Metadata`](#metadata) \| `undefined`\>
@@ -225,6 +271,8 @@ Provider media capabilities and preferred reference resolution.
 ###### Returns
 
 `Effect`\<[`Metadata`](#metadata) \| `undefined`\>
+
+<a id="get"></a>
 
 ##### get
 
@@ -240,11 +288,15 @@ Provider media capabilities and preferred reference resolution.
 
 `Effect`\<[`Metadata`](#metadata), [`NotFound`](#notfound)\>
 
+<a id="list"></a>
+
 ##### list
 
 > `readonly` **list**: `Effect`\<readonly [`Metadata`](#metadata)[]\>
 
 ## Type Aliases
+
+<a id="usd"></a>
 
 ### Usd
 
@@ -254,6 +306,8 @@ Non-negative US dollars computed from catalog prices.
 
 ## Variables
 
+<a id="bundled"></a>
+
 ### bundled
 
 > `const` **bundled**: `ReadonlyArray`\<[`Metadata`](#metadata)\>
@@ -262,6 +316,8 @@ Hand-maintained static metadata snapshot.
 
 ***
 
+<a id="conservativecontextwindow"></a>
+
 ### conservativeContextWindow
 
 > `const` **conservativeContextWindow**: `32768` = `32768`
@@ -269,6 +325,8 @@ Hand-maintained static metadata snapshot.
 Conservative context window used when model metadata is unavailable.
 
 ***
+
+<a id="contextwindow-2"></a>
 
 ### contextWindow
 
@@ -294,6 +352,8 @@ Resolve a model context window from the provided catalog or bundled snapshot.
 
 ***
 
+<a id="cost-1"></a>
+
 ### cost
 
 > `const` **cost**: (`selection`, `usage`) => `Effect.Effect`\<`Option.Option`\<`number`\>, `never`, `never`\>
@@ -315,6 +375,8 @@ Compute catalog cost, using the bundled snapshot when no catalog service is prov
 `Effect.Effect`\<`Option.Option`\<`number`\>, `never`, `never`\>
 
 ***
+
+<a id="find-1"></a>
 
 ### find
 
@@ -338,6 +400,8 @@ Compute catalog cost, using the bundled snapshot when no catalog service is prov
 
 ***
 
+<a id="get-1"></a>
+
 ### get
 
 > `const` **get**: (`selection`) => `Effect.Effect`\<[`Metadata`](#metadata), [`NotFound`](#notfound), [`ModelCatalog`](#modelcatalog)\>
@@ -360,6 +424,8 @@ Compute catalog cost, using the bundled snapshot when no catalog service is prov
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`overrides?`) => `Layer.Layer`\<[`ModelCatalog`](#modelcatalog)\>
@@ -375,6 +441,8 @@ Compute catalog cost, using the bundled snapshot when no catalog service is prov
 `Layer.Layer`\<[`ModelCatalog`](#modelcatalog)\>
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -392,6 +460,8 @@ Compute catalog cost, using the bundled snapshot when no catalog service is prov
 
 ***
 
+<a id="list-1"></a>
+
 ### list
 
 > `const` **list**: () => `Effect.Effect`\<readonly [`Metadata`](#metadata)[], `never`, [`ModelCatalog`](#modelcatalog)\>
@@ -401,6 +471,8 @@ Compute catalog cost, using the bundled snapshot when no catalog service is prov
 `Effect.Effect`\<readonly [`Metadata`](#metadata)[], `never`, [`ModelCatalog`](#modelcatalog)\>
 
 ***
+
+<a id="usd-1"></a>
 
 ### Usd
 

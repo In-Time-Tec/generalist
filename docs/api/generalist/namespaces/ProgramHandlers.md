@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="agenthandler"></a>
+
 ### AgentHandler
 
 One exact Agent implementation callable by a program host.
@@ -28,13 +30,19 @@ One exact Agent implementation callable by a program host.
 
 #### Properties
 
+<a id="agent"></a>
+
 ##### agent
 
 > `readonly` **agent**: `string` & `Brand`\<`"generalist/agent-pin"`\>
 
+<a id="authorize"></a>
+
 ##### authorize
 
 > `readonly` **authorize**: [`Authorize`](#authorize-5)\<`I`\>
+
+<a id="execute"></a>
 
 ##### execute
 
@@ -50,17 +58,25 @@ One exact Agent implementation callable by a program host.
 
 `Effect`\<[`AgentRunResult`](./ProgramCapabilities#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| `E`\>
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `Codec`\<`I`, `IE`\>
+
+<a id="inputpin"></a>
 
 ##### inputPin
 
 > `readonly` **inputPin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
 
+<a id="replay"></a>
+
 ##### replay
 
 > `readonly` **replay**: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -68,11 +84,15 @@ One exact Agent implementation callable by a program host.
 
 ***
 
+<a id="agentinvocation"></a>
+
 ### AgentInvocation
 
 One decoded Agent invocation, exposing only the prompt every Agent input must produce.
 
 #### Properties
+
+<a id="authorize-1"></a>
 
 ##### authorize
 
@@ -88,9 +108,13 @@ One decoded Agent invocation, exposing only the prompt every Agent input must pr
 
 `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
 
+<a id="execute-1"></a>
+
 ##### execute
 
 > `readonly` **execute**: `Effect`\<[`AgentRunResult`](./ProgramCapabilities#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities#programinvocationfailure)\>
+
+<a id="prompt"></a>
 
 ##### prompt
 
@@ -98,15 +122,21 @@ One decoded Agent invocation, exposing only the prompt every Agent input must pr
 
 ***
 
+<a id="anyagent"></a>
+
 ### AnyAgent
 
 Host-facing view of one Agent handler, with its decoded input hidden behind [AgentInvocation](#agentinvocation).
 
 #### Properties
 
+<a id="agent-1"></a>
+
 ##### agent
 
 > `readonly` **agent**: `string` & `Brand`\<`"generalist/agent-pin"`\>
+
+<a id="decode"></a>
 
 ##### decode
 
@@ -122,17 +152,25 @@ Host-facing view of one Agent handler, with its decoded input hidden behind [Age
 
 `Effect`\<[`AgentInvocation`](#agentinvocation), `SchemaError`\>
 
+<a id="input-1"></a>
+
 ##### input
 
 > `readonly` **input**: `Codec`\<`unknown`, `unknown`\>
+
+<a id="inputpin-1"></a>
 
 ##### inputPin
 
 > `readonly` **inputPin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
 
+<a id="replay-1"></a>
+
 ##### replay
 
 > `readonly` **replay**: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`
+
+<a id="selection-1"></a>
 
 ##### selection
 
@@ -140,12 +178,16 @@ Host-facing view of one Agent handler, with its decoded input hidden behind [Age
 
 ***
 
+<a id="anytool"></a>
+
 ### AnyTool
 
 Host-facing view of one tool in a heterogeneous handler set. Its identity, replay policy, and
 boundary codecs stay observable; its decoded input type is reachable only through [Invocation](#invocation).
 
 #### Properties
+
+<a id="decode-1"></a>
 
 ##### decode
 
@@ -161,21 +203,31 @@ boundary codecs stay observable; its decoded input type is reachable only throug
 
 `Effect`\<[`Invocation`](#invocation)\<`unknown`, [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities#programinvocationfailure)\>, `SchemaError`\>
 
+<a id="input-2"></a>
+
 ##### input
 
 > `readonly` **input**: `Codec`\<`unknown`, `unknown`\>
+
+<a id="name"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="output"></a>
+
 ##### output
 
 > `readonly` **output**: `Codec`\<`unknown`, `unknown`\>
 
+<a id="pin"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+<a id="replay-2"></a>
 
 ##### replay
 
@@ -183,25 +235,35 @@ boundary codecs stay observable; its decoded input type is reachable only throug
 
 ***
 
+<a id="handlers"></a>
+
 ### Handlers
 
 Complete live authority available to a ProgramRunner.
 
 #### Properties
 
+<a id="agents"></a>
+
 ##### agents
 
 > `readonly` **agents**: readonly [`AnyAgent`](#anyagent)[]
 
+<a id="steps"></a>
+
 ##### steps
 
 > `readonly` **steps**: readonly [`TypedTool`](#typedtool)[]
+
+<a id="tools"></a>
 
 ##### tools
 
 > `readonly` **tools**: readonly [`TypedTool`](#typedtool)[]
 
 ***
+
+<a id="invocation"></a>
 
 ### Invocation
 
@@ -220,6 +282,8 @@ authorization and execution keep the exact type the handler declared.
 
 #### Properties
 
+<a id="authorize-2"></a>
+
 ##### authorize
 
 > `readonly` **authorize**: (`operation`) => `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
@@ -234,11 +298,15 @@ authorization and execution keep the exact type the handler declared.
 
 `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
 
+<a id="execute-2"></a>
+
 ##### execute
 
 > `readonly` **execute**: `Effect`\<`O`, `E`\>
 
 ***
+
+<a id="stephandler"></a>
 
 ### StepHandler
 
@@ -272,6 +340,8 @@ One live typed named step implementation and its exact identity.
 
 #### Properties
 
+<a id="authorize-3"></a>
+
 ##### authorize
 
 > `readonly` **authorize**: [`Authorize`](#authorize-5)\<`I`\>
@@ -279,6 +349,8 @@ One live typed named step implementation and its exact identity.
 ###### Inherited from
 
 `Omit.authorize`
+
+<a id="execute-3"></a>
 
 ##### execute
 
@@ -298,6 +370,8 @@ One live typed named step implementation and its exact identity.
 
 `Omit.execute`
 
+<a id="input-3"></a>
+
 ##### input
 
 > `readonly` **input**: `Codec`\<`I`, `IE`\>
@@ -306,9 +380,13 @@ One live typed named step implementation and its exact identity.
 
 `Omit.input`
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="output-1"></a>
 
 ##### output
 
@@ -318,6 +396,8 @@ One live typed named step implementation and its exact identity.
 
 `Omit.output`
 
+<a id="pin-1"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
@@ -325,6 +405,8 @@ One live typed named step implementation and its exact identity.
 ###### Inherited from
 
 `Omit.pin`
+
+<a id="replay-3"></a>
 
 ##### replay
 
@@ -335,6 +417,8 @@ One live typed named step implementation and its exact identity.
 `Omit.replay`
 
 ***
+
+<a id="toolhandler"></a>
 
 ### ToolHandler
 
@@ -364,9 +448,13 @@ One live typed tool implementation and its exact identity.
 
 #### Properties
 
+<a id="authorize-4"></a>
+
 ##### authorize
 
 > `readonly` **authorize**: [`Authorize`](#authorize-5)\<`I`\>
+
+<a id="execute-4"></a>
 
 ##### execute
 
@@ -382,27 +470,39 @@ One live typed tool implementation and its exact identity.
 
 `Effect`\<`O`, `E`\>
 
+<a id="input-4"></a>
+
 ##### input
 
 > `readonly` **input**: `Codec`\<`I`, `IE`\>
+
+<a id="name-2"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="output-2"></a>
+
 ##### output
 
 > `readonly` **output**: `Codec`\<`O`, `OE`\>
 
+<a id="pin-2"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+<a id="replay-4"></a>
 
 ##### replay
 
 > `readonly` **replay**: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`
 
 ## Type Aliases
+
+<a id="anystep"></a>
 
 ### AnyStep
 
@@ -411,6 +511,8 @@ One live typed tool implementation and its exact identity.
 Host-facing view of one named step, with the same hidden input as [AnyTool](#anytool).
 
 ***
+
+<a id="authorize-5"></a>
 
 ### Authorize
 
@@ -442,6 +544,8 @@ Host-owned authorization callback for one decoded invocation.
 
 ***
 
+<a id="programreplaypolicy"></a>
+
 ### ProgramReplayPolicy
 
 > **ProgramReplayPolicy** = *typeof* `ProgramReplayPolicy.Type`
@@ -450,6 +554,8 @@ Replay behavior selected by the host, never by program source.
 
 ***
 
+<a id="typedstep"></a>
+
 ### TypedStep
 
 > **TypedStep** = [`TypedTool`](#typedtool)
@@ -457,6 +563,8 @@ Replay behavior selected by the host, never by program source.
 A step handler retaining its exact decoded invocation types.
 
 ***
+
+<a id="typedtool"></a>
 
 ### TypedTool
 
@@ -481,6 +589,8 @@ A tool handler retaining its exact decoded invocation types.
 `Effect.Effect`\<[`Invocation`](#invocation), `Schema.SchemaError`\>
 
 ## Variables
+
+<a id="agent-2"></a>
 
 ### agent
 
@@ -514,6 +624,8 @@ Construct an exact typed Agent handler.
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`handlers`) => [`Handlers`](#handlers)
@@ -532,6 +644,8 @@ Construct the runner's complete live Program handler set.
 
 ***
 
+<a id="programreplaypolicy-1"></a>
+
 ### ProgramReplayPolicy
 
 > `const` **ProgramReplayPolicy**: `Schema.Literals`\<readonly \[`"recorded"`, `"idempotent"`, `"non-idempotent"`\]\>
@@ -539,6 +653,8 @@ Construct the runner's complete live Program handler set.
 Replay behavior selected by the host, never by program source.
 
 ***
+
+<a id="step"></a>
 
 ### step
 
@@ -579,6 +695,8 @@ Construct a typed named step handler.
 [`TypedStep`](#typedstep) & `object`
 
 ***
+
+<a id="tool"></a>
 
 ### tool
 

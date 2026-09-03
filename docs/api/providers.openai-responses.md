@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="clientoptions"></a>
+
 ### ClientOptions
 
 #### Extends
@@ -16,13 +18,19 @@
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey?
 
 > `readonly` `optional` **apiKey?**: `Config`\<`Redacted`\<`string`\>\>
 
+<a id="baseurl"></a>
+
 ##### baseUrl?
 
 > `readonly` `optional` **baseUrl?**: `string`
+
+<a id="classifyfailure"></a>
 
 ##### classifyFailure?
 
@@ -32,9 +40,13 @@
 
 [`Options`](#options).[`classifyFailure`](#classifyfailure-1)
 
+<a id="clientconfig"></a>
+
 ##### clientConfig?
 
 > `readonly` `optional` **clientConfig?**: `Omit`\<\{ \}, `"apiKey"` \| `"apiUrl"`\>
+
+<a id="config"></a>
 
 ##### config?
 
@@ -43,6 +55,8 @@
 ###### Inherited from
 
 [`Options`](#options).[`config`](#config-1)
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -56,6 +70,8 @@
 
 [`Options`](#options).[`metadata`](#metadata-1)
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
@@ -64,6 +80,8 @@
 
 [`Options`](#options).[`model`](#model-1)
 
+<a id="provider"></a>
+
 ##### provider?
 
 > `readonly` `optional` **provider?**: `string`
@@ -71,6 +89,8 @@
 ###### Inherited from
 
 [`Options`](#options).[`provider`](#provider-1)
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -81,6 +101,8 @@
 [`Options`](#options).[`registrationKey`](#registrationkey-1)
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -94,13 +116,19 @@
 
 #### Properties
 
+<a id="classifyfailure-1"></a>
+
 ##### classifyFailure?
 
 > `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
 
+<a id="config-1"></a>
+
 ##### config?
 
 > `readonly` `optional` **config?**: `Config`
+
+<a id="metadata-1"></a>
 
 ##### metadata?
 
@@ -114,13 +142,19 @@
 
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
 
+<a id="model-1"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
 
+<a id="provider-1"></a>
+
 ##### provider?
 
 > `readonly` `optional` **provider?**: `string`
+
+<a id="registrationkey-1"></a>
 
 ##### registrationKey?
 
@@ -131,6 +165,8 @@
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -147,6 +183,8 @@
 `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="layermodel"></a>
 
 ### layerModel
 
@@ -166,17 +204,23 @@ Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`.
 
 ## References
 
+<a id="decodeconfig"></a>
+
 ### decodeConfig
 
 Re-exports [decodeConfig](./providers.openai#decodeconfig)
 
 ***
 
+<a id="layerconfig"></a>
+
 ### layerConfig
 
 Re-exports [layerConfig](./providers.openai#layerconfig)
 
 ***
+
+<a id="tooljsonschemacompiler"></a>
 
 ### toolJsonSchemaCompiler
 

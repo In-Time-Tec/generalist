@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="mcpclient"></a>
+
 ### MCPClient
 
 **`Experimental`**
@@ -17,6 +19,8 @@
 - `MCPClient_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -40,6 +44,8 @@
 
 ***
 
+<a id="mcpconnectionfailed"></a>
+
 ### MCPConnectionFailed
 
 **`Experimental`**
@@ -49,6 +55,8 @@
 - `MCPConnectionFailed_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -72,6 +80,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -82,6 +92,8 @@
 
 `MCPConnectionFailed_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -91,6 +103,8 @@
 ###### Inherited from
 
 `MCPConnectionFailed_base.message`
+
+<a id="server"></a>
 
 ##### server
 
@@ -104,6 +118,8 @@
 
 ***
 
+<a id="mcptoolcallfailed"></a>
+
 ### MCPToolCallFailed
 
 **`Experimental`**
@@ -113,6 +129,8 @@
 - `MCPToolCallFailed_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -136,6 +154,8 @@
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -145,6 +165,8 @@
 ###### Inherited from
 
 `MCPToolCallFailed_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -156,6 +178,8 @@
 
 `MCPToolCallFailed_base.message`
 
+<a id="server-1"></a>
+
 ##### server
 
 > `readonly` **server**: `string`
@@ -165,6 +189,8 @@
 ###### Inherited from
 
 `MCPToolCallFailed_base.server`
+
+<a id="tool"></a>
 
 ##### tool
 
@@ -178,11 +204,15 @@
 
 ## Interfaces
 
+<a id="calloptions"></a>
+
 ### CallOptions
 
 **`Experimental`**
 
 #### Properties
+
+<a id="calltimeout"></a>
 
 ##### callTimeout?
 
@@ -192,11 +222,15 @@
 
 ***
 
+<a id="discoveredtool"></a>
+
 ### DiscoveredTool
 
 **`Experimental`**
 
 #### Properties
+
+<a id="description"></a>
 
 ##### description
 
@@ -204,11 +238,15 @@
 
 **`Experimental`**
 
+<a id="inputschema"></a>
+
 ##### inputSchema
 
 > `readonly` **inputSchema**: `Json`
 
 **`Experimental`**
+
+<a id="name"></a>
 
 ##### name
 
@@ -216,11 +254,15 @@
 
 **`Experimental`**
 
+<a id="outputschema"></a>
+
 ##### outputSchema
 
 > `readonly` **outputSchema**: `Json`
 
 **`Experimental`**
+
+<a id="rawname"></a>
 
 ##### rawName
 
@@ -230,11 +272,15 @@
 
 ***
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
 
 #### Properties
+
+<a id="calltimeout-1"></a>
 
 ##### callTimeout?
 
@@ -242,11 +288,15 @@
 
 **`Experimental`**
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
 **`Experimental`**
+
+<a id="transport"></a>
 
 ##### transport
 
@@ -256,17 +306,23 @@
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
 
 #### Properties
 
+<a id="aitools"></a>
+
 ##### aiTools
 
 > `readonly` **aiTools**: `Effect`\<readonly [`MCPTool`](#mcptool)[]\>
 
 **`Experimental`**
+
+<a id="calltool"></a>
 
 ##### callTool
 
@@ -288,11 +344,15 @@
 
 `Effect`\<`Json`, [`MCPToolCallFailed`](#mcptoolcallfailed)\>
 
+<a id="server-2"></a>
+
 ##### server
 
 > `readonly` **server**: `string`
 
 **`Experimental`**
+
+<a id="tools"></a>
 
 ##### tools
 
@@ -302,6 +362,8 @@
 
 ## Type Aliases
 
+<a id="jsonvalue"></a>
+
 ### JsonValue
 
 > **JsonValue** = `Schema.Json`
@@ -309,6 +371,8 @@
 **`Experimental`**
 
 ***
+
+<a id="mcptool"></a>
 
 ### MCPTool
 
@@ -318,6 +382,8 @@
 
 ***
 
+<a id="mcptoolfailure"></a>
+
 ### MCPToolFailure
 
 > **MCPToolFailure** = *typeof* `MCPToolFailure.Type`
@@ -325,6 +391,8 @@
 **`Experimental`**
 
 ## Variables
+
+<a id="fromtransport"></a>
 
 ### fromTransport
 
@@ -374,6 +442,8 @@
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](#mcpclient), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
@@ -391,6 +461,8 @@
 `Layer.Layer`\<[`MCPClient`](#mcpclient), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
 
 ***
+
+<a id="layertagged"></a>
 
 ### layerTagged
 
@@ -437,6 +509,8 @@
 `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
 
 ***
+
+<a id="mcptoolfailure-1"></a>
 
 ### MCPToolFailure
 

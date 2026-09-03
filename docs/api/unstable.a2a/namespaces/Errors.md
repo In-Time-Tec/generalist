@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="messagerejected"></a>
+
 ### MessageRejected
 
 **`Experimental`**
@@ -19,6 +21,8 @@ The remote A2A message cannot be admitted as untrusted user input.
 - `MessageRejected_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@ The remote A2A message cannot be admitted as untrusted user input.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -52,6 +58,8 @@ The remote A2A message cannot be admitted as untrusted user input.
 
 `MessageRejected_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -61,6 +69,8 @@ The remote A2A message cannot be admitted as untrusted user input.
 ###### Inherited from
 
 `MessageRejected_base.message`
+
+<a id="part"></a>
 
 ##### part?
 
@@ -74,6 +84,8 @@ The remote A2A message cannot be admitted as untrusted user input.
 
 ***
 
+<a id="taskprojectionfailed"></a>
+
 ### TaskProjectionFailed
 
 **`Experimental`**
@@ -85,6 +97,8 @@ Runtime state could not be projected to an A2A Task.
 - `TaskProjectionFailed_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -108,6 +122,8 @@ Runtime state could not be projected to an A2A Task.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -117,6 +133,8 @@ Runtime state could not be projected to an A2A Task.
 ###### Inherited from
 
 `TaskProjectionFailed_base.cause`
+
+<a id="hint-1"></a>
 
 ##### hint
 
@@ -128,6 +146,8 @@ Runtime state could not be projected to an A2A Task.
 
 `TaskProjectionFailed_base.hint`
 
+<a id="message-1"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -137,6 +157,8 @@ Runtime state could not be projected to an A2A Task.
 ###### Inherited from
 
 `TaskProjectionFailed_base.message`
+
+<a id="taskid"></a>
 
 ##### taskId
 

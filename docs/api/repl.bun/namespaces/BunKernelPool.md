@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 How the pool boots and retires the one kernel that owns each Session.
 
 #### Properties
+
+<a id="bootstrap"></a>
 
 ##### bootstrap?
 
@@ -20,25 +24,37 @@ How the pool boots and retires the one kernel that owns each Session.
 
 Host source evaluated on every worker start, after restore, before any cell.
 
+<a id="capturetimeoutmillis"></a>
+
 ##### captureTimeoutMillis?
 
 > `readonly` `optional` **captureTimeoutMillis?**: `number`
+
+<a id="environment"></a>
 
 ##### environment
 
 > `readonly` **environment**: `Readonly`\<`Record`\<`string`, `string`\>\>
 
+<a id="idletimetolive"></a>
+
 ##### idleTimeToLive
 
 > `readonly` **idleTimeToLive**: `Input`
+
+<a id="interruptgracemillis"></a>
 
 ##### interruptGraceMillis
 
 > `readonly` **interruptGraceMillis**: `number`
 
+<a id="maxconcurrentboots"></a>
+
 ##### maxConcurrentBoots
 
 > `readonly` **maxConcurrentBoots**: `number`
+
+<a id="profile"></a>
 
 ##### profile
 
@@ -136,19 +152,27 @@ Host source evaluated on every worker start, after restore, before any cell.
 
 > `readonly` **root**: `string`
 
+<a id="runtimecommand"></a>
+
 ##### runtimeCommand
 
 > `readonly` **runtimeCommand**: `string`
 
+<a id="starttimeoutmillis"></a>
+
 ##### startTimeoutMillis
 
 > `readonly` **startTimeoutMillis**: `number`
+
+<a id="workermodule"></a>
 
 ##### workerModule
 
 > `readonly` **workerModule**: `string`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -167,6 +191,8 @@ One Server-scoped pool of live Bun kernels, one per Session.
 `Layer.Layer`\<[`KernelPool`](../../repl/namespaces/KernelPool#kernelpool), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

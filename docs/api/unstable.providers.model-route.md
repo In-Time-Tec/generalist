@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="availabilitysemanticsmissing"></a>
+
 ### AvailabilitySemanticsMissing
 
 **`Experimental`**
@@ -19,6 +21,8 @@ An ordered candidate route contains a candidate without provider-approved availa
 - `AvailabilitySemanticsMissing_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -51,6 +57,8 @@ An ordered candidate route contains a candidate without provider-approved availa
 ###### Inherited from
 
 `AvailabilitySemanticsMissing_base.hint`
+
+<a id="model"></a>
 
 ##### model
 
@@ -62,6 +70,8 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 `AvailabilitySemanticsMissing_base.model`
 
+<a id="provider"></a>
+
 ##### provider
 
 > `readonly` **provider**: `string`
@@ -71,6 +81,8 @@ An ordered candidate route contains a candidate without provider-approved availa
 ###### Inherited from
 
 `AvailabilitySemanticsMissing_base.provider`
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -84,11 +96,15 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 ## Interfaces
 
+<a id="input"></a>
+
 ### Input
 
 **`Experimental`**
 
 #### Properties
+
+<a id="candidates"></a>
 
 ##### candidates
 
@@ -98,17 +114,23 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 ***
 
+<a id="route"></a>
+
 ### Route
 
 **`Experimental`**
 
 #### Properties
 
+<a id="registration"></a>
+
 ##### registration
 
 > `readonly` **registration**: [`Registration`](./generalist/namespaces/ModelRegistry#registration-1)
 
 **`Experimental`**
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -117,6 +139,8 @@ An ordered candidate route contains a candidate without provider-approved availa
 **`Experimental`**
 
 ## Variables
+
+<a id="make"></a>
 
 ### make
 

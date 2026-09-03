@@ -15,7 +15,7 @@
     "docs:api": "bun run --cwd packages/generalist build && bun scripts/docs-api.ts",
     "docs:api:check": "bun scripts/docs-api.ts --check",
     "docs:build": "bun scripts/docs-features.ts && MINTLIFY_TELEMETRY_DISABLED=1 bun --cwd docs mint validate && bun run docs:links",
-    "docs:links": "MINTLIFY_TELEMETRY_DISABLED=1 bun --cwd docs mint broken-links --check-redirects",
+    "docs:links": "MINTLIFY_TELEMETRY_DISABLED=1 bun --cwd docs mint broken-links --check-anchors --check-redirects",
     "format": "prettier --write .",
     "package": "bun scripts/package-smoke.ts",
     "readme:check": "bun scripts/readme-check.ts",

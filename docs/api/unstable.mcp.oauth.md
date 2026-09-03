@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="oauth"></a>
+
 ### OAuth
 
 **`Experimental`**
@@ -17,6 +19,8 @@
 - `OAuth_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -40,6 +44,8 @@
 
 ***
 
+<a id="oauthdenied"></a>
+
 ### OAuthDenied
 
 **`Experimental`**
@@ -49,6 +55,8 @@
 - `OAuthDenied_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -72,6 +80,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -81,6 +91,8 @@
 ###### Inherited from
 
 `OAuthDenied_base.hint`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -94,6 +106,8 @@
 
 ***
 
+<a id="oauthexpired"></a>
+
 ### OAuthExpired
 
 **`Experimental`**
@@ -103,6 +117,8 @@
 - `OAuthExpired_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -126,6 +142,8 @@
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -135,6 +153,8 @@
 ###### Inherited from
 
 `OAuthExpired_base.hint`
+
+<a id="server"></a>
 
 ##### server
 
@@ -148,6 +168,8 @@
 
 ***
 
+<a id="oauthpending"></a>
+
 ### OAuthPending
 
 **`Experimental`**
@@ -157,6 +179,8 @@
 - `OAuthPending_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -180,6 +204,8 @@
 
 #### Properties
 
+<a id="authorizationurl"></a>
+
 ##### authorizationUrl
 
 > `readonly` **authorizationUrl**: `string`
@@ -189,6 +215,8 @@
 ###### Inherited from
 
 `OAuthPending_base.authorizationUrl`
+
+<a id="hint-2"></a>
 
 ##### hint
 
@@ -202,6 +230,8 @@
 
 ***
 
+<a id="oauthprovidererror"></a>
+
 ### OAuthProviderError
 
 **`Experimental`**
@@ -211,6 +241,8 @@
 - `OAuthProviderError_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -234,6 +266,8 @@
 
 #### Properties
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -243,6 +277,8 @@
 ###### Inherited from
 
 `OAuthProviderError_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -254,6 +290,8 @@
 
 `OAuthProviderError_base.message`
 
+<a id="operation"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -263,6 +301,8 @@
 ###### Inherited from
 
 `OAuthProviderError_base.operation`
+
+<a id="server-1"></a>
 
 ##### server
 
@@ -276,6 +316,8 @@
 
 ***
 
+<a id="tokenstore"></a>
+
 ### TokenStore
 
 **`Experimental`**
@@ -285,6 +327,8 @@
 - `TokenStore_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -308,17 +352,23 @@
 
 ## Interfaces
 
+<a id="authorization"></a>
+
 ### Authorization
 
 **`Experimental`**
 
 #### Properties
 
+<a id="state"></a>
+
 ##### state
 
 > `readonly` **state**: `string`
 
 **`Experimental`**
+
+<a id="url"></a>
 
 ##### url
 
@@ -328,11 +378,15 @@
 
 ***
 
+<a id="configuration"></a>
+
 ### Configuration
 
 **`Experimental`**
 
 #### Properties
+
+<a id="clientinformation"></a>
 
 ##### clientInformation?
 
@@ -340,11 +394,15 @@
 
 **`Experimental`**
 
+<a id="clientmetadata"></a>
+
 ##### clientMetadata
 
 > `readonly` **clientMetadata**: `object`
 
 **`Experimental`**
+
+<a id="redirecturl"></a>
 
 ##### redirectUrl
 
@@ -352,11 +410,15 @@
 
 **`Experimental`**
 
+<a id="scope"></a>
+
 ##### scope?
 
 > `readonly` `optional` **scope?**: `string`
 
 **`Experimental`**
+
+<a id="serverurl"></a>
 
 ##### serverUrl
 
@@ -366,17 +428,23 @@
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
 
 #### Properties
 
+<a id="authorize"></a>
+
 ##### authorize
 
 > `readonly` **authorize**: `Effect`\<[`Authorization`](#authorization), [`OAuthProviderError`](#oauthprovidererror)\>
 
 **`Experimental`**
+
+<a id="callback"></a>
 
 ##### callback
 
@@ -394,11 +462,15 @@
 
 `Effect`\<`void`, [`OAuthProviderError`](#oauthprovidererror) \| [`OAuthDenied`](#oauthdenied) \| [`OAuthExpired`](#oauthexpired)\>
 
+<a id="clear"></a>
+
 ##### clear
 
 > `readonly` **clear**: `Effect`\<`void`, [`OAuthProviderError`](#oauthprovidererror)\>
 
 **`Experimental`**
+
+<a id="pending"></a>
 
 ##### pending
 
@@ -406,11 +478,15 @@
 
 **`Experimental`**
 
+<a id="provider"></a>
+
 ##### provider
 
 > `readonly` **provider**: `OAuthClientProvider`
 
 **`Experimental`**
+
+<a id="withtransport"></a>
 
 ##### withTransport
 
@@ -444,6 +520,8 @@
 
 ## Variables
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`configuration`) => `Layer.Layer`\<[`OAuth`](#oauth), `never`, [`TokenStore`](#tokenstore) \| `Crypto.Crypto`\>
@@ -461,6 +539,8 @@
 `Layer.Layer`\<[`OAuth`](#oauth), `never`, [`TokenStore`](#tokenstore) \| `Crypto.Crypto`\>
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -480,6 +560,8 @@
 
 ***
 
+<a id="layertokenstorememory"></a>
+
 ### layerTokenStoreMemory
 
 > `const` **layerTokenStoreMemory**: `Layer.Layer`\<[`TokenStore`](#tokenstore)\>
@@ -487,6 +569,8 @@
 **`Experimental`**
 
 ***
+
+<a id="layertokenstoretest"></a>
 
 ### layerTokenStoreTest
 

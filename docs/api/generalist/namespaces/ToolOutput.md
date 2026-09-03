@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="error"></a>
+
 ### Error
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Error_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `Error_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -54,6 +62,8 @@
 
 ***
 
+<a id="store"></a>
+
 ### Store
 
 #### Extends
@@ -61,6 +71,8 @@
 - `Store_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -82,6 +94,8 @@
 
 ## Interfaces
 
+<a id="boundedsuccess"></a>
+
 ### BoundedSuccess
 
 A successful tool result after applying the output bound.
@@ -92,6 +106,8 @@ A successful tool result after applying the output bound.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Success"`
@@ -100,6 +116,8 @@ A successful tool result after applying the output bound.
 
 [`Success`](./ToolExecutor#success).[`_tag`](./ToolExecutor#_tag-1)
 
+<a id="encodedresult"></a>
+
 ##### encodedResult
 
 > `readonly` **encodedResult**: `unknown`
@@ -107,6 +125,8 @@ A successful tool result after applying the output bound.
 ###### Inherited from
 
 [`Success`](./ToolExecutor#success).[`encodedResult`](./ToolExecutor#encodedresult)
+
+<a id="memoized"></a>
 
 ##### memoized?
 
@@ -124,9 +144,13 @@ A successful tool result after applying the output bound.
 
 [`Success`](./ToolExecutor#success).[`memoized`](./ToolExecutor#memoized)
 
+<a id="outputpaths"></a>
+
 ##### outputPaths
 
 > `readonly` **outputPaths**: readonly `string`[]
+
+<a id="result"></a>
 
 ##### result
 
@@ -138,21 +162,29 @@ A successful tool result after applying the output bound.
 
 ***
 
+<a id="output"></a>
+
 ### Output
 
 A bounded tool result: inline content plus optional spilled overflow references.
 
 #### Properties
 
+<a id="inline"></a>
+
 ##### inline
 
 > `readonly` **inline**: `unknown`
+
+<a id="outputpaths-1"></a>
 
 ##### outputPaths?
 
 > `readonly` `optional` **outputPaths?**: readonly `string`[]
 
 ## Variables
+
+<a id="bound"></a>
 
 ### bound
 
@@ -204,17 +236,23 @@ A bounded tool result: inline content plus optional spilled overflow references.
 
 ***
 
+<a id="layermemory"></a>
+
 ### layerMemory
 
 > `const` **layerMemory**: `Layer.Layer`\<[`Store`](#store)\>
 
 ***
 
+<a id="layernoop"></a>
+
 ### layerNoop
 
 > `const` **layerNoop**: `Layer.Layer`\<[`Store`](#store)\>
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 

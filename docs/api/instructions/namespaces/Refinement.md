@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="refinementrejected"></a>
+
 ### RefinementRejected
 
 One proposal was rejected and no state changed.
@@ -17,6 +19,8 @@ One proposal was rejected and no state changed.
 - `RefinementRejected_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ One proposal was rejected and no state changed.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -45,6 +51,8 @@ One proposal was rejected and no state changed.
 ###### Inherited from
 
 `RefinementRejected_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -54,6 +62,8 @@ One proposal was rejected and no state changed.
 
 `RefinementRejected_base.message`
 
+<a id="proposal"></a>
+
 ##### proposal
 
 > `readonly` **proposal**: `string`
@@ -62,6 +72,8 @@ One proposal was rejected and no state changed.
 
 `RefinementRejected_base.proposal`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"pinned-revision"` \| `"baseline-drift"` \| `"create-existing"` \| `"delete-missing"` \| `"duplicate-target"` \| `"kind-capacity"` \| `"rollback-not-newest"` \| `"update-missing"` \| `"version-drift"`
@@ -69,6 +81,8 @@ One proposal was rejected and no state changed.
 ###### Inherited from
 
 `RefinementRejected_base.reason`
+
+<a id="target"></a>
 
 ##### target?
 
@@ -80,15 +94,21 @@ One proposal was rejected and no state changed.
 
 ## Interfaces
 
+<a id="applyoptions"></a>
+
 ### ApplyOptions
 
 Bounds enforced while one proposal is applied.
 
 #### Properties
 
+<a id="maxentriesperkind"></a>
+
 ##### maxEntriesPerKind?
 
 > `readonly` `optional` **maxEntriesPerKind?**: `number`
+
+<a id="maxrefinements"></a>
 
 ##### maxRefinements?
 
@@ -96,29 +116,41 @@ Bounds enforced while one proposal is applied.
 
 ***
 
+<a id="rollbackoptions"></a>
+
 ### RollbackOptions
 
 Identity of the inverse proposal of one applied refinement.
 
 #### Properties
 
+<a id="at"></a>
+
 ##### at
 
 > `readonly` **at**: `string`
+
+<a id="id"></a>
 
 ##### id
 
 > `readonly` **id**: `string`
 
+<a id="rationale"></a>
+
 ##### rationale?
 
 > `readonly` `optional` **rationale?**: `string`
+
+<a id="source"></a>
 
 ##### source?
 
 > `readonly` `optional` **source?**: `string`
 
 ## Type Aliases
+
+<a id="refinementrejection"></a>
 
 ### RefinementRejection
 
@@ -128,6 +160,8 @@ Why one proposal cannot be applied to one state.
 
 ***
 
+<a id="refinementresult"></a>
+
 ### RefinementResult
 
 > **RefinementResult** = *typeof* `RefinementResult.Type`
@@ -135,6 +169,8 @@ Why one proposal cannot be applied to one state.
 The next state and the durable record of one applied proposal.
 
 ## Variables
+
+<a id="apply"></a>
 
 ### apply
 
@@ -201,6 +237,8 @@ stays the engine's: a create lands at version 1 and an update bumps the entry it
 `Result`\<\{ `event`: `Schema.Struct`\<\{ `after`: `Schema.String`; `applied`: `Schema.$Array`\<`Schema.Struct`\<\{ `after`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `arguments`: ...; `content`: ...; `createdAt`: ...; `id`: ...; `kind`: ...; `metadata`: ...; `path`: ...; `reference`: ...; `scope`: ...; `source`: ...; `title`: ...; `updatedAt`: ...; `version`: ...; \}\>\>; `before`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `arguments`: ...; `content`: ...; `createdAt`: ...; `id`: ...; `kind`: ...; `metadata`: ...; `path`: ...; `reference`: ...; `scope`: ...; `source`: ...; `title`: ...; `updatedAt`: ...; `version`: ...; \}\>\>; `edit`: `Schema.Union`\<readonly \[..., ..., ...\]\>; \}\>\>; `at`: `Schema.String`; `before`: `Schema.String`; `proposal`: `Schema.String`; `rationale`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>; `state`: `Schema.Struct`\<\{ `entries`: `Schema.Struct`\<\{ `memory`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `prompt`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `skill`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `subagent`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; \}\>; `refinements`: `Schema.$Array`\<`Schema.Struct`\<\{ `after`: `Schema.String`; `applied`: `Schema.$Array`\<`Schema.Struct`\<\{ `after`: ...; `before`: ...; `edit`: ...; \}\>\>; `at`: `Schema.String`; `before`: `Schema.String`; `proposal`: `Schema.String`; `rationale`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\>; `schemaVersion`: `Schema.Literal`\<`"1"`\>; `scope`: `Schema.String`; \}\>; \}, [`RefinementRejected`](#refinementrejected)\>
 
 ***
+
+<a id="applytrusted"></a>
 
 ### applyTrusted
 
@@ -320,6 +358,8 @@ every ordinary refinement goes through `apply`.
 
 ***
 
+<a id="isauthored"></a>
+
 ### isAuthored
 
 > `const` **isAuthored**: (`proposal`) => `boolean`
@@ -337,6 +377,8 @@ Whether every edit of one proposal leaves its revision to the engine.
 `boolean`
 
 ***
+
+<a id="makerollback"></a>
 
 ### makeRollback
 
@@ -412,6 +454,8 @@ Build the proposal that restores the exact entries one refinement replaced.
 
 ***
 
+<a id="refinementrejection-1"></a>
+
 ### RefinementRejection
 
 > `const` **RefinementRejection**: `Schema.Literals`\<readonly \[`"baseline-drift"`, `"create-existing"`, `"delete-missing"`, `"duplicate-target"`, `"kind-capacity"`, `"pinned-revision"`, `"rollback-not-newest"`, `"update-missing"`, `"version-drift"`\]\>
@@ -420,6 +464,8 @@ Why one proposal cannot be applied to one state.
 
 ***
 
+<a id="refinementresult-1"></a>
+
 ### RefinementResult
 
 > `const` **RefinementResult**: `Schema.Struct`\<\{ `event`: `Schema.Struct`\<\{ `after`: `Schema.String`; `applied`: `Schema.$Array`\<`Schema.Struct`\<\{ `after`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `before`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `edit`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>\]\>; \}\>\>; `at`: `Schema.String`; `before`: `Schema.String`; `proposal`: `Schema.String`; `rationale`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>; `state`: `Schema.Struct`\<\{ `entries`: `Schema.Struct`\<\{ `memory`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `prompt`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `skill`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `subagent`: `Schema.$Array`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; \}\>; `refinements`: `Schema.$Array`\<`Schema.Struct`\<\{ `after`: `Schema.String`; `applied`: `Schema.$Array`\<`Schema.Struct`\<\{ `after`: `Schema.optionalKey`\<...\>; `before`: `Schema.optionalKey`\<...\>; `edit`: `Schema.Union`\<...\>; \}\>\>; `at`: `Schema.String`; `before`: `Schema.String`; `proposal`: `Schema.String`; `rationale`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\>; `schemaVersion`: `Schema.Literal`\<`"1"`\>; `scope`: `Schema.String`; \}\>; \}\>
@@ -427,6 +473,8 @@ Why one proposal cannot be applied to one state.
 The next state and the durable record of one applied proposal.
 
 ***
+
+<a id="rollbacktarget"></a>
 
 ### rollbackTarget
 

@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="actor"></a>
+
 ### Actor
 
 **`Experimental`**
@@ -15,6 +17,8 @@
 Minimal agentOS actor boundary used by recorded fixtures.
 
 #### Properties
+
+<a id="destroy"></a>
 
 ##### destroy
 
@@ -25,6 +29,8 @@ Minimal agentOS actor boundary used by recorded fixtures.
 ###### Returns
 
 `Promise`\<`void`\>
+
+<a id="execute"></a>
 
 ##### execute
 
@@ -50,6 +56,8 @@ readonly `string`[]
 
 `Promise`\<`ExecResult`\>
 
+<a id="health"></a>
+
 ##### health
 
 > `readonly` **health**: () => `Promise`\<`void`\>
@@ -59,6 +67,8 @@ readonly `string`[]
 ###### Returns
 
 `Promise`\<`void`\>
+
+<a id="makedirectory"></a>
 
 ##### makeDirectory
 
@@ -76,6 +86,8 @@ readonly `string`[]
 
 `Promise`\<`void`\>
 
+<a id="readfile"></a>
+
 ##### readFile
 
 > `readonly` **readFile**: (`path`) => `Promise`\<`Uint8Array`\<`ArrayBufferLike`\>\>
@@ -91,6 +103,8 @@ readonly `string`[]
 ###### Returns
 
 `Promise`\<`Uint8Array`\<`ArrayBufferLike`\>\>
+
+<a id="writefile"></a>
 
 ##### writeFile
 
@@ -114,6 +128,8 @@ readonly `string`[]
 
 ***
 
+<a id="client"></a>
+
 ### Client
 
 **`Experimental`**
@@ -121,6 +137,8 @@ readonly `string`[]
 Minimal RivetKit client boundary used by recorded fixtures.
 
 #### Properties
+
+<a id="close"></a>
 
 ##### close
 
@@ -131,6 +149,8 @@ Minimal RivetKit client boundary used by recorded fixtures.
 ###### Returns
 
 `Promise`\<`void`\>
+
+<a id="create"></a>
 
 ##### create
 
@@ -151,6 +171,8 @@ Minimal RivetKit client boundary used by recorded fixtures.
 ###### Returns
 
 `Promise`\<[`Actor`](#actor)\>
+
+<a id="get"></a>
 
 ##### get
 
@@ -174,6 +196,8 @@ Minimal RivetKit client boundary used by recorded fixtures.
 
 ***
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
@@ -181,6 +205,8 @@ Minimal RivetKit client boundary used by recorded fixtures.
 agentOS actor sandbox configuration.
 
 #### Properties
+
+<a id="actor-1"></a>
 
 ##### actor?
 
@@ -190,11 +216,15 @@ agentOS actor sandbox configuration.
 
 Actor name registered by the agentOS host.
 
+<a id="endpoint"></a>
+
 ##### endpoint
 
 > `readonly` **endpoint**: `string`
 
 **`Experimental`**
+
+<a id="token"></a>
 
 ##### token
 
@@ -203,6 +233,8 @@ Actor name registered by the agentOS host.
 **`Experimental`**
 
 ***
+
+<a id="provideroptions"></a>
 
 ### ProviderOptions
 
@@ -216,6 +248,8 @@ Resolved agentOS configuration used by recorded fixtures.
 
 #### Properties
 
+<a id="actor-2"></a>
+
 ##### actor?
 
 > `readonly` `optional` **actor?**: `string`
@@ -228,11 +262,15 @@ Actor name registered by the agentOS host.
 
 [`Options`](#options).[`actor`](#actor-1)
 
+<a id="client-1"></a>
+
 ##### client
 
 > `readonly` **client**: [`Client`](#client)
 
 **`Experimental`**
+
+<a id="endpoint-1"></a>
 
 ##### endpoint
 
@@ -244,6 +282,8 @@ Actor name registered by the agentOS host.
 
 [`Options`](#options).[`endpoint`](#endpoint)
 
+<a id="token-1"></a>
+
 ##### token
 
 > `readonly` **token**: `Redacted`\<`string`\>
@@ -251,6 +291,8 @@ Actor name registered by the agentOS host.
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -271,6 +313,8 @@ Provide the hosted agentOS V8-isolate Sandbox leaf.
 `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`\>
 
 ***
+
+<a id="makeprovider"></a>
 
 ### makeProvider
 

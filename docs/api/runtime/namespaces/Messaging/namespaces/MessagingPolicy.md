@@ -8,9 +8,13 @@
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="allow"></a>
 
 ##### allow
 
@@ -25,6 +29,8 @@
 ###### Returns
 
 `Effect`\<`boolean`\>
+
+<a id="discover"></a>
 
 ##### discover
 

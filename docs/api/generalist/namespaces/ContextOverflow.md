@@ -8,6 +8,8 @@
 
 ## Variables
 
+<a id="classify"></a>
+
 ### classify
 
 > `const` **classify**: (`cause`) => [`FailureClassification`](./ModelRegistry#failureclassification)

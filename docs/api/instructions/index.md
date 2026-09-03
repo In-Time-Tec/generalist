@@ -21,6 +21,8 @@
 
 ## Classes
 
+<a id="instructions"></a>
+
 ### Instructions
 
 #### Extends
@@ -28,6 +30,8 @@
 - `Instructions_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -49,15 +53,21 @@
 
 ## Interfaces
 
+<a id="instructionfile"></a>
+
 ### InstructionFile
 
 Loaded instruction-file content.
 
 #### Properties
 
+<a id="content"></a>
+
 ##### content
 
 > `readonly` **content**: `string`
+
+<a id="path"></a>
 
 ##### path
 
@@ -65,25 +75,35 @@ Loaded instruction-file content.
 
 ***
 
+<a id="options"></a>
+
 ### Options
 
 Instruction-file discovery options.
 
 #### Properties
 
+<a id="cwd"></a>
+
 ##### cwd?
 
 > `readonly` `optional` **cwd?**: `string`
 
+<a id="filenames"></a>
+
 ##### filenames?
 
 > `readonly` `optional` **filenames?**: readonly `string`[]
+
+<a id="globalfiles"></a>
 
 ##### globalFiles?
 
 > `readonly` `optional` **globalFiles?**: readonly `string`[]
 
 ***
+
+<a id="provider"></a>
 
 ### Provider
 
@@ -97,9 +117,13 @@ Ordered provider of model instructions or contextual updates.
 
 #### Properties
 
+<a id="id"></a>
+
 ##### id
 
 > `readonly` **id**: `string`
+
+<a id="render"></a>
 
 ##### render
 
@@ -117,15 +141,21 @@ Ordered provider of model instructions or contextual updates.
 
 ***
 
+<a id="rendercontext"></a>
+
 ### RenderContext
 
 Context available while rendering instruction providers.
 
 #### Properties
 
+<a id="agentname"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -133,17 +163,23 @@ Context available while rendering instruction providers.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Instructions registry service boundary.
 
 #### Properties
 
+<a id="providers"></a>
+
 ##### providers
 
 > `readonly` **providers**: readonly [`Provider`](#provider)\<`never`\>[]
 
 ## Variables
+
+<a id="fromtext"></a>
 
 ### fromText
 
@@ -185,6 +221,8 @@ A static baseline provider.
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: \<`R`\>(`providers`) => `Layer.Layer`\<[`Instructions`](#instructions), `never`, `R`\>
@@ -209,6 +247,8 @@ Provide an explicit ordered instructions registry.
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`Instructions`](#instructions)\>
@@ -224,6 +264,8 @@ Provide an explicit ordered instructions registry.
 `Layer.Layer`\<[`Instructions`](#instructions)\>
 
 ***
+
+<a id="load"></a>
 
 ### load
 
@@ -242,6 +284,8 @@ Load AGENTS.md / CLAUDE.md instruction files from global and ancestor paths.
 `Effect.Effect`\<`ReadonlyArray`\<[`InstructionFile`](#instructionfile)\>, `PlatformError.PlatformError`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
+
+<a id="render-1"></a>
 
 ### render
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="authorshiprejected"></a>
+
 ### AuthorshipRejected
 
 Untrusted proposal input was refused and no state was inspected or changed.
@@ -17,6 +19,8 @@ Untrusted proposal input was refused and no state was inspected or changed.
 - `AuthorshipRejected_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ Untrusted proposal input was refused and no state was inspected or changed.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ Untrusted proposal input was refused and no state was inspected or changed.
 
 `AuthorshipRejected_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -53,6 +61,8 @@ Untrusted proposal input was refused and no state was inspected or changed.
 ###### Inherited from
 
 `AuthorshipRejected_base.message`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -64,6 +74,8 @@ Untrusted proposal input was refused and no state was inspected or changed.
 
 ## Type Aliases
 
+<a id="authorshiprejection"></a>
+
 ### AuthorshipRejection
 
 > **AuthorshipRejection** = *typeof* `AuthorshipRejection.Type`
@@ -71,6 +83,8 @@ Untrusted proposal input was refused and no state was inspected or changed.
 Why untrusted proposal input was refused before it could reach the engine.
 
 ## Variables
+
+<a id="author"></a>
 
 ### author
 
@@ -95,6 +109,8 @@ silently dropped, so model-originated input can never choose an entry's createdA
 
 ***
 
+<a id="authorshiprejection-1"></a>
+
 ### AuthorshipRejection
 
 > `const` **AuthorshipRejection**: `Schema.Literals`\<readonly \[`"pinned-revision"`, `"malformed"`\]\>
@@ -102,6 +118,8 @@ silently dropped, so model-originated input can never choose an entry's createdA
 Why untrusted proposal input was refused before it could reach the engine.
 
 ## References
+
+<a id="isauthored"></a>
 
 ### isAuthored
 

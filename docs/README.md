@@ -24,8 +24,8 @@ bun run docs:build
 ```
 
 `docs:api` refreshes the committed TypeDoc artifact. `docs:build` reports feature pages still missing test links,
-validates the current `docs.json`, and checks internal links and redirects. Mintlify provides hosted search; no separate
-search service is part of this repository.
+validates the current `docs.json`, and checks internal links, anchors, and redirects. Mintlify provides hosted search;
+no separate search service is part of this repository.
 
 The existing `apps/docs` deployment remains unchanged in this build-only change. The
 [recorded recommendation](decisions/retire-docs-app-after-mintlify-cutover.md) is to retire it only after an owner

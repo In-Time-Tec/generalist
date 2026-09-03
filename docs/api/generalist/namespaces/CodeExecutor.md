@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="codeexecutor"></a>
+
 ### CodeExecutor
 
 Host-supplied isolated source executor.
@@ -17,6 +19,8 @@ Host-supplied isolated source executor.
 - `CodeExecutor_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxcancelled"></a>
+
 ### SandboxCancelled
 
 #### Extends
@@ -45,6 +51,8 @@ Host-supplied isolated source executor.
 - `SandboxCancelled_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -73,6 +83,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxCancelled_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -84,6 +96,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxdeadlineexceeded"></a>
+
 ### SandboxDeadlineExceeded
 
 #### Extends
@@ -91,6 +105,8 @@ Host-supplied isolated source executor.
 - `SandboxDeadlineExceeded_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -112,6 +128,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -119,6 +137,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxDeadlineExceeded_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -130,6 +150,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxexecutionfailure"></a>
+
 ### SandboxExecutionFailure
 
 #### Extends
@@ -137,6 +159,8 @@ Host-supplied isolated source executor.
 - `SandboxExecutionFailure_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -158,6 +182,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -165,6 +191,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxExecutionFailure_base.hint`
+
+<a id="message-2"></a>
 
 ##### message
 
@@ -176,6 +204,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxguaranteeunavailable"></a>
+
 ### SandboxGuaranteeUnavailable
 
 #### Extends
@@ -183,6 +213,8 @@ Host-supplied isolated source executor.
 - `SandboxGuaranteeUnavailable_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -204,6 +236,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="guarantee"></a>
+
 ##### guarantee
 
 > `readonly` **guarantee**: `"subrequests"` \| `"physicalIsolation"` \| `"persistence"` \| `"network"` \| `"deadlineMillis"` \| `"cpuMillis"` \| `"outputBytes"` \| `"filesystem"` \| `"processes"`
@@ -212,6 +246,8 @@ Host-supplied isolated source executor.
 
 `SandboxGuaranteeUnavailable_base.guarantee`
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -219,6 +255,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxGuaranteeUnavailable_base.hint`
+
+<a id="message-3"></a>
 
 ##### message
 
@@ -230,6 +268,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxinputinvalid"></a>
+
 ### SandboxInputInvalid
 
 #### Extends
@@ -237,6 +277,8 @@ Host-supplied isolated source executor.
 - `SandboxInputInvalid_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -258,6 +300,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-4"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -265,6 +309,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxInputInvalid_base.hint`
+
+<a id="message-4"></a>
 
 ##### message
 
@@ -276,6 +322,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxoutputinvalid"></a>
+
 ### SandboxOutputInvalid
 
 #### Extends
@@ -283,6 +331,8 @@ Host-supplied isolated source executor.
 - `SandboxOutputInvalid_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -304,6 +354,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-5"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -311,6 +363,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxOutputInvalid_base.hint`
+
+<a id="message-5"></a>
 
 ##### message
 
@@ -322,6 +376,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxprotocolviolation"></a>
+
 ### SandboxProtocolViolation
 
 #### Extends
@@ -329,6 +385,8 @@ Host-supplied isolated source executor.
 - `SandboxProtocolViolation_base`
 
 #### Constructors
+
+<a id="constructor-7"></a>
 
 ##### Constructor
 
@@ -350,6 +408,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-6"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -357,6 +417,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxProtocolViolation_base.hint`
+
+<a id="message-6"></a>
 
 ##### message
 
@@ -368,6 +430,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxresourceexceeded"></a>
+
 ### SandboxResourceExceeded
 
 #### Extends
@@ -375,6 +439,8 @@ Host-supplied isolated source executor.
 - `SandboxResourceExceeded_base`
 
 #### Constructors
+
+<a id="constructor-8"></a>
 
 ##### Constructor
 
@@ -396,6 +462,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-7"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -404,6 +472,8 @@ Host-supplied isolated source executor.
 
 `SandboxResourceExceeded_base.hint`
 
+<a id="limit"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
@@ -411,6 +481,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxResourceExceeded_base.limit`
+
+<a id="resource"></a>
 
 ##### resource
 
@@ -422,6 +494,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxsourceinvalid"></a>
+
 ### SandboxSourceInvalid
 
 #### Extends
@@ -429,6 +503,8 @@ Host-supplied isolated source executor.
 - `SandboxSourceInvalid_base`
 
 #### Constructors
+
+<a id="constructor-9"></a>
 
 ##### Constructor
 
@@ -450,6 +526,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-8"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -457,6 +535,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxSourceInvalid_base.hint`
+
+<a id="message-7"></a>
 
 ##### message
 
@@ -468,6 +548,8 @@ Host-supplied isolated source executor.
 
 ***
 
+<a id="sandboxunavailable"></a>
+
 ### SandboxUnavailable
 
 #### Extends
@@ -475,6 +557,8 @@ Host-supplied isolated source executor.
 - `SandboxUnavailable_base`
 
 #### Constructors
+
+<a id="constructor-10"></a>
 
 ##### Constructor
 
@@ -496,6 +580,8 @@ Host-supplied isolated source executor.
 
 #### Properties
 
+<a id="hint-9"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -503,6 +589,8 @@ Host-supplied isolated source executor.
 ###### Inherited from
 
 `SandboxUnavailable_base.hint`
+
+<a id="message-8"></a>
 
 ##### message
 
@@ -514,31 +602,45 @@ Host-supplied isolated source executor.
 
 ## Interfaces
 
+<a id="request"></a>
+
 ### Request
 
 Complete immutable reconstruction request for one sandbox invocation.
 
 #### Properties
 
+<a id="capabilities"></a>
+
 ##### capabilities
 
 > `readonly` **capabilities**: readonly `object`[]
+
+<a id="deadlinemillis"></a>
 
 ##### deadlineMillis
 
 > `readonly` **deadlineMillis**: `number`
 
+<a id="entrypoint"></a>
+
 ##### entrypoint
 
 > `readonly` **entrypoint**: `string`
+
+<a id="input"></a>
 
 ##### input
 
 > `readonly` **input**: `unknown`
 
+<a id="inputcodec"></a>
+
 ##### inputCodec
 
 > `readonly` **inputCodec**: `string`
+
+<a id="limits"></a>
 
 ##### limits
 
@@ -556,25 +658,37 @@ Complete immutable reconstruction request for one sandbox invocation.
 
 > `readonly` **subrequests**: `number`
 
+<a id="modules"></a>
+
 ##### modules
 
 > `readonly` **modules**: readonly `object`[]
+
+<a id="outputcodec"></a>
 
 ##### outputCodec
 
 > `readonly` **outputCodec**: `string`
 
+<a id="protocolversion"></a>
+
 ##### protocolVersion
 
 > `readonly` **protocolVersion**: `"1"`
+
+<a id="requestid"></a>
 
 ##### requestId
 
 > `readonly` **requestId**: `string`
 
+<a id="signal"></a>
+
 ##### signal
 
 > `readonly` **signal**: `AbortSignal`
+
+<a id="sourcedigest"></a>
 
 ##### sourceDigest
 
@@ -582,9 +696,13 @@ Complete immutable reconstruction request for one sandbox invocation.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="execute"></a>
 
 ##### execute
 
@@ -599,6 +717,8 @@ Complete immutable reconstruction request for one sandbox invocation.
 ###### Returns
 
 `Effect`\<\{ `inputCodec`: `string`; `output`: `unknown`; `outputCodec`: `string`; `protocolVersion`: `"1"`; `requestId`: `string`; `sourceDigest`: `string`; \}, [`SandboxUnavailable`](#sandboxunavailable) \| [`SandboxSourceInvalid`](#sandboxsourceinvalid) \| [`SandboxInputInvalid`](#sandboxinputinvalid) \| [`SandboxOutputInvalid`](#sandboxoutputinvalid) \| [`SandboxExecutionFailure`](#sandboxexecutionfailure) \| [`SandboxProtocolViolation`](#sandboxprotocolviolation) \| [`SandboxDeadlineExceeded`](#sandboxdeadlineexceeded) \| [`SandboxCancelled`](#sandboxcancelled) \| [`SandboxResourceExceeded`](#sandboxresourceexceeded) \| [`SandboxGuaranteeUnavailable`](#sandboxguaranteeunavailable) \| [`ProgramCapabilityMissing`](./ProgramCapabilities#programcapabilitymissing) \| [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSchemaFailure`](./ProgramCapabilities#programschemafailure) \| [`ProgramToolFailure`](./ProgramCapabilities#programtoolfailure) \| [`ProgramStepFailure`](./ProgramCapabilities#programstepfailure) \| [`ProgramAgentFailure`](./ProgramCapabilities#programagentfailure) \| [`ProgramBudgetExhausted`](./ProgramCapabilities#programbudgetexhausted) \| [`ProgramReplayDivergence`](./ProgramCapabilities#programreplaydivergence) \| [`ProgramOperationUnknown`](./ProgramCapabilities#programoperationunknown) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled), `Scope` \| [`ProgramCapabilities`](./ProgramCapabilities#programcapabilities)\>
+
+<a id="identity"></a>
 
 ##### identity
 
@@ -698,6 +818,8 @@ Complete immutable reconstruction request for one sandbox invocation.
 
 ## Type Aliases
 
+<a id="capabilitygrant"></a>
+
 ### CapabilityGrant
 
 > **CapabilityGrant** = *typeof* `CapabilityGrant.Type`
@@ -705,6 +827,8 @@ Complete immutable reconstruction request for one sandbox invocation.
 Explicit capability authority admitted for one execution.
 
 ***
+
+<a id="executionfailure"></a>
 
 ### ExecutionFailure
 
@@ -714,6 +838,8 @@ Typed failures that may cross the sandbox capability protocol.
 
 ***
 
+<a id="identity-1"></a>
+
 ### Identity
 
 > **Identity** = *typeof* `Identity.Type`
@@ -721,6 +847,8 @@ Typed failures that may cross the sandbox capability protocol.
 Persistable provider facts and exact guarantees enforced for every invocation.
 
 ***
+
+<a id="module"></a>
 
 ### Module
 
@@ -730,6 +858,8 @@ Exact normalized JavaScript module supplied to an isolated executor.
 
 ***
 
+<a id="result"></a>
+
 ### Result
 
 > **Result** = *typeof* `Result.Type`
@@ -737,6 +867,8 @@ Exact normalized JavaScript module supplied to an isolated executor.
 Identity-bound encoded output returned by an isolated executor.
 
 ***
+
+<a id="testexecute"></a>
 
 ### TestExecute
 
@@ -755,6 +887,8 @@ Trusted fixture executor for tests only.
 `Effect.Effect`\<`unknown`, [`ExecutionFailure`](#executionfailure), [`ProgramCapabilities`](./ProgramCapabilities#programcapabilities) \| `Scope.Scope`\>
 
 ## Variables
+
+<a id="admit"></a>
 
 ### admit
 
@@ -838,6 +972,8 @@ Fail closed before source evaluation when an executor cannot enforce the normali
 
 ***
 
+<a id="capabilitygrant-1"></a>
+
 ### CapabilityGrant
 
 > `const` **CapabilityGrant**: `Schema.Struct`\<\{ `names`: `Schema.$Array`\<`Schema.String`\>; `operation`: `Schema.Literals`\<readonly \[`"discoverTools"`, `"describeTool"`, `"callTool"`, `"callStep"`, `"runAgent"`, `"mapAgents"`, `"fanOutAgents"`, `"log"`\]\>; \}\>
@@ -845,6 +981,8 @@ Fail closed before source evaluation when an executor cannot enforce the normali
 Explicit capability authority admitted for one execution.
 
 ***
+
+<a id="declareidentity"></a>
 
 ### declareIdentity
 
@@ -864,6 +1002,8 @@ Validate and deeply freeze persistable executor identity facts.
 
 ***
 
+<a id="executionfailure-1"></a>
+
 ### ExecutionFailure
 
 > `const` **ExecutionFailure**: `Schema.Union`\<readonly \[*typeof* [`SandboxUnavailable`](#sandboxunavailable), *typeof* [`SandboxSourceInvalid`](#sandboxsourceinvalid), *typeof* [`SandboxInputInvalid`](#sandboxinputinvalid), *typeof* [`SandboxOutputInvalid`](#sandboxoutputinvalid), *typeof* [`SandboxExecutionFailure`](#sandboxexecutionfailure), *typeof* [`SandboxProtocolViolation`](#sandboxprotocolviolation), *typeof* [`SandboxDeadlineExceeded`](#sandboxdeadlineexceeded), *typeof* [`SandboxCancelled`](#sandboxcancelled), *typeof* [`SandboxResourceExceeded`](#sandboxresourceexceeded), *typeof* [`SandboxGuaranteeUnavailable`](#sandboxguaranteeunavailable), `Schema.Union`\<readonly \[[`ProgramCapabilityMissing`](./ProgramCapabilities#programcapabilitymissing), [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied), [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure), [`ProgramSchemaFailure`](./ProgramCapabilities#programschemafailure), [`ProgramToolFailure`](./ProgramCapabilities#programtoolfailure), [`ProgramStepFailure`](./ProgramCapabilities#programstepfailure), [`ProgramAgentFailure`](./ProgramCapabilities#programagentfailure), [`ProgramBudgetExhausted`](./ProgramCapabilities#programbudgetexhausted), [`ProgramReplayDivergence`](./ProgramCapabilities#programreplaydivergence), [`ProgramOperationUnknown`](./ProgramCapabilities#programoperationunknown), [`ProgramSuspended`](./ProgramCapabilities#programsuspended), [`ProgramCancelled`](./ProgramCapabilities#programcancelled)\]\>\]\>
@@ -872,6 +1012,8 @@ Typed failures that may cross the sandbox capability protocol.
 
 ***
 
+<a id="identity-2"></a>
+
 ### Identity
 
 > `const` **Identity**: `Schema.Struct`\<\{ `implementation`: `Schema.Struct`\<\{ `name`: `Schema.String`; `version`: `Schema.String`; \}\>; `knownLimitations`: `Schema.$Array`\<`Schema.String`\>; `limits`: `Schema.Struct`\<\{ `cpuMillis`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `maximum`: `Schema.NullOr`\<`Schema.Int`\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; `deadlineMillis`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `maximum`: `Schema.NullOr`\<`Schema.Int`\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; `filesystem`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; `outputBytes`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `maximum`: `Schema.NullOr`\<`Schema.Int`\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; `processes`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; `subrequests`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `maximum`: `Schema.NullOr`\<`Schema.Int`\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; \}\>; `network`: `Schema.Struct`\<\{ `enforcement`: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `by`: `Schema.Literals`\<readonly ...\>; `mechanism`: `Schema.String`; `status`: `Schema.Literal`\<`"enforced"`\>; \}\>, `Schema.Struct`\<\{ `reason`: `Schema.String`; `status`: `Schema.Literal`\<`"unenforced"`\>; \}\>\]\>; `posture`: `Schema.Literals`\<readonly \[`"default-deny"`, `"unrestricted"`, `"host"`, `"none"`\]\>; \}\>; `persistence`: `Schema.Literals`\<readonly \[`"fresh-per-execution"`, `"trusted-fixture"`, `"none"`\]\>; `physicalIsolation`: `Schema.Literals`\<readonly \[`"worker-isolate"`, `"microvm"`, `"sidecar-process-v8-isolate"`, `"trusted-test"`, `"none"`\]\>; `provider`: `Schema.String`; `runtime`: `Schema.Struct`\<\{ `name`: `Schema.String`; `version`: `Schema.String`; \}\>; `template`: `Schema.Struct`\<\{ `name`: `Schema.String`; `version`: `Schema.String`; \}\>; \}\>
@@ -879,6 +1021,8 @@ Typed failures that may cross the sandbox capability protocol.
 Persistable provider facts and exact guarantees enforced for every invocation.
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -897,6 +1041,8 @@ Trusted fixture Layer for tests only. It provides no source isolation.
 `Layer.Layer`\<[`CodeExecutor`](#codeexecutor)\>
 
 ***
+
+<a id="makerequest"></a>
 
 ### makeRequest
 
@@ -970,6 +1116,8 @@ Synthesize the canonical single-module request used by current Program manifests
 
 ***
 
+<a id="maketest"></a>
+
 ### makeTest
 
 > `const` **makeTest**: (`execute`) => [`Service`](#service)
@@ -988,6 +1136,8 @@ Trusted fixture executor for tests only.
 
 ***
 
+<a id="module-1"></a>
+
 ### Module
 
 > `const` **Module**: `Schema.Struct`\<\{ `name`: `Schema.String`; `source`: `Schema.String`; \}\>
@@ -995,6 +1145,8 @@ Trusted fixture executor for tests only.
 Exact normalized JavaScript module supplied to an isolated executor.
 
 ***
+
+<a id="protocolversion-1"></a>
 
 ### protocolVersion
 
@@ -1004,6 +1156,8 @@ Canonical protocol version implemented by CodeExecutor adapters.
 
 ***
 
+<a id="result-1"></a>
+
 ### Result
 
 > `const` **Result**: `Schema.Struct`\<\{ `inputCodec`: `Schema.String`; `output`: `Schema.Unknown`; `outputCodec`: `Schema.String`; `protocolVersion`: `Schema.Literal`\<`"1"`\>; `requestId`: `Schema.String`; `sourceDigest`: `Schema.String`; \}\>
@@ -1011,6 +1165,8 @@ Canonical protocol version implemented by CodeExecutor adapters.
 Identity-bound encoded output returned by an isolated executor.
 
 ***
+
+<a id="sourcedigest-1"></a>
 
 ### sourceDigest
 
@@ -1048,6 +1204,8 @@ Compute the sole digest representation for normalized source.
 
 ***
 
+<a id="testidentity"></a>
+
 ### testIdentity
 
 > `const` **testIdentity**: [`Identity`](#identity-1)
@@ -1055,6 +1213,8 @@ Compute the sole digest representation for normalized source.
 Identity carried by trusted fixture executors.
 
 ***
+
+<a id="validateresult"></a>
 
 ### validateResult
 

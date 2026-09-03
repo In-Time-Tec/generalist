@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
 
 #### Properties
+
+<a id="calltimeout"></a>
 
 ##### callTimeout?
 
@@ -20,11 +24,15 @@
 
 **`Experimental`**
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
 **`Experimental`**
+
+<a id="transport"></a>
 
 ##### transport
 
@@ -34,6 +42,8 @@
 
 ***
 
+<a id="transportoptions"></a>
+
 ### TransportOptions
 
 **`Experimental`**
@@ -42,17 +52,23 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 #### Properties
 
+<a id="oauth"></a>
+
 ##### oauth?
 
 > `readonly` `optional` **oauth?**: [`Service`](./unstable.mcp.oauth#service)
 
 **`Experimental`**
 
+<a id="requestinit"></a>
+
 ##### requestInit?
 
 > `readonly` `optional` **requestInit?**: `RequestInit`
 
 **`Experimental`**
+
+<a id="url"></a>
 
 ##### url
 
@@ -61,6 +77,8 @@ Process-local HTTP transport options. Construct request headers at this boundary
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -79,6 +97,8 @@ Process-local HTTP transport options. Construct request headers at this boundary
 `Layer.Layer`\<[`MCPClient`](./unstable.mcp.client#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
 
 ***
+
+<a id="layertagged"></a>
 
 ### layerTagged
 
@@ -125,6 +145,8 @@ Process-local HTTP transport options. Construct request headers at this boundary
 `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

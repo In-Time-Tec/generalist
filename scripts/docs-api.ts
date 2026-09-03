@@ -101,6 +101,7 @@ const program = Effect.fn("DocsApi.program")(function* (check: boolean) {
     router: "module",
     skipErrorChecking: true,
     tsconfig: "tsconfig.json",
+    useHTMLAnchors: true,
   } satisfies Schema.Json
   yield* fileSystem.writeFileString(path.join(directory, "tsconfig.json"), `${encodeJson(compiler)}\n`)
   yield* fileSystem.writeFileString(path.join(directory, "options.json"), `${encodeJson(options)}\n`)

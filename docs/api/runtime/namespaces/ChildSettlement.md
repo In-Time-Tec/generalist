@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="notification"></a>
+
 ### Notification
 
 > **Notification** = *typeof* `Notification.Type`
@@ -16,6 +18,8 @@ One ordered durable child settlement notification.
 
 ***
 
+<a id="payload"></a>
+
 ### Payload
 
 > **Payload** = *typeof* `Payload.Type`
@@ -23,6 +27,8 @@ One ordered durable child settlement notification.
 Durable payload written when a child Run reaches a terminal state.
 
 ## Variables
+
+<a id="frommailboxentry"></a>
 
 ### fromMailboxEntry
 
@@ -41,6 +47,8 @@ Decode a typed settlement notification from a mailbox row.
 [`Notification`](#notification) \| `undefined`
 
 ***
+
+<a id="frommetadata"></a>
 
 ### fromMetadata
 
@@ -70,6 +78,8 @@ Decode a typed settlement notification from mailbox metadata.
 
 ***
 
+<a id="maxresultbytes"></a>
+
 ### maxResultBytes
 
 > `const` **maxResultBytes**: `16384` = `16384`
@@ -78,6 +88,8 @@ Maximum UTF-8 result size carried inline by one settlement notification.
 
 ***
 
+<a id="notification-1"></a>
+
 ### Notification
 
 > `const` **Notification**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ChildSettlement"`\>; `admittedAtMillis`: `Schema.Finite`; `childRunId`: `Schema.String`; `joined`: `Schema.optionalKey`\<`Schema.Boolean`\>; `notificationId`: `Schema.String`; `parentRunId`: `Schema.String`; `resultBytes`: `Schema.Int`; `resultText`: `Schema.String`; `resultTruncated`: `Schema.Boolean`; `sequence`: `Schema.Int`; `status`: `Schema.Literals`\<readonly \[`"succeeded"`, `"failed"`, `"cancelled"`\]\>; `terminalEventId`: `Schema.String`; \}\>
@@ -85,6 +97,8 @@ Maximum UTF-8 result size carried inline by one settlement notification.
 One ordered durable child settlement notification.
 
 ***
+
+<a id="notificationidfor"></a>
 
 ### notificationIdFor
 
@@ -103,6 +117,8 @@ Stable identity shared by retries of one child's settlement.
 `string`
 
 ***
+
+<a id="observationentry"></a>
 
 ### observationEntry
 
@@ -140,6 +156,8 @@ operations.
 
 ***
 
+<a id="payload-1"></a>
+
 ### Payload
 
 > `const` **Payload**: `Schema.TaggedStruct`\<`"ChildSettlement"`, \{ `childRunId`: `Schema.String`; `joined`: `Schema.optionalKey`\<`Schema.Boolean`\>; `notificationId`: `Schema.String`; `parentRunId`: `Schema.String`; `resultBytes`: `Schema.Int`; `resultText`: `Schema.String`; `resultTruncated`: `Schema.Boolean`; `status`: `Schema.Literals`\<readonly \[`"succeeded"`, `"failed"`, `"cancelled"`\]\>; `terminalEventId`: `Schema.String`; \}\>
@@ -147,6 +165,8 @@ operations.
 Durable payload written when a child Run reaches a terminal state.
 
 ***
+
+<a id="payloadfromevent"></a>
 
 ### payloadFromEvent
 

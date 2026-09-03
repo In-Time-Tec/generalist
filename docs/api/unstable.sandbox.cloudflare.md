@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="execoptions"></a>
+
 ### ExecOptions
 
 **`Experimental`**
@@ -16,11 +18,15 @@ Options passed to Cloudflare Sandbox command execution.
 
 #### Properties
 
+<a id="cwd"></a>
+
 ##### cwd?
 
 > `optional` **cwd?**: `string`
 
 **`Experimental`**
+
+<a id="env"></a>
 
 ##### env?
 
@@ -28,11 +34,15 @@ Options passed to Cloudflare Sandbox command execution.
 
 **`Experimental`**
 
+<a id="signal"></a>
+
 ##### signal
 
 > **signal**: `AbortSignal`
 
 **`Experimental`**
+
+<a id="timeout"></a>
 
 ##### timeout?
 
@@ -41,6 +51,8 @@ Options passed to Cloudflare Sandbox command execution.
 **`Experimental`**
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -56,6 +68,8 @@ Cloudflare Sandbox binding configuration.
 
 #### Properties
 
+<a id="binding"></a>
+
 ##### binding
 
 > `readonly` **binding**: [`SandboxBinding`](#sandboxbinding)\<`Id`\>
@@ -64,6 +78,8 @@ Cloudflare Sandbox binding configuration.
 
 ***
 
+<a id="provideroptions"></a>
+
 ### ProviderOptions
 
 **`Experimental`**
@@ -71,6 +87,8 @@ Cloudflare Sandbox binding configuration.
 Resolved Cloudflare Sandbox factory used by the provider and recorded fixtures.
 
 #### Properties
+
+<a id="getsandbox"></a>
 
 ##### getSandbox
 
@@ -90,6 +108,8 @@ Resolved Cloudflare Sandbox factory used by the provider and recorded fixtures.
 
 ***
 
+<a id="sandboxbinding"></a>
+
 ### SandboxBinding
 
 **`Experimental`**
@@ -103,6 +123,8 @@ Structural Cloudflare Durable Object namespace accepted by the leaf.
 `Id`
 
 #### Methods
+
+<a id="get"></a>
 
 ##### get()
 
@@ -119,6 +141,8 @@ Structural Cloudflare Durable Object namespace accepted by the leaf.
 ###### Returns
 
 [`SandboxStub`](#sandboxstub)
+
+<a id="idfromname"></a>
 
 ##### idFromName()
 
@@ -138,6 +162,8 @@ Structural Cloudflare Durable Object namespace accepted by the leaf.
 
 ***
 
+<a id="sandboxstub"></a>
+
 ### SandboxStub
 
 **`Experimental`**
@@ -145,6 +171,8 @@ Structural Cloudflare Durable Object namespace accepted by the leaf.
 Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 
 #### Methods
+
+<a id="destroy"></a>
 
 ##### destroy()
 
@@ -155,6 +183,8 @@ Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 ###### Returns
 
 `Promise`\<`void`\>
+
+<a id="exec"></a>
 
 ##### exec()
 
@@ -175,6 +205,8 @@ Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 ###### Returns
 
 `Promise`\<\{ `command`: `string`; `duration`: `number`; `exitCode`: `number`; `sessionId?`: `string`; `stderr`: `string`; `stdout`: `string`; `success`: `boolean`; `timestamp`: `string`; \}\>
+
+<a id="mkdir"></a>
 
 ##### mkdir()
 
@@ -198,6 +230,8 @@ Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 
 `Promise`\<\{ `path`: `string`; `success`: `boolean`; \}\>
 
+<a id="readfile"></a>
+
 ##### readFile()
 
 > **readFile**(`path`, `options`): `Promise`\<\{ `content`: `string`; `path`: `string`; `success`: `boolean`; `timestamp`: `string`; \}\>
@@ -219,6 +253,8 @@ Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 ###### Returns
 
 `Promise`\<\{ `content`: `string`; `path`: `string`; `success`: `boolean`; `timestamp`: `string`; \}\>
+
+<a id="writefile"></a>
 
 ##### writeFile()
 
@@ -248,6 +284,8 @@ Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 
 ## Variables
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: \<`Id`\>(`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
@@ -273,6 +311,8 @@ Provide the hosted Cloudflare Container Sandbox leaf.
 `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
 
 ***
+
+<a id="makeprovider"></a>
 
 ### makeProvider
 

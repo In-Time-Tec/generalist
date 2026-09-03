@@ -60,6 +60,8 @@
 
 ## Type Aliases
 
+<a id="runid"></a>
+
 ### RunId
 
 > **RunId** = *typeof* `RunId.Type`
@@ -68,6 +70,8 @@ Stable identity of one Agent execution.
 
 ## Variables
 
+<a id="runid-1"></a>
+
 ### RunId
 
 > `const` **RunId**: `Schema.String`
@@ -75,6 +79,8 @@ Stable identity of one Agent execution.
 Stable identity of one Agent execution.
 
 ***
+
+<a id="withcachebreakpoints"></a>
 
 ### withCacheBreakpoints
 

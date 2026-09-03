@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="addressinvalid"></a>
+
 ### AddressInvalid
 
 #### Extends
@@ -15,6 +17,8 @@
 - `AddressInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="address"></a>
+
 ##### address
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
@@ -44,6 +50,8 @@
 
 `AddressInvalid_base.address`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -51,6 +59,8 @@
 ###### Inherited from
 
 `AddressInvalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -62,41 +72,59 @@
 
 ## Interfaces
 
+<a id="directoryentry"></a>
+
 ### DirectoryEntry
 
 One resolved, authoritative directory record.
 
 #### Properties
 
+<a id="address-1"></a>
+
 ##### address
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
+
+<a id="name"></a>
 
 ##### name?
 
 > `readonly` `optional` **name?**: `string` & `Brand`\<`"generalist/runtime/AgentName"`\>
 
+<a id="parentrunid"></a>
+
 ##### parentRunId?
 
 > `readonly` `optional` **parentRunId?**: `string`
+
+<a id="rootrunid"></a>
 
 ##### rootRunId
 
 > `readonly` **rootRunId**: `string`
 
+<a id="runid"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
 
+<a id="sessionid"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="status"></a>
 
 ##### status
 
 > `readonly` **status**: `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"` \| `"succeeded"` \| `"failed"` \| `"cancelled"`
 
 ## Type Aliases
+
+<a id="addresstarget"></a>
 
 ### AddressTarget
 
@@ -106,6 +134,8 @@ What an Address names before authoritative resolution.
 
 ***
 
+<a id="agentname"></a>
+
 ### AgentName
 
 > **AgentName** = *typeof* `AgentName.Type`
@@ -113,6 +143,8 @@ What an Address names before authoritative resolution.
 Host-assigned friendly name for one addressable agent.
 
 ***
+
+<a id="relationship"></a>
 
 ### Relationship
 
@@ -122,6 +154,8 @@ Relationship Generalist derives from authoritative Run records, never from Addre
 
 ## Variables
 
+<a id="agentname-1"></a>
+
 ### AgentName
 
 > `const` **AgentName**: `Schema.brand`\<`Schema.String`, `"generalist/runtime/AgentName"`\>
@@ -130,11 +164,15 @@ Host-assigned friendly name for one addressable agent.
 
 ***
 
+<a id="directoryentry-1"></a>
+
 ### DirectoryEntry
 
 > **DirectoryEntry**: `Codec`\<[`DirectoryEntry`](#directoryentry), `DirectoryEntryEncoded`, `never`, `never`\>
 
 ***
+
+<a id="makename"></a>
 
 ### makeName
 
@@ -151,6 +189,8 @@ Host-assigned friendly name for one addressable agent.
 [`AgentName`](#agentname)
 
 ***
+
+<a id="nameaddress"></a>
 
 ### nameAddress
 
@@ -176,6 +216,8 @@ Address of one host-assigned name inside the scope that owns it.
 
 ***
 
+<a id="namescope"></a>
+
 ### nameScope
 
 > `const` **nameScope**: (`input`) => `string`
@@ -200,6 +242,8 @@ Naming scope for one Run: its parent Run, or its own root when it has no parent.
 
 ***
 
+<a id="parseaddress"></a>
+
 ### parseAddress
 
 > `const` **parseAddress**: (`address`) => `Effect.Effect`\<[`AddressTarget`](#addresstarget), [`AddressInvalid`](#addressinvalid)\>
@@ -221,6 +265,8 @@ directory resolves to.
 `Effect.Effect`\<[`AddressTarget`](#addresstarget), [`AddressInvalid`](#addressinvalid)\>
 
 ***
+
+<a id="relationship-1"></a>
 
 ### relationship
 
@@ -265,6 +311,8 @@ other is a host policy decision, not a derived fact.
 
 ***
 
+<a id="relationship-2"></a>
+
 ### Relationship
 
 > `const` **Relationship**: `Schema.Literals`\<readonly \[`"self"`, `"parent"`, `"child"`, `"sibling"`\]\>
@@ -272,6 +320,8 @@ other is a host policy decision, not a derived fact.
 Relationship Generalist derives from authoritative Run records, never from Address text.
 
 ***
+
+<a id="runaddress"></a>
 
 ### runAddress
 
@@ -290,6 +340,8 @@ Address of one exact durable execution.
 [`Address`](./Address#address)
 
 ***
+
+<a id="sessionaddress"></a>
 
 ### sessionAddress
 

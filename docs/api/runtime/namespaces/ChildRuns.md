@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="childruns"></a>
+
 ### ChildRuns
 
 Runtime-owned child execution service.
@@ -17,6 +19,8 @@ Runtime-owned child execution service.
 - `ChildRuns_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,11 +42,15 @@ Runtime-owned child execution service.
 
 ## Interfaces
 
+<a id="authority"></a>
+
 ### Authority
 
 Exact declared child authority used to constrain model-visible selections.
 
 #### Properties
+
+<a id="children"></a>
 
 ##### children
 
@@ -50,43 +58,63 @@ Exact declared child authority used to constrain model-visible selections.
 
 ***
 
+<a id="fanoutgroupinput"></a>
+
 ### FanOutGroupInput
 
 Internal typed child-group admission used by AgentTool.fanOut.
 
 #### Properties
 
+<a id="budgetdivisor"></a>
+
 ##### budgetDivisor?
 
 > `readonly` `optional` **budgetDivisor?**: `number`
+
+<a id="concurrency"></a>
 
 ##### concurrency?
 
 > `readonly` `optional` **concurrency?**: `number`
 
+<a id="join"></a>
+
 ##### join
 
 > `readonly` **join**: \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \} \| \{ \}
+
+<a id="members"></a>
 
 ##### members
 
 > `readonly` **members**: readonly `object`[]
 
+<a id="operationkey"></a>
+
 ##### operationKey?
 
 > `readonly` `optional` **operationKey?**: `string`
+
+<a id="parentrunid"></a>
 
 ##### parentRunId
 
 > `readonly` **parentRunId**: `string`
 
+<a id="remainder"></a>
+
 ##### remainder
 
 > `readonly` **remainder**: `"await"` \| `"abandon"` \| `"request-cancel"` \| `"terminate"`
 
+<a id="tasks"></a>
+
 ##### tasks?
 
 > `readonly` `optional` **tasks?**: readonly `object`[]
+
+<a id="toolcallid"></a>
 
 ##### toolCallId
 
@@ -94,11 +122,15 @@ Internal typed child-group admission used by AgentTool.fanOut.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Runtime-owned child execution operations used by the model-facing routes.
 
 #### Properties
+
+<a id="awaitgroup"></a>
 
 ##### awaitGroup
 
@@ -114,6 +146,8 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
 
+<a id="fanout"></a>
+
 ##### fanOut
 
 > `readonly` **fanOut**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
@@ -127,6 +161,8 @@ Runtime-owned child execution operations used by the model-facing routes.
 ###### Returns
 
 `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+
+<a id="invoke"></a>
 
 ##### invoke
 
@@ -142,6 +178,8 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
 
+<a id="rungroup"></a>
+
 ##### runGroup
 
 > `readonly` **runGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
@@ -156,6 +194,8 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
 
+<a id="startgroup"></a>
+
 ##### startGroup
 
 > `readonly` **startGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
@@ -169,6 +209,8 @@ Runtime-owned child execution operations used by the model-facing routes.
 ###### Returns
 
 `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+
+<a id="transformresolved"></a>
 
 ##### transformResolved?
 
@@ -190,6 +232,8 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ## Type Aliases
 
+<a id="awaitgroupinput"></a>
+
 ### AwaitGroupInput
 
 > **AwaitGroupInput** = [`AwaitGroupParameters`](#awaitgroupparameters) & `object`
@@ -208,6 +252,8 @@ Input for one durable child-group join.
 
 ***
 
+<a id="awaitgroupparameters"></a>
+
 ### AwaitGroupParameters
 
 > **AwaitGroupParameters** = *typeof* `AwaitGroupParameters.Type`
@@ -215,6 +261,8 @@ Input for one durable child-group join.
 Parameters for durably joining one previously admitted child group.
 
 ***
+
+<a id="failure"></a>
 
 ### Failure
 
@@ -224,6 +272,8 @@ Typed policy failures preserved through model-facing child tools.
 
 ***
 
+<a id="groupchildreceipt"></a>
+
 ### GroupChildReceipt
 
 > **GroupChildReceipt** = *typeof* `GroupChildReceipt.Type`
@@ -231,6 +281,8 @@ Typed policy failures preserved through model-facing child tools.
 Stable receipt for one member of an admitted child group.
 
 ***
+
+<a id="groupchildresult"></a>
 
 ### GroupChildResult
 
@@ -240,6 +292,8 @@ Ordered terminal or remainder state for one child group member.
 
 ***
 
+<a id="groupreceipt"></a>
+
 ### GroupReceipt
 
 > **GroupReceipt** = *typeof* `GroupReceipt.Type`
@@ -248,6 +302,8 @@ Stable receipt returned without waiting for a child group.
 
 ***
 
+<a id="groupresult"></a>
+
 ### GroupResult
 
 > **GroupResult** = *typeof* `GroupResult.Type`
@@ -255,6 +311,8 @@ Stable receipt returned without waiting for a child group.
 Ordered durable join result for one child group.
 
 ***
+
+<a id="input"></a>
 
 ### Input
 
@@ -278,6 +336,8 @@ Input for one blocking child invocation.
 
 ***
 
+<a id="startgroupinput"></a>
+
 ### StartGroupInput
 
 > **StartGroupInput** = [`StartGroupParameters`](#startgroupparameters) & `object`
@@ -300,6 +360,8 @@ Input for one non-blocking bounded child-group admission.
 
 ***
 
+<a id="startgroupparameters"></a>
+
 ### StartGroupParameters
 
 > **StartGroupParameters** = *typeof* `StartGroupParameters.Type`
@@ -307,6 +369,8 @@ Input for one non-blocking bounded child-group admission.
 Parameters for atomically starting one bounded child group.
 
 ## Variables
+
+<a id="awaitgroupparameters-1"></a>
 
 ### AwaitGroupParameters
 
@@ -316,6 +380,8 @@ Parameters for durably joining one previously admitted child group.
 
 ***
 
+<a id="awaitgrouptool"></a>
+
 ### awaitGroupTool
 
 > `const` **awaitGroupTool**: `Tool.Tool`\<`"await_child_group"`, \{ `failure`: `Schema.Union`\<readonly \[*typeof* [`ChildDepthExceeded`](./Errors#childdepthexceeded), *typeof* [`ChildLimitExceeded`](./Errors#childlimitexceeded), `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>\]\>; `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `groupId`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `children`: `Schema.$Array`\<`Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `error`: `Schema.optionalKey`\<`Schema.Unknown`\>; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `selection`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"pending"`, `"running"`, `"succeeded"`, `"failed"`, `"cancelled"`, `"abandoned"`\]\>; `text`: `Schema.optionalKey`\<`Schema.String`\>; `turns`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `groupId`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"running"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
@@ -323,6 +389,8 @@ Parameters for durably joining one previously admitted child group.
 Durable join tool for a previously admitted child group.
 
 ***
+
+<a id="awaitgrouptoolname"></a>
 
 ### awaitGroupToolName
 
@@ -332,6 +400,8 @@ Name of the durable child-group join tool.
 
 ***
 
+<a id="executor"></a>
+
 ### Executor
 
 > `const` **Executor**: `object`
@@ -340,11 +410,15 @@ Tool executor that owns Runtime child routes.
 
 #### Type Declaration
 
+<a id="make"></a>
+
 ##### make
 
 > **make**: *typeof* `makeExecutor`
 
 ***
+
+<a id="failure-1"></a>
 
 ### Failure
 
@@ -354,6 +428,8 @@ Typed policy failures preserved through model-facing child tools.
 
 ***
 
+<a id="groupchildreceipt-1"></a>
+
 ### GroupChildReceipt
 
 > `const` **GroupChildReceipt**: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `selection`: `Schema.String`; \}\>
@@ -362,6 +438,8 @@ Stable receipt for one member of an admitted child group.
 
 ***
 
+<a id="groupchildresult-1"></a>
+
 ### GroupChildResult
 
 > `const` **GroupChildResult**: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `error`: `Schema.optionalKey`\<`Schema.Unknown`\>; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `selection`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"pending"`, `"running"`, `"succeeded"`, `"failed"`, `"cancelled"`, `"abandoned"`\]\>; `text`: `Schema.optionalKey`\<`Schema.String`\>; `turns`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>
@@ -369,6 +447,8 @@ Stable receipt for one member of an admitted child group.
 Ordered terminal or remainder state for one child group member.
 
 ***
+
+<a id="groupidfromsuspension"></a>
 
 ### groupIdFromSuspension
 
@@ -394,6 +474,8 @@ Return the owned group named by an await-child-group suspension, if any.
 
 ***
 
+<a id="groupreceipt-1"></a>
+
 ### GroupReceipt
 
 > `const` **GroupReceipt**: `Schema.Struct`\<\{ `children`: `Schema.$Array`\<`Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `selection`: `Schema.String`; \}\>\>; `groupId`: `Schema.String`; \}\>
@@ -402,6 +484,8 @@ Stable receipt returned without waiting for a child group.
 
 ***
 
+<a id="groupresult-1"></a>
+
 ### GroupResult
 
 > `const` **GroupResult**: `Schema.Struct`\<\{ `children`: `Schema.$Array`\<`Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `error`: `Schema.optionalKey`\<`Schema.Unknown`\>; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `selection`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"pending"`, `"running"`, `"succeeded"`, `"failed"`, `"cancelled"`, `"abandoned"`\]\>; `text`: `Schema.optionalKey`\<`Schema.String`\>; `turns`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `groupId`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"running"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>
@@ -409,6 +493,8 @@ Stable receipt returned without waiting for a child group.
 Ordered durable join result for one child group.
 
 ***
+
+<a id="groupwaitsfromsuspension"></a>
 
 ### groupWaitsFromSuspension
 
@@ -434,6 +520,8 @@ Every exact aggregate wait that owns one child group, in authored order.
 
 ***
 
+<a id="make-1"></a>
+
 ### make
 
 > `const` **make**: (`store`) => [`Service`](#service)
@@ -451,6 +539,8 @@ Construct Runtime-owned child execution operations over one RunStore.
 [`Service`](#service)
 
 ***
+
+<a id="ownschildsuspension"></a>
 
 ### ownsChildSuspension
 
@@ -488,6 +578,8 @@ Whether persisted child metadata and suspension authorize one direct blocking ha
 
 ***
 
+<a id="parameters"></a>
+
 ### Parameters
 
 > `const` **Parameters**: `Schema.Struct`\<\{ `label`: `Schema.optionalKey`\<`Schema.String`\>; `prompt`: `Schema.String`; `selection`: `Schema.Codec`\<`string`, `string`, `never`, `never`\>; \}\>
@@ -496,6 +588,8 @@ Parameters for one dependent child Run.
 
 ***
 
+<a id="result"></a>
+
 ### Result
 
 > `const` **Result**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Succeeded"`, \{ `childRunId`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `text`: `Schema.String`; `turns`: `Schema.Int`; \}\>, `Schema.TaggedStruct`\<`"Failed"`, \{ `childRunId`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `message`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Cancelled"`, \{ `childRunId`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>
@@ -503,6 +597,8 @@ Parameters for one dependent child Run.
 Result of one dependent child Run.
 
 ***
+
+<a id="resultfromchildevent"></a>
 
 ### resultFromChildEvent
 
@@ -532,6 +628,8 @@ Project one canonical child terminal event into its blocking parent handoff.
 
 ***
 
+<a id="resultfrominspection"></a>
+
 ### resultFromInspection
 
 > `const` **resultFromInspection**: (`inspection`) => [`GroupResult`](#groupresult)
@@ -550,6 +648,8 @@ Project one persisted fan-out inspection into the model-facing ordered child-gro
 
 ***
 
+<a id="route"></a>
+
 ### route
 
 > `const` **route**: [`Route`](../../generalist/namespaces/ToolPlacement#route)\<[`ChildRuns`](#childruns) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>
@@ -557,6 +657,8 @@ Project one persisted fan-out inspection into the model-facing ordered child-gro
 Route for the blocking and grouped child tools.
 
 ***
+
+<a id="rungrouptool"></a>
 
 ### runGroupTool
 
@@ -566,6 +668,8 @@ Blocking tool for one exact all-settled child group.
 
 ***
 
+<a id="rungrouptoolname"></a>
+
 ### runGroupToolName
 
 > `const` **runGroupToolName**: `"run_child_group"` = `"run_child_group"`
@@ -573,6 +677,8 @@ Blocking tool for one exact all-settled child group.
 Name of the blocking atomic child-group tool.
 
 ***
+
+<a id="startgroupparameters-1"></a>
 
 ### StartGroupParameters
 
@@ -582,6 +688,8 @@ Parameters for atomically starting one bounded child group.
 
 ***
 
+<a id="startgrouptool"></a>
+
 ### startGroupTool
 
 > `const` **startGroupTool**: `Tool.Any`
@@ -589,6 +697,8 @@ Parameters for atomically starting one bounded child group.
 Non-blocking tool for bounded independent child work.
 
 ***
+
+<a id="startgrouptoolname"></a>
 
 ### startGroupToolName
 
@@ -598,6 +708,8 @@ Name of the non-blocking child-group admission tool.
 
 ***
 
+<a id="tool"></a>
+
 ### tool
 
 > `const` **tool**: `Tool.Any`
@@ -605,6 +717,8 @@ Name of the non-blocking child-group admission tool.
 Blocking tool for dependent singleton child work.
 
 ***
+
+<a id="toolname"></a>
 
 ### toolName
 
@@ -614,6 +728,8 @@ Name of the blocking dependent-child tool.
 
 ***
 
+<a id="tools"></a>
+
 ### Tools
 
 > `const` **Tools**: `object`
@@ -622,11 +738,15 @@ Runtime-owned child-group tool declarations.
 
 #### Type Declaration
 
+<a id="make-2"></a>
+
 ##### make
 
 > **make**: *typeof* `makeTools`
 
 ***
+
+<a id="waitidforchild"></a>
 
 ### waitIdForChild
 
@@ -659,6 +779,8 @@ Return the exact aggregate wait owned by one direct child.
 `string` \| `undefined`
 
 ***
+
+<a id="waitidforgroup"></a>
 
 ### waitIdForGroup
 

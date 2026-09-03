@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="programagentfailure"></a>
+
 ### ProgramAgentFailure
 
 #### Extends
@@ -15,6 +17,8 @@
 - `ProgramAgentFailure_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause
 
 > `readonly` **cause**: `unknown`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `ProgramAgentFailure_base.cause`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -52,6 +60,8 @@
 
 `ProgramAgentFailure_base.hint`
 
+<a id="operation"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -59,6 +69,8 @@
 ###### Inherited from
 
 `ProgramAgentFailure_base.operation`
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -70,6 +82,8 @@
 
 ***
 
+<a id="programauthorizationfailure"></a>
+
 ### ProgramAuthorizationFailure
 
 #### Extends
@@ -77,6 +91,8 @@
 - `ProgramAuthorizationFailure_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -98,6 +114,8 @@
 
 #### Properties
 
+<a id="capability"></a>
+
 ##### capability
 
 > `readonly` **capability**: `string`
@@ -105,6 +123,8 @@
 ###### Inherited from
 
 `ProgramAuthorizationFailure_base.capability`
+
+<a id="cause-1"></a>
 
 ##### cause
 
@@ -114,6 +134,8 @@
 
 `ProgramAuthorizationFailure_base.cause`
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -121,6 +143,8 @@
 ###### Inherited from
 
 `ProgramAuthorizationFailure_base.hint`
+
+<a id="operation-1"></a>
 
 ##### operation
 
@@ -132,6 +156,8 @@
 
 ***
 
+<a id="programbudgetexhausted"></a>
+
 ### ProgramBudgetExhausted
 
 #### Extends
@@ -139,6 +165,8 @@
 - `ProgramBudgetExhausted_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -160,6 +188,8 @@
 
 #### Properties
 
+<a id="dimension"></a>
+
 ##### dimension
 
 > `readonly` **dimension**: `"toolCalls"` \| `"tokens"` \| `"outputBytes"` \| `"agentRuns"` \| `"concurrency"` \| `"wallClockMillis"` \| `"logBytes"`
@@ -168,6 +198,8 @@
 
 `ProgramBudgetExhausted_base.dimension`
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -175,6 +207,8 @@
 ###### Inherited from
 
 `ProgramBudgetExhausted_base.hint`
+
+<a id="limit"></a>
 
 ##### limit
 
@@ -186,6 +220,8 @@
 
 ***
 
+<a id="programcancelled"></a>
+
 ### ProgramCancelled
 
 #### Extends
@@ -193,6 +229,8 @@
 - `ProgramCancelled_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -214,6 +252,8 @@
 
 #### Properties
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -221,6 +261,8 @@
 ###### Inherited from
 
 `ProgramCancelled_base.hint`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -232,6 +274,8 @@
 
 ***
 
+<a id="programcapabilities"></a>
+
 ### ProgramCapabilities
 
 Host-owned encoded operations exposed only inside a sandbox execution.
@@ -241,6 +285,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 - `ProgramCapabilities_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -262,6 +308,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 
 ***
 
+<a id="programcapabilitydenied"></a>
+
 ### ProgramCapabilityDenied
 
 #### Extends
@@ -269,6 +317,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 - `ProgramCapabilityDenied_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -290,6 +340,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 
 #### Properties
 
+<a id="capability-1"></a>
+
 ##### capability
 
 > `readonly` **capability**: `string`
@@ -297,6 +349,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 ###### Inherited from
 
 `ProgramCapabilityDenied_base.capability`
+
+<a id="hint-4"></a>
 
 ##### hint
 
@@ -306,6 +360,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 
 `ProgramCapabilityDenied_base.hint`
 
+<a id="operation-2"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -313,6 +369,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 ###### Inherited from
 
 `ProgramCapabilityDenied_base.operation`
+
+<a id="reason-1"></a>
 
 ##### reason
 
@@ -324,6 +382,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 
 ***
 
+<a id="programcapabilitymissing"></a>
+
 ### ProgramCapabilityMissing
 
 #### Extends
@@ -331,6 +391,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 - `ProgramCapabilityMissing_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -352,6 +414,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 
 #### Properties
 
+<a id="capability-2"></a>
+
 ##### capability
 
 > `readonly` **capability**: `string`
@@ -359,6 +423,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 ###### Inherited from
 
 `ProgramCapabilityMissing_base.capability`
+
+<a id="hint-5"></a>
 
 ##### hint
 
@@ -370,6 +436,8 @@ Host-owned encoded operations exposed only inside a sandbox execution.
 
 ***
 
+<a id="programinvocationfailure"></a>
+
 ### ProgramInvocationFailure
 
 One decoded invocation failed with an implementation-specific error.
@@ -379,6 +447,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramInvocationFailure_base`
 
 #### Constructors
+
+<a id="constructor-7"></a>
 
 ##### Constructor
 
@@ -400,6 +470,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="cause-2"></a>
+
 ##### cause
 
 > `readonly` **cause**: `unknown`
@@ -407,6 +479,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramInvocationFailure_base.cause`
+
+<a id="hint-6"></a>
 
 ##### hint
 
@@ -418,6 +492,8 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="programoperationunknown"></a>
+
 ### ProgramOperationUnknown
 
 #### Extends
@@ -425,6 +501,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramOperationUnknown_base`
 
 #### Constructors
+
+<a id="constructor-8"></a>
 
 ##### Constructor
 
@@ -446,6 +524,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="hint-7"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -453,6 +533,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramOperationUnknown_base.hint`
+
+<a id="operation-3"></a>
 
 ##### operation
 
@@ -464,6 +546,8 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="programreplaydivergence"></a>
+
 ### ProgramReplayDivergence
 
 #### Extends
@@ -471,6 +555,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramReplayDivergence_base`
 
 #### Constructors
+
+<a id="constructor-9"></a>
 
 ##### Constructor
 
@@ -492,6 +578,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="actual"></a>
+
 ##### actual
 
 > `readonly` **actual**: `string`
@@ -499,6 +587,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramReplayDivergence_base.actual`
+
+<a id="expected"></a>
 
 ##### expected
 
@@ -508,6 +598,8 @@ One decoded invocation failed with an implementation-specific error.
 
 `ProgramReplayDivergence_base.expected`
 
+<a id="hint-8"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -515,6 +607,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramReplayDivergence_base.hint`
+
+<a id="operation-4"></a>
 
 ##### operation
 
@@ -526,6 +620,8 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="programschemafailure"></a>
+
 ### ProgramSchemaFailure
 
 #### Extends
@@ -533,6 +629,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramSchemaFailure_base`
 
 #### Constructors
+
+<a id="constructor-10"></a>
 
 ##### Constructor
 
@@ -554,6 +652,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="boundary"></a>
+
 ##### boundary
 
 > `readonly` **boundary**: `"program-input"` \| `"program-output"` \| `"tool-input"` \| `"tool-output"` \| `"step-input"` \| `"step-output"` \| `"agent-input"` \| `"agent-output"`
@@ -561,6 +661,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramSchemaFailure_base.boundary`
+
+<a id="capability-3"></a>
 
 ##### capability?
 
@@ -570,6 +672,8 @@ One decoded invocation failed with an implementation-specific error.
 
 `ProgramSchemaFailure_base.capability`
 
+<a id="hint-9"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -577,6 +681,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramSchemaFailure_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -588,6 +694,8 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="programstepfailure"></a>
+
 ### ProgramStepFailure
 
 #### Extends
@@ -595,6 +703,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramStepFailure_base`
 
 #### Constructors
+
+<a id="constructor-11"></a>
 
 ##### Constructor
 
@@ -616,6 +726,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="cause-3"></a>
+
 ##### cause
 
 > `readonly` **cause**: `unknown`
@@ -623,6 +735,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramStepFailure_base.cause`
+
+<a id="hint-10"></a>
 
 ##### hint
 
@@ -632,6 +746,8 @@ One decoded invocation failed with an implementation-specific error.
 
 `ProgramStepFailure_base.hint`
 
+<a id="operation-5"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -639,6 +755,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramStepFailure_base.operation`
+
+<a id="step"></a>
 
 ##### step
 
@@ -650,6 +768,8 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="programsuspended"></a>
+
 ### ProgramSuspended
 
 #### Extends
@@ -657,6 +777,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramSuspended_base`
 
 #### Constructors
+
+<a id="constructor-12"></a>
 
 ##### Constructor
 
@@ -678,6 +800,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="hint-11"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -685,6 +809,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramSuspended_base.hint`
+
+<a id="operation-6"></a>
 
 ##### operation
 
@@ -694,6 +820,8 @@ One decoded invocation failed with an implementation-specific error.
 
 `ProgramSuspended_base.operation`
 
+<a id="reason-2"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"agent"` \| `"step"` \| `"approval"` \| `"tool-wait"`
@@ -701,6 +829,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramSuspended_base.reason`
+
+<a id="token"></a>
 
 ##### token?
 
@@ -712,6 +842,8 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="programtoolfailure"></a>
+
 ### ProgramToolFailure
 
 #### Extends
@@ -719,6 +851,8 @@ One decoded invocation failed with an implementation-specific error.
 - `ProgramToolFailure_base`
 
 #### Constructors
+
+<a id="constructor-13"></a>
 
 ##### Constructor
 
@@ -740,6 +874,8 @@ One decoded invocation failed with an implementation-specific error.
 
 #### Properties
 
+<a id="cause-4"></a>
+
 ##### cause
 
 > `readonly` **cause**: `unknown`
@@ -747,6 +883,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramToolFailure_base.cause`
+
+<a id="hint-12"></a>
 
 ##### hint
 
@@ -756,6 +894,8 @@ One decoded invocation failed with an implementation-specific error.
 
 `ProgramToolFailure_base.hint`
 
+<a id="operation-7"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -763,6 +903,8 @@ One decoded invocation failed with an implementation-specific error.
 ###### Inherited from
 
 `ProgramToolFailure_base.operation`
+
+<a id="tool"></a>
 
 ##### tool
 
@@ -774,13 +916,19 @@ One decoded invocation failed with an implementation-specific error.
 
 ## Interfaces
 
+<a id="agentfanoutinput"></a>
+
 ### AgentFanOutInput
 
 #### Properties
 
+<a id="members"></a>
+
 ##### members
 
 > `readonly` **members**: readonly `AgentFanOutMember`[]
+
+<a id="operation-8"></a>
 
 ##### operation
 
@@ -788,17 +936,25 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="agentmapinput"></a>
+
 ### AgentMapInput
 
 #### Properties
+
+<a id="members-1"></a>
 
 ##### members
 
 > `readonly` **members**: readonly `AgentMapMember`[]
 
+<a id="operation-9"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
+
+<a id="selection-1"></a>
 
 ##### selection
 
@@ -806,13 +962,19 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="agentmemberresult"></a>
+
 ### AgentMemberResult
 
 #### Properties
 
+<a id="member"></a>
+
 ##### member
 
 > `readonly` **member**: `string`
+
+<a id="result"></a>
 
 ##### result
 
@@ -820,17 +982,25 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="agentruninput"></a>
+
 ### AgentRunInput
 
 #### Properties
+
+<a id="input"></a>
 
 ##### input
 
 > `readonly` **input**: `unknown`
 
+<a id="operation-10"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
+
+<a id="selection-2"></a>
 
 ##### selection
 
@@ -838,17 +1008,25 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="agentrunresult"></a>
+
 ### AgentRunResult
 
 #### Properties
+
+<a id="text"></a>
 
 ##### text
 
 > `readonly` **text**: `string`
 
+<a id="tokenusage"></a>
+
 ##### tokenUsage
 
 > `readonly` **tokenUsage**: `AgentTokenUsage`
+
+<a id="turns"></a>
 
 ##### turns
 
@@ -856,21 +1034,31 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="loginput"></a>
+
 ### LogInput
 
 #### Properties
+
+<a id="data"></a>
 
 ##### data?
 
 > `readonly` `optional` **data?**: `JsonObject`
 
+<a id="level"></a>
+
 ##### level
 
 > `readonly` **level**: `"error"` \| `"debug"` \| `"info"` \| `"warn"`
 
+<a id="message-1"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
+
+<a id="operation-11"></a>
 
 ##### operation
 
@@ -878,11 +1066,15 @@ One decoded invocation failed with an implementation-specific error.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Encoded operations visible to sandboxed source.
 
 #### Properties
+
+<a id="callstep"></a>
 
 ##### callStep
 
@@ -898,6 +1090,8 @@ Encoded operations visible to sandboxed source.
 
 `Effect`\<`unknown`, [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
 
+<a id="calltool"></a>
+
 ##### callTool
 
 > `readonly` **callTool**: (`input`) => `Effect`\<`unknown`, [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
@@ -911,6 +1105,8 @@ Encoded operations visible to sandboxed source.
 ###### Returns
 
 `Effect`\<`unknown`, [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
+
+<a id="describetool"></a>
 
 ##### describeTool
 
@@ -926,9 +1122,13 @@ Encoded operations visible to sandboxed source.
 
 `Effect`\<[`ToolDescription`](#tooldescription), [`ProgramCapabilityMissing`](#programcapabilitymissing)\>
 
+<a id="discovertools"></a>
+
 ##### discoverTools
 
 > `readonly` **discoverTools**: `Effect`\<readonly [`ToolSummary`](#toolsummary)[]\>
+
+<a id="fanoutagents"></a>
 
 ##### fanOutAgents
 
@@ -944,6 +1144,8 @@ Encoded operations visible to sandboxed source.
 
 `Effect`\<readonly [`AgentMemberResult`](#agentmemberresult)[], [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
 
+<a id="log"></a>
+
 ##### log
 
 > `readonly` **log**: (`input`) => `Effect`\<`void`, [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
@@ -958,6 +1160,8 @@ Encoded operations visible to sandboxed source.
 
 `Effect`\<`void`, [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
 
+<a id="mapagents"></a>
+
 ##### mapAgents
 
 > `readonly` **mapAgents**: (`input`) => `Effect`\<readonly [`AgentMemberResult`](#agentmemberresult)[], [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
@@ -971,6 +1175,8 @@ Encoded operations visible to sandboxed source.
 ###### Returns
 
 `Effect`\<readonly [`AgentMemberResult`](#agentmemberresult)[], [`ProgramCapabilityMissing`](#programcapabilitymissing) \| [`ProgramCapabilityDenied`](#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](#programauthorizationfailure) \| [`ProgramSchemaFailure`](#programschemafailure) \| [`ProgramToolFailure`](#programtoolfailure) \| [`ProgramStepFailure`](#programstepfailure) \| [`ProgramAgentFailure`](#programagentfailure) \| [`ProgramBudgetExhausted`](#programbudgetexhausted) \| [`ProgramReplayDivergence`](#programreplaydivergence) \| [`ProgramOperationUnknown`](#programoperationunknown) \| [`ProgramSuspended`](#programsuspended) \| [`ProgramCancelled`](#programcancelled)\>
+
+<a id="runagent"></a>
 
 ##### runAgent
 
@@ -988,17 +1194,25 @@ Encoded operations visible to sandboxed source.
 
 ***
 
+<a id="stepcallinput"></a>
+
 ### StepCallInput
 
 #### Properties
+
+<a id="input-1"></a>
 
 ##### input
 
 > `readonly` **input**: `unknown`
 
+<a id="operation-12"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
+
+<a id="step-1"></a>
 
 ##### step
 
@@ -1006,23 +1220,33 @@ Encoded operations visible to sandboxed source.
 
 ***
 
+<a id="toolcallinput"></a>
+
 ### ToolCallInput
 
 #### Properties
+
+<a id="input-2"></a>
 
 ##### input
 
 > `readonly` **input**: `unknown`
 
+<a id="operation-13"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
+
+<a id="tool-1"></a>
 
 ##### tool
 
 > `readonly` **tool**: `string`
 
 ***
+
+<a id="tooldescription"></a>
 
 ### ToolDescription
 
@@ -1034,9 +1258,13 @@ Focused encoded type description for one manifest-scoped tool.
 
 #### Properties
 
+<a id="inputschema"></a>
+
 ##### inputSchema
 
 > `readonly` **inputSchema**: `Json`
+
+<a id="name"></a>
 
 ##### name
 
@@ -1046,11 +1274,15 @@ Focused encoded type description for one manifest-scoped tool.
 
 [`ToolSummary`](#toolsummary).[`name`](#name-1)
 
+<a id="outputschema"></a>
+
 ##### outputSchema
 
 > `readonly` **outputSchema**: `Json`
 
 ***
+
+<a id="toolsummary"></a>
 
 ### ToolSummary
 
@@ -1062,11 +1294,15 @@ One manifest-scoped tool visible to Program source.
 
 #### Properties
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
 ## Type Aliases
+
+<a id="capabilityfailure"></a>
 
 ### CapabilityFailure
 
@@ -1076,11 +1312,15 @@ Failures crossing the encoded program capability protocol.
 
 ***
 
+<a id="loglevel"></a>
+
 ### LogLevel
 
 > **LogLevel** = *typeof* `LogLevel.Type`
 
 ***
+
+<a id="programmemberkey"></a>
 
 ### ProgramMemberKey
 
@@ -1090,6 +1330,8 @@ Stable, bounded identity for one member of a map or fan-out.
 
 ***
 
+<a id="programoperationname"></a>
+
 ### ProgramOperationName
 
 > **ProgramOperationName** = *typeof* `ProgramOperationName.Type`
@@ -1097,6 +1339,8 @@ Stable, bounded identity for one member of a map or fan-out.
 Stable, bounded, source-owned identity for one effectful operation.
 
 ## Variables
+
+<a id="capabilityfailure-1"></a>
 
 ### CapabilityFailure
 
@@ -1106,11 +1350,15 @@ Failures crossing the encoded program capability protocol.
 
 ***
 
+<a id="loglevel-1"></a>
+
 ### LogLevel
 
 > `const` **LogLevel**: `Schema.Literals`\<readonly \[`"debug"`, `"info"`, `"warn"`, `"error"`\]\>
 
 ***
+
+<a id="programmemberkey-1"></a>
 
 ### ProgramMemberKey
 
@@ -1119,6 +1367,8 @@ Failures crossing the encoded program capability protocol.
 Stable, bounded identity for one member of a map or fan-out.
 
 ***
+
+<a id="programoperationname-1"></a>
 
 ### ProgramOperationName
 

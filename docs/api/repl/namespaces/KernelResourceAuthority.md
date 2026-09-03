@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="kernelresourceauthority"></a>
+
 ### KernelResourceAuthority
 
 #### Extends
@@ -15,6 +17,8 @@
 - `KernelResourceAuthority_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="kernelresourceauthorityunavailable"></a>
+
 ### KernelResourceAuthorityUnavailable
 
 The resource authority could not read or commit its durable state.
@@ -45,6 +51,8 @@ The resource authority could not read or commit its durable state.
 - `KernelResourceAuthorityUnavailable_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ The resource authority could not read or commit its durable state.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -74,6 +84,8 @@ The resource authority could not read or commit its durable state.
 
 `KernelResourceAuthorityUnavailable_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -81,6 +93,8 @@ The resource authority could not read or commit its durable state.
 ###### Inherited from
 
 `KernelResourceAuthorityUnavailable_base.message`
+
+<a id="sessionid"></a>
 
 ##### sessionId?
 
@@ -92,6 +106,8 @@ The resource authority could not read or commit its durable state.
 
 ***
 
+<a id="kernelresourcerejected"></a>
+
 ### KernelResourceRejected
 
 A resource authority rejected an ownership or lifecycle transition atomically.
@@ -101,6 +117,8 @@ A resource authority rejected an ownership or lifecycle transition atomically.
 - `KernelResourceRejected_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -122,6 +140,8 @@ A resource authority rejected an ownership or lifecycle transition atomically.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -129,6 +149,8 @@ A resource authority rejected an ownership or lifecycle transition atomically.
 ###### Inherited from
 
 `KernelResourceRejected_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -138,6 +160,8 @@ A resource authority rejected an ownership or lifecycle transition atomically.
 
 `KernelResourceRejected_base.message`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"owned"` \| `"stale-claim"` \| `"resource-missing"` \| `"resource-mismatch"` \| `"cell-active"` \| `"cell-not-active"` \| `"cleanup-pending"`
@@ -145,6 +169,8 @@ A resource authority rejected an ownership or lifecycle transition atomically.
 ###### Inherited from
 
 `KernelResourceRejected_base.reason`
+
+<a id="sessionid-1"></a>
 
 ##### sessionId
 
@@ -156,27 +182,39 @@ A resource authority rejected an ownership or lifecycle transition atomically.
 
 ## Interfaces
 
+<a id="acquirerequest"></a>
+
 ### AcquireRequest
 
 Atomically request ownership using the store's authoritative clock.
 
 #### Properties
 
+<a id="leasemillis"></a>
+
 ##### leaseMillis
 
 > `readonly` **leaseMillis**: `number`
+
+<a id="ownerid"></a>
 
 ##### ownerId
 
 > `readonly` **ownerId**: `string`
 
+<a id="profiledigest"></a>
+
 ##### profileDigest
 
 > `readonly` **profileDigest**: `string`
 
+<a id="provider"></a>
+
 ##### provider
 
 > `readonly` **provider**: `string`
+
+<a id="sessionid-2"></a>
 
 ##### sessionId
 
@@ -184,11 +222,15 @@ Atomically request ownership using the store's authoritative clock.
 
 ***
 
+<a id="admitrequest"></a>
+
 ### AdmitRequest
 
 Admit a claim-bound command at the provider-side boundary immediately before it acts.
 
 #### Properties
+
+<a id="command"></a>
 
 ##### command
 
@@ -218,6 +260,8 @@ Admit a claim-bound command at the provider-side boundary immediately before it 
 
 > `readonly` **sessionId**: `string`
 
+<a id="expectedcell"></a>
+
 ##### expectedCell?
 
 > `readonly` `optional` **expectedCell?**: `object`
@@ -246,17 +290,23 @@ Admit a claim-bound command at the provider-side boundary immediately before it 
 
 > `readonly` **sessionId**: `string`
 
+<a id="kind"></a>
+
 ##### kind
 
 > `readonly` **kind**: `"cell"` \| `"control"`
 
 ***
 
+<a id="bindrequest"></a>
+
 ### BindRequest
 
 Bind or update the exact current provider resource. A different ID requires deletion first.
 
 #### Properties
+
+<a id="claim"></a>
 
 ##### claim
 
@@ -273,6 +323,8 @@ Bind or update the exact current provider resource. A different ID requires dele
 ###### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="resource"></a>
 
 ##### resource
 
@@ -304,11 +356,15 @@ Bind or update the exact current provider resource. A different ID requires dele
 
 ***
 
+<a id="deletionrequest"></a>
+
 ### DeletionRequest
 
 Complete or report cleanup only for the exact resource the provider call targeted.
 
 #### Properties
+
+<a id="claim-1"></a>
 
 ##### claim
 
@@ -325,6 +381,8 @@ Complete or report cleanup only for the exact resource the provider call targete
 ###### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="expectedresource"></a>
 
 ##### expectedResource
 
@@ -348,11 +406,15 @@ Complete or report cleanup only for the exact resource the provider call targete
 
 ***
 
+<a id="finishrequest"></a>
+
 ### FinishRequest
 
 Clear only the exact admitted cell under the current owner's authority.
 
 #### Properties
+
+<a id="claim-2"></a>
 
 ##### claim
 
@@ -369,6 +431,8 @@ Clear only the exact admitted cell under the current owner's authority.
 ###### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="expectedcell-1"></a>
 
 ##### expectedCell
 
@@ -400,6 +464,8 @@ Clear only the exact admitted cell under the current owner's authority.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Durable authority for a live external kernel resource. This is neither Runtime Run
@@ -419,6 +485,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 #### Properties
 
+<a id="acquire"></a>
+
 ##### acquire
 
 > `readonly` **acquire**: (`request`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
@@ -432,6 +500,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 ###### Returns
 
 `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
+
+<a id="admit"></a>
 
 ##### admit
 
@@ -447,6 +517,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
 
+<a id="bind"></a>
+
 ##### bind
 
 > `readonly` **bind**: (`request`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
@@ -461,6 +533,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
 
+<a id="confirmdeletion"></a>
+
 ##### confirmDeletion
 
 > `readonly` **confirmDeletion**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](#kernelresourcefailure)\>
@@ -474,6 +548,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 ###### Returns
 
 `Effect`\<`void`, [`KernelResourceFailure`](#kernelresourcefailure)\>
+
+<a id="faildeletion"></a>
 
 ##### failDeletion
 
@@ -493,6 +569,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
 
+<a id="finish"></a>
+
 ##### finish
 
 > `readonly` **finish**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](#kernelresourcefailure)\>
@@ -506,6 +584,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 ###### Returns
 
 `Effect`\<`void`, [`KernelResourceFailure`](#kernelresourcefailure)\>
+
+<a id="inspect"></a>
 
 ##### inspect
 
@@ -521,9 +601,13 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \} \| `undefined`, [`KernelResourceAuthorityUnavailable`](#kernelresourceauthorityunavailable)\>
 
+<a id="pendingdeletion"></a>
+
 ##### pendingDeletion
 
 > `readonly` **pendingDeletion**: `Effect`\<readonly `object`[], [`KernelResourceAuthorityUnavailable`](#kernelresourceauthorityunavailable)\>
+
+<a id="renew"></a>
 
 ##### renew
 
@@ -553,6 +637,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](#kernelresourcefailure)\>
 
+<a id="revoke"></a>
+
 ##### revoke
 
 > `readonly` **revoke**: (`claim`) => `Effect`\<\{ `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; \} \| `undefined`, [`KernelResourceFailure`](#kernelresourcefailure)\>
@@ -579,6 +665,8 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 ## Type Aliases
 
+<a id="claim-3"></a>
+
 ### Claim
 
 > **Claim** = *typeof* `Claim.Type`
@@ -587,6 +675,8 @@ Exact current owner of one Session kernel resource.
 
 ***
 
+<a id="cleanupfailure"></a>
+
 ### CleanupFailure
 
 > **CleanupFailure** = *typeof* `CleanupFailure.Type`
@@ -594,6 +684,8 @@ Exact current owner of one Session kernel resource.
 A cleanup failure kept with the resource until deletion is proven.
 
 ***
+
+<a id="commandclaim"></a>
 
 ### CommandClaim
 
@@ -605,6 +697,8 @@ calls so no command can escape the same admission boundary as authored source.
 
 ***
 
+<a id="generation"></a>
+
 ### Generation
 
 > **Generation** = *typeof* `Generation.Type`
@@ -612,6 +706,8 @@ calls so no command can escape the same admission boundary as authored source.
 Storage-issued, monotonically increasing ownership generation for one Session.
 
 ***
+
+<a id="kernelresourcefailure"></a>
 
 ### KernelResourceFailure
 
@@ -621,6 +717,8 @@ Closed failure union for host-owned resource authority operations.
 
 ***
 
+<a id="lease"></a>
+
 ### Lease
 
 > **Lease** = *typeof* `Lease.Type`
@@ -629,6 +727,8 @@ Current storage-owned lease plus any provider resource the owner must reconcile.
 
 ***
 
+<a id="ownerid-1"></a>
+
 ### OwnerId
 
 > **OwnerId** = *typeof* `OwnerId.Type`
@@ -636,6 +736,8 @@ Current storage-owned lease plus any provider resource the owner must reconcile.
 Identity of one host process competing to own a Session kernel.
 
 ***
+
+<a id="resource-1"></a>
 
 ### Resource
 
@@ -646,6 +748,8 @@ Resource IDs and cleanup failures never belong in KernelProfile, CellEvent, or C
 
 ***
 
+<a id="resourcebinding"></a>
+
 ### ResourceBinding
 
 > **ResourceBinding** = *typeof* `ResourceBinding.Type`
@@ -653,6 +757,8 @@ Resource IDs and cleanup failures never belong in KernelProfile, CellEvent, or C
 Host-supplied immutable binding and lifecycle facts; authority fields remain store-owned.
 
 ***
+
+<a id="resourceidentity"></a>
 
 ### ResourceIdentity
 
@@ -662,6 +768,8 @@ Exact provider resource targeted by a cleanup or lifecycle compare-and-set.
 
 ***
 
+<a id="resourcestate"></a>
+
 ### ResourceState
 
 > **ResourceState** = *typeof* `ResourceState.Type`
@@ -669,6 +777,8 @@ Exact provider resource targeted by a cleanup or lifecycle compare-and-set.
 Mutable provider resource state retained only in the host control authority.
 
 ## Variables
+
+<a id="claim-4"></a>
 
 ### Claim
 
@@ -678,6 +788,8 @@ Exact current owner of one Session kernel resource.
 
 ***
 
+<a id="cleanupfailure-1"></a>
+
 ### CleanupFailure
 
 > `const` **CleanupFailure**: `Schema.Struct`\<\{ `attempts`: `Schema.Int`; `message`: `Schema.String`; \}\>
@@ -685,6 +797,8 @@ Exact current owner of one Session kernel resource.
 A cleanup failure kept with the resource until deletion is proven.
 
 ***
+
+<a id="commandclaim-1"></a>
 
 ### CommandClaim
 
@@ -696,6 +810,8 @@ calls so no command can escape the same admission boundary as authored source.
 
 ***
 
+<a id="generation-1"></a>
+
 ### Generation
 
 > `const` **Generation**: `Schema.Int`
@@ -703,6 +819,8 @@ calls so no command can escape the same admission boundary as authored source.
 Storage-issued, monotonically increasing ownership generation for one Session.
 
 ***
+
+<a id="lease-1"></a>
 
 ### Lease
 
@@ -712,6 +830,8 @@ Current storage-owned lease plus any provider resource the owner must reconcile.
 
 ***
 
+<a id="leasemillis-1"></a>
+
 ### LeaseMillis
 
 > `const` **LeaseMillis**: `Schema.Int`
@@ -720,6 +840,8 @@ Validate a caller-supplied lease duration at an adapter boundary.
 
 ***
 
+<a id="ownerid-2"></a>
+
 ### OwnerId
 
 > `const` **OwnerId**: `Schema.String`
@@ -727,6 +849,8 @@ Validate a caller-supplied lease duration at an adapter boundary.
 Identity of one host process competing to own a Session kernel.
 
 ***
+
+<a id="resource-2"></a>
 
 ### Resource
 
@@ -737,6 +861,8 @@ Resource IDs and cleanup failures never belong in KernelProfile, CellEvent, or C
 
 ***
 
+<a id="resourcebinding-1"></a>
+
 ### ResourceBinding
 
 > `const` **ResourceBinding**: `Schema.Struct`\<\{ `checkpoint`: `Schema.Literals`\<readonly \[`"live-process"`, `"filesystem"`, `"namespace"`, `"restart-only"`\]\>; `epoch`: `Schema.Int`; `profileDigest`: `Schema.String`; `provider`: `Schema.String`; `resourceId`: `Schema.String`; `state`: `Schema.Literals`\<readonly \[`"live"`, `"paused"`, `"deleting"`\]\>; \}\>
@@ -745,6 +871,8 @@ Host-supplied immutable binding and lifecycle facts; authority fields remain sto
 
 ***
 
+<a id="resourceidentity-1"></a>
+
 ### ResourceIdentity
 
 > `const` **ResourceIdentity**: `Schema.Struct`\<\{ `epoch`: `Schema.Int`; `profileDigest`: `Schema.String`; `provider`: `Schema.String`; `resourceId`: `Schema.String`; \}\>
@@ -752,6 +880,8 @@ Host-supplied immutable binding and lifecycle facts; authority fields remain sto
 Exact provider resource targeted by a cleanup or lifecycle compare-and-set.
 
 ***
+
+<a id="resourcestate-1"></a>
 
 ### ResourceState
 

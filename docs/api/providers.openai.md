@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="clientoptions"></a>
+
 ### ClientOptions
 
 #### Extends
@@ -20,13 +22,19 @@
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Config`\<`Redacted`\<`string`\>\>
 
+<a id="clientconfig"></a>
+
 ##### clientConfig?
 
 > `readonly` `optional` **clientConfig?**: `Omit`\<\{ \}, `"apiKey"`\>
+
+<a id="config"></a>
 
 ##### config?
 
@@ -35,6 +43,8 @@
 ###### Inherited from
 
 [`Options`](#options).[`config`](#config-2)
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -48,6 +58,8 @@
 
 [`Options`](#options).[`metadata`](#metadata-2)
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string` & `object` \| `Model`
@@ -55,6 +67,8 @@
 ###### Inherited from
 
 [`Options`](#options).[`model`](#model-2)
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -66,6 +80,8 @@
 
 ***
 
+<a id="deterministicfallbackoptions"></a>
+
 ### DeterministicFallbackOptions
 
 #### Extends
@@ -73,6 +89,8 @@
 - [`ClientOptions`](#clientoptions)
 
 #### Properties
+
+<a id="apikey-1"></a>
 
 ##### apiKey
 
@@ -82,6 +100,8 @@
 
 [`ClientOptions`](#clientoptions).[`apiKey`](#apikey)
 
+<a id="clientconfig-1"></a>
+
 ##### clientConfig?
 
 > `readonly` `optional` **clientConfig?**: `Omit`\<\{ \}, `"apiKey"`\>
@@ -89,6 +109,8 @@
 ###### Inherited from
 
 [`ClientOptions`](#clientoptions).[`clientConfig`](#clientconfig)
+
+<a id="config-1"></a>
 
 ##### config?
 
@@ -98,13 +120,19 @@
 
 [`ClientOptions`](#clientoptions).[`config`](#config)
 
+<a id="fallbackmodel"></a>
+
 ##### fallbackModel
 
 > `readonly` **fallbackModel**: `string`
 
+<a id="fallbackprovider"></a>
+
 ##### fallbackProvider?
 
 > `readonly` `optional` **fallbackProvider?**: `string`
+
+<a id="metadata-1"></a>
 
 ##### metadata?
 
@@ -118,6 +146,8 @@
 
 [`ClientOptions`](#clientoptions).[`metadata`](#metadata)
 
+<a id="model-1"></a>
+
 ##### model
 
 > `readonly` **model**: `string` & `object` \| `Model`
@@ -125,6 +155,8 @@
 ###### Inherited from
 
 [`ClientOptions`](#clientoptions).[`model`](#model)
+
+<a id="registrationkey-1"></a>
 
 ##### registrationKey?
 
@@ -135,6 +167,8 @@
 [`ClientOptions`](#clientoptions).[`registrationKey`](#registrationkey)
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -148,6 +182,8 @@
 
 #### Properties
 
+<a id="config-2"></a>
+
 ##### config?
 
 > `readonly` `optional` **config?**: `Config`
@@ -155,6 +191,8 @@
 ###### Inherited from
 
 `ModelOptions.config`
+
+<a id="metadata-2"></a>
 
 ##### metadata?
 
@@ -168,6 +206,8 @@
 
 [`RegistrationOptions`](#registrationoptions).[`metadata`](#metadata-3)
 
+<a id="model-2"></a>
+
 ##### model
 
 > `readonly` **model**: `string` & `object` \| `Model`
@@ -175,6 +215,8 @@
 ###### Inherited from
 
 `ModelOptions.model`
+
+<a id="registrationkey-2"></a>
 
 ##### registrationKey?
 
@@ -185,6 +227,8 @@
 [`RegistrationOptions`](#registrationoptions).[`registrationKey`](#registrationkey-3)
 
 ***
+
+<a id="registrationoptions"></a>
 
 ### RegistrationOptions
 
@@ -200,6 +244,8 @@
 
 #### Properties
 
+<a id="metadata-3"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `object`
@@ -208,11 +254,15 @@
 
 \[`key`: `string`\]: `unknown`
 
+<a id="registrationkey-3"></a>
+
 ##### registrationKey?
 
 > `readonly` `optional` **registrationKey?**: `string`
 
 ## Type Aliases
+
+<a id="config-3"></a>
 
 ### Config
 
@@ -220,11 +270,15 @@
 
 ## Variables
 
+<a id="classifyfailure"></a>
+
 ### classifyFailure
 
 > `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
 
 ***
+
+<a id="decodeconfig"></a>
 
 ### decodeConfig
 
@@ -242,6 +296,8 @@
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
@@ -258,6 +314,8 @@
 
 ***
 
+<a id="layerconfig"></a>
+
 ### layerConfig
 
 > `const` **layerConfig**: (`options?`) => `Layer.Layer`\<`OpenAIClient.OpenAiClient`, `Config.ConfigError`, `HttpClient.HttpClient`\>
@@ -273,6 +331,8 @@
 `Layer.Layer`\<`OpenAIClient.OpenAiClient`, `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="layermodel"></a>
 
 ### layerModel
 
@@ -292,6 +352,8 @@ Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`.
 
 ***
 
+<a id="layerordeterministic"></a>
+
 ### layerOrDeterministic
 
 > `const` **layerOrDeterministic**: (`options`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
@@ -310,6 +372,8 @@ Selects OpenAI when its configured API key is present, otherwise the determinist
 
 ***
 
+<a id="normalizeresponsessse"></a>
+
 ### normalizeResponsesSSE
 
 > `const` **normalizeResponsesSSE**: (`client`) => `HttpClient.HttpClient`
@@ -325,6 +389,8 @@ Selects OpenAI when its configured API key is present, otherwise the determinist
 `HttpClient.HttpClient`
 
 ***
+
+<a id="registration"></a>
 
 ### registration
 
@@ -343,6 +409,8 @@ Bare registration effect; the consumer provides the OpenAI client (see layerConf
 `Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry#registration-1), `never`, `OpenAIClient.OpenAiClient`\>
 
 ***
+
+<a id="tooljsonschemacompiler"></a>
 
 ### toolJsonSchemaCompiler
 

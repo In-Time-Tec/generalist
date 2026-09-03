@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="webhookrejected"></a>
+
 ### WebhookRejected
 
 A webhook payload or signature failed its configured source boundary.
@@ -17,6 +19,8 @@ A webhook payload or signature failed its configured source boundary.
 - `WebhookRejected_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A webhook payload or signature failed its configured source boundary.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ A webhook payload or signature failed its configured source boundary.
 
 `WebhookRejected_base.hint`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"invalid-payload"` \| `"invalid-signature"` \| `"missing-dedupe-key"` \| `"stale-request"`
@@ -53,6 +61,8 @@ A webhook payload or signature failed its configured source boundary.
 ###### Inherited from
 
 `WebhookRejected_base.reason`
+
+<a id="source"></a>
 
 ##### source
 
@@ -64,19 +74,27 @@ A webhook payload or signature failed its configured source boundary.
 
 ## Interfaces
 
+<a id="hmacsha256options"></a>
+
 ### HmacSha256Options
 
 #### Properties
 
+<a id="header"></a>
+
 ##### header
 
 > `readonly` **header**: `string`
+
+<a id="prefix"></a>
 
 ##### prefix?
 
 > `readonly` `optional` **prefix?**: `string`
 
 ***
+
+<a id="ingestion"></a>
 
 ### Ingestion
 
@@ -87,6 +105,8 @@ A webhook payload or signature failed its configured source boundary.
 `Payload`
 
 #### Properties
+
+<a id="event"></a>
 
 ##### event
 
@@ -112,11 +132,15 @@ A webhook payload or signature failed its configured source boundary.
 
 > `readonly` **source**: `string`
 
+<a id="payload-1"></a>
+
 ##### payload
 
 > `readonly` **payload**: `Payload`
 
 ***
+
+<a id="webhooksource"></a>
 
 ### WebhookSource
 
@@ -128,13 +152,19 @@ A webhook payload or signature failed its configured source boundary.
 
 #### Properties
 
+<a id="payload-3"></a>
+
 ##### payload
 
 > `readonly` **payload**: `Payload`
 
+<a id="signature"></a>
+
 ##### signature
 
 > `readonly` **signature**: [`Signature`](#signature-1)
+
+<a id="source-1"></a>
 
 ##### source
 
@@ -142,11 +172,15 @@ A webhook payload or signature failed its configured source boundary.
 
 ## Type Aliases
 
+<a id="signature-1"></a>
+
 ### Signature
 
 > **Signature** = \{ `_tag`: `"GitHub"`; `secret`: `Secret`; \} \| \{ `_tag`: `"Slack"`; `secret`: `Secret`; `toleranceSeconds?`: `number`; \} \| \{ `_tag`: `"HmacSha256"`; `header`: `string`; `prefix?`: `string`; `secret`: `Secret`; \} \| \{ `_tag`: `"Unsigned"`; \}
 
 ## Variables
+
+<a id="github"></a>
 
 ### github
 
@@ -163,6 +197,8 @@ A webhook payload or signature failed its configured source boundary.
 [`Signature`](#signature-1)
 
 ***
+
+<a id="hmacsha256"></a>
 
 ### hmacSha256
 
@@ -202,6 +238,8 @@ A webhook payload or signature failed its configured source boundary.
 
 ***
 
+<a id="ingestwebhook"></a>
+
 ### ingestWebhook
 
 > `const` **ingestWebhook**: \<`Payload`\>(`input`) => `Effect.Effect`\<[`Ingestion`](#ingestion)\<`Payload`\[`"Type"`\]\>, [`WebhookRejected`](#webhookrejected) \| `PlatformError.PlatformError`, `Crypto.Crypto` \| `Payload`\[`"DecodingServices"`\]\>
@@ -239,6 +277,8 @@ Verify a raw request, validate its source-specific payload, and produce a wake e
 `Effect.Effect`\<[`Ingestion`](#ingestion)\<`Payload`\[`"Type"`\]\>, [`WebhookRejected`](#webhookrejected) \| `PlatformError.PlatformError`, `Crypto.Crypto` \| `Payload`\[`"DecodingServices"`\]\>
 
 ***
+
+<a id="slack"></a>
 
 ### slack
 
@@ -278,6 +318,8 @@ Verify a raw request, validate its source-specific payload, and produce a wake e
 
 ***
 
+<a id="source-2"></a>
+
 ### source
 
 > `const` **source**: \<`Payload`\>(`definition`) => [`WebhookSource`](#webhooksource)\<`Payload`\>
@@ -299,6 +341,8 @@ Verify a raw request, validate its source-specific payload, and produce a wake e
 [`WebhookSource`](#webhooksource)\<`Payload`\>
 
 ***
+
+<a id="unsigned"></a>
 
 ### unsigned
 

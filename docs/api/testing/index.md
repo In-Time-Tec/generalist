@@ -13,11 +13,15 @@
 
 ## Interfaces
 
+<a id="codeexecutorconformanceoptions"></a>
+
 ### CodeExecutorConformanceOptions
 
 Small provider seam used by the public CodeExecutor conformance suite.
 
 #### Properties
+
+<a id="assertclean"></a>
 
 ##### assertClean?
 
@@ -25,15 +29,21 @@ Small provider seam used by the public CodeExecutor conformance suite.
 
 Inspect provider-owned resources after every Exit. The assertion must observe zero live invocation resources.
 
+<a id="layer"></a>
+
 ##### layer
 
 > `readonly` **layer**: `Layer`\<[`CodeExecutor`](../generalist/namespaces/CodeExecutor#codeexecutor)\>
+
+<a id="name"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
 ## Variables
+
+<a id="codeexecutorconformance"></a>
 
 ### codeExecutorConformance
 
@@ -56,6 +66,8 @@ a vendor's physical isolate, microVM, or hypervisor implementation; providers mu
 
 ***
 
+<a id="testing"></a>
+
 ### Testing
 
 > `const` **Testing**: `object`
@@ -64,17 +76,25 @@ Public conformance suites and certification reporting.
 
 #### Type Declaration
 
+<a id="blobstore"></a>
+
 ##### blobStore
 
 > `readonly` **blobStore**: *typeof* `blobStore`
+
+<a id="memo"></a>
 
 ##### memo
 
 > `readonly` **memo**: *typeof* `memo`
 
+<a id="memory"></a>
+
 ##### memory
 
 > `readonly` **memory**: *typeof* `memory`
+
+<a id="report"></a>
 
 ##### report
 
@@ -84,13 +104,19 @@ Public conformance suites and certification reporting.
 
 > `readonly` **write**: *typeof* `write`
 
+<a id="rulestore"></a>
+
 ##### ruleStore
 
 > `readonly` **ruleStore**: *typeof* `ruleStore`
 
+<a id="runtimedriver"></a>
+
 ##### runtimeDriver
 
 > `readonly` **runtimeDriver**: *typeof* [`runtimeDriver`](../testing.runtime-driver#runtimedriver)
+
+<a id="sandbox"></a>
 
 ##### sandbox
 

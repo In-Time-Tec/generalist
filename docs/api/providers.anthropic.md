@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="clientoptions"></a>
+
 ### ClientOptions
 
 #### Extends
@@ -16,13 +18,19 @@
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Config`\<`Redacted`\<`string`\>\>
 
+<a id="clientconfig"></a>
+
 ##### clientConfig?
 
 > `readonly` `optional` **clientConfig?**: `Omit`\<\{ \}, `"apiKey"`\>
+
+<a id="config"></a>
 
 ##### config?
 
@@ -116,6 +124,8 @@
 
 [`Options`](#options).[`config`](#config-1)
 
+<a id="metadata"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `object`
@@ -128,6 +138,8 @@
 
 [`Options`](#options).[`metadata`](#metadata-1)
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string` & `object` \| `"claude-sonnet-5"` \| `"claude-fable-5"` \| `"claude-mythos-5"` \| `"claude-opus-4-8"` \| `"claude-opus-4-7"` \| `"claude-mythos-preview"` \| `"claude-opus-4-6"` \| `"claude-sonnet-4-6"` \| `"claude-haiku-4-5"` \| `"claude-haiku-4-5-20251001"` \| `"claude-opus-4-5"` \| `"claude-opus-4-5-20251101"` \| `"claude-sonnet-4-5"` \| `"claude-sonnet-4-5-20250929"` \| `"claude-opus-4-1"` \| `"claude-opus-4-1-20250805"`
@@ -135,6 +147,8 @@
 ###### Inherited from
 
 [`Options`](#options).[`model`](#model-1)
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -145,6 +159,8 @@
 [`Options`](#options).[`registrationKey`](#registrationkey-1)
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -157,6 +173,8 @@
 - [`ClientOptions`](#clientoptions)
 
 #### Properties
+
+<a id="config-1"></a>
 
 ##### config?
 
@@ -246,6 +264,8 @@
 
 > `readonly` `optional` **top\_p?**: `number`
 
+<a id="metadata-1"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `object`
@@ -258,9 +278,13 @@
 
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
 
+<a id="model-1"></a>
+
 ##### model
 
 > `readonly` **model**: `string` & `object` \| `"claude-sonnet-5"` \| `"claude-fable-5"` \| `"claude-mythos-5"` \| `"claude-opus-4-8"` \| `"claude-opus-4-7"` \| `"claude-mythos-preview"` \| `"claude-opus-4-6"` \| `"claude-sonnet-4-6"` \| `"claude-haiku-4-5"` \| `"claude-haiku-4-5-20251001"` \| `"claude-opus-4-5"` \| `"claude-opus-4-5-20251101"` \| `"claude-sonnet-4-5"` \| `"claude-sonnet-4-5-20250929"` \| `"claude-opus-4-1"` \| `"claude-opus-4-1-20250805"`
+
+<a id="registrationkey-1"></a>
 
 ##### registrationKey?
 
@@ -272,17 +296,23 @@
 
 ## Type Aliases
 
+<a id="config-2"></a>
+
 ### Config
 
 > **Config** = *typeof* `ConfigSchema.Type`
 
 ## Variables
 
+<a id="classifyfailure"></a>
+
 ### classifyFailure
 
 > `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
 
 ***
+
+<a id="decodeconfig"></a>
 
 ### decodeConfig
 
@@ -300,6 +330,8 @@
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `EffectConfig.ConfigError`, `HttpClient.HttpClient`\>
@@ -315,6 +347,8 @@
 `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `EffectConfig.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="layerconfig"></a>
 
 ### layerConfig
 
@@ -346,6 +380,8 @@
 
 ***
 
+<a id="layermodel"></a>
+
 ### layerModel
 
 > `const` **layerModel**: (`input`) => `Model.Model`\<`"anthropic"`, `LanguageModel.LanguageModel`, `AnthropicClient.AnthropicClient`\>
@@ -363,6 +399,8 @@ Model layer over `AnthropicClient`; provide it to a run with `Effect.provide`.
 `Model.Model`\<`"anthropic"`, `LanguageModel.LanguageModel`, `AnthropicClient.AnthropicClient`\>
 
 ***
+
+<a id="registration"></a>
 
 ### registration
 
@@ -382,6 +420,8 @@ Bare registration effect; the consumer provides the Anthropic client (see layerC
 
 ***
 
+<a id="resolvedconfig"></a>
+
 ### resolvedConfig
 
 > `const` **resolvedConfig**: (`input`) => [`Config`](#config-2)
@@ -399,6 +439,8 @@ Effective Anthropic request config; callers opt into top-level automatic caching
 [`Config`](#config-2)
 
 ***
+
+<a id="tooljsonschemacompiler"></a>
 
 ### toolJsonSchemaCompiler
 

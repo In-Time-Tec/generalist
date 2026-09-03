@@ -12,6 +12,8 @@
 
 ## Interfaces
 
+<a id="dag"></a>
+
 ### Dag
 
 **`Experimental`**
@@ -20,11 +22,15 @@ A point-in-time operation DAG projected from Runtime journals.
 
 #### Properties
 
+<a id="dagtypeid"></a>
+
 ##### \[DagTypeId\]
 
 > `readonly` **\[DagTypeId\]**: *typeof* `DagTypeId`
 
 **`Experimental`**
+
+<a id="edges"></a>
 
 ##### edges
 
@@ -32,17 +38,23 @@ A point-in-time operation DAG projected from Runtime journals.
 
 **`Experimental`**
 
+<a id="leaves"></a>
+
 ##### leaves
 
 > `readonly` **leaves**: readonly `string`[]
 
 **`Experimental`**
 
+<a id="nodes"></a>
+
 ##### nodes
 
 > `readonly` **nodes**: readonly `object`[]
 
 **`Experimental`**
+
+<a id="rootrunid"></a>
 
 ##### rootRunId
 
@@ -51,6 +63,8 @@ A point-in-time operation DAG projected from Runtime journals.
 **`Experimental`**
 
 ***
+
+<a id="dagruntime"></a>
 
 ### DagRuntime
 
@@ -63,6 +77,8 @@ Cross-driver Runtime methods required by `dag`.
 - [`JournalReader`](../trajectory#journalreader)
 
 #### Properties
+
+<a id="history"></a>
 
 ##### history
 
@@ -84,6 +100,8 @@ Cross-driver Runtime methods required by `dag`.
 
 [`JournalReader`](../trajectory#journalreader).[`history`](../trajectory#history)
 
+<a id="recordreward"></a>
+
 ##### recordReward
 
 > `readonly` **recordReward**: (`input`) => `Effect`\<`void`, `RecordRewardError`\>
@@ -99,6 +117,8 @@ Cross-driver Runtime methods required by `dag`.
 ###### Returns
 
 `Effect`\<`void`, `RecordRewardError`\>
+
+<a id="resolvemodelresponse"></a>
 
 ##### resolveModelResponse
 
@@ -120,6 +140,8 @@ Cross-driver Runtime methods required by `dag`.
 
 [`JournalReader`](../trajectory#journalreader).[`resolveModelResponse`](../trajectory#resolvemodelresponse)
 
+<a id="sessionentry"></a>
+
 ##### sessionEntry
 
 > `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../generalist/namespaces/Session#entry), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
@@ -139,6 +161,8 @@ Cross-driver Runtime methods required by `dag`.
 ###### Inherited from
 
 [`JournalReader`](../trajectory#journalreader).[`sessionEntry`](../trajectory#sessionentry)
+
+<a id="snapshot"></a>
 
 ##### snapshot
 
@@ -162,6 +186,8 @@ Cross-driver Runtime methods required by `dag`.
 
 ***
 
+<a id="exportoptions"></a>
+
 ### ExportOptions
 
 **`Experimental`**
@@ -180,17 +206,23 @@ Verifiers v1 JSONL export options.
 
 #### Properties
 
+<a id="format"></a>
+
 ##### format
 
 > `readonly` **format**: `"verifiers-v1"`
 
 **`Experimental`**
 
+<a id="include"></a>
+
 ##### include
 
 > `readonly` **include**: [`IncludeOptions`](#includeoptions)
 
 **`Experimental`**
+
+<a id="reward"></a>
 
 ##### reward
 
@@ -200,6 +232,8 @@ Verifiers v1 JSONL export options.
 
 ***
 
+<a id="includeoptions"></a>
+
 ### IncludeOptions
 
 **`Experimental`**
@@ -208,11 +242,15 @@ Branches included in verifiers v1 export.
 
 #### Properties
 
+<a id="childbranches"></a>
+
 ##### childBranches
 
 > `readonly` **childBranches**: `boolean`
 
 **`Experimental`**
+
+<a id="compactionbranches"></a>
 
 ##### compactionBranches
 
@@ -220,11 +258,15 @@ Branches included in verifiers v1 export.
 
 **`Experimental`**
 
+<a id="logprobs"></a>
+
 ##### logprobs
 
 > `readonly` **logprobs**: `boolean`
 
 **`Experimental`**
+
+<a id="speculationlosers"></a>
 
 ##### speculationLosers
 
@@ -236,6 +278,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 
 ## Type Aliases
 
+<a id="childlink"></a>
+
 ### ChildLink
 
 > **ChildLink** = *typeof* `ChildLink.Type`
@@ -243,6 +287,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 **`Experimental`**
 
 ***
+
+<a id="compaction"></a>
 
 ### Compaction
 
@@ -252,6 +298,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 
 ***
 
+<a id="edge"></a>
+
 ### Edge
 
 > **Edge** = *typeof* `Edge.Type`
@@ -259,6 +307,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 **`Experimental`**
 
 ***
+
+<a id="modelcall"></a>
 
 ### ModelCall
 
@@ -268,6 +318,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 
 ***
 
+<a id="node"></a>
+
 ### Node
 
 > **Node** = *typeof* `Node.Type`
@@ -275,6 +327,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 **`Experimental`**
 
 ***
+
+<a id="operation"></a>
 
 ### Operation
 
@@ -284,6 +338,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 
 ***
 
+<a id="terminal"></a>
+
 ### Terminal
 
 > **Terminal** = *typeof* `Terminal.Type`
@@ -291,6 +347,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 **`Experimental`**
 
 ***
+
+<a id="toolcall"></a>
 
 ### ToolCall
 
@@ -300,6 +358,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 
 ***
 
+<a id="verifiersv1record"></a>
+
 ### VerifiersV1Record
 
 > **VerifiersV1Record** = *typeof* `VerifiersV1Record.Type`
@@ -307,6 +367,8 @@ Accepted for forward compatibility; speculation has no journal branches until is
 **`Experimental`**
 
 ## Variables
+
+<a id="childlink-1"></a>
 
 ### ChildLink
 
@@ -318,6 +380,8 @@ One durable child-link operation.
 
 ***
 
+<a id="compaction-1"></a>
+
 ### Compaction
 
 > `const` **Compaction**: `Schema.TaggedStruct`\<`"Compaction"`, \{ `checkpointId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"microcompact"`, `"summarize"`\]\>; `operationId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>
@@ -327,6 +391,8 @@ One durable child-link operation.
 One applied durable compaction operation.
 
 ***
+
+<a id="dag-1"></a>
 
 ### dag
 
@@ -352,6 +418,8 @@ Project a root Run, retained forks, and linked child Runs into one operation DAG
 
 ***
 
+<a id="edge-1"></a>
+
 ### Edge
 
 > `const` **Edge**: `Schema.Struct`\<\{ `from`: `Schema.String`; `to`: `Schema.String`; `type`: `Schema.Literals`\<readonly \[`"parent"`, `"fork"`, `"child"`, `"compaction"`\]\>; \}\>
@@ -361,6 +429,8 @@ Project a root Run, retained forks, and linked child Runs into one operation DAG
 The journal fact relating two trajectory operations.
 
 ***
+
+<a id="export"></a>
 
 ### export
 
@@ -420,6 +490,8 @@ The journal fact relating two trajectory operations.
 
 ***
 
+<a id="modelcall-1"></a>
+
 ### ModelCall
 
 > `const` **ModelCall**: `Schema.TaggedStruct`\<`"ModelCall"`, \{ `logprobs`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Finite`\>\>; `modelCallId`: `Schema.String`; `operationId`: `Schema.String`; `tokens`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Int`\>\>; `turn`: `Schema.Finite`; \}\>
@@ -429,6 +501,8 @@ The journal fact relating two trajectory operations.
 One durable conversation model-call operation.
 
 ***
+
+<a id="node-1"></a>
 
 ### Node
 
@@ -440,6 +514,8 @@ One journal operation in a trajectory DAG.
 
 ***
 
+<a id="operation-1"></a>
+
 ### Operation
 
 > `const` **Operation**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"ModelCall"`, \{ `logprobs`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Finite`\>\>; `modelCallId`: `Schema.String`; `operationId`: `Schema.String`; `tokens`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Int`\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolCall"`, \{ `isFailure`: `Schema.Boolean`; `operationId`: `Schema.String`; `tool`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ChildLink"`, \{ `childRunId`: `Schema.String`; `operationId`: `Schema.String`; `selection`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Compaction"`, \{ `checkpointId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"microcompact"`, `"summarize"`\]\>; `operationId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Terminal"`, \{ `operationId`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>\]\>
@@ -449,6 +525,8 @@ One journal operation in a trajectory DAG.
 Operations represented in an RL trajectory DAG.
 
 ***
+
+<a id="terminal-1"></a>
 
 ### Terminal
 
@@ -460,6 +538,8 @@ One terminal durable Run operation.
 
 ***
 
+<a id="toolcall-1"></a>
+
 ### ToolCall
 
 > `const` **ToolCall**: `Schema.TaggedStruct`\<`"ToolCall"`, \{ `isFailure`: `Schema.Boolean`; `operationId`: `Schema.String`; `tool`: `Schema.String`; `turn`: `Schema.Finite`; \}\>
@@ -469,6 +549,8 @@ One terminal durable Run operation.
 One completed durable tool operation.
 
 ***
+
+<a id="verifiersv1record-1"></a>
 
 ### VerifiersV1Record
 

@@ -8,17 +8,25 @@
 
 ## Interfaces
 
+<a id="failurestep"></a>
+
 ### FailureStep
 
 #### Properties
+
+<a id="_tag"></a>
 
 ##### \_tag
 
 > `readonly` **\_tag**: `"Failure"`
 
+<a id="delay"></a>
+
 ##### delay?
 
 > `readonly` `optional` **delay?**: `Input`
+
+<a id="error"></a>
 
 ##### error
 
@@ -26,9 +34,13 @@
 
 ***
 
+<a id="fixture"></a>
+
 ### Fixture
 
 #### Properties
+
+<a id="awaitrequests"></a>
 
 ##### awaitRequests
 
@@ -44,29 +56,43 @@
 
 `Effect`\<readonly [`Request`](#request)[]\>
 
+<a id="layer"></a>
+
 ##### layer
 
 > `readonly` **layer**: `Layer`\<`LanguageModel`\>
+
+<a id="prompts"></a>
 
 ##### prompts
 
 > `readonly` **prompts**: `Effect`\<readonly `Prompt`[]\>
 
+<a id="registration"></a>
+
 ##### registration
 
 > `readonly` **registration**: [`Registration`](./generalist/namespaces/ModelRegistry#registration-1)
+
+<a id="registrylayer"></a>
 
 ##### registryLayer
 
 > `readonly` **registryLayer**: `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
 
+<a id="remaining"></a>
+
 ##### remaining
 
 > `readonly` **remaining**: `Effect`\<`number`\>
 
+<a id="requests"></a>
+
 ##### requests
 
 > `readonly` **requests**: `Effect`\<readonly [`Request`](#request)[]\>
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -74,9 +100,13 @@
 
 ***
 
+<a id="makeoptions"></a>
+
 ### MakeOptions
 
 #### Properties
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -86,19 +116,27 @@
 
 \[`key`: `string`\]: `unknown`
 
+<a id="model"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: `string`
 
+<a id="provider"></a>
+
 ##### provider?
 
 > `readonly` `optional` **provider?**: `string`
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
 > `readonly` `optional` **registrationKey?**: `string`
 
 ***
+
+<a id="objectstep"></a>
 
 ### ObjectStep
 
@@ -108,9 +146,13 @@
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Object"`
+
+<a id="delay-1"></a>
 
 ##### delay?
 
@@ -120,6 +162,8 @@
 
 [`StepOptions`](#stepoptions).[`delay`](#delay-2)
 
+<a id="finishreason"></a>
+
 ##### finishReason?
 
 > `readonly` `optional` **finishReason?**: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`
@@ -127,6 +171,8 @@
 ###### Inherited from
 
 [`StepOptions`](#stepoptions).[`finishReason`](#finishreason-1)
+
+<a id="logprobs"></a>
 
 ##### logprobs?
 
@@ -138,6 +184,8 @@ Provider output token log probabilities exposed to trajectory exporters.
 
 [`StepOptions`](#stepoptions).[`logprobs`](#logprobs-1)
 
+<a id="streampartdelay"></a>
+
 ##### streamPartDelay?
 
 > `readonly` `optional` **streamPartDelay?**: `Input`
@@ -145,6 +193,8 @@ Provider output token log probabilities exposed to trajectory exporters.
 ###### Inherited from
 
 [`StepOptions`](#stepoptions).[`streamPartDelay`](#streampartdelay-1)
+
+<a id="tokens"></a>
 
 ##### tokens?
 
@@ -156,6 +206,8 @@ Provider output token ids exposed to trajectory exporters.
 
 [`StepOptions`](#stepoptions).[`tokens`](#tokens-1)
 
+<a id="usage"></a>
+
 ##### usage?
 
 > `readonly` `optional` **usage?**: `Usage`
@@ -164,19 +216,27 @@ Provider output token ids exposed to trajectory exporters.
 
 [`StepOptions`](#stepoptions).[`usage`](#usage-1)
 
+<a id="value"></a>
+
 ##### value
 
 > `readonly` **value**: `unknown`
 
 ***
 
+<a id="reasoningpart"></a>
+
 ### ReasoningPart
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Reasoning"`
+
+<a id="text"></a>
 
 ##### text
 
@@ -184,43 +244,63 @@ Provider output token ids exposed to trajectory exporters.
 
 ***
 
+<a id="request"></a>
+
 ### Request
 
 #### Properties
+
+<a id="incrementalprompt"></a>
 
 ##### incrementalPrompt
 
 > `readonly` **incrementalPrompt**: `Prompt` \| `undefined`
 
+<a id="index"></a>
+
 ##### index
 
 > `readonly` **index**: `number`
+
+<a id="operation"></a>
 
 ##### operation
 
 > `readonly` **operation**: [`Operation`](#operation-1)
 
+<a id="previousresponseid"></a>
+
 ##### previousResponseId
 
 > `readonly` **previousResponseId**: `string` \| `undefined`
+
+<a id="prompt"></a>
 
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
 
+<a id="responseformat"></a>
+
 ##### responseFormat
 
 > `readonly` **responseFormat**: \{ \} \| \{ \}
 
+<a id="toolchoice"></a>
+
 ##### toolChoice
 
 > `readonly` **toolChoice**: `ToolChoice`\<`any`\>
+
+<a id="tools"></a>
 
 ##### tools
 
 > `readonly` **tools**: readonly `Any`[]
 
 ***
+
+<a id="stepoptions"></a>
 
 ### StepOptions
 
@@ -231,13 +311,19 @@ Provider output token ids exposed to trajectory exporters.
 
 #### Properties
 
+<a id="delay-2"></a>
+
 ##### delay?
 
 > `readonly` `optional` **delay?**: `Input`
 
+<a id="finishreason-1"></a>
+
 ##### finishReason?
 
 > `readonly` `optional` **finishReason?**: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`
+
+<a id="logprobs-1"></a>
 
 ##### logprobs?
 
@@ -245,9 +331,13 @@ Provider output token ids exposed to trajectory exporters.
 
 Provider output token log probabilities exposed to trajectory exporters.
 
+<a id="streampartdelay-1"></a>
+
 ##### streamPartDelay?
 
 > `readonly` `optional` **streamPartDelay?**: `Input`
+
+<a id="tokens-1"></a>
 
 ##### tokens?
 
@@ -255,19 +345,27 @@ Provider output token log probabilities exposed to trajectory exporters.
 
 Provider output token ids exposed to trajectory exporters.
 
+<a id="usage-1"></a>
+
 ##### usage?
 
 > `readonly` `optional` **usage?**: `Usage`
 
 ***
 
+<a id="textpart"></a>
+
 ### TextPart
 
 #### Properties
 
+<a id="_tag-3"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Text"`
+
+<a id="text-1"></a>
 
 ##### text
 
@@ -275,13 +373,19 @@ Provider output token ids exposed to trajectory exporters.
 
 ***
 
+<a id="toolcalloptions"></a>
+
 ### ToolCallOptions
 
 #### Properties
 
+<a id="id"></a>
+
 ##### id?
 
 > `readonly` `optional` **id?**: `string`
+
+<a id="providerexecuted"></a>
 
 ##### providerExecuted?
 
@@ -289,25 +393,37 @@ Provider output token ids exposed to trajectory exporters.
 
 ***
 
+<a id="toolcallpart"></a>
+
 ### ToolCallPart
 
 #### Properties
+
+<a id="_tag-4"></a>
 
 ##### \_tag
 
 > `readonly` **\_tag**: `"ToolCall"`
 
+<a id="id-1"></a>
+
 ##### id?
 
 > `readonly` `optional` **id?**: `string`
+
+<a id="name"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="params"></a>
+
 ##### params
 
 > `readonly` **params**: `unknown`
+
+<a id="providerexecuted-1"></a>
 
 ##### providerExecuted
 
@@ -315,33 +431,47 @@ Provider output token ids exposed to trajectory exporters.
 
 ***
 
+<a id="truncatedstep"></a>
+
 ### TruncatedStep
 
 A provider stream that ends mid-content and never emits `finish`.
 
 #### Properties
 
+<a id="_tag-5"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Truncated"`
+
+<a id="delay-3"></a>
 
 ##### delay?
 
 > `readonly` `optional` **delay?**: `Input`
 
+<a id="parts"></a>
+
 ##### parts
 
 > `readonly` **parts**: readonly [`Part`](#part)[]
 
+<a id="stopafter"></a>
+
 ##### stopAfter
 
 > `readonly` **stopAfter**: [`TruncationPoint`](#truncationpoint)
+
+<a id="streampartdelay-2"></a>
 
 ##### streamPartDelay?
 
 > `readonly` `optional` **streamPartDelay?**: `Input`
 
 ***
+
+<a id="turnstep"></a>
 
 ### TurnStep
 
@@ -351,9 +481,13 @@ A provider stream that ends mid-content and never emits `finish`.
 
 #### Properties
 
+<a id="_tag-6"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Turn"`
+
+<a id="delay-4"></a>
 
 ##### delay?
 
@@ -363,6 +497,8 @@ A provider stream that ends mid-content and never emits `finish`.
 
 [`StepOptions`](#stepoptions).[`delay`](#delay-2)
 
+<a id="finishreason-2"></a>
+
 ##### finishReason?
 
 > `readonly` `optional` **finishReason?**: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`
@@ -370,6 +506,8 @@ A provider stream that ends mid-content and never emits `finish`.
 ###### Inherited from
 
 [`StepOptions`](#stepoptions).[`finishReason`](#finishreason-1)
+
+<a id="logprobs-2"></a>
 
 ##### logprobs?
 
@@ -381,9 +519,13 @@ Provider output token log probabilities exposed to trajectory exporters.
 
 [`StepOptions`](#stepoptions).[`logprobs`](#logprobs-1)
 
+<a id="parts-1"></a>
+
 ##### parts
 
 > `readonly` **parts**: readonly [`Part`](#part)[]
+
+<a id="streampartdelay-3"></a>
 
 ##### streamPartDelay?
 
@@ -392,6 +534,8 @@ Provider output token log probabilities exposed to trajectory exporters.
 ###### Inherited from
 
 [`StepOptions`](#stepoptions).[`streamPartDelay`](#streampartdelay-1)
+
+<a id="tokens-2"></a>
 
 ##### tokens?
 
@@ -402,6 +546,8 @@ Provider output token ids exposed to trajectory exporters.
 ###### Inherited from
 
 [`StepOptions`](#stepoptions).[`tokens`](#tokens-1)
+
+<a id="usage-2"></a>
 
 ##### usage?
 
@@ -413,11 +559,15 @@ Provider output token ids exposed to trajectory exporters.
 
 ## Type Aliases
 
+<a id="operation-1"></a>
+
 ### Operation
 
 > **Operation** = `"streamText"` \| `"generateText"` \| `"generateObject"`
 
 ***
+
+<a id="part"></a>
 
 ### Part
 
@@ -425,11 +575,15 @@ Provider output token ids exposed to trajectory exporters.
 
 ***
 
+<a id="step"></a>
+
 ### Step
 
 > **Step** = [`Part`](#part) \| [`TurnStep`](#turnstep) \| [`ObjectStep`](#objectstep) \| [`FailureStep`](#failurestep) \| [`TruncatedStep`](#truncatedstep)
 
 ***
+
+<a id="truncationpoint"></a>
 
 ### TruncationPoint
 
@@ -440,6 +594,8 @@ without a `finish` part, reproducing a provider body that reached EOF without
 its terminal event.
 
 ## Variables
+
+<a id="failure"></a>
 
 ### failure
 
@@ -483,6 +639,8 @@ its terminal event.
 
 ***
 
+<a id="layer-1"></a>
+
 ### layer
 
 > `const` **layer**: \{(`options?`): (`script`) => `Layer`\<`LanguageModel`\>; (`script`, `options?`): `Layer`\<`LanguageModel`\>; \}
@@ -520,6 +678,8 @@ readonly [`Step`](#step)[]
 `Layer`\<`LanguageModel`\>
 
 ***
+
+<a id="layerregistry"></a>
 
 ### layerRegistry
 
@@ -559,6 +719,8 @@ readonly [`Fixture`](#fixture)[]
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: \{(`options?`): (`script`) => `Effect`\<[`Fixture`](#fixture)\>; (`script`, `options?`): `Effect`\<[`Fixture`](#fixture)\>; \}
@@ -596,6 +758,8 @@ readonly [`Step`](#step)[]
 `Effect`\<[`Fixture`](#fixture)\>
 
 ***
+
+<a id="object"></a>
 
 ### object
 
@@ -635,6 +799,8 @@ readonly [`Step`](#step)[]
 
 ***
 
+<a id="reasoning"></a>
+
 ### reasoning
 
 > `const` **reasoning**: (`value`) => [`ReasoningPart`](#reasoningpart)
@@ -651,6 +817,8 @@ readonly [`Step`](#step)[]
 
 ***
 
+<a id="text-2"></a>
+
 ### text
 
 > `const` **text**: (`value`) => [`TextPart`](#textpart)
@@ -666,6 +834,8 @@ readonly [`Step`](#step)[]
 [`TextPart`](#textpart)
 
 ***
+
+<a id="toolcall"></a>
 
 ### toolCall
 
@@ -712,6 +882,8 @@ readonly [`Step`](#step)[]
 [`ToolCallPart`](#toolcallpart)
 
 ***
+
+<a id="truncated"></a>
 
 ### truncated
 
@@ -774,6 +946,8 @@ readonly [`Part`](#part)[]
 [`TruncatedStep`](#truncatedstep)
 
 ***
+
+<a id="turn"></a>
 
 ### turn
 

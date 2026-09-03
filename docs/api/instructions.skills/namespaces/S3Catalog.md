@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Manifest-backed S3 catalog options.
@@ -18,6 +20,8 @@ Manifest-backed S3 catalog options.
 
 #### Properties
 
+<a id="bodymaxbytes"></a>
+
 ##### bodyMaxBytes?
 
 > `readonly` `optional` **bodyMaxBytes?**: `number`
@@ -26,9 +30,13 @@ Manifest-backed S3 catalog options.
 
 `Limits.bodyMaxBytes`
 
+<a id="bucket"></a>
+
 ##### bucket
 
 > `readonly` **bucket**: `string`
+
+<a id="manifestmaxbytes"></a>
 
 ##### manifestMaxBytes?
 
@@ -38,9 +46,13 @@ Manifest-backed S3 catalog options.
 
 `Limits.manifestMaxBytes`
 
+<a id="manifestname"></a>
+
 ##### manifestName?
 
 > `readonly` `optional` **manifestName?**: `string`
+
+<a id="maxskills"></a>
 
 ##### maxSkills?
 
@@ -50,13 +62,19 @@ Manifest-backed S3 catalog options.
 
 `Limits.maxSkills`
 
+<a id="prefix"></a>
+
 ##### prefix?
 
 > `readonly` `optional` **prefix?**: `string`
 
+<a id="region"></a>
+
 ##### region
 
 > `readonly` **region**: `string`
+
+<a id="toolsbyskill"></a>
 
 ##### toolsBySkill?
 
@@ -67,6 +85,8 @@ Manifest-backed S3 catalog options.
 `Limits.toolsBySkill`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -85,6 +105,8 @@ Build a manifest-backed S3 catalog layer.
 `ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog#layer)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

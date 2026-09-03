@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Where one scope's state is stored. The host owns every location decision.
 
 #### Properties
+
+<a id="path"></a>
 
 ##### path
 
@@ -29,6 +33,8 @@ Where one scope's state is stored. The host owns every location decision.
 `string`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -47,6 +53,8 @@ One durable filesystem-backed guidance store.
 `Layer.Layer`\<[`Store`](./Store#store), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

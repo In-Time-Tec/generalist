@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Generic HTTP skill catalog options.
@@ -18,6 +20,8 @@ Generic HTTP skill catalog options.
 
 #### Properties
 
+<a id="bodymaxbytes"></a>
+
 ##### bodyMaxBytes?
 
 > `readonly` `optional` **bodyMaxBytes?**: `number`
@@ -25,6 +29,8 @@ Generic HTTP skill catalog options.
 ###### Inherited from
 
 `Limits.bodyMaxBytes`
+
+<a id="manifestmaxbytes"></a>
 
 ##### manifestMaxBytes?
 
@@ -34,9 +40,13 @@ Generic HTTP skill catalog options.
 
 `Limits.manifestMaxBytes`
 
+<a id="manifesturl"></a>
+
 ##### manifestUrl
 
 > `readonly` **manifestUrl**: `string`
+
+<a id="maxskills"></a>
 
 ##### maxSkills?
 
@@ -45,6 +55,8 @@ Generic HTTP skill catalog options.
 ###### Inherited from
 
 `Limits.maxSkills`
+
+<a id="toolsbyskill"></a>
 
 ##### toolsBySkill?
 
@@ -55,6 +67,8 @@ Generic HTTP skill catalog options.
 `Limits.toolsBySkill`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -73,6 +87,8 @@ Build a generic HTTP catalog layer.
 `ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog#layer)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

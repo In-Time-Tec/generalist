@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="skillcatalog"></a>
+
 ### SkillCatalog
 
 #### Extends
@@ -15,6 +17,8 @@
 - `SkillCatalog_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="skillcatalogerror"></a>
+
 ### SkillCatalogError
 
 Skill catalog operation failed.
@@ -45,6 +51,8 @@ Skill catalog operation failed.
 - `SkillCatalogError_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ Skill catalog operation failed.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -73,6 +83,8 @@ Skill catalog operation failed.
 ###### Inherited from
 
 `SkillCatalogError_base.cause`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -82,6 +94,8 @@ Skill catalog operation failed.
 
 `SkillCatalogError_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -89,6 +103,8 @@ Skill catalog operation failed.
 ###### Inherited from
 
 `SkillCatalogError_base.message`
+
+<a id="source"></a>
 
 ##### source
 
@@ -100,15 +116,21 @@ Skill catalog operation failed.
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 Skill registry seam.
 
 #### Properties
 
+<a id="all"></a>
+
 ##### all
 
 > `readonly` **all**: `Effect`\<readonly [`Skill`](#skill)[], [`SkillCatalogError`](#skillcatalogerror)\>
+
+<a id="get"></a>
 
 ##### get
 
@@ -126,31 +148,45 @@ Skill registry seam.
 
 ***
 
+<a id="skill"></a>
+
 ### Skill
 
 A discovered skill.
 
 #### Properties
 
+<a id="allowedtools"></a>
+
 ##### allowedTools?
 
 > `readonly` `optional` **allowedTools?**: readonly `string`[]
+
+<a id="contextfork"></a>
 
 ##### contextFork?
 
 > `readonly` `optional` **contextFork?**: `boolean`
 
+<a id="description"></a>
+
 ##### description
 
 > `readonly` **description**: `string`
+
+<a id="disablemodelinvocation"></a>
 
 ##### disableModelInvocation?
 
 > `readonly` `optional` **disableModelInvocation?**: `boolean`
 
+<a id="instructions"></a>
+
 ##### instructions
 
 > `readonly` **instructions**: `Effect`\<`string`, [`SkillCatalogError`](#skillcatalogerror)\>
+
+<a id="location"></a>
 
 ##### location?
 
@@ -160,27 +196,39 @@ Where the skill was found, for a catalog that reads a filesystem. A host that re
 beside a skill needs the directory it came from rather than one derived from its name, because
 a catalog may find a skill anywhere beneath its root.
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="paths"></a>
 
 ##### paths?
 
 > `readonly` `optional` **paths?**: readonly `string`[]
 
+<a id="tools"></a>
+
 ##### tools
 
 > `readonly` **tools**: readonly `Any`[]
 
+<a id="userinvocable"></a>
+
 ##### userInvocable?
 
 > `readonly` `optional` **userInvocable?**: `boolean`
+
+<a id="whentouse"></a>
 
 ##### whenToUse?
 
 > `readonly` `optional` **whenToUse?**: `string`
 
 ## Variables
+
+<a id="descriptionlimit"></a>
 
 ### descriptionLimit
 
@@ -189,6 +237,8 @@ a catalog may find a skill anywhere beneath its root.
 Per-entry description character cap.
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -214,6 +264,8 @@ Build one layer from composable catalogs.
 
 ***
 
+<a id="layerempty"></a>
+
 ### layerEmpty
 
 > `const` **layerEmpty**: `Layer.Layer`\<[`SkillCatalog`](#skillcatalog)\>
@@ -221,6 +273,8 @@ Build one layer from composable catalogs.
 Empty skill catalog.
 
 ***
+
+<a id="layerskills"></a>
 
 ### layerSkills
 
@@ -240,6 +294,8 @@ A catalog built from in-memory skills.
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`SkillCatalog`](#skillcatalog)\>
@@ -255,6 +311,8 @@ A catalog built from in-memory skills.
 `Layer.Layer`\<[`SkillCatalog`](#skillcatalog)\>
 
 ***
+
+<a id="merge"></a>
 
 ### merge
 
@@ -295,6 +353,8 @@ Merge two catalogs with the second catalog winning duplicate names.
 [`Service`](#service)
 
 ***
+
+<a id="selectlistings"></a>
 
 ### selectListings
 

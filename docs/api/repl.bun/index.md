@@ -13,6 +13,8 @@
 
 ## Variables
 
+<a id="workermodule"></a>
+
 ### workerModule
 
 > `const` **workerModule**: `string`
@@ -22,6 +24,8 @@ Filesystem path of the kernel worker module a pool spawns. A host passes this as
 only supported way to locate it.
 
 ***
+
+<a id="workersupportmodules"></a>
 
 ### workerSupportModules
 

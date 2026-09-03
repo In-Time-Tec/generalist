@@ -10,6 +10,8 @@
 
 ## Classes
 
+<a id="agui"></a>
+
 ### AGUI
 
 **`Experimental`**
@@ -19,6 +21,8 @@
 - `AGUI_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,11 +46,15 @@
 
 ## Interfaces
 
+<a id="layeroptions"></a>
+
 ### LayerOptions
 
 **`Experimental`**
 
 #### Properties
+
+<a id="address"></a>
 
 ##### address
 
@@ -56,11 +64,15 @@
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
 
 #### Properties
+
+<a id="run"></a>
 
 ##### run
 
@@ -75,6 +87,8 @@
 ###### Returns
 
 `Stream`\<`objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`Omit`\<`object` & `object`, `"type"` \| `"messageId"`\> & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\> \| `objectOutputType`\<`object` & `object`, `ZodTypeAny`, `"passthrough"`\>, [`RunError`](#runerror)\>
+
+<a id="snapshot"></a>
 
 ##### snapshot
 
@@ -94,6 +108,8 @@
 
 ## Type Aliases
 
+<a id="runerror"></a>
+
 ### RunError
 
 > **RunError** = [`InputMalformed`](./Errors#inputmalformed) \| [`InputRejected`](./Errors#inputrejected) \| [`ResumeMismatch`](./Errors#resumemismatch) \| [`EventInvalid`](./Errors#eventinvalid) \| [`ValueNotSerializable`](./Errors#valuenotserializable) \| [`SendError`](../../runtime/namespaces/Runtime#senderror) \| [`ActivateError`](../../runtime/namespaces/Runtime#activateerror) \| [`EventsError`](../../runtime/namespaces/Runtime#eventserror) \| [`RespondError`](../../runtime/namespaces/Runtime#responderror) \| [`RespondApprovalError`](../../runtime/namespaces/Runtime#respondapprovalerror) \| [`InspectError`](../../runtime/namespaces/Runtime#inspecterror) \| [`SessionEntryError`](../../runtime/namespaces/Runtime#sessionentryerror)
@@ -101,6 +117,8 @@
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 

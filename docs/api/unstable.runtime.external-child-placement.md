@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="externalchildcapacityunavailable"></a>
+
 ### ExternalChildCapacityUnavailable
 
 No child slot is available; reservation made no mutation.
@@ -17,6 +19,8 @@ No child slot is available; reservation made no mutation.
 - `ExternalChildCapacityUnavailable_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ No child slot is available; reservation made no mutation.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ No child slot is available; reservation made no mutation.
 
 `ExternalChildCapacityUnavailable_base.hint`
 
+<a id="limit"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
@@ -53,6 +61,8 @@ No child slot is available; reservation made no mutation.
 ###### Inherited from
 
 `ExternalChildCapacityUnavailable_base.limit`
+
+<a id="parentrunid"></a>
 
 ##### parentRunId
 
@@ -64,6 +74,8 @@ No child slot is available; reservation made no mutation.
 
 ***
 
+<a id="externalchildplacementconflict"></a>
+
 ### ExternalChildPlacementConflict
 
 A placement id was replayed with different immutable facts.
@@ -73,6 +85,8 @@ A placement id was replayed with different immutable facts.
 - `ExternalChildPlacementConflict_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -94,6 +108,8 @@ A placement id was replayed with different immutable facts.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -101,6 +117,8 @@ A placement id was replayed with different immutable facts.
 ###### Inherited from
 
 `ExternalChildPlacementConflict_base.hint`
+
+<a id="placementid"></a>
 
 ##### placementId
 
@@ -112,6 +130,8 @@ A placement id was replayed with different immutable facts.
 
 ***
 
+<a id="externalchildplacementnotfound"></a>
+
 ### ExternalChildPlacementNotFound
 
 No external placement has this id.
@@ -121,6 +141,8 @@ No external placement has this id.
 - `ExternalChildPlacementNotFound_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -142,6 +164,8 @@ No external placement has this id.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -149,6 +173,8 @@ No external placement has this id.
 ###### Inherited from
 
 `ExternalChildPlacementNotFound_base.hint`
+
+<a id="placementid-1"></a>
 
 ##### placementId
 
@@ -160,6 +186,8 @@ No external placement has this id.
 
 ***
 
+<a id="externalchildsettlementconflict"></a>
+
 ### ExternalChildSettlementConflict
 
 A settlement identity was replayed with a different outcome.
@@ -169,6 +197,8 @@ A settlement identity was replayed with a different outcome.
 - `ExternalChildSettlementConflict_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -190,6 +220,8 @@ A settlement identity was replayed with a different outcome.
 
 #### Properties
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -198,6 +230,8 @@ A settlement identity was replayed with a different outcome.
 
 `ExternalChildSettlementConflict_base.hint`
 
+<a id="placementid-2"></a>
+
 ##### placementId
 
 > `readonly` **placementId**: `string`
@@ -205,6 +239,8 @@ A settlement identity was replayed with a different outcome.
 ###### Inherited from
 
 `ExternalChildSettlementConflict_base.placementId`
+
+<a id="settlementid"></a>
 
 ##### settlementId
 
@@ -216,6 +252,8 @@ A settlement identity was replayed with a different outcome.
 
 ***
 
+<a id="externalrootconflict"></a>
+
 ### ExternalRootConflict
 
 An external root identity was replayed with different immutable facts.
@@ -225,6 +263,8 @@ An external root identity was replayed with different immutable facts.
 - `ExternalRootConflict_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -246,6 +286,8 @@ An external root identity was replayed with different immutable facts.
 
 #### Properties
 
+<a id="hint-4"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -253,6 +295,8 @@ An external root identity was replayed with different immutable facts.
 ###### Inherited from
 
 `ExternalRootConflict_base.hint`
+
+<a id="placementid-3"></a>
 
 ##### placementId
 
@@ -264,6 +308,8 @@ An external root identity was replayed with different immutable facts.
 
 ***
 
+<a id="externalrootexecutablemismatch"></a>
+
 ### ExternalRootExecutableMismatch
 
 The supplied digest does not identify the root executable.
@@ -273,6 +319,8 @@ The supplied digest does not identify the root executable.
 - `ExternalRootExecutableMismatch_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -294,6 +342,8 @@ The supplied digest does not identify the root executable.
 
 #### Properties
 
+<a id="actual"></a>
+
 ##### actual
 
 > `readonly` **actual**: `string`
@@ -301,6 +351,8 @@ The supplied digest does not identify the root executable.
 ###### Inherited from
 
 `ExternalRootExecutableMismatch_base.actual`
+
+<a id="expected"></a>
 
 ##### expected
 
@@ -310,6 +362,8 @@ The supplied digest does not identify the root executable.
 
 `ExternalRootExecutableMismatch_base.expected`
 
+<a id="hint-5"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -317,6 +371,8 @@ The supplied digest does not identify the root executable.
 ###### Inherited from
 
 `ExternalRootExecutableMismatch_base.hint`
+
+<a id="placementid-4"></a>
 
 ##### placementId
 
@@ -328,6 +384,8 @@ The supplied digest does not identify the root executable.
 
 ***
 
+<a id="externalrootnotfound"></a>
+
 ### ExternalRootNotFound
 
 No locally owned external root has this placement id.
@@ -337,6 +395,8 @@ No locally owned external root has this placement id.
 - `ExternalRootNotFound_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -358,6 +418,8 @@ No locally owned external root has this placement id.
 
 #### Properties
 
+<a id="hint-6"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -365,6 +427,8 @@ No locally owned external root has this placement id.
 ###### Inherited from
 
 `ExternalRootNotFound_base.hint`
+
+<a id="placementid-5"></a>
 
 ##### placementId
 
@@ -376,6 +440,8 @@ No locally owned external root has this placement id.
 
 ## Type Aliases
 
+<a id="externalroot"></a>
+
 ### ExternalRoot
 
 > **ExternalRoot** = *typeof* `ExternalRoot.Type`
@@ -383,6 +449,8 @@ No locally owned external root has this placement id.
 A depth-zero child root owned by this partition.
 
 ***
+
+<a id="externalrootsettlement"></a>
 
 ### ExternalRootSettlement
 
@@ -392,6 +460,8 @@ Durable terminal delivery replayed until the parent acknowledges it.
 
 ***
 
+<a id="externalrunref"></a>
+
 ### ExternalRunRef
 
 > **ExternalRunRef** = *typeof* `ExternalRunRef.Type`
@@ -399,6 +469,8 @@ Durable terminal delivery replayed until the parent acknowledges it.
 A Run address owned by an external partition.
 
 ***
+
+<a id="parentsuspension"></a>
 
 ### ParentSuspension
 
@@ -408,6 +480,8 @@ Optional parent suspension committed atomically with external placement.
 
 ***
 
+<a id="placement"></a>
+
 ### Placement
 
 > **Placement** = *typeof* `Placement.Type`
@@ -416,6 +490,8 @@ Stored placement state returned by every placement operation.
 
 ***
 
+<a id="reserveinput"></a>
+
 ### ReserveInput
 
 > **ReserveInput** = *typeof* `ReserveInput.Type`
@@ -423,6 +499,8 @@ Stored placement state returned by every placement operation.
 Immutable admission facts plus current parent claim authority.
 
 ## Variables
+
+<a id="executabledigest"></a>
 
 ### executableDigest
 
@@ -442,6 +520,8 @@ Stable digest of the exact executable admitted on the child partition.
 
 ***
 
+<a id="externalroot-1"></a>
+
 ### ExternalRoot
 
 > `const` **ExternalRoot**: `Schema.Struct`\<\{ `activated`: `Schema.Boolean`; `admissionDigest`: `Schema.String`; `cancelRequested`: `Schema.Boolean`; `executableDigest`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./runtime/namespaces/Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: `unknown`; `session`: \{ `leafId`: `string` \| `null`; `sessionId`: `string`; \}; `text`: `string`; `turns`: `number`; \} \| \{ `_tag`: `"Program"`; `value`: `unknown`; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `parent`: `Schema.Struct`\<\{ `partition`: `Schema.String`; `runId`: `Schema.String`; \}\>; `placementId`: `Schema.String`; `ref`: `Schema.Struct`\<\{ `partition`: `Schema.String`; `runId`: `Schema.String`; \}\>; `requestDigest`: `Schema.String`; `sessionId`: `Schema.String`; `settlementAcknowledged`: `Schema.Boolean`; \}\>
@@ -449,6 +529,8 @@ Stable digest of the exact executable admitted on the child partition.
 A depth-zero child root owned by this partition.
 
 ***
+
+<a id="externalrootsettlement-1"></a>
 
 ### ExternalRootSettlement
 
@@ -458,6 +540,8 @@ Durable terminal delivery replayed until the parent acknowledges it.
 
 ***
 
+<a id="externalrunref-1"></a>
+
 ### ExternalRunRef
 
 > `const` **ExternalRunRef**: `Schema.Struct`\<\{ `partition`: `Schema.String`; `runId`: `Schema.String`; \}\>
@@ -465,6 +549,8 @@ Durable terminal delivery replayed until the parent acknowledges it.
 A Run address owned by an external partition.
 
 ***
+
+<a id="parentsuspension-1"></a>
 
 ### ParentSuspension
 
@@ -474,6 +560,8 @@ Optional parent suspension committed atomically with external placement.
 
 ***
 
+<a id="placement-1"></a>
+
 ### Placement
 
 > `const` **Placement**: `Schema.Struct`\<\{ `acknowledged`: `Schema.Boolean`; `cancelRequested`: `Schema.Boolean`; `executableDigest`: `Schema.String`; `invocationId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./runtime/namespaces/Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: `unknown`; `session`: \{ `leafId`: `string` \| `null`; `sessionId`: `string`; \}; `text`: `string`; `turns`: `number`; \} \| \{ `_tag`: `"Program"`; `value`: `unknown`; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `parentRunId`: `Schema.String`; `placementId`: `Schema.String`; `ref`: `Schema.Struct`\<\{ `partition`: `Schema.String`; `runId`: `Schema.String`; \}\>; `requestDigest`: `Schema.String`; `settled`: `Schema.Boolean`; `settlementId`: `Schema.optionalKey`\<`Schema.String`\>; `suspensionIdentity`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
@@ -482,6 +570,8 @@ Stored placement state returned by every placement operation.
 
 ***
 
+<a id="reserveinput-1"></a>
+
 ### ReserveInput
 
 > `const` **ReserveInput**: `Schema.Struct`\<\{ `attemptFence`: `Schema.Int`; `executableDigest`: `Schema.String`; `invocationId`: `Schema.String`; `ownerId`: `Schema.String`; `parentSuspension`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `checkpoint`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `budget`: ...; `driverVersion`: ...; `executable`: ...; `state`: ...; `turn`: ...; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `version`: ...; \}\>\]\>\>; `continuation`: `Schema.optionalKey`\<`Schema.NullOr`\<`Schema.Struct`\<\{ `nextTurn`: `Schema.Int`; `prompt`: `Schema.Codec`\<`Prompt`, `PromptEncoded`, `never`, `never`\>; `queue`: `Schema.optionalKey`\<`Schema.Literals`\<...\>\>; `schemaVersion`: `Schema.Literal`\<`1`\>; `steeringEntryIds`: `Schema.$Array`\<`Schema.String`\>; \}\>\>\>; `suspension`: `Schema.Codec`\<[`ExecutionSuspension`](./runtime/namespaces/ExecutionState#executionsuspension), `unknown`, `never`, `never`\>; `wait`: `Schema.Struct`\<\{ `closedAt`: `Schema.optionalKey`\<`Schema.String`\>; `openedAt`: `Schema.String`; `reason`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>, `Schema.TaggedStruct`\<..., ...\>\]\>; `resolution`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[..., ..., ..., ...\]\>\>; `status`: `Schema.Literals`\<readonly \[`"open"`, `"responded"`, `"signaled"`, `"cancelled"`\]\>; `waitId`: `Schema.String`; \}\>; \}\>\>; `placementId`: `Schema.String`; `ref`: `Schema.Struct`\<\{ `partition`: `Schema.String`; `runId`: `Schema.String`; \}\>; `requestDigest`: `Schema.String`; `runId`: `Schema.String`; `session`: `Schema.Struct`\<\{ `epoch`: `Schema.String`; `ownerId`: `Schema.String`; `runAttemptFence`: `Schema.Finite`; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>; \}\>
@@ -489,6 +579,8 @@ Stored placement state returned by every placement operation.
 Immutable admission facts plus current parent claim authority.
 
 ***
+
+<a id="suspensionidentity"></a>
 
 ### suspensionIdentity
 

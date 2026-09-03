@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="kernelsnapshotstore"></a>
+
 ### KernelSnapshotStore
 
 #### Extends
@@ -15,6 +17,8 @@
 - `KernelSnapshotStore_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="kernelstateunavailable"></a>
+
 ### KernelStateUnavailable
 
 A snapshot store operation failed. Restore failure is non-fatal and reported.
@@ -45,6 +51,8 @@ A snapshot store operation failed. Restore failure is non-fatal and reported.
 - `KernelStateUnavailable_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ A snapshot store operation failed. Restore failure is non-fatal and reported.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -73,6 +83,8 @@ A snapshot store operation failed. Restore failure is non-fatal and reported.
 ###### Inherited from
 
 `KernelStateUnavailable_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -82,6 +94,8 @@ A snapshot store operation failed. Restore failure is non-fatal and reported.
 
 `KernelStateUnavailable_base.message`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"missing"` \| `"corrupt"` \| `"io"`
@@ -89,6 +103,8 @@ A snapshot store operation failed. Restore failure is non-fatal and reported.
 ###### Inherited from
 
 `KernelStateUnavailable_base.reason`
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -100,12 +116,16 @@ A snapshot store operation failed. Restore failure is non-fatal and reported.
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 Best-effort namespace persistence. Never durable authority: Generalist operations,
 events, Session entries, and children remain the only truth.
 
 #### Properties
+
+<a id="drop"></a>
 
 ##### drop
 
@@ -121,6 +141,8 @@ events, Session entries, and children remain the only truth.
 
 `Effect`\<`void`, [`KernelStateUnavailable`](#kernelstateunavailable)\>
 
+<a id="load"></a>
+
 ##### load
 
 > `readonly` **load**: (`sessionId`) => `Effect`\<[`Snapshot`](#snapshot) \| `undefined`, [`KernelStateUnavailable`](#kernelstateunavailable)\>
@@ -134,6 +156,8 @@ events, Session entries, and children remain the only truth.
 ###### Returns
 
 `Effect`\<[`Snapshot`](#snapshot) \| `undefined`, [`KernelStateUnavailable`](#kernelstateunavailable)\>
+
+<a id="loadimmutable"></a>
 
 ##### loadImmutable
 
@@ -151,6 +175,8 @@ Load one immutable namespace image by its durable content identity.
 
 `Effect`\<[`Snapshot`](#snapshot) \| `undefined`, [`KernelStateUnavailable`](#kernelstateunavailable)\>
 
+<a id="save"></a>
+
 ##### save
 
 > `readonly` **save**: (`snapshot`) => `Effect`\<`void`, [`KernelStateUnavailable`](#kernelstateunavailable)\>
@@ -164,6 +190,8 @@ Load one immutable namespace image by its durable content identity.
 ###### Returns
 
 `Effect`\<`void`, [`KernelStateUnavailable`](#kernelstateunavailable)\>
+
+<a id="saveimmutable"></a>
 
 ##### saveImmutable
 
@@ -183,11 +211,15 @@ Persist one immutable namespace image and return its durable content identity.
 
 ***
 
+<a id="snapshot"></a>
+
 ### Snapshot
 
 One persisted kernel namespace: opaque payload plus its manifest.
 
 #### Properties
+
+<a id="manifest"></a>
 
 ##### manifest
 
@@ -217,11 +249,15 @@ One persisted kernel namespace: opaque payload plus its manifest.
 
 > `readonly` **sessionId**: `string`
 
+<a id="payload"></a>
+
 ##### payload
 
 > `readonly` **payload**: `Uint8Array`
 
 ## Type Aliases
+
+<a id="droppedbinding"></a>
 
 ### DroppedBinding
 
@@ -230,6 +266,8 @@ One persisted kernel namespace: opaque payload plus its manifest.
 One binding the snapshot could not carry, and why.
 
 ***
+
+<a id="manifest-1"></a>
 
 ### Manifest
 
@@ -240,6 +278,8 @@ back and every binding that does not, so the model is told exactly what it lost.
 
 ***
 
+<a id="restoredbinding"></a>
+
 ### RestoredBinding
 
 > **RestoredBinding** = *typeof* `RestoredBinding.Type`
@@ -247,6 +287,8 @@ back and every binding that does not, so the model is told exactly what it lost.
 One binding that survived the snapshot.
 
 ***
+
+<a id="restorekind"></a>
 
 ### RestoreKind
 
@@ -256,6 +298,8 @@ How one binding was put back into a restored namespace.
 
 ## Variables
 
+<a id="droppedbinding-1"></a>
+
 ### DroppedBinding
 
 > `const` **DroppedBinding**: `Schema.Struct`\<\{ `name`: `Schema.String`; `reason`: `Schema.Literals`\<readonly \[`"function"`, `"class"`, `"module"`, `"live-handle"`, `"oversized"`, `"unserializable"`\]\>; \}\>
@@ -263,6 +307,8 @@ How one binding was put back into a restored namespace.
 One binding the snapshot could not carry, and why.
 
 ***
+
+<a id="manifest-2"></a>
 
 ### Manifest
 
@@ -273,6 +319,8 @@ back and every binding that does not, so the model is told exactly what it lost.
 
 ***
 
+<a id="restoredbinding-1"></a>
+
 ### RestoredBinding
 
 > `const` **RestoredBinding**: `Schema.Struct`\<\{ `kind`: `Schema.Literals`\<readonly \[`"value"`, `"source"`, `"import"`\]\>; `name`: `Schema.String`; \}\>
@@ -281,6 +329,8 @@ One binding that survived the snapshot.
 
 ***
 
+<a id="restorekind-1"></a>
+
 ### RestoreKind
 
 > `const` **RestoreKind**: `Schema.Literals`\<readonly \[`"value"`, `"source"`, `"import"`\]\>
@@ -288,6 +338,8 @@ One binding that survived the snapshot.
 How one binding was put back into a restored namespace.
 
 ***
+
+<a id="snapshotid"></a>
 
 ### snapshotId
 

@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="options"></a>
+
 ### Options
 
 > **Options** = `BunSqliteStoreOptions`

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="inboxfull"></a>
+
 ### InboxFull
 
 A finite Run inbox rejected an input without admitting it.
@@ -17,6 +19,8 @@ A finite Run inbox rejected an input without admitting it.
 - `InboxFull_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A finite Run inbox rejected an input without admitting it.
 
 #### Properties
 
+<a id="dimension"></a>
+
 ##### dimension
 
 > `readonly` **dimension**: `"bytes"` \| `"entries"`
@@ -45,6 +51,8 @@ A finite Run inbox rejected an input without admitting it.
 ###### Inherited from
 
 `InboxFull_base.dimension`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -54,6 +62,8 @@ A finite Run inbox rejected an input without admitting it.
 
 `InboxFull_base.hint`
 
+<a id="limit"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
@@ -62,6 +72,8 @@ A finite Run inbox rejected an input without admitting it.
 
 `InboxFull_base.limit`
 
+<a id="queue"></a>
+
 ##### queue
 
 > `readonly` **queue**: `"steering"` \| `"followUp"`
@@ -69,6 +81,8 @@ A finite Run inbox rejected an input without admitting it.
 ###### Inherited from
 
 `InboxFull_base.queue`
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -80,6 +94,8 @@ A finite Run inbox rejected an input without admitting it.
 
 ***
 
+<a id="policyinvalid"></a>
+
 ### PolicyInvalid
 
 A process-local Run inbox policy is not finite and positive.
@@ -89,6 +105,8 @@ A process-local Run inbox policy is not finite and positive.
 - `PolicyInvalid_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -110,6 +128,8 @@ A process-local Run inbox policy is not finite and positive.
 
 #### Properties
 
+<a id="field"></a>
+
 ##### field
 
 > `readonly` **field**: `string`
@@ -118,6 +138,8 @@ A process-local Run inbox policy is not finite and positive.
 
 `PolicyInvalid_base.field`
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -125,6 +147,8 @@ A process-local Run inbox policy is not finite and positive.
 ###### Inherited from
 
 `PolicyInvalid_base.hint`
+
+<a id="value"></a>
 
 ##### value
 
@@ -136,6 +160,8 @@ A process-local Run inbox policy is not finite and positive.
 
 ***
 
+<a id="rollbackrequiresruntime"></a>
+
 ### RollbackRequiresRuntime
 
 Rollback needs a durable journal and is unavailable for a process-local Run.
@@ -145,6 +171,8 @@ Rollback needs a durable journal and is unavailable for a process-local Run.
 - `RollbackRequiresRuntime_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -166,6 +194,8 @@ Rollback needs a durable journal and is unavailable for a process-local Run.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -173,6 +203,8 @@ Rollback needs a durable journal and is unavailable for a process-local Run.
 ###### Inherited from
 
 `RollbackRequiresRuntime_base.hint`
+
+<a id="runid-1"></a>
 
 ##### runId
 
@@ -184,6 +216,8 @@ Rollback needs a durable journal and is unavailable for a process-local Run.
 
 ***
 
+<a id="runbusy"></a>
+
 ### RunBusy
 
 A reject-policy message arrived while its process-local Run was executing.
@@ -193,6 +227,8 @@ A reject-policy message arrived while its process-local Run was executing.
 - `RunBusy_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -214,6 +250,8 @@ A reject-policy message arrived while its process-local Run was executing.
 
 #### Properties
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -221,6 +259,8 @@ A reject-policy message arrived while its process-local Run was executing.
 ###### Inherited from
 
 `RunBusy_base.hint`
+
+<a id="runid-2"></a>
 
 ##### runId
 
@@ -232,6 +272,8 @@ A reject-policy message arrived while its process-local Run was executing.
 
 ***
 
+<a id="runclosed"></a>
+
 ### RunClosed
 
 A producer attempted to address a Run after its inbox closed.
@@ -241,6 +283,8 @@ A producer attempted to address a Run after its inbox closed.
 - `RunClosed_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -262,6 +306,8 @@ A producer attempted to address a Run after its inbox closed.
 
 #### Properties
 
+<a id="hint-4"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -269,6 +315,8 @@ A producer attempted to address a Run after its inbox closed.
 ###### Inherited from
 
 `RunClosed_base.hint`
+
+<a id="runid-3"></a>
 
 ##### runId
 
@@ -280,11 +328,15 @@ A producer attempted to address a Run after its inbox closed.
 
 ## Interfaces
 
+<a id="input"></a>
+
 ### Input
 
 Prompt injected into a live agent run.
 
 #### Properties
+
+<a id="prompt"></a>
 
 ##### prompt
 
@@ -292,19 +344,27 @@ Prompt injected into a live agent run.
 
 ***
 
+<a id="options"></a>
+
 ### Options
 
 Per-Run process-local steering policy.
 
 #### Properties
 
+<a id="followup"></a>
+
 ##### followUp?
 
 > `readonly` `optional` **followUp?**: [`QueuePolicy`](#queuepolicy)
 
+<a id="maxpendingbytes"></a>
+
 ##### maxPendingBytes?
 
 > `readonly` `optional` **maxPendingBytes?**: `number`
+
+<a id="steering"></a>
 
 ##### steering?
 
@@ -312,11 +372,15 @@ Per-Run process-local steering policy.
 
 ***
 
+<a id="producer"></a>
+
 ### Producer
 
 Producer-only process-local control capability for one Run.
 
 #### Properties
+
+<a id="followup-1"></a>
 
 ##### followUp
 
@@ -331,6 +395,8 @@ Producer-only process-local control capability for one Run.
 ###### Returns
 
 `Effect`\<\{ `bytes`: `number`; `queue`: `"steering"` \| `"followUp"`; `runId`: `string`; `sequence`: `number`; \}, [`InboxFull`](#inboxfull) \| [`RunClosed`](#runclosed)\>
+
+<a id="steer"></a>
 
 ##### steer
 
@@ -348,25 +414,35 @@ Producer-only process-local control capability for one Run.
 
 ***
 
+<a id="queuepolicy"></a>
+
 ### QueuePolicy
 
 Policy for one steering queue.
 
 #### Properties
 
+<a id="capacity"></a>
+
 ##### capacity?
 
 > `readonly` `optional` **capacity?**: `number`
 
+<a id="mode"></a>
+
 ##### mode?
 
 > `readonly` `optional` **mode?**: [`DrainMode`](#drainmode)
+
+<a id="onfull"></a>
 
 ##### onFull?
 
 > `readonly` `optional` **onFull?**: [`OverflowStrategy`](#overflowstrategy)
 
 ## Type Aliases
+
+<a id="admissionpolicy"></a>
 
 ### AdmissionPolicy
 
@@ -376,6 +452,8 @@ When one message may enter its target Run.
 
 ***
 
+<a id="drainmode"></a>
+
 ### DrainMode
 
 > **DrainMode** = `"all"` \| `"one-at-a-time"`
@@ -383,6 +461,8 @@ When one message may enter its target Run.
 How many queued inputs to drain at a boundary.
 
 ***
+
+<a id="overflowstrategy"></a>
 
 ### OverflowStrategy
 
@@ -392,6 +472,8 @@ How a process-local producer behaves while its Run inbox is full.
 
 ***
 
+<a id="queuename"></a>
+
 ### QueueName
 
 > **QueueName** = `"steering"` \| `"followUp"`
@@ -399,6 +481,8 @@ How a process-local producer behaves while its Run inbox is full.
 Queue identity for typed steering errors.
 
 ***
+
+<a id="receipt"></a>
 
 ### Receipt
 
@@ -408,6 +492,8 @@ Stable receipt for one process-local Run input.
 
 ## Variables
 
+<a id="admissionpolicy-1"></a>
+
 ### AdmissionPolicy
 
 > `const` **AdmissionPolicy**: `Schema.Literals`\<readonly \[`"steer"`, `"enqueue"`, `"interrupt"`, `"rollback"`, `"reject"`\]\>
@@ -415,6 +501,8 @@ Stable receipt for one process-local Run input.
 When one message may enter its target Run.
 
 ***
+
+<a id="defaultcapacity"></a>
 
 ### defaultCapacity
 
@@ -424,6 +512,8 @@ Default maximum queued entries in each process-local or durable steering lane.
 
 ***
 
+<a id="defaultmaxpendingbytes"></a>
+
 ### defaultMaxPendingBytes
 
 > `const` **defaultMaxPendingBytes**: `1048576` = `1048576`
@@ -431,6 +521,8 @@ Default maximum queued entries in each process-local or durable steering lane.
 Default aggregate encoded prompt bytes pending for one Run.
 
 ***
+
+<a id="promptbytes"></a>
 
 ### promptBytes
 
@@ -449,6 +541,8 @@ Encoded size charged against the aggregate Run inbox byte bound.
 `number`
 
 ***
+
+<a id="receipt-1"></a>
 
 ### Receipt
 

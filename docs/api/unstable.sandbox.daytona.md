@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
@@ -16,17 +18,23 @@ Daytona hosted sandbox configuration.
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Config`\<`Redacted`\<`string`\>\>
 
 **`Experimental`**
 
+<a id="autopauseafter"></a>
+
 ##### autoPauseAfter?
 
 > `readonly` `optional` **autoPauseAfter?**: `Input`
 
 **`Experimental`**
+
+<a id="image"></a>
 
 ##### image
 
@@ -36,6 +44,8 @@ Daytona hosted sandbox configuration.
 
 OCI image for containers; existing Daytona VM snapshot for `linux-vm`.
 
+<a id="sandboxclass"></a>
+
 ##### sandboxClass
 
 > `readonly` **sandboxClass**: `"container"` \| `"linux-vm"`
@@ -43,6 +53,8 @@ OCI image for containers; existing Daytona VM snapshot for `linux-vm`.
 **`Experimental`**
 
 ***
+
+<a id="provideroptions"></a>
 
 ### ProviderOptions
 
@@ -56,11 +68,15 @@ Resolved Daytona configuration used by recorded fixtures.
 
 #### Properties
 
+<a id="apikey-1"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Redacted`\<`string`\>
 
 **`Experimental`**
+
+<a id="autopauseafter-1"></a>
 
 ##### autoPauseAfter?
 
@@ -71,6 +87,8 @@ Resolved Daytona configuration used by recorded fixtures.
 ###### Inherited from
 
 [`Options`](#options).[`autoPauseAfter`](#autopauseafter)
+
+<a id="image-1"></a>
 
 ##### image
 
@@ -84,6 +102,8 @@ OCI image for containers; existing Daytona VM snapshot for `linux-vm`.
 
 [`Options`](#options).[`image`](#image)
 
+<a id="sandboxclass-1"></a>
+
 ##### sandboxClass
 
 > `readonly` **sandboxClass**: `"container"` \| `"linux-vm"`
@@ -96,6 +116,8 @@ OCI image for containers; existing Daytona VM snapshot for `linux-vm`.
 
 ## Type Aliases
 
+<a id="sandboxclass-2"></a>
+
 ### SandboxClass
 
 > **SandboxClass** = *typeof* `SandboxClass.Type`
@@ -105,6 +127,8 @@ OCI image for containers; existing Daytona VM snapshot for `linux-vm`.
 Daytona sandbox class supported by this leaf.
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -125,6 +149,8 @@ Provide the hosted Daytona Sandbox leaf.
 `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="makeprovider"></a>
 
 ### makeProvider
 

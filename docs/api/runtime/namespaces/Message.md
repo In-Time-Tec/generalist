@@ -8,17 +8,23 @@
 
 ## Type Aliases
 
+<a id="message"></a>
+
 ### Message
 
 > **Message** = *typeof* `Message.Type`
 
 ***
 
+<a id="metadata"></a>
+
 ### Metadata
 
 > **Metadata** = *typeof* `Metadata.Type`
 
 ## Variables
+
+<a id="make"></a>
 
 ### make
 
@@ -74,17 +80,23 @@
 
 ***
 
+<a id="message-1"></a>
+
 ### Message
 
 > `const` **Message**: `Schema.Struct`\<\{ `causationId`: `Schema.optionalKey`\<`Schema.String`\>; `correlationId`: `Schema.String`; `from`: `Schema.optionalKey`\<`Schema.brand`\<`Schema.String`, `"Address"`\>\>; `id`: `Schema.String`; `idempotencyKey`: `Schema.String`; `inReplyTo`: `Schema.optionalKey`\<`Schema.String`\>; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `sessionId`: `Schema.String`; `to`: `Schema.brand`\<`Schema.String`, `"Address"`\>; \}\>
 
 ***
 
+<a id="metadata-1"></a>
+
 ### Metadata
 
 > `const` **Metadata**: `Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>
 
 ## Functions
+
+<a id="decode"></a>
 
 ### decode()
 
@@ -159,6 +171,8 @@
 (`input`) => `Effect`\<\{ `causationId?`: `string`; `correlationId`: `string`; `from?`: `string` & `Brand`\<`"Address"`\>; `id`: `string`; `idempotencyKey`: `string`; `inReplyTo?`: `string`; `metadata`: \{\[`key`: `string`\]: `unknown`; \}; `prompt`: `Prompt`; `sessionId`: `string`; `to`: `string` & `Brand`\<`"Address"`\>; \}, `SchemaError`, `never`\>
 
 ***
+
+<a id="encode"></a>
 
 ### encode()
 

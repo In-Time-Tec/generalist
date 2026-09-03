@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="watcher"></a>
+
 ### Watcher
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Watcher_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,9 +40,13 @@
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="watch"></a>
 
 ##### watch
 
@@ -58,19 +66,27 @@ Stream typed file changes from the host FileSystem watch capability.
 
 ***
 
+<a id="watchoptions"></a>
+
 ### WatchOptions
 
 #### Properties
 
+<a id="path"></a>
+
 ##### path
 
 > `readonly` **path**: `string`
+
+<a id="recursive"></a>
 
 ##### recursive?
 
 > `readonly` `optional` **recursive?**: `boolean`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -79,6 +95,8 @@ Stream typed file changes from the host FileSystem watch capability.
 FileSystem-backed environmental watch capability. Unsupported hosts omit this Layer.
 
 ***
+
+<a id="make"></a>
 
 ### make
 

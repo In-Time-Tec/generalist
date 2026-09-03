@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="agentexecutionresult"></a>
+
 ### AgentExecutionResult
 
 > **AgentExecutionResult** = *typeof* `AgentExecutionResult.Type`
@@ -15,6 +17,8 @@
 Terminal value produced by an Agent execution.
 
 ***
+
+<a id="executioncheckpoint"></a>
 
 ### ExecutionCheckpoint
 
@@ -24,6 +28,8 @@ Executable-neutral persisted continuation state.
 
 ***
 
+<a id="executionresult"></a>
+
 ### ExecutionResult
 
 > **ExecutionResult** = *typeof* `ExecutionResult.Type`
@@ -31,6 +37,8 @@ Executable-neutral persisted continuation state.
 Executable-neutral terminal result.
 
 ***
+
+<a id="executionsuspension"></a>
 
 ### ExecutionSuspension
 
@@ -40,6 +48,8 @@ Executable-neutral persisted suspension state.
 
 ***
 
+<a id="programcheckpoint"></a>
+
 ### ProgramCheckpoint
 
 > **ProgramCheckpoint** = *typeof* `ProgramCheckpoint.Type`
@@ -47,6 +57,8 @@ Executable-neutral persisted suspension state.
 Fresh-sandbox replay frontier for an Agent Program.
 
 ***
+
+<a id="programexecutionresult"></a>
 
 ### ProgramExecutionResult
 
@@ -56,11 +68,15 @@ Terminal value produced by an Agent Program execution.
 
 ***
 
+<a id="sessioncursor"></a>
+
 ### SessionCursor
 
 > **SessionCursor** = *typeof* `SessionCursor.Type`
 
 ## Variables
+
+<a id="agentexecutionresult-1"></a>
 
 ### AgentExecutionResult
 
@@ -70,6 +86,8 @@ Terminal value produced by an Agent execution.
 
 ***
 
+<a id="executioncheckpoint-1"></a>
+
 ### ExecutionCheckpoint
 
 > `const` **ExecutionCheckpoint**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `version`: `Schema.Literal`\<`"1"`\>; \}\>\]\>
@@ -77,6 +95,8 @@ Terminal value produced by an Agent execution.
 Executable-neutral persisted continuation state.
 
 ***
+
+<a id="executionresult-1"></a>
 
 ### ExecutionResult
 
@@ -86,11 +106,15 @@ Executable-neutral terminal result.
 
 ***
 
+<a id="executionsuspension-1"></a>
+
 ### ExecutionSuspension
 
 > **ExecutionSuspension**: `Codec`\<[`ExecutionSuspension`](#executionsuspension), `unknown`, `never`, `never`\>
 
 ***
+
+<a id="programcheckpoint-1"></a>
 
 ### ProgramCheckpoint
 
@@ -100,6 +124,8 @@ Fresh-sandbox replay frontier for an Agent Program.
 
 ***
 
+<a id="programexecutionresult-1"></a>
+
 ### ProgramExecutionResult
 
 > `const` **ProgramExecutionResult**: `Schema.TaggedStruct`\<`"Program"`, \{ `value`: `Schema.Unknown`; \}\>
@@ -107,6 +133,8 @@ Fresh-sandbox replay frontier for an Agent Program.
 Terminal value produced by an Agent Program execution.
 
 ***
+
+<a id="sessioncursor-1"></a>
 
 ### SessionCursor
 

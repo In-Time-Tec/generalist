@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="dependencies"></a>
+
 ### Dependencies
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Dependencies_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="store"></a>
+
 ### Store
 
 #### Extends
@@ -43,6 +49,8 @@
 - `Store_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -64,17 +72,25 @@
 
 ## Interfaces
 
+<a id="dependencyoptions"></a>
+
 ### DependencyOptions
 
 #### Properties
+
+<a id="capabilityscope"></a>
 
 ##### capabilityScope
 
 > `readonly` **capabilityScope**: `string`
 
+<a id="tenant"></a>
+
 ##### tenant
 
 > `readonly` **tenant**: `string`
+
+<a id="versions"></a>
 
 ##### versions
 
@@ -82,17 +98,25 @@
 
 ***
 
+<a id="dependencyservice"></a>
+
 ### DependencyService
 
 #### Properties
+
+<a id="capabilityscope-1"></a>
 
 ##### capabilityScope
 
 > `readonly` **capabilityScope**: `string`
 
+<a id="tenant-1"></a>
+
 ##### tenant
 
 > `readonly` **tenant**: `string`
+
+<a id="version"></a>
 
 ##### version
 
@@ -110,6 +134,8 @@
 
 ***
 
+<a id="entry"></a>
+
 ### Entry
 
 #### Extends
@@ -118,9 +144,13 @@
 
 #### Properties
 
+<a id="expiresatmillis"></a>
+
 ##### expiresAtMillis
 
 > `readonly` **expiresAtMillis**: `number`
+
+<a id="fromoperation"></a>
 
 ##### fromOperation
 
@@ -130,6 +160,8 @@
 
 [`Provenance`](#provenance).[`fromOperation`](#fromoperation-1)
 
+<a id="fromrun"></a>
+
 ##### fromRun
 
 > `readonly` **fromRun**: `string`
@@ -138,15 +170,21 @@
 
 [`Provenance`](#provenance).[`fromRun`](#fromrun-1)
 
+<a id="value"></a>
+
 ##### value
 
 > `readonly` **value**: `unknown`
 
 ***
 
+<a id="layeroptions"></a>
+
 ### LayerOptions
 
 #### Properties
+
+<a id="models"></a>
 
 ##### models?
 
@@ -154,25 +192,35 @@
 
 ***
 
+<a id="models-1"></a>
+
 ### Models
 
 #### Properties
+
+<a id="enabled"></a>
 
 ##### enabled
 
 > `readonly` **enabled**: `boolean`
 
 ***
+
+<a id="modelsoptions"></a>
 
 ### ModelsOptions
 
 #### Properties
 
+<a id="enabled-1"></a>
+
 ##### enabled
 
 > `readonly` **enabled**: `boolean`
 
 ***
+
+<a id="provenance"></a>
 
 ### Provenance
 
@@ -182,9 +230,13 @@
 
 #### Properties
 
+<a id="fromoperation-1"></a>
+
 ##### fromOperation
 
 > `readonly` **fromOperation**: `string`
+
+<a id="fromrun-1"></a>
 
 ##### fromRun
 
@@ -192,13 +244,19 @@
 
 ***
 
+<a id="pureoptions"></a>
+
 ### PureOptions
 
 #### Properties
 
+<a id="dependson"></a>
+
 ##### dependsOn?
 
 > `readonly` `optional` **dependsOn?**: readonly `string`[]
+
+<a id="ttl"></a>
 
 ##### ttl
 
@@ -206,9 +264,13 @@
 
 ***
 
+<a id="storeservice"></a>
+
 ### StoreService
 
 #### Properties
+
+<a id="get"></a>
 
 ##### get
 
@@ -224,9 +286,13 @@
 
 `Effect`\<`Option`\<[`Entry`](#entry)\>\>
 
+<a id="modelsenabled-1"></a>
+
 ##### modelsEnabled
 
 > `readonly` **modelsEnabled**: `boolean`
+
+<a id="put"></a>
 
 ##### put
 
@@ -248,6 +314,8 @@
 
 ## Variables
 
+<a id="layerdependencies"></a>
+
 ### layerDependencies
 
 > `const` **layerDependencies**: (`options`) => `Layer.Layer`\<[`Dependencies`](#dependencies)\>
@@ -263,6 +331,8 @@
 `Layer.Layer`\<[`Dependencies`](#dependencies)\>
 
 ***
+
+<a id="layermemory"></a>
 
 ### layerMemory
 
@@ -280,6 +350,8 @@
 
 ***
 
+<a id="layersql"></a>
+
 ### layerSql
 
 > `const` **layerSql**: (`options?`) => `Layer.Layer`\<[`Store`](#store), `never`, `SqlClient.SqlClient`\>
@@ -296,6 +368,8 @@
 
 ***
 
+<a id="models-2"></a>
+
 ### models
 
 > `const` **models**: (`options`) => [`Models`](#models-1)
@@ -311,6 +385,8 @@
 [`Models`](#models-1)
 
 ***
+
+<a id="pure"></a>
 
 ### pure
 

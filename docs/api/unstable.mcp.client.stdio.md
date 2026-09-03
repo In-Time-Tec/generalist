@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
 
 #### Properties
+
+<a id="calltimeout"></a>
 
 ##### callTimeout?
 
@@ -20,11 +24,15 @@
 
 **`Experimental`**
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
 
 **`Experimental`**
+
+<a id="transport"></a>
 
 ##### transport
 
@@ -34,6 +42,8 @@
 
 ***
 
+<a id="transportoptions"></a>
+
 ### TransportOptions
 
 **`Experimental`**
@@ -42,17 +52,23 @@ Node/Bun-only stdio transport options.
 
 #### Properties
 
+<a id="args"></a>
+
 ##### args?
 
 > `readonly` `optional` **args?**: readonly `string`[]
 
 **`Experimental`**
 
+<a id="command"></a>
+
 ##### command
 
 > `readonly` **command**: `string`
 
 **`Experimental`**
+
+<a id="env"></a>
 
 ##### env?
 
@@ -61,6 +77,8 @@ Node/Bun-only stdio transport options.
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -79,6 +97,8 @@ Node/Bun-only stdio transport options.
 `Layer.Layer`\<[`MCPClient`](./unstable.mcp.client#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
 
 ***
+
+<a id="layertagged"></a>
 
 ### layerTagged
 
@@ -125,6 +145,8 @@ Node/Bun-only stdio transport options.
 `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

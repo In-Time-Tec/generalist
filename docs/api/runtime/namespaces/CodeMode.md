@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="programadmissionfailed"></a>
+
 ### ProgramAdmissionFailed
 
 #### Extends
@@ -15,6 +17,8 @@
 - `ProgramAdmissionFailed_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `ProgramAdmissionFailed_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -54,6 +62,8 @@
 
 ***
 
+<a id="programauthorityexceeded"></a>
+
 ### ProgramAuthorityExceeded
 
 #### Extends
@@ -61,6 +71,8 @@
 - `ProgramAuthorityExceeded_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -82,6 +94,8 @@
 
 #### Properties
 
+<a id="allowedids"></a>
+
 ##### allowedIds
 
 > `readonly` **allowedIds**: readonly `string`[]
@@ -89,6 +103,8 @@
 ###### Inherited from
 
 `ProgramAuthorityExceeded_base.allowedIds`
+
+<a id="dimension"></a>
 
 ##### dimension
 
@@ -98,6 +114,8 @@
 
 `ProgramAuthorityExceeded_base.dimension`
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -106,6 +124,8 @@
 
 `ProgramAuthorityExceeded_base.hint`
 
+<a id="message-1"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -113,6 +133,8 @@
 ###### Inherited from
 
 `ProgramAuthorityExceeded_base.message`
+
+<a id="requestedid"></a>
 
 ##### requestedId?
 
@@ -124,6 +146,8 @@
 
 ***
 
+<a id="programauthoritymissing"></a>
+
 ### ProgramAuthorityMissing
 
 #### Extends
@@ -131,6 +155,8 @@
 - `ProgramAuthorityMissing_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -152,6 +178,8 @@
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -159,6 +187,8 @@
 ###### Inherited from
 
 `ProgramAuthorityMissing_base.hint`
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -170,19 +200,27 @@
 
 ## Interfaces
 
+<a id="authoritycatalog"></a>
+
 ### AuthorityCatalog
 
 Exact selection IDs advertised to the model for one ProgramAuthority.
 
 #### Properties
 
+<a id="agents"></a>
+
 ##### agents
 
 > `readonly` **agents**: readonly `string`[]
 
+<a id="steps"></a>
+
 ##### steps
 
 > `readonly` **steps**: readonly `string`[]
+
+<a id="tools"></a>
 
 ##### tools
 
@@ -190,15 +228,21 @@ Exact selection IDs advertised to the model for one ProgramAuthority.
 
 ***
 
+<a id="parameters"></a>
+
 ### Parameters
 
 Exact model-authored Program request admitted only through an authorized Agent Run.
 
 #### Properties
 
+<a id="agents-1"></a>
+
 ##### agents
 
 > `readonly` **agents**: readonly `string`[]
+
+<a id="budget"></a>
 
 ##### budget
 
@@ -232,17 +276,25 @@ Exact model-authored Program request admitted only through an authorized Agent R
 
 > `readonly` **wallClockMillis**: `number`
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `string`
+
+<a id="source"></a>
 
 ##### source
 
 > `readonly` **source**: `string`
 
+<a id="steps-1"></a>
+
 ##### steps
 
 > `readonly` **steps**: readonly `string`[]
+
+<a id="tools-1"></a>
 
 ##### tools
 
@@ -250,9 +302,13 @@ Exact model-authored Program request admitted only through an authorized Agent R
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="admitsuspension"></a>
 
 ##### admitSuspension
 
@@ -286,6 +342,8 @@ readonly `object`[]
 
 `Effect`\<`void`, [`ProgramAdmissionFailed`](#programadmissionfailed)\>
 
+<a id="invoke"></a>
+
 ##### invoke
 
 > `readonly` **invoke**: (`request`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
@@ -300,15 +358,21 @@ readonly `object`[]
 
 `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
 
+<a id="parameters-1"></a>
+
 ##### parameters
 
 > `readonly` **parameters**: `Struct`\<\{ `agents`: `Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `budget`: `Struct`\<\{ `agentRuns`: `Int`; `concurrency`: `Int`; `logBytes`: `Int`; `outputBytes`: `Int`; `tokens`: `Int`; `toolCalls`: `Int`; `wallClockMillis`: `Int`; \}\>; `input`: `String`; `source`: `String`; `steps`: `Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `tools`: `Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; \}\>
+
+<a id="tool"></a>
 
 ##### tool
 
 > `readonly` **tool**: `Tool`\<`"code_mode"`\>
 
 ## Variables
+
+<a id="executor"></a>
 
 ### Executor
 
@@ -318,11 +382,15 @@ Tool executor that owns the code_mode route.
 
 #### Type Declaration
 
+<a id="make"></a>
+
 ##### make
 
 > **make**: *typeof* `makeExecutor`
 
 ***
+
+<a id="make-1"></a>
 
 ### make
 
@@ -356,6 +424,8 @@ Construct the Run-attempt scoped implementation; applications still own sandbox 
 
 ***
 
+<a id="makecatalog"></a>
+
 ### makeCatalog
 
 > `const` **makeCatalog**: (`authority`) => [`AuthorityCatalog`](#authoritycatalog)
@@ -373,6 +443,8 @@ Construct the exact canonical selection catalog for one ProgramAuthority.
 [`AuthorityCatalog`](#authoritycatalog)
 
 ***
+
+<a id="makeparameters"></a>
 
 ### makeParameters
 
@@ -392,6 +464,8 @@ Construct the model-visible request schema for one exact ProgramAuthority.
 
 ***
 
+<a id="maketool"></a>
+
 ### makeTool
 
 > `const` **makeTool**: (`authority`) => `Tool.Tool`\<`"code_mode"`, \{ `failure`: `Schema.Union`\<readonly \[*typeof* [`ProgramAuthorityMissing`](#programauthoritymissing), *typeof* [`ProgramAuthorityExceeded`](#programauthorityexceeded), *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed)\]\>; `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `agents`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `input`: `Schema.String`; `source`: `Schema.String`; `steps`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `tools`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; \}\>; `success`: `Schema.Unknown`; \}, `never`\>
@@ -409,6 +483,8 @@ Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority.
 `Tool.Tool`\<`"code_mode"`, \{ `failure`: `Schema.Union`\<readonly \[*typeof* [`ProgramAuthorityMissing`](#programauthoritymissing), *typeof* [`ProgramAuthorityExceeded`](#programauthorityexceeded), *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed)\]\>; `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `agents`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `input`: `Schema.String`; `source`: `Schema.String`; `steps`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `tools`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; \}\>; `success`: `Schema.Unknown`; \}, `never`\>
 
 ***
+
+<a id="withtool"></a>
 
 ### withTool
 

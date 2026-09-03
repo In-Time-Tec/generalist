@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="packagecatalog"></a>
+
 ### PackageCatalog
 
 #### Extends
@@ -15,6 +17,8 @@
 - `PackageCatalog_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="packagecatalogerror"></a>
+
 ### PackageCatalogError
 
 Package resolution or loading failed.
@@ -45,6 +51,8 @@ Package resolution or loading failed.
 - `PackageCatalogError_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ Package resolution or loading failed.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -73,6 +83,8 @@ Package resolution or loading failed.
 ###### Inherited from
 
 `PackageCatalogError_base.cause`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -82,6 +94,8 @@ Package resolution or loading failed.
 
 `PackageCatalogError_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -89,6 +103,8 @@ Package resolution or loading failed.
 ###### Inherited from
 
 `PackageCatalogError_base.message`
+
+<a id="source"></a>
 
 ##### source
 
@@ -100,6 +116,8 @@ Package resolution or loading failed.
 
 ***
 
+<a id="packageintegritymismatch"></a>
+
 ### PackageIntegrityMismatch
 
 A package does not match its locked integrity or resolution.
@@ -109,6 +127,8 @@ A package does not match its locked integrity or resolution.
 - `PackageIntegrityMismatch_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -130,6 +150,8 @@ A package does not match its locked integrity or resolution.
 
 #### Properties
 
+<a id="actual"></a>
+
 ##### actual
 
 > `readonly` **actual**: `string`
@@ -137,6 +159,8 @@ A package does not match its locked integrity or resolution.
 ###### Inherited from
 
 `PackageIntegrityMismatch_base.actual`
+
+<a id="expected"></a>
 
 ##### expected
 
@@ -146,6 +170,8 @@ A package does not match its locked integrity or resolution.
 
 `PackageIntegrityMismatch_base.expected`
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -153,6 +179,8 @@ A package does not match its locked integrity or resolution.
 ###### Inherited from
 
 `PackageIntegrityMismatch_base.hint`
+
+<a id="specifier"></a>
 
 ##### specifier
 
@@ -164,31 +192,45 @@ A package does not match its locked integrity or resolution.
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Package catalog configuration.
 
 #### Properties
 
+<a id="allowtools"></a>
+
 ##### allowTools?
 
 > `readonly` `optional` **allowTools?**: `boolean`
+
+<a id="cachedir"></a>
 
 ##### cacheDir
 
 > `readonly` **cacheDir**: `string`
 
+<a id="githubapiurl"></a>
+
 ##### githubApiUrl?
 
 > `readonly` `optional` **githubApiUrl?**: `string`
+
+<a id="lock"></a>
 
 ##### lock
 
 > `readonly` **lock**: `string`
 
+<a id="npmregistryurl"></a>
+
 ##### npmRegistryUrl?
 
 > `readonly` `optional` **npmRegistryUrl?**: `string`
+
+<a id="packages"></a>
 
 ##### packages
 
@@ -196,11 +238,15 @@ Package catalog configuration.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 A resolved package catalog.
 
 #### Properties
+
+<a id="handlers"></a>
 
 ##### handlers
 
@@ -208,19 +254,27 @@ A resolved package catalog.
 
 Every installed package's tool handlers; provide it wherever the toolkit runs.
 
+<a id="instructions"></a>
+
 ##### instructions
 
 > `readonly` **instructions**: readonly [`Provider`](../index#provider)\<`never`\>[]
 
+<a id="skills"></a>
+
 ##### skills
 
 > `readonly` **skills**: [`Service`](../../generalist/namespaces/SkillCatalog#service)
+
+<a id="toolkit"></a>
 
 ##### toolkit
 
 > `readonly` **toolkit**: `Toolkit`\<`Record`\<`string`, `PackageTool`\>\>
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 

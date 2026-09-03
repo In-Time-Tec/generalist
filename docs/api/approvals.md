@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="approvals"></a>
+
 ### Approvals
 
 Enforcement point for policy asks and `Ai.Tool.needsApproval`.
@@ -17,6 +19,8 @@ Enforcement point for policy asks and `Ai.Tool.needsApproval`.
 - `Approvals_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ Enforcement point for policy asks and `Ai.Tool.needsApproval`.
 
 ***
 
+<a id="approvaltokeninvalid"></a>
+
 ### ApprovalTokenInvalid
 
 A Runtime approval token was malformed or did not carry a Run identity.
@@ -47,6 +53,8 @@ A Runtime approval token was malformed or did not carry a Run identity.
 - `ApprovalTokenInvalid_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -68,6 +76,8 @@ A Runtime approval token was malformed or did not carry a Run identity.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -76,6 +86,8 @@ A Runtime approval token was malformed or did not carry a Run identity.
 
 `ApprovalTokenInvalid_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -83,6 +95,8 @@ A Runtime approval token was malformed or did not carry a Run identity.
 ###### Inherited from
 
 `ApprovalTokenInvalid_base.message`
+
+<a id="token"></a>
 
 ##### token
 
@@ -94,13 +108,19 @@ A Runtime approval token was malformed or did not carry a Run identity.
 
 ## Interfaces
 
+<a id="approved"></a>
+
 ### Approved
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Approved"`
+
+<a id="remember"></a>
 
 ##### remember?
 
@@ -108,19 +128,27 @@ A Runtime approval token was malformed or did not carry a Run identity.
 
 ***
 
+<a id="denied"></a>
+
 ### Denied
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Denied"`
+
+<a id="reason"></a>
 
 ##### reason?
 
 > `readonly` `optional` **reason?**: `string`
 
 ***
+
+<a id="durableoptions"></a>
 
 ### DurableOptions
 
@@ -131,6 +159,8 @@ A Runtime approval token was malformed or did not carry a Run identity.
 `R`
 
 #### Properties
+
+<a id="notify"></a>
 
 ##### notify
 
@@ -148,37 +178,53 @@ A Runtime approval token was malformed or did not carry a Run identity.
 
 ***
 
+<a id="durablerequest"></a>
+
 ### DurableRequest
 
 One durable approval notification.
 
 #### Properties
 
+<a id="args"></a>
+
 ##### args
 
 > `readonly` **args**: `unknown`
+
+<a id="level"></a>
 
 ##### level
 
 > `readonly` **level**: [`Level`](./permissions#level-1)
 
+<a id="reason-1"></a>
+
 ##### reason
 
 > `readonly` **reason**: `string`
+
+<a id="runid"></a>
 
 ##### runId
 
 > `readonly` **runId**: `string`
 
+<a id="token-1"></a>
+
 ##### token
 
 > `readonly` **token**: `string`
+
+<a id="tool"></a>
 
 ##### tool
 
 > `readonly` **tool**: `string`
 
 ***
+
+<a id="pending"></a>
 
 ### Pending
 
@@ -190,9 +236,13 @@ An unresolved authorization request.
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Pending"`
+
+<a id="agentname"></a>
 
 ##### agentName
 
@@ -202,6 +252,8 @@ An unresolved authorization request.
 
 [`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`agentName`](./generalist/namespaces/ToolAuthorization#agentname)
 
+<a id="call"></a>
+
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
@@ -210,13 +262,19 @@ An unresolved authorization request.
 
 [`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`call`](./generalist/namespaces/ToolAuthorization#call)
 
+<a id="level-1"></a>
+
 ##### level
 
 > `readonly` **level**: [`Level`](./permissions#level-1)
 
+<a id="reason-2"></a>
+
 ##### reason
 
 > `readonly` **reason**: `string`
+
+<a id="runid-1"></a>
 
 ##### runId?
 
@@ -226,6 +284,8 @@ An unresolved authorization request.
 
 [`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`runId`](./generalist/namespaces/ToolAuthorization#runid)
 
+<a id="sessionid"></a>
+
 ##### sessionId?
 
 > `readonly` `optional` **sessionId?**: `string`
@@ -234,9 +294,13 @@ An unresolved authorization request.
 
 [`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`sessionId`](./generalist/namespaces/ToolAuthorization#sessionid)
 
+<a id="token-2"></a>
+
 ##### token
 
 > `readonly` **token**: `string`
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -248,9 +312,13 @@ An unresolved authorization request.
 
 ***
 
+<a id="resolveoptions"></a>
+
 ### ResolveOptions
 
 #### Properties
+
+<a id="operator"></a>
 
 ##### operator
 
@@ -260,9 +328,13 @@ Operator identity journaled with the decision; also requires the token to be an 
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="resolve"></a>
 
 ##### resolve
 
@@ -280,6 +352,8 @@ Operator identity journaled with the decision; also requires the token to be an 
 
 ***
 
+<a id="tieredoptions"></a>
+
 ### TieredOptions
 
 #### Type Parameters
@@ -294,9 +368,13 @@ Operator identity journaled with the decision; also requires the token to be an 
 
 #### Properties
 
+<a id="ask"></a>
+
 ##### ask
 
 > `readonly` **ask**: `Layer`\<[`Approvals`](#approvals), `E`, `R`\>
+
+<a id="askabove"></a>
 
 ##### askAbove
 
@@ -304,17 +382,23 @@ Operator identity journaled with the decision; also requires the token to be an 
 
 ## Type Aliases
 
+<a id="resolution"></a>
+
 ### Resolution
 
 > **Resolution** = [`Approved`](#approved) \| [`Denied`](#denied) \| [`Pending`](#pending)
 
 ***
 
+<a id="resolveerror"></a>
+
 ### ResolveError
 
 > **ResolveError** = [`ApprovalTokenInvalid`](#approvaltokeninvalid) \| [`RespondApprovalError`](./runtime/namespaces/Runtime#respondapprovalerror) \| [`RuleStoreError`](./permissions#rulestoreerror) \| [`IllegalOperatorAction`](./runtime/namespaces/Errors#illegaloperatoraction)
 
 ## Variables
+
+<a id="approved-1"></a>
 
 ### Approved
 
@@ -334,6 +418,8 @@ Construct an approval, optionally remembering one permission rule.
 
 ***
 
+<a id="denied-1"></a>
+
 ### Denied
 
 > **Denied**: (`options?`) => [`Denied`](#denied)
@@ -352,6 +438,8 @@ Construct a denial with an optional operator-facing reason.
 
 ***
 
+<a id="layerautoapprove"></a>
+
 ### layerAutoApprove
 
 > `const` **layerAutoApprove**: `Layer.Layer`\<[`Approvals`](#approvals)\>
@@ -359,6 +447,8 @@ Construct a denial with an optional operator-facing reason.
 Default: every request resolves Approved.
 
 ***
+
+<a id="layerconsole"></a>
 
 ### layerConsole
 
@@ -372,6 +462,8 @@ Ask for each approval through Effect's Terminal service.
 
 ***
 
+<a id="layerdenyall"></a>
+
 ### layerDenyAll
 
 > `const` **layerDenyAll**: `Layer.Layer`\<[`Approvals`](#approvals)\>
@@ -379,6 +471,8 @@ Ask for each approval through Effect's Terminal service.
 Every request resolves Denied.
 
 ***
+
+<a id="layerdurable"></a>
 
 ### layerDurable
 
@@ -404,6 +498,8 @@ Park approval requests in the Runtime and notify one external operator boundary.
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`Approvals`](#approvals)\>
@@ -419,6 +515,8 @@ Park approval requests in the Runtime and notify one external operator boundary.
 `Layer.Layer`\<[`Approvals`](#approvals)\>
 
 ***
+
+<a id="layertiered"></a>
 
 ### layerTiered
 
@@ -447,6 +545,8 @@ Delegate approvals at or above one Permissions level and approve lower levels.
 `Layer.Layer`\<[`Approvals`](#approvals), `E`, `R`\>
 
 ***
+
+<a id="resolve-1"></a>
 
 ### resolve
 

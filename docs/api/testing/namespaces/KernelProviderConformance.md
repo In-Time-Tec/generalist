@@ -10,6 +10,8 @@ Reusable KernelPool provider lifecycle and remote ownership conformance.
 
 ## Interfaces
 
+<a id="harness"></a>
+
 ### Harness
 
 One fresh provider instance used by the shared KernelPool lifecycle guarantees.
@@ -20,9 +22,13 @@ One fresh provider instance used by the shared KernelPool lifecycle guarantees.
 
 #### Properties
 
+<a id="pool"></a>
+
 ##### pool
 
 > `readonly` **pool**: [`Service`](../../repl/namespaces/KernelPool#service)
+
+<a id="profile"></a>
 
 ##### profile
 
@@ -120,6 +126,8 @@ One fresh provider instance used by the shared KernelPool lifecycle guarantees.
 
 > `readonly` **root**: `string`
 
+<a id="resourcecount"></a>
+
 ##### resourceCount
 
 > `readonly` **resourceCount**: `Effect`\<`number`\>
@@ -127,6 +135,8 @@ One fresh provider instance used by the shared KernelPool lifecycle guarantees.
 Number of live or paused provider resources owned by this isolated fixture.
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -144,29 +154,41 @@ Configuration for the reusable provider conformance suite.
 
 #### Properties
 
+<a id="live"></a>
+
 ##### live?
 
 > `readonly` `optional` **live?**: `boolean`
 
 Use Effect's live clock for providers whose process lifecycle depends on real time.
 
+<a id="make"></a>
+
 ##### make
 
 > `readonly` **make**: `Effect`\<[`Harness`](#harness), `CommonError`, `Scope`\>
+
+<a id="name"></a>
 
 ##### name
 
 > `readonly` **name**: `string`
 
+<a id="remote"></a>
+
 ##### remote?
 
 > `readonly` `optional` **remote?**: `Effect`\<[`RemoteHarness`](#remoteharness), `RemoteError`, `Scope`\>
+
+<a id="skip"></a>
 
 ##### skip?
 
 > `readonly` `optional` **skip?**: `boolean`
 
 ***
+
+<a id="remoteharness"></a>
 
 ### RemoteHarness
 
@@ -178,9 +200,13 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 #### Properties
 
+<a id="authority"></a>
+
 ##### authority
 
 > `readonly` **authority**: [`Service`](../../repl/namespaces/KernelResourceAuthority#service)
+
+<a id="changedprofile"></a>
 
 ##### changedProfile
 
@@ -278,9 +304,13 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 > `readonly` **root**: `string`
 
+<a id="changedprofilehost"></a>
+
 ##### changedProfileHost
 
 > `readonly` **changedProfileHost**: [`Service`](../../repl/namespaces/KernelPool#service)
+
+<a id="executioncount"></a>
 
 ##### executionCount
 
@@ -300,6 +330,8 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 `Effect`\<`number`\>
 
+<a id="expire"></a>
+
 ##### expire
 
 > `readonly` **expire**: (`sessionId`) => `Effect`\<`void`\>
@@ -314,9 +346,13 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 `Effect`\<`void`\>
 
+<a id="failnextdeletion"></a>
+
 ##### failNextDeletion
 
 > `readonly` **failNextDeletion**: `Effect`\<`void`\>
+
+<a id="forbiddenmodeltext"></a>
 
 ##### forbiddenModelText
 
@@ -324,9 +360,13 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 Exact host-only values that must never occur in a profile, event, failure, or result.
 
+<a id="hostb"></a>
+
 ##### hostB
 
 > `readonly` **hostB**: [`Service`](../../repl/namespaces/KernelPool#service)
+
+<a id="losenextconnection"></a>
 
 ##### loseNextConnection
 
@@ -342,6 +382,8 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 `Effect`\<`void`\>
 
+<a id="pause"></a>
+
 ##### pause
 
 > `readonly` **pause**: (`sessionId`) => `Effect`\<`boolean`, [`CellExecutionFailed`](../../repl/namespaces/Cell#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell#celloutcomeunknown)\>
@@ -356,6 +398,8 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 `Effect`\<`boolean`, [`CellExecutionFailed`](../../repl/namespaces/Cell#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell#celloutcomeunknown)\>
 
+<a id="pool-1"></a>
+
 ##### pool
 
 > `readonly` **pool**: [`Service`](../../repl/namespaces/KernelPool#service)
@@ -363,6 +407,8 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 ###### Inherited from
 
 [`Harness`](#harness).[`pool`](#pool)
+
+<a id="profile-1"></a>
 
 ##### profile
 
@@ -464,6 +510,8 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 [`Harness`](#harness).[`profile`](#profile)
 
+<a id="resourcecount-1"></a>
+
 ##### resourceCount
 
 > `readonly` **resourceCount**: `Effect`\<`number`\>
@@ -474,11 +522,15 @@ Number of live or paused provider resources owned by this isolated fixture.
 
 [`Harness`](#harness).[`resourceCount`](#resourcecount)
 
+<a id="retrycleanup"></a>
+
 ##### retryCleanup
 
 > `readonly` **retryCleanup**: `Effect`\<`void`, [`CellExecutionFailed`](../../repl/namespaces/Cell#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell#celloutcomeunknown)\>
 
 ## Type Aliases
+
+<a id="connectionloss"></a>
 
 ### ConnectionLoss
 
@@ -487,6 +539,8 @@ Number of live or paused provider resources owned by this isolated fixture.
 Deterministic failure positions a remote provider harness must be able to inject.
 
 ## Variables
+
+<a id="kernelproviderconformance"></a>
 
 ### kernelProviderConformance
 

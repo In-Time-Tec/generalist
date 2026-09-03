@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 #### Extends
@@ -15,6 +17,8 @@
 - [`RegistrationOptions`](./providers.openai#registrationoptions)
 
 #### Properties
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -28,13 +32,19 @@
 
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
 
+<a id="model"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: `string`
 
+<a id="provider"></a>
+
 ##### provider?
 
 > `readonly` `optional` **provider?**: `string`
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -44,6 +54,8 @@
 
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
 
+<a id="response"></a>
+
 ##### response?
 
 > `readonly` `optional` **response?**: `string`
@@ -51,6 +63,8 @@
 Scripted text returned by both streaming and non-streaming calls.
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -67,6 +81,8 @@ Scripted text returned by both streaming and non-streaming calls.
 `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
 
 ***
+
+<a id="layermodel"></a>
 
 ### layerModel
 
@@ -85,6 +101,8 @@ Scripted model layer for tests and CI; provide it to a run with `Effect.provide`
 `Model.Model`\<`string`, `LanguageModel.LanguageModel`, `never`\>
 
 ***
+
+<a id="registration"></a>
 
 ### registration
 

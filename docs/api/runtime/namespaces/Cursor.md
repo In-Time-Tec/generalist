@@ -8,17 +8,23 @@
 
 ## Type Aliases
 
+<a id="cursor"></a>
+
 ### Cursor
 
 > **Cursor** = *typeof* `Cursor.Type`
 
 ## Variables
 
+<a id="cursor-1"></a>
+
 ### Cursor
 
 > `const` **Cursor**: `Schema.Int`
 
 ***
+
+<a id="decode"></a>
 
 ### decode
 
@@ -58,6 +64,8 @@
 
 ***
 
+<a id="encode"></a>
+
 ### encode
 
 > `const` **encode**: \{(`input`, `options?`): `Effect`\<`number`, `SchemaError`\>; (`options?`): (`input`) => `Effect`\<`number`, `SchemaError`\>; \}
@@ -96,6 +104,8 @@
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`value`) => [`Cursor`](#cursor)
@@ -111,6 +121,8 @@
 [`Cursor`](#cursor)
 
 ***
+
+<a id="origin"></a>
 
 ### origin
 

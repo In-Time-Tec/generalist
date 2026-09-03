@@ -10,6 +10,8 @@
 
 ## Classes
 
+<a id="eventinvalid"></a>
+
 ### EventInvalid
 
 **`Experimental`**
@@ -19,6 +21,8 @@
 - `EventInvalid_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@
 
 #### Properties
 
+<a id="detail"></a>
+
 ##### detail
 
 > `readonly` **detail**: `string`
@@ -52,6 +58,8 @@
 
 `EventInvalid_base.detail`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -61,6 +69,8 @@
 ###### Inherited from
 
 `EventInvalid_base.hint`
+
+<a id="source"></a>
 
 ##### source
 
@@ -74,6 +84,8 @@
 
 ***
 
+<a id="inputmalformed"></a>
+
 ### InputMalformed
 
 **`Experimental`**
@@ -83,6 +95,8 @@
 - `InputMalformed_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -106,6 +120,8 @@
 
 #### Properties
 
+<a id="detail-1"></a>
+
 ##### detail
 
 > `readonly` **detail**: `string`
@@ -115,6 +131,8 @@
 ###### Inherited from
 
 `InputMalformed_base.detail`
+
+<a id="hint-1"></a>
 
 ##### hint
 
@@ -128,6 +146,8 @@
 
 ***
 
+<a id="inputrejected"></a>
+
 ### InputRejected
 
 **`Experimental`**
@@ -137,6 +157,8 @@
 - `InputRejected_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -160,6 +182,8 @@
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -169,6 +193,8 @@
 ###### Inherited from
 
 `InputRejected_base.hint`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -182,6 +208,8 @@
 
 ***
 
+<a id="resumemismatch"></a>
+
 ### ResumeMismatch
 
 **`Experimental`**
@@ -191,6 +219,8 @@
 - `ResumeMismatch_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -214,6 +244,8 @@
 
 #### Properties
 
+<a id="expectedwaitid"></a>
+
 ##### expectedWaitId?
 
 > `readonly` `optional` **expectedWaitId?**: `string`
@@ -223,6 +255,8 @@
 ###### Inherited from
 
 `ResumeMismatch_base.expectedWaitId`
+
+<a id="hint-3"></a>
 
 ##### hint
 
@@ -234,6 +268,8 @@
 
 `ResumeMismatch_base.hint`
 
+<a id="receivedwaitids"></a>
+
 ##### receivedWaitIds
 
 > `readonly` **receivedWaitIds**: readonly `string`[]
@@ -243,6 +279,8 @@
 ###### Inherited from
 
 `ResumeMismatch_base.receivedWaitIds`
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -256,6 +294,8 @@
 
 ***
 
+<a id="valuenotserializable"></a>
+
 ### ValueNotSerializable
 
 **`Experimental`**
@@ -265,6 +305,8 @@
 - `ValueNotSerializable_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -288,6 +330,8 @@
 
 #### Properties
 
+<a id="field"></a>
+
 ##### field
 
 > `readonly` **field**: `string`
@@ -297,6 +341,8 @@
 ###### Inherited from
 
 `ValueNotSerializable_base.field`
+
+<a id="hint-4"></a>
 
 ##### hint
 

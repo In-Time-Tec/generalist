@@ -12,6 +12,8 @@
 
 ## Classes
 
+<a id="agentmessaging"></a>
+
 ### AgentMessaging
 
 #### Effect-expect-leaking
@@ -26,6 +28,8 @@ which is exactly the forgery this contract exists to prevent.
 - `AgentMessaging_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -47,6 +51,8 @@ which is exactly the forgery this contract exists to prevent.
 
 ***
 
+<a id="messagingpolicy"></a>
+
 ### MessagingPolicy
 
 The host seam for addressing beyond Generalist's derived relationships.
@@ -60,6 +66,8 @@ cross-product addressing is opt-in rather than a consequence of knowing an id.
 - `MessagingPolicy_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -81,23 +89,33 @@ cross-product addressing is opt-in rather than a consequence of knowing an id.
 
 ## Interfaces
 
+<a id="policyinput"></a>
+
 ### PolicyInput
 
 One authorization question about one exact sender and target.
 
 #### Properties
 
+<a id="crosssession"></a>
+
 ##### crossSession
 
 > `readonly` **crossSession**: `boolean`
+
+<a id="relationship"></a>
 
 ##### relationship
 
 > `readonly` **relationship**: `"parent"` \| `"child"` \| `"self"` \| `"sibling"` \| `undefined`
 
+<a id="sender"></a>
+
 ##### sender
 
 > `readonly` **sender**: [`DirectoryEntry`](../AgentDirectory#directoryentry)
+
+<a id="target"></a>
 
 ##### target
 
@@ -105,35 +123,51 @@ One authorization question about one exact sender and target.
 
 ***
 
+<a id="sendmessageinput"></a>
+
 ### SendMessageInput
 
 Input for one addressed send. Sender identity is a Run id, never caller-supplied text.
 
 #### Properties
 
+<a id="causationid"></a>
+
 ##### causationId?
 
 > `readonly` `optional` **causationId?**: `string`
+
+<a id="correlationid"></a>
 
 ##### correlationId?
 
 > `readonly` `optional` **correlationId?**: `string`
 
+<a id="fromrunid"></a>
+
 ##### fromRunId
 
 > `readonly` **fromRunId**: `string`
+
+<a id="idempotencykey"></a>
 
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
 
+<a id="inreplyto"></a>
+
 ##### inReplyTo?
 
 > `readonly` `optional` **inReplyTo?**: `string`
 
+<a id="messageid"></a>
+
 ##### messageId?
 
 > `readonly` `optional` **messageId?**: `string`
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -143,13 +177,19 @@ Input for one addressed send. Sender identity is a Run id, never caller-supplied
 
 \[`key`: `string`\]: `unknown`
 
+<a id="policy"></a>
+
 ##### policy?
 
 > `readonly` `optional` **policy?**: `"enqueue"` \| `"interrupt"` \| `"reject"` \| `"rollback"` \| `"steer"`
 
+<a id="prompt"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `RawInput`
+
+<a id="to"></a>
 
 ##### to
 
@@ -157,11 +197,15 @@ Input for one addressed send. Sender identity is a Run id, never caller-supplied
 
 ## Type Aliases
 
+<a id="directoryerror"></a>
+
 ### DirectoryError
 
 > **DirectoryError** = [`RunNotFound`](../Errors#runnotfound) \| [`RuntimeUnavailable`](../Errors#runtimeunavailable)
 
 ***
+
+<a id="sendmessageerror"></a>
 
 ### SendMessageError
 
@@ -170,6 +214,8 @@ Input for one addressed send. Sender identity is a Run id, never caller-supplied
 Durable send failure.
 
 ## Variables
+
+<a id="authorize"></a>
 
 ### authorize
 
@@ -202,6 +248,8 @@ nothing on its own.
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`policy`) => `Layer.Layer`\<[`MessagingPolicy`](#messagingpolicy)\>
@@ -219,6 +267,8 @@ Host policy over exact sender and target identity.
 `Layer.Layer`\<[`MessagingPolicy`](#messagingpolicy)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 
@@ -251,6 +301,8 @@ can become visible to the target Run.
 
 ***
 
+<a id="policy-1"></a>
+
 ### Policy
 
 > `const` **Policy**: `object`
@@ -259,11 +311,15 @@ Host messaging policy construction.
 
 #### Type Declaration
 
+<a id="make-1"></a>
+
 ##### make
 
 > **make**: *typeof* `makePolicy`
 
 ***
+
+<a id="reachable"></a>
 
 ### reachable
 
@@ -292,6 +348,8 @@ Directory entries one Run may reach under Generalist relationships plus host pol
 `Effect.Effect`\<`ReadonlyArray`\<[`DirectoryEntry`](../AgentDirectory#directoryentry)\>, [`DirectoryError`](#directoryerror)\>
 
 ***
+
+<a id="sendmessageerror-1"></a>
 
 ### SendMessageError
 

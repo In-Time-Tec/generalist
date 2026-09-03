@@ -8,17 +8,23 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Where one Session's best-effort namespace snapshot is written.
 
 #### Properties
 
+<a id="dataroot"></a>
+
 ##### dataRoot
 
 > `readonly` **dataRoot**: `string`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -37,6 +43,8 @@ One durable filesystem-backed kernel snapshot store.
 `Layer.Layer`\<[`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

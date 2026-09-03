@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="cancellationfailure"></a>
+
 ### CancellationFailure
 
 A concrete executor could not definitively cancel one admitted operation.
@@ -17,6 +19,8 @@ A concrete executor could not definitively cancel one admitted operation.
 - `CancellationFailure_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 `CancellationFailure_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -53,6 +61,8 @@ A concrete executor could not definitively cancel one admitted operation.
 ###### Inherited from
 
 `CancellationFailure_base.message`
+
+<a id="tool"></a>
 
 ##### tool
 
@@ -64,6 +74,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 ***
 
+<a id="frameworkfailure"></a>
+
 ### FrameworkFailure
 
 #### Extends
@@ -71,6 +83,8 @@ A concrete executor could not definitively cancel one admitted operation.
 - `FrameworkFailure_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -92,6 +106,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -99,6 +115,8 @@ A concrete executor could not definitively cancel one admitted operation.
 ###### Inherited from
 
 `FrameworkFailure_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -108,6 +126,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 `FrameworkFailure_base.message`
 
+<a id="stage"></a>
+
 ##### stage
 
 > `readonly` **stage**: `"route"` \| `"authorization"` \| `"decode-input"` \| `"handler"` \| `"encode-success"` \| `"encode-domain-failure"` \| `"missing-handler"` \| `"placement"`
@@ -115,6 +135,8 @@ A concrete executor could not definitively cancel one admitted operation.
 ###### Inherited from
 
 `FrameworkFailure_base.stage`
+
+<a id="tool-1"></a>
 
 ##### tool
 
@@ -126,6 +148,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 ***
 
+<a id="remoteretrymisconfigured"></a>
+
 ### RemoteRetryMisconfigured
 
 #### Extends
@@ -133,6 +157,8 @@ A concrete executor could not definitively cancel one admitted operation.
 - `RemoteRetryMisconfigured_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -154,6 +180,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -162,6 +190,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 `RemoteRetryMisconfigured_base.hint`
 
+<a id="message-2"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -169,6 +199,8 @@ A concrete executor could not definitively cancel one admitted operation.
 ###### Inherited from
 
 `RemoteRetryMisconfigured_base.message`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -180,6 +212,8 @@ A concrete executor could not definitively cancel one admitted operation.
 
 ***
 
+<a id="toolexecutor"></a>
+
 ### ToolExecutor
 
 #### Extends
@@ -187,6 +221,8 @@ A concrete executor could not definitively cancel one admitted operation.
 - `ToolExecutor_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -208,45 +244,65 @@ A concrete executor could not definitively cancel one admitted operation.
 
 ## Interfaces
 
+<a id="cancellationrequest"></a>
+
 ### CancellationRequest
 
 Stable identity for semantic cancellation of one admitted tool operation.
 
 #### Properties
 
+<a id="attempt"></a>
+
 ##### attempt
 
 > `readonly` **attempt**: `number`
+
+<a id="execution"></a>
 
 ##### execution
 
 > `readonly` **execution**: [`Request`](#request)
 
+<a id="operationkey"></a>
+
 ##### operationKey
 
 > `readonly` **operationKey**: `string`
+
+<a id="rootrunid"></a>
 
 ##### rootRunId
 
 > `readonly` **rootRunId**: `string`
 
+<a id="runid"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
 
+<a id="toolcallid"></a>
+
 ##### toolCallId
 
 > `readonly` **toolCallId**: `string`
+
+<a id="toolname"></a>
 
 ##### toolName
 
 > `readonly` **toolName**: `string`
 
 ***
+
+<a id="closedtoolset"></a>
 
 ### ClosedToolSet
 
@@ -261,6 +317,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 `T` *extends* `SchemaTool` = `SchemaTool`
 
 #### Properties
+
+<a id="invoke"></a>
 
 ##### invoke
 
@@ -280,29 +338,41 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 `Effect`\<`unknown`, `unknown`, `R`\>
 
+<a id="tools"></a>
+
 ##### tools
 
 > `readonly` **tools**: `Readonly`\<`Record`\<`string`, `T`\>\>
 
 ***
 
+<a id="domainfailure"></a>
+
 ### DomainFailure
 
 #### Properties
+
+<a id="_tag"></a>
 
 ##### \_tag
 
 > `readonly` **\_tag**: `"DomainFailure"`
 
+<a id="encodedfailure"></a>
+
 ##### encodedFailure
 
 > `readonly` **encodedFailure**: `unknown`
+
+<a id="failure"></a>
 
 ##### failure
 
 > `readonly` **failure**: `unknown`
 
 ***
+
+<a id="request"></a>
 
 ### Request
 
@@ -312,21 +382,31 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 #### Properties
 
+<a id="agentname"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
+
+<a id="call"></a>
 
 ##### call
 
 > `readonly` **call**: `ToolCallPart`\<`string`, `unknown`\>
 
+<a id="sessionid-1"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
 
+<a id="tasks"></a>
+
 ##### tasks?
 
 > `readonly` `optional` **tasks?**: readonly `object`[]
+
+<a id="toolcallbatch"></a>
 
 ##### toolCallBatch
 
@@ -336,15 +416,21 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 > `readonly` **calls**: readonly `ToolCallPart`\<`string`, `unknown`\>[]
 
+<a id="toolcallindex"></a>
+
 ##### toolCallIndex
 
 > `readonly` **toolCallIndex**: `number`
+
+<a id="turn"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ***
+
+<a id="service"></a>
 
 ### Service
 
@@ -355,6 +441,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 `R` = [`ToolContext`](./ToolContext#toolcontext)
 
 #### Properties
+
+<a id="cancel"></a>
 
 ##### cancel?
 
@@ -370,6 +458,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 `Effect`\<[`CancellationOutcome`](#cancellationoutcome), [`CancellationFailure`](#cancellationfailure), `R`\>
 
+<a id="cancellable"></a>
+
 ##### cancellable?
 
 > `readonly` `optional` **cancellable?**: (`request`) => `boolean`
@@ -383,6 +473,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 ###### Returns
 
 `boolean`
+
+<a id="execute"></a>
 
 ##### execute
 
@@ -398,6 +490,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 `Effect`\<[`Outcome`](#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
 
+<a id="replaypolicy"></a>
+
 ##### replayPolicy?
 
 > `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](#replaypolicy-1)
@@ -411,6 +505,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 ###### Returns
 
 [`ReplayPolicy`](#replaypolicy-1)
+
+<a id="transformresolved"></a>
 
 ##### transformResolved?
 
@@ -432,6 +528,8 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ***
 
+<a id="success"></a>
+
 ### Success
 
 #### Extended by
@@ -440,13 +538,19 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Success"`
 
+<a id="encodedresult"></a>
+
 ##### encodedResult
 
 > `readonly` **encodedResult**: `unknown`
+
+<a id="memoized"></a>
 
 ##### memoized?
 
@@ -460,19 +564,27 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 > `readonly` **fromRun**: `string`
 
+<a id="result"></a>
+
 ##### result
 
 > `readonly` **result**: `unknown`
 
 ***
 
+<a id="suspend"></a>
+
 ### Suspend
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Suspend"`
+
+<a id="awaitevent"></a>
 
 ##### awaitEvent?
 
@@ -486,11 +598,15 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 > `readonly` **filter**: \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"create"` \| `"remove"` \| `"update"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
 
+<a id="token"></a>
+
 ##### token
 
 > `readonly` **token**: `string`
 
 ## Type Aliases
+
+<a id="cancellationoutcome"></a>
 
 ### CancellationOutcome
 
@@ -500,11 +616,15 @@ A definitive executor/provider acknowledgement of semantic cancellation.
 
 ***
 
+<a id="frameworkstage"></a>
+
 ### FrameworkStage
 
 > **FrameworkStage** = *typeof* `FrameworkStage.Type`
 
 ***
+
+<a id="outcome"></a>
 
 ### Outcome
 
@@ -514,17 +634,23 @@ Durable tool execution outcome.
 
 ***
 
+<a id="replaypolicy-1"></a>
+
 ### ReplayPolicy
 
 > **ReplayPolicy** = `"never"` \| `"provider-idempotent"`
 
 ***
 
+<a id="settledoutcome"></a>
+
 ### SettledOutcome
 
 > **SettledOutcome** = [`Success`](#success) \| [`DomainFailure`](#domainfailure)
 
 ***
+
+<a id="terminaloutcome"></a>
 
 ### TerminalOutcome
 
@@ -533,6 +659,8 @@ Durable tool execution outcome.
 A completed tool outcome reported while cancelling an exact durable operation.
 
 ***
+
+<a id="toolkitinput"></a>
 
 ### ToolkitInput
 
@@ -545,6 +673,8 @@ A completed tool outcome reported while cancelling an exact durable operation.
 `Tools` *extends* `Record`\<`string`, `Tool.Any`\>
 
 ## Variables
+
+<a id="client"></a>
 
 ### client
 
@@ -574,17 +704,23 @@ Route tool calls to a user/browser/desktop client.
 
 ***
 
+<a id="executetoolkit"></a>
+
 ### executeToolkit
 
 > `const` **executeToolkit**: *typeof* `executeToolkitUncurried` & \{\<`R`, `T`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), [`ToolContext`](./ToolContext#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>; \<`Name`, `Parameters`, `SuccessSchema`, `R`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure), [`ToolContext`](./ToolContext#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>; \<`Tools`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), `HandlerServices`\<`Tools`\[keyof `Tools`\]\>\>; \<`Tools`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), `HandlersFor`\<`Tools`\> \| `HandlerServices`\<`Tools`\[keyof `Tools`\]\>\>; \}
 
 ***
 
+<a id="frameworkstage-1"></a>
+
 ### FrameworkStage
 
 > `const` **FrameworkStage**: `Schema.Literals`\<readonly \[`"decode-input"`, `"handler"`, `"encode-success"`, `"encode-domain-failure"`, `"missing-handler"`, `"route"`, `"placement"`, `"authorization"`\]\>
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -601,6 +737,8 @@ Route tool calls to a user/browser/desktop client.
 `Layer.Layer`\<[`ToolExecutor`](#toolexecutor)\>
 
 ***
+
+<a id="mcp"></a>
 
 ### mcp
 
@@ -630,6 +768,8 @@ Route tool calls to an MCP placement adapter.
 
 ***
 
+<a id="outcome-1"></a>
+
 ### Outcome
 
 > `const` **Outcome**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Success"`\>; `encodedResult`: `Schema.Unknown`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: `Schema.String`; `fromRun`: `Schema.String`; \}\>\>; `outputPaths`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.String`\>\>; `result`: `Schema.Unknown`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"DomainFailure"`\>; `encodedFailure`: `Schema.Unknown`; `failure`: `Schema.Unknown`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Suspend"`\>; `awaitEvent`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[..., ..., ..., ..., ...\]\>; \}\>\>; `token`: `Schema.String`; \}\>\]\>
@@ -637,6 +777,8 @@ Route tool calls to an MCP placement adapter.
 Durable tool execution outcome.
 
 ***
+
+<a id="remote"></a>
 
 ### remote
 
@@ -666,6 +808,8 @@ Route tool calls to a remote tool worker or service.
 
 ***
 
+<a id="sandbox"></a>
+
 ### sandbox
 
 > `const` **sandbox**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
@@ -693,6 +837,8 @@ Route tool calls to a workspace or sandbox runtime.
 [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ## Functions
+
+<a id="layerrouter"></a>
 
 ### layerRouter()
 
@@ -795,6 +941,8 @@ Route tool calls to a workspace or sandbox runtime.
 `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, `R`\>
 
 ***
+
+<a id="layertoolkit"></a>
 
 ### layerToolkit()
 
@@ -916,6 +1064,8 @@ Route tool calls to a workspace or sandbox runtime.
 
 ***
 
+<a id="route"></a>
+
 ### route()
 
 #### Call Signature
@@ -953,6 +1103,8 @@ Route tool calls to a workspace or sandbox runtime.
 [`Route`](./ToolPlacement#route)\<`R`\>
 
 ***
+
+<a id="routetoolkit"></a>
 
 ### routeToolkit()
 

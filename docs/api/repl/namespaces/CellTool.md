@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="parameters"></a>
+
 ### Parameters
 
 > **Parameters** = *typeof* `Parameters.Type`
@@ -16,11 +18,15 @@ The cell source parameter.
 
 ## Variables
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: `Layer.Layer`\<[`ToolExecutor`](../../generalist/namespaces/ToolExecutor#toolexecutor), `never`, [`SandboxProvider`](../../sandbox#sandboxprovider)\>
 
 ***
+
+<a id="maxprogressbytes"></a>
 
 ### maxProgressBytes
 
@@ -30,6 +36,8 @@ Largest encoded cell event carried in one progress record.
 
 ***
 
+<a id="maxsourcebytes"></a>
+
 ### maxSourceBytes
 
 > `const` **maxSourceBytes**: `65536` = `65536`
@@ -37,6 +45,8 @@ Largest encoded cell event carried in one progress record.
 Maximum authored source accepted in one cell.
 
 ***
+
+<a id="name"></a>
 
 ### name
 
@@ -46,6 +56,8 @@ The only name a Generalist REPL host advertises to a model.
 
 ***
 
+<a id="parameters-1"></a>
+
 ### Parameters
 
 > `const` **Parameters**: `Schema.Struct`\<\{ `code`: `Schema.String`; \}\>
@@ -53,6 +65,8 @@ The only name a Generalist REPL host advertises to a model.
 The cell source parameter.
 
 ***
+
+<a id="route"></a>
 
 ### route
 
@@ -62,6 +76,8 @@ The cell route: one tool, ToolContext progress and interruption, typed cell outc
 
 ***
 
+<a id="sandboxsnapshot"></a>
+
 ### SandboxSnapshot
 
 > `const` **SandboxSnapshot**: `Schema.TaggedStruct`\<`"SandboxSnapshot"`, \{ `snapshotId`: `Schema.String`; \}\>
@@ -70,6 +86,8 @@ A durable marker naming the Sandbox image committed after a cell.
 
 ***
 
+<a id="sandboxsnapshotunavailable"></a>
+
 ### SandboxSnapshotUnavailable
 
 > `const` **SandboxSnapshotUnavailable**: `Schema.TaggedStruct`\<`"SandboxSnapshotUnavailable"`, \{ \}\>
@@ -77,6 +95,8 @@ A durable marker naming the Sandbox image committed after a cell.
 A durable marker recording that cell state cannot be restored.
 
 ***
+
+<a id="scheduling"></a>
 
 ### scheduling
 
@@ -87,6 +107,8 @@ and every call is an authored-order exclusive barrier.
 
 ***
 
+<a id="tool"></a>
+
 ### tool
 
 > `const` **tool**: `Tool.Tool`\<`"typescript"`, \{ `failure`: `Schema.Union`\<readonly \[[`CellExecutionFailed`](./Cell#cellexecutionfailed), *typeof* [`KernelUnavailable`](./Cell#kernelunavailable), *typeof* [`KernelProtocolViolation`](./Cell#kernelprotocolviolation), [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\]\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `code`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `cellId`: `Schema.String`; `durationMillis`: `Schema.Int`; `epoch`: `Schema.Int`; `sequence`: `Schema.Int`; `stderr`: `Schema.String`; `stdout`: `Schema.String`; `value`: `Schema.String`; \}\>; \}, `never`\>
@@ -94,6 +116,8 @@ and every call is an authored-order exclusive barrier.
 The one Effect AI tool a conversational Generalist agent advertises.
 
 ***
+
+<a id="toolkit"></a>
 
 ### toolkit
 

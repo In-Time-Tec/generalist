@@ -8,6 +8,8 @@
 
 ## Variables
 
+<a id="artifactfromevent"></a>
+
 ### artifactFromEvent
 
 > `const` **artifactFromEvent**: (`event`) => `Artifact`
@@ -27,6 +29,8 @@ Build the completion artifact update for a Runtime completion.
 `Artifact`
 
 ***
+
+<a id="fromruntime"></a>
 
 ### fromRuntime
 
@@ -70,6 +74,8 @@ Project one Runtime snapshot and its canonical history to an A2A Task.
 
 ***
 
+<a id="statefromrun"></a>
+
 ### stateFromRun
 
 > `const` **stateFromRun**: (`run`) => `TaskState`
@@ -89,6 +95,8 @@ Map authoritative Runtime status to A2A task state.
 `TaskState`
 
 ***
+
+<a id="statusfromevent"></a>
 
 ### statusFromEvent
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="hostbindings"></a>
+
 ### HostBindings
 
 #### Extends
@@ -15,6 +17,8 @@
 - `HostBindings_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="hostmoduleconflict"></a>
+
 ### HostModuleConflict
 
 Two modules or two operations claimed the same mounted name.
@@ -45,6 +51,8 @@ Two modules or two operations claimed the same mounted name.
 - `HostModuleConflict_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ Two modules or two operations claimed the same mounted name.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -74,6 +84,8 @@ Two modules or two operations claimed the same mounted name.
 
 `HostModuleConflict_base.hint`
 
+<a id="module"></a>
+
 ##### module
 
 > `readonly` **module**: `string`
@@ -81,6 +93,8 @@ Two modules or two operations claimed the same mounted name.
 ###### Inherited from
 
 `HostModuleConflict_base.module`
+
+<a id="operation"></a>
 
 ##### operation?
 
@@ -92,6 +106,8 @@ Two modules or two operations claimed the same mounted name.
 
 ***
 
+<a id="hostmodulenotfound"></a>
+
 ### HostModuleNotFound
 
 The cell addressed a module or operation that is not mounted.
@@ -101,6 +117,8 @@ The cell addressed a module or operation that is not mounted.
 - `HostModuleNotFound_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -122,6 +140,8 @@ The cell addressed a module or operation that is not mounted.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -130,6 +150,8 @@ The cell addressed a module or operation that is not mounted.
 
 `HostModuleNotFound_base.hint`
 
+<a id="module-1"></a>
+
 ##### module
 
 > `readonly` **module**: `string`
@@ -137,6 +159,8 @@ The cell addressed a module or operation that is not mounted.
 ###### Inherited from
 
 `HostModuleNotFound_base.module`
+
+<a id="operation-1"></a>
 
 ##### operation?
 
@@ -148,6 +172,8 @@ The cell addressed a module or operation that is not mounted.
 
 ***
 
+<a id="hostmoduleschemafailure"></a>
+
 ### HostModuleSchemaFailure
 
 A host request or reply did not match the operation's declared schema.
@@ -157,6 +183,8 @@ A host request or reply did not match the operation's declared schema.
 - `HostModuleSchemaFailure_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -178,6 +206,8 @@ A host request or reply did not match the operation's declared schema.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -185,6 +215,8 @@ A host request or reply did not match the operation's declared schema.
 ###### Inherited from
 
 `HostModuleSchemaFailure_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -194,6 +226,8 @@ A host request or reply did not match the operation's declared schema.
 
 `HostModuleSchemaFailure_base.message`
 
+<a id="module-2"></a>
+
 ##### module
 
 > `readonly` **module**: `string`
@@ -202,6 +236,8 @@ A host request or reply did not match the operation's declared schema.
 
 `HostModuleSchemaFailure_base.module`
 
+<a id="operation-2"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -209,6 +245,8 @@ A host request or reply did not match the operation's declared schema.
 ###### Inherited from
 
 `HostModuleSchemaFailure_base.operation`
+
+<a id="stage"></a>
 
 ##### stage
 
@@ -220,21 +258,29 @@ A host request or reply did not match the operation's declared schema.
 
 ## Interfaces
 
+<a id="descriptor"></a>
+
 ### Descriptor
 
 The mounted surface a cell can see, without any handler.
 
 #### Properties
 
+<a id="module-3"></a>
+
 ##### module
 
 > `readonly` **module**: `string`
+
+<a id="operations"></a>
 
 ##### operations
 
 > `readonly` **operations**: readonly `string`[]
 
 ***
+
+<a id="module-4"></a>
 
 ### Module
 
@@ -248,15 +294,21 @@ One named module of operations, mounted as a single kernel binding.
 
 #### Properties
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="operations-1"></a>
 
 ##### operations
 
 > `readonly` **operations**: readonly [`AnyOperation`](#anyoperation)\<`R`\>[]
 
 ***
+
+<a id="operation-3"></a>
 
 ### Operation
 
@@ -282,9 +334,13 @@ One Schema-typed operation a host mounts into the kernel namespace.
 
 #### Properties
 
+<a id="failure-1"></a>
+
 ##### failure
 
 > `readonly` **failure**: `Failure`
+
+<a id="handle"></a>
 
 ##### handle
 
@@ -300,13 +356,19 @@ One Schema-typed operation a host mounts into the kernel namespace.
 
 `Effect`\<`Output`\[`"Type"`\], `Failure`\[`"Type"`\] & [`Tagged`](#tagged), `R`\>
 
+<a id="input-1"></a>
+
 ##### input
 
 > `readonly` **input**: `Input`
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="output-1"></a>
 
 ##### output
 
@@ -314,11 +376,15 @@ One Schema-typed operation a host mounts into the kernel namespace.
 
 ***
 
+<a id="request"></a>
+
 ### Request
 
 A request from an executing cell to a mounted host module.
 
 #### Properties
+
+<a id="cellid"></a>
 
 ##### cellId?
 
@@ -326,17 +392,25 @@ A request from an executing cell to a mounted host module.
 
 The cell that raised this request.
 
+<a id="input-2"></a>
+
 ##### input
 
 > `readonly` **input**: `unknown`
+
+<a id="module-5"></a>
 
 ##### module
 
 > `readonly` **module**: `string`
 
+<a id="operation-4"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
+
+<a id="sessionid"></a>
 
 ##### sessionId?
 
@@ -346,6 +420,8 @@ The Session whose cell raised this request.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 The seam by which a host mounts named Schema-typed modules into the kernel
@@ -353,9 +429,13 @@ namespace and answers requests from an executing cell.
 
 #### Properties
 
+<a id="descriptors"></a>
+
 ##### descriptors
 
 > `readonly` **descriptors**: readonly [`Descriptor`](#descriptor)[]
+
+<a id="invoke"></a>
 
 ##### invoke
 
@@ -370,6 +450,8 @@ namespace and answers requests from an executing cell.
 ###### Returns
 
 `Effect`\<[`Response`](#response), [`BindingFailure`](#bindingfailure)\>
+
+<a id="resolve"></a>
 
 ##### resolve
 
@@ -387,17 +469,23 @@ namespace and answers requests from an executing cell.
 
 ***
 
+<a id="tagged"></a>
+
 ### Tagged
 
 Every host operation failure is tagged, so a cell can discriminate it as data.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `string`
 
 ## Type Aliases
+
+<a id="anyoperation"></a>
 
 ### AnyOperation
 
@@ -411,6 +499,8 @@ Every host operation failure is tagged, so a cell can discriminate it as data.
 
 ***
 
+<a id="bindingfailure"></a>
+
 ### BindingFailure
 
 > **BindingFailure** = [`HostModuleNotFound`](#hostmodulenotfound) \| [`HostModuleSchemaFailure`](#hostmoduleschemafailure)
@@ -419,6 +509,8 @@ Closed union of host-module boundary failures.
 
 ***
 
+<a id="response"></a>
+
 ### Response
 
 > **Response** = \{ `_tag`: `"Success"`; `output`: `unknown`; \} \| \{ `_tag`: `"Failure"`; `failure`: `unknown`; \}
@@ -426,6 +518,8 @@ Closed union of host-module boundary failures.
 Encoded outcome returned to the cell that issued the request.
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -449,6 +543,8 @@ Encoded outcome returned to the cell that issued the request.
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`HostBindings`](#hostbindings)\>
@@ -464,6 +560,8 @@ Encoded outcome returned to the cell that issued the request.
 `Layer.Layer`\<[`HostBindings`](#hostbindings)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

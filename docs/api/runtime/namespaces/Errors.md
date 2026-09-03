@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="ackbeyondcommitted"></a>
+
 ### AckBeyondCommitted
 
 The acknowledged sequence is beyond the last committed model cycle.
@@ -17,6 +19,8 @@ The acknowledged sequence is beyond the last committed model cycle.
 - `AckBeyondCommitted_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ The acknowledged sequence is beyond the last committed model cycle.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -45,6 +51,8 @@ The acknowledged sequence is beyond the last committed model cycle.
 ###### Inherited from
 
 `AckBeyondCommitted_base.hint`
+
+<a id="lastcommittedsequence"></a>
 
 ##### lastCommittedSequence
 
@@ -54,6 +62,8 @@ The acknowledged sequence is beyond the last committed model cycle.
 
 `AckBeyondCommitted_base.lastCommittedSequence`
 
+<a id="runid"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -61,6 +71,8 @@ The acknowledged sequence is beyond the last committed model cycle.
 ###### Inherited from
 
 `AckBeyondCommitted_base.runId`
+
+<a id="sequence"></a>
 
 ##### sequence
 
@@ -72,6 +84,8 @@ The acknowledged sequence is beyond the last committed model cycle.
 
 ***
 
+<a id="ackinvalid"></a>
+
 ### AckInvalid
 
 The acknowledged sequence is not a valid processed-through point for the Run.
@@ -81,6 +95,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 - `AckInvalid_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -102,6 +118,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -109,6 +127,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AckInvalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -118,6 +138,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 `AckInvalid_base.message`
 
+<a id="runid-1"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -125,6 +147,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AckInvalid_base.runId`
+
+<a id="sequence-1"></a>
 
 ##### sequence
 
@@ -136,6 +160,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 ***
 
+<a id="addressnotfound"></a>
+
 ### AddressNotFound
 
 #### Extends
@@ -143,6 +169,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 - `AddressNotFound_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -164,6 +192,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 #### Properties
 
+<a id="address"></a>
+
 ##### address
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
@@ -171,6 +201,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AddressNotFound_base.address`
+
+<a id="hint-2"></a>
 
 ##### hint
 
@@ -182,6 +214,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 ***
 
+<a id="agentexecutionfailure"></a>
+
 ### AgentExecutionFailure
 
 #### Extends
@@ -189,6 +223,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 - `AgentExecutionFailure_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -210,6 +246,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -217,6 +255,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AgentExecutionFailure_base.cause`
+
+<a id="failure"></a>
 
 ##### failure?
 
@@ -226,6 +266,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 `AgentExecutionFailure_base.failure`
 
+<a id="hint-3"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -233,6 +275,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AgentExecutionFailure_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -244,6 +288,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 ***
 
+<a id="agentnameconflict"></a>
+
 ### AgentNameConflict
 
 #### Extends
@@ -251,6 +297,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 - `AgentNameConflict_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -272,6 +320,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 #### Properties
 
+<a id="existingrunid"></a>
+
 ##### existingRunId
 
 > `readonly` **existingRunId**: `string`
@@ -279,6 +329,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AgentNameConflict_base.existingRunId`
+
+<a id="hint-4"></a>
 
 ##### hint
 
@@ -288,6 +340,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 `AgentNameConflict_base.hint`
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -295,6 +349,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 ###### Inherited from
 
 `AgentNameConflict_base.name`
+
+<a id="scope"></a>
 
 ##### scope
 
@@ -306,6 +362,8 @@ The acknowledged sequence is not a valid processed-through point for the Run.
 
 ***
 
+<a id="approvalmismatch"></a>
+
 ### ApprovalMismatch
 
 The response conflicts with the authoritative approval identity or decision.
@@ -315,6 +373,8 @@ The response conflicts with the authoritative approval identity or decision.
 - `ApprovalMismatch_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -336,6 +396,8 @@ The response conflicts with the authoritative approval identity or decision.
 
 #### Properties
 
+<a id="approvalid"></a>
+
 ##### approvalId
 
 > `readonly` **approvalId**: `string`
@@ -343,6 +405,8 @@ The response conflicts with the authoritative approval identity or decision.
 ###### Inherited from
 
 `ApprovalMismatch_base.approvalId`
+
+<a id="expectedapprovalid"></a>
 
 ##### expectedApprovalId?
 
@@ -352,6 +416,8 @@ The response conflicts with the authoritative approval identity or decision.
 
 `ApprovalMismatch_base.expectedApprovalId`
 
+<a id="hint-5"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -360,6 +426,8 @@ The response conflicts with the authoritative approval identity or decision.
 
 `ApprovalMismatch_base.hint`
 
+<a id="mismatch"></a>
+
 ##### mismatch
 
 > `readonly` **mismatch**: `"decision"` \| `"approval-id"` \| `"wait-kind"`
@@ -367,6 +435,8 @@ The response conflicts with the authoritative approval identity or decision.
 ###### Inherited from
 
 `ApprovalMismatch_base.mismatch`
+
+<a id="runid-2"></a>
 
 ##### runId
 
@@ -378,6 +448,8 @@ The response conflicts with the authoritative approval identity or decision.
 
 ***
 
+<a id="approvalstale"></a>
+
 ### ApprovalStale
 
 The approval no longer names an unresolved request.
@@ -387,6 +459,8 @@ The approval no longer names an unresolved request.
 - `ApprovalStale_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -408,6 +482,8 @@ The approval no longer names an unresolved request.
 
 #### Properties
 
+<a id="approvalid-1"></a>
+
 ##### approvalId
 
 > `readonly` **approvalId**: `string`
@@ -416,6 +492,8 @@ The approval no longer names an unresolved request.
 
 `ApprovalStale_base.approvalId`
 
+<a id="hint-6"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -423,6 +501,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ApprovalStale_base.hint`
+
+<a id="runid-3"></a>
 
 ##### runId
 
@@ -434,6 +514,8 @@ The approval no longer names an unresolved request.
 
 ***
 
+<a id="childdepthexceeded"></a>
+
 ### ChildDepthExceeded
 
 #### Extends
@@ -441,6 +523,8 @@ The approval no longer names an unresolved request.
 - `ChildDepthExceeded_base`
 
 #### Constructors
+
+<a id="constructor-7"></a>
 
 ##### Constructor
 
@@ -462,6 +546,8 @@ The approval no longer names an unresolved request.
 
 #### Properties
 
+<a id="current"></a>
+
 ##### current
 
 > `readonly` **current**: `number`
@@ -469,6 +555,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildDepthExceeded_base.current`
+
+<a id="depth"></a>
 
 ##### depth
 
@@ -478,6 +566,8 @@ The approval no longer names an unresolved request.
 
 `ChildDepthExceeded_base.depth`
 
+<a id="hint-7"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -485,6 +575,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildDepthExceeded_base.hint`
+
+<a id="limit"></a>
 
 ##### limit
 
@@ -494,6 +586,8 @@ The approval no longer names an unresolved request.
 
 `ChildDepthExceeded_base.limit`
 
+<a id="parentdepth"></a>
+
 ##### parentDepth
 
 > `readonly` **parentDepth**: `number`
@@ -501,6 +595,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildDepthExceeded_base.parentDepth`
+
+<a id="parentrunid"></a>
 
 ##### parentRunId
 
@@ -510,6 +606,8 @@ The approval no longer names an unresolved request.
 
 `ChildDepthExceeded_base.parentRunId`
 
+<a id="requested"></a>
+
 ##### requested
 
 > `readonly` **requested**: `number`
@@ -517,6 +615,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildDepthExceeded_base.requested`
+
+<a id="rootrunid"></a>
 
 ##### rootRunId
 
@@ -528,6 +628,8 @@ The approval no longer names an unresolved request.
 
 ***
 
+<a id="childlimitexceeded"></a>
+
 ### ChildLimitExceeded
 
 #### Extends
@@ -535,6 +637,8 @@ The approval no longer names an unresolved request.
 - `ChildLimitExceeded_base`
 
 #### Constructors
+
+<a id="constructor-8"></a>
 
 ##### Constructor
 
@@ -556,6 +660,8 @@ The approval no longer names an unresolved request.
 
 #### Properties
 
+<a id="current-1"></a>
+
 ##### current
 
 > `readonly` **current**: `number`
@@ -563,6 +669,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildLimitExceeded_base.current`
+
+<a id="depth-1"></a>
 
 ##### depth
 
@@ -572,6 +680,8 @@ The approval no longer names an unresolved request.
 
 `ChildLimitExceeded_base.depth`
 
+<a id="hint-8"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -579,6 +689,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildLimitExceeded_base.hint`
+
+<a id="limit-1"></a>
 
 ##### limit
 
@@ -588,6 +700,8 @@ The approval no longer names an unresolved request.
 
 `ChildLimitExceeded_base.limit`
 
+<a id="parentdepth-1"></a>
+
 ##### parentDepth
 
 > `readonly` **parentDepth**: `number`
@@ -595,6 +709,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildLimitExceeded_base.parentDepth`
+
+<a id="parentrunid-1"></a>
 
 ##### parentRunId
 
@@ -604,6 +720,8 @@ The approval no longer names an unresolved request.
 
 `ChildLimitExceeded_base.parentRunId`
 
+<a id="requested-1"></a>
+
 ##### requested
 
 > `readonly` **requested**: `number`
@@ -611,6 +729,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildLimitExceeded_base.requested`
+
+<a id="rootrunid-1"></a>
 
 ##### rootRunId
 
@@ -622,6 +742,8 @@ The approval no longer names an unresolved request.
 
 ***
 
+<a id="childselectionmissing"></a>
+
 ### ChildSelectionMissing
 
 #### Extends
@@ -629,6 +751,8 @@ The approval no longer names an unresolved request.
 - `ChildSelectionMissing_base`
 
 #### Constructors
+
+<a id="constructor-9"></a>
 
 ##### Constructor
 
@@ -650,6 +774,8 @@ The approval no longer names an unresolved request.
 
 #### Properties
 
+<a id="hint-9"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -658,6 +784,8 @@ The approval no longer names an unresolved request.
 
 `ChildSelectionMissing_base.hint`
 
+<a id="parentrunid-2"></a>
+
 ##### parentRunId
 
 > `readonly` **parentRunId**: `string`
@@ -665,6 +793,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `ChildSelectionMissing_base.parentRunId`
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -676,6 +806,8 @@ The approval no longer names an unresolved request.
 
 ***
 
+<a id="cursorexpired"></a>
+
 ### CursorExpired
 
 #### Extends
@@ -683,6 +815,8 @@ The approval no longer names an unresolved request.
 - `CursorExpired_base`
 
 #### Constructors
+
+<a id="constructor-10"></a>
 
 ##### Constructor
 
@@ -704,6 +838,8 @@ The approval no longer names an unresolved request.
 
 #### Properties
 
+<a id="cursor"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `number`
@@ -711,6 +847,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `CursorExpired_base.cursor`
+
+<a id="earliestsequence"></a>
 
 ##### earliestSequence
 
@@ -720,6 +858,8 @@ The approval no longer names an unresolved request.
 
 `CursorExpired_base.earliestSequence`
 
+<a id="hint-10"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -727,6 +867,8 @@ The approval no longer names an unresolved request.
 ###### Inherited from
 
 `CursorExpired_base.hint`
+
+<a id="runid-4"></a>
 
 ##### runId
 
@@ -738,6 +880,8 @@ The approval no longer names an unresolved request.
 
 ***
 
+<a id="duplicateagent"></a>
+
 ### DuplicateAgent
 
 An Agent name is already registered in this Runtime process.
@@ -747,6 +891,8 @@ An Agent name is already registered in this Runtime process.
 - `DuplicateAgent_base`
 
 #### Constructors
+
+<a id="constructor-11"></a>
 
 ##### Constructor
 
@@ -768,6 +914,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="hint-11"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -775,6 +923,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `DuplicateAgent_base.hint`
+
+<a id="name-1"></a>
 
 ##### name
 
@@ -786,6 +936,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="executableidentitymismatch"></a>
+
 ### ExecutableIdentityMismatch
 
 #### Extends
@@ -793,6 +945,8 @@ An Agent name is already registered in this Runtime process.
 - `ExecutableIdentityMismatch_base`
 
 #### Constructors
+
+<a id="constructor-12"></a>
 
 ##### Constructor
 
@@ -814,6 +968,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="actualref"></a>
+
 ##### actualRef
 
 > `readonly` **actualRef**: `object`
@@ -829,6 +985,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `ExecutableIdentityMismatch_base.actualRef`
+
+<a id="expectedref"></a>
 
 ##### expectedRef
 
@@ -846,6 +1004,8 @@ An Agent name is already registered in this Runtime process.
 
 `ExecutableIdentityMismatch_base.expectedRef`
 
+<a id="hint-12"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -853,6 +1013,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `ExecutableIdentityMismatch_base.hint`
+
+<a id="runid-5"></a>
 
 ##### runId
 
@@ -864,6 +1026,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="executablepinmissing"></a>
+
 ### ExecutablePinMissing
 
 #### Extends
@@ -871,6 +1035,8 @@ An Agent name is already registered in this Runtime process.
 - `ExecutablePinMissing_base`
 
 #### Constructors
+
+<a id="constructor-13"></a>
 
 ##### Constructor
 
@@ -892,6 +1058,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="hint-13"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -899,6 +1067,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `ExecutablePinMissing_base.hint`
+
+<a id="ref"></a>
 
 ##### ref
 
@@ -916,6 +1086,8 @@ An Agent name is already registered in this Runtime process.
 
 `ExecutablePinMissing_base.ref`
 
+<a id="runid-6"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -926,6 +1098,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="executableregistrationconflict"></a>
+
 ### ExecutableRegistrationConflict
 
 #### Extends
@@ -933,6 +1107,8 @@ An Agent name is already registered in this Runtime process.
 - `ExecutableRegistrationConflict_base`
 
 #### Constructors
+
+<a id="constructor-14"></a>
 
 ##### Constructor
 
@@ -954,6 +1130,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="hint-14"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -961,6 +1139,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `ExecutableRegistrationConflict_base.hint`
+
+<a id="pin"></a>
 
 ##### pin
 
@@ -972,6 +1152,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="executableregistrationinvalid"></a>
+
 ### ExecutableRegistrationInvalid
 
 #### Extends
@@ -979,6 +1161,8 @@ An Agent name is already registered in this Runtime process.
 - `ExecutableRegistrationInvalid_base`
 
 #### Constructors
+
+<a id="constructor-15"></a>
 
 ##### Constructor
 
@@ -1000,6 +1184,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="hint-15"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1007,6 +1193,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `ExecutableRegistrationInvalid_base.hint`
+
+<a id="message-2"></a>
 
 ##### message
 
@@ -1018,6 +1206,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="executableregistrationmissing"></a>
+
 ### ExecutableRegistrationMissing
 
 #### Extends
@@ -1025,6 +1215,8 @@ An Agent name is already registered in this Runtime process.
 - `ExecutableRegistrationMissing_base`
 
 #### Constructors
+
+<a id="constructor-16"></a>
 
 ##### Constructor
 
@@ -1046,6 +1238,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="hint-16"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1053,6 +1247,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `ExecutableRegistrationMissing_base.hint`
+
+<a id="pin-1"></a>
 
 ##### pin
 
@@ -1064,6 +1260,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="fanoutconflict"></a>
+
 ### FanOutConflict
 
 #### Extends
@@ -1071,6 +1269,8 @@ An Agent name is already registered in this Runtime process.
 - `FanOutConflict_base`
 
 #### Constructors
+
+<a id="constructor-17"></a>
 
 ##### Constructor
 
@@ -1092,6 +1292,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="existingfanoutid"></a>
+
 ##### existingFanOutId
 
 > `readonly` **existingFanOutId**: `string`
@@ -1099,6 +1301,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `FanOutConflict_base.existingFanOutId`
+
+<a id="hint-17"></a>
 
 ##### hint
 
@@ -1108,6 +1312,8 @@ An Agent name is already registered in this Runtime process.
 
 `FanOutConflict_base.hint`
 
+<a id="idempotencykey"></a>
+
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
@@ -1115,6 +1321,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `FanOutConflict_base.idempotencyKey`
+
+<a id="parentrunid-3"></a>
 
 ##### parentRunId
 
@@ -1126,6 +1334,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="fanoutinvalid"></a>
+
 ### FanOutInvalid
 
 #### Extends
@@ -1133,6 +1343,8 @@ An Agent name is already registered in this Runtime process.
 - `FanOutInvalid_base`
 
 #### Constructors
+
+<a id="constructor-18"></a>
 
 ##### Constructor
 
@@ -1154,6 +1366,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="hint-18"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1161,6 +1375,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `FanOutInvalid_base.hint`
+
+<a id="message-3"></a>
 
 ##### message
 
@@ -1172,6 +1388,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="fanoutnotfound"></a>
+
 ### FanOutNotFound
 
 #### Extends
@@ -1179,6 +1397,8 @@ An Agent name is already registered in this Runtime process.
 - `FanOutNotFound_base`
 
 #### Constructors
+
+<a id="constructor-19"></a>
 
 ##### Constructor
 
@@ -1200,6 +1420,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="fanoutid"></a>
+
 ##### fanOutId
 
 > `readonly` **fanOutId**: `string`
@@ -1207,6 +1429,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `FanOutNotFound_base.fanOutId`
+
+<a id="hint-19"></a>
 
 ##### hint
 
@@ -1218,6 +1442,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="fanoutremainderunsupported"></a>
+
 ### FanOutRemainderUnsupported
 
 #### Extends
@@ -1225,6 +1451,8 @@ An Agent name is already registered in this Runtime process.
 - `FanOutRemainderUnsupported_base`
 
 #### Constructors
+
+<a id="constructor-20"></a>
 
 ##### Constructor
 
@@ -1246,6 +1474,8 @@ An Agent name is already registered in this Runtime process.
 
 #### Properties
 
+<a id="durability"></a>
+
 ##### durability
 
 > `readonly` **durability**: `"ephemeral"` \| `"durable"`
@@ -1254,6 +1484,8 @@ An Agent name is already registered in this Runtime process.
 
 `FanOutRemainderUnsupported_base.durability`
 
+<a id="hint-20"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1261,6 +1493,8 @@ An Agent name is already registered in this Runtime process.
 ###### Inherited from
 
 `FanOutRemainderUnsupported_base.hint`
+
+<a id="remainder"></a>
 
 ##### remainder
 
@@ -1272,6 +1506,8 @@ An Agent name is already registered in this Runtime process.
 
 ***
 
+<a id="forksequenceinvalid"></a>
+
 ### ForkSequenceInvalid
 
 A fork or rewind sequence is outside the committed journal.
@@ -1281,6 +1517,8 @@ A fork or rewind sequence is outside the committed journal.
 - `ForkSequenceInvalid_base`
 
 #### Constructors
+
+<a id="constructor-21"></a>
 
 ##### Constructor
 
@@ -1302,6 +1540,8 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Properties
 
+<a id="hint-21"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1309,6 +1549,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `ForkSequenceInvalid_base.hint`
+
+<a id="lastsequence"></a>
 
 ##### lastSequence
 
@@ -1318,6 +1560,8 @@ A fork or rewind sequence is outside the committed journal.
 
 `ForkSequenceInvalid_base.lastSequence`
 
+<a id="runid-7"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -1325,6 +1569,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `ForkSequenceInvalid_base.runId`
+
+<a id="sequence-2"></a>
 
 ##### sequence
 
@@ -1336,6 +1582,8 @@ A fork or rewind sequence is outside the committed journal.
 
 ***
 
+<a id="idempotencyconflict"></a>
+
 ### IdempotencyConflict
 
 #### Extends
@@ -1343,6 +1591,8 @@ A fork or rewind sequence is outside the committed journal.
 - `IdempotencyConflict_base`
 
 #### Constructors
+
+<a id="constructor-22"></a>
 
 ##### Constructor
 
@@ -1364,6 +1614,8 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Properties
 
+<a id="address-1"></a>
+
 ##### address
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
@@ -1371,6 +1623,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `IdempotencyConflict_base.address`
+
+<a id="existingrunid-1"></a>
 
 ##### existingRunId
 
@@ -1380,6 +1634,8 @@ A fork or rewind sequence is outside the committed journal.
 
 `IdempotencyConflict_base.existingRunId`
 
+<a id="hint-22"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1388,6 +1644,8 @@ A fork or rewind sequence is outside the committed journal.
 
 `IdempotencyConflict_base.hint`
 
+<a id="idempotencykey-1"></a>
+
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
@@ -1395,6 +1653,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `IdempotencyConflict_base.idempotencyKey`
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -1406,6 +1666,8 @@ A fork or rewind sequence is outside the committed journal.
 
 ***
 
+<a id="illegaloperatoraction"></a>
+
 ### IllegalOperatorAction
 
 #### Extends
@@ -1413,6 +1675,8 @@ A fork or rewind sequence is outside the committed journal.
 - `IllegalOperatorAction_base`
 
 #### Constructors
+
+<a id="constructor-23"></a>
 
 ##### Constructor
 
@@ -1434,6 +1698,8 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Properties
 
+<a id="action"></a>
+
 ##### action
 
 > `readonly` **action**: `string`
@@ -1441,6 +1707,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `IllegalOperatorAction_base.action`
+
+<a id="decision"></a>
 
 ##### decision
 
@@ -1450,6 +1718,8 @@ A fork or rewind sequence is outside the committed journal.
 
 `IllegalOperatorAction_base.decision`
 
+<a id="hint-23"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1457,6 +1727,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `IllegalOperatorAction_base.hint`
+
+<a id="runid-8"></a>
 
 ##### runId
 
@@ -1468,6 +1740,8 @@ A fork or rewind sequence is outside the committed journal.
 
 ***
 
+<a id="multiworkerunsupported"></a>
+
 ### MultiWorkerUnsupported
 
 #### Extends
@@ -1475,6 +1749,8 @@ A fork or rewind sequence is outside the committed journal.
 - `MultiWorkerUnsupported_base`
 
 #### Constructors
+
+<a id="constructor-24"></a>
 
 ##### Constructor
 
@@ -1496,6 +1772,8 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Properties
 
+<a id="backend"></a>
+
 ##### backend
 
 > `readonly` **backend**: `"sqlite"` \| `"mysql"`
@@ -1504,6 +1782,8 @@ A fork or rewind sequence is outside the committed journal.
 
 `MultiWorkerUnsupported_base.backend`
 
+<a id="hint-24"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1511,6 +1791,8 @@ A fork or rewind sequence is outside the committed journal.
 ###### Inherited from
 
 `MultiWorkerUnsupported_base.hint`
+
+<a id="message-4"></a>
 
 ##### message
 
@@ -1522,6 +1804,8 @@ A fork or rewind sequence is outside the committed journal.
 
 ***
 
+<a id="nosnapshot"></a>
+
 ### NoSnapshot
 
 A fork point includes sandbox state that has no committed image to restore.
@@ -1531,6 +1815,8 @@ A fork point includes sandbox state that has no committed image to restore.
 - `NoSnapshot_base`
 
 #### Constructors
+
+<a id="constructor-25"></a>
 
 ##### Constructor
 
@@ -1552,6 +1838,8 @@ A fork point includes sandbox state that has no committed image to restore.
 
 #### Properties
 
+<a id="atsequence"></a>
+
 ##### atSequence
 
 > `readonly` **atSequence**: `number`
@@ -1560,6 +1848,8 @@ A fork point includes sandbox state that has no committed image to restore.
 
 `NoSnapshot_base.atSequence`
 
+<a id="hint-25"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1567,6 +1857,8 @@ A fork point includes sandbox state that has no committed image to restore.
 ###### Inherited from
 
 `NoSnapshot_base.hint`
+
+<a id="runid-9"></a>
 
 ##### runId
 
@@ -1578,6 +1870,8 @@ A fork point includes sandbox state that has no committed image to restore.
 
 ***
 
+<a id="notinfamily"></a>
+
 ### NotInFamily
 
 One Run attempted to message a target outside its durable Run family.
@@ -1587,6 +1881,8 @@ One Run attempted to message a target outside its durable Run family.
 - `NotInFamily_base`
 
 #### Constructors
+
+<a id="constructor-26"></a>
 
 ##### Constructor
 
@@ -1608,6 +1904,8 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
+<a id="fromrunid"></a>
+
 ##### fromRunId
 
 > `readonly` **fromRunId**: `string`
@@ -1616,6 +1914,8 @@ One Run attempted to message a target outside its durable Run family.
 
 `NotInFamily_base.fromRunId`
 
+<a id="hint-26"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1623,6 +1923,8 @@ One Run attempted to message a target outside its durable Run family.
 ###### Inherited from
 
 `NotInFamily_base.hint`
+
+<a id="targetrunid"></a>
 
 ##### targetRunId
 
@@ -1634,6 +1936,8 @@ One Run attempted to message a target outside its durable Run family.
 
 ***
 
+<a id="operationresolutionconflict"></a>
+
 ### OperationResolutionConflict
 
 #### Extends
@@ -1641,6 +1945,8 @@ One Run attempted to message a target outside its durable Run family.
 - `OperationResolutionConflict_base`
 
 #### Constructors
+
+<a id="constructor-27"></a>
 
 ##### Constructor
 
@@ -1662,6 +1968,8 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
+<a id="hint-27"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1669,6 +1977,8 @@ One Run attempted to message a target outside its durable Run family.
 ###### Inherited from
 
 `OperationResolutionConflict_base.hint`
+
+<a id="idempotencykey-2"></a>
 
 ##### idempotencyKey
 
@@ -1678,6 +1988,8 @@ One Run attempted to message a target outside its durable Run family.
 
 `OperationResolutionConflict_base.idempotencyKey`
 
+<a id="operationid"></a>
+
 ##### operationId
 
 > `readonly` **operationId**: `string`
@@ -1685,6 +1997,8 @@ One Run attempted to message a target outside its durable Run family.
 ###### Inherited from
 
 `OperationResolutionConflict_base.operationId`
+
+<a id="runid-10"></a>
 
 ##### runId
 
@@ -1696,6 +2010,8 @@ One Run attempted to message a target outside its durable Run family.
 
 ***
 
+<a id="responseconflict"></a>
+
 ### ResponseConflict
 
 #### Extends
@@ -1703,6 +2019,8 @@ One Run attempted to message a target outside its durable Run family.
 - `ResponseConflict_base`
 
 #### Constructors
+
+<a id="constructor-28"></a>
 
 ##### Constructor
 
@@ -1724,6 +2042,8 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
+<a id="hint-28"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1732,6 +2052,8 @@ One Run attempted to message a target outside its durable Run family.
 
 `ResponseConflict_base.hint`
 
+<a id="runid-11"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -1739,6 +2061,8 @@ One Run attempted to message a target outside its durable Run family.
 ###### Inherited from
 
 `ResponseConflict_base.runId`
+
+<a id="waitid"></a>
 
 ##### waitId
 
@@ -1750,6 +2074,8 @@ One Run attempted to message a target outside its durable Run family.
 
 ***
 
+<a id="runbusy"></a>
+
 ### RunBusy
 
 A reject-policy message arrived while its target Run was executing.
@@ -1759,6 +2085,8 @@ A reject-policy message arrived while its target Run was executing.
 - `RunBusy_base`
 
 #### Constructors
+
+<a id="constructor-29"></a>
 
 ##### Constructor
 
@@ -1780,6 +2108,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-29"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1787,6 +2117,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `RunBusy_base.hint`
+
+<a id="runid-12"></a>
 
 ##### runId
 
@@ -1798,6 +2130,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="runidconflict"></a>
+
 ### RunIdConflict
 
 #### Extends
@@ -1805,6 +2139,8 @@ A reject-policy message arrived while its target Run was executing.
 - `RunIdConflict_base`
 
 #### Constructors
+
+<a id="constructor-30"></a>
 
 ##### Constructor
 
@@ -1826,6 +2162,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="existingrunid-2"></a>
+
 ##### existingRunId
 
 > `readonly` **existingRunId**: `string`
@@ -1834,6 +2172,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `RunIdConflict_base.existingRunId`
 
+<a id="hint-30"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1841,6 +2181,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `RunIdConflict_base.hint`
+
+<a id="runid-13"></a>
 
 ##### runId
 
@@ -1852,6 +2194,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="runnotfound"></a>
+
 ### RunNotFound
 
 #### Extends
@@ -1859,6 +2203,8 @@ A reject-policy message arrived while its target Run was executing.
 - `RunNotFound_base`
 
 #### Constructors
+
+<a id="constructor-31"></a>
 
 ##### Constructor
 
@@ -1880,6 +2226,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-31"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1887,6 +2235,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `RunNotFound_base.hint`
+
+<a id="runid-14"></a>
 
 ##### runId
 
@@ -1898,6 +2248,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="runterminal"></a>
+
 ### RunTerminal
 
 #### Extends
@@ -1905,6 +2257,8 @@ A reject-policy message arrived while its target Run was executing.
 - `RunTerminal_base`
 
 #### Constructors
+
+<a id="constructor-32"></a>
 
 ##### Constructor
 
@@ -1926,6 +2280,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-32"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1934,6 +2290,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `RunTerminal_base.hint`
 
+<a id="runid-15"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -1941,6 +2299,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `RunTerminal_base.runId`
+
+<a id="status"></a>
 
 ##### status
 
@@ -1952,6 +2312,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="runtimeunavailable"></a>
+
 ### RuntimeUnavailable
 
 #### Extends
@@ -1959,6 +2321,8 @@ A reject-policy message arrived while its target Run was executing.
 - `RuntimeUnavailable_base`
 
 #### Constructors
+
+<a id="constructor-33"></a>
 
 ##### Constructor
 
@@ -1980,6 +2344,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-33"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -1987,6 +2353,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `RuntimeUnavailable_base.hint`
+
+<a id="message-5"></a>
 
 ##### message
 
@@ -1998,6 +2366,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="sessionentrycorrupt"></a>
+
 ### SessionEntryCorrupt
 
 #### Extends
@@ -2005,6 +2375,8 @@ A reject-policy message arrived while its target Run was executing.
 - `SessionEntryCorrupt_base`
 
 #### Constructors
+
+<a id="constructor-34"></a>
 
 ##### Constructor
 
@@ -2026,6 +2398,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="entryid"></a>
+
 ##### entryId
 
 > `readonly` **entryId**: `string`
@@ -2033,6 +2407,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `SessionEntryCorrupt_base.entryId`
+
+<a id="hint-34"></a>
 
 ##### hint
 
@@ -2042,6 +2418,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryCorrupt_base.hint`
 
+<a id="message-6"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -2049,6 +2427,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `SessionEntryCorrupt_base.message`
+
+<a id="sessionid-1"></a>
 
 ##### sessionId
 
@@ -2060,6 +2440,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="sessionentrynotfound"></a>
+
 ### SessionEntryNotFound
 
 #### Extends
@@ -2067,6 +2449,8 @@ A reject-policy message arrived while its target Run was executing.
 - `SessionEntryNotFound_base`
 
 #### Constructors
+
+<a id="constructor-35"></a>
 
 ##### Constructor
 
@@ -2088,6 +2472,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="entryid-1"></a>
+
 ##### entryId
 
 > `readonly` **entryId**: `string`
@@ -2096,6 +2482,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryNotFound_base.entryId`
 
+<a id="hint-35"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2103,6 +2491,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `SessionEntryNotFound_base.hint`
+
+<a id="sessionid-2"></a>
 
 ##### sessionId
 
@@ -2114,6 +2504,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="staleclaim"></a>
+
 ### StaleClaim
 
 #### Extends
@@ -2121,6 +2513,8 @@ A reject-policy message arrived while its target Run was executing.
 - `StaleClaim_base`
 
 #### Constructors
+
+<a id="constructor-36"></a>
 
 ##### Constructor
 
@@ -2142,6 +2536,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="attemptfence"></a>
+
 ##### attemptFence
 
 > `readonly` **attemptFence**: `number`
@@ -2149,6 +2545,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `StaleClaim_base.attemptFence`
+
+<a id="hint-36"></a>
 
 ##### hint
 
@@ -2158,6 +2556,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `StaleClaim_base.hint`
 
+<a id="runid-16"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -2165,6 +2565,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `StaleClaim_base.runId`
+
+<a id="workerid"></a>
 
 ##### workerId
 
@@ -2176,6 +2578,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="startinvalid"></a>
+
 ### StartInvalid
 
 #### Extends
@@ -2183,6 +2587,8 @@ A reject-policy message arrived while its target Run was executing.
 - `StartInvalid_base`
 
 #### Constructors
+
+<a id="constructor-37"></a>
 
 ##### Constructor
 
@@ -2204,6 +2610,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-37"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2211,6 +2619,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `StartInvalid_base.hint`
+
+<a id="message-7"></a>
 
 ##### message
 
@@ -2222,6 +2632,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="steeringconflict"></a>
+
 ### SteeringConflict
 
 #### Extends
@@ -2229,6 +2641,8 @@ A reject-policy message arrived while its target Run was executing.
 - `SteeringConflict_base`
 
 #### Constructors
+
+<a id="constructor-38"></a>
 
 ##### Constructor
 
@@ -2250,6 +2664,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-38"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2258,6 +2674,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `SteeringConflict_base.hint`
 
+<a id="idempotencykey-3"></a>
+
 ##### idempotencyKey
 
 > `readonly` **idempotencyKey**: `string`
@@ -2265,6 +2683,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `SteeringConflict_base.idempotencyKey`
+
+<a id="runid-17"></a>
 
 ##### runId
 
@@ -2276,6 +2696,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="subscriberlagged"></a>
+
 ### SubscriberLagged
 
 #### Extends
@@ -2283,6 +2705,8 @@ A reject-policy message arrived while its target Run was executing.
 - `SubscriberLagged_base`
 
 #### Constructors
+
+<a id="constructor-39"></a>
 
 ##### Constructor
 
@@ -2304,6 +2728,8 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
+<a id="hint-39"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2312,6 +2738,8 @@ A reject-policy message arrived while its target Run was executing.
 
 `SubscriberLagged_base.hint`
 
+<a id="lastdeliveredsequence"></a>
+
 ##### lastDeliveredSequence
 
 > `readonly` **lastDeliveredSequence**: `number`
@@ -2319,6 +2747,8 @@ A reject-policy message arrived while its target Run was executing.
 ###### Inherited from
 
 `SubscriberLagged_base.lastDeliveredSequence`
+
+<a id="runid-18"></a>
 
 ##### runId
 
@@ -2330,6 +2760,8 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="substitutioninvalid"></a>
+
 ### SubstitutionInvalid
 
 A counterfactual substitution does not name a completed operation in the selected prefix.
@@ -2339,6 +2771,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 - `SubstitutionInvalid_base`
 
 #### Constructors
+
+<a id="constructor-40"></a>
 
 ##### Constructor
 
@@ -2360,6 +2794,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Properties
 
+<a id="hint-40"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2368,6 +2804,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 `SubstitutionInvalid_base.hint`
 
+<a id="operationid-1"></a>
+
 ##### operationId
 
 > `readonly` **operationId**: `string`
@@ -2375,6 +2813,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 ###### Inherited from
 
 `SubstitutionInvalid_base.operationId`
+
+<a id="runid-19"></a>
 
 ##### runId
 
@@ -2386,6 +2826,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 ***
 
+<a id="treecursorexpired"></a>
+
 ### TreeCursorExpired
 
 #### Extends
@@ -2393,6 +2835,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 - `TreeCursorExpired_base`
 
 #### Constructors
+
+<a id="constructor-41"></a>
 
 ##### Constructor
 
@@ -2414,6 +2858,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Properties
 
+<a id="cursor-1"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
@@ -2421,6 +2867,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 ###### Inherited from
 
 `TreeCursorExpired_base.cursor`
+
+<a id="earliestcursor"></a>
 
 ##### earliestCursor
 
@@ -2430,6 +2878,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 `TreeCursorExpired_base.earliestCursor`
 
+<a id="hint-41"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2437,6 +2887,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 ###### Inherited from
 
 `TreeCursorExpired_base.hint`
+
+<a id="rootrunid-2"></a>
 
 ##### rootRunId
 
@@ -2448,6 +2900,8 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 ***
 
+<a id="treecursorfuture"></a>
+
 ### TreeCursorFuture
 
 The cursor names a position that has not committed.
@@ -2457,6 +2911,8 @@ The cursor names a position that has not committed.
 - `TreeCursorFuture_base`
 
 #### Constructors
+
+<a id="constructor-42"></a>
 
 ##### Constructor
 
@@ -2478,6 +2934,8 @@ The cursor names a position that has not committed.
 
 #### Properties
 
+<a id="cursor-2"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
@@ -2485,6 +2943,8 @@ The cursor names a position that has not committed.
 ###### Inherited from
 
 `TreeCursorFuture_base.cursor`
+
+<a id="hint-42"></a>
 
 ##### hint
 
@@ -2494,6 +2954,8 @@ The cursor names a position that has not committed.
 
 `TreeCursorFuture_base.hint`
 
+<a id="latestcursor"></a>
+
 ##### latestCursor
 
 > `readonly` **latestCursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
@@ -2501,6 +2963,8 @@ The cursor names a position that has not committed.
 ###### Inherited from
 
 `TreeCursorFuture_base.latestCursor`
+
+<a id="rootrunid-3"></a>
 
 ##### rootRunId
 
@@ -2512,6 +2976,8 @@ The cursor names a position that has not committed.
 
 ***
 
+<a id="treecursorinvalid"></a>
+
 ### TreeCursorInvalid
 
 #### Extends
@@ -2519,6 +2985,8 @@ The cursor names a position that has not committed.
 - `TreeCursorInvalid_base`
 
 #### Constructors
+
+<a id="constructor-43"></a>
 
 ##### Constructor
 
@@ -2540,6 +3008,8 @@ The cursor names a position that has not committed.
 
 #### Properties
 
+<a id="cursor-3"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
@@ -2547,6 +3017,8 @@ The cursor names a position that has not committed.
 ###### Inherited from
 
 `TreeCursorInvalid_base.cursor`
+
+<a id="hint-43"></a>
 
 ##### hint
 
@@ -2556,6 +3028,8 @@ The cursor names a position that has not committed.
 
 `TreeCursorInvalid_base.hint`
 
+<a id="message-8"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -2563,6 +3037,8 @@ The cursor names a position that has not committed.
 ###### Inherited from
 
 `TreeCursorInvalid_base.message`
+
+<a id="rootrunid-4"></a>
 
 ##### rootRunId
 
@@ -2574,6 +3050,8 @@ The cursor names a position that has not committed.
 
 ***
 
+<a id="treecursorrootmismatch"></a>
+
 ### TreeCursorRootMismatch
 
 The cursor belongs to a different root Run.
@@ -2583,6 +3061,8 @@ The cursor belongs to a different root Run.
 - `TreeCursorRootMismatch_base`
 
 #### Constructors
+
+<a id="constructor-44"></a>
 
 ##### Constructor
 
@@ -2604,6 +3084,8 @@ The cursor belongs to a different root Run.
 
 #### Properties
 
+<a id="cursor-4"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
@@ -2611,6 +3093,8 @@ The cursor belongs to a different root Run.
 ###### Inherited from
 
 `TreeCursorRootMismatch_base.cursor`
+
+<a id="cursorrootrunid"></a>
 
 ##### cursorRootRunId
 
@@ -2620,6 +3104,8 @@ The cursor belongs to a different root Run.
 
 `TreeCursorRootMismatch_base.cursorRootRunId`
 
+<a id="hint-44"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2627,6 +3113,8 @@ The cursor belongs to a different root Run.
 ###### Inherited from
 
 `TreeCursorRootMismatch_base.hint`
+
+<a id="rootrunid-5"></a>
 
 ##### rootRunId
 
@@ -2638,6 +3126,8 @@ The cursor belongs to a different root Run.
 
 ***
 
+<a id="treepolicyinvalid"></a>
+
 ### TreePolicyInvalid
 
 #### Extends
@@ -2645,6 +3135,8 @@ The cursor belongs to a different root Run.
 - `TreePolicyInvalid_base`
 
 #### Constructors
+
+<a id="constructor-45"></a>
 
 ##### Constructor
 
@@ -2666,6 +3158,8 @@ The cursor belongs to a different root Run.
 
 #### Properties
 
+<a id="hint-45"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2673,6 +3167,8 @@ The cursor belongs to a different root Run.
 ###### Inherited from
 
 `TreePolicyInvalid_base.hint`
+
+<a id="message-9"></a>
 
 ##### message
 
@@ -2684,6 +3180,8 @@ The cursor belongs to a different root Run.
 
 ***
 
+<a id="treereplaylimitinvalid"></a>
+
 ### TreeReplayLimitInvalid
 
 A replay request falls outside the fixed page-size contract.
@@ -2693,6 +3191,8 @@ A replay request falls outside the fixed page-size contract.
 - `TreeReplayLimitInvalid_base`
 
 #### Constructors
+
+<a id="constructor-46"></a>
 
 ##### Constructor
 
@@ -2714,6 +3214,8 @@ A replay request falls outside the fixed page-size contract.
 
 #### Properties
 
+<a id="hint-46"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2721,6 +3223,8 @@ A replay request falls outside the fixed page-size contract.
 ###### Inherited from
 
 `TreeReplayLimitInvalid_base.hint`
+
+<a id="maximum"></a>
 
 ##### maximum
 
@@ -2730,6 +3234,8 @@ A replay request falls outside the fixed page-size contract.
 
 `TreeReplayLimitInvalid_base.maximum`
 
+<a id="minimum"></a>
+
 ##### minimum
 
 > `readonly` **minimum**: `number`
@@ -2737,6 +3243,8 @@ A replay request falls outside the fixed page-size contract.
 ###### Inherited from
 
 `TreeReplayLimitInvalid_base.minimum`
+
+<a id="received"></a>
 
 ##### received
 
@@ -2748,6 +3256,8 @@ A replay request falls outside the fixed page-size contract.
 
 ***
 
+<a id="unknownagent"></a>
+
 ### UnknownAgent
 
 A durable Run names an Agent that this Runtime process has not registered.
@@ -2757,6 +3267,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 - `UnknownAgent_base`
 
 #### Constructors
+
+<a id="constructor-47"></a>
 
 ##### Constructor
 
@@ -2778,6 +3290,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
+<a id="hint-47"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2786,6 +3300,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 `UnknownAgent_base.hint`
 
+<a id="name-2"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
@@ -2793,6 +3309,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 ###### Inherited from
 
 `UnknownAgent_base.name`
+
+<a id="runid-20"></a>
 
 ##### runId
 
@@ -2804,6 +3322,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 ***
 
+<a id="waitnotopen"></a>
+
 ### WaitNotOpen
 
 #### Extends
@@ -2811,6 +3331,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 - `WaitNotOpen_base`
 
 #### Constructors
+
+<a id="constructor-48"></a>
 
 ##### Constructor
 
@@ -2832,6 +3354,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
+<a id="hint-48"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -2840,6 +3364,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 `WaitNotOpen_base.hint`
 
+<a id="runid-21"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
@@ -2847,6 +3373,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 ###### Inherited from
 
 `WaitNotOpen_base.runId`
+
+<a id="waitid-1"></a>
 
 ##### waitId
 
@@ -2858,6 +3386,8 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 ## Type Aliases
 
+<a id="structuredagentfailure"></a>
+
 ### StructuredAgentFailure
 
 > **StructuredAgentFailure** = [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`GateFailed`](../../generalist/namespaces/Gate#gatefailed) \| [`PermissionDenied`](../../generalist/namespaces/ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](../../generalist/namespaces/AgentEvent#resumemismatch)
@@ -2866,11 +3396,15 @@ The structured Agent failures a durable terminal event preserves verbatim.
 
 ## Variables
 
+<a id="structuredagentfailure-1"></a>
+
 ### StructuredAgentFailure
 
 > **StructuredAgentFailure**: `Codec`\<[`StructuredAgentFailure`](#structuredagentfailure), \{ `expected?`: \{ `checkpoint`: \{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}; `hint?`: `string`; `waits`: readonly `object`[]; \}; `hint?`: `string`; `reason`: `"checkpoint-not-found"` \| `"identity-mismatch"`; `received`: \{ `checkpoint`: \{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}; `hint?`: `string`; `waits`: readonly `object`[]; \}; \} \| \{ `gate`: \{ `evidence`: `Json`; `name`: `string`; `verdict`: `"pass"` \| `"fail"`; \}; `hint?`: `string`; \} \| \{ `hint?`: `string`; `message`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; `hint?`: `string`; `remaining?`: `number`; `requested`: `number`; \}, `never`, `never`\>
 
 ## References
+
+<a id="schemachecksummismatch"></a>
 
 ### SchemaChecksumMismatch
 
@@ -2878,11 +3412,15 @@ Re-exports [SchemaChecksumMismatch](../../runtime.sql-driver/index#schemachecksu
 
 ***
 
+<a id="schemadirty"></a>
+
 ### SchemaDirty
 
 Re-exports [SchemaDirty](../../runtime.sql-driver/index#schemadirty)
 
 ***
+
+<a id="schemamigrationfailed"></a>
 
 ### SchemaMigrationFailed
 
@@ -2890,11 +3428,15 @@ Re-exports [SchemaMigrationFailed](../../runtime.sql-driver/index#schemamigratio
 
 ***
 
+<a id="schemaupgraderequired"></a>
+
 ### SchemaUpgradeRequired
 
 Re-exports [SchemaUpgradeRequired](../../runtime.sql-driver/index#schemaupgraderequired)
 
 ***
+
+<a id="schemaversionunsupported"></a>
 
 ### SchemaVersionUnsupported
 

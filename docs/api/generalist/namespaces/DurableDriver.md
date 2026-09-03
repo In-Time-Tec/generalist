@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="drivererror"></a>
+
 ### DriverError
 
 #### Extends
@@ -15,6 +17,8 @@
 - `DriverError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -44,6 +50,8 @@
 
 `DriverError_base.cause`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -51,6 +59,8 @@
 ###### Inherited from
 
 `DriverError_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -62,6 +72,8 @@
 
 ***
 
+<a id="driverinterpreter"></a>
+
 ### DriverInterpreter
 
 #### Extends
@@ -69,6 +81,8 @@
 - `DriverInterpreter_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -90,6 +104,8 @@
 
 ***
 
+<a id="driverjournal"></a>
+
 ### DriverJournal
 
 Optional host journal service merged into Agent.stream driver layers.
@@ -99,6 +115,8 @@ Optional host journal service merged into Agent.stream driver layers.
 - `DriverJournal_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -120,6 +138,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 ***
 
+<a id="driverstateinvalid"></a>
+
 ### DriverStateInvalid
 
 #### Extends
@@ -127,6 +147,8 @@ Optional host journal service merged into Agent.stream driver layers.
 - `DriverStateInvalid_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -148,6 +170,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -155,6 +179,8 @@ Optional host journal service merged into Agent.stream driver layers.
 ###### Inherited from
 
 `DriverStateInvalid_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -166,6 +192,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 ***
 
+<a id="driverunknownreplay"></a>
+
 ### DriverUnknownReplay
 
 #### Extends
@@ -173,6 +201,8 @@ Optional host journal service merged into Agent.stream driver layers.
 - `DriverUnknownReplay_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -194,6 +224,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 #### Properties
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -202,6 +234,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 `DriverUnknownReplay_base.hint`
 
+<a id="operationid"></a>
+
 ##### operationId
 
 > `readonly` **operationId**: `string`
@@ -209,6 +243,8 @@ Optional host journal service merged into Agent.stream driver layers.
 ###### Inherited from
 
 `DriverUnknownReplay_base.operationId`
+
+<a id="operationkey"></a>
 
 ##### operationKey
 
@@ -220,6 +256,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 ***
 
+<a id="driverversionmismatch"></a>
+
 ### DriverVersionMismatch
 
 #### Extends
@@ -227,6 +265,8 @@ Optional host journal service merged into Agent.stream driver layers.
 - `DriverVersionMismatch_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -248,6 +288,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 #### Properties
 
+<a id="actual"></a>
+
 ##### actual
 
 > `readonly` **actual**: `string`
@@ -256,6 +298,8 @@ Optional host journal service merged into Agent.stream driver layers.
 
 `DriverVersionMismatch_base.actual`
 
+<a id="expected"></a>
+
 ##### expected
 
 > `readonly` **expected**: `string`
@@ -263,6 +307,8 @@ Optional host journal service merged into Agent.stream driver layers.
 ###### Inherited from
 
 `DriverVersionMismatch_base.expected`
+
+<a id="hint-3"></a>
 
 ##### hint
 
@@ -274,11 +320,15 @@ Optional host journal service merged into Agent.stream driver layers.
 
 ## Interfaces
 
+<a id="driverinput"></a>
+
 ### DriverInput
 
 Input used to construct the first checkpoint for one run.
 
 #### Properties
+
+<a id="budget"></a>
 
 ##### budget
 
@@ -332,6 +382,8 @@ Input used to construct the first checkpoint for one run.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="executable"></a>
+
 ##### executable?
 
 > `readonly` `optional` **executable?**: `object`
@@ -344,9 +396,13 @@ Input used to construct the first checkpoint for one run.
 
 > `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
 
+<a id="prompt"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
+
+<a id="resume"></a>
 
 ##### resume?
 
@@ -354,11 +410,15 @@ Input used to construct the first checkpoint for one run.
 
 ***
 
+<a id="durableagentdriver"></a>
+
 ### DurableAgentDriver
 
 Versioned durable agent driver shared by inline and runtime execution.
 
 #### Properties
+
+<a id="apply"></a>
 
 ##### apply
 
@@ -452,6 +512,8 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
+<a id="decide"></a>
+
 ##### decide
 
 > `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
@@ -540,6 +602,8 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"tool"` \| `"memory"` \| `"wait"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
+<a id="initial"></a>
+
 ##### initial
 
 > `readonly` **initial**: (`input`) => `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverError`](#drivererror)\>
@@ -554,17 +618,23 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverError`](#drivererror)\>
 
+<a id="version"></a>
+
 ##### version
 
 > `readonly` **version**: `string`
 
 ***
 
+<a id="journal"></a>
+
 ### Journal
 
 Host hook surface for durable operation journaling without runtime imports.
 
 #### Properties
+
+<a id="oncheckpoint"></a>
 
 ##### onCheckpoint
 
@@ -653,6 +723,8 @@ Host hook surface for durable operation journaling without runtime imports.
 ###### Returns
 
 `Effect`\<`void`, [`DriverError`](#drivererror)\>
+
+<a id="oncompleted"></a>
 
 ##### onCompleted
 
@@ -768,6 +840,8 @@ Host hook surface for durable operation journaling without runtime imports.
 
 `Effect`\<`void`, [`DriverError`](#drivererror)\>
 
+<a id="onscheduled"></a>
+
 ##### onScheduled
 
 > `readonly` **onScheduled**: (`operation`, `checkpoint`) => `Effect`\<`void` \| \{ `_tag`: `"Succeeded"`; `value`: `unknown`; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; \} \| \{ `_tag`: `"Unknown"`; `operationId`: `string`; \}, [`DriverError`](#drivererror)\>
@@ -880,6 +954,8 @@ Host hook surface for durable operation journaling without runtime imports.
 
 ***
 
+<a id="operationspec"></a>
+
 ### OperationSpec
 
 Operation scheduled at one agent-loop effect boundary.
@@ -915,6 +991,8 @@ Operation scheduled at one agent-loop effect boundary.
 `FailureEncodingServices` = `never`
 
 #### Properties
+
+<a id="applycheckpoint"></a>
 
 ##### applyCheckpoint?
 
@@ -1084,9 +1162,13 @@ Operation scheduled at one agent-loop effect boundary.
 
 > `readonly` **turn**: `number`
 
+<a id="failure-1"></a>
+
 ##### failure
 
 > `readonly` **failure**: `Codec`\<`Failure`, `unknown`, `FailureDecodingServices`, `FailureEncodingServices`\>
+
+<a id="input"></a>
 
 ##### input
 
@@ -1096,6 +1178,8 @@ Operation scheduled at one agent-loop effect boundary.
 
 `OperationInput.input`
 
+<a id="key"></a>
+
 ##### key
 
 > `readonly` **key**: `string`
@@ -1103,6 +1187,8 @@ Operation scheduled at one agent-loop effect boundary.
 ###### Inherited from
 
 `OperationInput.key`
+
+<a id="kind"></a>
 
 ##### kind
 
@@ -1112,6 +1198,8 @@ Operation scheduled at one agent-loop effect boundary.
 
 `OperationInput.kind`
 
+<a id="replaypolicy"></a>
+
 ##### replayPolicy
 
 > `readonly` **replayPolicy**: `"pure"` \| `"provider-idempotent"` \| `"never"`
@@ -1120,9 +1208,13 @@ Operation scheduled at one agent-loop effect boundary.
 
 `OperationInput.replayPolicy`
 
+<a id="success-1"></a>
+
 ##### success
 
 > `readonly` **success**: `Codec`\<`Success`, `unknown`, `SuccessDecodingServices`, `SuccessEncodingServices`\>
+
+<a id="turn"></a>
 
 ##### turn?
 
@@ -1130,11 +1222,15 @@ Operation scheduled at one agent-loop effect boundary.
 
 ***
 
+<a id="recordedoperation"></a>
+
 ### RecordedOperation
 
 Recorded operation for tests and future runtime journaling.
 
 #### Properties
+
+<a id="checkpoint"></a>
 
 ##### checkpoint
 
@@ -1216,6 +1312,8 @@ Recorded operation for tests and future runtime journaling.
 
 > `readonly` **turn**: `number`
 
+<a id="operation"></a>
+
 ##### operation
 
 > `readonly` **operation**: `object`
@@ -1240,11 +1338,15 @@ Recorded operation for tests and future runtime journaling.
 
 > `readonly` **replayPolicy**: `"pure"` \| `"provider-idempotent"` \| `"never"`
 
+<a id="outcome"></a>
+
 ##### outcome
 
 > `readonly` **outcome**: \{ `_tag`: `"Succeeded"`; `value`: `unknown`; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; \} \| \{ `_tag`: `"Unknown"`; `operationId`: `string`; \}
 
 ***
+
+<a id="streamsuccesscodec"></a>
 
 ### StreamSuccessCodec
 
@@ -1270,6 +1372,8 @@ Caller-owned successful stream result and replay codec.
 
 #### Properties
 
+<a id="complete"></a>
+
 ##### complete
 
 > `readonly` **complete**: () => `Success`
@@ -1277,6 +1381,8 @@ Caller-owned successful stream result and replay codec.
 ###### Returns
 
 `Success`
+
+<a id="iscomplete"></a>
 
 ##### isComplete?
 
@@ -1287,6 +1393,8 @@ Whether the source reached its authored semantic terminal value rather than a do
 ###### Returns
 
 `boolean`
+
+<a id="observe"></a>
 
 ##### observe
 
@@ -1301,6 +1409,8 @@ Whether the source reached its authored semantic terminal value rather than a do
 ###### Returns
 
 `void`
+
+<a id="replay"></a>
 
 ##### replay
 
@@ -1318,19 +1428,27 @@ Whether the source reached its authored semantic terminal value rather than a do
 
 ***
 
+<a id="tracermodelstep"></a>
+
 ### TracerModelStep
 
 Scripted model response used by the tracer driver.
 
 #### Properties
 
+<a id="text"></a>
+
 ##### text?
 
 > `readonly` `optional` **text?**: `string`
 
+<a id="toolcalls"></a>
+
 ##### toolCalls?
 
 > `readonly` `optional` **toolCalls?**: readonly `object`[]
+
+<a id="wait"></a>
 
 ##### wait?
 
@@ -1346,6 +1464,8 @@ Scripted model response used by the tracer driver.
 
 ## Type Aliases
 
+<a id="drivercheckpoint"></a>
+
 ### DriverCheckpoint
 
 > **DriverCheckpoint** = *typeof* `DriverCheckpoint.Type`
@@ -1353,6 +1473,8 @@ Scripted model response used by the tracer driver.
 Reconstructable durable checkpoint for one agent run.
 
 ***
+
+<a id="driverdecision"></a>
 
 ### DriverDecision
 
@@ -1362,6 +1484,8 @@ Next step chosen deterministically from one checkpoint.
 
 ***
 
+<a id="driveroperation"></a>
+
 ### DriverOperation
 
 > **DriverOperation** = *typeof* `DriverOperation.Type`
@@ -1369,6 +1493,8 @@ Next step chosen deterministically from one checkpoint.
 One schedulable nondeterministic operation with deterministic identity.
 
 ***
+
+<a id="driveroperationkind"></a>
 
 ### DriverOperationKind
 
@@ -1378,6 +1504,8 @@ Bounded operation kinds the driver may schedule.
 
 ***
 
+<a id="driverresult"></a>
+
 ### DriverResult
 
 > **DriverResult** = *typeof* `DriverResult.Type`
@@ -1385,6 +1513,8 @@ Bounded operation kinds the driver may schedule.
 Terminal structured result carried by a Complete decision.
 
 ***
+
+<a id="driverversion"></a>
 
 ### DriverVersion
 
@@ -1394,6 +1524,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="operationoutcome"></a>
+
 ### OperationOutcome
 
 > **OperationOutcome** = *typeof* `OperationOutcome.Type`
@@ -1401,6 +1533,8 @@ Version string for a durable driver implementation.
 Persisted outcome for one operation attempt.
 
 ***
+
+<a id="replaypolicy-1"></a>
 
 ### ReplayPolicy
 
@@ -1410,6 +1544,8 @@ How a host may replay one persisted operation after recovery.
 
 ***
 
+<a id="tracerstate"></a>
+
 ### TracerState
 
 > **TracerState** = *typeof* `TracerState.Type`
@@ -1418,6 +1554,8 @@ Internal tracer state serialized in DriverCheckpoint.state.
 
 ***
 
+<a id="waitdefinition"></a>
+
 ### WaitDefinition
 
 > **WaitDefinition** = *typeof* `WaitDefinition.Type`
@@ -1425,6 +1563,8 @@ Internal tracer state serialized in DriverCheckpoint.state.
 Wait the driver requests before the next decision.
 
 ## Variables
+
+<a id="abortpending"></a>
 
 ### abortPending
 
@@ -1441,6 +1581,8 @@ Wait the driver requests before the next decision.
 `Effect.Effect`\<`void`, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="applyoperation"></a>
 
 ### applyOperation
 
@@ -1526,6 +1668,8 @@ Advance one Execute decision using a supplied outcome.
 
 ***
 
+<a id="arraystreamcodec"></a>
+
 ### arrayStreamCodec
 
 > `const` **arrayStreamCodec**: \<`A`\>() => [`StreamSuccessCodec`](#streamsuccesscodec)\<`A`, `ReadonlyArray`\<`A`\>\>
@@ -1544,6 +1688,8 @@ Collect and replay one stream as its emitted values.
 
 ***
 
+<a id="chargeusage"></a>
+
 ### chargeUsage
 
 > `const` **chargeUsage**: (`usage`) => `Effect.Effect`\<`void`, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget#exhausted), [`DriverInterpreter`](#driverinterpreter)\>
@@ -1560,11 +1706,15 @@ Collect and replay one stream as its emitted values.
 
 ***
 
+<a id="checkpoint-1"></a>
+
 ### checkpoint
 
 > `const` **checkpoint**: `Effect.Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand` \| `string` & `Brand`; `executable`: `string` & `Brand`; \}; `state`: `unknown`; `turn`: `number`; \}, `never`, [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="completefromcheckpoint"></a>
 
 ### completeFromCheckpoint
 
@@ -1584,6 +1734,8 @@ Produce a Complete decision from a terminal tracer checkpoint.
 
 ***
 
+<a id="currentdriverversion"></a>
+
 ### currentDriverVersion
 
 > `const` **currentDriverVersion**: `"1"`
@@ -1591,6 +1743,8 @@ Produce a Complete decision from a terminal tracer checkpoint.
 Current durable driver contract version.
 
 ***
+
+<a id="decodecheckpoint"></a>
 
 ### decodeCheckpoint
 
@@ -1648,6 +1802,8 @@ Current durable driver contract version.
 
 ***
 
+<a id="decodedecision"></a>
+
 ### decodeDecision
 
 > `const` **decodeDecision**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; \}
@@ -1685,6 +1841,8 @@ Current durable driver contract version.
 (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ***
+
+<a id="decodeoutcome"></a>
 
 ### decodeOutcome
 
@@ -1724,6 +1882,8 @@ Current durable driver contract version.
 
 ***
 
+<a id="drivercheckpoint-1"></a>
+
 ### DriverCheckpoint
 
 > `const` **DriverCheckpoint**: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>
@@ -1731,6 +1891,8 @@ Current durable driver contract version.
 Reconstructable durable checkpoint for one agent run.
 
 ***
+
+<a id="driverdecision-1"></a>
 
 ### DriverDecision
 
@@ -1740,6 +1902,8 @@ Next step chosen deterministically from one checkpoint.
 
 ***
 
+<a id="driveroperation-1"></a>
+
 ### DriverOperation
 
 > `const` **DriverOperation**: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>
@@ -1747,6 +1911,8 @@ Next step chosen deterministically from one checkpoint.
 One schedulable nondeterministic operation with deterministic identity.
 
 ***
+
+<a id="driveroperationkind-1"></a>
 
 ### DriverOperationKind
 
@@ -1756,6 +1922,8 @@ Bounded operation kinds the driver may schedule.
 
 ***
 
+<a id="driverresult-1"></a>
+
 ### DriverResult
 
 > `const` **DriverResult**: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>
@@ -1764,6 +1932,8 @@ Terminal structured result carried by a Complete decision.
 
 ***
 
+<a id="driverversion-1"></a>
+
 ### DriverVersion
 
 > `const` **DriverVersion**: `Schema.String`
@@ -1771,6 +1941,8 @@ Terminal structured result carried by a Complete decision.
 Version string for a durable driver implementation.
 
 ***
+
+<a id="encodecheckpoint"></a>
 
 ### encodeCheckpoint
 
@@ -1828,6 +2000,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="encodedecision"></a>
+
 ### encodeDecision
 
 > `const` **encodeDecision**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; \}
@@ -1866,6 +2040,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="encodeoutcome"></a>
+
 ### encodeOutcome
 
 > `const` **encodeOutcome**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Succeeded"`\>; `value`: `Schema.Unknown`; \} \| \{ `_tag`: `Schema.tag`\<`"Failed"`\>; `error`: `Schema.Unknown`; \} \| \{ `_tag`: `Schema.tag`\<`"Unknown"`\>; `operationId`: `Schema.String`; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Succeeded"`\>; `value`: `Schema.Unknown`; \} \| \{ `_tag`: `Schema.tag`\<`"Failed"`\>; `error`: `Schema.Unknown`; \} \| \{ `_tag`: `Schema.tag`\<`"Unknown"`\>; `operationId`: `Schema.String`; \}, `SchemaError`, `never`\>; \}
@@ -1903,6 +2079,8 @@ Version string for a durable driver implementation.
 (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Succeeded"`\>; `value`: `Schema.Unknown`; \} \| \{ `_tag`: `Schema.tag`\<`"Failed"`\>; `error`: `Schema.Unknown`; \} \| \{ `_tag`: `Schema.tag`\<`"Unknown"`\>; `operationId`: `Schema.String`; \}, `SchemaError`, `never`\>
 
 ***
+
+<a id="guardunknownneverreplay"></a>
 
 ### guardUnknownNeverReplay
 
@@ -1960,6 +2138,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="inputdigest"></a>
+
 ### inputDigest
 
 > `const` **inputDigest**: (`input`) => `string`
@@ -1975,6 +2155,8 @@ Version string for a durable driver implementation.
 `string`
 
 ***
+
+<a id="intercept"></a>
 
 ### intercept
 
@@ -2070,6 +2252,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="interceptstream"></a>
+
 ### interceptStream
 
 > `const` **interceptStream**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
@@ -2164,6 +2348,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="isfailedoutcome"></a>
+
 ### isFailedOutcome
 
 > `const` **isFailedOutcome**: (`outcome`) => `outcome is Extract<OperationOutcome, { _tag: "Failed" }>`
@@ -2179,6 +2365,8 @@ Version string for a durable driver implementation.
 `outcome is Extract<OperationOutcome, { _tag: "Failed" }>`
 
 ***
+
+<a id="issucceededoutcome"></a>
 
 ### isSucceededOutcome
 
@@ -2196,6 +2384,8 @@ Version string for a durable driver implementation.
 
 ***
 
+<a id="isunknownoutcome"></a>
+
 ### isUnknownOutcome
 
 > `const` **isUnknownOutcome**: (`outcome`) => `outcome is Extract<OperationOutcome, { _tag: "Unknown" }>`
@@ -2211,6 +2401,8 @@ Version string for a durable driver implementation.
 `outcome is Extract<OperationOutcome, { _tag: "Unknown" }>`
 
 ***
+
+<a id="layerforrun"></a>
 
 ### layerForRun
 
@@ -2316,6 +2508,8 @@ Construct the inline driver Layer for one Agent run.
 
 ***
 
+<a id="layerinline"></a>
+
 ### layerInline
 
 > `const` **layerInline**: (`input`) => `Layer.Layer`\<[`DriverInterpreter`](#driverinterpreter)\>
@@ -2341,6 +2535,8 @@ Construct the inline driver Layer for one Agent run.
 `Layer.Layer`\<[`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -2368,11 +2564,15 @@ Construct the inline driver Layer for one Agent run.
 
 ***
 
+<a id="logicaloperationid"></a>
+
 ### logicalOperationId
 
 > `const` **logicalOperationId**: `Effect.Effect`\<`string`, [`DriverStateInvalid`](#driverstateinvalid), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="makeinline"></a>
 
 ### makeInline
 
@@ -2400,6 +2600,8 @@ Construct the inline driver Layer for one Agent run.
 
 ***
 
+<a id="makeloopdriver"></a>
+
 ### makeLoopDriver
 
 > `const` **makeLoopDriver**: (`options`) => [`DurableAgentDriver`](#durableagentdriver)
@@ -2417,6 +2619,8 @@ Production durable driver backing inline Agent.stream runs.
 [`DurableAgentDriver`](#durableagentdriver)
 
 ***
+
+<a id="makeoperation"></a>
 
 ### makeOperation
 
@@ -2448,6 +2652,8 @@ Production durable driver backing inline Agent.stream runs.
 
 ***
 
+<a id="maketracer"></a>
+
 ### makeTracer
 
 > `const` **makeTracer**: (`script`) => [`DurableAgentDriver`](#durableagentdriver)
@@ -2466,6 +2672,8 @@ Canonical in-memory driver for checkpoint/decision/apply conformance tests.
 
 ***
 
+<a id="operationkey-1"></a>
+
 ### operationKey
 
 > `const` **operationKey**: (`parts`) => `string`
@@ -2482,6 +2690,8 @@ Canonical in-memory driver for checkpoint/decision/apply conformance tests.
 
 ***
 
+<a id="operationoutcome-1"></a>
+
 ### OperationOutcome
 
 > `const` **OperationOutcome**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Succeeded"`\>; `value`: `Schema.Unknown`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Failed"`\>; `error`: `Schema.Unknown`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Unknown"`\>; `operationId`: `Schema.String`; \}\>\]\>
@@ -2490,11 +2700,15 @@ Persisted outcome for one operation attempt.
 
 ***
 
+<a id="recorded"></a>
+
 ### recorded
 
 > `const` **recorded**: `Effect.Effect`\<readonly [`RecordedOperation`](#recordedoperation)[], `never`, [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="refundchildbudget"></a>
 
 ### refundChildBudget
 
@@ -2512,6 +2726,8 @@ Persisted outcome for one operation attempt.
 
 ***
 
+<a id="replaypolicy-2"></a>
+
 ### ReplayPolicy
 
 > `const` **ReplayPolicy**: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>
@@ -2519,6 +2735,8 @@ Persisted outcome for one operation attempt.
 How a host may replay one persisted operation after recovery.
 
 ***
+
+<a id="requiredriverversion"></a>
 
 ### requireDriverVersion
 
@@ -2558,6 +2776,8 @@ How a host may replay one persisted operation after recovery.
 
 ***
 
+<a id="reservechildbudget"></a>
+
 ### reserveChildBudget
 
 > `const` **reserveChildBudget**: (`grant`) => `Effect.Effect`\<\{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget#exhausted) \| [`Invalid`](./RunBudget#invalid), [`DriverInterpreter`](#driverinterpreter)\>
@@ -2574,6 +2794,8 @@ How a host may replay one persisted operation after recovery.
 
 ***
 
+<a id="setbudget"></a>
+
 ### setBudget
 
 > `const` **setBudget**: (`budget`) => `Effect.Effect`\<`void`, [`DriverError`](#drivererror), [`DriverInterpreter`](#driverinterpreter)\>
@@ -2589,6 +2811,8 @@ How a host may replay one persisted operation after recovery.
 `Effect.Effect`\<`void`, [`DriverError`](#drivererror), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="settoolbatch"></a>
 
 ### setToolBatch
 
@@ -2610,6 +2834,8 @@ Replace the one current authored-order tool batch checkpoint.
 
 ***
 
+<a id="tracerstate-1"></a>
+
 ### TracerState
 
 > `const` **TracerState**: `Schema.Struct`\<\{ `modelIndex`: `Schema.Finite`; `pendingTools`: `Schema.$Array`\<`Schema.Struct`\<\{ `name`: `Schema.String`; `params`: `Schema.Unknown`; \}\>\>; `phase`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"wait-resume"`, `"done"`\]\>; `promptText`: `Schema.String`; `script`: `Schema.$Array`\<`Schema.Struct`\<\{ `text`: `Schema.optionalKey`\<`Schema.String`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `name`: `Schema.String`; `params`: `Schema.Unknown`; \}\>\>\>; `wait`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `reason`: `Schema.String`; `waitId`: `Schema.String`; \}\>\>; \}\>\>; `text`: `Schema.String`; `toolIndex`: `Schema.Finite`; `waitId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
@@ -2617,6 +2843,8 @@ Replace the one current authored-order tool batch checkpoint.
 Internal tracer state serialized in DriverCheckpoint.state.
 
 ***
+
+<a id="updatetoolbatch"></a>
 
 ### updateToolBatch
 
@@ -2637,6 +2865,8 @@ Apply one exact tool-call state transition to the current batch checkpoint.
 `Effect.Effect`\<\{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
+
+<a id="waitdefinition-1"></a>
 
 ### WaitDefinition
 

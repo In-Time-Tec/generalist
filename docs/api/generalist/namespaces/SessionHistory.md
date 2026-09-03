@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="historypage"></a>
+
 ### HistoryPage
 
 One page of exact Session entries plus the cursors that continue it.
@@ -17,25 +19,37 @@ caller learns that history continues behind a compaction checkpoint rather than 
 
 #### Properties
 
+<a id="entries"></a>
+
 ##### entries
 
 > `readonly` **entries**: readonly [`Entry`](./Session#entry)[]
+
+<a id="firstentryid"></a>
 
 ##### firstEntryId?
 
 > `readonly` `optional` **firstEntryId?**: `string`
 
+<a id="hasafter"></a>
+
 ##### hasAfter
 
 > `readonly` **hasAfter**: `boolean`
+
+<a id="hasbefore"></a>
 
 ##### hasBefore
 
 > `readonly` **hasBefore**: `boolean`
 
+<a id="lastentryid"></a>
+
 ##### lastEntryId?
 
 > `readonly` `optional` **lastEntryId?**: `string`
+
+<a id="unknowncursors"></a>
 
 ##### unknownCursors?
 
@@ -47,11 +61,15 @@ stops a caller reading the newest entries as though they preceded something.
 
 ***
 
+<a id="historypageinput"></a>
+
 ### HistoryPageInput
 
 One bounded read over the exact entry log.
 
 #### Properties
+
+<a id="after"></a>
 
 ##### after?
 
@@ -59,17 +77,23 @@ One bounded read over the exact entry log.
 
 Return entries strictly after this entry.
 
+<a id="before"></a>
+
 ##### before?
 
 > `readonly` `optional` **before?**: `string`
 
 Return entries strictly before this entry. Omitted reads the newest page.
 
+<a id="limit"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
 
 ## Variables
+
+<a id="compactioncheckpoints"></a>
 
 ### compactionCheckpoints
 
@@ -88,6 +112,8 @@ Every compaction checkpoint on one path, oldest first.
 `ReadonlyArray`\<[`CompactionEntry`](./Session#compactionentry)\>
 
 ***
+
+<a id="page"></a>
 
 ### page
 

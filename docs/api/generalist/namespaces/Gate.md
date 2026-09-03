@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="gatefailed"></a>
+
 ### GateFailed
 
 The configured failure mode rejected a proposed completion.
@@ -17,6 +19,8 @@ The configured failure mode rejected a proposed completion.
 - `GateFailed_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ The configured failure mode rejected a proposed completion.
 
 #### Properties
 
+<a id="gate"></a>
+
 ##### gate
 
 > `readonly` **gate**: `object`
@@ -58,6 +64,8 @@ The configured failure mode rejected a proposed completion.
 
 `GateFailed_base.gate`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -68,25 +76,35 @@ The configured failure mode rejected a proposed completion.
 
 ## Interfaces
 
+<a id="command"></a>
+
 ### Command
 
 Run one shell command in the Sandbox owned by the proposing Agent.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Command"`
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="run"></a>
 
 ##### run
 
 > `readonly` **run**: `string`
 
 ***
+
+<a id="predicate"></a>
 
 ### Predicate
 
@@ -104,9 +122,13 @@ Evaluate application code against the decoded proposed output.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Predicate"`
+
+<a id="check"></a>
 
 ##### check
 
@@ -122,9 +144,13 @@ Evaluate application code against the decoded proposed output.
 
 `boolean` \| `Effect`\<`boolean`, `unknown`, `R`\>
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="requirements"></a>
 
 ##### requirements?
 
@@ -135,6 +161,8 @@ Evaluate application code against the decoded proposed output.
 `R`
 
 ***
+
+<a id="verifier"></a>
 
 ### Verifier
 
@@ -148,17 +176,25 @@ Run one independent Agent and compare its structured score to a threshold.
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Verifier"`
+
+<a id="agent"></a>
 
 ##### agent
 
 > `readonly` **agent**: [`Any`](./Agent#any)
 
+<a id="name-2"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="requirements-1"></a>
 
 ##### requirements?
 
@@ -168,11 +204,15 @@ Run one independent Agent and compare its structured score to a threshold.
 
 `R`
 
+<a id="threshold"></a>
+
 ##### threshold
 
 > `readonly` **threshold**: `number`
 
 ## Type Aliases
+
+<a id="any"></a>
 
 ### Any
 
@@ -181,6 +221,8 @@ Run one independent Agent and compare its structured score to a threshold.
 One Gate with its output and requirement types hidden.
 
 ***
+
+<a id="checkpoint"></a>
 
 ### Checkpoint
 
@@ -192,6 +234,8 @@ One keyed result retained in the durable loop checkpoint.
 
 ***
 
+<a id="failuremode"></a>
+
 ### FailureMode
 
 > **FailureMode** = `"retry"` \| `"fail"`
@@ -199,6 +243,8 @@ One keyed result retained in the durable loop checkpoint.
 Behavior after the first gate that rejects a proposed output.
 
 ***
+
+<a id="gate-1"></a>
 
 ### Gate
 
@@ -218,6 +264,8 @@ One ordered completion gate.
 
 ***
 
+<a id="requirements-2"></a>
+
 ### Requirements
 
 > **Requirements**\<`G`\> = `G` *extends* [`Verifier`](#verifier)\<infer R\> \| [`Predicate`](#predicate)\<`never`, infer R\> ? `R` : `never`
@@ -232,6 +280,8 @@ Extract a Gate's Effect requirements.
 
 ***
 
+<a id="result"></a>
+
 ### Result
 
 > **Result** = *typeof* `Result.Type`
@@ -240,6 +290,8 @@ Journaled evidence from one completion-gate decision.
 
 ***
 
+<a id="verdict"></a>
+
 ### Verdict
 
 > **Verdict** = *typeof* `Verdict.Type`
@@ -247,6 +299,8 @@ Journaled evidence from one completion-gate decision.
 Whether one completion gate accepted or rejected a proposed terminal output.
 
 ***
+
+<a id="verifieragent-1"></a>
 
 ### VerifierAgent
 
@@ -262,6 +316,8 @@ Verifier Agent shape retained after type erasure.
 
 ***
 
+<a id="verifieroutput"></a>
+
 ### VerifierOutput
 
 > **VerifierOutput** = *typeof* `VerifierOutput.Type`
@@ -269,6 +325,8 @@ Verifier Agent shape retained after type erasure.
 Structured output required from a verifier Agent.
 
 ## Variables
+
+<a id="checkpoint-1"></a>
 
 ### Checkpoint
 
@@ -279,6 +337,8 @@ Structured output required from a verifier Agent.
 One keyed result retained in the durable loop checkpoint.
 
 ***
+
+<a id="command-1"></a>
 
 ### command
 
@@ -303,6 +363,8 @@ Construct a Sandbox command completion gate.
 [`Command`](#command)
 
 ***
+
+<a id="predicate-1"></a>
 
 ### predicate
 
@@ -338,6 +400,8 @@ Construct an application predicate completion gate.
 
 ***
 
+<a id="result-1"></a>
+
 ### Result
 
 > `const` **Result**: `Schema.Struct`\<\{ `evidence`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `name`: `Schema.String`; `verdict`: `Schema.Literals`\<readonly \[`"pass"`, `"fail"`\]\>; \}\>
@@ -345,6 +409,8 @@ Construct an application predicate completion gate.
 Journaled evidence from one completion-gate decision.
 
 ***
+
+<a id="validateagentgates"></a>
 
 ### validateAgentGates
 
@@ -376,6 +442,8 @@ Validate Agent-owned gate configuration while the Agent is constructed.
 
 ***
 
+<a id="verdict-1"></a>
+
 ### Verdict
 
 > `const` **Verdict**: `Schema.Literals`\<readonly \[`"pass"`, `"fail"`\]\>
@@ -383,6 +451,8 @@ Validate Agent-owned gate configuration while the Agent is constructed.
 Whether one completion gate accepted or rejected a proposed terminal output.
 
 ***
+
+<a id="verifier-1"></a>
 
 ### verifier
 
@@ -417,6 +487,8 @@ Construct an isolated Agent verifier completion gate.
 [`Verifier`](#verifier)\<[`Requirements`](./Agent#requirements-1)\<`A`\>\>
 
 ***
+
+<a id="verifieroutput-1"></a>
 
 ### VerifierOutput
 

@@ -8,19 +8,27 @@
 
 ## Interfaces
 
+<a id="agententry"></a>
+
 ### AgentEntry
 
 One complete pinned Agent entry in an executable closure.
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Agent"`
 
+<a id="manifest"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`AgentManifest`](./AgentManifest#agentmanifest)
+
+<a id="pin"></a>
 
 ##### pin
 
@@ -28,29 +36,41 @@ One complete pinned Agent entry in an executable closure.
 
 ***
 
+<a id="executablemanifest"></a>
+
 ### ExecutableManifest
 
 Complete closed executable profile registry and entry closure.
 
 #### Properties
 
+<a id="entries"></a>
+
 ##### entries
 
 > `readonly` **entries**: readonly [`ExecutableEntry`](#executableentry)[]
+
+<a id="profiles"></a>
 
 ##### profiles
 
 > `readonly` **profiles**: readonly [`ProfileBinding`](#profilebinding)[]
 
+<a id="root"></a>
+
 ##### root
 
 > `readonly` **root**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+<a id="version"></a>
 
 ##### version
 
 > `readonly` **version**: `"2"`
 
 ***
+
+<a id="executablemanifestencoded"></a>
 
 ### ExecutableManifestEncoded
 
@@ -62,17 +82,25 @@ Encoded executable manifest.
 
 #### Properties
 
+<a id="entries-1"></a>
+
 ##### entries
 
 > `readonly` **entries**: readonly `ExecutableEntryEncoded`[]
+
+<a id="profiles-1"></a>
 
 ##### profiles
 
 > `readonly` **profiles**: readonly `ProfileBindingEncoded`[]
 
+<a id="root-1"></a>
+
 ##### root
 
 > `readonly` **root**: `string`
+
+<a id="version-1"></a>
 
 ##### version
 
@@ -84,15 +112,21 @@ Encoded executable manifest.
 
 ***
 
+<a id="pinnedexecutable"></a>
+
 ### PinnedExecutable
 
 Executable closure paired with its constructor-owned reference.
 
 #### Properties
 
+<a id="manifest-1"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`ExecutableManifest`](#executablemanifest)
+
+<a id="ref"></a>
 
 ##### ref
 
@@ -108,15 +142,21 @@ Executable closure paired with its constructor-owned reference.
 
 ***
 
+<a id="profilebinding"></a>
+
 ### ProfileBinding
 
 One globally pinned child profile available by selection name.
 
 #### Properties
 
+<a id="agent"></a>
+
 ##### agent
 
 > `readonly` **agent**: `string` & `Brand`\<`"generalist/agent-pin"`\>
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -124,15 +164,21 @@ One globally pinned child profile available by selection name.
 
 ***
 
+<a id="programentry"></a>
+
 ### ProgramEntry
 
 One complete pinned Agent Program entry in an executable closure.
 
 #### Properties
 
+<a id="_tag-1"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Program"`
+
+<a id="manifest-2"></a>
 
 ##### manifest
 
@@ -218,11 +264,15 @@ One complete pinned Agent Program entry in an executable closure.
 
 > `readonly` **version**: `"1"`
 
+<a id="pin-1"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/program-pin"`\>
 
 ## Type Aliases
+
+<a id="executableentry"></a>
 
 ### ExecutableEntry
 
@@ -232,6 +282,8 @@ One exact executable definition in a closed closure.
 
 ***
 
+<a id="executableref"></a>
+
 ### ExecutableRef
 
 > **ExecutableRef** = *typeof* `ExecutableRef.Type`
@@ -239,6 +291,8 @@ One exact executable definition in a closed closure.
 Durable reference to one exact executable closure and active Agent.
 
 ***
+
+<a id="executabletarget"></a>
 
 ### ExecutableTarget
 
@@ -248,6 +302,8 @@ Exact active executable within one closed closure.
 
 ## Variables
 
+<a id="agententry-1"></a>
+
 ### AgentEntry
 
 > **AgentEntry**: `Codec`\<[`AgentEntry`](#agententry), `AgentEntryEncoded`, `never`, `never`\>
@@ -255,6 +311,8 @@ Exact active executable within one closed closure.
 One complete pinned Agent entry in an executable closure.
 
 ***
+
+<a id="decode"></a>
 
 ### decode
 
@@ -275,6 +333,8 @@ One complete pinned Agent entry in an executable closure.
 `Effect.Effect`\<[`PinnedExecutable`](#pinnedexecutable), `Schema.SchemaError` \| `UnknownError`, `never`\>
 
 ***
+
+<a id="encode"></a>
 
 ### encode
 
@@ -316,6 +376,8 @@ Encode one constructor-validated executable authority.
 
 ***
 
+<a id="executableentry-1"></a>
+
 ### ExecutableEntry
 
 > **ExecutableEntry**: `Codec`\<[`ExecutableEntry`](#executableentry), `ExecutableEntryEncoded`, `never`, `never`\>
@@ -323,6 +385,8 @@ Encode one constructor-validated executable authority.
 One exact executable definition in a closed closure.
 
 ***
+
+<a id="executablemanifest-1"></a>
 
 ### ExecutableManifest
 
@@ -332,6 +396,8 @@ Complete closed executable profile registry and entry closure.
 
 ***
 
+<a id="executableref-1"></a>
+
 ### ExecutableRef
 
 > `const` **ExecutableRef**: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>
@@ -340,6 +406,8 @@ Durable reference to one exact executable closure and active Agent.
 
 ***
 
+<a id="executabletarget-1"></a>
+
 ### ExecutableTarget
 
 > `const` **ExecutableTarget**: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>
@@ -347,6 +415,8 @@ Durable reference to one exact executable closure and active Agent.
 Exact active executable within one closed closure.
 
 ***
+
+<a id="make"></a>
 
 ### make
 
@@ -379,6 +449,8 @@ Construct, validate, canonicalize, and pin a complete executable closure.
 [`PinnedExecutable`](#pinnedexecutable)
 
 ***
+
+<a id="maketest"></a>
 
 ### makeTest
 
@@ -420,6 +492,8 @@ Canonical executable fixture for tests and non-running documentation examples.
 
 ***
 
+<a id="profilebinding-1"></a>
+
 ### ProfileBinding
 
 > **ProfileBinding**: `Codec`\<[`ProfileBinding`](#profilebinding), `ProfileBindingEncoded`, `never`, `never`\>
@@ -428,6 +502,8 @@ One globally pinned child profile available by selection name.
 
 ***
 
+<a id="programentry-1"></a>
+
 ### ProgramEntry
 
 > **ProgramEntry**: `Codec`\<[`ProgramEntry`](#programentry), `ProgramEntryEncoded`, `never`, `never`\>
@@ -435,6 +511,8 @@ One globally pinned child profile available by selection name.
 One complete pinned Agent Program entry in an executable closure.
 
 ***
+
+<a id="validateref"></a>
 
 ### validateRef
 

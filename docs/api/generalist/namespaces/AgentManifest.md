@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="agentmanifest"></a>
+
 ### AgentManifest
 
 Closed, reconstructable identity contract for one Agent.
 
 #### Properties
+
+<a id="budget"></a>
 
 ##### budget
 
@@ -38,53 +42,79 @@ Closed, reconstructable identity contract for one Agent.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="children"></a>
+
 ##### children
 
 > `readonly` **children**: readonly [`ChildSelection`](#childselection)[]
+
+<a id="compaction"></a>
 
 ##### compaction?
 
 > `readonly` `optional` **compaction?**: [`CompactionIdentity`](#compactionidentity)
 
+<a id="instructions"></a>
+
 ##### instructions?
 
 > `readonly` `optional` **instructions?**: `string`
+
+<a id="model"></a>
 
 ##### model
 
 > `readonly` **model**: `string` & `Brand`\<`"generalist/model-pin"`\>
 
+<a id="name"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="policy"></a>
 
 ##### policy
 
 > `readonly` **policy**: [`PolicyIdentity`](#policyidentity)
 
+<a id="programauthority"></a>
+
 ##### programAuthority?
 
 > `readonly` `optional` **programAuthority?**: [`ProgramAuthority`](#programauthority-1)
+
+<a id="services"></a>
 
 ##### services
 
 > `readonly` **services**: readonly [`NamedCapability`](#namedcapability)[]
 
+<a id="skills"></a>
+
 ##### skills
 
 > `readonly` **skills**: readonly [`NamedCapability`](#namedcapability)[]
+
+<a id="supplemental"></a>
 
 ##### supplemental?
 
 > `readonly` `optional` **supplemental?**: `string`
 
+<a id="tools"></a>
+
 ##### tools
 
 > `readonly` **tools**: readonly [`NamedCapability`](#namedcapability)[]
 
+<a id="toolscheduling"></a>
+
 ##### toolScheduling
 
 > `readonly` **toolScheduling**: [`ToolSchedulingPolicy`](./Agent#toolschedulingpolicy)
+
+<a id="version"></a>
 
 ##### version
 
@@ -92,11 +122,15 @@ Closed, reconstructable identity contract for one Agent.
 
 ***
 
+<a id="childselection"></a>
+
 ### ChildSelection
 
 One child profile name this Agent may select from its executable registry.
 
 #### Properties
+
+<a id="selection"></a>
 
 ##### selection
 
@@ -104,35 +138,51 @@ One child profile name this Agent may select from its executable registry.
 
 ***
 
+<a id="compactionidentity"></a>
+
 ### CompactionIdentity
 
 Exact identity and token limits of one reconstructable compaction capability.
 
 #### Properties
 
+<a id="contextwindow"></a>
+
 ##### contextWindow
 
 > `readonly` **contextWindow**: `number`
+
+<a id="keeprecenttokens"></a>
 
 ##### keepRecentTokens
 
 > `readonly` **keepRecentTokens**: `number`
 
+<a id="reservetokens"></a>
+
 ##### reserveTokens
 
 > `readonly` **reserveTokens**: `number`
+
+<a id="service"></a>
 
 ##### service
 
 > `readonly` **service**: `string` & `Brand`\<`"generalist/capability-pin"`\>
 
+<a id="strategyidentity"></a>
+
 ##### strategyIdentity
 
 > `readonly` **strategyIdentity**: `string`
 
+<a id="summarymodel"></a>
+
 ##### summaryModel
 
 > `readonly` **summaryModel**: `string` & `Brand`\<`"generalist/model-pin"`\>
+
+<a id="summarypromptidentity"></a>
 
 ##### summaryPromptIdentity
 
@@ -140,11 +190,15 @@ Exact identity and token limits of one reconstructable compaction capability.
 
 ***
 
+<a id="namedcapability"></a>
+
 ### NamedCapability
 
 One named capability required by an Agent or Agent Program.
 
 #### Properties
+
+<a id="content"></a>
 
 ##### content?
 
@@ -162,9 +216,13 @@ One named capability required by an Agent or Agent Program.
 
 > `readonly` **version**: `string`
 
+<a id="name-1"></a>
+
 ##### name
 
 > `readonly` **name**: `string`
+
+<a id="pin"></a>
 
 ##### pin
 
@@ -172,15 +230,21 @@ One named capability required by an Agent or Agent Program.
 
 ***
 
+<a id="pinnedagent"></a>
+
 ### PinnedAgent
 
 An Agent manifest paired with its constructor-owned digest.
 
 #### Properties
 
+<a id="manifest"></a>
+
 ##### manifest
 
 > `readonly` **manifest**: [`AgentManifest`](#agentmanifest)
+
+<a id="pin-1"></a>
 
 ##### pin
 
@@ -188,25 +252,37 @@ An Agent manifest paired with its constructor-owned digest.
 
 ***
 
+<a id="portablepolicy"></a>
+
 ### PortablePolicy
 
 #### Properties
+
+<a id="_tag"></a>
 
 ##### \_tag
 
 > `readonly` **\_tag**: `"Forever"` \| `"Recurs"` \| `"UntilToolCall"` \| `"Both"`
 
+<a id="count"></a>
+
 ##### count?
 
 > `readonly` `optional` **count?**: `number`
+
+<a id="first"></a>
 
 ##### first?
 
 > `readonly` `optional` **first?**: [`PortablePolicy`](#portablepolicy)
 
+<a id="name-2"></a>
+
 ##### name?
 
 > `readonly` `optional` **name?**: `string`
+
+<a id="second"></a>
 
 ##### second?
 
@@ -214,15 +290,21 @@ An Agent manifest paired with its constructor-owned digest.
 
 ***
 
+<a id="programauthority-1"></a>
+
 ### ProgramAuthority
 
 Maximum Program authority an Agent may narrow for one dynamic child.
 
 #### Properties
 
+<a id="agents"></a>
+
 ##### agents
 
 > `readonly` **agents**: readonly `object`[]
+
+<a id="budget-1"></a>
 
 ##### budget
 
@@ -256,31 +338,45 @@ Maximum Program authority an Agent may narrow for one dynamic child.
 
 > `readonly` **wallClockMillis**: `number`
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+<a id="maxsourcebytes"></a>
 
 ##### maxSourceBytes
 
 > `readonly` **maxSourceBytes**: `number`
 
+<a id="output"></a>
+
 ##### output
 
 > `readonly` **output**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+<a id="sandbox"></a>
 
 ##### sandbox
 
 > `readonly` **sandbox**: `string` & `Brand`\<`"generalist/capability-pin"`\>
 
+<a id="steps"></a>
+
 ##### steps
 
 > `readonly` **steps**: readonly [`NamedCapability`](#namedcapability)[]
+
+<a id="tools-1"></a>
 
 ##### tools
 
 > `readonly` **tools**: readonly [`NamedCapability`](#namedcapability)[]
 
 ## Type Aliases
+
+<a id="pinnedcontent"></a>
 
 ### PinnedContent
 
@@ -290,6 +386,8 @@ Exact identity of the host-owned content one capability registration must recons
 
 ***
 
+<a id="policyidentity"></a>
+
 ### PolicyIdentity
 
 > **PolicyIdentity** = \{ `_tag`: `"Portable"`; `policy`: [`PortablePolicy`](#portablepolicy); \} \| \{ `_tag`: `"Pinned"`; `pin`: [`CapabilityPin`](./Pins#capabilitypin); \}
@@ -297,6 +395,8 @@ Exact identity of the host-owned content one capability registration must recons
 Exact identity of either a portable policy or an opaque policy capability.
 
 ## Variables
+
+<a id="agentmanifest-1"></a>
 
 ### AgentManifest
 
@@ -306,6 +406,8 @@ Closed, reconstructable identity contract for one Agent.
 
 ***
 
+<a id="childselection-1"></a>
+
 ### ChildSelection
 
 > **ChildSelection**: `Codec`\<[`ChildSelection`](#childselection), [`ChildSelection`](#childselection), `never`, `never`\>
@@ -314,6 +416,8 @@ One child profile name this Agent may select from its executable registry.
 
 ***
 
+<a id="compactionidentity-1"></a>
+
 ### CompactionIdentity
 
 > **CompactionIdentity**: `Codec`\<[`CompactionIdentity`](#compactionidentity), `CompactionIdentityEncoded`, `never`, `never`\>
@@ -321,6 +425,8 @@ One child profile name this Agent may select from its executable registry.
 Exact identity and token limits of one reconstructable compaction capability.
 
 ***
+
+<a id="fromliveagent"></a>
 
 ### fromLiveAgent
 
@@ -466,6 +572,8 @@ Build an exact manifest for a live Agent using explicitly supplied opaque depend
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`input`) => [`PinnedAgent`](#pinnedagent)
@@ -484,6 +592,8 @@ Construct and pin a canonical closed Agent manifest.
 
 ***
 
+<a id="namedcapability-1"></a>
+
 ### NamedCapability
 
 > **NamedCapability**: `Codec`\<[`NamedCapability`](#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>
@@ -491,6 +601,8 @@ Construct and pin a canonical closed Agent manifest.
 One named capability required by an Agent or Agent Program.
 
 ***
+
+<a id="pinnedcontent-1"></a>
 
 ### PinnedContent
 
@@ -500,6 +612,8 @@ Exact identity of the host-owned content one capability registration must recons
 
 ***
 
+<a id="policyidentity-1"></a>
+
 ### PolicyIdentity
 
 > **PolicyIdentity**: `Codec`\<[`PolicyIdentity`](#policyidentity), `PolicyIdentityEncoded`, `never`, `never`\>
@@ -508,6 +622,8 @@ Exact identity of either a portable policy or an opaque policy capability.
 
 ***
 
+<a id="portablepolicy-1"></a>
+
 ### PortablePolicy
 
 > **PortablePolicy**: `Codec`\<[`PortablePolicy`](#portablepolicy), [`PortablePolicy`](#portablepolicy), `never`, `never`\>
@@ -515,6 +631,8 @@ Exact identity of either a portable policy or an opaque policy capability.
 Closed portable turn-policy constructor data.
 
 ***
+
+<a id="programauthority-2"></a>
 
 ### ProgramAuthority
 

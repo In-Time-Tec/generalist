@@ -15,13 +15,19 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 #### Properties
 
+<a id="semantic"></a>
+
 ##### semantic?
 
 > `readonly` `optional` **semantic?**: [`Options`](./namespaces/SemanticRecall#options)
+
+<a id="working"></a>
 
 ##### working?
 
@@ -29,21 +35,29 @@
 
 ***
 
+<a id="pgvectoroptions"></a>
+
 ### PgVectorOptions
 
 PostgreSQL pgvector storage configuration.
 
 #### Properties
 
+<a id="dimensions"></a>
+
 ##### dimensions
 
 > `readonly` **dimensions**: `number`
+
+<a id="table"></a>
 
 ##### table
 
 > `readonly` **table**: `string`
 
 ## Type Aliases
+
+<a id="workingrequirement"></a>
 
 ### WorkingRequirement
 
@@ -60,6 +74,8 @@ The ambient LanguageModel is required only when working memory summarizes withou
 `O`
 
 ## Variables
+
+<a id="layerpgvector"></a>
 
 ### layerPgVector
 
@@ -78,6 +94,8 @@ Persistent PostgreSQL vector store. Requires the `vector` extension.
 `Layer.Layer`\<[`VectorStore`](./namespaces/VectorStore#vectorstore), [`VectorStoreError`](./namespaces/VectorStore#vectorstoreerror), `SqlClient.SqlClient`\>
 
 ## Functions
+
+<a id="layer"></a>
 
 ### layer()
 
@@ -111,17 +129,23 @@ Persistent PostgreSQL vector store. Requires the `vector` extension.
 
 ## References
 
+<a id="layersupermemory"></a>
+
 ### layerSupermemory
 
 Renames and re-exports [layer](./namespaces/Supermemory#layer)
 
 ***
 
+<a id="supermemoryerror"></a>
+
 ### SupermemoryError
 
 Re-exports [SupermemoryError](./namespaces/Supermemory#supermemoryerror)
 
 ***
+
+<a id="supermemoryoptions"></a>
 
 ### SupermemoryOptions
 

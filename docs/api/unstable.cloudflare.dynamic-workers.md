@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="capabilityrpc"></a>
+
 ### CapabilityRpc
 
 **`Experimental`**
@@ -15,6 +17,8 @@
 Request-scoped capability RPC implementation.
 
 #### Properties
+
+<a id="call"></a>
 
 ##### call
 
@@ -34,6 +38,8 @@ Request-scoped capability RPC implementation.
 
 ***
 
+<a id="fetcher"></a>
+
 ### Fetcher
 
 **`Experimental`**
@@ -41,6 +47,8 @@ Request-scoped capability RPC implementation.
 Minimal loaded Worker fetch entrypoint.
 
 #### Properties
+
+<a id="fetch"></a>
 
 ##### fetch
 
@@ -60,6 +68,8 @@ Minimal loaded Worker fetch entrypoint.
 
 ***
 
+<a id="makeoptions"></a>
+
 ### MakeOptions
 
 **`Experimental`**
@@ -68,11 +78,15 @@ Inputs for adapting one Sandbox provider to the Worker Loader CodeExecutor ident
 
 #### Properties
 
+<a id="compatibilitydate"></a>
+
 ##### compatibilityDate
 
 > `readonly` **compatibilityDate**: `string`
 
 **`Experimental`**
+
+<a id="provider"></a>
 
 ##### provider
 
@@ -81,6 +95,8 @@ Inputs for adapting one Sandbox provider to the Worker Loader CodeExecutor ident
 **`Experimental`**
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -93,6 +109,8 @@ Cloudflare Worker Loader adapter construction options.
 - [`WorkerLoaderOptions`](./unstable.sandbox.worker-loader#workerloaderoptions)
 
 #### Properties
+
+<a id="capabilitybinding"></a>
 
 ##### capabilityBinding
 
@@ -110,11 +128,15 @@ Cloudflare Worker Loader adapter construction options.
 
 `CapabilityBinding`
 
+<a id="compatibilitydate-1"></a>
+
 ##### compatibilityDate
 
 > `readonly` **compatibilityDate**: `string`
 
 **`Experimental`**
+
+<a id="loader"></a>
 
 ##### loader
 
@@ -124,6 +146,8 @@ Cloudflare Worker Loader adapter construction options.
 
 ***
 
+<a id="workercode"></a>
+
 ### WorkerCode
 
 **`Experimental`**
@@ -132,11 +156,15 @@ Minimal Worker Loader code contract used by this adapter.
 
 #### Properties
 
+<a id="compatibilitydate-2"></a>
+
 ##### compatibilityDate
 
 > `readonly` **compatibilityDate**: `string`
 
 **`Experimental`**
+
+<a id="env"></a>
 
 ##### env
 
@@ -144,11 +172,15 @@ Minimal Worker Loader code contract used by this adapter.
 
 **`Experimental`**
 
+<a id="globaloutbound"></a>
+
 ##### globalOutbound
 
 > `readonly` **globalOutbound**: `null`
 
 **`Experimental`**
+
+<a id="limits"></a>
 
 ##### limits
 
@@ -164,11 +196,15 @@ Minimal Worker Loader code contract used by this adapter.
 
 > `readonly` **subRequests**: `number`
 
+<a id="mainmodule"></a>
+
 ##### mainModule
 
 > `readonly` **mainModule**: `string`
 
 **`Experimental`**
+
+<a id="modules"></a>
 
 ##### modules
 
@@ -178,6 +214,8 @@ Minimal Worker Loader code contract used by this adapter.
 
 ***
 
+<a id="workerloader"></a>
+
 ### WorkerLoader
 
 **`Experimental`**
@@ -185,6 +223,8 @@ Minimal Worker Loader code contract used by this adapter.
 Minimal Worker Loader binding contract.
 
 #### Properties
+
+<a id="load"></a>
 
 ##### load
 
@@ -204,6 +244,8 @@ Minimal Worker Loader binding contract.
 
 ***
 
+<a id="workerstub"></a>
+
 ### WorkerStub
 
 **`Experimental`**
@@ -211,6 +253,8 @@ Minimal Worker Loader binding contract.
 Minimal Worker Loader stub contract.
 
 #### Properties
+
+<a id="getentrypoint"></a>
 
 ##### getEntrypoint
 
@@ -224,6 +268,8 @@ Minimal Worker Loader stub contract.
 
 ## Type Aliases
 
+<a id="capabilityrpcrequest"></a>
+
 ### CapabilityRpcRequest
 
 > **CapabilityRpcRequest** = `Union`\<readonly \[`Struct`\<\{ `input`: `optionalKey`\<`Undefined`\>; `operation`: `Literal`\<`"discoverTools"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `String`; `operation`: `Literal`\<`"describeTool"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `Struct`\<\{ `input`: `Unknown`; `operation`: `String`; `tool`: `String`; \}\>; `operation`: `Literal`\<`"callTool"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `Struct`\<\{ `input`: `Unknown`; `operation`: `String`; `step`: `String`; \}\>; `operation`: `Literal`\<`"callStep"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `Struct`\<\{ `input`: `Unknown`; `operation`: `String`; `selection`: `String`; \}\>; `operation`: `Literal`\<`"runAgent"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `Struct`\<\{ `members`: `$Array`\<`Struct`\<\{ `input`: `Unknown`; `member`: `String`; \}\>\>; `operation`: `String`; `selection`: `String`; \}\>; `operation`: `Literal`\<`"mapAgents"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `Struct`\<\{ `members`: `$Array`\<`Struct`\<\{ `input`: `Unknown`; `member`: `String`; `selection`: `String`; \}\>\>; `operation`: `String`; \}\>; `operation`: `Literal`\<`"fanOutAgents"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>, `Struct`\<\{ `input`: `Struct`\<\{ `data`: `optionalKey`\<`$Record`\<`String`, `Codec`\<`Json`, `Json`, `never`, `never`\>\>\>; `level`: `Literals`\<readonly \[`"debug"`, `"info"`, `"warn"`, `"error"`\]\>; `message`: `String`; `operation`: `String`; \}\>; `operation`: `Literal`\<`"log"`\>; `protocolVersion`: `Literal`\<`"1"`\>; `requestId`: `String`; \}\>\]\>
@@ -234,6 +280,8 @@ Strict requests accepted by the sole multiplexed capability binding.
 
 ***
 
+<a id="capabilityrpcrequest-1"></a>
+
 ### CapabilityRpcRequest
 
 > **CapabilityRpcRequest** = *typeof* `CapabilityRpcRequest.Type`
@@ -241,6 +289,8 @@ Strict requests accepted by the sole multiplexed capability binding.
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -262,6 +312,8 @@ Provide the Worker Loader CodeExecutor.
 
 ***
 
+<a id="layerunavailable"></a>
+
 ### layerUnavailable
 
 > `const` **layerUnavailable**: (`message?`) => `Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor#codeexecutor)\>
@@ -282,6 +334,8 @@ Provide an explicitly disabled Worker Loader boundary.
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`options`) => [`Service`](./generalist/namespaces/CodeExecutor#service)
@@ -301,6 +355,8 @@ Construct a CodeExecutor as a thin adapter over an explicit Sandbox provider.
 [`Service`](./generalist/namespaces/CodeExecutor#service)
 
 ***
+
+<a id="makeunavailable"></a>
 
 ### makeUnavailable
 

@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="durableobjectstorage"></a>
+
 ### DurableObjectStorage
 
 > **DurableObjectStorage** = `NonNullable`\<`Parameters`\<*typeof* `SqliteClient.make`\>\[`0`\]\[`"storage"`\]\>
@@ -15,6 +17,8 @@
 **`Experimental`**
 
 ## Variables
+
+<a id="layerrunstore"></a>
 
 ### layerRunStore
 
@@ -34,6 +38,8 @@
 
 ***
 
+<a id="layersqlclient"></a>
+
 ### layerSqlClient
 
 > `const` **layerSqlClient**: (`storage`) => `Layer.Layer`\<`SqlClient.SqlClient` \| `SqliteClient.SqliteClient`\>
@@ -51,6 +57,8 @@
 `Layer.Layer`\<`SqlClient.SqlClient` \| `SqliteClient.SqliteClient`\>
 
 ***
+
+<a id="makesqlclient"></a>
 
 ### makeSqlClient
 

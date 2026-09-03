@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="pinnedprogram"></a>
+
 ### PinnedProgram
 
 An Agent Program manifest paired with its constructor-owned digest.
 
 #### Properties
+
+<a id="manifest"></a>
 
 ##### manifest
 
@@ -98,11 +102,15 @@ An Agent Program manifest paired with its constructor-owned digest.
 
 > `readonly` **version**: `"1"`
 
+<a id="pin"></a>
+
 ##### pin
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/program-pin"`\>
 
 ## Type Aliases
+
+<a id="programagentcapability"></a>
 
 ### ProgramAgentCapability
 
@@ -112,6 +120,8 @@ Exact Agent and input schema callable by one Program selection.
 
 ***
 
+<a id="programbudget"></a>
+
 ### ProgramBudget
 
 > **ProgramBudget** = *typeof* `ProgramBudget.Type`
@@ -119,6 +129,8 @@ Exact Agent and input schema callable by one Program selection.
 Bounded resources available to one Agent Program.
 
 ***
+
+<a id="programcapabilitymanifest"></a>
 
 ### ProgramCapabilityManifest
 
@@ -128,6 +140,8 @@ Exact host capabilities visible inside one Agent Program sandbox.
 
 ***
 
+<a id="programmanifest"></a>
+
 ### ProgramManifest
 
 > **ProgramManifest** = *typeof* `ProgramManifest.Type`
@@ -136,6 +150,8 @@ Closed reconstructable identity contract for one Agent Program.
 
 ***
 
+<a id="programsource"></a>
+
 ### ProgramSource
 
 > **ProgramSource** = *typeof* `ProgramSource.Type`
@@ -143,6 +159,8 @@ Closed reconstructable identity contract for one Agent Program.
 Sandboxed source pinned as part of one Agent Program.
 
 ## Variables
+
+<a id="make"></a>
 
 ### make
 
@@ -162,6 +180,8 @@ Construct and pin one canonical Agent Program manifest.
 
 ***
 
+<a id="programagentcapability-1"></a>
+
 ### ProgramAgentCapability
 
 > `const` **ProgramAgentCapability**: `Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>
@@ -169,6 +189,8 @@ Construct and pin one canonical Agent Program manifest.
 Exact Agent and input schema callable by one Program selection.
 
 ***
+
+<a id="programbudget-1"></a>
 
 ### ProgramBudget
 
@@ -178,6 +200,8 @@ Bounded resources available to one Agent Program.
 
 ***
 
+<a id="programcapabilitymanifest-1"></a>
+
 ### ProgramCapabilityManifest
 
 > `const` **ProgramCapabilityManifest**: `Schema.Struct`\<\{ `agents`: `Schema.$Array`\<`Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>\>; `steps`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; `tools`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; \}\>
@@ -186,6 +210,8 @@ Exact host capabilities visible inside one Agent Program sandbox.
 
 ***
 
+<a id="programmanifest-1"></a>
+
 ### ProgramManifest
 
 > `const` **ProgramManifest**: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `capabilities`: `Schema.Struct`\<\{ `agents`: `Schema.$Array`\<`Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>\>; `steps`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; `tools`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; \}\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `name`: `Schema.String`; `output`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `sandbox`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `source`: `Schema.Struct`\<\{ `language`: `Schema.Literal`\<`"javascript"`\>; `text`: `Schema.String`; \}\>; `version`: `Schema.Literal`\<`"1"`\>; \}\>
@@ -193,6 +219,8 @@ Exact host capabilities visible inside one Agent Program sandbox.
 Closed reconstructable identity contract for one Agent Program.
 
 ***
+
+<a id="programsource-1"></a>
 
 ### ProgramSource
 

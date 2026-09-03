@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 **`Experimental`**
@@ -16,17 +18,23 @@ E2B hosted microVM configuration.
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Config`\<`Redacted`\<`string`\>\>
 
 **`Experimental`**
 
+<a id="autopauseafter"></a>
+
 ##### autoPauseAfter?
 
 > `readonly` `optional` **autoPauseAfter?**: `Input`
 
 **`Experimental`**
+
+<a id="template"></a>
 
 ##### template
 
@@ -35,6 +43,8 @@ E2B hosted microVM configuration.
 **`Experimental`**
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -55,6 +65,8 @@ Provide the hosted E2B microVM Sandbox leaf.
 `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="makeprovider"></a>
 
 ### makeProvider
 

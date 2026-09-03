@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="program"></a>
+
 ### Program
 
 An exact Agent Program paired with its input and output codecs.
@@ -32,19 +34,27 @@ An exact Agent Program paired with its input and output codecs.
 
 #### Properties
 
+<a id="input"></a>
+
 ##### input
 
 > `readonly` **input**: `Codec`\<`I`, `IE`\>
 
+<a id="output"></a>
+
 ##### output
 
 > `readonly` **output**: `Codec`\<`O`, `OE`\>
+
+<a id="pinned"></a>
 
 ##### pinned
 
 > `readonly` **pinned**: [`PinnedProgram`](./ProgramManifest#pinnedprogram)
 
 ## Variables
+
+<a id="make"></a>
 
 ### make
 
@@ -123,6 +133,8 @@ Construct and pin an Agent Program without evaluating its source.
 [`Program`](#program)\<`I`, `IE`, `O`, `OE`\>
 
 ***
+
+<a id="run"></a>
 
 ### run
 

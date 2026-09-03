@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="compaction"></a>
+
 ### Compaction
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Compaction_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="compactionerror"></a>
+
 ### CompactionError
 
 Compaction service failure.
@@ -45,6 +51,8 @@ Compaction service failure.
 - `CompactionError_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ Compaction service failure.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -74,6 +84,8 @@ Compaction service failure.
 
 `CompactionError_base.cause`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -81,6 +93,8 @@ Compaction service failure.
 ###### Inherited from
 
 `CompactionError_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -92,23 +106,33 @@ Compaction service failure.
 
 ## Interfaces
 
+<a id="cacheawareoptions"></a>
+
 ### CacheAwareOptions
 
 Options for cache-aware semantic compaction.
 
 #### Properties
 
+<a id="keeprecenttokens"></a>
+
 ##### keepRecentTokens?
 
 > `readonly` `optional` **keepRecentTokens?**: `number`
+
+<a id="media"></a>
 
 ##### media?
 
 > `readonly` `optional` **media?**: `Strategy`
 
+<a id="stableprefixturns"></a>
+
 ##### stablePrefixTurns
 
 > `readonly` **stablePrefixTurns**: `number`
+
+<a id="summarize"></a>
 
 ##### summarize
 
@@ -130,6 +154,8 @@ Options for cache-aware semantic compaction.
 
 ***
 
+<a id="defaultoptions"></a>
+
 ### DefaultOptions
 
 Options for the default compaction implementation.
@@ -140,13 +166,19 @@ Options for the default compaction implementation.
 
 #### Properties
 
+<a id="contextwindow"></a>
+
 ##### contextWindow?
 
 > `readonly` `optional` **contextWindow?**: `number`
 
+<a id="keeprecenttokens-1"></a>
+
 ##### keepRecentTokens?
 
 > `readonly` `optional` **keepRecentTokens?**: `number`
+
+<a id="media-1"></a>
 
 ##### media?
 
@@ -156,13 +188,19 @@ Options for the default compaction implementation.
 
 Reference-only media handling during compaction.
 
+<a id="reservetokens"></a>
+
 ##### reserveTokens?
 
 > `readonly` `optional` **reserveTokens?**: `number`
 
+<a id="summarymodel"></a>
+
 ##### summaryModel?
 
 > `readonly` `optional` **summaryModel?**: `Layer`\<`LanguageModel`, `never`, `never`\>
+
+<a id="summaryprompt"></a>
 
 ##### summaryPrompt?
 
@@ -170,17 +208,23 @@ Reference-only media handling during compaction.
 
 ***
 
+<a id="keeprecentoptions"></a>
+
 ### KeepRecentOptions
 
 Options for token-denominated recent retention.
 
 #### Properties
 
+<a id="tokens"></a>
+
 ##### tokens
 
 > `readonly` **tokens**: `number`
 
 ***
+
+<a id="layerconstructor"></a>
 
 ### LayerConstructor()
 
@@ -220,6 +264,8 @@ Layer wiring the default or provided strategy.
 
 ***
 
+<a id="layeroptions"></a>
+
 ### LayerOptions
 
 Options accepted by the Compaction layer.
@@ -230,6 +276,8 @@ Options accepted by the Compaction layer.
 
 #### Properties
 
+<a id="contextwindow-1"></a>
+
 ##### contextWindow?
 
 > `readonly` `optional` **contextWindow?**: `number`
@@ -238,6 +286,8 @@ Options accepted by the Compaction layer.
 
 [`DefaultOptions`](#defaultoptions).[`contextWindow`](#contextwindow)
 
+<a id="keeprecenttokens-2"></a>
+
 ##### keepRecentTokens?
 
 > `readonly` `optional` **keepRecentTokens?**: `number`
@@ -245,6 +295,8 @@ Options accepted by the Compaction layer.
 ###### Inherited from
 
 [`DefaultOptions`](#defaultoptions).[`keepRecentTokens`](#keeprecenttokens-1)
+
+<a id="media-2"></a>
 
 ##### media?
 
@@ -258,6 +310,8 @@ Reference-only media handling during compaction.
 
 [`DefaultOptions`](#defaultoptions).[`media`](#media-1)
 
+<a id="reservetokens-1"></a>
+
 ##### reserveTokens?
 
 > `readonly` `optional` **reserveTokens?**: `number`
@@ -266,9 +320,13 @@ Reference-only media handling during compaction.
 
 [`DefaultOptions`](#defaultoptions).[`reserveTokens`](#reservetokens)
 
+<a id="strategy"></a>
+
 ##### strategy?
 
 > `readonly` `optional` **strategy?**: [`Strategy`](#strategy-1)
+
+<a id="summarymodel-1"></a>
 
 ##### summaryModel?
 
@@ -277,6 +335,8 @@ Reference-only media handling during compaction.
 ###### Inherited from
 
 [`DefaultOptions`](#defaultoptions).[`summaryModel`](#summarymodel)
+
+<a id="summaryprompt-1"></a>
 
 ##### summaryPrompt?
 
@@ -288,11 +348,15 @@ Reference-only media handling during compaction.
 
 ***
 
+<a id="outputboundoptions"></a>
+
 ### OutputBoundOptions
 
 Options for lossless tool-output bounding.
 
 #### Properties
+
+<a id="maxbytes"></a>
 
 ##### maxBytes
 
@@ -300,19 +364,27 @@ Options for lossless tool-output bounding.
 
 ***
 
+<a id="plan"></a>
+
 ### Plan
 
 What to keep verbatim and what the summary replaces.
 
 #### Properties
 
+<a id="compact"></a>
+
 ##### compact
 
 > `readonly` **compact**: `Prompt`
 
+<a id="keep"></a>
+
 ##### keep
 
 > `readonly` **keep**: `Prompt`
+
+<a id="recent"></a>
 
 ##### recent
 
@@ -320,35 +392,51 @@ What to keep verbatim and what the summary replaces.
 
 ***
 
+<a id="request"></a>
+
 ### Request
 
 Request passed to a compaction implementation.
 
 #### Properties
 
+<a id="agentname"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
+
+<a id="compactionid"></a>
 
 ##### compactionId
 
 > `readonly` **compactionId**: `string`
 
+<a id="history"></a>
+
 ##### history
 
 > `readonly` **history**: `Prompt`
+
+<a id="overflow"></a>
 
 ##### overflow
 
 > `readonly` **overflow**: `boolean`
 
+<a id="path"></a>
+
 ##### path?
 
 > `readonly` `optional` **path?**: readonly [`Entry`](./generalist/namespaces/Session#entry)[]
 
+<a id="prompt"></a>
+
 ##### prompt
 
 > `readonly` **prompt**: `Prompt`
+
+<a id="runid"></a>
 
 ##### runId?
 
@@ -356,17 +444,25 @@ Request passed to a compaction implementation.
 
 Durable run identity. Keys the unchanged-threshold cache so concurrent runs never share an entry.
 
+<a id="sessionid"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
+
+<a id="tooloutputmaxbytes"></a>
 
 ##### toolOutputMaxBytes?
 
 > `readonly` `optional` **toolOutputMaxBytes?**: `number`
 
+<a id="turn"></a>
+
 ##### turn
 
 > `readonly` **turn**: `number`
+
+<a id="usage"></a>
 
 ##### usage
 
@@ -374,11 +470,15 @@ Durable run identity. Keys the unchanged-threshold cache so concurrent runs neve
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Compaction service boundary consulted by the loop.
 
 #### Properties
+
+<a id="maybecompact"></a>
 
 ##### maybeCompact
 
@@ -393,6 +493,8 @@ Compaction service boundary consulted by the loop.
 ###### Returns
 
 `Effect`\<`Option`\<\{ `history`: `Prompt`; `prompt`: `Prompt`; \} \| \{ `history`: `Prompt`; `prompt`: `Prompt`; `summary`: `string`; \}\>, [`CompactionError`](#compactionerror), `LanguageModel`\>
+
+<a id="willcompact"></a>
 
 ##### willCompact?
 
@@ -416,11 +518,15 @@ Compaction service boundary consulted by the loop.
 
 ***
 
+<a id="strategy-1"></a>
+
 ### Strategy
 
 Compaction strategy: decide, cut, summarize.
 
 #### Properties
+
+<a id="cut"></a>
 
 ##### cut
 
@@ -440,9 +546,13 @@ Compaction strategy: decide, cut, summarize.
 
 `Option`\<[`Plan`](#plan)\>
 
+<a id="keeprecenttokens-3"></a>
+
 ##### keepRecentTokens?
 
 > `readonly` `optional` **keepRecentTokens?**: `number`
+
+<a id="media-3"></a>
 
 ##### media
 
@@ -451,6 +561,8 @@ Compaction strategy: decide, cut, summarize.
 **`Experimental`**
 
 Reference-only media handling during compaction.
+
+<a id="shouldcompact"></a>
 
 ##### shouldCompact
 
@@ -472,6 +584,8 @@ Reference-only media handling during compaction.
 
 `boolean`
 
+<a id="summarize-1"></a>
+
 ##### summarize
 
 > `readonly` **summarize**: (`plan`, `request`) => `Effect`\<`string`, [`CompactionError`](#compactionerror), `LanguageModel`\>
@@ -490,17 +604,23 @@ Reference-only media handling during compaction.
 
 `Effect`\<`string`, [`CompactionError`](#compactionerror), `LanguageModel`\>
 
+<a id="tooloutputmaxbytes-1"></a>
+
 ##### toolOutputMaxBytes?
 
 > `readonly` `optional` **toolOutputMaxBytes?**: `number`
 
 ***
 
+<a id="strategypart"></a>
+
 ### StrategyPart
 
 One independently composable compaction capability.
 
 #### Properties
+
+<a id="cut-1"></a>
 
 ##### cut?
 
@@ -520,9 +640,13 @@ One independently composable compaction capability.
 
 `Option`\<[`Plan`](#plan)\>
 
+<a id="keeprecenttokens-4"></a>
+
 ##### keepRecentTokens?
 
 > `readonly` `optional` **keepRecentTokens?**: `number`
+
+<a id="media-4"></a>
 
 ##### media?
 
@@ -531,6 +655,8 @@ One independently composable compaction capability.
 **`Experimental`**
 
 Reference-only media handling during compaction.
+
+<a id="shouldcompact-1"></a>
 
 ##### shouldCompact?
 
@@ -552,6 +678,8 @@ Reference-only media handling during compaction.
 
 `boolean`
 
+<a id="summarize-2"></a>
+
 ##### summarize?
 
 > `readonly` `optional` **summarize?**: (`plan`, `request`) => `Effect`\<`string`, [`CompactionError`](#compactionerror), `LanguageModel`\>
@@ -570,11 +698,15 @@ Reference-only media handling during compaction.
 
 `Effect`\<`string`, [`CompactionError`](#compactionerror), `LanguageModel`\>
 
+<a id="tooloutputmaxbytes-2"></a>
+
 ##### toolOutputMaxBytes?
 
 > `readonly` `optional` **toolOutputMaxBytes?**: `number`
 
 ***
+
+<a id="structuredsummaryoptions"></a>
 
 ### StructuredSummaryOptions
 
@@ -582,13 +714,19 @@ Options for schema-validated structured summaries.
 
 #### Properties
 
+<a id="objectname"></a>
+
 ##### objectName?
 
 > `readonly` `optional` **objectName?**: `string`
 
+<a id="summarymodel-2"></a>
+
 ##### summaryModel?
 
 > `readonly` `optional` **summaryModel?**: `Layer`\<`LanguageModel`, `never`, `never`\>
+
+<a id="summaryprompt-2"></a>
 
 ##### summaryPrompt?
 
@@ -596,11 +734,15 @@ Options for schema-validated structured summaries.
 
 ***
 
+<a id="summarizewithmodeloptions"></a>
+
 ### SummarizeWithModelOptions
 
 Options for model-backed text summaries.
 
 #### Properties
+
+<a id="model"></a>
 
 ##### model?
 
@@ -608,11 +750,15 @@ Options for model-backed text summaries.
 
 Closed model layer for summary calls; omit to use the ambient LanguageModel.
 
+<a id="prompt-1"></a>
+
 ##### prompt?
 
 > `readonly` `optional` **prompt?**: `string`
 
 ***
+
+<a id="usage-1"></a>
 
 ### Usage
 
@@ -620,19 +766,27 @@ Token accounting for a compaction decision.
 
 #### Properties
 
+<a id="contexttokens"></a>
+
 ##### contextTokens
 
 > `readonly` **contextTokens**: `number`
 
+<a id="contextwindow-2"></a>
+
 ##### contextWindow
 
 > `readonly` **contextWindow**: `number`
+
+<a id="reservetokens-2"></a>
 
 ##### reserveTokens
 
 > `readonly` **reserveTokens**: `number`
 
 ## Type Aliases
+
+<a id="agentsummary"></a>
 
 ### AgentSummary
 
@@ -642,6 +796,8 @@ Structured checkpoint schema used by structuredSummary.
 
 ***
 
+<a id="microcompactresult"></a>
+
 ### MicrocompactResult
 
 > **MicrocompactResult** = `Extract`\<[`Result`](#result), \{ `_tag`: `"Microcompact"`; \}\>
@@ -649,6 +805,8 @@ Structured checkpoint schema used by structuredSummary.
 Result from tool-output microcompaction.
 
 ***
+
+<a id="result"></a>
 
 ### Result
 
@@ -658,6 +816,8 @@ Compaction result applied by the agent loop.
 
 ***
 
+<a id="summarizeresult"></a>
+
 ### SummarizeResult
 
 > **SummarizeResult** = `Extract`\<[`Result`](#result), \{ `_tag`: `"Summarize"`; \}\>
@@ -666,6 +826,8 @@ Result from summary checkpointing.
 
 ## Variables
 
+<a id="agentsummary-1"></a>
+
 ### AgentSummary
 
 > `const` **AgentSummary**: `Schema.Struct`\<\{ `decisions`: `Schema.$Array`\<`Schema.String`\>; `facts`: `Schema.$Array`\<`Schema.String`\>; `goal`: `Schema.String`; `openQuestions`: `Schema.$Array`\<`Schema.String`\>; `toolFindings`: `Schema.$Array`\<`Schema.String`\>; \}\>
@@ -673,6 +835,8 @@ Result from summary checkpointing.
 Structured checkpoint schema used by structuredSummary.
 
 ***
+
+<a id="cacheaware"></a>
 
 ### cacheAware
 
@@ -693,6 +857,8 @@ summarize only the middle, and retain the recent token-denominated tail verbatim
 
 ***
 
+<a id="defaultkeeprecenttokens"></a>
+
 ### defaultKeepRecentTokens
 
 > `const` **defaultKeepRecentTokens**: `20000` = `20000`
@@ -701,6 +867,8 @@ Default recent-session suffix target kept verbatim.
 
 ***
 
+<a id="defaultreservetokens"></a>
+
 ### defaultReserveTokens
 
 > `const` **defaultReserveTokens**: `16384` = `16384`
@@ -708,6 +876,8 @@ Default recent-session suffix target kept verbatim.
 Default headroom kept for the next model response.
 
 ***
+
+<a id="defaultstrategy"></a>
 
 ### defaultStrategy
 
@@ -727,6 +897,8 @@ The default two-stage compaction strategy.
 
 ***
 
+<a id="keeprecent"></a>
+
 ### keepRecent
 
 > `const` **keepRecent**: (`options`) => [`StrategyPart`](#strategypart)
@@ -745,6 +917,8 @@ Configure the token target retained verbatim after a summary cut.
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: [`LayerConstructor`](#layerconstructor)
@@ -752,6 +926,8 @@ Configure the token target retained verbatim after a summary cut.
 Layer wiring the default or provided strategy.
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -768,6 +944,8 @@ Layer wiring the default or provided strategy.
 `Layer.Layer`\<[`Compaction`](#compaction)\>
 
 ***
+
+<a id="layertruncate"></a>
 
 ### layerTruncate
 
@@ -787,6 +965,8 @@ Exact truncate-only compaction. The layer declares the `Tokenizer` requirement.
 
 ***
 
+<a id="layertruncateestimated"></a>
+
 ### layerTruncateEstimated
 
 > `const` **layerTruncateEstimated**: (`maxTokens`) => `Layer.Layer`\<[`Compaction`](#compaction)\>
@@ -804,6 +984,8 @@ Approximate truncate-only compaction over the prompt token estimator; no `Tokeni
 `Layer.Layer`\<[`Compaction`](#compaction)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 
@@ -845,6 +1027,8 @@ Build a compaction service from a strategy.
 
 ***
 
+<a id="result-1"></a>
+
 ### Result
 
 > `const` **Result**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Microcompact"`, \{ `history`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Summarize"`, \{ `history`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `summary`: `Schema.String`; \}\>\]\>
@@ -852,6 +1036,8 @@ Build a compaction service from a strategy.
 Compaction result applied by the agent loop.
 
 ***
+
+<a id="strategy-2"></a>
 
 ### strategy
 
@@ -893,6 +1079,8 @@ readonly [`StrategyPart`](#strategypart)[]
 
 ***
 
+<a id="structuredsummary"></a>
+
 ### structuredSummary
 
 > `const` **structuredSummary**: (`options?`) => [`StrategyPart`](#strategypart)
@@ -910,6 +1098,8 @@ Summarize through Effect AI structured output and render a string checkpoint.
 [`StrategyPart`](#strategypart)
 
 ***
+
+<a id="summarizewithmodel"></a>
 
 ### summarizeWithModel
 
@@ -929,6 +1119,8 @@ Summarize compacted context with an ambient or dedicated LanguageModel.
 
 ***
 
+<a id="summarytemplate"></a>
+
 ### summaryTemplate
 
 > `const` **summaryTemplate**: "Summarize the conversation so another agent can continue seamlessly.\n\nUse Markdown with these sections:\n\n## Goal\n## Constraints\n## Progress\n### Done\n### In Progress\n### Blocked\n## Key Decisions\n## Next Steps\n## Critical Context\n\nDo not mention that context was compacted." = "Summarize the conversation so another agent can continue seamlessly.\n\nUse Markdown with these sections:\n\n## Goal\n## Constraints\n## Progress\n### Done\n### In Progress\n### Blocked\n## Key Decisions\n## Next Steps\n## Critical Context\n\nDo not mention that context was compacted."
@@ -936,6 +1128,8 @@ Summarize compacted context with an ambient or dedicated LanguageModel.
 Fixed prompt used for dedicated summary calls.
 
 ***
+
+<a id="tooloutputbound"></a>
 
 ### toolOutputBound
 
@@ -954,6 +1148,8 @@ Configure lossless successful-tool-result bounding.
 [`StrategyPart`](#strategypart)
 
 ***
+
+<a id="withlifecycle"></a>
 
 ### withLifecycle
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="blobnotfound"></a>
+
 ### BlobNotFound
 
 **`Experimental`**
@@ -19,6 +21,8 @@ No content exists for the requested SHA-256 digest.
 - `BlobNotFound_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -42,6 +46,8 @@ No content exists for the requested SHA-256 digest.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -51,6 +57,8 @@ No content exists for the requested SHA-256 digest.
 ###### Inherited from
 
 `BlobNotFound_base.hint`
+
+<a id="sha256"></a>
 
 ##### sha256
 
@@ -64,6 +72,8 @@ No content exists for the requested SHA-256 digest.
 
 ***
 
+<a id="blobstore"></a>
+
 ### BlobStore
 
 **`Experimental`**
@@ -75,6 +85,8 @@ Content-addressed BlobStore service.
 - `BlobStore_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -98,6 +110,8 @@ Content-addressed BlobStore service.
 
 ***
 
+<a id="blobstoreerror"></a>
+
 ### BlobStoreError
 
 **`Experimental`**
@@ -109,6 +123,8 @@ A BlobStore backend operation failed.
 - `BlobStoreError_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -132,6 +148,8 @@ A BlobStore backend operation failed.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -142,6 +160,8 @@ A BlobStore backend operation failed.
 
 `BlobStoreError_base.hint`
 
+<a id="operation"></a>
+
 ##### operation
 
 > `readonly` **operation**: `string`
@@ -151,6 +171,8 @@ A BlobStore backend operation failed.
 ###### Inherited from
 
 `BlobStoreError_base.operation`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -164,6 +186,8 @@ A BlobStore backend operation failed.
 
 ***
 
+<a id="blobtoolarge"></a>
+
 ### BlobTooLarge
 
 **`Experimental`**
@@ -175,6 +199,8 @@ Content exceeds the configured byte limit.
 - `BlobTooLarge_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -198,6 +224,8 @@ Content exceeds the configured byte limit.
 
 #### Properties
 
+<a id="bytes"></a>
+
 ##### bytes
 
 > `readonly` **bytes**: `number`
@@ -208,6 +236,8 @@ Content exceeds the configured byte limit.
 
 `BlobTooLarge_base.bytes`
 
+<a id="hint-2"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -217,6 +247,8 @@ Content exceeds the configured byte limit.
 ###### Inherited from
 
 `BlobTooLarge_base.hint`
+
+<a id="maxbytes"></a>
 
 ##### maxBytes
 
@@ -230,6 +262,8 @@ Content exceeds the configured byte limit.
 
 ## Interfaces
 
+<a id="filesystemoptions"></a>
+
 ### FileSystemOptions
 
 **`Experimental`**
@@ -242,11 +276,15 @@ Content-addressed filesystem Layer options.
 
 #### Properties
 
+<a id="dir"></a>
+
 ##### dir
 
 > `readonly` **dir**: `string`
 
 **`Experimental`**
+
+<a id="maxbytes-1"></a>
 
 ##### maxBytes?
 
@@ -259,6 +297,8 @@ Content-addressed filesystem Layer options.
 [`LayerOptions`](#layeroptions).[`maxBytes`](#maxbytes-2)
 
 ***
+
+<a id="layeroptions"></a>
 
 ### LayerOptions
 
@@ -273,6 +313,8 @@ Shared BlobStore Layer options.
 
 #### Properties
 
+<a id="maxbytes-2"></a>
+
 ##### maxBytes?
 
 > `readonly` `optional` **maxBytes?**: `number`
@@ -280,6 +322,8 @@ Shared BlobStore Layer options.
 **`Experimental`**
 
 ***
+
+<a id="resolvedblob"></a>
 
 ### ResolvedBlob
 
@@ -289,11 +333,15 @@ Provider-ready content and its canonical stored reference.
 
 #### Properties
 
+<a id="data"></a>
+
 ##### data
 
 > `readonly` **data**: `Uint8Array`\<`ArrayBufferLike`\> \| `URL`
 
 **`Experimental`**
+
+<a id="ref"></a>
 
 ##### ref
 
@@ -319,6 +367,8 @@ Provider-ready content and its canonical stored reference.
 
 ***
 
+<a id="resolveoptions"></a>
+
 ### ResolveOptions
 
 **`Experimental`**
@@ -327,6 +377,8 @@ Provider transport preference for resolving a reference.
 
 #### Properties
 
+<a id="prefer"></a>
+
 ##### prefer
 
 > `readonly` **prefer**: `"bytes"` \| `"url"`
@@ -334,6 +386,8 @@ Provider transport preference for resolving a reference.
 **`Experimental`**
 
 ***
+
+<a id="s3client"></a>
 
 ### S3Client
 
@@ -348,6 +402,8 @@ Minimal S3-compatible client needed by BlobStore.
 `E` = `unknown`
 
 #### Properties
+
+<a id="get"></a>
 
 ##### get
 
@@ -369,6 +425,8 @@ Minimal S3-compatible client needed by BlobStore.
 
 `Effect`\<`Option`\<[`S3Object`](#s3object)\>, `E`\>
 
+<a id="head"></a>
+
 ##### head
 
 > `readonly` **head**: (`bucket`, `key`) => `Effect`\<`boolean`, `E`\>
@@ -388,6 +446,8 @@ Minimal S3-compatible client needed by BlobStore.
 ###### Returns
 
 `Effect`\<`boolean`, `E`\>
+
+<a id="put"></a>
 
 ##### put
 
@@ -415,6 +475,8 @@ Minimal S3-compatible client needed by BlobStore.
 
 ***
 
+<a id="s3object"></a>
+
 ### S3Object
 
 **`Experimental`**
@@ -423,11 +485,15 @@ One object exchanged with an injected S3-compatible client.
 
 #### Properties
 
+<a id="data-1"></a>
+
 ##### data
 
 > `readonly` **data**: `Uint8Array`
 
 **`Experimental`**
+
+<a id="filename"></a>
 
 ##### filename?
 
@@ -435,11 +501,15 @@ One object exchanged with an injected S3-compatible client.
 
 **`Experimental`**
 
+<a id="mediatype"></a>
+
 ##### mediaType
 
 > `readonly` **mediaType**: `string`
 
 **`Experimental`**
+
+<a id="url"></a>
 
 ##### url?
 
@@ -448,6 +518,8 @@ One object exchanged with an injected S3-compatible client.
 **`Experimental`**
 
 ***
+
+<a id="s3options"></a>
 
 ### S3Options
 
@@ -467,17 +539,23 @@ S3-compatible BlobStore Layer options.
 
 #### Properties
 
+<a id="bucket"></a>
+
 ##### bucket
 
 > `readonly` **bucket**: `string`
 
 **`Experimental`**
 
+<a id="client"></a>
+
 ##### client
 
 > `readonly` **client**: [`S3Client`](#s3client)\<`E`\>
 
 **`Experimental`**
+
+<a id="maxbytes-3"></a>
 
 ##### maxBytes?
 
@@ -491,6 +569,8 @@ S3-compatible BlobStore Layer options.
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
@@ -498,6 +578,8 @@ S3-compatible BlobStore Layer options.
 Content-addressed storage operations.
 
 #### Properties
+
+<a id="get-1"></a>
 
 ##### get
 
@@ -514,6 +596,8 @@ Content-addressed storage operations.
 ###### Returns
 
 `Effect`\<\{ `data`: `Uint8Array`; `ref`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; \}, [`BlobNotFound`](#blobnotfound) \| [`BlobStoreError`](#blobstoreerror)\>
+
+<a id="put-1"></a>
 
 ##### put
 
@@ -540,6 +624,8 @@ Content-addressed storage operations.
 ###### Returns
 
 `Effect`\<\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}, [`BlobTooLarge`](#blobtoolarge) \| [`BlobStoreError`](#blobstoreerror)\>
+
+<a id="resolve"></a>
 
 ##### resolve
 
@@ -577,6 +663,8 @@ Content-addressed storage operations.
 
 ## Type Aliases
 
+<a id="blob"></a>
+
 ### Blob
 
 > **Blob** = *typeof* `Blob.Type`
@@ -586,6 +674,8 @@ Content-addressed storage operations.
 Stored content and its canonical reference.
 
 ***
+
+<a id="put-2"></a>
 
 ### Put
 
@@ -597,6 +687,8 @@ Input accepted by `BlobStore.put`.
 
 ## Variables
 
+<a id="blob-1"></a>
+
 ### Blob
 
 > `const` **Blob**: `Schema.Struct`\<\{ `data`: `Schema.Uint8Array`; `ref`: `Schema.Struct`\<\{ `bytes`: `Schema.Int`; `filename`: `Schema.optionalKey`\<`Schema.String`\>; `mediaType`: `Schema.String`; `sha256`: `Schema.String`; \}\>; \}\>
@@ -606,6 +698,8 @@ Input accepted by `BlobStore.put`.
 Stored content and its canonical reference.
 
 ***
+
+<a id="layerfilesystem"></a>
 
 ### layerFileSystem
 
@@ -627,6 +721,8 @@ Content-addressed files with a schema-encoded metadata sidecar.
 
 ***
 
+<a id="layermemory"></a>
+
 ### layerMemory
 
 > `const` **layerMemory**: (`options?`) => `Layer.Layer`\<[`BlobStore`](#blobstore), `never`, `Crypto.Crypto`\>
@@ -646,6 +742,8 @@ Process-local content-addressed storage.
 `Layer.Layer`\<[`BlobStore`](#blobstore), `never`, `Crypto.Crypto`\>
 
 ***
+
+<a id="layers3"></a>
 
 ### layerS3
 
@@ -673,6 +771,8 @@ S3-compatible storage through an injected client; no AWS SDK is required.
 
 ***
 
+<a id="layersql"></a>
+
 ### layerSql
 
 > `const` **layerSql**: (`options?`) => `Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `SqlClient.SqlClient`\>
@@ -692,6 +792,8 @@ Portable SQL storage over the runtime SqlClient seam.
 `Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `SqlClient.SqlClient`\>
 
 ***
+
+<a id="put-3"></a>
 
 ### Put
 

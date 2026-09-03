@@ -8,25 +8,35 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Filesystem skill catalog options.
 
 #### Properties
 
+<a id="cwd"></a>
+
 ##### cwd
 
 > `readonly` **cwd**: `string`
 
+<a id="frontmattermaxbytes"></a>
+
 ##### frontmatterMaxBytes?
 
 > `readonly` `optional` **frontmatterMaxBytes?**: `number`
+
+<a id="roots"></a>
 
 ##### roots?
 
 > `readonly` `optional` **roots?**: readonly `string`[]
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -45,6 +55,8 @@ Build a SkillCatalog layer from filesystem roots.
 `Layer.Layer`\<[`SkillCatalog`](../../generalist/namespaces/SkillCatalog#skillcatalog), [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

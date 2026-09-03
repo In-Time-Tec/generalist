@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="languagemodelnotregistered"></a>
+
 ### LanguageModelNotRegistered
 
 #### Extends
@@ -15,6 +17,8 @@
 - `LanguageModelNotRegistered_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `LanguageModelNotRegistered_base.hint`
+
+<a id="model"></a>
 
 ##### model
 
@@ -52,6 +60,8 @@
 
 `LanguageModelNotRegistered_base.model`
 
+<a id="provider"></a>
+
 ##### provider
 
 > `readonly` **provider**: `string`
@@ -59,6 +69,8 @@
 ###### Inherited from
 
 `LanguageModelNotRegistered_base.provider`
+
+<a id="registration_key"></a>
 
 ##### registration\_key?
 
@@ -70,6 +82,8 @@
 
 ***
 
+<a id="modelregistry"></a>
+
 ### ModelRegistry
 
 #### Extends
@@ -77,6 +91,8 @@
 - `ModelRegistry_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -98,9 +114,13 @@
 
 ## Interfaces
 
+<a id="governanceoptions"></a>
+
 ### GovernanceOptions
 
 #### Properties
+
+<a id="maxconcurrentmodelcalls"></a>
 
 ##### maxConcurrentModelCalls?
 
@@ -108,17 +128,25 @@
 
 ***
 
+<a id="modelselection"></a>
+
 ### ModelSelection
 
 #### Properties
+
+<a id="model-1"></a>
 
 ##### model
 
 > `readonly` **model**: `string`
 
+<a id="provider-1"></a>
+
 ##### provider
 
 > `readonly` **provider**: `string`
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -126,9 +154,13 @@
 
 ***
 
+<a id="registerinput"></a>
+
 ### RegisterInput
 
 #### Properties
+
+<a id="registration"></a>
 
 ##### registration
 
@@ -136,21 +168,31 @@
 
 ***
 
+<a id="registration-1"></a>
+
 ### Registration
 
 #### Properties
+
+<a id="classifyfailure"></a>
 
 ##### classifyFailure?
 
 > `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](#failureclassifier)
 
+<a id="isavailabilityfailure"></a>
+
 ##### isAvailabilityFailure?
 
 > `readonly` `optional` **isAvailabilityFailure?**: [`AvailabilityFailureClassifier`](#availabilityfailureclassifier)
 
+<a id="layer"></a>
+
 ##### layer
 
 > `readonly` **layer**: `Layer`\<[`ModelEnvironment`](#modelenvironment)\>
+
+<a id="metadata"></a>
 
 ##### metadata?
 
@@ -160,17 +202,25 @@
 
 \[`key`: `string`\]: `unknown`
 
+<a id="model-2"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
+
+<a id="provider-2"></a>
 
 ##### provider
 
 > `readonly` **provider**: `string`
 
+<a id="registrationkey-1"></a>
+
 ##### registrationKey?
 
 > `readonly` `optional` **registrationKey?**: `string`
+
+<a id="tooljsonschemacompiler"></a>
 
 ##### toolJsonSchemaCompiler?
 
@@ -178,9 +228,13 @@
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 #### Properties
+
+<a id="register"></a>
 
 ##### register
 
@@ -196,9 +250,13 @@
 
 `Effect`\<`void`\>
 
+<a id="registrations"></a>
+
 ##### registrations
 
 > `readonly` **registrations**: `Effect`\<readonly [`Registration`](#registration-1)[]\>
+
+<a id="stream"></a>
 
 ##### stream
 
@@ -231,6 +289,8 @@
 ###### Returns
 
 `Stream`\<`A`, [`LanguageModelNotRegistered`](#languagemodelnotregistered) \| `E`, `Exclude`\<`R`, [`ModelEnvironment`](#modelenvironment)\>\>
+
+<a id="withmodel"></a>
 
 ##### withModel
 
@@ -266,6 +326,8 @@
 
 ## Type Aliases
 
+<a id="availabilityfailureclassifier"></a>
+
 ### AvailabilityFailureClassifier
 
 > **AvailabilityFailureClassifier** = (`cause`) => `boolean`
@@ -284,11 +346,15 @@ Provider-owned decision that a failed invocation may advance an ordered candidat
 
 ***
 
+<a id="failureclassification"></a>
+
 ### FailureClassification
 
 > **FailureClassification** = `"context-overflow"` \| `"other"`
 
 ***
+
+<a id="failureclassifier"></a>
 
 ### FailureClassifier
 
@@ -306,17 +372,23 @@ Provider-owned decision that a failed invocation may advance an ordered candidat
 
 ***
 
+<a id="metadata-1"></a>
+
 ### Metadata
 
 > **Metadata** = *typeof* `Metadata.Type`
 
 ***
 
+<a id="modelenvironment"></a>
+
 ### ModelEnvironment
 
 > **ModelEnvironment** = `LanguageModel.LanguageModel` \| `Model.ProviderName` \| `Model.ModelName`
 
 ***
+
+<a id="tooljsonschemacompiler-1"></a>
 
 ### ToolJsonSchemaCompiler
 
@@ -333,6 +405,8 @@ Provider-owned decision that a failed invocation may advance an ordered candidat
 `Effect.Effect`\<`JsonSchema.JsonSchema`, `AiError.AiError`\>
 
 ## Variables
+
+<a id="classifyfailure-1"></a>
 
 ### classifyFailure
 
@@ -371,6 +445,8 @@ Provider-owned decision that a failed invocation may advance an ordered candidat
 [`FailureClassification`](#failureclassification)
 
 ***
+
+<a id="layer-1"></a>
 
 ### layer
 
@@ -438,6 +514,8 @@ readonly `Effect`\<[`Registration`](#registration-1), `E`, `R`\>[]
 
 ***
 
+<a id="layermerged"></a>
+
 ### layerMerged
 
 > `const` **layerMerged**: \{\<`E`, `R`\>(`options?`): (`registries`) => `Layer`\<[`ModelRegistry`](#modelregistry), `E`, `R`\>; \<`E`, `R`\>(`registries`, `options?`): `Layer`\<[`ModelRegistry`](#modelregistry), `E`, `R`\>; \}
@@ -496,6 +574,8 @@ readonly `Layer`\<[`ModelRegistry`](#modelregistry), `E`, `R`\>[]
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`ModelRegistry`](#modelregistry), `never`, `never`\>
@@ -514,6 +594,8 @@ In-memory model registry.
 
 ***
 
+<a id="register-1"></a>
+
 ### register
 
 > `const` **register**: (`input`) => `Effect.Effect`\<`void`, `never`, [`ModelRegistry`](#modelregistry)\>
@@ -529,6 +611,8 @@ In-memory model registry.
 `Effect.Effect`\<`void`, `never`, [`ModelRegistry`](#modelregistry)\>
 
 ***
+
+<a id="registration-2"></a>
 
 ### registration
 
@@ -582,6 +666,8 @@ In-memory model registry.
 
 ***
 
+<a id="registrations-1"></a>
+
 ### registrations
 
 > `const` **registrations**: () => `Effect.Effect`\<readonly [`Registration`](#registration-1)[], `never`, [`ModelRegistry`](#modelregistry)\>
@@ -591,6 +677,8 @@ In-memory model registry.
 `Effect.Effect`\<readonly [`Registration`](#registration-1)[], `never`, [`ModelRegistry`](#modelregistry)\>
 
 ***
+
+<a id="stream-1"></a>
 
 ### stream
 
@@ -658,6 +746,8 @@ In-memory model registry.
 
 ***
 
+<a id="tooljsonschemacompiler-2"></a>
+
 ### toolJsonSchemaCompiler
 
 > `const` **toolJsonSchemaCompiler**: (`model`) => [`ToolJsonSchemaCompiler`](#tooljsonschemacompiler-1) \| `undefined`
@@ -673,6 +763,8 @@ In-memory model registry.
 [`ToolJsonSchemaCompiler`](#tooljsonschemacompiler-1) \| `undefined`
 
 ***
+
+<a id="withmodel-1"></a>
 
 ### withModel
 
@@ -739,6 +831,8 @@ In-memory model registry.
 `Effect`\<`A`, [`LanguageModelNotRegistered`](#languagemodelnotregistered) \| `E`, [`ModelRegistry`](#modelregistry) \| `Exclude`\<`R`, [`ModelEnvironment`](#modelenvironment)\>\>
 
 ***
+
+<a id="withtooljsonschemacompiler"></a>
 
 ### withToolJsonSchemaCompiler
 

@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="invocationlifecycle"></a>
+
 ### InvocationLifecycle
 
 #### Extends
@@ -15,6 +17,8 @@
 - `InvocationLifecycle_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="invocationlifecyclefailed"></a>
+
 ### InvocationLifecycleFailed
 
 #### Extends
@@ -43,6 +49,8 @@
 - `InvocationLifecycleFailed_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -64,6 +72,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -71,6 +81,8 @@
 ###### Inherited from
 
 `InvocationLifecycleFailed_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -82,6 +94,8 @@
 
 ***
 
+<a id="sink"></a>
+
 ### Sink
 
 Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`.
@@ -91,6 +105,8 @@ Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessio
 - `Sink_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -112,6 +128,8 @@ Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessio
 
 ***
 
+<a id="sinkfailed"></a>
+
 ### SinkFailed
 
 Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink.
@@ -121,6 +139,8 @@ Host telemetry delivery failure. A remote failure can be ambiguous; reconcile wi
 - `SinkFailed_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -142,6 +162,8 @@ Host telemetry delivery failure. A remote failure can be ambiguous; reconcile wi
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -150,6 +172,8 @@ Host telemetry delivery failure. A remote failure can be ambiguous; reconcile wi
 
 `SinkFailed_base.cause`
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -157,6 +181,8 @@ Host telemetry delivery failure. A remote failure can be ambiguous; reconcile wi
 ###### Inherited from
 
 `SinkFailed_base.hint`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -168,11 +194,15 @@ Host telemetry delivery failure. A remote failure can be ambiguous; reconcile wi
 
 ## Interfaces
 
+<a id="instrumentation"></a>
+
 ### Instrumentation
 
 The active loop's model-call telemetry seam.
 
 #### Properties
+
+<a id="emit"></a>
 
 ##### emit
 
@@ -187,6 +217,8 @@ The active loop's model-call telemetry seam.
 ###### Returns
 
 `Effect`\<`void`\>
+
+<a id="wrap"></a>
 
 ##### wrap
 
@@ -204,17 +236,23 @@ The active loop's model-call telemetry seam.
 
 ***
 
+<a id="summarycallcell"></a>
+
 ### SummaryCallCell
 
 Mutable cell recording the model call a compaction pass issued for its summary.
 
 #### Properties
 
+<a id="current"></a>
+
 ##### current
 
 > **current**: `string` \| `undefined`
 
 ## Type Aliases
+
+<a id="attemptcompleted"></a>
 
 ### AttemptCompleted
 
@@ -230,6 +268,8 @@ precede stream completion.
 
 ***
 
+<a id="attemptfailed"></a>
+
 ### AttemptFailed
 
 > **AttemptFailed** = *typeof* `AttemptFailed.Type`
@@ -237,6 +277,8 @@ precede stream completion.
 A provider invocation failed with a bounded category.
 
 ***
+
+<a id="attemptfirstoutput"></a>
 
 ### AttemptFirstOutput
 
@@ -247,6 +289,8 @@ most one event per kind. Text lifecycle starts and empty deltas do not count.
 
 ***
 
+<a id="attemptstarted"></a>
+
 ### AttemptStarted
 
 > **AttemptStarted** = *typeof* `AttemptStarted.Type`
@@ -255,6 +299,8 @@ One provider invocation within a model call began. `attempt` is 0-based.
 
 ***
 
+<a id="callcompleted"></a>
+
 ### CallCompleted
 
 > **CallCompleted** = *typeof* `CallCompleted.Type`
@@ -262,6 +308,8 @@ One provider invocation within a model call began. `attempt` is 0-based.
 The model call reached a successful terminal outcome.
 
 ***
+
+<a id="callfailed"></a>
 
 ### CallFailed
 
@@ -276,6 +324,8 @@ classification while the call reports `terminal`.
 
 ***
 
+<a id="callpurpose"></a>
+
 ### CallPurpose
 
 > **CallPurpose** = *typeof* `CallPurpose.Type`
@@ -283,6 +333,8 @@ classification while the call reports `terminal`.
 Bounded purpose of one model call issued by the loop.
 
 ***
+
+<a id="callstarted"></a>
 
 ### CallStarted
 
@@ -293,6 +345,8 @@ for one prepared input. All timestamps are epoch milliseconds sampled from
 the Effect Clock at the operation boundary.
 
 ***
+
+<a id="compactionapplied"></a>
 
 ### CompactionApplied
 
@@ -305,6 +359,8 @@ also carries this pass's `compactionId` on its `CallStarted` event.
 
 ***
 
+<a id="compactioncommit"></a>
+
 ### CompactionCommit
 
 > **CompactionCommit** = *typeof* `CompactionCommit.Type`
@@ -312,6 +368,8 @@ also carries this pass's `compactionId` on its `CallStarted` event.
 Atomic checkpoint record joining a compaction pass to its telemetry and projection.
 
 ***
+
+<a id="compactionfailed"></a>
 
 ### CompactionFailed
 
@@ -321,6 +379,8 @@ A compaction pass failed or was interrupted after work began.
 
 ***
 
+<a id="compactionkind"></a>
+
 ### CompactionKind
 
 > **CompactionKind** = *typeof* `CompactionKind.Type`
@@ -328,6 +388,8 @@ A compaction pass failed or was interrupted after work began.
 How a completed compaction pass reduced context.
 
 ***
+
+<a id="compactionskipped"></a>
 
 ### CompactionSkipped
 
@@ -337,6 +399,8 @@ A started compaction pass found no projection change to apply.
 
 ***
 
+<a id="compactionstarted"></a>
+
 ### CompactionStarted
 
 > **CompactionStarted** = *typeof* `CompactionStarted.Type`
@@ -344,6 +408,8 @@ A started compaction pass found no projection change to apply.
 A compaction pass that decided to do work began.
 
 ***
+
+<a id="compactiontrigger"></a>
 
 ### CompactionTrigger
 
@@ -353,6 +419,8 @@ What caused a compaction pass to run.
 
 ***
 
+<a id="deliverybatch"></a>
+
 ### DeliveryBatch
 
 > **DeliveryBatch** = *typeof* `DeliveryBatch.Type`
@@ -360,6 +428,8 @@ What caused a compaction pass to run.
 One ordered telemetry delivery batch scoped to its agent session.
 
 ***
+
+<a id="event"></a>
 
 ### Event
 
@@ -372,6 +442,8 @@ next event boundary or at stream end.
 
 ***
 
+<a id="eventpayload"></a>
+
 ### EventPayload
 
 > **EventPayload** = `WithoutDeliveryId`\<[`Event`](#event)\>
@@ -379,6 +451,8 @@ next event boundary or at stream end.
 Lifecycle payload before the run assigns its stable delivery identifier.
 
 ***
+
+<a id="failurecategory"></a>
 
 ### FailureCategory
 
@@ -388,6 +462,8 @@ Bounded provider-neutral model failure category.
 
 ***
 
+<a id="failureclassification"></a>
+
 ### FailureClassification
 
 > **FailureClassification** = *typeof* `FailureClassification.Type`
@@ -395,6 +471,8 @@ Bounded provider-neutral model failure category.
 Classification a retry decision was based on.
 
 ***
+
+<a id="failuredisposition"></a>
 
 ### FailureDisposition
 
@@ -404,6 +482,8 @@ Decision taken after a provider attempt failed.
 
 ***
 
+<a id="fallbackscheduled"></a>
+
 ### FallbackScheduled
 
 > **FallbackScheduled** = *typeof* `FallbackScheduled.Type`
@@ -411,6 +491,8 @@ Decision taken after a provider attempt failed.
 An unavailable candidate was exhausted before any replay-sensitive output escaped.
 
 ***
+
+<a id="firstoutputkind"></a>
 
 ### FirstOutputKind
 
@@ -420,11 +502,15 @@ Kind of the first output part produced by a model attempt.
 
 ***
 
+<a id="modelinvocationcompleted"></a>
+
 ### ModelInvocationCompleted
 
 > **ModelInvocationCompleted** = *typeof* `ModelInvocationCompleted.Type`
 
 ***
+
+<a id="modelinvocationfailed"></a>
 
 ### ModelInvocationFailed
 
@@ -432,11 +518,15 @@ Kind of the first output part produced by a model attempt.
 
 ***
 
+<a id="modelinvocationmethod"></a>
+
 ### ModelInvocationMethod
 
 > **ModelInvocationMethod** = *typeof* `ModelInvocationMethod.Type`
 
 ***
+
+<a id="modelinvocationstarted"></a>
 
 ### ModelInvocationStarted
 
@@ -444,11 +534,15 @@ Kind of the first output part produced by a model attempt.
 
 ***
 
+<a id="providerusage"></a>
+
 ### ProviderUsage
 
 > **ProviderUsage** = `ProviderUsageValue`
 
 ***
+
+<a id="retryreason"></a>
 
 ### RetryReason
 
@@ -457,6 +551,8 @@ Kind of the first output part produced by a model attempt.
 Bounded reason a model attempt retry was scheduled.
 
 ***
+
+<a id="retryscheduled"></a>
 
 ### RetryScheduled
 
@@ -467,6 +563,8 @@ A retry of the model call was accepted. `attempt` is the
 sleep. `delayMillis` is the accepted backoff delay.
 
 ## Variables
+
+<a id="attemptcompleted-1"></a>
 
 ### AttemptCompleted
 
@@ -482,6 +580,8 @@ precede stream completion.
 
 ***
 
+<a id="attemptfailed-1"></a>
+
 ### AttemptFailed
 
 > `const` **AttemptFailed**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFailed"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `category`: `Schema.Literals`\<readonly \[`"authentication"`, `"rate-limit"`, `"transport"`, `"provider-response"`, `"stream-decode"`, `"truncated-stream"`, `"context-overflow"`, `"invalid-tool-call"`, `"token-budget"`, `"timeout"`, `"cancellation"`, `"unknown"`\]\>; `classification`: `Schema.Literals`\<readonly \[`"transient"`, `"terminal"`\]\>; `deliveryId`: `Schema.String`; `disposition`: `Schema.Literals`\<readonly \[`"retry"`, `"fallback"`, `"terminal"`\]\>; `failedAt`: `Schema.Finite`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: `Schema.optionalKey`\<`Schema.Int`\>; `outputTokens`: `Schema.optionalKey`\<`Schema.Int`\>; `totalTokens`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>
@@ -489,6 +589,8 @@ precede stream completion.
 A provider invocation failed with a bounded category.
 
 ***
+
+<a id="attemptfirstoutput-1"></a>
 
 ### AttemptFirstOutput
 
@@ -499,6 +601,8 @@ most one event per kind. Text lifecycle starts and empty deltas do not count.
 
 ***
 
+<a id="attemptstarted-1"></a>
+
 ### AttemptStarted
 
 > `const` **AttemptStarted**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptStarted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>
@@ -507,6 +611,8 @@ One provider invocation within a model call began. `attempt` is 0-based.
 
 ***
 
+<a id="callcompleted-1"></a>
+
 ### CallCompleted
 
 > `const` **CallCompleted**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallCompleted"`\>; `attempts`: `Schema.Int`; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: `Schema.optionalKey`\<`Schema.Int`\>; `outputTokens`: `Schema.optionalKey`\<`Schema.Int`\>; `totalTokens`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[`"conversation"`, `"structured-output"`, `"compaction-summary"`\]\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>
@@ -514,6 +620,8 @@ One provider invocation within a model call began. `attempt` is 0-based.
 The model call reached a successful terminal outcome.
 
 ***
+
+<a id="callfailed-1"></a>
 
 ### CallFailed
 
@@ -528,6 +636,8 @@ classification while the call reports `terminal`.
 
 ***
 
+<a id="callpurpose-1"></a>
+
 ### CallPurpose
 
 > `const` **CallPurpose**: `Schema.Literals`\<readonly \[`"conversation"`, `"structured-output"`, `"compaction-summary"`\]\>
@@ -535,6 +645,8 @@ classification while the call reports `terminal`.
 Bounded purpose of one model call issued by the loop.
 
 ***
+
+<a id="callstarted-1"></a>
 
 ### CallStarted
 
@@ -545,6 +657,8 @@ for one prepared input. All timestamps are epoch milliseconds sampled from
 the Effect Clock at the operation boundary.
 
 ***
+
+<a id="classifyfailurecategory"></a>
 
 ### classifyFailureCategory
 
@@ -570,6 +684,8 @@ Map a model failure onto the bounded cross-provider category.
 
 ***
 
+<a id="compactionapplied-1"></a>
+
 ### CompactionApplied
 
 > `const` **CompactionApplied**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionApplied"`\>; `appliedAt`: `Schema.Finite`; `checkpointId`: `Schema.String`; `commit`: `Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `summaryModelCallId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"microcompact"`, `"summarize"`\]\>; `turn`: `Schema.Finite`; \}\>
@@ -581,6 +697,8 @@ also carries this pass's `compactionId` on its `CallStarted` event.
 
 ***
 
+<a id="compactioncommit-1"></a>
+
 ### CompactionCommit
 
 > `const` **CompactionCommit**: `Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `summaryModelCallId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
@@ -588,6 +706,8 @@ also carries this pass's `compactionId` on its `CallStarted` event.
 Atomic checkpoint record joining a compaction pass to its telemetry and projection.
 
 ***
+
+<a id="compactionfailed-1"></a>
 
 ### CompactionFailed
 
@@ -597,6 +717,8 @@ A compaction pass failed or was interrupted after work began.
 
 ***
 
+<a id="compactionkind-1"></a>
+
 ### CompactionKind
 
 > `const` **CompactionKind**: `Schema.Literals`\<readonly \[`"microcompact"`, `"summarize"`, `"unchanged"`\]\>
@@ -604,6 +726,8 @@ A compaction pass failed or was interrupted after work began.
 How a completed compaction pass reduced context.
 
 ***
+
+<a id="compactionskipped-1"></a>
 
 ### CompactionSkipped
 
@@ -613,6 +737,8 @@ A started compaction pass found no projection change to apply.
 
 ***
 
+<a id="compactionstarted-1"></a>
+
 ### CompactionStarted
 
 > `const` **CompactionStarted**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionStarted"`\>; `compactionId`: `Schema.String`; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `deliveryId`: `Schema.String`; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `startedAt`: `Schema.Finite`; `trigger`: `Schema.Literals`\<readonly \[`"threshold"`, `"overflow"`\]\>; `turn`: `Schema.Finite`; \}\>
@@ -620,6 +746,8 @@ A started compaction pass found no projection change to apply.
 A compaction pass that decided to do work began.
 
 ***
+
+<a id="compactiontrigger-1"></a>
 
 ### CompactionTrigger
 
@@ -629,6 +757,8 @@ What caused a compaction pass to run.
 
 ***
 
+<a id="currentcompactionid"></a>
+
 ### CurrentCompactionId
 
 > `const` **CurrentCompactionId**: `Context.Reference`\<`string` \| `undefined`\>
@@ -636,6 +766,8 @@ What caused a compaction pass to run.
 Compaction pass identifier stamped onto model calls it issues.
 
 ***
+
+<a id="currentinstrumentation"></a>
 
 ### CurrentInstrumentation
 
@@ -645,6 +777,8 @@ The instrumentation of the enclosing agent run, when present.
 
 ***
 
+<a id="currentpurpose"></a>
+
 ### CurrentPurpose
 
 > `const` **CurrentPurpose**: `Context.Reference`\<[`CallPurpose`](#callpurpose)\>
@@ -652,6 +786,8 @@ The instrumentation of the enclosing agent run, when present.
 Purpose stamped onto model calls issued within the current region.
 
 ***
+
+<a id="currentsummarycall"></a>
 
 ### CurrentSummaryCall
 
@@ -661,6 +797,8 @@ Cell a compaction pass provides to learn its summary model-call id.
 
 ***
 
+<a id="deliverybatch-1"></a>
+
 ### DeliveryBatch
 
 > `const` **DeliveryBatch**: `Schema.Struct`\<\{ `events`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallStarted"`\>; `compactionId`: `Schema.optionalKey`\<`Schema.String`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptStarted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFirstOutput"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptCompleted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `finishReason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerMetadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<...\>\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `requestId`: `Schema.optionalKey`\<`Schema.String`\>; `responseModel`: `Schema.optionalKey`\<`Schema.String`\>; `serviceTier`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: *typeof* `Response.Usage`; `usageAt`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFailed"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `classification`: `Schema.Literals`\<readonly \[..., ...\]\>; `deliveryId`: `Schema.String`; `disposition`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `failedAt`: `Schema.Finite`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelRetryScheduled"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `delayMillis`: `Schema.Finite`; `deliveryId`: `Schema.String`; `modelCallId`: `Schema.String`; `reason`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelFallbackScheduled"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `deliveryId`: `Schema.String`; `fromCandidate`: `Schema.Int`; `fromModel`: `Schema.String`; `fromProvider`: `Schema.String`; `fromRegistrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `modelCallId`: `Schema.String`; `toCandidate`: `Schema.Int`; `toModel`: `Schema.String`; `toProvider`: `Schema.String`; `toRegistrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallCompleted"`\>; `attempts`: `Schema.Int`; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[..., ..., ..., ..., ..., ..., ..., ...\]\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallFailed"`\>; `attempts`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `classification`: `Schema.Literals`\<readonly \[..., ...\]\>; `deliveryId`: `Schema.String`; `failedAt`: `Schema.Finite`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionStarted"`\>; `compactionId`: `Schema.String`; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `deliveryId`: `Schema.String`; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `startedAt`: `Schema.Finite`; `trigger`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionSkipped"`\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `skippedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionApplied"`\>; `appliedAt`: `Schema.Finite`; `checkpointId`: `Schema.String`; `commit`: `Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<...\>; `contextTokensBefore`: `Schema.optionalKey`\<...\>; `entriesAfter`: `Schema.optionalKey`\<...\>; `entriesBefore`: `Schema.optionalKey`\<...\>; `summaryModelCallId`: `Schema.optionalKey`\<...\>; \}\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionFailed"`\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `failedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>\]\>\>; `sessionId`: `Schema.String`; \}\>
@@ -668,6 +806,8 @@ Cell a compaction pass provides to learn its summary model-call id.
 One ordered telemetry delivery batch scoped to its agent session.
 
 ***
+
+<a id="event-1"></a>
 
 ### Event
 
@@ -680,6 +820,8 @@ next event boundary or at stream end.
 
 ***
 
+<a id="failurecategory-1"></a>
+
 ### FailureCategory
 
 > `const` **FailureCategory**: `Schema.Literals`\<readonly \[`"authentication"`, `"rate-limit"`, `"transport"`, `"provider-response"`, `"stream-decode"`, `"truncated-stream"`, `"context-overflow"`, `"invalid-tool-call"`, `"token-budget"`, `"timeout"`, `"cancellation"`, `"unknown"`\]\>
@@ -687,6 +829,8 @@ next event boundary or at stream end.
 Bounded provider-neutral model failure category.
 
 ***
+
+<a id="failureclassification-1"></a>
 
 ### FailureClassification
 
@@ -696,6 +840,8 @@ Classification a retry decision was based on.
 
 ***
 
+<a id="failuredisposition-1"></a>
+
 ### FailureDisposition
 
 > `const` **FailureDisposition**: `Schema.Literals`\<readonly \[`"retry"`, `"fallback"`, `"terminal"`\]\>
@@ -703,6 +849,8 @@ Classification a retry decision was based on.
 Decision taken after a provider attempt failed.
 
 ***
+
+<a id="fallbackscheduled-1"></a>
 
 ### FallbackScheduled
 
@@ -712,6 +860,8 @@ An unavailable candidate was exhausted before any replay-sensitive output escape
 
 ***
 
+<a id="firstoutputkind-1"></a>
+
 ### FirstOutputKind
 
 > `const` **FirstOutputKind**: `Schema.Literals`\<readonly \[`"reasoning"`, `"text"`, `"tool-call"`\]\>
@@ -720,6 +870,8 @@ Kind of the first output part produced by a model attempt.
 
 ***
 
+<a id="generateid"></a>
+
 ### generateId
 
 > `const` **generateId**: `Effect.Effect`\<`string`\>
@@ -727,6 +879,8 @@ Kind of the first output part produced by a model attempt.
 Generate one telemetry identifier via `IdGenerator`, defaulting when absent.
 
 ***
+
+<a id="isinvocationlifecyclefailed"></a>
 
 ### isInvocationLifecycleFailed
 
@@ -750,11 +904,15 @@ Generate one telemetry identifier via `IdGenerator`, defaulting when absent.
 
 ***
 
+<a id="layerinvocationlifecyclenoop"></a>
+
 ### layerInvocationLifecycleNoop
 
 > `const` **layerInvocationLifecycleNoop**: `Layer.Layer`\<[`InvocationLifecycle`](#invocationlifecycle)\>
 
 ***
+
+<a id="layersinknoop"></a>
 
 ### layerSinkNoop
 
@@ -764,11 +922,15 @@ No-op host delivery sink.
 
 ***
 
+<a id="modelinvocationcompleted-1"></a>
+
 ### ModelInvocationCompleted
 
 > `const` **ModelInvocationCompleted**: `Schema.Struct`\<\{ `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `completedAt`: `Schema.Finite`; `finishReason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `logicalOperationId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerMetadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `requestId`: `Schema.optionalKey`\<`Schema.String`\>; `responseModel`: `Schema.optionalKey`\<`Schema.String`\>; `usage`: *typeof* `Response.Usage`; \}\>
 
 ***
+
+<a id="modelinvocationfailed-1"></a>
 
 ### ModelInvocationFailed
 
@@ -776,11 +938,15 @@ No-op host delivery sink.
 
 ***
 
+<a id="modelinvocationmethod-1"></a>
+
 ### ModelInvocationMethod
 
 > `const` **ModelInvocationMethod**: `Schema.Literals`\<readonly \[`"generateText"`, `"generateObject"`, `"streamText"`\]\>
 
 ***
+
+<a id="modelinvocationstarted-1"></a>
 
 ### ModelInvocationStarted
 
@@ -788,11 +954,15 @@ No-op host delivery sink.
 
 ***
 
+<a id="providerusage-1"></a>
+
 ### ProviderUsage
 
 > `const` **ProviderUsage**: `Schema.Struct`\<\{ `inputTokens`: `Schema.optionalKey`\<`Schema.Int`\>; `outputTokens`: `Schema.optionalKey`\<`Schema.Int`\>; `totalTokens`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>
 
 ***
+
+<a id="retryreason-1"></a>
 
 ### RetryReason
 
@@ -801,6 +971,8 @@ No-op host delivery sink.
 Bounded reason a model attempt retry was scheduled.
 
 ***
+
+<a id="retryscheduled-1"></a>
 
 ### RetryScheduled
 

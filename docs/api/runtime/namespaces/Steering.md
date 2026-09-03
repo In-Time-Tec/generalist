@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="executioncontinuation"></a>
+
 ### ExecutionContinuation
 
 > **ExecutionContinuation** = *typeof* `ExecutionContinuation.Type`
@@ -15,6 +17,8 @@
 Durable reconstruction data for a steering-driven turn.
 
 ***
+
+<a id="messagesource"></a>
 
 ### MessageSource
 
@@ -24,6 +28,8 @@ Authoritative identity that admitted one inbox message.
 
 ***
 
+<a id="steeringentry"></a>
+
 ### SteeringEntry
 
 > **SteeringEntry** = *typeof* `SteeringEntry.Type`
@@ -32,6 +38,8 @@ One pending durable inbox entry.
 
 ***
 
+<a id="steeringreceipt"></a>
+
 ### SteeringReceipt
 
 > **SteeringReceipt** = *typeof* `SteeringReceipt.Type`
@@ -39,6 +47,8 @@ One pending durable inbox entry.
 Stable identity returned for durable steering admission and every identical retry.
 
 ## Variables
+
+<a id="decodecontinuation"></a>
 
 ### decodeContinuation
 
@@ -55,6 +65,8 @@ Stable identity returned for durable steering admission and every identical retr
 [`ExecutionContinuation`](#executioncontinuation)
 
 ***
+
+<a id="digest"></a>
 
 ### digest
 
@@ -88,6 +100,8 @@ Stable digest used for inbox idempotency.
 
 ***
 
+<a id="encodecontinuation"></a>
+
 ### encodeContinuation
 
 > `const` **encodeContinuation**: (`continuation`) => `string`
@@ -104,6 +118,8 @@ Stable digest used for inbox idempotency.
 
 ***
 
+<a id="executioncontinuation-1"></a>
+
 ### ExecutionContinuation
 
 > `const` **ExecutionContinuation**: `Schema.Struct`\<\{ `nextTurn`: `Schema.Int`; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `queue`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>\>; `schemaVersion`: `Schema.Literal`\<`1`\>; `steeringEntryIds`: `Schema.$Array`\<`Schema.String`\>; \}\>
@@ -111,6 +127,8 @@ Stable digest used for inbox idempotency.
 Durable reconstruction data for a steering-driven turn.
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -120,6 +138,8 @@ Handlers for `toolkit()`, backed by the Runtime-owned messaging service.
 
 ***
 
+<a id="messagesource-1"></a>
+
 ### MessageSource
 
 > `const` **MessageSource**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `runId`: `Schema.String`; \}\>, `Schema.Struct`\<\{ `user`: `Schema.String`; \}\>, `Schema.Struct`\<\{ `system`: `Schema.Literal`\<`true`\>; \}\>\]\>
@@ -127,6 +147,8 @@ Handlers for `toolkit()`, backed by the Runtime-owned messaging service.
 Authoritative identity that admitted one inbox message.
 
 ***
+
+<a id="steeringentry-1"></a>
 
 ### SteeringEntry
 
@@ -136,6 +158,8 @@ One pending durable inbox entry.
 
 ***
 
+<a id="steeringreceipt-1"></a>
+
 ### SteeringReceipt
 
 > `const` **SteeringReceipt**: `Schema.Struct`\<\{ `entryId`: `Schema.String`; `sequence`: `Schema.Int`; \}\>
@@ -143,6 +167,8 @@ One pending durable inbox entry.
 Stable identity returned for durable steering admission and every identical retry.
 
 ***
+
+<a id="toolkit"></a>
 
 ### toolkit
 
@@ -156,11 +182,15 @@ Effect AI tools for messaging direct children and parents and inspecting this Ru
 
 ## References
 
+<a id="admissionpolicy"></a>
+
 ### AdmissionPolicy
 
 Re-exports [AdmissionPolicy](../../generalist/namespaces/Steering#admissionpolicy-1)
 
 ***
+
+<a id="defaultcapacity"></a>
 
 ### defaultCapacity
 
@@ -168,17 +198,23 @@ Re-exports [defaultCapacity](../../generalist/namespaces/Steering#defaultcapacit
 
 ***
 
+<a id="defaultmaxpendingbytes"></a>
+
 ### defaultMaxPendingBytes
 
 Re-exports [defaultMaxPendingBytes](../../generalist/namespaces/Steering#defaultmaxpendingbytes)
 
 ***
 
+<a id="inboxfull"></a>
+
 ### InboxFull
 
 Re-exports [InboxFull](../../generalist/namespaces/Steering#inboxfull)
 
 ***
+
+<a id="promptbytes"></a>
 
 ### promptBytes
 

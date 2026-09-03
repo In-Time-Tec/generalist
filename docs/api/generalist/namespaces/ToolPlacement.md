@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="placementrequest"></a>
+
 ### PlacementRequest
 
 #### Extends
@@ -20,6 +22,8 @@
 
 #### Properties
 
+<a id="agentname"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -27,6 +31,8 @@
 ###### Inherited from
 
 [`Request`](./ToolExecutor#request).[`agentName`](./ToolExecutor#agentname)
+
+<a id="call"></a>
 
 ##### call
 
@@ -36,9 +42,13 @@
 
 [`Request`](./ToolExecutor#request).[`call`](./ToolExecutor#call)
 
+<a id="placement"></a>
+
 ##### placement
 
 > `readonly` **placement**: [`Placement`](#placement-2)
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -48,6 +58,8 @@
 
 [`Request`](./ToolExecutor#request).[`sessionId`](./ToolExecutor#sessionid-1)
 
+<a id="tasks"></a>
+
 ##### tasks?
 
 > `readonly` `optional` **tasks?**: readonly `object`[]
@@ -56,9 +68,13 @@
 
 [`Request`](./ToolExecutor#request).[`tasks`](./ToolExecutor#tasks)
 
+<a id="tool"></a>
+
 ##### tool
 
 > `readonly` **tool**: `Any`
+
+<a id="toolcallbatch"></a>
 
 ##### toolCallBatch
 
@@ -72,6 +88,8 @@
 
 [`Request`](./ToolExecutor#request).[`toolCallBatch`](./ToolExecutor#toolcallbatch)
 
+<a id="toolcallindex"></a>
+
 ##### toolCallIndex
 
 > `readonly` **toolCallIndex**: `number`
@@ -79,6 +97,8 @@
 ###### Inherited from
 
 [`Request`](./ToolExecutor#request).[`toolCallIndex`](./ToolExecutor#toolcallindex)
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -89,6 +109,8 @@
 [`Request`](./ToolExecutor#request).[`turn`](./ToolExecutor#turn)
 
 ***
+
+<a id="placementrouteoptions"></a>
 
 ### PlacementRouteOptions
 
@@ -108,6 +130,8 @@
 
 #### Properties
 
+<a id="execute"></a>
+
 ##### execute
 
 > `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
@@ -122,15 +146,21 @@
 
 `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
+<a id="toolkit"></a>
+
 ##### toolkit
 
 > `readonly` **toolkit**: `PlacementToolkit`\<`Tools`\>
+
+<a id="tools-1"></a>
 
 ##### tools?
 
 > `readonly` `optional` **tools?**: readonly `string`[]
 
 ***
+
+<a id="remoteplacementrequest"></a>
 
 ### RemotePlacementRequest
 
@@ -142,6 +172,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 
 #### Properties
 
+<a id="agentname-1"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
@@ -149,6 +181,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 ###### Inherited from
 
 [`PlacementRequest`](#placementrequest).[`agentName`](#agentname)
+
+<a id="call-1"></a>
 
 ##### call
 
@@ -158,9 +192,13 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 
 [`PlacementRequest`](#placementrequest).[`call`](#call)
 
+<a id="operationkey"></a>
+
 ##### operationKey
 
 > `readonly` **operationKey**: `string`
+
+<a id="placement-1"></a>
 
 ##### placement
 
@@ -170,6 +208,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 
 [`PlacementRequest`](#placementrequest).[`placement`](#placement)
 
+<a id="sessionid-1"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
@@ -177,6 +217,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 ###### Inherited from
 
 [`PlacementRequest`](#placementrequest).[`sessionId`](#sessionid)
+
+<a id="tasks-1"></a>
 
 ##### tasks?
 
@@ -186,6 +228,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 
 [`PlacementRequest`](#placementrequest).[`tasks`](#tasks)
 
+<a id="tool-1"></a>
+
 ##### tool
 
 > `readonly` **tool**: `Any`
@@ -193,6 +237,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 ###### Inherited from
 
 [`PlacementRequest`](#placementrequest).[`tool`](#tool)
+
+<a id="toolcallbatch-1"></a>
 
 ##### toolCallBatch
 
@@ -206,6 +252,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 
 [`PlacementRequest`](#placementrequest).[`toolCallBatch`](#toolcallbatch)
 
+<a id="toolcallindex-1"></a>
+
 ##### toolCallIndex
 
 > `readonly` **toolCallIndex**: `number`
@@ -213,6 +261,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 ###### Inherited from
 
 [`PlacementRequest`](#placementrequest).[`toolCallIndex`](#toolcallindex)
+
+<a id="turn-1"></a>
 
 ##### turn
 
@@ -223,6 +273,8 @@ An idempotent remote placement request carrying its endpoint deduplication key.
 [`PlacementRequest`](#placementrequest).[`turn`](#turn)
 
 ***
+
+<a id="remoterouteidempotentoptions"></a>
 
 ### RemoteRouteIdempotentOptions
 
@@ -240,6 +292,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 #### Properties
 
+<a id="execute-1"></a>
+
 ##### execute
 
 > `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
@@ -254,13 +308,19 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
+<a id="idempotent"></a>
+
 ##### idempotent
 
 > `readonly` **idempotent**: `true`
 
+<a id="maxretries"></a>
+
 ##### maxRetries
 
 > `readonly` **maxRetries**: `number`
+
+<a id="operationkey-1"></a>
 
 ##### operationKey
 
@@ -276,19 +336,27 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 `string`
 
+<a id="schedule"></a>
+
 ##### schedule
 
 > `readonly` **schedule**: `Schedule`\<`unknown`, `E`\>
 
+<a id="toolkit-1"></a>
+
 ##### toolkit
 
 > `readonly` **toolkit**: `PlacementToolkit`\<`Tools`\>
+
+<a id="tools-3"></a>
 
 ##### tools?
 
 > `readonly` `optional` **tools?**: readonly `string`[]
 
 ***
+
+<a id="remoteroutenonidempotentoptions"></a>
 
 ### RemoteRouteNonIdempotentOptions
 
@@ -308,6 +376,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 #### Properties
 
+<a id="execute-2"></a>
+
 ##### execute
 
 > `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
@@ -326,13 +396,19 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 [`PlacementRouteOptions`](#placementrouteoptions).[`execute`](#execute)
 
+<a id="idempotent-1"></a>
+
 ##### idempotent?
 
 > `readonly` `optional` **idempotent?**: `false`
 
+<a id="schedule-1"></a>
+
 ##### schedule?
 
 > `readonly` `optional` **schedule?**: `Schedule`\<`unknown`, `unknown`, `never`, `never`\>
+
+<a id="toolkit-2"></a>
 
 ##### toolkit
 
@@ -341,6 +417,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 ###### Inherited from
 
 [`PlacementRouteOptions`](#placementrouteoptions).[`toolkit`](#toolkit)
+
+<a id="tools-5"></a>
 
 ##### tools?
 
@@ -352,6 +430,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ***
 
+<a id="route"></a>
+
 ### Route
 
 #### Type Parameters
@@ -361,6 +441,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 `R` = [`ToolContext`](./ToolContext#toolcontext)
 
 #### Properties
+
+<a id="cancel"></a>
 
 ##### cancel?
 
@@ -376,6 +458,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 `Effect`\<[`CancellationOutcome`](./ToolExecutor#cancellationoutcome), [`CancellationFailure`](./ToolExecutor#cancellationfailure), `R`\>
 
+<a id="execute-3"></a>
+
 ##### execute
 
 > `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
@@ -389,6 +473,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 ###### Returns
 
 `Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
+
+<a id="matches"></a>
 
 ##### matches
 
@@ -404,6 +490,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 `boolean`
 
+<a id="replaypolicy"></a>
+
 ##### replayPolicy?
 
 > `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
@@ -418,11 +506,15 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 [`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
 
+<a id="tools-6"></a>
+
 ##### tools
 
 > `readonly` **tools**: readonly `string`[]
 
 ***
+
+<a id="routeoptions"></a>
 
 ### RouteOptions
 
@@ -433,6 +525,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 `R` = [`ToolContext`](./ToolContext#toolcontext)
 
 #### Properties
+
+<a id="cancel-1"></a>
 
 ##### cancel?
 
@@ -448,6 +542,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 `Effect`\<[`CancellationOutcome`](./ToolExecutor#cancellationoutcome), [`CancellationFailure`](./ToolExecutor#cancellationfailure), `R`\>
 
+<a id="execute-4"></a>
+
 ##### execute
 
 > `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
@@ -461,6 +557,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 ###### Returns
 
 `Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
+
+<a id="matches-1"></a>
 
 ##### matches?
 
@@ -476,6 +574,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 `boolean`
 
+<a id="replaypolicy-1"></a>
+
 ##### replayPolicy?
 
 > `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
@@ -490,11 +590,15 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 [`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
 
+<a id="tools-7"></a>
+
 ##### tools?
 
 > `readonly` `optional` **tools?**: readonly `string`[]
 
 ## Type Aliases
+
+<a id="placement-2"></a>
 
 ### Placement
 
@@ -502,11 +606,15 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ***
 
+<a id="placementresponse"></a>
+
 ### PlacementResponse
 
 > **PlacementResponse** = \{ `_tag`: `"Success"`; `result`: `unknown`; \} \| \{ `_tag`: `"DomainFailure"`; `failure`: `unknown`; \} \| \{ `_tag`: `"Suspend"`; `token`: `string`; \}
 
 ***
+
+<a id="remoterouteoptions"></a>
 
 ### RemoteRouteOptions
 
@@ -524,6 +632,8 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ***
 
+<a id="routeinput"></a>
+
 ### RouteInput
 
 > **RouteInput**\<`R`\> = [`Route`](#route)\<`R`\> \| `Effect.Effect`\<[`Route`](#route)\<`R`\>, `never`, `R`\>
@@ -536,11 +646,15 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ## Variables
 
+<a id="placementoutcome"></a>
+
 ### placementOutcome
 
 > `const` **placementOutcome**: `object`
 
 #### Type Declaration
+
+<a id="fromresponse"></a>
 
 ##### fromResponse
 

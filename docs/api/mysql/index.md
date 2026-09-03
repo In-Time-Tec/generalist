@@ -12,6 +12,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 #### Extends
@@ -19,6 +21,8 @@
 - [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions)
 
 #### Properties
+
+<a id="activationprojection"></a>
 
 ##### activationProjection?
 
@@ -30,6 +34,8 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions).[`activationProjection`](../runtime.sql-driver/index#activationprojection-1)
 
+<a id="addresses"></a>
+
 ##### addresses
 
 > `readonly` **addresses**: readonly [`AddressBinding`](../runtime/namespaces/Runtime#addressbinding)[]
@@ -38,9 +44,13 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions).[`addresses`](../runtime.sql-driver/index#addresses-1)
 
+<a id="maxconnections"></a>
+
 ##### maxConnections?
 
 > `readonly` `optional` **maxConnections?**: `number`
+
+<a id="messagingpolicy"></a>
 
 ##### messagingPolicy?
 
@@ -52,9 +62,13 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions).[`messagingPolicy`](../runtime.sql-driver/index#messagingpolicy-1)
 
+<a id="pollinterval"></a>
+
 ##### pollInterval?
 
 > `readonly` `optional` **pollInterval?**: `Input`
+
+<a id="scheduler"></a>
 
 ##### scheduler?
 
@@ -72,6 +86,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions).[`scheduler`](../runtime.sql-driver/index#scheduler-1)
 
+<a id="source"></a>
+
 ##### source?
 
 > `readonly` `optional` **source?**: `string`
@@ -79,6 +95,8 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Overrides
 
 [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions).[`source`](../runtime.sql-driver/index#source-6)
+
+<a id="subscriberqueuecapacity"></a>
 
 ##### subscriberQueueCapacity?
 
@@ -88,17 +106,23 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`SqlStoreOptions`](../runtime.sql-driver/index#sqlstoreoptions).[`subscriberQueueCapacity`](../runtime.sql-driver/index#subscriberqueuecapacity-1)
 
+<a id="url"></a>
+
 ##### url
 
 > `readonly` **url**: `string`
 
 ## Type Aliases
 
+<a id="runtimeerror"></a>
+
 ### RuntimeError
 
 > **RuntimeError** = [`SqlDriverStoreError`](../runtime.sql-driver/index#sqldriverstoreerror)
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 

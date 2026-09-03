@@ -8,21 +8,29 @@
 
 ## Interfaces
 
+<a id="checkpoint"></a>
+
 ### Checkpoint
 
 Atomic point-in-time tree inspection and exclusive replay cursor.
 
 #### Properties
 
+<a id="cursor"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
+
+<a id="inspection"></a>
 
 ##### inspection
 
 > `readonly` **inspection**: [`Inspection`](#inspection-1)
 
 ***
+
+<a id="eventsinput"></a>
 
 ### EventsInput
 
@@ -32,15 +40,21 @@ Atomic point-in-time tree inspection and exclusive replay cursor.
 
 #### Properties
 
+<a id="cursor-1"></a>
+
 ##### cursor?
 
 > `readonly` `optional` **cursor?**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
+
+<a id="rootrunid"></a>
 
 ##### rootRunId
 
 > `readonly` **rootRunId**: `string`
 
 ***
+
+<a id="replayinput"></a>
 
 ### ReplayInput
 
@@ -48,19 +62,27 @@ Bounded replay strictly after an optional root-bound cursor.
 
 #### Properties
 
+<a id="cursor-2"></a>
+
 ##### cursor?
 
 > `readonly` `optional` **cursor?**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
 
+<a id="limit"></a>
+
 ##### limit
 
 > `readonly` **limit**: `number`
+
+<a id="rootrunid-1"></a>
 
 ##### rootRunId
 
 > `readonly` **rootRunId**: `string`
 
 ***
+
+<a id="replaypage"></a>
 
 ### ReplayPage
 
@@ -68,13 +90,19 @@ One bounded, ordered page read strictly after the requested cursor.
 
 #### Properties
 
+<a id="cursor-3"></a>
+
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
 
+<a id="events"></a>
+
 ##### events
 
 > `readonly` **events**: readonly [`TreeEvent`](#treeevent)[]
+
+<a id="hasmore"></a>
 
 ##### hasMore
 
@@ -82,41 +110,61 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ***
 
+<a id="treeevent"></a>
+
 ### TreeEvent
 
 #### Properties
+
+<a id="cursor-4"></a>
 
 ##### cursor
 
 > `readonly` **cursor**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
 
+<a id="event"></a>
+
 ##### event
 
 > `readonly` **event**: [`RunEvent`](./RunEvent#runevent)
+
+<a id="invocationid"></a>
 
 ##### invocationId?
 
 > `readonly` `optional` **invocationId?**: `string`
 
+<a id="modelattemptid"></a>
+
 ##### modelAttemptId?
 
 > `readonly` `optional` **modelAttemptId?**: `string`
+
+<a id="modelcallid"></a>
 
 ##### modelCallId?
 
 > `readonly` `optional` **modelCallId?**: `string`
 
+<a id="parentrunid"></a>
+
 ##### parentRunId?
 
 > `readonly` `optional` **parentRunId?**: `string`
+
+<a id="rootrunid-2"></a>
 
 ##### rootRunId
 
 > `readonly` **rootRunId**: `string`
 
+<a id="runid"></a>
+
 ##### runId
 
 > `readonly` **runId**: `string`
+
+<a id="toolcallid"></a>
 
 ##### toolCallId?
 
@@ -124,27 +172,39 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ***
 
+<a id="treeruninspection"></a>
+
 ### TreeRunInspection
 
 #### Properties
+
+<a id="invocationid-1"></a>
 
 ##### invocationId?
 
 > `readonly` `optional` **invocationId?**: `string`
 
+<a id="outcome"></a>
+
 ##### outcome?
 
 > `readonly` `optional` **outcome?**: [`RunOutcome`](./Run#runoutcome)
 
+<a id="parentrunid-1"></a>
+
 ##### parentRunId?
 
 > `readonly` `optional` **parentRunId?**: `string`
+
+<a id="run"></a>
 
 ##### run
 
 > `readonly` **run**: [`RunInspection`](./Run#runinspection)
 
 ***
+
+<a id="watchinput"></a>
 
 ### WatchInput
 
@@ -154,6 +214,8 @@ One bounded, ordered page read strictly after the requested cursor.
 
 #### Properties
 
+<a id="cursor-5"></a>
+
 ##### cursor?
 
 > `readonly` `optional` **cursor?**: `string` & `Brand`\<`"generalist/runtime/TreeCursor"`\>
@@ -161,6 +223,8 @@ One bounded, ordered page read strictly after the requested cursor.
 ###### Inherited from
 
 [`EventsInput`](#eventsinput).[`cursor`](#cursor-1)
+
+<a id="rootrunid-3"></a>
 
 ##### rootRunId
 
@@ -170,11 +234,15 @@ One bounded, ordered page read strictly after the requested cursor.
 
 [`EventsInput`](#eventsinput).[`rootRunId`](#rootrunid)
 
+<a id="settlement"></a>
+
 ##### settlement?
 
 > `readonly` `optional` **settlement?**: `"tree-terminal"` \| `"root-blocked"`
 
 ## Type Aliases
+
+<a id="inspection-1"></a>
 
 ### Inspection
 
@@ -182,11 +250,15 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ***
 
+<a id="treecursor"></a>
+
 ### TreeCursor
 
 > **TreeCursor** = *typeof* `TreeCursor.Type`
 
 ## Variables
+
+<a id="awaitterminal"></a>
 
 ### awaitTerminal
 
@@ -203,6 +275,8 @@ One bounded, ordered page read strictly after the requested cursor.
 `Effect.Effect`\<`Extract`\<[`Inspection`](#inspection-1), \{ `_tag`: `"Terminal"`; \}\>, [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
 
 ***
+
+<a id="checkpoint-1"></a>
 
 ### checkpoint
 
@@ -222,11 +296,15 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ***
 
+<a id="checkpoint-2"></a>
+
 ### Checkpoint
 
 > **Checkpoint**: `Codec`\<[`Checkpoint`](#checkpoint), `CheckpointEncoded`, `never`, `never`\>
 
 ***
+
+<a id="encodecheckpoint"></a>
 
 ### encodeCheckpoint
 
@@ -266,6 +344,8 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ***
 
+<a id="encodeinspection"></a>
+
 ### encodeInspection
 
 > `const` **encodeInspection**: \{(`input`, `options?`): `Effect`\<`InspectionEncoded`, `SchemaError`\>; (`options?`): (`input`) => `Effect`\<`InspectionEncoded`, `SchemaError`\>; \}
@@ -303,6 +383,8 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 (`input`) => `Effect`\<`InspectionEncoded`, `SchemaError`\>
 
 ***
+
+<a id="encodereplaypage"></a>
 
 ### encodeReplayPage
 
@@ -342,6 +424,8 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ***
 
+<a id="encodetreeevent"></a>
+
 ### encodeTreeEvent
 
 > `const` **encodeTreeEvent**: \{(`input`, `options?`): `Effect`\<`TreeEventEncoded`, `SchemaError`\>; (`options?`): (`input`) => `Effect`\<`TreeEventEncoded`, `SchemaError`\>; \}
@@ -380,6 +464,8 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ***
 
+<a id="events-1"></a>
+
 ### events
 
 > `const` **events**: (`input`) => `Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
@@ -396,11 +482,15 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ***
 
+<a id="inspection-2"></a>
+
 ### Inspection
 
 > **Inspection**: `Codec`\<[`Inspection`](#inspection-1), `InspectionEncoded`, `never`, `never`\>
 
 ***
+
+<a id="replay"></a>
 
 ### replay
 
@@ -420,11 +510,15 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 ***
 
+<a id="replaypage-1"></a>
+
 ### ReplayPage
 
 > **ReplayPage**: `Codec`\<[`ReplayPage`](#replaypage), `ReplayPageEncoded`, `never`, `never`\>
 
 ***
+
+<a id="treecursor-1"></a>
 
 ### TreeCursor
 
@@ -432,17 +526,23 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 ***
 
+<a id="treeevent-1"></a>
+
 ### TreeEvent
 
 > **TreeEvent**: `Codec`\<[`TreeEvent`](#treeevent), `TreeEventEncoded`, `never`, `never`\>
 
 ***
 
+<a id="treeruninspection-1"></a>
+
 ### TreeRunInspection
 
 > **TreeRunInspection**: `Codec`\<[`TreeRunInspection`](#treeruninspection), `TreeRunInspectionEncoded`, `never`, `never`\>
 
 ***
+
+<a id="watch"></a>
 
 ### watch
 
@@ -459,6 +559,8 @@ Read one bounded, ordered page strictly after the supplied cursor.
 `Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
 
 ## Functions
+
+<a id="decodecheckpoint"></a>
 
 ### decodeCheckpoint()
 
@@ -496,6 +598,8 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 ***
 
+<a id="decodeinspection"></a>
+
 ### decodeInspection()
 
 #### Call Signature
@@ -532,6 +636,8 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 ***
 
+<a id="decodereplaypage"></a>
+
 ### decodeReplayPage()
 
 #### Call Signature
@@ -567,6 +673,8 @@ Read one bounded, ordered page strictly after the supplied cursor.
 (`input`) => `Effect`\<[`ReplayPage`](#replaypage), `SchemaError`\>
 
 ***
+
+<a id="decodetreeevent"></a>
 
 ### decodeTreeEvent()
 

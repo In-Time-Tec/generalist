@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="supermemoryerror"></a>
+
 ### SupermemoryError
 
 Supermemory HTTP API failure.
@@ -17,6 +19,8 @@ Supermemory HTTP API failure.
 - `SupermemoryError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ Supermemory HTTP API failure.
 
 #### Properties
 
+<a id="body"></a>
+
 ##### body
 
 > `readonly` **body**: `string`
@@ -46,6 +52,8 @@ Supermemory HTTP API failure.
 
 `SupermemoryError_base.body`
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -53,6 +61,8 @@ Supermemory HTTP API failure.
 ###### Inherited from
 
 `SupermemoryError_base.hint`
+
+<a id="status"></a>
 
 ##### status
 
@@ -64,19 +74,27 @@ Supermemory HTTP API failure.
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Hosted Supermemory configuration.
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Config`\<`Redacted`\<`string`\>\>
 
+<a id="containertag"></a>
+
 ##### containerTag
 
 > `readonly` **containerTag**: `string`
+
+<a id="containertagforkey"></a>
 
 ##### containerTagForKey?
 
@@ -92,19 +110,27 @@ Hosted Supermemory configuration.
 
 `string`
 
+<a id="endpoint"></a>
+
 ##### endpoint?
 
 > `readonly` `optional` **endpoint?**: `string`
 
+<a id="limit"></a>
+
 ##### limit?
 
 > `readonly` `optional` **limit?**: `number`
+
+<a id="threshold"></a>
 
 ##### threshold?
 
 > `readonly` `optional` **threshold?**: `number`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 

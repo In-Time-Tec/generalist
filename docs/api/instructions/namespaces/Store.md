@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="store"></a>
+
 ### Store
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Store_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 ***
 
+<a id="storeerror"></a>
+
 ### StoreError
 
 A guidance store operation failed.
@@ -45,6 +51,8 @@ A guidance store operation failed.
 - `StoreError_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -66,6 +74,8 @@ A guidance store operation failed.
 
 #### Properties
 
+<a id="cause"></a>
+
 ##### cause?
 
 > `readonly` `optional` **cause?**: `unknown`
@@ -73,6 +83,8 @@ A guidance store operation failed.
 ###### Inherited from
 
 `StoreError_base.cause`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -82,6 +94,8 @@ A guidance store operation failed.
 
 `StoreError_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -90,6 +104,8 @@ A guidance store operation failed.
 
 `StoreError_base.message`
 
+<a id="reason"></a>
+
 ##### reason
 
 > `readonly` **reason**: `"corrupt"` \| `"encode"` \| `"unreadable"` \| `"unwritable"`
@@ -97,6 +113,8 @@ A guidance store operation failed.
 ###### Inherited from
 
 `StoreError_base.reason`
+
+<a id="scope"></a>
 
 ##### scope
 
@@ -108,11 +126,15 @@ A guidance store operation failed.
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 Durable instruction state seam, keyed by scope.
 
 #### Properties
+
+<a id="load"></a>
 
 ##### load
 
@@ -127,6 +149,8 @@ Durable instruction state seam, keyed by scope.
 ###### Returns
 
 `Effect`\<\{ `entries`: \{ `memory`: readonly `object`[]; `prompt`: readonly `object`[]; `skill`: readonly `object`[]; `subagent`: readonly `object`[]; \}; `refinements`: readonly `object`[]; `schemaVersion`: `"1"`; `scope`: `string`; \}, [`StoreError`](#storeerror)\>
+
+<a id="save"></a>
 
 ##### save
 
@@ -174,6 +198,8 @@ readonly `object`[]
 
 ## Type Aliases
 
+<a id="storerejection"></a>
+
 ### StoreRejection
 
 > **StoreRejection** = *typeof* `StoreRejection.Type`
@@ -182,6 +208,8 @@ Why one guidance store operation failed.
 
 ## Variables
 
+<a id="layermemory"></a>
+
 ### layerMemory
 
 > `const` **layerMemory**: `Layer.Layer`\<[`Store`](#store)\>
@@ -189,6 +217,8 @@ Why one guidance store operation failed.
 An in-process store that starts empty and never persists beyond its own scope.
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -205,6 +235,8 @@ An in-process store that starts empty and never persists beyond its own scope.
 `Layer.Layer`\<[`Store`](#store)\>
 
 ***
+
+<a id="storerejection-1"></a>
 
 ### StoreRejection
 

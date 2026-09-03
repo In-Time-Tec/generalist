@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="modelmiddleware"></a>
+
 ### ModelMiddleware
 
 Service holding the middleware chain, applied in array order.
@@ -17,6 +19,8 @@ Service holding the middleware chain, applied in array order.
 - `ModelMiddleware_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,11 +42,15 @@ Service holding the middleware chain, applied in array order.
 
 ## Interfaces
 
+<a id="middleware"></a>
+
 ### Middleware
 
 A single middleware. Both hooks are optional; omitted hooks are identity.
 
 #### Properties
+
+<a id="transformpart"></a>
 
 ##### transformPart?
 
@@ -67,6 +75,8 @@ is a middleware bug; the loop fails the run with MiddlewareViolation if it happe
 
 `Effect`\<`Option`\<`StreamPart`\<`Record`\<`string`, `Any`\>, `false`\>\>, [`HookFailed`](../../hooks#hookfailed) \| [`AgentError`](./AgentEvent#agenterror)\>
 
+<a id="transformprompt"></a>
+
 ##### transformPrompt?
 
 > `readonly` `optional` **transformPrompt?**: (`prompt`, `context`) => `Effect`\<`Prompt`, [`HookFailed`](../../hooks#hookfailed) \| [`AgentError`](./AgentEvent#agenterror)\>
@@ -89,21 +99,29 @@ Transform the prompt for a turn before it is sent to the model. Recalled-memory 
 
 ***
 
+<a id="turncontext"></a>
+
 ### TurnContext
 
 Turn-scoped info handed to middleware.
 
 #### Properties
 
+<a id="agentname"></a>
+
 ##### agentName
 
 > `readonly` **agentName**: `string`
+
+<a id="turn"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ## Variables
+
+<a id="adapt"></a>
 
 ### adapt
 
@@ -173,6 +191,8 @@ Typed operation-level adapter for LanguageModel.Service wrappers.
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`middleware`) => `Layer.Layer`\<[`ModelMiddleware`](#modelmiddleware)\>
@@ -190,6 +210,8 @@ Provide an explicit chain.
 `Layer.Layer`\<[`ModelMiddleware`](#modelmiddleware)\>
 
 ***
+
+<a id="layeridentity"></a>
 
 ### layerIdentity
 

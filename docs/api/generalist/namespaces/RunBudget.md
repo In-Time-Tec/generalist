@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="exhausted"></a>
+
 ### Exhausted
 
 #### Extends
@@ -15,6 +17,8 @@
 - `Exhausted_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="budget"></a>
+
 ##### budget
 
 > `readonly` **budget**: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`
@@ -43,6 +49,8 @@
 ###### Inherited from
 
 `Exhausted_base.budget`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -52,6 +60,8 @@
 
 `Exhausted_base.hint`
 
+<a id="remaining"></a>
+
 ##### remaining?
 
 > `readonly` `optional` **remaining?**: `number`
@@ -59,6 +69,8 @@
 ###### Inherited from
 
 `Exhausted_base.remaining`
+
+<a id="requested"></a>
 
 ##### requested
 
@@ -70,6 +82,8 @@
 
 ***
 
+<a id="invalid"></a>
+
 ### Invalid
 
 Invalid serialized child grant or extension.
@@ -79,6 +93,8 @@ Invalid serialized child grant or extension.
 - `Invalid_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -100,6 +116,8 @@ Invalid serialized child grant or extension.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -107,6 +125,8 @@ Invalid serialized child grant or extension.
 ###### Inherited from
 
 `Invalid_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -118,31 +138,45 @@ Invalid serialized child grant or extension.
 
 ## Interfaces
 
+<a id="input"></a>
+
 ### Input
 
 #### Properties
+
+<a id="children"></a>
 
 ##### children?
 
 > `readonly` `optional` **children?**: `number`
 
+<a id="duration"></a>
+
 ##### duration?
 
 > `readonly` `optional` **duration?**: `Input`
+
+<a id="tokens"></a>
 
 ##### tokens?
 
 > `readonly` `optional` **tokens?**: `number`
 
+<a id="toolcalls"></a>
+
 ##### toolCalls?
 
 > `readonly` `optional` **toolCalls?**: `number`
+
+<a id="usd"></a>
 
 ##### usd?
 
 > `readonly` `optional` **usd?**: `number`
 
 ## Type Aliases
+
+<a id="budgetexhausted"></a>
 
 ### BudgetExhausted
 
@@ -152,6 +186,8 @@ Durable non-terminal suspension reason.
 
 ***
 
+<a id="budgetlimits"></a>
+
 ### BudgetLimits
 
 > **BudgetLimits** = *typeof* `BudgetLimits.Type`
@@ -160,17 +196,23 @@ Normalized portable limits. Duration is milliseconds.
 
 ***
 
+<a id="dimension"></a>
+
 ### Dimension
 
 > **Dimension** = *typeof* `Dimension.Type`
 
 ***
 
+<a id="remaining-1"></a>
+
 ### Remaining
 
 > **Remaining** = *typeof* `Remaining.Type`
 
 ***
+
+<a id="runbudget"></a>
 
 ### RunBudget
 
@@ -180,11 +222,15 @@ One allocation and its transient loop remainder. Durable Runtime spend is projec
 
 ***
 
+<a id="spend"></a>
+
 ### Spend
 
 > **Spend** = *typeof* `Spend.Type`
 
 ## Variables
+
+<a id="budgetexhausted-1"></a>
 
 ### BudgetExhausted
 
@@ -194,6 +240,8 @@ Durable non-terminal suspension reason.
 
 ***
 
+<a id="budgetlimits-1"></a>
+
 ### BudgetLimits
 
 > `const` **BudgetLimits**: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>
@@ -201,6 +249,8 @@ Durable non-terminal suspension reason.
 Normalized portable limits. Duration is milliseconds.
 
 ***
+
+<a id="charge"></a>
 
 ### charge
 
@@ -284,6 +334,8 @@ Charge transient loop state. Runtime reconstructs this state from its journal be
 
 ***
 
+<a id="childgrant"></a>
+
 ### childGrant
 
 > `const` **childGrant**: \{(`admittedChildren`): (`remaining`) => `object`; (`remaining`, `admittedChildren`): `object`; \}
@@ -362,11 +414,15 @@ Aggregate limits available after reserving the child admissions themselves.
 
 ***
 
+<a id="dimension-1"></a>
+
 ### Dimension
 
 > `const` **Dimension**: `Schema.Literals`\<readonly \[`"tokens"`, `"usd"`, `"duration"`, `"toolCalls"`, `"children"`\]\>
 
 ***
+
+<a id="extend"></a>
 
 ### extend
 
@@ -419,6 +475,8 @@ Aggregate limits available after reserving the child admissions themselves.
 > `readonly` **remaining**: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>
 
 ***
+
+<a id="inspect"></a>
 
 ### inspect
 
@@ -520,6 +578,8 @@ Aggregate limits available after reserving the child admissions themselves.
 
 ***
 
+<a id="make"></a>
+
 ### make
 
 > `const` **make**: (`input`) => [`RunBudget`](#runbudget)
@@ -537,6 +597,8 @@ Construct one validated in-memory budget.
 [`RunBudget`](#runbudget)
 
 ***
+
+<a id="narrowchild"></a>
 
 ### narrowChild
 
@@ -638,6 +700,8 @@ Construct one validated in-memory budget.
 
 ***
 
+<a id="refundunused"></a>
+
 ### refundUnused
 
 > `const` **refundUnused**: \{(`child`): (`parent`) => `object`; (`parent`, `child`): `object`; \}
@@ -702,11 +766,15 @@ Construct one validated in-memory budget.
 
 ***
 
+<a id="remaining-2"></a>
+
 ### Remaining
 
 > `const` **Remaining**: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[`Schema.Finite`, `Schema.Literal`\<`"unknown"`\>\]\>\>; \}\>
 
 ***
+
+<a id="reservechild"></a>
 
 ### reserveChild
 
@@ -787,6 +855,8 @@ Construct one validated in-memory budget.
 `Effect`\<\{ `child`: [`RunBudget`](#runbudget); `parent`: [`RunBudget`](#runbudget); \}, [`Exhausted`](#exhausted) \| [`Invalid`](#invalid)\>
 
 ***
+
+<a id="resolve"></a>
 
 ### resolve
 
@@ -888,6 +958,8 @@ Construct one validated in-memory budget.
 
 ***
 
+<a id="runbudget-1"></a>
+
 ### RunBudget
 
 > `const` **RunBudget**: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>
@@ -895,6 +967,8 @@ Construct one validated in-memory budget.
 One allocation and its transient loop remainder. Durable Runtime spend is projected from journal facts.
 
 ***
+
+<a id="settlemodeltokens"></a>
 
 ### settleModelTokens
 
@@ -940,11 +1014,15 @@ One allocation and its transient loop remainder. Durable Runtime spend is projec
 
 ***
 
+<a id="spend-1"></a>
+
 ### Spend
 
 > `const` **Spend**: `Schema.Struct`\<\{ `children`: `Schema.Finite`; `duration`: `Schema.Finite`; `tokens`: `Schema.Finite`; `toolCalls`: `Schema.Finite`; `usd`: `Schema.Union`\<readonly \[`Schema.Finite`, `Schema.Literal`\<`"unknown"`\>\]\>; \}\>
 
 ***
+
+<a id="unbounded"></a>
 
 ### unbounded
 
@@ -953,6 +1031,8 @@ One allocation and its transient loop remainder. Durable Runtime spend is projec
 Explicitly unlimited allocation.
 
 ***
+
+<a id="zerospend"></a>
 
 ### zeroSpend
 

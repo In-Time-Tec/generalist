@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="appliedrefinementedit"></a>
+
 ### AppliedRefinementEdit
 
 > **AppliedRefinementEdit** = *typeof* `AppliedRefinementEdit.Type`
@@ -15,6 +17,8 @@
 One applied change with its exact before and after entries.
 
 ***
+
+<a id="authoredcreateedit"></a>
 
 ### AuthoredCreateEdit
 
@@ -25,6 +29,8 @@ untrusted input cannot choose an entry's createdAt, updatedAt, or version.
 
 ***
 
+<a id="authorededit"></a>
+
 ### AuthoredEdit
 
 > **AuthoredEdit** = *typeof* `AuthoredEdit.Type`
@@ -32,6 +38,8 @@ untrusted input cannot choose an entry's createdAt, updatedAt, or version.
 One change an untrusted author may request.
 
 ***
+
+<a id="authoredproposal"></a>
 
 ### AuthoredProposal
 
@@ -41,6 +49,8 @@ A proposal whose edits cannot carry a pinned revision. This is the only shape an
 may express, so a model-originated proposal can never forge an entry's audit trail.
 
 ***
+
+<a id="authoredrefinementproposal"></a>
 
 ### AuthoredRefinementProposal
 
@@ -55,6 +65,8 @@ assignable to an authored edit.
 
 ***
 
+<a id="authoredupdateedit"></a>
+
 ### AuthoredUpdateEdit
 
 > **AuthoredUpdateEdit** = *typeof* `AuthoredUpdateEdit.Type`
@@ -62,6 +74,8 @@ assignable to an authored edit.
 One update edit an untrusted author may request, without any pinned revision.
 
 ***
+
+<a id="createedit"></a>
 
 ### CreateEdit
 
@@ -71,6 +85,8 @@ Add one entry that must not already exist. A pinned revision reconstructs an exa
 
 ***
 
+<a id="deleteedit"></a>
+
 ### DeleteEdit
 
 > **DeleteEdit** = *typeof* `DeleteEdit.Type`
@@ -78,6 +94,8 @@ Add one entry that must not already exist. A pinned revision reconstructs an exa
 Remove one existing entry.
 
 ***
+
+<a id="guidanceentry"></a>
 
 ### GuidanceEntry
 
@@ -87,6 +105,8 @@ One versioned instruction entry.
 
 ***
 
+<a id="guidanceentryvalue"></a>
+
 ### GuidanceEntryValue
 
 > **GuidanceEntryValue** = *typeof* `GuidanceEntryValue.Type`
@@ -94,6 +114,8 @@ One versioned instruction entry.
 The authored value of one entry, independent of identity and revision.
 
 ***
+
+<a id="guidanceid"></a>
 
 ### GuidanceId
 
@@ -103,6 +125,8 @@ Bounded identifier of one guidance entry within its kind.
 
 ***
 
+<a id="guidanceinstant"></a>
+
 ### GuidanceInstant
 
 > **GuidanceInstant** = *typeof* `GuidanceInstant.Type`
@@ -110,6 +134,8 @@ Bounded identifier of one guidance entry within its kind.
 Caller-supplied UTC ISO-8601 instant with millisecond precision.
 
 ***
+
+<a id="guidancekind"></a>
 
 ### GuidanceKind
 
@@ -119,6 +145,8 @@ The four versioned instruction entry kinds.
 
 ***
 
+<a id="guidancerevision"></a>
+
 ### GuidanceRevision
 
 > **GuidanceRevision** = *typeof* `GuidanceRevision.Type`
@@ -126,6 +154,8 @@ The four versioned instruction entry kinds.
 The audit revision of one entry.
 
 ***
+
+<a id="guidancescope"></a>
 
 ### GuidanceScope
 
@@ -135,6 +165,8 @@ Host-chosen store partition one entry belongs to.
 
 ***
 
+<a id="guidancesnapshotid"></a>
+
 ### GuidanceSnapshotId
 
 > **GuidanceSnapshotId** = *typeof* `GuidanceSnapshotId.Type`
@@ -142,6 +174,8 @@ Host-chosen store partition one entry belongs to.
 Content-addressed identity of one exact guidance state.
 
 ***
+
+<a id="guidanceversion"></a>
 
 ### GuidanceVersion
 
@@ -151,6 +185,8 @@ Revision counter of one entry.
 
 ***
 
+<a id="refinementedit"></a>
+
 ### RefinementEdit
 
 > **RefinementEdit** = *typeof* `RefinementEdit.Type`
@@ -158,6 +194,8 @@ Revision counter of one entry.
 One requested change to the guidance.
 
 ***
+
+<a id="refinementevent"></a>
 
 ### RefinementEvent
 
@@ -167,6 +205,8 @@ The durable record of one applied proposal.
 
 ***
 
+<a id="refinementproposal"></a>
+
 ### RefinementProposal
 
 > **RefinementProposal** = *typeof* `RefinementProposal.Type`
@@ -174,6 +214,8 @@ The durable record of one applied proposal.
 An atomic set of requested changes with optional baseline pinning.
 
 ***
+
+<a id="updateedit"></a>
 
 ### UpdateEdit
 
@@ -183,6 +225,8 @@ Replace the authored value of one existing entry. A pinned revision reconstructs
 
 ## Variables
 
+<a id="appliedrefinementedit-1"></a>
+
 ### AppliedRefinementEdit
 
 > `const` **AppliedRefinementEdit**: `Schema.Struct`\<\{ `after`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `before`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `edit`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Create"`, \{ `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Update"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<..., ...\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Delete"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; \}\>\]\>; \}\>
@@ -190,6 +234,8 @@ Replace the authored value of one existing entry. A pinned revision reconstructs
 One applied change with its exact before and after entries.
 
 ***
+
+<a id="authoredcreateedit-1"></a>
 
 ### AuthoredCreateEdit
 
@@ -200,6 +246,8 @@ untrusted input cannot choose an entry's createdAt, updatedAt, or version.
 
 ***
 
+<a id="authorededit-1"></a>
+
 ### AuthoredEdit
 
 > `const` **AuthoredEdit**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Create"`, \{ `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Update"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Delete"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; \}\>\]\>
@@ -207,6 +255,8 @@ untrusted input cannot choose an entry's createdAt, updatedAt, or version.
 One change an untrusted author may request.
 
 ***
+
+<a id="authoredproposal-1"></a>
 
 ### AuthoredProposal
 
@@ -217,6 +267,8 @@ may express, so a model-originated proposal can never forge an entry's audit tra
 
 ***
 
+<a id="authoredupdateedit-1"></a>
+
 ### AuthoredUpdateEdit
 
 > `const` **AuthoredUpdateEdit**: `Schema.TaggedStruct`\<`"Update"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>
@@ -224,6 +276,8 @@ may express, so a model-originated proposal can never forge an entry's audit tra
 One update edit an untrusted author may request, without any pinned revision.
 
 ***
+
+<a id="createedit-1"></a>
 
 ### CreateEdit
 
@@ -233,6 +287,8 @@ Add one entry that must not already exist. A pinned revision reconstructs an exa
 
 ***
 
+<a id="deleteedit-1"></a>
+
 ### DeleteEdit
 
 > `const` **DeleteEdit**: `Schema.TaggedStruct`\<`"Delete"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; \}\>
@@ -240,6 +296,8 @@ Add one entry that must not already exist. A pinned revision reconstructs an exa
 Remove one existing entry.
 
 ***
+
+<a id="editkey"></a>
 
 ### editKey
 
@@ -259,6 +317,8 @@ Exact identity of one edit target within a state.
 
 ***
 
+<a id="guidanceentry-1"></a>
+
 ### GuidanceEntry
 
 > `const` **GuidanceEntry**: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `createdAt`: `Schema.String`; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `scope`: `Schema.String`; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>
@@ -266,6 +326,8 @@ Exact identity of one edit target within a state.
 One versioned instruction entry.
 
 ***
+
+<a id="guidanceentryvalue-1"></a>
 
 ### GuidanceEntryValue
 
@@ -275,6 +337,8 @@ The authored value of one entry, independent of identity and revision.
 
 ***
 
+<a id="guidanceid-1"></a>
+
 ### GuidanceId
 
 > `const` **GuidanceId**: `Schema.String`
@@ -282,6 +346,8 @@ The authored value of one entry, independent of identity and revision.
 Bounded identifier of one guidance entry within its kind.
 
 ***
+
+<a id="guidanceinstant-1"></a>
 
 ### GuidanceInstant
 
@@ -291,6 +357,8 @@ Caller-supplied UTC ISO-8601 instant with millisecond precision.
 
 ***
 
+<a id="guidancekind-1"></a>
+
 ### GuidanceKind
 
 > `const` **GuidanceKind**: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>
@@ -298,6 +366,8 @@ Caller-supplied UTC ISO-8601 instant with millisecond precision.
 The four versioned instruction entry kinds.
 
 ***
+
+<a id="guidancerevision-1"></a>
 
 ### GuidanceRevision
 
@@ -307,6 +377,8 @@ The audit revision of one entry.
 
 ***
 
+<a id="guidancescope-1"></a>
+
 ### GuidanceScope
 
 > `const` **GuidanceScope**: `Schema.String`
@@ -314,6 +386,8 @@ The audit revision of one entry.
 Host-chosen store partition one entry belongs to.
 
 ***
+
+<a id="guidancesnapshotid-1"></a>
 
 ### GuidanceSnapshotId
 
@@ -323,6 +397,8 @@ Content-addressed identity of one exact guidance state.
 
 ***
 
+<a id="guidanceversion-1"></a>
+
 ### GuidanceVersion
 
 > `const` **GuidanceVersion**: `Schema.Int`
@@ -330,6 +406,8 @@ Content-addressed identity of one exact guidance state.
 Revision counter of one entry.
 
 ***
+
+<a id="kinds"></a>
 
 ### kinds
 
@@ -339,6 +417,8 @@ Every guidance kind in canonical order.
 
 ***
 
+<a id="refinementedit-1"></a>
+
 ### RefinementEdit
 
 > `const` **RefinementEdit**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Create"`, \{ `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Update"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Delete"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; \}\>\]\>
@@ -346,6 +426,8 @@ Every guidance kind in canonical order.
 One requested change to the guidance.
 
 ***
+
+<a id="refinementevent-1"></a>
 
 ### RefinementEvent
 
@@ -355,6 +437,8 @@ The durable record of one applied proposal.
 
 ***
 
+<a id="refinementproposal-1"></a>
+
 ### RefinementProposal
 
 > `const` **RefinementProposal**: `Schema.Struct`\<\{ `at`: `Schema.String`; `baseSnapshot`: `Schema.optionalKey`\<`Schema.String`\>; `edits`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Create"`, \{ `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ..., ..., ...\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: ...; `updatedAt`: ...; `version`: ...; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Update"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ..., ..., ...\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: ...; `updatedAt`: ...; `version`: ...; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<...\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<...\>; `path`: `Schema.optionalKey`\<...\>; `reference`: `Schema.optionalKey`\<...\>; `source`: `Schema.optionalKey`\<...\>; `title`: `Schema.String`; \}\>; \}\>, `Schema.TaggedStruct`\<`"Delete"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ..., ..., ...\]\>; \}\>\]\>\>; `id`: `Schema.String`; `rationale`: `Schema.optionalKey`\<`Schema.String`\>; `rollbackOf`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
@@ -362,6 +446,8 @@ The durable record of one applied proposal.
 An atomic set of requested changes with optional baseline pinning.
 
 ***
+
+<a id="revision"></a>
 
 ### revision
 
@@ -381,6 +467,8 @@ Project one entry back to its audit revision.
 
 ***
 
+<a id="updateedit-1"></a>
+
 ### UpdateEdit
 
 > `const` **UpdateEdit**: `Schema.TaggedStruct`\<`"Update"`, \{ `baseVersion`: `Schema.optionalKey`\<`Schema.Int`\>; `id`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"prompt"`, `"memory"`, `"skill"`, `"subagent"`\]\>; `revision`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `createdAt`: `Schema.String`; `updatedAt`: `Schema.String`; `version`: `Schema.Int`; \}\>\>; `value`: `Schema.Struct`\<\{ `arguments`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `content`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; `reference`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.optionalKey`\<`Schema.String`\>; `title`: `Schema.String`; \}\>; \}\>
@@ -388,6 +476,8 @@ Project one entry back to its audit revision.
 Replace the authored value of one existing entry. A pinned revision reconstructs an exact prior entry.
 
 ***
+
+<a id="value"></a>
 
 ### value
 

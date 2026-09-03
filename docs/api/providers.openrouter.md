@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="clientoptions"></a>
+
 ### ClientOptions
 
 #### Extends
@@ -16,13 +18,19 @@
 
 #### Properties
 
+<a id="apikey"></a>
+
 ##### apiKey
 
 > `readonly` **apiKey**: `Config`\<`Redacted`\<`string`\>\>
 
+<a id="clientconfig"></a>
+
 ##### clientConfig?
 
 > `readonly` `optional` **clientConfig?**: `Omit`\<\{ \}, `"apiKey"`\>
+
+<a id="config"></a>
 
 ##### config?
 
@@ -208,6 +216,8 @@
 
 [`Options`](#options).[`config`](#config-1)
 
+<a id="metadata"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `object`
@@ -220,6 +230,8 @@
 
 [`Options`](#options).[`metadata`](#metadata-1)
 
+<a id="model"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
@@ -227,6 +239,8 @@
 ###### Inherited from
 
 [`Options`](#options).[`model`](#model-1)
+
+<a id="registrationkey"></a>
 
 ##### registrationKey?
 
@@ -237,6 +251,8 @@
 [`Options`](#options).[`registrationKey`](#registrationkey-1)
 
 ***
+
+<a id="options"></a>
 
 ### Options
 
@@ -249,6 +265,8 @@
 - [`ClientOptions`](#clientoptions)
 
 #### Properties
+
+<a id="config-1"></a>
 
 ##### config?
 
@@ -430,6 +448,8 @@
 
 > `readonly` `optional` **user?**: `string`
 
+<a id="metadata-1"></a>
+
 ##### metadata?
 
 > `readonly` `optional` **metadata?**: `object`
@@ -442,9 +462,13 @@
 
 [`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
 
+<a id="model-1"></a>
+
 ##### model
 
 > `readonly` **model**: `string`
+
+<a id="registrationkey-1"></a>
 
 ##### registrationKey?
 
@@ -456,17 +480,23 @@
 
 ## Type Aliases
 
+<a id="config-2"></a>
+
 ### Config
 
 > **Config** = *typeof* `ConfigSchema.Type`
 
 ## Variables
 
+<a id="classifyfailure"></a>
+
 ### classifyFailure
 
 > `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
 
 ***
+
+<a id="decodeconfig"></a>
 
 ### decodeConfig
 
@@ -484,6 +514,8 @@
 
 ***
 
+<a id="layer"></a>
+
 ### layer
 
 > `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
@@ -500,6 +532,8 @@
 
 ***
 
+<a id="layerconfig"></a>
+
 ### layerConfig
 
 > `const` **layerConfig**: (`options?`) => `Layer.Layer`\<`OpenRouterClient.OpenRouterClient`, `Config.ConfigError`, `HttpClient.HttpClient`\>
@@ -515,6 +549,8 @@
 `Layer.Layer`\<`OpenRouterClient.OpenRouterClient`, `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
+
+<a id="layermodel"></a>
 
 ### layerModel
 
@@ -533,6 +569,8 @@ Model layer over `OpenRouterClient`; provide it to a run with `Effect.provide`.
 `Model.Model`\<`"openrouter"`, `LanguageModel.LanguageModel`, `OpenRouterClient.OpenRouterClient`\>
 
 ***
+
+<a id="tooljsonschemacompiler"></a>
 
 ### toolJsonSchemaCompiler
 

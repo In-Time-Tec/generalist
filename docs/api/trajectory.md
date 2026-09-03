@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="projectionfailed"></a>
+
 ### ProjectionFailed
 
 #### Extends
@@ -15,6 +17,8 @@
 - `ProjectionFailed_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -36,6 +40,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -44,6 +50,8 @@
 
 `ProjectionFailed_base.hint`
 
+<a id="message"></a>
+
 ##### message
 
 > `readonly` **message**: `string`
@@ -51,6 +59,8 @@
 ###### Inherited from
 
 `ProjectionFailed_base.message`
+
+<a id="runid"></a>
 
 ##### runId
 
@@ -62,15 +72,21 @@
 
 ## Interfaces
 
+<a id="exportoptions"></a>
+
 ### ExportOptions
 
 #### Properties
+
+<a id="format"></a>
 
 ##### format
 
 > `readonly` **format**: `"jsonl"`
 
 ***
+
+<a id="journalreader"></a>
 
 ### JournalReader
 
@@ -81,6 +97,8 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 - [`DagRuntime`](./unstable.rl-export/index#dagruntime)
 
 #### Properties
+
+<a id="history"></a>
 
 ##### history
 
@@ -96,6 +114,8 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 
 `Effect`\<readonly [`RunEvent`](./runtime/namespaces/RunEvent#runevent)[], [`EventsError`](./runtime/namespaces/Runtime#eventserror)\>
 
+<a id="resolvemodelresponse"></a>
+
 ##### resolveModelResponse
 
 > `readonly` **resolveModelResponse**: (`event`) => `Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \}, [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
@@ -110,6 +130,8 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 
 `Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \}, [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
 
+<a id="sessionentry"></a>
+
 ##### sessionEntry
 
 > `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](./generalist/namespaces/Session#entry), [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
@@ -123,6 +145,8 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 ###### Returns
 
 `Effect`\<[`Entry`](./generalist/namespaces/Session#entry), [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
+
+<a id="snapshot"></a>
 
 ##### snapshot
 
@@ -140,11 +164,15 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 
 ## Type Aliases
 
+<a id="fromjournalerror"></a>
+
 ### FromJournalError
 
 > **FromJournalError** = [`InspectError`](./runtime/namespaces/Runtime#inspecterror) \| [`EventsError`](./runtime/namespaces/Runtime#eventserror) \| [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror) \| [`ProjectionFailed`](#projectionfailed)
 
 ***
+
+<a id="jsonlrecord"></a>
 
 ### JsonlRecord
 
@@ -154,11 +182,15 @@ One JSON Lines record. Each exported stream currently contains exactly one traje
 
 ***
 
+<a id="toolcall"></a>
+
 ### ToolCall
 
 > **ToolCall** = *typeof* `ToolCall.Type`
 
 ***
+
+<a id="trajectory"></a>
 
 ### Trajectory
 
@@ -168,11 +200,15 @@ Stable, serializable projection of one Runtime journal.
 
 ***
 
+<a id="turn"></a>
+
 ### Turn
 
 > **Turn** = *typeof* `Turn.Type`
 
 ## Variables
+
+<a id="encode"></a>
 
 ### encode
 
@@ -189,6 +225,8 @@ Stable, serializable projection of one Runtime journal.
 `Effect.Effect`\<*typeof* `Trajectory.Encoded`, `Schema.SchemaError`\>
 
 ***
+
+<a id="export"></a>
 
 ### export
 
@@ -260,6 +298,8 @@ Agent budget allocation when the journal's executable manifest declares one.
 
 ***
 
+<a id="fromjournal"></a>
+
 ### fromJournal
 
 > `const` **fromJournal**: (`runtime`, `runId`) => `Effect.Effect`\<\{ `agent`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `gates`: readonly `object`[]; `input`: `Prompt.Prompt`; `output`: `unknown`; `runId`: `string`; `stopReason`: `string`; `turns`: readonly `object`[]; \}, [`FromJournalError`](#fromjournalerror), `never`\>
@@ -282,6 +322,8 @@ Project one point-in-time Runtime journal using only cross-driver Runtime read m
 
 ***
 
+<a id="jsonlrecord-1"></a>
+
 ### JsonlRecord
 
 > `const` **JsonlRecord**: `Schema.Struct`\<\{ `schemaVersion`: `Schema.Literal`\<`"1"`\>; `trajectory`: `Schema.Struct`\<\{ `agent`: `Schema.String`; `budget`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `gates`: `Schema.$Array`\<`Schema.Struct`\<\{ `evidence`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `name`: `Schema.String`; `verdict`: `Schema.Literals`\<readonly \[`"pass"`, `"fail"`\]\>; \}\>\>; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `output`: `Schema.Unknown`; `runId`: `Schema.String`; `stopReason`: `Schema.String`; `turns`: `Schema.$Array`\<`Schema.Struct`\<\{ `compaction`: `Schema.optionalKey`\<`Schema.Codec`\<[`CompactionInspection`](./runtime/namespaces/Run#compactioninspection), [`CompactionInspection`](./runtime/namespaces/Run#compactioninspection), `never`, `never`\>\>; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `response`: `Schema.Struct`\<\{ `content`: `Schema.$Array`\<`Schema.Union`\<...\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<...\>\>; `usage`: `Schema.optionalKey`\<`Schema.Struct`\<...\>\>; \}\>; `toolCalls`: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `isFailure`: `Schema.optionalKey`\<...\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `result`: `Schema.optionalKey`\<...\>; \}\>\>; `usageFacts`: `Schema.$Array`\<`Schema.Codec`\<[`RawUsageFact`](./runtime/namespaces/Run#rawusagefact), [`RawUsageFact`](./runtime/namespaces/Run#rawusagefact), `never`, `never`\>\>; \}\>\>; \}\>; \}\>
@@ -290,11 +332,15 @@ One JSON Lines record. Each exported stream currently contains exactly one traje
 
 ***
 
+<a id="toolcall-1"></a>
+
 ### ToolCall
 
 > `const` **ToolCall**: `Schema.Struct`\<\{ `id`: `Schema.String`; `isFailure`: `Schema.optionalKey`\<`Schema.Boolean`\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `result`: `Schema.optionalKey`\<`Schema.Unknown`\>; \}\>
 
 ***
+
+<a id="trajectory-1"></a>
 
 ### Trajectory
 
@@ -303,6 +349,8 @@ One JSON Lines record. Each exported stream currently contains exactly one traje
 Stable, serializable projection of one Runtime journal.
 
 ***
+
+<a id="turn-1"></a>
 
 ### Turn
 

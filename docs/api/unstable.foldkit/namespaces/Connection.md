@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="connection"></a>
+
 ### Connection
 
 **`Experimental`**
@@ -17,6 +19,8 @@
 - `Connection_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -40,6 +44,8 @@
 
 ***
 
+<a id="sendfailed"></a>
+
 ### SendFailed
 
 **`Experimental`**
@@ -49,6 +55,8 @@
 - `SendFailed_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -72,6 +80,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -81,6 +91,8 @@
 ###### Inherited from
 
 `SendFailed_base.hint`
+
+<a id="reason"></a>
 
 ##### reason
 
@@ -94,11 +106,15 @@
 
 ## Interfaces
 
+<a id="service"></a>
+
 ### Service
 
 **`Experimental`**
 
 #### Properties
+
+<a id="send"></a>
 
 ##### send
 
@@ -115,6 +131,8 @@
 ###### Returns
 
 `Effect`\<`void`, `TransportError` \| [`SendFailed`](#sendfailed)\>
+
+<a id="session"></a>
 
 ##### session
 
@@ -140,17 +158,23 @@
 
 ***
 
+<a id="sessionconnection"></a>
+
 ### SessionConnection
 
 **`Experimental`**
 
 #### Properties
 
+<a id="frames"></a>
+
 ##### frames
 
 > `readonly` **frames**: `Stream`\<[`Incoming`](#incoming), `never`\>
 
 **`Experimental`**
+
+<a id="send-1"></a>
 
 ##### send
 
@@ -168,6 +192,8 @@
 
 `Effect`\<`void`, `TransportError` \| [`SendFailed`](#sendfailed)\>
 
+<a id="sessionid"></a>
+
 ##### sessionId
 
 > `readonly` **sessionId**: `string`
@@ -175,6 +201,8 @@
 **`Experimental`**
 
 ## Type Aliases
+
+<a id="agentcommanderror"></a>
 
 ### AgentCommandError
 
@@ -184,6 +212,8 @@
 
 ***
 
+<a id="commandoperation"></a>
+
 ### CommandOperation
 
 > **CommandOperation** = *typeof* `CommandOperation.Type`
@@ -191,6 +221,8 @@
 **`Experimental`**
 
 ***
+
+<a id="incoming"></a>
 
 ### Incoming
 
@@ -200,6 +232,8 @@
 
 ## Variables
 
+<a id="agentcommanderror-1"></a>
+
 ### AgentCommandError
 
 > `const` **AgentCommandError**: `Schema.Union`\<readonly \[*typeof* `TransportError`, *typeof* [`SendFailed`](#sendfailed)\]\>
@@ -207,6 +241,8 @@
 **`Experimental`**
 
 ***
+
+<a id="commandoperation-1"></a>
 
 ### CommandOperation
 
@@ -216,6 +252,8 @@
 
 ***
 
+<a id="connectionfailed"></a>
+
 ### ConnectionFailed
 
 > `const` **ConnectionFailed**: `CallableTaggedStruct`\<`"ConnectionFailed"`, \{ `error`: *typeof* `TransportError`; `operation`: `Schema.Literal`\<`"connect"`\>; `reason`: *typeof* `Schema.String`; \}\>
@@ -223,6 +261,8 @@
 **`Experimental`**
 
 ***
+
+<a id="connectionlost"></a>
 
 ### ConnectionLost
 
@@ -232,6 +272,8 @@
 
 ***
 
+<a id="connectionopened"></a>
+
 ### ConnectionOpened
 
 > `const` **ConnectionOpened**: `CallableTaggedStruct`\<`"ConnectionOpened"`, `Record`\<`never`, `never`\>\>
@@ -240,6 +282,8 @@
 
 ***
 
+<a id="incoming-1"></a>
+
 ### Incoming
 
 > **Incoming**: `Schema`\<[`Incoming`](#incoming)\>
@@ -247,6 +291,8 @@
 **`Experimental`**
 
 ***
+
+<a id="layertest"></a>
 
 ### layerTest
 
@@ -265,6 +311,8 @@
 `Layer.Layer`\<[`Connection`](#connection)\>
 
 ***
+
+<a id="layerwebsocket"></a>
 
 ### layerWebSocket
 

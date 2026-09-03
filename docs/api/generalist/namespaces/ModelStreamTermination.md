@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="timeout"></a>
+
 ### Timeout
 
 A provider part stream exceeded its configured idle deadline.
@@ -17,6 +19,8 @@ A provider part stream exceeded its configured idle deadline.
 - `Timeout_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A provider part stream exceeded its configured idle deadline.
 
 #### Properties
 
+<a id="emitted"></a>
+
 ##### emitted
 
 > `readonly` **emitted**: \{ `_tag`: `"Nothing"`; \} \| \{ `_tag`: `"DisplayOnly"`; `characters`: `number`; \} \| \{ `_tag`: `"OpenToolCall"`; `characters`: `number`; `toolCallId`: `string`; `toolName`: `string`; \}
@@ -45,6 +51,8 @@ A provider part stream exceeded its configured idle deadline.
 ###### Inherited from
 
 `Timeout_base.emitted`
+
+<a id="hint"></a>
 
 ##### hint
 
@@ -54,6 +62,8 @@ A provider part stream exceeded its configured idle deadline.
 
 `Timeout_base.hint`
 
+<a id="idlemillis"></a>
+
 ##### idleMillis
 
 > `readonly` **idleMillis**: `number`
@@ -61,6 +71,8 @@ A provider part stream exceeded its configured idle deadline.
 ###### Inherited from
 
 `Timeout_base.idleMillis`
+
+<a id="lastpart"></a>
 
 ##### lastPart?
 
@@ -70,6 +82,8 @@ A provider part stream exceeded its configured idle deadline.
 
 `Timeout_base.lastPart`
 
+<a id="model"></a>
+
 ##### model?
 
 > `readonly` `optional` **model?**: `string`
@@ -77,6 +91,8 @@ A provider part stream exceeded its configured idle deadline.
 ###### Inherited from
 
 `Timeout_base.model`
+
+<a id="provider"></a>
 
 ##### provider?
 
@@ -86,6 +102,8 @@ A provider part stream exceeded its configured idle deadline.
 
 `Timeout_base.provider`
 
+<a id="requestid"></a>
+
 ##### requestId?
 
 > `readonly` `optional` **requestId?**: `string`
@@ -93,6 +111,8 @@ A provider part stream exceeded its configured idle deadline.
 ###### Inherited from
 
 `Timeout_base.requestId`
+
+<a id="turn"></a>
 
 ##### turn
 
@@ -104,6 +124,8 @@ A provider part stream exceeded its configured idle deadline.
 
 ***
 
+<a id="truncated"></a>
+
 ### Truncated
 
 A provider part stream reached a clean end without its terminal
@@ -114,6 +136,8 @@ A provider part stream reached a clean end without its terminal
 - `Truncated_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -135,6 +159,8 @@ A provider part stream reached a clean end without its terminal
 
 #### Properties
 
+<a id="emitted-1"></a>
+
 ##### emitted
 
 > `readonly` **emitted**: \{ `_tag`: `"Nothing"`; \} \| \{ `_tag`: `"DisplayOnly"`; `characters`: `number`; \} \| \{ `_tag`: `"OpenToolCall"`; `characters`: `number`; `toolCallId`: `string`; `toolName`: `string`; \}
@@ -142,6 +168,8 @@ A provider part stream reached a clean end without its terminal
 ###### Inherited from
 
 `Truncated_base.emitted`
+
+<a id="hint-1"></a>
 
 ##### hint
 
@@ -151,6 +179,8 @@ A provider part stream reached a clean end without its terminal
 
 `Truncated_base.hint`
 
+<a id="lastpart-1"></a>
+
 ##### lastPart?
 
 > `readonly` `optional` **lastPart?**: `string`
@@ -158,6 +188,8 @@ A provider part stream reached a clean end without its terminal
 ###### Inherited from
 
 `Truncated_base.lastPart`
+
+<a id="model-1"></a>
 
 ##### model?
 
@@ -167,6 +199,8 @@ A provider part stream reached a clean end without its terminal
 
 `Truncated_base.model`
 
+<a id="provider-1"></a>
+
 ##### provider?
 
 > `readonly` `optional` **provider?**: `string`
@@ -175,6 +209,8 @@ A provider part stream reached a clean end without its terminal
 
 `Truncated_base.provider`
 
+<a id="requestid-1"></a>
+
 ##### requestId?
 
 > `readonly` `optional` **requestId?**: `string`
@@ -182,6 +218,8 @@ A provider part stream reached a clean end without its terminal
 ###### Inherited from
 
 `Truncated_base.requestId`
+
+<a id="turn-1"></a>
 
 ##### turn
 
@@ -193,25 +231,35 @@ A provider part stream reached a clean end without its terminal
 
 ## Interfaces
 
+<a id="origin"></a>
+
 ### Origin
 
 Provenance stamped onto a termination failure.
 
 #### Properties
 
+<a id="model-2"></a>
+
 ##### model
 
 > `readonly` **model**: `string` \| `undefined`
 
+<a id="provider-2"></a>
+
 ##### provider
 
 > `readonly` **provider**: `string` \| `undefined`
+
+<a id="turn-2"></a>
 
 ##### turn
 
 > `readonly` **turn**: `number`
 
 ## Type Aliases
+
+<a id="emittedoutput"></a>
 
 ### EmittedOutput
 
@@ -224,6 +272,8 @@ duplicating transcript content.
 
 ***
 
+<a id="terminationfailure"></a>
+
 ### TerminationFailure
 
 > **TerminationFailure** = [`Truncated`](#truncated) \| [`Timeout`](#timeout)
@@ -231,6 +281,8 @@ duplicating transcript content.
 A model part stream did not reach a provider-reported terminal event.
 
 ## Variables
+
+<a id="emittedoutput-1"></a>
 
 ### EmittedOutput
 
@@ -242,6 +294,8 @@ render or replay reached it, so the attempt can be retried without
 duplicating transcript content.
 
 ***
+
+<a id="isterminationfailure"></a>
 
 ### isTerminationFailure
 
@@ -261,6 +315,8 @@ Whether a failure means the stream did not reach its terminal event.
 
 ***
 
+<a id="istimeout"></a>
+
 ### isTimeout
 
 > `const` **isTimeout**: (`cause`) => `cause is Timeout`
@@ -278,6 +334,8 @@ Whether a model stream exceeded its configured idle deadline.
 `cause is Timeout`
 
 ***
+
+<a id="requireterminal"></a>
 
 ### requireTerminal
 

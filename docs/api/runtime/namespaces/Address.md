@@ -8,17 +8,23 @@
 
 ## Type Aliases
 
+<a id="address"></a>
+
 ### Address
 
 > **Address** = *typeof* `Address.Type`
 
 ## Variables
 
+<a id="address-1"></a>
+
 ### Address
 
 > `const` **Address**: `Schema.brand`\<`Schema.String`, `"Address"`\>
 
 ***
+
+<a id="decode"></a>
 
 ### decode
 
@@ -58,6 +64,8 @@
 
 ***
 
+<a id="encode"></a>
+
 ### encode
 
 > `const` **encode**: \{(`input`, `options?`): `Effect`\<`string`, `SchemaError`\>; (`options?`): (`input`) => `Effect`\<`string`, `SchemaError`\>; \}
@@ -95,6 +103,8 @@
 (`input`) => `Effect`\<`string`, `SchemaError`\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

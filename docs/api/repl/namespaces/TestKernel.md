@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="memoryresourceauthority"></a>
+
 ### MemoryResourceAuthority
 
 In-memory resource authority controls used only by deterministic provider tests.
@@ -17,6 +19,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 - [`Service`](./KernelResourceAuthority#service)
 
 #### Properties
+
+<a id="acquire"></a>
 
 ##### acquire
 
@@ -36,6 +40,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 [`Service`](./KernelResourceAuthority#service).[`acquire`](./KernelResourceAuthority#acquire)
 
+<a id="admit"></a>
+
 ##### admit
 
 > `readonly` **admit**: (`request`) => `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
@@ -53,6 +59,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 ###### Inherited from
 
 [`Service`](./KernelResourceAuthority#service).[`admit`](./KernelResourceAuthority#admit)
+
+<a id="bind"></a>
 
 ##### bind
 
@@ -72,6 +80,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 [`Service`](./KernelResourceAuthority#service).[`bind`](./KernelResourceAuthority#bind)
 
+<a id="confirmdeletion"></a>
+
 ##### confirmDeletion
 
 > `readonly` **confirmDeletion**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
@@ -90,6 +100,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 [`Service`](./KernelResourceAuthority#service).[`confirmDeletion`](./KernelResourceAuthority#confirmdeletion)
 
+<a id="expire"></a>
+
 ##### expire
 
 > `readonly` **expire**: (`sessionId`) => `Effect`\<`void`\>
@@ -103,6 +115,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 ###### Returns
 
 `Effect`\<`void`\>
+
+<a id="faildeletion"></a>
 
 ##### failDeletion
 
@@ -126,6 +140,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 [`Service`](./KernelResourceAuthority#service).[`failDeletion`](./KernelResourceAuthority#faildeletion)
 
+<a id="finish"></a>
+
 ##### finish
 
 > `readonly` **finish**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
@@ -143,6 +159,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 ###### Inherited from
 
 [`Service`](./KernelResourceAuthority#service).[`finish`](./KernelResourceAuthority#finish)
+
+<a id="inspect"></a>
 
 ##### inspect
 
@@ -162,6 +180,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 [`Service`](./KernelResourceAuthority#service).[`inspect`](./KernelResourceAuthority#inspect)
 
+<a id="pendingdeletion"></a>
+
 ##### pendingDeletion
 
 > `readonly` **pendingDeletion**: `Effect`\<readonly `object`[], [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority#kernelresourceauthorityunavailable)\>
@@ -169,6 +189,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 ###### Inherited from
 
 [`Service`](./KernelResourceAuthority#service).[`pendingDeletion`](./KernelResourceAuthority#pendingdeletion)
+
+<a id="renew"></a>
 
 ##### renew
 
@@ -202,6 +224,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 [`Service`](./KernelResourceAuthority#service).[`renew`](./KernelResourceAuthority#renew)
 
+<a id="revoke"></a>
+
 ##### revoke
 
 > `readonly` **revoke**: (`claim`) => `Effect`\<\{ `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; \} \| `undefined`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
@@ -232,13 +256,19 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ***
 
+<a id="testpooloptions"></a>
+
 ### TestPoolOptions
 
 #### Properties
 
+<a id="bindings"></a>
+
 ##### bindings?
 
 > `readonly` `optional` **bindings?**: readonly [`Binding`](./KernelPool#binding)[]
+
+<a id="profile"></a>
 
 ##### profile
 
@@ -336,6 +366,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 > `readonly` **root**: `string`
 
+<a id="script"></a>
+
 ##### script?
 
 > `readonly` `optional` **script?**: (`request`) => [`Script`](#script-1)
@@ -352,6 +384,8 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ## Type Aliases
 
+<a id="script-1"></a>
+
 ### Script
 
 > **Script** = \{ `_tag`: `"Value"`; `stderr?`: `string`; `stdout?`: `string`; `value`: `string`; \} \| \{ `_tag`: `"Throw"`; `message`: `string`; `name`: `string`; `stderr?`: `string`; \} \| \{ `_tag`: `"Failure"`; `failure`: [`CellFailure`](./Cell#cellfailure); \}
@@ -360,17 +394,23 @@ What the scripted pool does with one cell.
 
 ## Variables
 
+<a id="layermemoryresourceauthority"></a>
+
 ### layerMemoryResourceAuthority
 
 > `const` **layerMemoryResourceAuthority**: `Layer.Layer`\<[`KernelResourceAuthority`](./KernelResourceAuthority#kernelresourceauthority)\>
 
 ***
 
+<a id="layermemorystore"></a>
+
 ### layerMemoryStore
 
 > `const` **layerMemoryStore**: `Layer.Layer`\<[`KernelSnapshotStore`](./KernelSnapshotStore#kernelsnapshotstore)\>
 
 ***
+
+<a id="layertestpool"></a>
 
 ### layerTestPool
 
@@ -387,6 +427,8 @@ What the scripted pool does with one cell.
 `Layer.Layer`\<[`KernelPool`](./KernelPool#kernelpool)\>
 
 ***
+
+<a id="layertestsandbox"></a>
 
 ### layerTestSandbox
 
@@ -407,6 +449,8 @@ security boundary and must not be used to certify a production provider.
 
 ***
 
+<a id="makememoryresourceauthority"></a>
+
 ### makeMemoryResourceAuthority
 
 > `const` **makeMemoryResourceAuthority**: `Effect.Effect`\<[`MemoryResourceAuthority`](#memoryresourceauthority)\>
@@ -416,6 +460,8 @@ takeover reconciliation, and retained cleanup without pretending to be durable s
 
 ***
 
+<a id="makememorystore"></a>
+
 ### makeMemoryStore
 
 > `const` **makeMemoryStore**: `Effect.Effect`\<[`Service`](./KernelSnapshotStore#service)\>
@@ -423,6 +469,8 @@ takeover reconciliation, and retained cleanup without pretending to be durable s
 An in-memory snapshot store keyed by Session identity.
 
 ***
+
+<a id="maketest"></a>
 
 ### makeTest
 

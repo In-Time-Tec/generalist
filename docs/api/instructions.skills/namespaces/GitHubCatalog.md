@@ -8,6 +8,8 @@
 
 ## Interfaces
 
+<a id="options"></a>
+
 ### Options
 
 Manifest-backed GitHub catalog options.
@@ -18,9 +20,13 @@ Manifest-backed GitHub catalog options.
 
 #### Properties
 
+<a id="apibaseurl"></a>
+
 ##### apiBaseUrl?
 
 > `readonly` `optional` **apiBaseUrl?**: `string`
+
+<a id="bodymaxbytes"></a>
 
 ##### bodyMaxBytes?
 
@@ -30,6 +36,8 @@ Manifest-backed GitHub catalog options.
 
 `Limits.bodyMaxBytes`
 
+<a id="manifestmaxbytes"></a>
+
 ##### manifestMaxBytes?
 
 > `readonly` `optional` **manifestMaxBytes?**: `number`
@@ -38,9 +46,13 @@ Manifest-backed GitHub catalog options.
 
 `Limits.manifestMaxBytes`
 
+<a id="manifestname"></a>
+
 ##### manifestName?
 
 > `readonly` `optional` **manifestName?**: `string`
+
+<a id="maxskills"></a>
 
 ##### maxSkills?
 
@@ -50,21 +62,31 @@ Manifest-backed GitHub catalog options.
 
 `Limits.maxSkills`
 
+<a id="owner"></a>
+
 ##### owner
 
 > `readonly` **owner**: `string`
+
+<a id="ref"></a>
 
 ##### ref
 
 > `readonly` **ref**: `string`
 
+<a id="repo"></a>
+
 ##### repo
 
 > `readonly` **repo**: `string`
 
+<a id="root"></a>
+
 ##### root?
 
 > `readonly` `optional` **root?**: `string`
+
+<a id="toolsbyskill"></a>
 
 ##### toolsBySkill?
 
@@ -75,6 +97,8 @@ Manifest-backed GitHub catalog options.
 `Limits.toolsBySkill`
 
 ## Variables
+
+<a id="layer"></a>
 
 ### layer
 
@@ -93,6 +117,8 @@ Build a manifest-backed immutable GitHub catalog layer.
 `ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog#layer)\>
 
 ***
+
+<a id="make"></a>
 
 ### make
 

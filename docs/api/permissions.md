@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="invalidrulefile"></a>
+
 ### InvalidRuleFile
 
 A permission rule file failed JSON/YAML parsing or Rule schema validation.
@@ -17,6 +19,8 @@ A permission rule file failed JSON/YAML parsing or Rule schema validation.
 - `InvalidRuleFile_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -38,6 +42,8 @@ A permission rule file failed JSON/YAML parsing or Rule schema validation.
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -46,6 +52,8 @@ A permission rule file failed JSON/YAML parsing or Rule schema validation.
 
 `InvalidRuleFile_base.hint`
 
+<a id="issues"></a>
+
 ##### issues
 
 > `readonly` **issues**: `string`
@@ -53,6 +61,8 @@ A permission rule file failed JSON/YAML parsing or Rule schema validation.
 ###### Inherited from
 
 `InvalidRuleFile_base.issues`
+
+<a id="path"></a>
 
 ##### path
 
@@ -64,6 +74,8 @@ A permission rule file failed JSON/YAML parsing or Rule schema validation.
 
 ***
 
+<a id="permissionerror"></a>
+
 ### PermissionError
 
 Permission service failure.
@@ -73,6 +85,8 @@ Permission service failure.
 - `PermissionError_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -94,6 +108,8 @@ Permission service failure.
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -101,6 +117,8 @@ Permission service failure.
 ###### Inherited from
 
 `PermissionError_base.hint`
+
+<a id="message"></a>
 
 ##### message
 
@@ -112,6 +130,8 @@ Permission service failure.
 
 ***
 
+<a id="permissions"></a>
+
 ### Permissions
 
 #### Extends
@@ -119,6 +139,8 @@ Permission service failure.
 - `Permissions_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -140,6 +162,8 @@ Permission service failure.
 
 ***
 
+<a id="rulestore"></a>
+
 ### RuleStore
 
 Remembered permission-rule persistence boundary.
@@ -149,6 +173,8 @@ Remembered permission-rule persistence boundary.
 - `RuleStore_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -170,13 +196,19 @@ Remembered permission-rule persistence boundary.
 
 ## Interfaces
 
+<a id="allow"></a>
+
 ### Allow
 
 #### Properties
 
+<a id="_tag"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Allow"`
+
+<a id="reason"></a>
 
 ##### reason?
 
@@ -184,17 +216,25 @@ Remembered permission-rule persistence boundary.
 
 ***
 
+<a id="ask"></a>
+
 ### Ask
 
 #### Properties
+
+<a id="_tag-1"></a>
 
 ##### \_tag
 
 > `readonly` **\_tag**: `"Ask"`
 
+<a id="reason-1"></a>
+
 ##### reason?
 
 > `readonly` `optional` **reason?**: `string`
+
+<a id="token"></a>
 
 ##### token
 
@@ -202,19 +242,27 @@ Remembered permission-rule persistence boundary.
 
 ***
 
+<a id="deny"></a>
+
 ### Deny
 
 #### Properties
 
+<a id="_tag-2"></a>
+
 ##### \_tag
 
 > `readonly` **\_tag**: `"Deny"`
+
+<a id="reason-2"></a>
 
 ##### reason?
 
 > `readonly` `optional` **reason?**: `string`
 
 ***
+
+<a id="rule"></a>
 
 ### Rule
 
@@ -222,13 +270,19 @@ One ordered permission rule.
 
 #### Properties
 
+<a id="level"></a>
+
 ##### level
 
 > `readonly` **level**: [`Level`](#level-1)
 
+<a id="pattern"></a>
+
 ##### pattern
 
 > `readonly` **pattern**: `string`
+
+<a id="reason-3"></a>
 
 ##### reason?
 
@@ -236,15 +290,21 @@ One ordered permission rule.
 
 ***
 
+<a id="ruleset"></a>
+
 ### Ruleset
 
 Ordered permission ruleset.
 
 #### Properties
 
+<a id="fallback"></a>
+
 ##### fallback?
 
 > `readonly` `optional` **fallback?**: [`Level`](#level-1)
+
+<a id="rules"></a>
 
 ##### rules
 
@@ -252,17 +312,23 @@ Ordered permission ruleset.
 
 ***
 
+<a id="rulestorefileoptions"></a>
+
 ### RuleStoreFileOptions
 
 One JSON or YAML permission-rule file.
 
 #### Properties
 
+<a id="path-1"></a>
+
 ##### path
 
 > `readonly` **path**: `string`
 
 ***
+
+<a id="rulestoresqloptions"></a>
 
 ### RuleStoreSqlOptions
 
@@ -271,17 +337,23 @@ per-session rules. Defaults to `"global"`.
 
 #### Properties
 
+<a id="scope"></a>
+
 ##### scope?
 
 > `readonly` `optional` **scope?**: `string`
 
 ***
 
+<a id="service"></a>
+
 ### Service
 
 Permission policy service boundary.
 
 #### Properties
+
+<a id="evaluate"></a>
 
 ##### evaluate
 
@@ -299,6 +371,8 @@ Permission policy service boundary.
 
 ## Type Aliases
 
+<a id="decision"></a>
+
 ### Decision
 
 > **Decision** = [`Allow`](#allow) \| [`Deny`](#deny) \| [`Ask`](#ask)
@@ -306,6 +380,8 @@ Permission policy service boundary.
 Resolved policy decision for one tool call.
 
 ***
+
+<a id="level-1"></a>
 
 ### Level
 
@@ -315,6 +391,8 @@ What a matched permission rule grants.
 
 ***
 
+<a id="rulestoreerror"></a>
+
 ### RuleStoreError
 
 > **RuleStoreError** = [`PermissionError`](#permissionerror) \| [`InvalidRuleFile`](#invalidrulefile)
@@ -322,6 +400,8 @@ What a matched permission rule grants.
 Permission rule persistence failure.
 
 ## Variables
+
+<a id="evaluate-1"></a>
 
 ### evaluate
 
@@ -370,6 +450,8 @@ Evaluate a ruleset with last-match semantics.
 [`Level`](#level-1)
 
 ***
+
+<a id="evaluatewithrules"></a>
 
 ### evaluateWithRules
 
@@ -431,6 +513,8 @@ Evaluate a base policy with remembered rules as a last-match overlay.
 
 ***
 
+<a id="layerallowall"></a>
+
 ### layerAllowAll
 
 > `const` **layerAllowAll**: `Layer.Layer`\<[`Permissions`](#permissions)\>
@@ -438,6 +522,8 @@ Evaluate a base policy with remembered rules as a last-match overlay.
 Permission policy that allows every call.
 
 ***
+
+<a id="layerfailclosed"></a>
 
 ### layerFailClosed
 
@@ -457,6 +543,8 @@ Permission policy that asks before every unmatched call.
 
 ***
 
+<a id="layerruleset"></a>
+
 ### layerRuleset
 
 > `const` **layerRuleset**: (`ruleset`) => `Layer.Layer`\<[`Permissions`](#permissions)\>
@@ -474,6 +562,8 @@ Policy from a static ruleset.
 `Layer.Layer`\<[`Permissions`](#permissions)\>
 
 ***
+
+<a id="layerrulestorefile"></a>
 
 ### layerRuleStoreFile
 
@@ -493,6 +583,8 @@ A watched, atomically written JSON or YAML RuleStore.
 
 ***
 
+<a id="layerrulestorememory"></a>
+
 ### layerRuleStoreMemory
 
 > `const` **layerRuleStoreMemory**: (`initialRules?`) => `Layer.Layer`\<[`RuleStore`](#rulestore)\>
@@ -510,6 +602,8 @@ Non-durable in-memory remembered-rule store.
 `Layer.Layer`\<[`RuleStore`](#rulestore)\>
 
 ***
+
+<a id="layerrulestoresql"></a>
 
 ### layerRuleStoreSql
 
@@ -530,6 +624,8 @@ the Runtime SQL schema, so the schema must be migrated before this Layer is used
 
 ***
 
+<a id="layerrulestoretest"></a>
+
 ### layerRuleStoreTest
 
 > `const` **layerRuleStoreTest**: (`implementation`) => `Layer.Layer`\<[`RuleStore`](#rulestore)\>
@@ -546,6 +642,8 @@ the Runtime SQL schema, so the schema must be migrated before this Layer is used
 
 ***
 
+<a id="layertest"></a>
+
 ### layerTest
 
 > `const` **layerTest**: (`implementation`) => `Layer.Layer`\<[`Permissions`](#permissions)\>
@@ -561,6 +659,8 @@ the Runtime SQL schema, so the schema must be migrated before this Layer is used
 `Layer.Layer`\<[`Permissions`](#permissions)\>
 
 ***
+
+<a id="matches"></a>
 
 ### matches
 
@@ -610,6 +710,8 @@ Match a permission pattern against a tool call.
 
 ***
 
+<a id="matchrule"></a>
+
 ### matchRule
 
 > `const` **matchRule**: \{(`tool`, `params`): (`ruleset`) => `Option`\<[`Rule`](#rule)\>; (`ruleset`, `tool`, `params`): `Option`\<[`Rule`](#rule)\>; \}
@@ -658,6 +760,8 @@ Find the last matching rule without applying a fallback.
 
 ***
 
+<a id="rulefile"></a>
+
 ### RuleFile
 
 > `const` **RuleFile**: `Schema.$Array`\<`Schema.Struct`\<\{ `level`: `Schema.Literals`\<readonly \[`"allow"`, `"deny"`, `"ask"`\]\>; `pattern`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\>
@@ -665,6 +769,8 @@ Find the last matching rule without applying a fallback.
 Schema for the permission rule file format.
 
 ***
+
+<a id="ruleschema"></a>
 
 ### RuleSchema
 

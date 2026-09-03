@@ -8,6 +8,8 @@
 
 ## Type Aliases
 
+<a id="agentpin"></a>
+
 ### AgentPin
 
 > **AgentPin** = *typeof* `AgentPin.Type`
@@ -15,6 +17,8 @@
 Exact identity of one closed Agent manifest.
 
 ***
+
+<a id="capabilitypin"></a>
 
 ### CapabilityPin
 
@@ -24,6 +28,8 @@ Exact opaque identity of a tool, skill, service, or policy capability.
 
 ***
 
+<a id="executablepin"></a>
+
 ### ExecutablePin
 
 > **ExecutablePin** = *typeof* `ExecutablePin.Type`
@@ -31,6 +37,8 @@ Exact opaque identity of a tool, skill, service, or policy capability.
 Exact identity of one complete executable closure.
 
 ***
+
+<a id="modelpin"></a>
 
 ### ModelPin
 
@@ -40,6 +48,8 @@ Exact opaque identity of a model implementation and configuration.
 
 ***
 
+<a id="programpin"></a>
+
 ### ProgramPin
 
 > **ProgramPin** = *typeof* `ProgramPin.Type`
@@ -47,6 +57,8 @@ Exact opaque identity of a model implementation and configuration.
 Exact identity of one closed Agent Program manifest.
 
 ## Variables
+
+<a id="agentpin-1"></a>
 
 ### AgentPin
 
@@ -56,6 +68,8 @@ Exact identity of one closed Agent manifest.
 
 ***
 
+<a id="capabilitypin-1"></a>
+
 ### CapabilityPin
 
 > `const` **CapabilityPin**: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>
@@ -63,6 +77,8 @@ Exact identity of one closed Agent manifest.
 Exact opaque identity of a tool, skill, service, or policy capability.
 
 ***
+
+<a id="digest"></a>
 
 ### digest
 
@@ -86,6 +102,8 @@ Canonical SHA-256 identity for closed JSON values.
 
 ***
 
+<a id="executablepin-1"></a>
+
 ### ExecutablePin
 
 > `const` **ExecutablePin**: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>
@@ -93,6 +111,8 @@ Canonical SHA-256 identity for closed JSON values.
 Exact identity of one complete executable closure.
 
 ***
+
+<a id="makecapability"></a>
 
 ### makeCapability
 
@@ -116,6 +136,8 @@ Construct the exact identity of a tool, skill, service, or policy capability.
 
 ***
 
+<a id="makemodel"></a>
+
 ### makeModel
 
 > `const` **makeModel**: (`input`, `options?`) => `string` & `Brand`
@@ -137,6 +159,8 @@ Construct the exact identity of a model implementation and configuration.
 `string` & `Brand`
 
 ***
+
+<a id="makeprogram"></a>
 
 ### makeProgram
 
@@ -160,6 +184,8 @@ Construct the exact identity of one closed Agent Program manifest.
 
 ***
 
+<a id="modelpin-1"></a>
+
 ### ModelPin
 
 > `const` **ModelPin**: `Schema.brand`\<`Schema.String`, `"generalist/model-pin"`\>
@@ -167,6 +193,8 @@ Construct the exact identity of one closed Agent Program manifest.
 Exact opaque identity of a model implementation and configuration.
 
 ***
+
+<a id="programpin-1"></a>
 
 ### ProgramPin
 

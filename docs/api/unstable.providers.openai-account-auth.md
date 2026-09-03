@@ -8,6 +8,8 @@
 
 ## Classes
 
+<a id="autherror"></a>
+
 ### AuthError
 
 **`Experimental`**
@@ -17,6 +19,8 @@
 - `AuthError_base`
 
 #### Constructors
+
+<a id="constructor"></a>
 
 ##### Constructor
 
@@ -40,6 +44,8 @@
 
 #### Properties
 
+<a id="hint"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -50,6 +56,8 @@
 
 `AuthError_base.hint`
 
+<a id="kind"></a>
+
 ##### kind
 
 > `readonly` **kind**: `"timeout"` \| `"network"` \| `"cancelled"` \| `"protocol"` \| `"host"` \| `"account-mismatch"` \| `"login-required"`
@@ -59,6 +67,8 @@
 ###### Inherited from
 
 `AuthError_base.kind`
+
+<a id="message"></a>
 
 ##### message
 
@@ -72,6 +82,8 @@
 
 ***
 
+<a id="browserauthorization"></a>
+
 ### BrowserAuthorization
 
 **`Experimental`**
@@ -81,6 +93,8 @@
 - `BrowserAuthorization_base`
 
 #### Constructors
+
+<a id="constructor-1"></a>
 
 ##### Constructor
 
@@ -104,6 +118,8 @@
 
 ***
 
+<a id="credentialstore"></a>
+
 ### CredentialStore
 
 **`Experimental`**
@@ -113,6 +129,8 @@
 - `CredentialStore_base`
 
 #### Constructors
+
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -136,6 +154,8 @@
 
 ***
 
+<a id="deviceauthorizationpresenter"></a>
+
 ### DeviceAuthorizationPresenter
 
 **`Experimental`**
@@ -145,6 +165,8 @@
 - `DeviceAuthorizationPresenter_base`
 
 #### Constructors
+
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -168,6 +190,8 @@
 
 ***
 
+<a id="oauthclient"></a>
+
 ### OAuthClient
 
 **`Experimental`**
@@ -177,6 +201,8 @@
 - `OAuthClient_base`
 
 #### Constructors
+
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -200,6 +226,8 @@
 
 ***
 
+<a id="openaiaccountauth"></a>
+
 ### OpenAIAccountAuth
 
 **`Experimental`**
@@ -209,6 +237,8 @@
 - `OpenAIAccountAuth_base`
 
 #### Constructors
+
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -232,6 +262,8 @@
 
 ***
 
+<a id="storeerror"></a>
+
 ### StoreError
 
 **`Experimental`**
@@ -241,6 +273,8 @@
 - `StoreError_base`
 
 #### Constructors
+
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -264,6 +298,8 @@
 
 #### Properties
 
+<a id="hint-1"></a>
+
 ##### hint
 
 > `readonly` **hint**: `string`
@@ -274,6 +310,8 @@
 
 `StoreError_base.hint`
 
+<a id="kind-1"></a>
+
 ##### kind
 
 > `readonly` **kind**: `"missing"` \| `"corrupt"` \| `"unsafe"` \| `"busy"` \| `"io"`
@@ -283,6 +321,8 @@
 ###### Inherited from
 
 `StoreError_base.kind`
+
+<a id="message-1"></a>
 
 ##### message
 
@@ -296,17 +336,23 @@
 
 ## Interfaces
 
+<a id="authorizationresult"></a>
+
 ### AuthorizationResult
 
 **`Experimental`**
 
 #### Properties
 
+<a id="code"></a>
+
 ##### code
 
 > `readonly` **code**: `Redacted`\<`string`\>
 
 **`Experimental`**
+
+<a id="state"></a>
 
 ##### state
 
@@ -316,11 +362,15 @@
 
 ***
 
+<a id="credential"></a>
+
 ### Credential
 
 **`Experimental`**
 
 #### Properties
+
+<a id="accesstoken"></a>
 
 ##### accessToken
 
@@ -328,11 +378,15 @@
 
 **`Experimental`**
 
+<a id="accountid"></a>
+
 ##### accountId
 
 > `readonly` **accountId**: `Redacted`\<`string`\>
 
 **`Experimental`**
+
+<a id="expiresat"></a>
 
 ##### expiresAt
 
@@ -340,11 +394,15 @@
 
 **`Experimental`**
 
+<a id="fingerprint"></a>
+
 ##### fingerprint
 
 > `readonly` **fingerprint**: `string`
 
 **`Experimental`**
+
+<a id="generation"></a>
 
 ##### generation
 
@@ -352,17 +410,23 @@
 
 **`Experimental`**
 
+<a id="idtoken"></a>
+
 ##### idToken
 
 > `readonly` **idToken**: `Redacted`\<`string`\>
 
 **`Experimental`**
 
+<a id="refreshedat"></a>
+
 ##### refreshedAt
 
 > `readonly` **refreshedAt**: `number`
 
 **`Experimental`**
+
+<a id="refreshtoken"></a>
 
 ##### refreshToken
 
@@ -372,11 +436,15 @@
 
 ***
 
+<a id="deviceprompt"></a>
+
 ### DevicePrompt
 
 **`Experimental`**
 
 #### Properties
+
+<a id="usercode"></a>
 
 ##### userCode
 
@@ -384,11 +452,15 @@
 
 **`Experimental`**
 
+<a id="verificationurl"></a>
+
 ##### verificationUrl
 
 > `readonly` **verificationUrl**: `string`
 
 **`Experimental`**
+
+<a id="warning"></a>
 
 ##### warning
 
@@ -398,11 +470,15 @@
 
 ***
 
+<a id="timingoptions"></a>
+
 ### TimingOptions
 
 **`Experimental`**
 
 #### Properties
+
+<a id="devicetimeout"></a>
 
 ##### deviceTimeout?
 
@@ -412,6 +488,8 @@
 
 ## Type Aliases
 
+<a id="error"></a>
+
 ### Error
 
 > **Error** = [`AuthError`](#autherror) \| [`StoreError`](#storeerror)
@@ -419,6 +497,8 @@
 **`Experimental`**
 
 ***
+
+<a id="status"></a>
 
 ### Status
 
@@ -428,6 +508,8 @@
 
 ***
 
+<a id="tokenresponse"></a>
+
 ### TokenResponse
 
 > **TokenResponse** = *typeof* `TokenResponse.Type`
@@ -435,6 +517,8 @@
 **`Experimental`**
 
 ## Variables
+
+<a id="authorizationurl"></a>
 
 ### authorizationUrl
 
@@ -484,6 +568,8 @@
 
 ***
 
+<a id="clientid"></a>
+
 ### clientId
 
 > `const` **clientId**: `"app_EMoamEEZ73f0CkXaXp7hrann"` = `"app_EMoamEEZ73f0CkXaXp7hrann"`
@@ -491,6 +577,8 @@
 **`Experimental`**
 
 ***
+
+<a id="credentialdisk"></a>
 
 ### CredentialDisk
 
@@ -500,6 +588,8 @@
 
 ***
 
+<a id="credentialformatversion"></a>
+
 ### credentialFormatVersion
 
 > `const` **credentialFormatVersion**: `1` = `1`
@@ -507,6 +597,8 @@
 **`Experimental`**
 
 ***
+
+<a id="deviceexchangeredirect"></a>
 
 ### deviceExchangeRedirect
 
@@ -516,6 +608,8 @@
 
 ***
 
+<a id="devicepollresponse"></a>
+
 ### DevicePollResponse
 
 > `const` **DevicePollResponse**: `Schema.Struct`\<\{ `authorization_code`: `Schema.String`; `code_challenge`: `Schema.String`; `code_verifier`: `Schema.String`; \}\>
@@ -523,6 +617,8 @@
 **`Experimental`**
 
 ***
+
+<a id="devicestartresponse"></a>
 
 ### DeviceStartResponse
 
@@ -532,6 +628,8 @@
 
 ***
 
+<a id="deviceverificationurl"></a>
+
 ### deviceVerificationUrl
 
 > `const` **deviceVerificationUrl**: `"https://auth.openai.com/codex/device"` = `"https://auth.openai.com/codex/device"`
@@ -539,6 +637,8 @@
 **`Experimental`**
 
 ***
+
+<a id="generatepkce"></a>
 
 ### generatePkce
 
@@ -548,6 +648,8 @@
 
 ***
 
+<a id="issuer"></a>
+
 ### issuer
 
 > `const` **issuer**: `"https://auth.openai.com"` = `"https://auth.openai.com"`
@@ -555,6 +657,8 @@
 **`Experimental`**
 
 ***
+
+<a id="layer"></a>
 
 ### layer
 
@@ -574,6 +678,8 @@
 
 ***
 
+<a id="layerbrowserauthorizationtest"></a>
+
 ### layerBrowserAuthorizationTest
 
 > `const` **layerBrowserAuthorizationTest**: (`implementation`) => `Layer.Layer`\<[`BrowserAuthorization`](#browserauthorization)\>
@@ -591,6 +697,8 @@
 `Layer.Layer`\<[`BrowserAuthorization`](#browserauthorization)\>
 
 ***
+
+<a id="layercredentialstoretest"></a>
 
 ### layerCredentialStoreTest
 
@@ -610,6 +718,8 @@
 
 ***
 
+<a id="layerdeviceauthorizationpresentertest"></a>
+
 ### layerDeviceAuthorizationPresenterTest
 
 > `const` **layerDeviceAuthorizationPresenterTest**: (`implementation`) => `Layer.Layer`\<[`DeviceAuthorizationPresenter`](#deviceauthorizationpresenter)\>
@@ -627,6 +737,8 @@
 `Layer.Layer`\<[`DeviceAuthorizationPresenter`](#deviceauthorizationpresenter)\>
 
 ***
+
+<a id="layeroauthclienttest"></a>
 
 ### layerOAuthClientTest
 
@@ -646,6 +758,8 @@
 
 ***
 
+<a id="originator"></a>
+
 ### originator
 
 > `const` **originator**: `"codex_cli_rs"` = `"codex_cli_rs"`
@@ -653,6 +767,8 @@
 **`Experimental`**
 
 ***
+
+<a id="redirecturi"></a>
 
 ### redirectUri
 
@@ -662,6 +778,8 @@
 
 ***
 
+<a id="scopes"></a>
+
 ### scopes
 
 > `const` **scopes**: `"openid profile email offline_access api.connectors.read api.connectors.invoke"` = `"openid profile email offline_access api.connectors.read api.connectors.invoke"`
@@ -669,6 +787,8 @@
 **`Experimental`**
 
 ***
+
+<a id="tokenresponse-1"></a>
 
 ### TokenResponse
 

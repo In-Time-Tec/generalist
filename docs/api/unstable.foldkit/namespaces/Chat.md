@@ -8,11 +8,15 @@
 
 ## Interfaces
 
+<a id="model"></a>
+
 ### Model
 
 **`Experimental`**
 
 #### Properties
+
+<a id="connection"></a>
 
 ##### connection
 
@@ -20,11 +24,15 @@
 
 **`Experimental`**
 
+<a id="draft"></a>
+
 ##### draft
 
 > `readonly` **draft**: `string`
 
 **`Experimental`**
+
+<a id="entries"></a>
 
 ##### entries
 
@@ -32,17 +40,23 @@
 
 **`Experimental`**
 
+<a id="lastseq"></a>
+
 ##### lastSeq
 
 > `readonly` **lastSeq**: `number`
 
 **`Experimental`**
 
+<a id="run"></a>
+
 ##### run
 
 > `readonly` **run**: [`RunState`](#runstate)
 
 **`Experimental`**
+
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -52,6 +66,8 @@
 
 ## Type Aliases
 
+<a id="action"></a>
+
 ### Action
 
 > **Action** = *typeof* `ReceivedConnection.Type` \| *typeof* `OpenedSession.Type` \| *typeof* `ChangedDraft.Type` \| *typeof* `SubmittedMessage.Type` \| *typeof* `ClickedCancel.Type` \| *typeof* `ClickedApprove.Type` \| *typeof* `ClickedDeny.Type` \| *typeof* `SentUserMessage.Type` \| *typeof* `ResolvedApproval.Type` \| *typeof* `CancelledRun.Type` \| *typeof* `FailedAgentCommand.Type`
@@ -59,6 +75,8 @@
 **`Experimental`**
 
 ***
+
+<a id="chatcommand"></a>
 
 ### ChatCommand
 
@@ -68,6 +86,8 @@
 
 ***
 
+<a id="chatentry"></a>
+
 ### ChatEntry
 
 > **ChatEntry** = *typeof* `UserEntry.Type` \| *typeof* `AssistantEntry.Type` \| *typeof* `ToolEntry.Type`
@@ -75,6 +95,8 @@
 **`Experimental`**
 
 ***
+
+<a id="conversationitem"></a>
 
 ### ConversationItem
 
@@ -84,6 +106,8 @@
 
 ***
 
+<a id="messagealign"></a>
+
 ### MessageAlign
 
 > **MessageAlign** = *typeof* `MessageAlign.Type`
@@ -91,6 +115,8 @@
 **`Experimental`**
 
 ***
+
+<a id="output"></a>
 
 ### Output
 
@@ -100,6 +126,8 @@
 
 ***
 
+<a id="promptinputstatus"></a>
+
 ### PromptInputStatus
 
 > **PromptInputStatus** = *typeof* `PromptInputStatus.Type`
@@ -107,6 +135,8 @@
 **`Experimental`**
 
 ***
+
+<a id="runstate"></a>
 
 ### RunState
 
@@ -116,6 +146,8 @@
 
 ***
 
+<a id="tooloutcome"></a>
+
 ### ToolOutcome
 
 > **ToolOutcome** = *typeof* `Pending.Type` \| *typeof* `Completed.Type`
@@ -123,6 +155,8 @@
 **`Experimental`**
 
 ***
+
+<a id="toolpendingphase"></a>
 
 ### ToolPendingPhase
 
@@ -132,6 +166,8 @@
 
 ***
 
+<a id="toolstatus"></a>
+
 ### ToolStatus
 
 > **ToolStatus** = *typeof* `ToolStatus.Type`
@@ -139,6 +175,8 @@
 **`Experimental`**
 
 ## Variables
+
+<a id="action-1"></a>
 
 ### Action
 
@@ -148,6 +186,8 @@
 
 ***
 
+<a id="approvalconversationitem"></a>
+
 ### ApprovalConversationItem
 
 > `const` **ApprovalConversationItem**: `CallableTaggedStruct`\<`"ApprovalConversationItem"`, \{ `align`: *typeof* [`MessageAlign`](#messagealign-1); `key`: *typeof* `Schema.String`; `params`: *typeof* `Schema.Unknown`; `token`: *typeof* `Schema.String`; `toolName`: *typeof* `Schema.String`; \}\>
@@ -155,6 +195,8 @@
 **`Experimental`**
 
 ***
+
+<a id="approvalrequired"></a>
 
 ### ApprovalRequired
 
@@ -164,6 +206,8 @@
 
 ***
 
+<a id="assistantconversationitem"></a>
+
 ### AssistantConversationItem
 
 > `const` **AssistantConversationItem**: `CallableTaggedStruct`\<`"AssistantConversationItem"`, \{ `align`: *typeof* [`MessageAlign`](#messagealign-1); `entry`: *typeof* [`AssistantEntry`](#assistantentry); `key`: *typeof* `Schema.String`; \}\>
@@ -171,6 +215,8 @@
 **`Experimental`**
 
 ***
+
+<a id="assistantentry"></a>
 
 ### AssistantEntry
 
@@ -180,6 +226,8 @@
 
 ***
 
+<a id="awaitingapproval"></a>
+
 ### AwaitingApproval
 
 > `const` **AwaitingApproval**: `CallableTaggedStruct`\<`"AwaitingApproval"`, *typeof* `AwaitingApprovalFields`\>
@@ -187,6 +235,8 @@
 **`Experimental`**
 
 ***
+
+<a id="cancelledrun"></a>
 
 ### CancelledRun
 
@@ -196,6 +246,8 @@
 
 ***
 
+<a id="cancelrun"></a>
+
 ### CancelRun
 
 > `const` **CancelRun**: `CommandDefinitionWithArgs`
@@ -203,6 +255,8 @@
 **`Experimental`**
 
 ***
+
+<a id="changeddraft"></a>
 
 ### ChangedDraft
 
@@ -212,6 +266,8 @@
 
 ***
 
+<a id="chatentry-1"></a>
+
 ### ChatEntry
 
 > **ChatEntry**: `Schema`\<[`ChatEntry`](#chatentry)\>
@@ -219,6 +275,8 @@
 **`Experimental`**
 
 ***
+
+<a id="clickedapprove"></a>
 
 ### ClickedApprove
 
@@ -228,6 +286,8 @@
 
 ***
 
+<a id="clickedcancel"></a>
+
 ### ClickedCancel
 
 > `const` **ClickedCancel**: `CallableTaggedStruct`\<`"ClickedCancel"`, `EmptyFields`\>
@@ -235,6 +295,8 @@
 **`Experimental`**
 
 ***
+
+<a id="clickeddeny"></a>
 
 ### ClickedDeny
 
@@ -244,6 +306,8 @@
 
 ***
 
+<a id="conversationitem-1"></a>
+
 ### ConversationItem
 
 > **ConversationItem**: `Schema`\<[`ConversationItem`](#conversationitem)\>
@@ -251,6 +315,8 @@
 **`Experimental`**
 
 ***
+
+<a id="conversationitems"></a>
 
 ### conversationItems
 
@@ -270,6 +336,8 @@
 
 ***
 
+<a id="failed"></a>
+
 ### Failed
 
 > `const` **Failed**: `CallableTaggedStruct`\<`"Failed"`, \{ `message`: *typeof* `Schema.String`; \}\>
@@ -277,6 +345,8 @@
 **`Experimental`**
 
 ***
+
+<a id="failedagentcommand"></a>
 
 ### FailedAgentCommand
 
@@ -286,6 +356,8 @@
 
 ***
 
+<a id="failureconversationitem"></a>
+
 ### FailureConversationItem
 
 > `const` **FailureConversationItem**: `CallableTaggedStruct`\<`"FailureConversationItem"`, \{ `align`: *typeof* [`MessageAlign`](#messagealign-1); `key`: *typeof* `Schema.String`; `message`: *typeof* `Schema.String`; \}\>
@@ -294,6 +366,8 @@
 
 ***
 
+<a id="idle"></a>
+
 ### Idle
 
 > `const` **Idle**: `CallableTaggedStruct`\<`"Idle"`, `EmptyFields`\>
@@ -301,6 +375,8 @@
 **`Experimental`**
 
 ***
+
+<a id="initialmodel"></a>
 
 ### initialModel
 
@@ -320,6 +396,8 @@
 
 ***
 
+<a id="messagealign-1"></a>
+
 ### MessageAlign
 
 > `const` **MessageAlign**: `Schema.Literals`\<readonly \[`"start"`, `"end"`\]\>
@@ -327,6 +405,8 @@
 **`Experimental`**
 
 ***
+
+<a id="model-1"></a>
 
 ### Model
 
@@ -336,6 +416,8 @@
 
 ***
 
+<a id="openedsession"></a>
+
 ### OpenedSession
 
 > `const` **OpenedSession**: `CallableTaggedStruct`\<`"OpenedSession"`, *typeof* `OpenedSessionFields`\>
@@ -343,6 +425,8 @@
 **`Experimental`**
 
 ***
+
+<a id="output-1"></a>
 
 ### Output
 
@@ -352,6 +436,8 @@
 
 ***
 
+<a id="promptinputstatus-1"></a>
+
 ### PromptInputStatus
 
 > `const` **PromptInputStatus**: `Schema.Literals`\<readonly \[`"idle"`, `"submitted"`, `"streaming"`, `"error"`\]\>
@@ -359,6 +445,8 @@
 **`Experimental`**
 
 ***
+
+<a id="promptinputstatusof"></a>
 
 ### promptInputStatusOf
 
@@ -378,6 +466,8 @@
 
 ***
 
+<a id="receivedconnection"></a>
+
 ### ReceivedConnection
 
 > `const` **ReceivedConnection**: `CallableTaggedStruct`\<`"ReceivedConnection"`, *typeof* `ReceivedConnectionFields`\>
@@ -385,6 +475,8 @@
 **`Experimental`**
 
 ***
+
+<a id="resolveapproval"></a>
 
 ### ResolveApproval
 
@@ -394,6 +486,8 @@
 
 ***
 
+<a id="resolvedapproval"></a>
+
 ### ResolvedApproval
 
 > `const` **ResolvedApproval**: `CallableTaggedStruct`\<`"ResolvedApproval"`, `EmptyFields`\>
@@ -401,6 +495,8 @@
 **`Experimental`**
 
 ***
+
+<a id="runcompleted"></a>
 
 ### RunCompleted
 
@@ -410,6 +506,8 @@
 
 ***
 
+<a id="runfailed"></a>
+
 ### RunFailed
 
 > `const` **RunFailed**: `CallableTaggedStruct`\<`"RunFailed"`, \{ `message`: *typeof* `Schema.String`; \}\>
@@ -417,6 +515,8 @@
 **`Experimental`**
 
 ***
+
+<a id="running"></a>
 
 ### Running
 
@@ -426,6 +526,8 @@
 
 ***
 
+<a id="runstate-1"></a>
+
 ### RunState
 
 > **RunState**: `Schema`\<[`RunState`](#runstate)\>
@@ -433,6 +535,8 @@
 **`Experimental`**
 
 ***
+
+<a id="sendusermessage"></a>
 
 ### SendUserMessage
 
@@ -442,6 +546,8 @@
 
 ***
 
+<a id="sentusermessage"></a>
+
 ### SentUserMessage
 
 > `const` **SentUserMessage**: `CallableTaggedStruct`\<`"SentUserMessage"`, `EmptyFields`\>
@@ -449,6 +555,8 @@
 **`Experimental`**
 
 ***
+
+<a id="submittedmessage"></a>
 
 ### SubmittedMessage
 
@@ -458,6 +566,8 @@
 
 ***
 
+<a id="subscriptions"></a>
+
 ### subscriptions
 
 > `const` **subscriptions**: `object`
@@ -465,6 +575,8 @@
 **`Experimental`**
 
 #### Type Declaration
+
+<a id="agentframes"></a>
 
 ##### agentFrames
 
@@ -540,6 +652,8 @@
 
 ***
 
+<a id="toolconversationitem"></a>
+
 ### ToolConversationItem
 
 > `const` **ToolConversationItem**: `CallableTaggedStruct`\<`"ToolConversationItem"`, \{ `align`: *typeof* [`MessageAlign`](#messagealign-1); `entry`: *typeof* [`ToolEntry`](#toolentry); `input`: *typeof* `Schema.String`; `key`: *typeof* `Schema.String`; `status`: *typeof* [`ToolStatus`](#toolstatus-1); \}\>
@@ -547,6 +661,8 @@
 **`Experimental`**
 
 ***
+
+<a id="toolentry"></a>
 
 ### ToolEntry
 
@@ -556,6 +672,8 @@
 
 ***
 
+<a id="tooloutcome-1"></a>
+
 ### ToolOutcome
 
 > **ToolOutcome**: `Schema`\<[`ToolOutcome`](#tooloutcome)\>
@@ -563,6 +681,8 @@
 **`Experimental`**
 
 ***
+
+<a id="toolpendingphase-1"></a>
 
 ### ToolPendingPhase
 
@@ -572,6 +692,8 @@
 
 ***
 
+<a id="toolstatus-1"></a>
+
 ### ToolStatus
 
 > `const` **ToolStatus**: `Schema.Literals`\<readonly \[`"input-available"`, `"output-available"`, `"output-error"`\]\>
@@ -579,6 +701,8 @@
 **`Experimental`**
 
 ***
+
+<a id="toolstatusof"></a>
 
 ### toolStatusOf
 
@@ -597,6 +721,8 @@
 [`ToolStatus`](#toolstatus)
 
 ***
+
+<a id="update"></a>
 
 ### update
 
@@ -638,6 +764,8 @@ readonly \[[`Model`](#model), readonly `Readonly`\<\{ \}\>[], `Option`\<[`Output
 
 ***
 
+<a id="userconversationitem"></a>
+
 ### UserConversationItem
 
 > `const` **UserConversationItem**: `CallableTaggedStruct`\<`"UserConversationItem"`, \{ `align`: *typeof* [`MessageAlign`](#messagealign-1); `entry`: *typeof* [`UserEntry`](#userentry); `key`: *typeof* `Schema.String`; \}\>
@@ -646,6 +774,8 @@ readonly \[[`Model`](#model), readonly `Readonly`\<\{ \}\>[], `Option`\<[`Output
 
 ***
 
+<a id="userentry"></a>
+
 ### UserEntry
 
 > `const` **UserEntry**: `CallableTaggedStruct`\<`"UserEntry"`, *typeof* `UserEntryFields`\>
@@ -653,6 +783,8 @@ readonly \[[`Model`](#model), readonly `Readonly`\<\{ \}\>[], `Option`\<[`Output
 **`Experimental`**
 
 ***
+
+<a id="waitingconversationitem"></a>
 
 ### WaitingConversationItem
 
