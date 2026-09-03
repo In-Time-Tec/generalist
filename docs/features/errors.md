@@ -2,6 +2,15 @@
 
 Every Generalist framework error carries a stable `_tag`, identifying fields where the boundary knows them, and a `hint`. `error.name` is always the tag. When an error declares no `message` field, its native `message` is derived from the identifying fields and the hint, so `Cause.pretty` prints `Tag: field="value". Hint: …` as one paragraph before the stack. When an error declares a `message` field, that value is the message (often text from a provider or the caller) and `hint` stays a separate field. Older encoded errors without a hint still decode with the current default hint.
 
+```ts
+import { AgentEvent } from "generalist"
+
+const error = AgentEvent.AgentError.make({ message: "model stream failed", turn: 0 })
+console.log(error._tag, error.hint)
+```
+
+Test: [`core/error-hint.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/error-hint.test.ts)
+
 For every error below, the final segment of the tag names when it fires at the named API boundary. The error's `hint` is the supported fix. The identifying fields select the affected run, turn, tool, agent, provider, or resource. This keeps firing conditions and fixes on the error value instead of duplicating text that can drift from the implementation.
 
 ## Approvals, eval, host, and trajectory

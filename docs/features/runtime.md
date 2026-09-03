@@ -128,6 +128,7 @@ worker/process loss
 ## Related
 
 - Source: `packages/generalist/src/runtime/{index.ts,run.ts,service.ts,cursor.ts,address.ts}`, `packages/generalist/src/runtime/{run,session,execution}/`
+- Test: [`runtime/execution/recovery/exclusive.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/runtime/execution/recovery/exclusive.test.ts)
 - Site: `/docs/learn/native-runtime`, `/docs/reference/runtime`
 - Decisions/tradeoffs: [`runtime-outside-core.md`](../decisions/runtime-outside-core.md), [`effect-workflow-substrate.md`](../decisions/effect-workflow-substrate.md), [`runtime-dynamic-transport.md`](../decisions/runtime-dynamic-transport.md)
 - Sibling feature docs: [`fork.md`](./fork.md), [`host.md`](./host.md), [`durable-stores.md`](./durable-stores.md), [`durable-agent-driver.md`](./durable-agent-driver.md), [`child-admission.md`](./child-admission.md), [`addressed-messaging.md`](./addressed-messaging.md), [`nested-operations.md`](./nested-operations.md)

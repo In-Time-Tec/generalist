@@ -133,4 +133,5 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 ## Related
 
 - Source: `packages/generalist/src/host/index.ts`, `packages/generalist/src/host/attachments.ts`, `packages/generalist/src/runtime/session/host.ts`
+- Test: [`host/index.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/host/index.test.ts)
 - Sibling feature docs: [`media.md`](./media.md), [`server.md`](./server.md), [`runtime.md`](./runtime.md), [`durable-stores.md`](./durable-stores.md), [`testing.md`](./testing.md)

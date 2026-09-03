@@ -22,7 +22,7 @@ const handler = Effect.gen(function* () {
 }).pipe(Effect.provide(A2A.layer(deployment)), Effect.provide(runtimeLayer))
 ```
 
-See the runnable offline [two-host A2A example](../../examples/a2a).
+See the runnable offline [two-host A2A example](https://github.com/In-Time-Tec/generalist/tree/main/examples/a2a).
 
 ## Implemented from the spec
 

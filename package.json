@@ -9,9 +9,13 @@
   "packageManager": "bun@1.4.0",
   "scripts": {
     "build": "bun turbo build",
-    "check": "bun run build && prettier --cache --check . && repo-lint check --no-cache && bun node_modules/oxlint/dist/cli.js --deny-warnings packages apps examples scripts test vitest.config.ts && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck",
+    "check": "bun run build && bun run docs:api:check && bun run docs:build && prettier --cache --check . && repo-lint check --no-cache && bun node_modules/oxlint/dist/cli.js --deny-warnings packages apps examples scripts test vitest.config.ts && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck",
     "install-preflight": "bun scripts/install-preflight.ts",
     "dev": "bun --cwd apps/docs dev",
+    "docs:api": "bun run --cwd packages/generalist build && bun scripts/docs-api.ts",
+    "docs:api:check": "bun scripts/docs-api.ts --check",
+    "docs:build": "bun scripts/docs-features.ts && MINTLIFY_TELEMETRY_DISABLED=1 bun --cwd docs mint validate && bun run docs:links",
+    "docs:links": "MINTLIFY_TELEMETRY_DISABLED=1 bun --cwd docs mint broken-links --check-redirects",
     "format": "prettier --write .",
     "package": "bun scripts/package-smoke.ts",
     "readme:check": "bun scripts/readme-check.ts",
@@ -24,6 +28,7 @@
     "packages": [
       "packages/*",
       "apps/*",
+      "docs",
       "examples/*",
       "examples/*/*"
     ],

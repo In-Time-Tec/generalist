@@ -2,6 +2,18 @@
 
 HTTP, SSE, and WebSocket transport now belong to stable `generalist/server`. The removed `generalist/unstable/transport/*` entrypoints exposed raw per-Run Runtime history; the current contract exposes product Sessions and their Host event cursor through one schema-first HttpApi.
 
+```ts
+import { Effect, Stream } from "effect"
+import { Server } from "generalist/server"
+
+const firstEvent = Effect.gen(function* () {
+  const client = yield* Server.client({ baseUrl: "https://agents.example.com" })
+  return yield* client.events.subscribe({ sessionId: "session-42" }).pipe(Stream.runHead)
+})
+```
+
+Test: [`server/websocket.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/server/websocket.test.ts)
+
 ## Current contract
 
 ```text
