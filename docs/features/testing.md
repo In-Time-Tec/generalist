@@ -91,3 +91,5 @@ const model = testModel([toolCall("lookup", { orderId: "42" }, { id: "call-1" })
 ```
 
 The model subpath depends on Effect but not `@effect/vitest` or `vitest`. One fixture owns one atomic FIFO cursor shared by streaming and non-streaming calls. It captures normalized requests before delay or failure and exposes direct and `ModelRegistry` Layers.
+
+Test: [`testing/runtime-driver/index.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/testing/runtime-driver/index.test.ts)

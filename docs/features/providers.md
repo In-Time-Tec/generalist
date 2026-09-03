@@ -118,4 +118,5 @@ The account client fixes the endpoint and bearer/account headers without putting
 ## Related
 
 - Source: `packages/generalist/src/ai/...`
+- Test: [`ai/provider/layer-model.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/ai/provider/layer-model.test.ts)
 - Site: `/docs/guides/providers`, `/docs/reference/providers`

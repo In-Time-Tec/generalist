@@ -29,7 +29,7 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(AGUI.layer({ address: Address.make("agent:assistant") })), Effect.provide(runtimeLayer))
 ```
 
-See the runnable offline [plain-fetch AG-UI example](../../examples/ag-ui).
+See the runnable offline [plain-fetch AG-UI example](https://github.com/In-Time-Tec/generalist/tree/main/examples/ag-ui).
 
 ## Implemented from the spec
 

@@ -1,23 +1,32 @@
 # Generalist documentation
 
-Consumer documentation follows the [Diátaxis](https://diataxis.fr) structure and lives in the docs site at [`apps/docs`](../apps/docs), published at:
+Generalist is an Effect-native TypeScript framework for process-local and durable AI agents. The
+[package README](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/README.md) owns installation,
+the first runnable Agent, package status, and license information.
 
-- Production: https://generalist-docs-production.up.railway.app
-- Staging: https://generalist-docs-staging.up.railway.app
+```sh
+bun add generalist effect
+```
 
-| Quadrant      | Site section | Purpose                                                          |
-| ------------- | ------------ | ---------------------------------------------------------------- |
-| Tutorials     | Start        | Introduction, five-minute quickstart, and full app walkthroughs. |
-| How-to guides | Guides       | Task-oriented recipes: tools, providers, memory, MCP, and more.  |
-| Explanation   | Learn        | How and why the agent loop, sessions, and durable Runtime work.  |
-| Reference     | Reference    | Every public entrypoint and its contract.                        |
+## Catalog
 
-Site pages are TypeScript modules under `apps/docs/src/pages` with typechecked snippets under `apps/docs/src/snippets`; the build also generates the LLM text files. Deployment is described in [`deployment.md`](deployment.md).
+- [Features](features/agent-loop.md) record current behavior and invariants, organized in navigation as Agents, Runtime,
+  Batteries, Hosts, and Testing.
+- [API reference](api/index.md) is generated from every public package export and searched by Mintlify.
+- [Decisions](decisions/typed-tool-boundaries.md) record durable reasons behind important choices.
+- [Tradeoffs](tradeoffs/strict-tool-registry.md) record meaningful gains and costs.
 
-This `docs/` directory holds contributor-facing records:
+## Build locally
 
-- [`features/`](features/) — current behavior and invariants the code relies on.
-- [`decisions/`](decisions/) — durable reasons behind important choices.
-- [`tradeoffs/`](tradeoffs/) — meaningful gains and costs.
+```sh
+bun run docs:api
+bun run docs:build
+```
 
-Vocabulary and ownership live in [`CONTEXT.md`](../CONTEXT.md), and product direction lives in [`PRODUCT.md`](../PRODUCT.md). Runnable examples live in [`examples/`](../examples), one README each.
+`docs:api` refreshes the committed TypeDoc artifact. `docs:build` reports feature pages still missing test links,
+validates the current `docs.json`, and checks internal links, anchors, and redirects. Mintlify provides hosted search;
+no separate search service is part of this repository.
+
+The existing `apps/docs` deployment remains unchanged in this build-only change. The
+[recorded recommendation](decisions/retire-docs-app-after-mintlify-cutover.md) is to retire it only after an owner
+approves a deployed Mintlify cutover.

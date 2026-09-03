@@ -96,4 +96,4 @@ hosted body fetch
 
 - Source: `packages/generalist/src/instructions/providers.ts`, `packages/generalist/src/instructions/files.ts`, `packages/generalist/src/instructions/skills/`, `packages/generalist/src/core/context/skill-catalog.ts`, `packages/generalist/src/core/agent/skill-tool.ts`
 - Site: `/docs/guides/instructions`, `/docs/guides/skills`, `/docs/reference/skills`
-- Feature: [Instruction guidance](instruction-guidance.md)
+- Feature: [Instruction guidance](./instruction-guidance.md)

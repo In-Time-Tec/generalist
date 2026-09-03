@@ -1,0 +1,11 @@
+{
+  "name": "@generalist/docs",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "mint": "4.2.866",
+    "typedoc": "0.28.20",
+    "typedoc-plugin-markdown": "4.13.0",
+    "typescript": "6.0.2"
+  }
+}
