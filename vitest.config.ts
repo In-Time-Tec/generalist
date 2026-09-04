@@ -1,7 +1,6 @@
 import { availableParallelism } from "node:os"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
-import { sourceTextPlugin } from "./apps/docs/scripts/source-text-plugin"
 import generalistManifest from "./packages/generalist/package.json" with { type: "json" }
 import { RuntimeDriverReport } from "./scripts/runtime-driver-report"
 
@@ -51,13 +50,11 @@ export default defineConfig({
     alias: generalistSourceAliases,
   },
   plugins: [
-    sourceTextPlugin,
     {
       name: "workspace-at-alias",
       resolveId(source: string, importer: string | undefined) {
         if (!source.startsWith("@/") || importer === undefined) return undefined
-        const base = importer.includes("/apps/docs/") ? "apps/docs/src" : "examples/deep-research-agent/web/src"
-        return `${repositoryRoot}${base}/${source.slice(2)}.ts`
+        return `${repositoryRoot}examples/deep-research-agent/web/src/${source.slice(2)}.ts`
       },
     },
   ],
@@ -66,11 +63,8 @@ export default defineConfig({
     maxWorkers: workers,
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    environmentMatchGlobs: [["apps/docs/**", "happy-dom"]],
     include: [
       "packages/**/test/**/*.test.ts",
-      "apps/**/src/**/*.test.ts",
-      "apps/**/test/**/*.test.ts",
       "examples/**/test/**/*.test.ts",
       "examples/**/src/**/*.test.ts",
       "test/**/*.test.ts",

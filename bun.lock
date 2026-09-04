@@ -33,28 +33,6 @@
         "vitest": "catalog:",
       },
     },
-    "apps/docs": {
-      "name": "generalist-docs",
-      "version": "0.0.0",
-      "dependencies": {
-        "@foldkit/ui": "catalog:",
-        "class-variance-authority": "catalog:",
-        "clsx": "catalog:",
-        "effect": "catalog:",
-        "foldkit": "catalog:",
-        "generalist": "workspace:*",
-        "tailwind-merge": "catalog:",
-      },
-      "devDependencies": {
-        "@foldkit/vite-plugin": "catalog:",
-        "@tailwindcss/vite": "catalog:",
-        "happy-dom": "catalog:",
-        "tailwindcss": "catalog:",
-        "typescript": "catalog:",
-        "vite": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
     "docs": {
       "name": "@generalist/docs",
       "devDependencies": {
@@ -161,6 +139,20 @@
         "tailwindcss": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",
+      },
+    },
+    "examples/docs-snippets": {
+      "name": "generalist-docs",
+      "dependencies": {
+        "@effect/platform-bun": "catalog:",
+        "@effect/sql-pg": "catalog:",
+        "effect": "catalog:",
+        "foldkit": "catalog:",
+        "generalist": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "examples/eval-in-ci": {
@@ -2076,7 +2068,7 @@
 
     "generalist": ["generalist@workspace:packages/generalist"],
 
-    "generalist-docs": ["generalist-docs@workspace:apps/docs"],
+    "generalist-docs": ["generalist-docs@workspace:examples/docs-snippets"],
 
     "generalist-example-a2a": ["generalist-example-a2a@workspace:examples/a2a"],
 

@@ -1,11 +1,10 @@
-# Retire the docs app after the Mintlify cutover
+# Mintlify is the documentation site
 
-Recommend deleting `apps/docs` in a follow-up after the owner approves and verifies a deployed Mintlify site. The app
-currently rebuilds navigation, Markdown rendering, static search, and reference pages that Mintlify supplies, while its
-content competes with `docs/features`, `docs/decisions`, `docs/tradeoffs`, and the package README as a second source of
-truth.
+The cutover is approved: `docs/` is the documentation source and Mintlify is the only documentation renderer and
+deployment target. The former `apps/docs` Foldkit site was removed instead of retaining a second navigation, search,
+rendering, and deployment system.
 
-Keep `apps/docs` unchanged until cutover because it is still the deployed consumer site and its typechecked snippets
-remain useful migration evidence. If a future page requires an interactive execution demo that Mintlify cannot host,
-retain only that independently useful demo in a deliberately separate app; do not keep a parallel documentation shell
-for hypothetical interactivity.
+The authored TypeScript pages were rendered to Markdown during migration. Their runnable sources live under
+`examples/docs-snippets` and remain part of the scripted-surface check. The Foldkit adapter and the independently useful
+deep-research web example remain supported; neither requires retaining a parallel docs shell. A future interactive demo
+must be an independently useful example rather than another documentation application.

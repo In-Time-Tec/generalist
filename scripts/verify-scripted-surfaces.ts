@@ -26,13 +26,13 @@ const skippedExamples = new Map([
 ])
 
 const skippedSnippets = new Map([
-  ["apps/docs/src/snippets/guides/agent/middleware/resilience.ts", "requires OPENROUTER_API_KEY"],
-  ["apps/docs/src/snippets/guides/runtime/providers/combine-providers.ts", "requires provider credentials"],
-  ["apps/docs/src/snippets/guides/runtime/providers/gemini-openai-compat.ts", "requires GOOGLE_AI_STUDIO_API_KEY"],
-  ["apps/docs/src/snippets/guides/runtime/providers/layer-first.ts", "requires OPENAI_API_KEY"],
-  ["apps/docs/src/snippets/guides/runtime/providers/openrouter.ts", "requires OPENROUTER_API_KEY"],
-  ["apps/docs/src/snippets/guides/tools/mcp/connect-server.ts", "requires OPENROUTER_API_KEY and an MCP server"],
-  ["apps/docs/src/snippets/research-agent/approve.ts", "requires a running research server and RUN_ID"],
+  ["examples/docs-snippets/guides/agent/middleware/resilience.ts", "requires OPENROUTER_API_KEY"],
+  ["examples/docs-snippets/guides/runtime/providers/combine-providers.ts", "requires provider credentials"],
+  ["examples/docs-snippets/guides/runtime/providers/gemini-openai-compat.ts", "requires GOOGLE_AI_STUDIO_API_KEY"],
+  ["examples/docs-snippets/guides/runtime/providers/layer-first.ts", "requires OPENAI_API_KEY"],
+  ["examples/docs-snippets/guides/runtime/providers/openrouter.ts", "requires OPENROUTER_API_KEY"],
+  ["examples/docs-snippets/guides/tools/mcp/connect-server.ts", "requires OPENROUTER_API_KEY and an MCP server"],
+  ["examples/docs-snippets/research-agent/approve.ts", "requires a running research server and RUN_ID"],
 ])
 
 const credentialNames = [
@@ -78,7 +78,7 @@ const exampleTargets = Effect.fn("VerifyScriptedSurfaces.exampleTargets")(functi
 
 const snippetTargets = Effect.fn("VerifyScriptedSurfaces.snippetTargets")(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-  const paths = yield* spawner.lines(ChildProcess.make("rg", ["-l", "^await ", "apps/docs/src/snippets", "-g", "*.ts"]))
+  const paths = yield* spawner.lines(ChildProcess.make("rg", ["-l", "^await ", "examples/docs-snippets", "-g", "*.ts"]))
   return sorted(paths.filter((path) => !skippedSnippets.has(path))).map(
     (path): Target => ({
       label: `snippet ${path}`,

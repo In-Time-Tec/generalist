@@ -1,0 +1,19 @@
+{
+  "name": "generalist-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "effect": "catalog:",
+    "foldkit": "catalog:",
+    "generalist": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

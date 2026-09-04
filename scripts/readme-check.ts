@@ -41,17 +41,26 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const root = path.resolve(".")
-  const readme = yield* fileSystem.readFileString(path.join(root, "README.md"))
-  const blocks = Array.from(readme.matchAll(typescriptFence), (match) => match[1])
-  if (blocks.length === 0) return yield* failure("README.md contains no ```ts code blocks")
-
   const directory = yield* fileSystem.makeTempDirectoryScoped({ directory: root, prefix: ".readme-check-" })
   yield* fileSystem.writeFileString(path.join(directory, "tsconfig.json"), tsconfig)
-  yield* Effect.forEach(blocks, (block, index) =>
-    fileSystem.writeFileString(path.join(directory, `block-${index + 1}.ts`), block ?? ""),
-  )
+
+  let count = 0
+  for (const filename of [
+    "README.md",
+    "packages/generalist/README.md",
+    "docs/getting-started.md",
+    "docs/start/quickstart.md",
+  ]) {
+    const source = yield* fileSystem.readFileString(path.join(root, filename))
+    const blocks = Array.from(source.matchAll(typescriptFence), (match) => match[1])
+    if (blocks.length === 0) return yield* failure(`${filename} contains no \`\`\`ts code blocks`)
+    for (const block of blocks) {
+      count += 1
+      yield* fileSystem.writeFileString(path.join(directory, `block-${count}.ts`), block ?? "")
+    }
+  }
   yield* typecheck(directory)
-  yield* Console.log(`README TypeScript blocks: ${blocks.length} passed`)
+  yield* Console.log(`README and quickstart TypeScript blocks: ${count} passed`)
 })
 
 await Effect.runPromise(program().pipe(Effect.scoped, Effect.provide(layer)))

@@ -1,8 +1,34 @@
-# Testing adapters
+# Testing
 
-`generalist/testing` gives adapter authors the same conformance suites used by Generalist itself and exports the scripted Effect AI model fixture as `TestModel`. Import its named members from `generalist/testing/model` when no test runner is installed. The old `generalist/test` subpath does not exist.
+Test agent behavior with scripted model responses instead of calling a paid API. You can check your prompts, tool handlers, and output handling with predictable results.
 
-## Register conformance suites
+## Test an agent without an API key
+
+Save this as `agent-check.ts` and run `bun agent-check.ts` in a project with Generalist and Effect installed:
+
+```ts
+import { Console, Effect } from "effect"
+import { Agent } from "generalist"
+import { layer as testModel, text } from "generalist/testing/model"
+
+const assistant = Agent.make({ name: "assistant" })
+
+await Effect.gen(function* () {
+  const answer = yield* Agent.run(assistant, "Say hello.")
+  if (answer !== "Hello!") return yield* Effect.fail("Unexpected answer")
+  yield* Console.log("Agent check passed")
+}).pipe(Effect.provide(testModel([text("Hello!")])), Effect.runPromise)
+```
+
+The program prints `Agent check passed`. The model returns the scripted response regardless of the prompt, so this checks your application's handling of the response—not whether a real model follows instructions. Use [evals](../guides/testing-evals.md) to measure behavior with real models.
+
+For tool-calling tests, script a `toolCall(...)` followed by the final `text(...)`, and provide the toolkit's handler Layer and authorization policy. The [offline quickstart](../start/quickstart.md) shows a complete example.
+
+## Test a custom adapter
+
+If you are implementing a Runtime driver, memory store, or sandbox adapter, `generalist/testing` provides the shared conformance suites used by Generalist itself. The `generalist/testing/model` subpath is independent of Vitest; the conformance suites use `@effect/vitest`.
+
+### Register conformance suites
 
 An out-of-repo Runtime driver advertises only capabilities it implements. Capability values carry the driver-specific operations needed by the shared expectations.
 

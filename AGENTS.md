@@ -8,7 +8,7 @@ Use the Bun version pinned in `package.json` and the committed lockfile.
 
 ```bash
 bun install --frozen-lockfile # install the locked workspace
-bun run dev                   # run the docs app
+bun run dev                   # preview the Mintlify docs
 bun run build                 # build every workspace
 bun run format                # write formatting changes
 ```
@@ -51,7 +51,7 @@ This is the downstream compatibility check. It packs the public package, validat
 - Inspect pinned Effect source and types in `node_modules` before using an unfamiliar API. `repos/effect` is read-only reference material: never edit, import, format, build, or test it.
 - This project is pre-1.0 and has no compatibility promise. Keep one current contract, update all callers, and delete replaced paths instead of adding shims.
 
-`PRODUCT.md` owns audience, direction, and exclusions. `CONTEXT.md` owns vocabulary, authority, and system boundaries. `PLAN.md` owns unfinished work, target contracts, dependency order, deletion scope, and release acceptance; it does not describe shipped behavior. `docs/features/` records current behavior and invariants. `docs/decisions/` records durable reasons, and `docs/tradeoffs/` records meaningful gains and costs. Package READMEs and the docs app own public usage.
+`PRODUCT.md` owns audience, direction, and exclusions. `CONTEXT.md` owns vocabulary, authority, and system boundaries. `PLAN.md` owns unfinished work, target contracts, dependency order, deletion scope, and release acceptance; it does not describe shipped behavior. `docs/features/` records current behavior and invariants. `docs/decisions/` records durable reasons, and `docs/tradeoffs/` records meaningful gains and costs. Package READMEs and the Mintlify guides in `docs/` own public usage.
 
 Package manifests, `scripts/package-smoke*.ts`, and `.github/workflows/publish.yml` own the release train. Do not introduce another package list, version, or artifact authority.
 

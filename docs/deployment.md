@@ -1,14 +1,13 @@
 # Deployment
 
-The docs site (`apps/docs`) deploys through Railway project `generalist` with two GitHub-triggered environments, both gated on green CI:
+Mintlify owns the documentation build and deployment from the `docs/` directory. Connect the repository and set the
+Mintlify docs path to `docs`; pushes then use `docs/docs.json` and the Markdown pages in that directory.
 
-- Staging https://generalist-docs-staging.up.railway.app — auto-deploys every push to `main`.
-- Production https://generalist-docs-production.up.railway.app — auto-deploys every push to `release`.
+Before merging documentation changes, run:
 
-Promote staging to production:
-
-```bash
-git push origin main:release
+```console
+bun run docs:build
 ```
 
-If `release` ever diverges (direct hotfix), confirm the hotfix landed on `main`, then `git push --force-with-lease origin main:release`. Build config lives in `apps/docs/railway.json`; the static output dir comes from the `RAILPACK_SPA_OUTPUT_DIR=apps/docs/dist` service variable. Verify both environments any time with `scripts/verify-docs-deploy.sh`.
+This validates Mintlify configuration and checks internal links, anchors, and redirects. `bun run dev` starts the local
+Mintlify preview. The retired Foldkit docs app and its Railway smoke script are intentionally not deployment paths.

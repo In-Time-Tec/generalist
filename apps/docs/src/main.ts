@@ -1,6 +1,0 @@
-export { init } from "./app/init"
-export { Message } from "./app/message"
-export { Model } from "./app/model"
-export { subscriptions } from "./app/subscriptions"
-export { update } from "./app/update"
-export { view } from "./app/view"

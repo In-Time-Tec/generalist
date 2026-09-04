@@ -222,7 +222,7 @@
       }
     },
     {
-      "files": ["apps/docs/src/snippets/**/*.ts"],
+      "files": ["examples/docs-snippets/**/*.ts"],
       "rules": {
         "effecttsgo/strict-effect-provide": "off"
       }

@@ -1,82 +1,59 @@
 # Generalist
 
-Generalist is a TypeScript framework for building AI agents on [Effect](https://effect.website). An agent is a plain value — a name, instructions, tools, and a turn policy — and running one produces a typed event stream. Models, approvals, permissions, memory, and every other capability are Effect services you can swap, each with a deterministic test layer, so agents run in CI with no API keys.
+Build AI agents in TypeScript with [Effect](https://effect.website). Generalist calls a model, runs its tools, and continues until it has an answer. You choose the model, tools, and deployment.
 
-Use `generalist` for process-local agents and chat streaming. Add `generalist/runtime` when runs need stable addresses, replayable events, durable waits, cancellation, or restart recovery.
+Use the agent loop on its own, or add the optional durable Runtime for work that must survive a restart.
 
 ## Install
 
+This example uses OpenAI. You will need an API key and Bun 1.4+.
+
 ```bash
-bun add generalist @effect/ai-openai # or the provider you use
+bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
+export OPENAI_API_KEY="your-api-key"
 ```
 
-`effect` is a peer dependency — install it only if your project does not have it already. Requires `effect@4.0.0-rc.112`, Node 22+ or Bun 1.4+. Everything ships as this single package: names like `generalist/runtime`, `generalist/testing/model`, `generalist/pg`, or `generalist/providers/openai` are import subpaths, not separate packages. Each adapter's host dependencies are optional peers, so you install only what you import.
+## Run an agent
 
-## Example
+Save this as `index.ts` and run `bun index.ts`:
 
 ```ts
-import { Config, Effect, Layer, Schema } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
+import { Config, Console, Effect, Layer } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import { Agent, Approvals, Compaction, Permissions } from "generalist"
-import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/providers/openai"
-import { WorkingMemory } from "generalist/memory"
+import { Agent } from "generalist"
+import { layerConfig, layerModel } from "generalist/providers/openai"
 
-const searchDocs = Tool.make("search_docs", {
-  description: "Search the product docs",
-  parameters: Schema.Struct({ query: Schema.String }),
-  success: Schema.Array(Schema.String),
-})
-const toolkit = Toolkit.make(searchDocs)
-
-const support = Agent.make({
-  name: "support",
-  instructions: "Answer from the docs. Be brief.",
-  toolkit,
+const assistant = Agent.make({
+  name: "assistant",
+  instructions: "Give short, practical answers.",
 })
 
-// One provider client; models are thin layers over it.
-const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
-const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi)) // any OpenAI model id
+const model = layerModel({ model: "gpt-4o-mini" }).pipe(
+  Layer.provide(layerConfig({ apiKey: Config.redacted("OPENAI_API_KEY") })),
+  Layer.provide(FetchHttpClient.layer),
+)
 
-const program = Agent.run(support, "How do I rotate my API key?", {
-  memory: { key: { agent: "support", subject: "user:42" } }, // remembers this user across runs
-  compaction: { contextWindow: 200_000 }, // old turns compress, never drop
-})
-
-await program.pipe(
-  Effect.provide(sol), // choose the model per run — nothing else changes
-  Effect.provide(
-    Layer.mergeAll(
-      toolkit.toLayer({ search_docs: () => Effect.succeed(["Settings → API keys → Rotate"]) }),
-      Permissions.layerAllowAll, // explicit tool policy: no implicit defaults
-      Approvals.layerAutoApprove,
-      WorkingMemory.layer({ maxMessages: 50 }),
-      Compaction.layer({
-        contextWindow: 200_000,
-        reserveTokens: 16_384,
-        strategy: Compaction.strategy([
-          Compaction.toolOutputBound({ maxBytes: 16_384 }),
-          Compaction.structuredSummary({ objectName: "AgentSummary" }),
-          Compaction.keepRecent({ tokens: 20_000 }),
-        ]),
-      }),
-    ),
-  ),
+await Agent.run(assistant, "When would I use an AI agent instead of a single model call?").pipe(
+  Effect.provide(model),
+  Effect.flatMap(Console.log),
   Effect.runPromise,
 )
 ```
 
-Tools, per-user memory, and compaction — all layers you can swap for tests. Child agents inherit the ambient model or choose their own via a model layer. Durable runs (`generalist/runtime`) add stop, inspect, and resume across restarts; any agent can also be exposed as a tool another agent calls.
+`Agent.make` defines the agent; `Agent.run` returns its answer. Provide a different model Layer to change providers or test without an API key. Use `Agent.stream` when you need events instead of just the final result.
 
-## Documentation
+## Next steps
 
-[generalist-docs-production.up.railway.app](https://generalist-docs-production.up.railway.app) has tutorials, how-to guides, explanation, and reference for every public subpath.
+- [Offline quickstart](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/quickstart.md): run a tool-calling agent without credentials.
+- [Tools](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/define-tools.md): give an agent functions it can call.
+- [Structured output](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/structured-output.md): return schema-validated objects.
+- [Durable Runtime](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/runtime.md): persist work with SQLite, PostgreSQL, or MySQL.
+- [Documentation](https://github.com/In-Time-Tec/generalist/tree/main/docs): guides, examples, and API reference.
 
 ## Status
 
-Every export is `@experimental` while `effect/unstable/ai` is unstable. Tested against `effect@4.0.0-rc.112`.
+Generalist is pre-1.0: APIs can change between releases. Requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
-## License
+Everything ships in this package. Imports such as `generalist/runtime`, `generalist/pg`, and `generalist/testing/model` are subpaths, not separate installs. You only need the optional dependencies for adapters you use.
 
-[MIT](LICENSE)
+[MIT](LICENSE) · [Source](https://github.com/In-Time-Tec/generalist)
