@@ -12,7 +12,7 @@ You will need Bun 1.4+.
 ```bash
 mkdir generalist-quickstart && cd generalist-quickstart
 bun init -y
-bun add generalist effect@4.0.0-rc.112
+bun add generalist@0.61.0 effect@4.0.0-rc.112
 ```
 
 ## Define and run the agent
@@ -77,9 +77,14 @@ The allow-all and auto-approve Layers are appropriate for this harmless example.
 
 Keep the agent and toolkit. Replace `testModel(...)` in the service Layer with a provider model Layer from [Getting started](/getting-started), and replace the weather stub with your weather service. The model can then choose when to call the tool and compose its own answer.
 
+## If it fails
+
+A missing handler or policy service usually means the service Layer was not provided to `Agent.run`. Copy the whole example, including `Permissions` and `Approvals`. If imports fail, check the matching versions in [Installation](/start/installation); do not mix Effect release candidates.
+
 ## Next steps
 
 - [Define tools](/guides/define-tools): tool inputs, outputs, and handlers.
 - [Understand the loop](/learn/agent-loop): turns and streaming events.
 - [Test your agent](/features/testing): scripted responses and assertions.
 - [Browse examples](/start/examples): larger applications to build on.
+- [Run locally and reopen SQLite](/start/examples#local-and-sqlite-in-five-minutes): see when Runtime adds value.

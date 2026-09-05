@@ -1,9 +1,9 @@
 ---
-title: "Getting started"
-description: "Build your first AI agent with TypeScript and Effect."
+title: "Run an agent in your application"
+description: "Start with a local agent, then add tools or durable execution when you need them."
 ---
 
-Generalist runs AI agents inside your TypeScript application. It handles the loop between model calls and tools, while you choose the provider and write the tool functions.
+Generalist adds a tool-calling agent loop to Effect AI. It runs inside your TypeScript application; you own the model, tools, and service Layers. Use Effect AI directly for a single generation. Add Generalist for multiple turns, policies, approvals, and run events.
 
 You can start without a database, server, or API key. The [offline quickstart](/start/quickstart) walks through a tool-calling agent with a scripted model. To use a real model, follow the example below.
 
@@ -14,7 +14,7 @@ You will need Bun 1.4+ and an OpenAI API key. Generalist also supports Node 22+;
 ```bash
 mkdir my-agent && cd my-agent
 bun init -y
-bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
+bun add generalist@0.61.0 effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
 export OPENAI_API_KEY="your-api-key"
 ```
 
@@ -49,6 +49,8 @@ bun index.ts
 
 The program prints the model's answer. The wording varies, and the request uses your OpenAI account's API quota.
 
+If configuration fails, check that `OPENAI_API_KEY` is set in the shell running Bun. If the provider rejects the request, check model access and account quota. To check the wiring without a provider, run the [offline quickstart](/start/quickstart).
+
 ## What the code does
 
 - `Agent.make` defines a name and instructions. It does not call the model yet.
@@ -64,5 +66,7 @@ An Effect describes work, including its result, possible failures, and required 
 - [Choose another provider](/guides/providers) without changing the agent definition.
 - [Test agent behavior](/features/testing) without network calls or API keys.
 - [Add the durable Runtime](/features/runtime) when accepted work must survive a restart.
+
+Want to see the difference first? [Five minutes: local and SQLite reopen](/start/examples#local-and-sqlite-in-five-minutes) runs the same agent both ways without credentials. Before exposing a server, read [Operate an agent service](/guides/production).
 
 Generalist is pre-1.0 and uses unstable Effect AI APIs. Keep Effect and optional Effect provider packages on the documented matching versions; expect breaking changes between Generalist releases.

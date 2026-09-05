@@ -1,9 +1,9 @@
 ---
 title: "Tutorial: a research agent with approvals and a live UI"
-description: "Build a research agent with a real web_search tool, human approval over the wire, and a live FoldKit chat UI: zero-credential by default, live with one env var."
+description: "Build an approval and chat transport demo with canned search; optionally connect a live model."
 ---
 
-In this tutorial we build a research agent with a real web_search tool, human approval, and a live FoldKit chat UI. It runs with zero credentials by default and goes live against a real model with one environment variable.
+Build a research-shaped agent with human approval and a FoldKit chat UI. Search results are canned, not fetched from the web. With no credentials the model is scripted too. `OPENROUTER_API_KEY` enables a live model but does not enable live search in this tutorial.
 
 Three parts: a Bun server that streams agent runs over SSE and WebSocket, an approval resolved over the wire, and a browser chat UI. If you have not done [the quickstart](/start/quickstart), start there. The finished, styled version of this app lives in the repository at [examples/deep-research-agent](https://github.com/In-Time-Tec/generalist/tree/main/examples/deep-research-agent).
 
@@ -16,7 +16,7 @@ Three parts: a Bun server that streams agent runs over SSE and WebSocket, an app
 ```bash
 mkdir research-agent && cd research-agent
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.45.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112
+bun add effect@4.0.0-rc.112 generalist@0.61.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112
 ```
 
 ### A web search service
@@ -221,7 +221,7 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | WebSearch |
 
 ### Runtime and routes
 
-`Runtime.layerMemory` owns durable execution, while `Generalist.create` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. The approvals layer parks an approval-gated tool until a human resolves its durable token. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket.
+`Runtime.layerMemory` implements the Runtime contract in memory; its data does not survive a process restart. `Generalist.create` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. The approvals layer parks an approval-gated tool until a human resolves its token. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production).
 
 **server.ts**
 
@@ -411,7 +411,7 @@ The stream resumes, the tool executes, the second model turn synthesizes, and th
 ```bash
 mkdir web && cd web
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.45.0 foldkit@0.148.2
+bun add effect@4.0.0-rc.112 generalist@0.61.0 foldkit@0.148.2
 bun add -d vite
 ```
 
@@ -449,7 +449,7 @@ import { type ApplicationInit, makeApplication, run } from "foldkit/runtime"
 import { ts } from "foldkit/schema"
 import { type Subscriptions, lift } from "foldkit/subscription"
 import { evo } from "foldkit/struct"
-import { html } from "../../html"
+import { html } from "./html"
 const SERVER_HTTP_URL = "http://localhost:4000"
 
 const SessionOpening = ts("SessionOpening")
@@ -664,6 +664,8 @@ const application = makeApplication({
 run(application)
 ```
 
+The view uses the repository's typed HTML helper, not a FoldKit export. Copy [examples/docs-snippets/html.ts](https://github.com/In-Time-Tec/generalist/blob/main/examples/docs-snippets/html.ts) into `web/html.ts`. The utility class names require styling; this minimal scaffold does not configure Tailwind. For the styled application and its build configuration, run [examples/deep-research-agent](https://github.com/In-Time-Tec/generalist/tree/main/examples/deep-research-agent) instead.
+
 Run `bunx vite` next to the `index.html` and open the printed URL.
 
 ## You have built the whole thing
@@ -672,6 +674,7 @@ Ask a question in the browser; the Agent pauses with an approval card; click App
 
 ## Next steps
 
+- Unlike this tutorial, the repository example has an Exa search Layer: `EXA_API_KEY` selects live search independently of `OPENROUTER_API_KEY`. With only the model key, search remains canned; with only the Exa key, the model remains scripted. Neither key is required for the demo.
 - The transport in depth (replay cursors, snapshots, busy sessions): [How to serve an agent over SSE and WebSocket](/guides/serve-transport).
 - The chat model in depth (semantic entries, run state, reconnect states): [How to build a chat UI with FoldKit](/guides/foldkit-chat).
 - Where durability lives when runs must survive restarts: [Core and Runtime](/learn/native-runtime).

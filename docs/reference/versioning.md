@@ -7,13 +7,13 @@ Generalist publishes to npm as one package; every adapter is a subpath export at
 
 ## Published package
 
-| Package      | Version  | Subpath exports                                                                                                                                                                                                                                                                                                          |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `generalist` | `0.61.0` | 67 explicit subpath exports for Core, Runtime, exact AI leaves, MCP, memory, instructions and skills, test hosts, transport, integrations, and the `./pg`, `./mysql`, `./unstable/cloudflare/workers`, `./unstable/cloudflare/durable-objects`, `./unstable/cloudflare/dynamic-workers`, and `./unstable/rivet` adapters |
+| Package      | Version  | Subpath exports                                                                                                                                                                                                                                                                          |
+| ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generalist` | `0.61.0` | Core, Runtime, exact AI leaves, MCP, memory, instructions and skills, test hosts, transport, integrations, and the `./pg`, `./mysql`, `./unstable/cloudflare/workers`, `./unstable/cloudflare/durable-objects`, `./unstable/cloudflare/dynamic-workers`, and `./unstable/rivet` adapters |
 
 ## The @experimental policy
 
-Every public export remains `@experimental` while `effect/unstable/ai` is unstable. APIs may change in any 0.x release.
+Every public export remains `@experimental` while `effect/unstable/ai` is unstable. This pre-1.0 project has no compatibility promise: APIs may change in any 0.x release. Read the changelog, use the [generated API](/api/index) for current signatures, and test your callers before upgrading. The package manifest, not a manually maintained export count, owns the public entrypoints.
 
 ## Effect compatibility
 

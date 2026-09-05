@@ -19,7 +19,7 @@ You will learn how to:
 ```bash
 mkdir cell-agent && cd cell-agent
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.45.0
+bun add effect@4.0.0-rc.112 generalist@0.61.0 @effect/platform-bun@4.0.0-rc.112
 ```
 
 `generalist/repl`'s root export is contracts only, so nothing so far touches a process.
@@ -63,7 +63,7 @@ await Effect.runPromise(program)
 tool: typescript
 parameters: code
 scheduling: maxConcurrency=1 parallelSafe=0
-epoch digest: 02d1994c96b99e5142dffabc351dc7d66e2d387df3361a60d7aaf3afc94748ed
+epoch digest: 12f2803b14c8b96bc3580bb6fdc07ca792eab971f31260feb0922f030c588991
 ```
 
 Three facts are already visible. The agent gets exactly one tool, named `typescript`, with exactly one parameter, `code`. Because one namespace is shared, scheduling is always `maxConcurrency: 1` with no parallel-safe tool, so every cell is an authored-order exclusive barrier. And the profile has a digest: change the pinned runtime, the mounted bindings, the workspace, the limits, or the trust mode, and you get a different epoch rather than a reused one.
@@ -112,6 +112,7 @@ const program = Effect.gen(function* () {
 
 const runtime = ManagedRuntime.make(TestKernel.layerTestPool({ profile, script }))
 await runtime.runPromise(Effect.scoped(program))
+await runtime.dispose()
 ```
 
 **Output**
@@ -223,6 +224,7 @@ const layer = CellTool.layer.pipe(
 
 const runtime = ManagedRuntime.make(layer)
 await runtime.runPromise(program)
+await runtime.dispose()
 ```
 
 **Output**
@@ -238,7 +240,7 @@ The mounted module names feed `KernelProfile.bindingsDigest`, which is part of t
 
 ## Step 5: Swap in the real Bun kernel
 
-Everything so far ran without a process. `generalist/repl/bun` is the only module that changes that. The contract is identical, so only the layer changes:
+Everything so far ran without a worker process. `generalist/repl/bun` changes that. The following is a composition fragment, not a standalone runnable file: supply the `workspace` module from Step 4, a writable `dataRoot`, and your installed `bunVersion`. The earlier `1.3.14` profile values are test fixtures, not the required Bun version. Use the repository's pinned Bun version for the real kernel.
 
 **kernel.ts**
 

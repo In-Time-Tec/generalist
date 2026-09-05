@@ -14,7 +14,17 @@ bun install --frozen-lockfile
 bun run build
 ```
 
-## The examples
+## Local and SQLite in five minutes
+
+Start with [examples/five-minutes](https://github.com/In-Time-Tec/generalist/tree/main/examples/five-minutes). After the setup above:
+
+```bash
+bun run --cwd examples/five-minutes start
+```
+
+It prints `Local: A durable agent can continue an accepted run after its host restarts.` and then `Recovered <runId>:` with the same summary. It closes the first SQLite Runtime scope, opens a fresh Layer on the same file, and starts with the same Session and idempotency key. The example asserts that the Run ID and output match. The temporary database is removed when the example exits; this is a reopen demonstration, not a database deployment recipe.
+
+## More examples
 
 | Example                    | What it shows                                                                                                                                      | Run                                                 |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
@@ -28,4 +38,4 @@ bun run build
 | `capstone-local-assistant` | The runtime packages composed in one offline program: core loop, deterministic provider, skills, memory, wire frames, and the headless chat update | `bun --cwd examples/capstone-local-assistant start` |
 | `deep-research-agent`      | The full server-plus-browser app: a web_search tool, SSE and WebSocket transport, and a styled FoldKit chat UI                                     | `bun --cwd examples/deep-research-agent start`      |
 
-`deep-research-agent` starts the server; run the web UI beside it with `bun --cwd examples/deep-research-agent web`. It uses canned search results and a scripted model until you set `EXA_API_KEY` and `OPENROUTER_API_KEY`. The tutorial that builds it from scratch is [Tutorial: a research agent](/start/research-agent).
+`deep-research-agent` starts the server; run the web UI beside it with `bun --cwd examples/deep-research-agent web`. `EXA_API_KEY` enables live Exa search; `OPENROUTER_API_KEY` independently enables a live model. With neither key, both are scripted/canned. The [research tutorial](/start/research-agent) is a smaller unstyled scaffold: it only implements canned search, even with a live model key. Its pass-through authentication is not suitable for public hosting.
