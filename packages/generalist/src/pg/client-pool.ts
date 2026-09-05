@@ -2,7 +2,7 @@ import { PgClient } from "@effect/sql-pg"
 import { Cause, Duration, Effect, Exit, Redacted, Stream } from "effect"
 import type { Connection } from "effect/unstable/sql/SqlConnection"
 import { ConnectionError, SqlError, UnknownError } from "effect/unstable/sql/SqlError"
-import { Client, Pool } from "pg"
+import { Client, Pool, type PoolClient } from "pg"
 import Cursor from "pg-cursor"
 import { Reactivity } from "effect/unstable/reactivity"
 
@@ -33,6 +33,7 @@ export const makeClient = (config: PgClient.PgPoolConfig) =>
       (resource) => Effect.promise(() => resource.end()),
     )
     pool.on("error", () => {})
+    const backendIds = new WeakMap<PoolClient, number>()
     const reactivity = yield* Reactivity.Reactivity
     const acquire = Effect.gen(function* () {
       let released = false
@@ -58,8 +59,32 @@ export const makeClient = (config: PgClient.PgPoolConfig) =>
       const client = yield* PgClient.fromClient({ acquire: Effect.succeed(raw), acquireForStream: true }).pipe(
         Effect.provideService(Reactivity.Reactivity, reactivity),
       )
+      let backendId = backendIds.get(raw)
+      if (backendId === undefined) {
+        const [row] = yield* client<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`
+        if (row === undefined)
+          return yield* SqlError.make({
+            reason: ConnectionError.make({ cause: "Missing backend PID", operation: "acquire" }),
+          })
+        backendId = row.pid
+        backendIds.set(raw, backendId)
+      }
+      const pid = backendId
+      // Cancellation must not wait for capacity in the pool occupied by the query it cancels.
+      const cancel = Effect.acquireUseRelease(
+        Effect.sync(() => {
+          const control = new Client({ ...pool.options, connectionTimeoutMillis: 750, query_timeout: 750 })
+          control.on("error", () => {})
+          return control
+        }),
+        (control) =>
+          Effect.tryPromise(() => control.connect()).pipe(
+            Effect.andThen(Effect.tryPromise(() => control.query("SELECT pg_cancel_backend($1)", [pid]))),
+          ),
+        (control) => Effect.promise(() => control.end()).pipe(Effect.timeoutOption("1 second")),
+      ).pipe(Effect.ignore, Effect.ensuring(discard))
       const connection = yield* client.reserve
-      const protect = <A, E>(effect: Effect.Effect<A, E>) => effect.pipe(Effect.onInterrupt(() => discard))
+      const protect = <A, E>(effect: Effect.Effect<A, E>) => effect.pipe(Effect.onInterrupt(() => cancel))
       return {
         execute: (...args) => protect(connection.execute(...args)),
         executeRaw: (...args) => protect(connection.executeRaw(...args)),
@@ -85,7 +110,10 @@ export const makeClient = (config: PgClient.PgPoolConfig) =>
                     else resume(Effect.succeed([first, ...rest]))
                   }
                 })
-              }).pipe(Effect.onError(() => discard))
+              }).pipe(
+                Effect.onInterrupt(() => cancel),
+                Effect.onError(() => discard),
+              )
               return Stream.fromPull(Effect.succeed(pull))
             }),
           ),

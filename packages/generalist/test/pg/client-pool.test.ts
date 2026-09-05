@@ -142,6 +142,13 @@ for (const mode of ["statement", "stream"] as const) {
           const started = yield* Clock.currentTimeMillis
           yield* Fiber.interrupt(running)
           expect((yield* Clock.currentTimeMillis) - started).toBeLessThan(1_000)
+          const activity = yield* Effect.tryPromise(() =>
+            admin.query<{ count: number }>(
+              "SELECT count(*)::int AS count FROM pg_stat_activity WHERE pid = $1 AND state = 'active'",
+              [pid],
+            ),
+          )
+          expect(activity.rows[0]?.count).toBe(0)
           expect((yield* sql<{ pid: number }>`SELECT pg_backend_pid() AS pid`)[0]?.pid).not.toBe(pid)
         }),
       ),
