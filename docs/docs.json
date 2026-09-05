@@ -2,6 +2,8 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Generalist",
+  "logo": "/images/generalist-logo.png",
+  "favicon": "/images/generalist-logo.png",
   "colors": {
     "primary": "#5B5BD6"
   },

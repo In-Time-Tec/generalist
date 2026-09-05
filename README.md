@@ -1,3 +1,5 @@
+<img src="docs/images/generalist-logo.png" alt="Generalist logo" width="160" height="160" />
+
 # Generalist
 
 Build AI agents in TypeScript with [Effect](https://effect.website). Generalist runs the conversation loop: call a model, execute its tools, and continue until it has an answer. You choose the model, tools, and where the agent runs.
