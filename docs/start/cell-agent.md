@@ -19,7 +19,7 @@ You will learn how to:
 ```bash
 mkdir cell-agent && cd cell-agent
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.61.0 @effect/platform-bun@4.0.0-rc.112
+bun add effect@4.0.0-rc.112 generalist@0.61.1 @effect/platform-bun@4.0.0-rc.112
 ```
 
 `generalist/repl`'s root export is contracts only, so nothing so far touches a process.

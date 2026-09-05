@@ -14,7 +14,7 @@ You will need Bun 1.4+ and an OpenAI API key. Generalist also supports Node 22+;
 ```bash
 mkdir my-agent && cd my-agent
 bun init -y
-bun add generalist@0.61.0 effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
+bun add generalist@0.61.1 effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
 export OPENAI_API_KEY="your-api-key"
 ```
 

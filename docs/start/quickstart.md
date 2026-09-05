@@ -12,7 +12,7 @@ You will need Bun 1.4+.
 ```bash
 mkdir generalist-quickstart && cd generalist-quickstart
 bun init -y
-bun add generalist@0.61.0 effect@4.0.0-rc.112
+bun add generalist@0.61.1 effect@4.0.0-rc.112
 ```
 
 ## Define and run the agent
