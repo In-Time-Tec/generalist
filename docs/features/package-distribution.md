@@ -9,7 +9,7 @@ Generalist ships as one `generalist` package: compiled ESM and declarations are 
 bun add generalist effect
 
 # Add only the peers required by an imported adapter
-bun add @effect/sql-pg
+bun add @effect/sql-pg pg pg-cursor
 ```
 
 ```ts

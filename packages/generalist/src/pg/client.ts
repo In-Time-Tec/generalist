@@ -1,5 +1,5 @@
 import { Redacted } from "effect"
-import { PgClient } from "@effect/sql-pg"
+import { layerClientPool } from "./client-pool.js"
 
 export interface PostgresClientOptions {
   readonly url: string
@@ -7,7 +7,7 @@ export interface PostgresClientOptions {
 }
 
 export const layerClient = (options: PostgresClientOptions) =>
-  PgClient.layer({
+  layerClientPool({
     url: Redacted.make(options.url),
     ...(options.maxConnections === undefined ? undefined : { maxConnections: options.maxConnections }),
   })

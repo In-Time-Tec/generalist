@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.61.0",
+  "version": "0.61.1",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,9 @@
     "modal": "catalog:",
     "rivetkit": "catalog:",
     "vitest": "catalog:",
-    "yjs": "catalog:"
+    "yjs": "catalog:",
+    "pg": "catalog:",
+    "pg-cursor": "catalog:"
   },
   "files": [
     "dist",
@@ -358,7 +360,9 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "workerd": "1.20260819.1",
-    "yjs": "catalog:"
+    "yjs": "catalog:",
+    "pg": "catalog:",
+    "pg-cursor": "catalog:"
   },
   "repository": {
     "type": "git",
@@ -433,6 +437,12 @@
       "optional": true
     },
     "yjs": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "pg-cursor": {
       "optional": true
     }
   }

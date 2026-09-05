@@ -211,9 +211,9 @@ export const minimumConsumerProfiles = [
   },
   {
     name: "sql-adapters",
-    peers: ["@effect/sql-pg", "@effect/sql-mysql2"],
+    peers: ["@effect/sql-pg", "@effect/sql-mysql2", "pg", "pg-cursor"],
     imports: [
-      { specifier: "generalist/pg", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
+      { specifier: "generalist/pg", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema", "layerClientPool"] },
       { specifier: "generalist/mysql", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
     ],
   },

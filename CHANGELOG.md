@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.61.1
+
+- Discard PostgreSQL connections when queries are interrupted or transactions fail, preventing pool starvation and reuse after ambiguous commits.
+- Expose `layerClientPool` from `generalist/pg` for applications sharing the same scoped PostgreSQL connection behavior.
+
 ## Unreleased
 
 - Preserve the committed model-response replay cursor across interruption and reopen. Recovery consumes the recorded response without calling the model again, and restores already charged tokens only while replaying that response.

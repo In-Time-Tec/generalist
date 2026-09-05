@@ -208,6 +208,26 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 PostgreSQL Runtime construction failures.
 
+## Variables
+
+<a id="layerclientpool"></a>
+
+### layerClientPool
+
+> `const` **layerClientPool**: (`config`) => `Layer`
+
+Provide the scoped PostgreSQL client and Effect SQL services.
+
+#### Parameters
+
+##### config
+
+`PgClient.PgPoolConfig`
+
+#### Returns
+
+`Layer`
+
 ## Functions
 
 <a id="layer"></a>
