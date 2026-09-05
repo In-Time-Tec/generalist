@@ -4,6 +4,7 @@ import {
   type DriverOperation,
   type OperationOutcome,
 } from "../../core/durable/driver.js"
+import { withPending } from "../../core/durable/loop-driver.js"
 import { Effect, Function, Option, Ref, Schema } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
@@ -36,7 +37,17 @@ export const commitDriverOperation = (input: {
   if (operation.kind === "model" && outcome._tag === "Succeeded") {
     const event = liveModelResponseEvent(outcome.value)
     if (Schema.is(RuntimeUnavailable)(event)) return Effect.fail(event)
-    return store.commitModelResponse({ ...claim, operationId, outcome, checkpoint, ...prepared, event })
+    // The response is durable, but the loop has not consumed it or checkpointed its tool batch yet.
+    // Keep the replay cursor on this result; the next safe checkpoint advances it without redispatch.
+    const { inputDigest: _, ...pending } = operation
+    return store.commitModelResponse({
+      ...claim,
+      operationId,
+      outcome,
+      checkpoint: withPending(checkpoint, pending, checkpoint.turn),
+      ...prepared,
+      event,
+    })
   }
   let completion: Parameters<RunStoreService["completeOperation"]>[0]["outcome"]
   if (outcome._tag === "Succeeded") completion = { _tag: "Succeeded", value: outcome.value }
