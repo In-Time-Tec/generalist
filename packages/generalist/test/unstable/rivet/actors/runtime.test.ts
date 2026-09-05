@@ -218,8 +218,15 @@ const input = (key: string): Runtime.SendInput => ({
 
 const incarnation = (ownerId: string) => Number(ownerId.slice(ownerId.lastIndexOf(":") + 1))
 
+// The local engine outlives registries. Isolate test factories from other tests and
+// processes, while keeping every recovery incarnation in the same pool.
+const testPool = (context: Parameters<typeof setupTest>[0]) => ({
+  poolName: `generalist-${process.pid}-${context.task.id}`,
+})
+
 test("executes the convenience Runtime actor through actor-local SQLite", async (context) => {
   const registry = setup({
+    envoy: testPool(context),
     use: {
       runtimePartition: makeRuntimeActor({
         addresses,
@@ -244,7 +251,7 @@ test("executes the convenience Runtime actor through actor-local SQLite", async 
 test("composes application projection atomically and preserves typed custom actions", async (context) => {
   const observed = counters({ failProjection: true })
   const definition = makeDefinition(observed)
-  const registry = registerShutdown(context, setup({ use: { partition: definition } }))
+  const registry = registerShutdown(context, setup({ envoy: testPool(context), use: { partition: definition } }))
   const { client } = await setupTest(context, registry)
   const partition = client.partition.getOrCreate(partitionKey("atomic"))
   const command = input(`atomic-${process.pid}`)
@@ -269,7 +276,10 @@ test("composes application projection atomically and preserves typed custom acti
 test("a fresh registry recovers a missed notification exactly once during startup", async (context) => {
   const observed = counters()
   const key = partitionKey("recovery")
-  const firstRegistry = registerShutdown(context, setup({ use: { partition: makeDefinition(observed) } }))
+  const firstRegistry = registerShutdown(
+    context,
+    setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
+  )
   const { client: firstClient } = await setupTest(context, firstRegistry)
   const first = firstClient.partition.getOrCreate(key)
   const command = input(`recovery-${process.pid}`)
@@ -279,7 +289,10 @@ test("a fresh registry recovers a missed notification exactly once during startu
   await firstRegistry.shutdown()
   expect(observed.finalized).toBe(observed.initialized)
 
-  const secondRegistry = registerShutdown(context, setup({ use: { partition: makeDefinition(observed) } }))
+  const secondRegistry = registerShutdown(
+    context,
+    setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
+  )
   const { client: secondClient } = await setupTest(context, secondRegistry)
   const reopened = secondClient.partition.getOrCreate(key)
   const recovered = await reopened.work.snapshot(receipt.runId)
@@ -293,7 +306,10 @@ test("a fresh registry recovers a missed notification exactly once during startu
   await secondRegistry.shutdown()
   expect(observed.finalized).toBe(observed.initialized)
 
-  const thirdRegistry = registerShutdown(context, setup({ use: { partition: makeDefinition(observed) } }))
+  const thirdRegistry = registerShutdown(
+    context,
+    setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
+  )
   const { client: thirdClient } = await setupTest(context, thirdRegistry)
   const third = thirdClient.partition.getOrCreate(key)
   const final = await third.work.snapshot(receipt.runId)
@@ -371,7 +387,10 @@ test("failed initialization releases every acquired application scope", async ()
 
 test("cancellation drains through the same runtime and leaves no activation", async (context) => {
   const observed = counters()
-  const registry = registerShutdown(context, setup({ use: { partition: makeDefinition(observed) } }))
+  const registry = registerShutdown(
+    context,
+    setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
+  )
   const { client } = await setupTest(context, registry)
   const partition = client.partition.getOrCreate(partitionKey("cancellation"))
   const command = input(`cancel-${process.pid}`)
@@ -402,7 +421,10 @@ test("scope interruption leaves never-replay work for explicit resolution withou
   const key = partitionKey("unknown-operation")
   const firstRegistry = registerShutdown(
     context,
-    setup({ use: { partition: makeDefinition(observed, makeResolverWithModel(blockingModel)) } }),
+    setup({
+      envoy: testPool(context),
+      use: { partition: makeDefinition(observed, makeResolverWithModel(blockingModel)) },
+    }),
   )
   const { client: firstClient } = await setupTest(context, firstRegistry)
   const first = firstClient.partition.getOrCreate(key)
@@ -426,7 +448,10 @@ test("scope interruption leaves never-replay work for explicit resolution withou
   )
   const secondRegistry = registerShutdown(
     context,
-    setup({ use: { partition: makeDefinition(observed, makeResolverWithModel(recoveredModel)) } }),
+    setup({
+      envoy: testPool(context),
+      use: { partition: makeDefinition(observed, makeResolverWithModel(recoveredModel)) },
+    }),
   )
   const { client: secondClient } = await setupTest(context, secondRegistry)
   const reopened = secondClient.partition.getOrCreate(key)
