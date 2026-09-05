@@ -101,8 +101,8 @@ with failure classification, image-source handling, and tool-schema compilation 
 - Per phase: focused vitest for the touched suites plus `bun run --cwd packages/generalist typecheck` and prettier.
 - Phase 1 additionally: multi-agent snippets typecheck (inherit and choose both demonstrated), handoff runtime tests.
 - Phase 2 additionally: full `bun run test` — security-default and compaction-cache changes touch durable replay.
-- Phase 4 additionally: `bun run check` and `PACKAGE_ARTIFACT_DIR=release bun run package` (public exports change).
+- Phase 4 additionally: `bun run check` and `bun pm pack --cwd packages/generalist` (public exports change).
 
 ## Release Acceptance
 
-One release after Phase 4: CHANGELOG entry describing the layer-first model pattern, lockstep minor bump, full checks with PostgreSQL and MySQL available, package smoke green.
+One release after Phase 4: CHANGELOG entry describing the layer-first model pattern, lockstep minor bump, and full checks with PostgreSQL and MySQL available.

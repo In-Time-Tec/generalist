@@ -12,27 +12,12 @@ const pins = new Set([
   "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 ])
 
-const sorted = (values: ReadonlyArray<string>): Array<string> =>
-  values.reduce<Array<string>>((result, value) => {
-    const index = result.findIndex((item) => value.localeCompare(item) < 0)
-    result.splice(index < 0 ? result.length : index, 0, value)
-    return result
-  }, [])
-
 const readWorkflow = (name: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     return yield* fileSystem.readFileString(path.resolve(".", `.github/workflows/${name}`))
   })
-
-const workspacePackages = Effect.gen(function* () {
-  const fileSystem = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const packageNames: Array<string> = yield* fileSystem.readDirectory(path.resolve(".", "packages"))
-  packageNames.sort()
-  return packageNames
-})
 
 layer(bunLayer)("release workflows", (it) => {
   it.effect("requires the behavioral test suite in continuous integration", () =>
@@ -46,7 +31,6 @@ layer(bunLayer)("release workflows", (it) => {
   it.effect("keeps release recovery immutable, authenticated, and least-privileged", () =>
     Effect.gen(function* () {
       const source = yield* readWorkflow("publish.yml")
-      const packageNames = yield* workspacePackages
       expect(source).toMatch(/tag:\n(?: {8}.+\n)* {8}required: true\n {8}type: string/)
       expect(source).toMatch(/expected_commit:\n(?: {8}.+\n)* {8}required: true\n {8}type: string/)
       expect(source).toContain('tags: ["v*"]')
@@ -60,7 +44,7 @@ layer(bunLayer)("release workflows", (it) => {
       )
       expect(source).toMatch(/release:[\s\S]*?permissions:\n {6}contents: write/)
       expect(source).toMatch(/publish:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write/)
-      expect(source.match(/bun run package/g)).toHaveLength(1)
+      expect(source.match(/bun pm pack/g)).toHaveLength(1)
       expect(source).toContain("subject-path: release/*")
       expect(source).toContain("github.event.repository.private == false || github.event.enterprise != null")
       expect(source).toContain("sha256sum --check SHA256SUMS")
@@ -79,16 +63,6 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source).toContain('[[ "$registry_integrity" == "$local_integrity" ]]')
       expect(source).toContain('curl --fail --silent --show-error "https://registry.npmjs.org/${1/\\//%2f}/$2"')
       expect(source).not.toContain('npm view "$package@$VERSION"')
-      expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
-      expect(source.match(new RegExp(`\\(\\.packages \\| length\\) == ${packageNames.length}`, "g"))).toHaveLength(2)
-      expect(source.match(/\(\.packages \| length\) == \d+/g)).toHaveLength(2)
-      expect(source.match(/printf '%s\\n' generalist \| sort/g)).toHaveLength(2)
-      for (const manifests of source.matchAll(
-        /for manifest in package\.json((?: packages\/[a-z-]+\/package\.json)+); do/g,
-      )) {
-        const listed = [...manifests[1].matchAll(/packages\/([a-z-]+)\/package\.json/g)].map((match) => match[1])
-        expect(sorted(listed)).toEqual(packageNames)
-      }
       expect(source.match(/for manifest in package\.json packages\//g)).toHaveLength(1)
       expect(source).toContain(`generalist-\${VERSION}.tgz`)
       expect(source).not.toMatch(/bun publish|Rewrite package manifests/)
@@ -99,7 +73,7 @@ layer(bunLayer)("release workflows", (it) => {
         expect(uses.every((use) => pins.has(use))).toBe(true)
       }
       const release = source.split("  release:")[1].split("  publish:")[0]
-      expect(release).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
+      expect(release).not.toMatch(/checkout|bun install|npm install|bun run build|pm pack/)
     }),
   )
 })

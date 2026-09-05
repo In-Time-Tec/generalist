@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.0
+
+- Add `layerActorRuntime(context, options)` and `ActorRuntime` to `generalist/unstable/rivet` for application-owned Rivet actors. A custom actor can initialize product tables, compose a product activation projection into the same `Runtime.send` transaction as Generalist's durable activation projection, run typed actions through one wake-scoped `ManagedRuntime`, and dispose it on sleep or destroy. Startup and periodic recovery use that same projection and SQLite authority; `makeRuntimeActor` now delegates to the same Layer. Pin the raw RivetKit SDK to `2.3.15`; `@rivetkit/effect` is not used.
+
 ## 0.61.0
 
 - Add media parts and a content-addressed `BlobStore`. `Media.Ref { sha256, mediaType, bytes, filename? }` references stored bytes; `Media.File({ mediaType })` declares a typed Agent input or output field; `Media.fromPath`, `Media.part`, and `Media.resolve` build and read refs. Prompts carry reference-only file parts that are resolved to bytes or a URL only at provider dispatch, according to `ModelCatalog.Metadata.media`; generated `FilePart` bytes are persisted before the model response commits and returned through `Media.File` output fields, so journals never hold blob payloads. `BlobStore.layerMemory`, `layerFileSystem({ dir })`, `layerSql()`, and `layerS3({ bucket, client })` store blobs under their SHA-256 with a default 100 MiB limit. `Compaction.Strategy.media` is `"elide"` (default), `"keep"`, or `"describe"`. `Host.attachments.put/get`, authenticated `POST /attachments` and `GET /attachments/:sha256`, and `Testing.blobStore` conformance are added. New exports: `generalist/media`, `generalist/blob-store`. (#351)

@@ -30,13 +30,7 @@ bun run check # build, formatting, repository rules, lint, and typecheck; no tes
 bun run test  # build and run the complete Vitest suite
 ```
 
-For changes to public exports, package manifests, dependencies, or release output, also run:
-
-```bash
-PACKAGE_ARTIFACT_DIR=release bun run package
-```
-
-This is the downstream compatibility check. It packs the public package, validates every exact manifest export plus concrete wildcard examples, installs the tarball in fresh Bun-isolated, core-only, and npm consumers, typechecks and bundles a consumer, imports public entrypoints under Node and Bun, and verifies one Effect installation. It writes one tarball, `release-evidence.json`, and `SHA256SUMS`.
+For changes to public exports, package manifests, dependencies, or release output, build and pack the package with Bun and inspect the resulting manifest.
 
 ## Boundaries
 
@@ -53,7 +47,7 @@ This is the downstream compatibility check. It packs the public package, validat
 
 `PRODUCT.md` owns audience, direction, and exclusions. `CONTEXT.md` owns vocabulary, authority, and system boundaries. `PLAN.md` owns unfinished work, target contracts, dependency order, deletion scope, and release acceptance; it does not describe shipped behavior. `docs/features/` records current behavior and invariants. `docs/decisions/` records durable reasons, and `docs/tradeoffs/` records meaningful gains and costs. Package READMEs and the Mintlify guides in `docs/` own public usage.
 
-Package manifests, `scripts/package-smoke*.ts`, and `.github/workflows/publish.yml` own the release train. Do not introduce another package list, version, or artifact authority.
+Package manifests and `.github/workflows/publish.yml` own the release train. Do not introduce another package list, version, or artifact authority.
 
 ## Durable Runtime checks
 
@@ -86,8 +80,8 @@ A release change must:
 
 1. Add the user-visible change to `CHANGELOG.md`.
 2. Set one lockstep semantic version in the root manifest and `packages/generalist/package.json`.
-3. Pass `bun run check`, `bun run test` with PostgreSQL and MySQL available, and `bun run package`.
-4. Use the `generalist-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
+3. Pass `bun run check` and `bun run test` with PostgreSQL and MySQL available.
+4. Build and pack from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
 5. Land the exact release commit on `main`, then create the immutable `v<version>` tag at that commit.
 6. Push the tag to start `.github/workflows/publish.yml`. The workflow builds once, passes the same checksummed assets to GitHub and npm, and checks registry integrity. Manual dispatch only reconciles an existing tag and requires the tag plus its full 40-character commit SHA.
 

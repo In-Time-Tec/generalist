@@ -8,7 +8,7 @@ Start with `generalist` and its matching `effect` version. Add provider or stora
 **Terminal**
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.61.0
+bun add effect@4.0.0-rc.112 generalist@0.62.0
 ```
 
 With npm or pnpm:
@@ -16,12 +16,12 @@ With npm or pnpm:
 **Terminal**
 
 ```bash
-npm install effect@4.0.0-rc.112 generalist@0.61.0
-pnpm add effect@4.0.0-rc.112 generalist@0.61.0
+npm install effect@4.0.0-rc.112 generalist@0.62.0
+pnpm add effect@4.0.0-rc.112 generalist@0.62.0
 ```
 
 <Warning title="Pin the Effect release candidate">
-Generalist 0.61.0 targets `effect@4.0.0-rc.112`. Effect AI APIs can change between release candidates. Use the documented version, and install optional `@effect/ai-*` and platform packages at the matching version.
+Generalist 0.62.0 targets `effect@4.0.0-rc.112`. Effect AI APIs can change between release candidates. Use the documented version, and install optional `@effect/ai-*` and platform packages at the matching version.
 </Warning>
 
 ## One package
@@ -30,7 +30,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 
 | Package      | Version | Runtime and role                                                                                                                     |
 | ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `generalist` | 0.61.0  | Node 22+ and Bun 1.4+: agent loop, generic Runtime, exact feature import subpaths, and the pg, mysql, cloudflare, and rivet adapters |
+| `generalist` | 0.62.0  | Node 22+ and Bun 1.4+: agent loop, generic Runtime, exact feature import subpaths, and the pg, mysql, cloudflare, and rivet adapters |
 
 ## Import subpaths and peers
 
@@ -43,7 +43,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 | `generalist/unstable/cloudflare/workers`                   | None beyond effect                                                                        | Cloudflare Workers                                           |
 | `generalist/unstable/cloudflare/durable-objects`           | `@effect/sql-sqlite-do@4.0.0-rc.112`                                                      | Cloudflare Workers                                           |
 | `generalist/unstable/cloudflare/dynamic-workers`           | `es-module-lexer@2.3.2`                                                                   | Cloudflare Workers                                           |
-| `generalist/unstable/rivet`                                | `rivetkit@2.3.10` and `@standard-schema/spec@1.1.0`                                       | Node and Bun                                                 |
+| `generalist/unstable/rivet`                                | `rivetkit@2.3.15` and `@standard-schema/spec@1.1.0`                                       | Node and Bun                                                 |
 | `generalist/runtime/sqlite-bun`                            | `@effect/sql-sqlite-bun@4.0.0-rc.112`                                                     | Bun only                                                     |
 | `generalist/unstable/mcp/*`                                | `@modelcontextprotocol/sdk@1.29.0`                                                        | Node, Bun; HTTP is Worker-safe                               |
 | `generalist/unstable/foldkit`                              | `foldkit@0.148.2`                                                                         | Node and Bun                                                 |
@@ -56,7 +56,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 
 | Generalist release | Tested Effect version |
 | ------------------ | --------------------- |
-| `0.61.0`           | `effect@4.0.0-rc.112` |
+| `0.62.0`           | `effect@4.0.0-rc.112` |
 
 `generalist/unstable/foldkit` declares the exact tested optional peer `foldkit@0.148.2`.
 
