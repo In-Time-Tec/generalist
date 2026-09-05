@@ -1,4 +1,6 @@
 import "./suites/host-preview-suite.js"
+import "./suites/boundaries.js"
+import "./suites/operation-boundaries.js"
 import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
