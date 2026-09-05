@@ -120,118 +120,123 @@
         "tab": "Reference",
         "groups": [
           {
-            "$ref": "./api/navigation.json"
-          },
-          {
-            "group": "Concept reference",
+            "group": "Reference",
             "pages": [
-              "reference/core-agent",
-              "reference/core-events",
-              "reference/core-tools",
-              "reference/core-policies",
-              "reference/core-models",
-              "reference/core-context",
-              "reference/runtime",
-              "reference/a2a",
-              "reference/ag-ui",
-              "reference/providers",
-              "reference/mcp",
-              "reference/skills",
-              "reference/test",
-              "reference/memory",
-              "reference/repl",
-              "reference/instruction-guidance",
-              "reference/transport",
-              "reference/foldkit",
-              "reference/versioning"
+              {
+                "group": "Concept reference",
+                "pages": [
+                  "reference/core-agent",
+                  "reference/core-events",
+                  "reference/core-tools",
+                  "reference/core-policies",
+                  "reference/core-models",
+                  "reference/core-context",
+                  "reference/runtime",
+                  "reference/a2a",
+                  "reference/ag-ui",
+                  "reference/providers",
+                  "reference/mcp",
+                  "reference/skills",
+                  "reference/test",
+                  "reference/memory",
+                  "reference/repl",
+                  "reference/instruction-guidance",
+                  "reference/transport",
+                  "reference/foldkit",
+                  "reference/versioning"
+                ]
+              },
+              {
+                "$ref": "./api/navigation.json"
+              },
+              {
+                "group": "Agents",
+                "pages": [
+                  "features/agent-loop",
+                  "features/structured-output",
+                  "features/session-and-compaction",
+                  "features/session-history-paging",
+                  "features/suspension-and-resume",
+                  "features/tools-and-authorization",
+                  "features/approvals",
+                  "features/hooks",
+                  "features/gates",
+                  "features/multi-agent",
+                  "features/child-admission",
+                  "features/addressed-messaging",
+                  "features/steering",
+                  "features/fork",
+                  "features/agent-programs",
+                  "features/nested-operations",
+                  "features/errors"
+                ]
+              },
+              {
+                "group": "Integrations and capabilities",
+                "pages": [
+                  "features/instructions-and-skills",
+                  "features/instruction-guidance",
+                  "features/packages",
+                  "features/providers",
+                  "features/middleware",
+                  "features/compaction",
+                  "features/memory",
+                  "features/memoization",
+                  "features/media",
+                  "features/tasks",
+                  "features/triggers",
+                  "features/sandbox",
+                  "features/typescript-cells",
+                  "features/evals",
+                  "features/learning",
+                  "features/consolidation",
+                  "features/rl-export",
+                  "features/rlm",
+                  "features/mcp",
+                  "features/a2a",
+                  "features/ag-ui",
+                  "features/foldkit"
+                ]
+              },
+              {
+                "group": "Testing",
+                "pages": ["features/testing"]
+              },
+              {
+                "group": "Packages",
+                "pages": ["features/package-distribution"]
+              },
+              { "group": "Documentation", "pages": ["deployment"] },
+              {
+                "group": "Decisions",
+                "pages": [
+                  "decisions/agentos-code-executor-rejected",
+                  "decisions/authoritative-session-history",
+                  "decisions/child-admission-returns-at-admission",
+                  "decisions/compiled-packages",
+                  "decisions/e2b-kernel-pool-rejected",
+                  "decisions/e2b-program-executor-rejected",
+                  "decisions/effect-ai-vocabulary",
+                  "decisions/effect-workflow-substrate",
+                  "decisions/infinite-default-turn-policy",
+                  "decisions/kernel-child-process",
+                  "decisions/kernel-frame-channel",
+                  "decisions/kernel-profile-pin",
+                  "decisions/kernel-state-is-not-authority",
+                  "decisions/retire-docs-app-after-mintlify-cutover",
+                  "decisions/rivet-actors-runtime-host",
+                  "decisions/runtime-dynamic-transport",
+                  "decisions/runtime-outside-core",
+                  "decisions/steering-consumption-is-the-ack",
+                  "decisions/typed-tool-boundaries",
+                  "decisions/values-layers-local-provide"
+                ]
+              },
+              {
+                "group": "Tradeoffs",
+                "pages": ["tradeoffs/process-local-transport", "tradeoffs/strict-tool-registry"]
+              }
             ]
-          },
-          {
-            "group": "Agents",
-            "pages": [
-              "features/agent-loop",
-              "features/structured-output",
-              "features/session-and-compaction",
-              "features/session-history-paging",
-              "features/suspension-and-resume",
-              "features/tools-and-authorization",
-              "features/approvals",
-              "features/hooks",
-              "features/gates",
-              "features/multi-agent",
-              "features/child-admission",
-              "features/addressed-messaging",
-              "features/steering",
-              "features/fork",
-              "features/agent-programs",
-              "features/nested-operations",
-              "features/errors"
-            ]
-          },
-          {
-            "group": "Integrations and capabilities",
-            "pages": [
-              "features/instructions-and-skills",
-              "features/instruction-guidance",
-              "features/packages",
-              "features/providers",
-              "features/middleware",
-              "features/compaction",
-              "features/memory",
-              "features/memoization",
-              "features/media",
-              "features/tasks",
-              "features/triggers",
-              "features/sandbox",
-              "features/typescript-cells",
-              "features/evals",
-              "features/learning",
-              "features/consolidation",
-              "features/rl-export",
-              "features/rlm",
-              "features/mcp",
-              "features/a2a",
-              "features/ag-ui",
-              "features/foldkit"
-            ]
-          },
-          {
-            "group": "Testing",
-            "pages": ["features/testing"]
-          },
-          {
-            "group": "Packages",
-            "pages": ["features/package-distribution"]
-          },
-          { "group": "Documentation", "pages": ["deployment"] },
-          {
-            "group": "Decisions",
-            "pages": [
-              "decisions/agentos-code-executor-rejected",
-              "decisions/authoritative-session-history",
-              "decisions/child-admission-returns-at-admission",
-              "decisions/compiled-packages",
-              "decisions/e2b-kernel-pool-rejected",
-              "decisions/e2b-program-executor-rejected",
-              "decisions/effect-ai-vocabulary",
-              "decisions/effect-workflow-substrate",
-              "decisions/infinite-default-turn-policy",
-              "decisions/kernel-child-process",
-              "decisions/kernel-frame-channel",
-              "decisions/kernel-profile-pin",
-              "decisions/kernel-state-is-not-authority",
-              "decisions/retire-docs-app-after-mintlify-cutover",
-              "decisions/rivet-actors-runtime-host",
-              "decisions/runtime-dynamic-transport",
-              "decisions/runtime-outside-core",
-              "decisions/steering-consumption-is-the-ack",
-              "decisions/typed-tool-boundaries",
-              "decisions/values-layers-local-provide"
-            ]
-          },
-          {
-            "group": "Tradeoffs",
-            "pages": ["tradeoffs/process-local-transport", "tradeoffs/strict-tool-registry"]
           }
         ]
       }

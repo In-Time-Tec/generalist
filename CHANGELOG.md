@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Preserve the committed model-response replay cursor across interruption and reopen. Recovery consumes the recorded response without calling the model again, and restores already charged tokens only while replaying that response.
+- Expand MySQL's shared Runtime conformance coverage to admission, approvals, run trees, concurrent claims, transaction rollback, and notification recovery.
+- Reorganize the documentation into Start, Build, Operate, and Reference; correct tutorial installation commands and distinguish scripted search from live providers. Tutorial checks now typecheck extracted code and execute credential-free examples.
+
 ## 0.61.0
 
 - Add media parts and a content-addressed `BlobStore`. `Media.Ref { sha256, mediaType, bytes, filename? }` references stored bytes; `Media.File({ mediaType })` declares a typed Agent input or output field; `Media.fromPath`, `Media.part`, and `Media.resolve` build and read refs. Prompts carry reference-only file parts that are resolved to bytes or a URL only at provider dispatch, according to `ModelCatalog.Metadata.media`; generated `FilePart` bytes are persisted before the model response commits and returned through `Media.File` output fields, so journals never hold blob payloads. `BlobStore.layerMemory`, `layerFileSystem({ dir })`, `layerSql()`, and `layerS3({ bucket, client })` store blobs under their SHA-256 with a default 100 MiB limit. `Compaction.Strategy.media` is `"elide"` (default), `"keep"`, or `"describe"`. `Host.attachments.put/get`, authenticated `POST /attachments` and `GET /attachments/:sha256`, and `Testing.blobStore` conformance are added. New exports: `generalist/media`, `generalist/blob-store`. (#351)

@@ -39,13 +39,12 @@ const typecheck = Effect.fn("ReadmeCheck.typecheck")(function* (directory: strin
 
 const checkVersions = Effect.fn("ReadmeCheck.checkVersions")(function* () {
   const fileSystem = yield* FileSystem.FileSystem
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const manifest = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ version: Schema.String })))(
     yield* fileSystem.readFileString("packages/generalist/package.json"),
   )
-  const publicDocs = yield* spawner.lines(
-    ChildProcess.make("rg", ["--files", "docs", "-g", "*.md", "-g", "*.mdx", "-g", "!api/**"]),
-  )
+  const publicDocs = (yield* fileSystem.readDirectory("docs", { recursive: true }))
+    .filter((name) => /\.mdx?$/.test(name) && !name.startsWith("api/") && !name.startsWith("node_modules/"))
+    .map((name) => `docs/${name}`)
   for (const filename of ["README.md", "packages/generalist/README.md", ...publicDocs]) {
     const source = yield* fileSystem.readFileString(filename)
     for (const match of source.matchAll(/\bgeneralist@(\d+\.\d+\.\d+(?:-[\w.-]+)?)/g)) {
