@@ -3,6 +3,7 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Runtime, RunStore } from "../../../../../src/runtime/index.js"
+import type { PathPageCursor } from "../../../../../src/core/context/session-history.js"
 import { assistantAddress, textPrompt } from "../../../execution/fixtures.js"
 import { sqliteLayer, tempDbPath } from "../../scenario.js"
 
@@ -202,3 +203,61 @@ it.live("rejects a stable SQLite append retry after its branch is abandoned", ()
     )
   }),
 )
+
+it.live("pages a fixed SQLite leaf across reopen and bounds effective reads at projection boundaries", () => {
+  const filename = tempDbPath("bounded-session-reads")
+  const sessionId = "sqlite:bounded-session-reads"
+  let fixedLeaf = ""
+  let cursor: PathPageCursor | undefined
+  const expectedIds: Array<string> = []
+
+  return Effect.gen(function* () {
+    yield* withDb(filename)(
+      Effect.gen(function* () {
+        const { store } = yield* claimedSession(sessionId, "bounded-writer")
+        for (let index = 0; index < 80; index += 1) {
+          expectedIds.push((yield* store.append({ _tag: "Message", message: user(`cold-${index}`) })).id)
+        }
+        const checkpointId = yield* store.reserveEntryId
+        expectedIds.push(
+          (yield* store.appendCheckpoint({
+            id: checkpointId,
+            parentId: expectedIds.at(-1)!,
+            projectedHistory: Prompt.fromMessages([user("bounded projection")]),
+            telemetry: [],
+          })).checkpoint.id,
+        )
+        for (let index = 0; index < 20; index += 1) {
+          expectedIds.push((yield* store.append({ _tag: "Message", message: user(`hot-${index}`) })).id)
+        }
+        fixedLeaf = expectedIds.at(-1)!
+        const first = yield* store.pathPage({ leafId: fixedLeaf, limit: 7 })
+        expect(first.entries).toHaveLength(7)
+        expect(first).toMatchObject({ hasOlder: true, hasNewer: false })
+        cursor = first.nextCursor
+        yield* store.append({ _tag: "Message", message: user("later append outside fixed leaf") })
+      }),
+    )
+
+    yield* withDb(filename)(
+      Effect.gen(function* () {
+        const reader = yield* sessionReader(sessionId)
+        const newest = yield* reader.pathPage({ leafId: fixedLeaf, limit: 7 })
+        const paged = [...newest.entries]
+        let next = cursor
+        while (next !== undefined) {
+          const page = yield* reader.pathPage({ leafId: fixedLeaf, cursor: next, limit: 7 })
+          paged.unshift(...page.entries)
+          next = page.nextCursor
+        }
+        expect(paged.map((entry) => entry.id)).toEqual(expectedIds)
+        expect(paged).toHaveLength(101)
+        expect((yield* reader.path()).length).toBe(102)
+        const effective = yield* reader.effectivePath(fixedLeaf)
+        expect(effective).toHaveLength(21)
+        expect(effective[0]?._tag).toBe("Compaction")
+        expect(yield* reader.latestCompaction(fixedLeaf)).toEqual(effective[0])
+      }),
+    )
+  })
+})

@@ -596,7 +596,7 @@ it.live("rejects mutated interrupted model response references and Session stora
         })
 
       for (const candidate of [
-        { ...event, runId: "corrupt-run" },
+        { ...event, originRunId: "corrupt-run" },
         { ...event, operationKey: "corrupt-operation" },
         { ...event, sessionEntryId: "corrupt-entry" },
         { ...event, turn: event.turn + 1 },

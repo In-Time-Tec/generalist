@@ -2186,7 +2186,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### sessionEntry
 
-> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../../generalist/namespaces/Session#entry), [`SessionEntryError`](#sessionentryerror)\>
+> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../../generalist/namespaces/Session#entry-1), [`SessionEntryError`](#sessionentryerror)\>
 
 ###### Parameters
 
@@ -2196,7 +2196,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Effect`\<[`Entry`](../../generalist/namespaces/Session#entry), [`SessionEntryError`](#sessionentryerror)\>
+`Effect`\<[`Entry`](../../generalist/namespaces/Session#entry-1), [`SessionEntryError`](#sessionentryerror)\>
 
 <a id="sessionevents"></a>
 
@@ -2874,7 +2874,7 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ### EventsError
 
-> **EventsError** = [`RunNotFound`](./Errors#runnotfound) \| [`CursorExpired`](./Errors#cursorexpired) \| [`SubscriberLagged`](./Errors#subscriberlagged) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
+> **EventsError** = [`RunNotFound`](./Errors#runnotfound) \| [`CursorExpired`](./Errors#cursorexpired) \| [`HistoryLimitInvalid`](./Errors#historylimitinvalid) \| [`SubscriberLagged`](./Errors#subscriberlagged) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
 
 ***
 

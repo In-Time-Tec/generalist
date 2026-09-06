@@ -857,9 +857,13 @@ Load and publish authoritative Session events after a lossy wakeup.
 
 `number`
 
+###### loadAfter
+
+(`cursor`) => `Effect`\<readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[], [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable)\>
+
 ###### loadReplay
 
-`Effect`\<\{ `lastSequence`: `number`; `replay`: readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
+`Effect`\<\{ `lastSequence`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
 
 ###### onSubscribed?
 
@@ -891,9 +895,13 @@ Load and publish authoritative Session events after a lossy wakeup.
 
 `number`
 
+###### loadAfter
+
+(`cursor`) => `Effect`\<readonly [`HostSessionEvent`](../runtime/namespaces/HostSession#hostsessionevent)[], [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
+
 ###### loadReplay
 
-`Effect`\<\{ `lastCursor`: `number`; `replay`: readonly [`HostSessionEvent`](../runtime/namespaces/HostSession#hostsessionevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
+`Effect`\<\{ `lastCursor`: `number`; `replayCursor`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
 
 ###### onSubscribed?
 
@@ -1643,7 +1651,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### loadReplay
 
-`Effect`\<\{ `lastSequence`: `number`; `replay`: readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
+`Effect`\<\{ `lastSequence`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
 
 ###### runNoTransaction
 
@@ -1687,7 +1695,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### loadReplay
 
-`Effect`\<\{ `lastCursor`: `number`; `replay`: readonly [`HostSessionEvent`](../runtime/namespaces/HostSession#hostsessionevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
+`Effect`\<\{ `lastCursor`: `number`; `replayCursor`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound), `never`\>
 
 ###### runNoTransaction
 
@@ -2553,7 +2561,7 @@ The single logical SQL Runtime schema identity.
 
 ### SQL\_SCHEMA\_VERSION
 
-> `const` **SQL\_SCHEMA\_VERSION**: `10` = `10`
+> `const` **SQL\_SCHEMA\_VERSION**: `11` = `11`
 
 The single logical SQL Runtime schema version.
 

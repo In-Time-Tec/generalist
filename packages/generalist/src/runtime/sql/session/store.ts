@@ -12,21 +12,22 @@ import {
   SessionStoreError,
   checkpointMatches,
 } from "../../../core/context/session.js"
-import type { ExecutionClaim, SessionReader } from "../../run/store.js"
+import type { ExecutionClaim } from "../../run/store.js"
 import { StaleSessionClaim } from "../errors.js"
 import { requireSessionWriteClaim } from "./claim.js"
 import { type EntryRow, type SessionRow, SessionStorage } from "./storage.js"
 import { markSqlTransitionExactRetry } from "../store/kernel/observability.js"
-const {
-  appendMatches,
-  decodeSession,
-  entryPayloadEquivalence,
-  storeError,
-  encodePayload,
-  fromEntry,
-  toEntry,
-  pathFromRows,
-} = SessionStorage
+import { SessionReads } from "./reader.js"
+const { readPathPage, readEffectivePath, readLatestCompaction } = SessionReads
+const { appendMatches, decodeSession, entryPayloadEquivalence, storeError, encodePayload, fromEntry, toEntry } =
+  SessionStorage
+
+const nextSequence = (sequence: number, id: string): number => {
+  const numeric = Number(id)
+  return Number.isSafeInteger(numeric) && numeric >= 0 && String(numeric) === id
+    ? Math.max(sequence + 1, numeric + 1)
+    : sequence + 1
+}
 
 /** Append or verify one stable interrupted assistant projection inside the caller's SQL transaction. */
 export const appendInterruptedSessionEntry = (
@@ -91,7 +92,7 @@ export const appendInterruptedSessionEntry = (
     yield* sql`
       INSERT INTO generalist_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'ModelResponse',
-        ${encodePayload(payload)}, ${created})
+        ${yield* encodePayload(payload)}, ${created})
     `
     yield* sql`
       UPDATE generalist_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
@@ -302,21 +303,16 @@ export const claimedStore = (options: {
             })
           }
           const created = yield* now
-          let generatedSequence = session.next_seq
-          if (appendOptions.id === undefined) {
-            const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
-            while (ids.has(String(generatedSequence))) generatedSequence += 1
-          }
-          const id = appendOptions.id ?? String(generatedSequence)
+          const id = appendOptions.id ?? String(session.next_seq)
           yield* insertEntry({
             id,
             parentId: session.leaf_id,
             seq: session.next_seq,
             tag: entry._tag,
-            payload: fromEntry(entry),
+            payload: yield* fromEntry(entry),
             created,
           })
-          yield* advance(id, appendOptions.id === undefined ? generatedSequence + 1 : session.next_seq + 1, created)
+          yield* advance(id, nextSequence(session.next_seq, id), created)
           return { ...entry, id, parentId: session.leaf_id }
         }),
       )
@@ -377,13 +373,30 @@ export const claimedStore = (options: {
             parentId: checkpoint.parentId,
             seq: session.next_seq,
             tag: "Compaction",
-            payload: fromEntry(checkpoint),
+            payload: yield* fromEntry(checkpoint),
             created,
           })
-          yield* advance(checkpoint.id, session.next_seq + 1, created)
+          yield* advance(checkpoint.id, nextSequence(session.next_seq, checkpoint.id), created)
           return { _tag: "Appended" as const, checkpoint, leafId: checkpoint.id }
         }),
       )
+
+    const readEntry = (id: EntryId): Effect.Effect<Entry | undefined, SessionStoreError> =>
+      sql<EntryRow>`
+        SELECT entry_id, parent_id, seq, tag, payload_json FROM generalist_session_entries
+        WHERE session_id = ${sessionId} AND entry_id = ${id}
+      `.pipe(
+        Effect.map((rows) => (rows[0] === undefined ? undefined : toEntry(rows[0]))),
+        asReadError,
+      )
+
+    const resolveReadLeaf = (leaf: EntryId | undefined) =>
+      leaf === undefined
+        ? sessionRow.pipe(
+            Effect.map((session) => session?.leaf_id ?? null),
+            asReadError,
+          )
+        : Effect.succeed(leaf)
 
     return {
       reserveEntryId: observedTransaction(
@@ -391,16 +404,19 @@ export const claimedStore = (options: {
         Effect.gen(function* () {
           yield* requireWriteClaim
           const session = yield* requireSession
-          const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
-          let sequence = session.next_seq
-          while (ids.has(String(sequence))) sequence += 1
           const created = yield* now
-          yield* advance(session.leaf_id, sequence + 1, created)
-          return String(sequence)
+          yield* advance(session.leaf_id, session.next_seq + 1, created)
+          return String(session.next_seq)
         }),
       ).pipe(asReserveError),
       append: (entry, appendOptions) => asStoreError(append(entry, appendOptions)),
       appendCheckpoint: (prepared) => asStoreError(appendCheckpoint(prepared)),
+      entry: readEntry,
+      pathPage: (input) => readPathPage(readEntry, input),
+      effectivePath: (leaf) =>
+        resolveReadLeaf(leaf).pipe(Effect.flatMap((resolved) => readEffectivePath(readEntry, resolved))),
+      latestCompaction: (leaf) =>
+        resolveReadLeaf(leaf).pipe(Effect.flatMap((resolved) => readLatestCompaction(readEntry, resolved))),
       path: (leaf) =>
         Effect.gen(function* () {
           const session = yield* sessionRow
@@ -427,42 +443,6 @@ export const claimedStore = (options: {
               `
           }),
         ).pipe(asReserveError),
-      leaf: sessionRow.pipe(
-        Effect.map((session) => session?.leaf_id ?? null),
-        Effect.orDie,
-      ),
-    }
-  })
-
-/** @internal Read-only SQLite Session hydration. */
-export const reader = (sessionId: string): Effect.Effect<SessionReader, never, SqlClient.SqlClient> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const sessionRow = Effect.gen(function* () {
-      const rows = yield* sql<SessionRow>`
-        SELECT leaf_id, next_seq, writer_epoch, writer_run_id, writer_owner_id, writer_attempt_fence
-        FROM generalist_sessions WHERE session_id = ${sessionId}
-      `
-      return rows[0] === undefined ? undefined : decodeSession(rows[0])
-    })
-    return {
-      path: (leaf) =>
-        sessionRow.pipe(
-          Effect.flatMap((session) => {
-            if (session === undefined && leaf === undefined) return Effect.succeed([])
-            if (session === undefined) return storeError(`Session entry ${String(leaf)} does not exist`)
-            return sql<EntryRow>`
-              SELECT entry_id, parent_id, seq, tag, payload_json FROM generalist_session_entries
-              WHERE session_id = ${sessionId} ORDER BY seq
-            `.pipe(
-              Effect.flatMap((rows) => {
-                const path = pathFromRows(rows, leaf ?? session.leaf_id)
-                return Schema.is(SessionStoreError)(path) ? path : Effect.succeed(path)
-              }),
-            )
-          }),
-          Effect.mapError((error) => (Schema.is(SessionStoreError)(error) ? error : storeError(String(error)))),
-        ),
       leaf: sessionRow.pipe(
         Effect.map((session) => session?.leaf_id ?? null),
         Effect.orDie,

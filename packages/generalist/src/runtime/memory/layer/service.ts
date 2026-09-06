@@ -7,6 +7,7 @@ import {
   ExecutableIdentityMismatch,
   ExecutablePinMissing,
   ExecutableRegistrationInvalid,
+  HistoryLimitInvalid,
   StartInvalid,
   RuntimeUnavailable,
   IllegalOperatorAction,
@@ -491,7 +492,9 @@ const makeRuntimeWith = (
       previews: (input) => modelPreviews(previewLane)(input.runId),
       snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
-        store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
+        !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1000
+          ? HistoryLimitInvalid.make({ received: String(input.limit), minimum: 1, maximum: 1000 })
+          : store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
       createSession: store.createHostSession,
       session: store.hostSession,
       listSessions: store.listHostSessions,

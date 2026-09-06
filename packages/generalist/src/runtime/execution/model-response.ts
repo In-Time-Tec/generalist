@@ -13,10 +13,10 @@ import type { ExecutionContinuation } from "../run/steering.js"
 import type { OperationRecord } from "../sql/operations.js"
 import {
   completedOperationRefValue,
-  hydrateCompletedOperation,
   liveModelResponseEvent,
   type LiveModelResponseCommitted,
 } from "./model-response/commit.js"
+import { hydrateCompletedOperation } from "./model-response/hydration.js"
 
 interface PreparedCompletion {
   readonly continuation?: ExecutionContinuation | null

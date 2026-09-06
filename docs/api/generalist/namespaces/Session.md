@@ -358,7 +358,7 @@ Session event-log service boundary.
 
 ##### append
 
-> `readonly` **append**: (`entry`, `options?`) => `Effect`\<[`Entry`](#entry), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
+> `readonly` **append**: (`entry`, `options?`) => `Effect`\<[`Entry`](#entry-1), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
 
 ###### Parameters
 
@@ -372,7 +372,7 @@ Session event-log service boundary.
 
 ###### Returns
 
-`Effect`\<[`Entry`](#entry), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
+`Effect`\<[`Entry`](#entry-1), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
 
 <a id="appendcheckpoint"></a>
 
@@ -392,6 +392,60 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 `Effect`\<[`CheckpointAppend`](#checkpointappend), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
 
+<a id="effectivepath"></a>
+
+##### effectivePath
+
+> `readonly` **effectivePath**: (`leaf?`) => `Effect`\<readonly [`Entry`](#entry-1)[], [`SessionStoreError`](#sessionstoreerror)\>
+
+Read only the latest Compaction/Handoff projection boundary and its suffix.
+
+###### Parameters
+
+###### leaf?
+
+`string`
+
+###### Returns
+
+`Effect`\<readonly [`Entry`](#entry-1)[], [`SessionStoreError`](#sessionstoreerror)\>
+
+<a id="entry"></a>
+
+##### entry
+
+> `readonly` **entry**: (`id`) => `Effect`\<[`Entry`](#entry-1) \| `undefined`, [`SessionStoreError`](#sessionstoreerror)\>
+
+Read one immutable entry without materializing its ancestor path.
+
+###### Parameters
+
+###### id
+
+`string`
+
+###### Returns
+
+`Effect`\<[`Entry`](#entry-1) \| `undefined`, [`SessionStoreError`](#sessionstoreerror)\>
+
+<a id="latestcompaction"></a>
+
+##### latestCompaction
+
+> `readonly` **latestCompaction**: (`leaf?`) => `Effect`\<[`CompactionEntry`](#compactionentry) \| `undefined`, [`SessionStoreError`](#sessionstoreerror)\>
+
+Find checkpoint telemetry without materializing the complete ancestor path.
+
+###### Parameters
+
+###### leaf?
+
+`string`
+
+###### Returns
+
+`Effect`\<[`CompactionEntry`](#compactionentry) \| `undefined`, [`SessionStoreError`](#sessionstoreerror)\>
+
 <a id="leaf"></a>
 
 ##### leaf
@@ -402,7 +456,9 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 ##### path
 
-> `readonly` **path**: (`leaf?`) => `Effect`\<readonly [`Entry`](#entry)[], [`SessionStoreError`](#sessionstoreerror)\>
+> `readonly` **path**: (`leaf?`) => `Effect`\<readonly [`Entry`](#entry-1)[], [`SessionStoreError`](#sessionstoreerror)\>
+
+Complete lossless ancestry for audit, compaction input, and memory retention.
 
 ###### Parameters
 
@@ -412,7 +468,25 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 ###### Returns
 
-`Effect`\<readonly [`Entry`](#entry)[], [`SessionStoreError`](#sessionstoreerror)\>
+`Effect`\<readonly [`Entry`](#entry-1)[], [`SessionStoreError`](#sessionstoreerror)\>
+
+<a id="pathpage"></a>
+
+##### pathPage
+
+> `readonly` **pathPage**: (`input`) => `Effect`\<[`PathPage`](./SessionHistory#pathpage), [`SessionStoreError`](#sessionstoreerror)\>
+
+Read at most one backward page on an immutable leaf; continue only with the returned cursor.
+
+###### Parameters
+
+###### input
+
+[`PathPageInput`](./SessionHistory#pathpageinput)
+
+###### Returns
+
+`Effect`\<[`PathPage`](./SessionHistory#pathpage), [`SessionStoreError`](#sessionstoreerror)\>
 
 <a id="reserveentryid"></a>
 
@@ -442,7 +516,7 @@ Atomically persists projection, telemetry, and commit. Remote failure is ambiguo
 
 ### AppendInput
 
-> **AppendInput** = `AppendEntryInput`\<[`Entry`](#entry)\>
+> **AppendInput** = `AppendEntryInput`\<[`Entry`](#entry-1)\>
 
 Session entry input appended by a store implementation.
 
@@ -540,7 +614,7 @@ An exact point-in-time compaction projection.
 
 ***
 
-<a id="entry"></a>
+<a id="entry-1"></a>
 
 ### Entry
 
@@ -786,7 +860,7 @@ Purely projects a root-to-leaf session path into model context.
 
 ##### path
 
-`ReadonlyArray`\<[`Entry`](#entry)\>
+`ReadonlyArray`\<[`Entry`](#entry-1)\>
 
 #### Returns
 
@@ -806,7 +880,7 @@ Purely projects a lossless path for memory retention.
 
 ##### path
 
-`ReadonlyArray`\<[`Entry`](#entry)\>
+`ReadonlyArray`\<[`Entry`](#entry-1)\>
 
 #### Returns
 

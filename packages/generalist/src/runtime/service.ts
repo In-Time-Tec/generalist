@@ -51,6 +51,7 @@ import type {
   UnknownAgent,
   IllegalOperatorAction,
   ForkSequenceInvalid,
+  HistoryLimitInvalid,
   NoSnapshot,
   SubstitutionInvalid,
   RunBusy,
@@ -418,7 +419,7 @@ export type SendMessageError =
 export type DirectoryError = RunNotFound | RuntimeUnavailable
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable
 export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable
-export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
+export type EventsError = RunNotFound | CursorExpired | HistoryLimitInvalid | SubscriberLagged | RuntimeUnavailable
 /** Durable host acknowledgement failures. */
 export type AckError = RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable
 export type TreeReplayError =

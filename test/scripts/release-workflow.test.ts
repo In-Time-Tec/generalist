@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Path, Schema } from "effect"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const pins = new Set([
   "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -35,6 +36,56 @@ const workspacePackages = Effect.gen(function* () {
 })
 
 layer(bunLayer)("release workflows", (it) => {
+  it.effect("executes the exact-commit CI gate against successful and contradictory evidence", () =>
+    Effect.gen(function* () {
+      const source = yield* readWorkflow("publish.yml")
+      const section = source.split("      - name: Require successful database CI for the exact release commit\n")[1]
+      const block = section.split("        run: |\n")[1].split("      - uses:")[0]
+      const script = block
+        .split("\n")
+        .map((line) => line.replace(/^ {10}/, ""))
+        .join("\n")
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const success = {
+        head_sha: "exact",
+        event: "push",
+        head_branch: "main",
+        run_number: 1,
+        status: "completed",
+        conclusion: "success",
+      }
+      const cases = [
+        { runs: [success], allowed: true },
+        { runs: [], allowed: false },
+        { runs: [{ ...success, head_sha: "other" }], allowed: false },
+        { runs: [{ ...success, event: "pull_request" }], allowed: false },
+        { runs: [{ ...success, head_branch: "release" }], allowed: false },
+        ...["failure", "cancelled", "skipped"].map((conclusion) => ({
+          runs: [{ ...success, conclusion }],
+          allowed: false,
+        })),
+        { runs: [success, { ...success, run_number: 2, status: "in_progress", conclusion: null }], allowed: false },
+        { runs: [success, { ...success, run_number: 2, conclusion: "failure" }], allowed: false },
+      ]
+      for (const item of cases) {
+        const command = ChildProcess.make("bash", [
+          "-c",
+          `
+          mock_evidence=$1
+          gh() { printf '%s' "$mock_evidence"; }
+          GH_REPO=test/repo
+          SOURCE_COMMIT=exact
+          ${script}
+        `,
+          "release-gate",
+          yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({ workflow_runs: item.runs }),
+        ])
+        const code = yield* spawner.exitCode(command)
+        expect(code === 0).toBe(item.allowed)
+      }
+    }),
+  )
+
   it.effect("requires the behavioral test suite in continuous integration", () =>
     Effect.gen(function* () {
       const source = yield* readWorkflow("ci.yml")
@@ -56,7 +107,7 @@ layer(bunLayer)("release workflows", (it) => {
       )
       expect(source).toContain("cancel-in-progress: false")
       expect(source).toMatch(
-        /produce:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write\n {6}attestations: write/,
+        /produce:[\s\S]*?permissions:\n {6}contents: read\n {6}actions: read\n {6}id-token: write\n {6}attestations: write/,
       )
       expect(source).toMatch(/release:[\s\S]*?permissions:\n {6}contents: write/)
       expect(source).toMatch(/publish:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write/)

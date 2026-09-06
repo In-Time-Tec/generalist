@@ -5,6 +5,7 @@ import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
 import { StaleClaim } from "../../runtime/sql/errors.js"
+import { registerPayload } from "./payload/index.js"
 import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAdmission, registerAgentStart } from "./agent-start.js"
@@ -121,6 +122,17 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
 ) => {
   registerAcknowledgement({ options, capability })
 
+  const payloadIdentity = identity(options.name, "payload-bounds")
+  registerPayload({
+    capability,
+    request: {
+      to: options.address,
+      sessionId: payloadIdentity.sessionId,
+      idempotencyKey: payloadIdentity.idempotencyKey,
+    },
+    provide: (use) => provide(options, use),
+  })
+
   it.effect("persists control transitions and strictly ordered durable events", () =>
     provide(options, (services) =>
       Effect.gen(function* () {
@@ -158,6 +170,11 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
         expect(events.map((event) => event.eventId)).toEqual(
           events.map((event) => `${receipt.runId}:${event.sequence}`),
         )
+        expect(yield* Effect.flip(services.runtime.history({ runId: receipt.runId, limit: 1001 }))).toMatchObject({
+          _tag: "generalist/runtime/HistoryLimitInvalid",
+          minimum: 1,
+          maximum: 1000,
+        })
       }),
     ),
   )

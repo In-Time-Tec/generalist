@@ -13,20 +13,17 @@ import {
 } from "../../core/context/session.js"
 import type { InterruptedSessionEntry } from "../execution/agent/event.js"
 import { RuntimeUnavailable } from "../errors.js"
+import { validate as validatePayload } from "../execution/payload/index.js"
 import type { CompletedSessionEntry } from "../execution/model-response/commit.js"
 import { handoffPayload, type HandoffSessionEntry } from "../session/handoff.js"
 import { terminalToolMessage, type RunTerminalOutcome } from "../session/tool-results.js"
-import type { MemorySession, MemoryState } from "./state.js"
-import type { ExecutionClaim, SessionReader } from "../run/store.js"
+import { emptySession, type MemorySession, type MemoryState } from "./state.js"
+import type { ExecutionClaim } from "../run/store.js"
 import { StaleSessionClaim } from "../sql/errors.js"
+import { reader, SessionReads } from "./session-reader.js"
 
-const emptySession = (): MemorySession => ({
-  entries: new Map(),
-  order: [],
-  leaf: null,
-  counter: 0,
-  writerEpoch: 0n,
-})
+const { pathTo } = SessionReads
+
 const payloadEquivalence = Schema.toEquivalence(EntryPayload)
 const storeError = (message: string) => SessionStoreError.make({ message })
 const conflict = (reason: SessionConflict["reason"], message: string) => SessionConflict.make({ reason, message })
@@ -37,26 +34,19 @@ const entryFromInput = (input: AppendInput, id: string, parentId: string | null)
   parentId,
 })
 
-const pathTo = (session: MemorySession, leaf: string | null): ReadonlyArray<Entry> | SessionStoreError => {
-  if (leaf === null) return []
-  const entries: Array<Entry> = []
-  let cursor: string | null = leaf
-  while (cursor !== null) {
-    if (entries.length > session.order.length) return storeError(`Session path for leaf ${leaf} contains a cycle`)
-    const entry: Entry | undefined = session.entries.get(cursor)
-    if (entry === undefined) return storeError(`Session entry ${cursor} does not exist`)
-    entries.push(entry)
-    cursor = entry.parentId
-  }
-  return entries.toReversed()
-}
-
 const onActivePath = (session: MemorySession, id: string): boolean => {
   const path = pathTo(session, session.leaf)
   return !Schema.is(SessionStoreError)(path) && path.some((entry) => entry.id === id)
 }
 
 const samePayload = (entry: Entry, input: AppendInput): boolean => payloadEquivalence(entry, input)
+
+const nextCounter = (counter: number, id: string): number => {
+  const numeric = Number(id)
+  return Number.isSafeInteger(numeric) && numeric >= 0 && String(numeric) === id
+    ? Math.max(counter + 1, numeric + 1)
+    : counter + 1
+}
 
 const isAppendSuccess = (
   value: readonly [Entry, MemorySession] | SessionConflict,
@@ -92,9 +82,7 @@ const append = (
       `Expected Session leaf ${String(options.expectedLeafId)} but found ${String(session.leaf)}`,
     )
   }
-  let generated = session.counter
-  if (options?.id === undefined) while (session.entries.has(String(generated))) generated += 1
-  const id = options?.id ?? String(generated)
+  const id = options?.id ?? String(session.counter)
   const entry = entryFromInput(input, id, session.leaf)
   const entries = new Map(session.entries).set(id, entry)
   return [
@@ -104,7 +92,7 @@ const append = (
       entries,
       order: [...session.order, id],
       leaf: id,
-      counter: options?.id === undefined ? generated + 1 : session.counter,
+      counter: nextCounter(session.counter, id),
     },
   ]
 }
@@ -391,43 +379,33 @@ const claimedUpdate = <A, E>(
     ),
   )
 
-export const reader = (config: {
-  readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
-  readonly sessionId: string
-}): SessionReader => ({
-  path: (leaf) =>
-    SynchronizedRef.get(config.stateRef).pipe(
-      Effect.flatMap((state) => {
-        const session = state.sessions.get(config.sessionId) ?? emptySession()
-        const path = pathTo(session, leaf ?? session.leaf)
-        return Schema.is(SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
-      }),
-    ),
-  leaf: SynchronizedRef.get(config.stateRef).pipe(
-    Effect.map((state) => state.sessions.get(config.sessionId)?.leaf ?? null),
-  ),
-})
-
 export const claimedStore = (config: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<MemoryState>
   readonly claim: ExecutionClaim
 }): SessionStore => {
   const { stateRef, claim } = config
   const sessionId = claim.session.sessionId
+  const reads = reader({ stateRef, sessionId })
   return {
-    reserveEntryId: claimedUpdate(stateRef, claim, (session) => {
-      let counter = session.counter
-      while (session.entries.has(String(counter))) counter += 1
-      return Effect.succeed([String(counter), { ...session, counter: counter + 1 }] as const)
-    }),
+    reserveEntryId: claimedUpdate(stateRef, claim, (session) =>
+      Effect.succeed([String(session.counter), { ...session, counter: session.counter + 1 }] as const),
+    ),
     append: (input, options) =>
-      claimedUpdate<Entry, SessionConflict>(stateRef, claim, (session) => {
-        const result = append(session, input, options)
-        return isAppendSuccess(result) ? Effect.succeed(result) : Effect.fail(result)
-      }),
-    appendCheckpoint: (prepared) =>
-      claimedUpdate<CheckpointAppend, SessionConflict>(stateRef, claim, (session) =>
+      claimedUpdate<Entry, SessionConflict | SessionStoreError>(stateRef, claim, (session) =>
         Effect.gen(function* () {
+          yield* validatePayload({ value: input, boundary: "Session entry" }).pipe(
+            Effect.mapError((error) => storeError(error.message)),
+          )
+          const result = append(session, input, options)
+          return yield* isAppendSuccess(result) ? Effect.succeed(result) : Effect.fail(result)
+        }),
+      ),
+    appendCheckpoint: (prepared) =>
+      claimedUpdate<CheckpointAppend, SessionConflict | SessionStoreError>(stateRef, claim, (session) =>
+        Effect.gen(function* () {
+          yield* validatePayload({ value: prepared, boundary: "Session checkpoint" }).pipe(
+            Effect.mapError((error) => storeError(error.message)),
+          )
           if (prepared.compactionCommit !== undefined && prepared.compactionCommit.checkpointId !== prepared.id) {
             return yield* conflict("checkpoint-id-reused", "Compaction commit checkpoint identity diverges")
           }
@@ -479,7 +457,11 @@ export const claimedStore = (config: {
           ] as const
         }),
       ),
-    path: reader({ stateRef, sessionId }).path,
+    entry: reads.entry,
+    pathPage: reads.pathPage,
+    effectivePath: reads.effectivePath,
+    latestCompaction: reads.latestCompaction,
+    path: reads.path,
     setLeaf: (id) =>
       claimedUpdate(stateRef, claim, (session) =>
         id !== null && !session.entries.has(id)

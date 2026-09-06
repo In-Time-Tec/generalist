@@ -5,10 +5,10 @@ import type { Service as RunStoreService } from "../run/store.js"
 import type { ModelResponseEvent, SessionEntryInput } from "../service.js"
 import {
   completedSessionEntryId,
-  hydrateCompletedOperation,
   referenceFromEvent,
   resolvedModelResponse,
 } from "../execution/model-response/commit.js"
+import { hydrateCompletedOperation } from "../execution/model-response/hydration.js"
 import { interruptedSessionEntryId, resolveInterruptedModelResponse } from "../execution/model-response/interrupted.js"
 
 export const readEntry =
@@ -19,12 +19,8 @@ export const readEntry =
       if (Option.isNone(session)) {
         return yield* RuntimeUnavailable.make({ message: `Session ${input.sessionId} is unavailable` })
       }
-      const path = yield* session.value.path(input.entryId).pipe(
-        Effect.mapError((error) =>
-          error.message.includes("does not exist")
-            ? SessionEntryNotFound.make(input)
-            : SessionEntryCorrupt.make({ ...input, message: error.message }),
-        ),
+      const entry = yield* session.value.entry(input.entryId).pipe(
+        Effect.mapError((error) => SessionEntryCorrupt.make({ ...input, message: error.message })),
         Effect.catchDefect((defect) =>
           Effect.fail(
             SessionEntryCorrupt.make({
@@ -34,17 +30,27 @@ export const readEntry =
           ),
         ),
       )
-      const entry = path.at(-1)
-      if (entry?.id !== input.entryId) return yield* SessionEntryNotFound.make(input)
+      if (entry === undefined) return yield* SessionEntryNotFound.make(input)
       return Object.freeze(entry)
     })
 
 export const resolveModelResponse = (store: RunStoreService) => (event: ModelResponseEvent) =>
   Effect.gen(function* () {
+    const originPrefix = `${event.originRunId}:`
+    const expectedOperationKey = event.originOperationKey.startsWith(originPrefix)
+      ? `${event.runId}:${event.originOperationKey.slice(originPrefix.length)}`
+      : event.originOperationKey
+    if (event.operationKey !== expectedOperationKey) {
+      return yield* SessionEntryCorrupt.make({
+        sessionId: event.sessionId,
+        entryId: event.sessionEntryId,
+        message: "Session model response operation placement does not match its authored identity",
+      })
+    }
     const expectedEntryId =
       event._tag === "ModelResponseCommitted"
-        ? completedSessionEntryId({ runId: event.runId, operationKey: event.operationKey })
-        : interruptedSessionEntryId({ runId: event.runId, operationKey: event.operationKey })
+        ? completedSessionEntryId({ runId: event.originRunId, operationKey: event.originOperationKey })
+        : interruptedSessionEntryId({ runId: event.originRunId, operationKey: event.originOperationKey })
     if (event.sessionEntryId !== expectedEntryId) {
       return yield* SessionEntryCorrupt.make({
         sessionId: event.sessionId,

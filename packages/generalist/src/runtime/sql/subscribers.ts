@@ -1,4 +1,4 @@
-import { Effect, Metric, Queue, Scope, Stream, SynchronizedRef } from "effect"
+import { Effect, Metric, Option, Queue, Scope, Stream, SynchronizedRef } from "effect"
 import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { Cursor } from "../cursor.js"
 import type { RunEvent } from "../run/event.js"
@@ -17,11 +17,15 @@ type HostSessionSubscriberQueue = Queue.Queue<HostSessionEvent, SessionSubscribe
 
 interface HubState {
   readonly nextId: number
-  readonly byRun: ReadonlyMap<string, ReadonlyMap<number, SubscriberQueue>>
+  readonly byRun: ReadonlyMap<
+    string,
+    ReadonlyMap<number, { readonly queue: SubscriberQueue; readonly lastQueued: Cursor }>
+  >
   readonly byTreeRoot: ReadonlyMap<string, ReadonlyMap<number, TreeSubscriberQueue>>
-  readonly byHostSession: ReadonlyMap<string, ReadonlyMap<number, HostSessionSubscriberQueue>>
-  readonly lastSequenceByRun: ReadonlyMap<string, number>
-  readonly lastCursorByHostSession: ReadonlyMap<string, number>
+  readonly byHostSession: ReadonlyMap<
+    string,
+    ReadonlyMap<number, { readonly queue: HostSessionSubscriberQueue; readonly lastQueued: Cursor }>
+  >
 }
 
 export interface EventHub {
@@ -45,10 +49,8 @@ export interface EventHub {
   readonly subscribe: (input: {
     readonly runId: string
     readonly cursor: Cursor
-    readonly loadReplay: Effect.Effect<
-      { readonly replay: ReadonlyArray<RunEvent>; readonly lastSequence: number },
-      RunNotFound | RuntimeUnavailable
-    >
+    readonly loadReplay: Effect.Effect<{ readonly lastSequence: number }, RunNotFound | RuntimeUnavailable>
+    readonly loadAfter: (cursor: Cursor) => Effect.Effect<ReadonlyArray<RunEvent>, RuntimeUnavailable>
     readonly capacity: number
     readonly onSubscribed?: Effect.Effect<void, never, Scope.Scope>
   }) => Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable>
@@ -60,9 +62,12 @@ export interface EventHub {
     readonly sessionId: string
     readonly cursor: Cursor
     readonly loadReplay: Effect.Effect<
-      { readonly replay: ReadonlyArray<HostSessionEvent>; readonly lastCursor: number },
+      { readonly lastCursor: number; readonly replayCursor: number },
       SessionNotFound | RuntimeUnavailable
     >
+    readonly loadAfter: (
+      cursor: Cursor,
+    ) => Effect.Effect<ReadonlyArray<HostSessionEvent>, SessionNotFound | RuntimeUnavailable>
     readonly capacity: number
     readonly onSubscribed?: Effect.Effect<void, never, Scope.Scope>
   }) => Stream.Stream<
@@ -108,8 +113,6 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
       byRun: new Map(),
       byTreeRoot: new Map(),
       byHostSession: new Map(),
-      lastSequenceByRun: new Map(),
-      lastCursorByHostSession: new Map(),
     })
 
     const wakeTree = (rootRunId: string) =>
@@ -122,15 +125,17 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
     const publishEvent = (runId: string, event: RunEvent) =>
       SynchronizedRef.modifyEffect(stateRef, (state) =>
         Effect.gen(function* () {
-          const lastSequence = state.lastSequenceByRun.get(runId)
-          if (lastSequence !== undefined && event.sequence <= lastSequence) return [false, state] as const
-          const nextState = { ...state, lastSequenceByRun: new Map(state.lastSequenceByRun).set(runId, event.sequence) }
           const subscribers = state.byRun.get(runId)
-          if (subscribers === undefined) return [true, nextState] as const
+          if (subscribers === undefined) return [true, state] as const
           const nextSubs = new Map(subscribers)
-          for (const [id, queue] of subscribers) {
+          let published = false
+          for (const [id, { queue, lastQueued }] of subscribers) {
+            if (event.sequence <= lastQueued) continue
+            published = true
             const offered = yield* Queue.offer(queue, event)
-            if (!offered) {
+            if (offered) {
+              nextSubs.set(id, { queue, lastQueued: event.sequence })
+            } else {
               yield* Metric.update(overflows, 1)
               yield* Queue.fail(queue, SubscriberLagged.make({ runId, lastDeliveredSequence: event.sequence - 1 }))
               nextSubs.delete(id)
@@ -139,7 +144,7 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
           const byRun = new Map(state.byRun)
           if (nextSubs.size === 0) byRun.delete(runId)
           else byRun.set(runId, nextSubs)
-          return [true, { ...nextState, byRun }] as const
+          return [published, { ...state, byRun }] as const
         }),
       )
 
@@ -154,18 +159,16 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
     const publishHostSession = (sessionId: string, entry: HostSessionEvent) =>
       SynchronizedRef.modifyEffect(stateRef, (state) =>
         Effect.gen(function* () {
-          const lastCursor = state.lastCursorByHostSession.get(sessionId)
-          if (lastCursor !== undefined && entry.cursor <= lastCursor) return [undefined, state] as const
-          const nextState = {
-            ...state,
-            lastCursorByHostSession: new Map(state.lastCursorByHostSession).set(sessionId, entry.cursor),
-          }
           const subscribers = state.byHostSession.get(sessionId)
-          if (subscribers === undefined) return [undefined, nextState] as const
+          if (subscribers === undefined) return [undefined, state] as const
           const nextSubscribers = new Map(subscribers)
-          for (const [id, queue] of subscribers) {
+          for (const [id, { queue, lastQueued }] of subscribers) {
+            if (entry.cursor <= lastQueued) continue
             const offered = yield* Queue.offer(queue, entry)
-            if (offered) continue
+            if (offered) {
+              nextSubscribers.set(id, { queue, lastQueued: entry.cursor })
+              continue
+            }
             yield* Queue.fail(
               queue,
               SessionSubscriberLagged.make({
@@ -179,16 +182,12 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
           const byHostSession = new Map(state.byHostSession)
           if (nextSubscribers.size === 0) byHostSession.delete(sessionId)
           else byHostSession.set(sessionId, nextSubscribers)
-          return [undefined, { ...nextState, byHostSession }] as const
+          return [undefined, { ...state, byHostSession }] as const
         }),
       )
 
     const publishReplay = (runId: string, event: RunEvent) =>
-      publishEvent(runId, event).pipe(
-        Effect.flatMap((published) =>
-          published ? wakeTree(event.rootRunId).pipe(Effect.as(true)) : Effect.succeed(false),
-        ),
-      )
+      publishEvent(runId, event).pipe(Effect.tap((published) => (published ? wakeTree(event.rootRunId) : Effect.void)))
 
     const recordReplay = (input: {
       readonly runId: string
@@ -255,7 +254,7 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
           const subscriberId = yield* SynchronizedRef.modify(stateRef, (state) => {
             const id = state.nextId
             const current = new Map(state.byRun.get(input.runId) ?? [])
-            current.set(id, liveQueue)
+            current.set(id, { queue: liveQueue, lastQueued: input.cursor })
             const byRun = new Map(state.byRun)
             byRun.set(input.runId, current)
             return [id, { ...state, nextId: id + 1, byRun }] as const
@@ -272,26 +271,65 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
               return { ...state, byRun }
             }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
           )
-          const [duration, { replay, lastSequence }] = yield* Effect.timed(input.loadReplay)
+          const { lastSequence } = yield* input.loadReplay
           if (input.cursor < -1 || input.cursor > lastSequence) {
             return yield* CursorExpired.make({
               runId: input.runId,
               cursor: input.cursor,
-              earliestSequence: replay[0]?.sequence ?? 0,
+              earliestSequence: 0,
             })
           }
-          const replayCutoff = replay.at(-1)?.sequence ?? input.cursor
-          yield* recordReplay({
-            runId: input.runId,
-            cursor: input.cursor,
-            lastSequence,
-            count: replay.length,
-            duration,
-          })
+          const replayThrough = (after: Cursor, through: Cursor) =>
+            Stream.paginate(after, (cursor) =>
+              cursor >= through
+                ? Effect.succeed([[], Option.none<number>()] as const)
+                : Effect.timed(input.loadAfter(cursor)).pipe(
+                    Effect.flatMap(([duration, loaded]) => {
+                      const events = loaded.filter((event) => event.sequence > cursor && event.sequence <= through)
+                      const next = events.at(-1)?.sequence
+                      if (next === undefined || next <= cursor) {
+                        return Effect.fail(
+                          RuntimeUnavailable.make({
+                            message: `persisted Run ${input.runId} event replay did not advance after ${cursor}`,
+                          }),
+                        )
+                      }
+                      return recordReplay({
+                        runId: input.runId,
+                        cursor,
+                        lastSequence: next,
+                        count: events.length,
+                        duration,
+                      }).pipe(Effect.as([events, next < through ? Option.some(next) : Option.none<number>()] as const))
+                    }),
+                  ),
+            )
           if (input.onSubscribed !== undefined) yield* Effect.forkScoped(input.onSubscribed)
-          return Stream.concat(
-            Stream.fromIterable(replay),
-            Stream.fromQueue(liveQueue).pipe(Stream.filter((event) => event.sequence > replayCutoff)),
+          let delivered = lastSequence
+          return replayThrough(input.cursor, lastSequence).pipe(
+            Stream.concat(
+              Stream.fromQueue(liveQueue).pipe(
+                Stream.flatMap((event) =>
+                  event.sequence <= delivered
+                    ? Stream.empty
+                    : (event.sequence === delivered + 1
+                        ? Stream.succeed(event)
+                        : replayThrough(delivered, event.sequence)
+                      ).pipe(
+                        Stream.tap((item) =>
+                          Effect.sync(() => {
+                            delivered = item.sequence
+                          }),
+                        ),
+                      ),
+                ),
+              ),
+            ),
+            Stream.mapError((error) =>
+              error._tag === "generalist/runtime/SubscriberLagged"
+                ? SubscriberLagged.make({ runId: input.runId, lastDeliveredSequence: delivered })
+                : error,
+            ),
           )
         }),
       )
@@ -335,7 +373,7 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
           const subscriberId = yield* SynchronizedRef.modify(stateRef, (state) => {
             const id = state.nextId
             const current = new Map(state.byHostSession.get(input.sessionId) ?? [])
-            current.set(id, liveQueue)
+            current.set(id, { queue: liveQueue, lastQueued: input.cursor })
             const byHostSession = new Map(state.byHostSession)
             byHostSession.set(input.sessionId, current)
             return [id, { ...state, nextId: id + 1, byHostSession }] as const
@@ -352,7 +390,7 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
               return { ...state, byHostSession }
             }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
           )
-          const { replay, lastCursor } = yield* input.loadReplay
+          const { lastCursor, replayCursor } = yield* input.loadReplay
           if (input.cursor < -1 || input.cursor > lastCursor) {
             return yield* SessionCursorExpired.make({
               sessionId: input.sessionId,
@@ -362,11 +400,54 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
               hint: "Restart replay from the earliest available Session cursor.",
             })
           }
-          const replayCutoff = replay.at(-1)?.cursor ?? input.cursor
+          const replayThrough = (after: Cursor, through: Cursor) =>
+            Stream.paginate(after, (cursor) =>
+              cursor >= through
+                ? Effect.succeed([[], Option.none<number>()] as const)
+                : input.loadAfter(cursor).pipe(
+                    Effect.flatMap((loaded) => {
+                      const entries = loaded.filter((entry) => entry.cursor > cursor && entry.cursor <= through)
+                      const next = entries.at(-1)?.cursor
+                      if (next === undefined || next <= cursor) {
+                        return Effect.fail(
+                          RuntimeUnavailable.make({
+                            message: `persisted host Session ${input.sessionId} replay did not advance after ${cursor}`,
+                          }),
+                        )
+                      }
+                      return Effect.succeed([
+                        entries,
+                        next < through ? Option.some(next) : Option.none<number>(),
+                      ] as const)
+                    }),
+                  ),
+            )
           if (input.onSubscribed !== undefined) yield* Effect.forkScoped(input.onSubscribed)
-          return Stream.concat(
-            Stream.fromIterable(replay),
-            Stream.fromQueue(liveQueue).pipe(Stream.filter((entry) => entry.cursor > replayCutoff)),
+          let delivered = lastCursor
+          return replayThrough(input.cursor, replayCursor).pipe(
+            Stream.concat(
+              Stream.fromQueue(liveQueue).pipe(
+                Stream.flatMap((entry) =>
+                  entry.cursor <= delivered
+                    ? Stream.empty
+                    : (entry.cursor === delivered + 1
+                        ? Stream.succeed(entry)
+                        : replayThrough(delivered, entry.cursor)
+                      ).pipe(
+                        Stream.tap((item) =>
+                          Effect.sync(() => {
+                            delivered = item.cursor
+                          }),
+                        ),
+                      ),
+                ),
+              ),
+            ),
+            Stream.mapError((error) =>
+              error._tag === "generalist/host/SessionSubscriberLagged"
+                ? SessionSubscriberLagged.make({ ...error, lastDeliveredCursor: delivered })
+                : error,
+            ),
           )
         }),
       )
@@ -379,7 +460,7 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
             Effect.forEach(
               state.byRun.values(),
               (subscribers) =>
-                Effect.forEach(subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
+                Effect.forEach(subscribers.values(), ({ queue }) => Queue.fail(queue, unavailable), { discard: true }),
               { discard: true },
             ),
             Effect.forEach(
@@ -391,7 +472,7 @@ export const forBackend = (backend: Exclude<StoreBackend, "memory">): Effect.Eff
             Effect.forEach(
               state.byHostSession.values(),
               (subscribers) =>
-                Effect.forEach(subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
+                Effect.forEach(subscribers.values(), ({ queue }) => Queue.fail(queue, unavailable), { discard: true }),
               { discard: true },
             ),
           ],

@@ -228,7 +228,7 @@
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`RuntimeWorker`](#runtimeworker), `never`, [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore)\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`RuntimeWorker`](#runtimeworker), [`RuntimeUnavailable`](../../runtime/namespaces/Errors#runtimeunavailable), [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore)\>
 
 #### Parameters
 
@@ -238,7 +238,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`RuntimeWorker`](#runtimeworker), `never`, [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore)\>
+`Layer.Layer`\<[`RuntimeWorker`](#runtimeworker), [`RuntimeUnavailable`](../../runtime/namespaces/Errors#runtimeunavailable), [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore)\>
 
 ***
 
@@ -246,7 +246,7 @@
 
 ### make
 
-> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](#service), `never`, [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore) \| `Scope.Scope`\>
+> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](#service), [`RuntimeUnavailable`](../../runtime/namespaces/Errors#runtimeunavailable), [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore) \| `Scope.Scope`\>
 
 #### Parameters
 
@@ -256,4 +256,4 @@
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](#service), `never`, [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore) \| `Scope.Scope`\>
+`Effect.Effect`\<[`Service`](#service), [`RuntimeUnavailable`](../../runtime/namespaces/Errors#runtimeunavailable), [`RunClaims`](../index#runclaims) \| [`RunExecutor`](../../runtime/namespaces/RunExecutor#runexecutor) \| [`RunStore`](../../runtime/namespaces/RunStore#runstore) \| `Scope.Scope`\>

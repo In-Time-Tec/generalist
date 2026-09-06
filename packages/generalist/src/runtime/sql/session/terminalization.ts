@@ -149,7 +149,7 @@ export const appendTerminalToolResults = (input: {
     yield* sql`
       INSERT INTO generalist_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.run.sessionId}, ${id}, ${parentId}, ${session.next_seq}, 'Message',
-        ${encodePayload(payload)}, ${created})
+        ${yield* encodePayload(payload).pipe(Effect.mapError((error) => unavailable(error.message)))}, ${created})
     `
     yield* sql`
       UPDATE generalist_sessions SET leaf_id = ${id}, next_seq = ${session.next_seq + 1}, updated_at = ${created}

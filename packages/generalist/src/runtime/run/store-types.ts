@@ -158,7 +158,10 @@ export interface SessionWriteClaim {
 }
 
 /** Read-only Session history capability. */
-export type SessionReader = Pick<SessionService, "path" | "leaf">
+export type SessionReader = Pick<
+  SessionService,
+  "entry" | "pathPage" | "effectivePath" | "latestCompaction" | "path" | "leaf"
+>
 
 export interface ExecutionClaim {
   readonly runId: string

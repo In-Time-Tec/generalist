@@ -2152,6 +2152,8 @@
                           "properties": {
                             "_tag": { "type": "string", "enum": ["ModelResponseCommitted"] },
                             "turn": { "type": "number" },
+                            "originRunId": { "type": "string", "minLength": 1 },
+                            "originOperationKey": { "type": "string" },
                             "operationKey": { "type": "string" },
                             "modelCallId": { "type": "string" },
                             "modelAttemptId": { "type": "string" },
@@ -2205,6 +2207,8 @@
                           "required": [
                             "_tag",
                             "turn",
+                            "originRunId",
+                            "originOperationKey",
                             "operationKey",
                             "modelCallId",
                             "modelAttemptId",
@@ -2222,6 +2226,8 @@
                           "properties": {
                             "_tag": { "type": "string", "enum": ["ModelResponseInterrupted"] },
                             "turn": { "type": "number" },
+                            "originRunId": { "type": "string", "minLength": 1 },
+                            "originOperationKey": { "type": "string" },
                             "operationKey": { "type": "string" },
                             "modelCallId": { "type": "string" },
                             "modelAttemptId": { "type": "string" },
@@ -2274,6 +2280,8 @@
                           "required": [
                             "_tag",
                             "turn",
+                            "originRunId",
+                            "originOperationKey",
                             "operationKey",
                             "modelCallId",
                             "modelAttemptId",

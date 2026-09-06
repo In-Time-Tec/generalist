@@ -8,6 +8,7 @@ import {
   type HostSessionEvent,
 } from "../../session/host.js"
 import { RuntimeUnavailable } from "../../errors.js"
+import { validate as validatePayload } from "../../execution/payload/index.js"
 import type { Service as RunStoreService } from "../../run/store.js"
 import type { HostSessionPublication, HostSessionSubscriberQueue, MemoryState } from "../state.js"
 import { toInspection } from "./events.js"
@@ -21,6 +22,7 @@ const missing = (sessionId: string) =>
 const createHostSession = (state: MemoryState, input: { readonly id: string; readonly title?: string }) =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+    yield* validatePayload({ value: input, boundary: "host Session metadata" })
     if (state.hostSessions.has(input.id)) {
       return yield* SessionConflict.make({
         sessionId: input.id,

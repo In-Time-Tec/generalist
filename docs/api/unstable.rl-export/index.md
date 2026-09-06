@@ -144,7 +144,7 @@ Cross-driver Runtime methods required by `dag`.
 
 ##### sessionEntry
 
-> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../generalist/namespaces/Session#entry), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
+> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../generalist/namespaces/Session#entry-1), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
 
 **`Experimental`**
 
@@ -156,7 +156,7 @@ Cross-driver Runtime methods required by `dag`.
 
 ###### Returns
 
-`Effect`\<[`Entry`](../generalist/namespaces/Session#entry), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
+`Effect`\<[`Entry`](../generalist/namespaces/Session#entry-1), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
 
 ###### Inherited from
 

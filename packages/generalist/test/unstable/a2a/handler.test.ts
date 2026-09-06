@@ -19,6 +19,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
 import type { Prompt as AiPrompt } from "effect/unstable/ai"
 import { make as makeHandler } from "../../../src/unstable/a2a/handler.js"
+import { fromRuntime } from "../../../src/unstable/a2a/projection.js"
 
 const address = Address.make("agent:test")
 const executable = ExecutableManifest.makeTest("test", "1")
@@ -427,6 +428,46 @@ describe("DefaultRequestHandler projection", () => {
         cancelHandler.cancelTask({ tenant: "", id: cancelId, metadata: {} }, new ServerCallContext()),
       )
       expect(canceled.status?.state).toBe(TaskState.TASK_STATE_CANCELED)
+    }),
+  )
+
+  it.effect("projects histories larger than the public page limit without losing the terminal result", () =>
+    Effect.gen(function* () {
+      const fixture = makeRuntime()
+      const runId = "long-history"
+      fixture.runs.set(runId, {
+        status: "succeeded",
+        waits: [],
+        pending: [],
+        events: [
+          accepted(runId),
+          ...Array.from(
+            { length: 1499 },
+            (_, index): RunEvent.RunEvent => ({
+              ...base(runId, index + 1),
+              _tag: "TurnStarted",
+              turn: index,
+            }),
+          ),
+          completed(runId, 1500),
+        ],
+      })
+      const limits: Array<number> = []
+      const task = yield* fromRuntime(
+        {
+          ...fixture.runtime,
+          history: (input) => {
+            expect(input.limit).toBeGreaterThan(0)
+            expect(input.limit).toBeLessThanOrEqual(1000)
+            limits.push(input.limit)
+            return fixture.runtime.history(input)
+          },
+        },
+        runId,
+      )
+      expect(limits).toEqual([1000, 501])
+      expect(task.status?.state).toBe(TaskState.TASK_STATE_COMPLETED)
+      expect(task.artifacts[0]?.artifactId).toBe(`${runId}:1500:result`)
     }),
   )
 

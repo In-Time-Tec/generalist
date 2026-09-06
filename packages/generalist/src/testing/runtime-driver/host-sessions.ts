@@ -37,22 +37,25 @@ export const registerHostSessions = <LayerError, ClaimsLayerError>(input: {
             expect.objectContaining({ runId: receipt.runId }),
           ])
 
-          const replayedRunEvents = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
+          const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "host-sessions" })
+          for (let turn = 0; turn < 140; turn += 1) {
+            yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn } })
+          }
+          const replayedRunEvents = yield* services.runtime.history({ runId: receipt.runId, limit: 1000 })
           const followed = yield* services.runtime.sessionEvents({ sessionId }).pipe(
-            Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 7),
+            Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 1007),
             Stream.runCollect,
             Effect.forkScoped,
           )
           yield* Effect.yieldNow
-          const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "host-sessions" })
-          yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 7 } })
+          yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1007 } })
           const entries = Array.from(yield* Fiber.join(followed))
 
           expect(entries.map(({ cursor }) => cursor)).toEqual(entries.map((_, cursor) => cursor))
           expect(entries.slice(0, replayedRunEvents.length).map(({ event }) => event.eventId)).toEqual(
             replayedRunEvents.map(({ eventId }) => eventId),
           )
-          expect(entries.at(-1)?.event).toMatchObject({ _tag: "TurnStarted", turn: 7 })
+          expect(entries.at(-1)?.event).toMatchObject({ _tag: "TurnStarted", turn: 1007 })
         }),
       ),
     ),

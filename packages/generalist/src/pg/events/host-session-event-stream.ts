@@ -33,6 +33,7 @@ export const hostSessionEventStream = (input: {
         sessionId: input.sessionId,
         cursor: input.cursor,
         loadReplay: input.loadReplay.pipe(Effect.tap(({ lastCursor }) => SynchronizedRef.set(cursor, lastCursor))),
+        loadAfter: input.loadAfter,
         capacity: input.capacity,
         onSubscribed: Effect.gen(function* () {
           yield* Effect.forkScoped(catchUp.pipe(Effect.repeat(Schedule.spaced("1 second")), Effect.ignore))

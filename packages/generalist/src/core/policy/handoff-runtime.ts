@@ -211,11 +211,9 @@ export const executeSameRunHandoff = (input: ExecuteInput) =>
         )
         const sessionParentId = Option.isNone(sessionService)
           ? null
-          : ((yield* sessionService.value
-              .path()
-              .pipe(
-                Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: error.message })),
-              )).at(-1)?.id ?? null)
+          : yield* sessionService.value.leaf.pipe(
+              Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: String(error) })),
+            )
         const frame =
           decoded.reason === undefined
             ? { handoffId, source, target: resolved.name, turn: input.turn }

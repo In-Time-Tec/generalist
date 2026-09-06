@@ -6,7 +6,18 @@ import { makeRuntime, runIds } from "./rl-fixture.js"
 it.effect("projects fork, child, and compaction journal facts into one DAG", () =>
   Effect.gen(function* () {
     const { runtime } = makeRuntime()
-    const trajectory = yield* dag(runtime, runIds.root)
+    const cursors: Array<number> = []
+    const trajectory = yield* dag(
+      {
+        ...runtime,
+        history: (input) => {
+          cursors.push(input.cursor ?? -1)
+          return runtime.history({ ...input, limit: Math.min(2, input.limit) })
+        },
+      },
+      runIds.root,
+    )
+    expect(cursors.some((cursor) => cursor > 0)).toBe(true)
 
     expect(trajectory.leaves).toEqual([
       `${runIds.root}:terminal`,

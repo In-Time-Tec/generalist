@@ -3,6 +3,7 @@ import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import type { BudgetLimits } from "../../core/durable/run-budget.js"
 import { RuntimeUnavailable } from "../errors.js"
+import { validate as validatePayload, maximumEventBytes } from "../execution/payload/index.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionResult } from "../execution/state.js"
@@ -116,6 +117,7 @@ export const appendEvent: {
       const sequence = run.lastSequence + 1
       const at = yield* occurredAt
       const event = build(baseFields(run, sequence, at), run)
+      yield* validatePayload({ value: event, boundary: "event", limit: maximumEventBytes })
       const discardReason = terminalReason(event)
       const pendingSteering = run.steering.filter(
         (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,

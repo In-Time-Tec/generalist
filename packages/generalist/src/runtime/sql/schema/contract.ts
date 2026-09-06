@@ -2,7 +2,7 @@
 export const SQL_SCHEMA_NAME = "generalist_runtime"
 
 /** The single logical SQL Runtime schema version. */
-export const SQL_SCHEMA_VERSION = 10
+export const SQL_SCHEMA_VERSION = 11
 
 export interface SqlLogicalTable {
   readonly name: string

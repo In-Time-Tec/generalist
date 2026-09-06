@@ -444,7 +444,12 @@ export const commitInterruptedModelResponse: {
     const withSession = yield* appendInterruptedSessionEntry({ state, entry: sessionEntry }).pipe(
       Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
     )
-    const record: OperationRecord = { ...current, status: "failed", error: input.outcome.error }
+    const record: OperationRecord = {
+      ...current,
+      status: "failed",
+      error: input.outcome.error,
+      completedSequence: run.lastSequence + 1,
+    }
     const operations = new Map(withSession.operations)
     operations.set(operationMapKey(input.runId, input.operationId), record)
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)

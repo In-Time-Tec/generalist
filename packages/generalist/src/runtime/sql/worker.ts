@@ -81,14 +81,31 @@ export class RuntimeWorker extends Context.Service<RuntimeWorker, Service>()(
 
 export const make = (
   options: Options,
-): Effect.Effect<Service, never, RunClaims | RunExecutor | RunStore | Scope.Scope> =>
+): Effect.Effect<Service, RuntimeUnavailable, RunClaims | RunExecutor | RunStore | Scope.Scope> =>
   Effect.gen(function* () {
-    const claims = yield* RunClaims
-    const executor = yield* RunExecutor
-    const store = yield* RunStore
     const concurrency = options.concurrency ?? 1
     const lease = options.lease ?? "30 seconds"
     const fallbackInterval = options.fallbackInterval ?? "30 seconds"
+    const cancellationInterval = options.cancellationInterval ?? "100 millis"
+    if (options.workerId.trim().length === 0) {
+      return yield* RuntimeUnavailable.make({ message: "workerId must not be empty" })
+    }
+    if (!Number.isSafeInteger(concurrency) || concurrency < 1) {
+      return yield* RuntimeUnavailable.make({ message: "worker concurrency must be a positive safe integer" })
+    }
+    for (const [name, duration, minimum] of [
+      ["lease", lease, 2],
+      ["fallbackInterval", fallbackInterval, 1],
+      ["cancellationInterval", cancellationInterval, 1],
+    ] as const) {
+      const invalid = () =>
+        RuntimeUnavailable.make({ message: `worker ${name} must be finite and at least ${minimum} milliseconds` })
+      const millis = yield* Effect.try({ try: () => Duration.toMillis(duration), catch: invalid })
+      if (!Number.isFinite(millis) || millis < minimum) return yield* invalid()
+    }
+    const claims = yield* RunClaims
+    const executor = yield* RunExecutor
+    const store = yield* RunStore
     const wakeups = yield* Queue.sliding<void>(1)
     yield* Effect.addFinalizer(() => Queue.shutdown(wakeups))
     const active = yield* FiberMap.make<string, void, never>()
@@ -100,7 +117,6 @@ export const make = (
       claims: new Map(),
     })
     const renewalInterval = Duration.millis(Math.max(1, Duration.toMillis(lease) / 2))
-    const cancellationInterval = options.cancellationInterval ?? "100 millis"
 
     const recordFailure = (cause: Cause.Cause<unknown>) =>
       Cause.hasInterruptsOnly(cause)
@@ -356,5 +372,7 @@ export const make = (
     }
   })
 
-export const layer = (options: Options): Layer.Layer<RuntimeWorker, never, RunClaims | RunExecutor | RunStore> =>
+export const layer = (
+  options: Options,
+): Layer.Layer<RuntimeWorker, RuntimeUnavailable, RunClaims | RunExecutor | RunStore> =>
   Layer.effect(RuntimeWorker, make(options).pipe(Effect.map((service) => RuntimeWorker.of(service))))

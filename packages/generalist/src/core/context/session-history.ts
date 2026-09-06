@@ -30,6 +30,28 @@ export interface HistoryPage {
   readonly unknownCursors?: ReadonlyArray<EntryId>
 }
 
+/** Opaque continuation for an older page on one immutable Session leaf. */
+export interface PathPageCursor {
+  readonly leafId: EntryId
+  readonly entryId: EntryId
+}
+
+/** One bounded backward traversal anchored to the same immutable leaf on every page. */
+export interface PathPageInput {
+  readonly leafId: EntryId | null
+  readonly limit: number
+  /** Use only a cursor returned by the preceding page for this leaf. */
+  readonly cursor?: PathPageCursor
+}
+
+/** One bounded path page in root-to-leaf order. */
+export interface PathPage {
+  readonly entries: ReadonlyArray<Entry>
+  readonly hasOlder: boolean
+  readonly hasNewer: boolean
+  readonly nextCursor?: PathPageCursor
+}
+
 /**
  * Purely page one root-to-leaf path over its exact entries.
  *

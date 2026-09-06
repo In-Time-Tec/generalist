@@ -42,7 +42,7 @@ export const seedFromSession = (input: {
 }): Effect.Effect<Option.Option<Prompt.Prompt>, import("../../context/session.js").SessionStoreError> =>
   input.suppliedHistory !== undefined || Option.isNone(input.activeSession)
     ? Effect.succeedNone
-    : input.activeSession.value.path().pipe(Effect.map(buildContext), Effect.map(Option.some))
+    : input.activeSession.value.effectivePath().pipe(Effect.map(buildContext), Effect.map(Option.some))
 
 /** Build the Chat a run starts from, preferring an active Session over supplied history. */
 export const initialChat = (input: {
@@ -94,7 +94,7 @@ export const replayModelMessages = (input: {
         }),
       ),
     onSome: (session) =>
-      session.path(input.sessionParentId).pipe(
+      session.effectivePath(input.sessionParentId).pipe(
         Effect.map((path) => withDerivedSystem({ system: input.system, projection: buildContext(path) }).content),
         Effect.mapError((error) => input.sessionError(input.turn, error)),
       ),
@@ -106,7 +106,7 @@ export const resumeChat = (input: {
   readonly suppliedHistory: Prompt.RawInput | undefined
 }): Effect.Effect<Chat.Service, import("../../context/session.js").SessionStoreError> => {
   if (Option.isSome(input.activeSession)) {
-    return input.activeSession.value.path().pipe(Effect.map(buildContext), Effect.flatMap(Chat.fromPrompt))
+    return input.activeSession.value.effectivePath().pipe(Effect.map(buildContext), Effect.flatMap(Chat.fromPrompt))
   }
   return input.suppliedHistory === undefined ? Chat.empty : Chat.fromPrompt(input.suppliedHistory)
 }
@@ -119,7 +119,7 @@ export const refreshResumeSystem = (input: {
   readonly supplemental?: string | undefined
 }): Effect.Effect<void, import("../../context/session.js").SessionStoreError> => {
   if (input.chat === undefined || Option.isNone(input.activeSession)) return Effect.void
-  return input.activeSession.value.path().pipe(
+  return input.activeSession.value.effectivePath().pipe(
     Effect.map(buildContext),
     Effect.flatMap((projection) =>
       Ref.set(
@@ -141,8 +141,7 @@ export const restoreCheckpointTelemetry = (input: {
   readonly session: SessionStore
   readonly undelivered: Array<ModelTelemetryEvent>
 }): Effect.Effect<void, import("../../context/session.js").SessionStoreError> =>
-  input.session.path().pipe(
-    Effect.map((path) => path.findLast((entry) => entry._tag === "Compaction")),
+  input.session.latestCompaction().pipe(
     Effect.map((checkpoint) => {
       if (checkpoint?._tag !== "Compaction") return
       for (const event of checkpoint.telemetry) {

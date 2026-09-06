@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- the memory store wires one storage service contract. */
 import { Context, Effect, Layer, Option, Ref, SynchronizedRef } from "effect"
+import { validate as validatePayload } from "../execution/payload/index.js"
 import {
   AddressNotFound,
   CursorExpired,
@@ -54,7 +55,8 @@ import {
 } from "./store/directory.js"
 import { Prompt } from "effect/unstable/ai"
 import type { RunEvent } from "../run/event.js"
-import { claimedStore as memorySessionStore, reader as memorySessionReader } from "./session-store.js"
+import { claimedStore as memorySessionStore } from "./session-store.js"
+import { reader as memorySessionReader } from "./session-reader.js"
 import { admitFanOut } from "./store/fan-out/service.js"
 import { inspectFanOut } from "./store/fan-out/inspection.js"
 import { make as makeTreeCursor } from "../tree/cursor.js"
@@ -138,11 +140,23 @@ const makeStoreServices = (options: LayerOptions) =>
     const fencedUpdate = <E>(
       input: import("../run/store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<MemoryState, E>,
-    ) => update((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
+    ) =>
+      update((state) =>
+        requireExecutionClaim(state, input).pipe(
+          Effect.andThen(validatePayload({ value: input, boundary: "transition" })),
+          Effect.andThen(transition(state)),
+        ),
+      )
     const fencedModify = <A, E>(
       input: import("../run/store.js").ExecutionClaim,
       transition: (state: MemoryState) => Effect.Effect<readonly [A, MemoryState], E>,
-    ) => modifyState((state) => requireExecutionClaim(state, input).pipe(Effect.andThen(transition(state))))
+    ) =>
+      modifyState((state) =>
+        requireExecutionClaim(state, input).pipe(
+          Effect.andThen(validatePayload({ value: input, boundary: "transition" })),
+          Effect.andThen(transition(state)),
+        ),
+      )
     const runStore = RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
       sessionReader: (sessionId) => Effect.succeed(Option.some(memorySessionReader({ stateRef, sessionId }))),
@@ -159,6 +173,7 @@ const makeStoreServices = (options: LayerOptions) =>
         ),
       admitSend: (input) =>
         Effect.gen(function* () {
+          yield* validatePayload({ value: input, boundary: "admission" })
           const bound = addressBindings.get(input.message.to)
           if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
           const admitted = yield* Effect.try({
@@ -174,10 +189,16 @@ const makeStoreServices = (options: LayerOptions) =>
           }
           return yield* modifyState((state) => admitSend(state, input))
         }),
-      admitStart: (input, startOptions) => modifyState((state) => admitStart(state, input, startOptions)),
+      admitStart: (input, startOptions) =>
+        validatePayload({ value: input, boundary: "admission" }).pipe(
+          Effect.andThen(modifyState((state) => admitStart(state, input, startOptions))),
+        ),
       activate: (input) => modifyState((state) => activateRoot(state, input.runId)),
       extendBudget: (runId, delta) => modifyState((state) => extendBudget(state, runId, delta)),
-      admitSpawn: (input) => modifyState((state) => admitSpawn(state, input)),
+      admitSpawn: (input) =>
+        validatePayload({ value: input, boundary: "child admission" }).pipe(
+          Effect.andThen(modifyState((state) => admitSpawn(state, input))),
+        ),
       admitProgramChild: (input) => fencedModify(input, (state) => admitProgramChild(state, input)),
       admitProgramChildAndSuspend: (input) =>
         fencedModify(input, (state) => admitProgramChildrenAndSuspend(state, input)),
@@ -208,7 +229,10 @@ const makeStoreServices = (options: LayerOptions) =>
           ),
         ),
       timeoutAwaitEvent: (input) => modifyState((state) => timeoutAwaitEvent(state, input)),
-      registerSchedule: (record) => modifyState((state) => registerSchedule(state, record)),
+      registerSchedule: (record) =>
+        validatePayload({ value: record, boundary: "schedule" }).pipe(
+          Effect.andThen(modifyState((state) => registerSchedule(state, record))),
+        ),
       claimSchedules: (input) => modifyState((state) => claimSchedules(state, input)),
       advanceSchedule: (input) => update((state) => advanceSchedule(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
@@ -271,7 +295,10 @@ const makeStoreServices = (options: LayerOptions) =>
       settlementNotifications: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => settlementNotifications(state, input))),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
-      fork: (input) => modifyState((state) => fork(state, input)),
+      fork: (input) =>
+        validatePayload({ value: input, boundary: "fork substitution" }).pipe(
+          Effect.andThen(modifyState((state) => fork(state, input))),
+        ),
       rewind: (input) => modifyState((state) => rewind(state, input)),
       snapshot: (runId) =>
         SynchronizedRef.get(stateRef).pipe(
@@ -526,14 +553,23 @@ const makeStoreServices = (options: LayerOptions) =>
             return [result, recorded] as const
           }),
         ),
-      resolveUnknown: (input) => update((state) => resolveUnknownOperation(state, input)),
+      resolveUnknown: (input) =>
+        validatePayload({ value: input, boundary: "operator resolution" }).pipe(
+          Effect.andThen(update((state) => resolveUnknownOperation(state, input))),
+        ),
       claimExecution: (input) => modifyState((state) => claimExecution(state, input)),
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),
       releaseExecution: (input) => modifyState((state) => releaseExecution(state, input)),
-      saveExecution: (input) => update((state) => saveExecution(state, input)),
+      saveExecution: (input) =>
+        validatePayload({ value: input, boundary: "checkpoint" }).pipe(
+          Effect.andThen(update((state) => saveExecution(state, input))),
+        ),
       retryExecution: (input) => modifyState((state) => retryExecution(state, input)),
-      admitFanOut: (input) => modifyState((state) => admitFanOut(state, input)),
+      admitFanOut: (input) =>
+        validatePayload({ value: input, boundary: "child admission" }).pipe(
+          Effect.andThen(modifyState((state) => admitFanOut(state, input))),
+        ),
       inspectFanOut: (fanOutId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectFanOut(state, fanOutId))),
       reserveProgramOperation: (input) => fencedModify(input, (state) => reserveProgramOperation(state, input)),

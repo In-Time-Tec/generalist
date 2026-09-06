@@ -14,11 +14,8 @@ export const eventStream = (input: {
   readonly runId: string
   readonly cursor: Cursor
   readonly capacity: number
-  readonly loadReplay: Effect.Effect<
-    { readonly replay: ReadonlyArray<RunEvent>; readonly lastSequence: number },
-    RunNotFound | RuntimeUnavailable
-  >
-  readonly loadAfter: (cursor: Cursor) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | RuntimeUnavailable>
+  readonly loadReplay: Effect.Effect<{ readonly lastSequence: number }, RunNotFound | RuntimeUnavailable>
+  readonly loadAfter: (cursor: Cursor) => Effect.Effect<ReadonlyArray<RunEvent>, RuntimeUnavailable>
 }): Stream.Stream<RunEvent, EventsError> =>
   Stream.unwrap(
     Effect.gen(function* () {
@@ -36,6 +33,7 @@ export const eventStream = (input: {
         runId: input.runId,
         cursor: input.cursor,
         loadReplay: input.loadReplay.pipe(Effect.tap(({ lastSequence }) => SynchronizedRef.set(cursor, lastSequence))),
+        loadAfter: input.loadAfter,
         capacity: input.capacity,
         onSubscribed: Effect.gen(function* () {
           yield* Effect.forkScoped(catchUp.pipe(Effect.repeat(Schedule.spaced("1 second")), Effect.ignore))

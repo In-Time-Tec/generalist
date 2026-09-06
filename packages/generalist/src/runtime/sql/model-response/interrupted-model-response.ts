@@ -81,7 +81,8 @@ export const commitInterruptedModelResponse: {
     const finished = yield* nowIso
     yield* sql`
       UPDATE generalist_run_operations
-      SET status = 'failed', error_json = ${encodeJsonValue(input.outcome.error)}, finished_at = ${finished}
+      SET status = 'failed', error_json = ${encodeJsonValue(input.outcome.error)}, finished_at = ${finished},
+        completed_sequence = ${run.lastSequence + 1}
       WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
         AND status IN ('requested', 'running')
     `

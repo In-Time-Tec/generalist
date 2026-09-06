@@ -2,7 +2,12 @@ import { DateTime, Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { eventIdFor, type RunEvent } from "../../run/event.js"
-import { decodePinned } from "../../executable/manifest-internal.js"
+import {
+  encode as encodeBounded,
+  validate as validatePayload,
+  maximumEventBytes,
+} from "../../execution/payload/index.js"
+import { decodePersistedEvents } from "../codec/events.js"
 import type { ExecutableManifest, ExecutableRef } from "../../executable/manifest.js"
 import type { Message } from "../../messaging/message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
@@ -93,28 +98,6 @@ export const hasAdmission = (input: {
     return rows.length > 0
   })
 
-export function decodePersistedEvents(
-  rows: EventRows,
-  manifest: ExecutableManifest,
-): Effect.Effect<RunEvent[], RuntimeUnavailable, never>
-export function decodePersistedEvents(
-  manifest: ExecutableManifest,
-): (rows: EventRows) => Effect.Effect<RunEvent[], RuntimeUnavailable, never>
-export function decodePersistedEvents(...args: [EventRows, ExecutableManifest] | [ExecutableManifest]) {
-  if (args.length === 1) return (rows: EventRows) => decodePersistedEvents(rows, args[0])
-  const [rows, manifest] = args
-  return Effect.forEach(rows, (row) =>
-    Effect.try({
-      try: () => {
-        const event = decodeEvent(row.event_json)
-        decodePinned({ ref: event.executableRef, manifest })
-        return event
-      },
-      catch: (error) =>
-        RuntimeUnavailable.make({ message: `invalid persisted Run event ${row.event_id}: ${String(error)}` }),
-    }),
-  )
-}
 export function loadEventsAfter(
   runId: string,
   cursor: number,
@@ -134,7 +117,7 @@ export function loadEventsAfter(...args: [string, number] | [number]) {
       WHERE run_id = ${runId} AND sequence > ${cursor}
       ORDER BY sequence ASC
     `
-    return yield* decodePersistedEvents(rows, run.executableManifest)
+    return yield* decodePersistedEvents({ rows, manifest: run.executableManifest })
   })
 }
 
@@ -202,7 +185,6 @@ export interface EventPartial {
   readonly _tag: string
   readonly [key: string]: EventField
 }
-type EventRows = ReadonlyArray<EventRow>
 type EventEffect = Effect.Effect<RunEvent, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 type TerminalEffect = Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
 const isTerminalEvent = (event: RunEvent): boolean =>
@@ -236,6 +218,7 @@ export const appendEvent: {
   (args) => "publish" in args[0],
   (hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
     Effect.gen(function* () {
+      yield* validatePayload({ value: partial, boundary: "event", limit: maximumEventBytes })
       const sql = yield* SqlClient.SqlClient
       const discarded = yield* discardPendingSteering({ runId: run.runId, terminalTag: partial._tag })
       if (discarded !== undefined) {
@@ -246,12 +229,18 @@ export const appendEvent: {
       const sequence = run.lastSequence + 1
       const occurredAt = yield* nowIso
       const event = makeEvent(run, partial, sequence, occurredAt)
+      const encodedEvent = yield* encodeBounded({
+        value: event,
+        boundary: "event",
+        serialize: encodeEvent,
+        limit: maximumEventBytes,
+      })
       const hostSessionCursor = yield* claimHostSessionCursor(run.rootRunId)
       yield* sql`
       INSERT INTO generalist_run_events (
         run_id, sequence, event_id, event_json, checkpoint_json, host_session_id, host_session_sequence
       ) VALUES (
-        ${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)},
+        ${run.runId}, ${sequence}, ${event.eventId}, ${encodedEvent},
         ${encodeCheckpoint(run.driverCheckpoint)},
         ${hostSessionCursor?.sessionId ?? null}, ${hostSessionCursor?.cursor ?? null}
       )

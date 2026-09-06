@@ -47,6 +47,8 @@ const modelEvent = {
   eventId: `${runId}:1`,
   sequence: 1,
   turn: 0,
+  originRunId: runId,
+  originOperationKey: "model:0",
   operationKey: "model:0",
   modelCallId: "call-1",
   modelAttemptId: "model-attempt-1",

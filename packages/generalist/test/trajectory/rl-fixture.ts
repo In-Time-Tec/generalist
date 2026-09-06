@@ -61,6 +61,8 @@ const modelEvent = (input: {
     eventId: input.eventId,
     sequence: input.sequence,
     turn: input.turn,
+    originRunId: input.runId,
+    originOperationKey: `model:${input.turn}`,
     operationKey: `model:${input.turn}`,
     modelCallId: input.modelCallId,
     modelAttemptId: `${input.modelCallId}:attempt:0`,
@@ -264,7 +266,13 @@ export const makeRuntime = (overrides: Partial<Record<string, CompletedModelResp
   ])
   const runtime = {
     snapshot: (runId: string) => Effect.succeed(snapshots.get(runId)!),
-    history: (input: { readonly runId: string }) => Effect.succeed(events.get(input.runId)!),
+    history: (input: { readonly runId: string; readonly cursor?: number; readonly limit: number }) =>
+      Effect.succeed(
+        events
+          .get(input.runId)!
+          .filter((event) => event.sequence > (input.cursor ?? -1))
+          .slice(0, input.limit),
+      ),
     sessionEntry: (input: { readonly entryId: string }) => Effect.succeed(entries.get(input.entryId)!),
     resolveModelResponse: (event: { readonly modelCallId: string }) =>
       Effect.succeed(responses.get(event.modelCallId)!),

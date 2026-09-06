@@ -264,33 +264,44 @@ for (const [backend, runtimeLayer] of layers) {
       }),
     )
 
-    suite.effect("replaces a large result with a bounded recovery marker", () =>
-      Effect.gen(function* () {
-        const { runtime, parent, child } = yield* admit
-        const store = yield* RunStore.RunStore
-        yield* store.complete({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
-          result: completedResult("x".repeat(345_000)),
-        })
+    suite.effect(
+      "rejects oversized terminal events and retains exact admitted results behind bounded notifications",
+      () =>
+        Effect.gen(function* () {
+          const { runtime, parent, child } = yield* admit
+          const store = yield* RunStore.RunStore
+          const claim = yield* store.claimExecution({ runId: child.runId, ownerId: "test" })
+          const rejected = yield* Effect.flip(
+            store.complete({ ...claim, result: completedResult("x".repeat(345_000)) }),
+          )
+          expect(rejected._tag).toBe("generalist/runtime/RuntimeUnavailable")
+          expect((yield* store.inspect(child.runId)).status).toBe("running")
+          expect(yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })).toEqual([])
+          const text = "x".repeat(ChildSettlement.maxResultBytes * 2)
+          yield* store.complete({ ...claim, result: completedResult(text) })
+          const terminal = (yield* runtime.history({ runId: child.runId, cursor: -1, limit: 100 })).find(
+            (event) => event._tag === "RunCompleted",
+          )
+          expect(terminal?.result).toEqual(completedResult(text))
 
-        const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
-        expect(notification).toBeDefined()
-        expect(notification!.resultBytes).toBe(345_000)
-        expect(notification!.resultTruncated).toBe(true)
-        expect(new TextEncoder().encode(notification!.resultText).length).toBeLessThanOrEqual(
-          ChildSettlement.maxResultBytes,
-        )
-        /**
-         * A truncated result names where the full one already is. It used to name a
-         * "result-handoff adapter" that exists nowhere in Generalist, which a reader could only act on
-         * by inventing it.
-         */
-        expect(notification!.resultText).toContain("the terminal event of child")
-        expect(notification!.resultText).not.toContain("result-handoff adapter")
-        expect(notification!.resultText).toContain(child.runId)
-        expect(notification!.resultText).not.toContain("Runtime.snapshot")
-        expect(notification!.resultText).not.toContain("x".repeat(1000))
-      }),
+          const [notification] = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
+          expect(notification).toBeDefined()
+          expect(notification!.resultBytes).toBe(text.length)
+          expect(notification!.resultTruncated).toBe(true)
+          expect(new TextEncoder().encode(notification!.resultText).length).toBeLessThanOrEqual(
+            ChildSettlement.maxResultBytes,
+          )
+          /**
+           * A truncated result names where the full one already is. It used to name a
+           * "result-handoff adapter" that exists nowhere in Generalist, which a reader could only act on
+           * by inventing it.
+           */
+          expect(notification!.resultText).toContain("the terminal event of child")
+          expect(notification!.resultText).not.toContain("result-handoff adapter")
+          expect(notification!.resultText).toContain(child.runId)
+          expect(notification!.resultText).not.toContain("Runtime.snapshot")
+          expect(notification!.resultText).not.toContain("x".repeat(1000))
+        }),
     )
 
     suite.effect("waits outside the scheduler execution FiberMap", () =>

@@ -134,7 +134,7 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 
 ##### sessionEntry
 
-> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](./generalist/namespaces/Session#entry), [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
+> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](./generalist/namespaces/Session#entry-1), [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
 
 ###### Parameters
 
@@ -144,7 +144,7 @@ Cross-driver Runtime journal reads required by `fromJournal`.
 
 ###### Returns
 
-`Effect`\<[`Entry`](./generalist/namespaces/Session#entry), [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
+`Effect`\<[`Entry`](./generalist/namespaces/Session#entry-1), [`SessionEntryError`](./runtime/namespaces/Runtime#sessionentryerror)\>
 
 <a id="snapshot"></a>
 

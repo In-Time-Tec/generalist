@@ -102,7 +102,7 @@ export const appendCompletedSessionEntry = (
     yield* sql`
       INSERT INTO generalist_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'ModelResponse',
-        ${encodePayload(payload)}, ${created})
+        ${yield* encodePayload(payload)}, ${created})
     `
     yield* sql`
       UPDATE generalist_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
@@ -199,7 +199,7 @@ export const appendHandoffSessionEntry = (
     yield* sql`
       INSERT INTO generalist_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
       VALUES (${input.sessionId}, ${input.entryId}, ${input.parentId}, ${session.next_seq}, 'Handoff',
-        ${encodePayload(payload)}, ${created})
+        ${yield* encodePayload(payload)}, ${created})
     `
     yield* sql`
       UPDATE generalist_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}

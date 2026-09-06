@@ -16,6 +16,7 @@ import {
   type StableAppendOptions,
   checkpointMatches,
 } from "./session.js"
+import type { PathPage, PathPageInput } from "./session-history.js"
 
 interface State {
   readonly entries: HashMap.HashMap<EntryId, Entry>
@@ -95,6 +96,72 @@ const pathFromState = (state: State, leaf: EntryId): Result<ReadonlyArray<Entry>
   }
 
   return success(entries.toReversed())
+}
+
+const pageFromState = (state: State, input: PathPageInput): Result<PathPage> => {
+  if (input.limit < 1 || !Number.isSafeInteger(input.limit)) return failure("Session path page limit must be positive")
+  if (input.cursor !== undefined && input.cursor.leafId !== input.leafId) {
+    return failure("Session path page cursor belongs to a different leaf")
+  }
+  if (input.leafId === null) {
+    return input.cursor === undefined
+      ? success({ entries: [], hasOlder: false, hasNewer: false })
+      : failure("An empty Session path cannot have a page cursor")
+  }
+  const newestFirst: Array<Entry> = []
+  const seen = new Set<string>()
+  let cursor: EntryId | null = input.cursor?.entryId ?? input.leafId
+  while (cursor !== null && newestFirst.length <= input.limit) {
+    if (seen.has(cursor)) return failure(`Session path for leaf ${input.leafId} contains a cycle`)
+    seen.add(cursor)
+    const entry: Option.Option<Entry> = HashMap.get(state.entries, cursor)
+    if (Option.isNone(entry)) return failure(`Session entry ${cursor} does not exist`)
+    newestFirst.push(entry.value)
+    cursor = entry.value.parentId
+  }
+  const hasOlder = newestFirst.length > input.limit
+  const entries = newestFirst.slice(0, input.limit).toReversed()
+  const nextEntryId = newestFirst.at(input.limit)?.id
+  return success(
+    nextEntryId !== undefined
+      ? {
+          entries,
+          hasOlder,
+          hasNewer: input.cursor !== undefined,
+          nextCursor: { leafId: input.leafId, entryId: nextEntryId },
+        }
+      : { entries, hasOlder, hasNewer: input.cursor !== undefined },
+  )
+}
+
+const effectivePathFromState = (state: State, leaf: EntryId): Result<ReadonlyArray<Entry>> => {
+  const newestFirst: Array<Entry> = []
+  const seen = new Set<string>()
+  let cursor: EntryId | null = leaf
+  while (cursor !== null) {
+    if (seen.has(cursor)) return failure(`Session path for leaf ${leaf} contains a cycle`)
+    seen.add(cursor)
+    const entry: Option.Option<Entry> = HashMap.get(state.entries, cursor)
+    if (Option.isNone(entry)) return failure(`Session entry ${cursor} does not exist`)
+    newestFirst.push(entry.value)
+    if (entry.value._tag === "Compaction" || entry.value._tag === "Handoff") break
+    cursor = entry.value.parentId
+  }
+  return success(newestFirst.toReversed())
+}
+
+const latestCompactionFromState = (state: State, leaf: EntryId | null): Result<CompactionEntry | undefined> => {
+  const seen = new Set<string>()
+  let cursor: EntryId | null = leaf
+  while (cursor !== null) {
+    if (seen.has(cursor)) return failure(`Session path for leaf ${leaf} contains a cycle`)
+    seen.add(cursor)
+    const entry: Option.Option<Entry> = HashMap.get(state.entries, cursor)
+    if (Option.isNone(entry)) return failure(`Session entry ${cursor} does not exist`)
+    if (entry.value._tag === "Compaction") return success(entry.value)
+    cursor = entry.value.parentId
+  }
+  return success(undefined)
 }
 
 const entryPayloadEquivalence = Schema.toEquivalence(EntryPayload)
@@ -255,6 +322,22 @@ const makeStore: Effect.Effect<SessionStore> = Ref.make(initialState).pipe(
         Effect.flatMap((result) =>
           result._tag === "generalist/core/SessionConflict" ? Effect.fail(result) : Effect.succeed(result),
         ),
+      ),
+    entry: (id) =>
+      Ref.get(state).pipe(Effect.map((current) => Option.getOrUndefined(HashMap.get(current.entries, id)))),
+    pathPage: (input) =>
+      Ref.get(state).pipe(Effect.flatMap((current) => effectFromResult(pageFromState(current, input)))),
+    effectivePath: (leaf) =>
+      Ref.get(state).pipe(
+        Effect.flatMap((current) =>
+          leaf === undefined && current.leaf === null
+            ? Effect.succeed([])
+            : effectFromResult(effectivePathFromState(current, leaf ?? current.leaf ?? "")),
+        ),
+      ),
+    latestCompaction: (leaf) =>
+      Ref.get(state).pipe(
+        Effect.flatMap((current) => effectFromResult(latestCompactionFromState(current, leaf ?? current.leaf))),
       ),
     path: (leaf) =>
       Ref.get(state).pipe(

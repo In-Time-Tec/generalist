@@ -60,6 +60,7 @@ commit: package.json = packages/generalist/package.json = 0.45.1
    ▼
 .github/workflows/publish.yml
 ├── validate immutable tag + 40-character commit identity
+├── require successful latest main CI at that exact commit (real PostgreSQL/MySQL tests)
 ├── run bun run package once
 ├── attest and upload the same 3 checksummed assets
 ├── publish that exact .tgz to npm (no rebuild)
@@ -67,6 +68,8 @@ commit: package.json = packages/generalist/package.json = 0.45.1
 ```
 
 A manual workflow run only reconciles an existing immutable tag and its exact commit.
+
+The release gate reads `.github/workflows/ci.yml` runs for that exact source commit, from a push to `main`. The latest matching run must be completed and successful; missing, pending, cancelled, failed, PR-only, or different-commit evidence blocks asset production. Wait for CI before pushing a release tag. If a tag races CI, reconcile the same immutable tag after CI succeeds; do not move it. Local dirty-worktree checks are development evidence, not exact-commit release certification.
 
 ## Invariants
 

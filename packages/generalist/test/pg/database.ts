@@ -38,7 +38,7 @@ type PostgresWorkerLayer = Layer.Layer<
   | import("generalist/runtime").RunStore.RunStore
   | import("generalist/runtime").Runtime.Runtime
   | import("generalist/runtime/sql-driver").RuntimeWorker.RuntimeWorker,
-  SqlError | RuntimeError,
+  SqlError | RuntimeError | import("generalist/runtime").Errors.RuntimeUnavailable,
   never
 >
 

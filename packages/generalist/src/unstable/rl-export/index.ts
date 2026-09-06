@@ -3,6 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import packageManifest from "../../../package.json" with { type: "json" }
 import { RunId, type RunSnapshot } from "../../runtime/run.js"
 import type { RunEvent } from "../../runtime/run/event.js"
+import { collect as collectHistory } from "../../runtime/run/history/index.js"
 import type { RecordRewardError, Service as RuntimeService } from "../../runtime/service.js"
 import {
   fromJournal,
@@ -129,7 +130,10 @@ const cachedReader = (
   events: ReadonlyArray<RunEvent>,
 ): JournalReader => ({
   snapshot: (requested) => (requested === runId ? Effect.succeed(snapshot) : runtime.snapshot(requested)),
-  history: (input) => (input.runId === runId ? Effect.succeed(events) : runtime.history(input)),
+  history: (input) =>
+    input.runId === runId
+      ? Effect.succeed(events.filter((event) => event.sequence > (input.cursor ?? -1)).slice(0, input.limit))
+      : runtime.history(input),
   sessionEntry: runtime.sessionEntry,
   resolveModelResponse: runtime.resolveModelResponse,
 })
@@ -181,7 +185,7 @@ const projectRun = Effect.fn("RlExport.projectRun")(function* (
   state: ProjectionState,
 ): Effect.fn.Return<ReadonlyArray<PendingRun>, FromJournalError> {
   const snapshot = yield* runtime.snapshot(pending.runId)
-  const events = yield* runtime.history({ runId: pending.runId, limit: snapshot.cursor + 1 })
+  const events = yield* collectHistory(runtime, pending.runId, snapshot.cursor)
   const trajectory = yield* fromJournal(cachedReader(runtime, pending.runId, snapshot, events), pending.runId)
   state.trajectories.set(pending.runId, trajectory)
   const relation = pending.relation

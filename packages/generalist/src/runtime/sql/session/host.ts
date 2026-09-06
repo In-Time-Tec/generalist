@@ -3,6 +3,7 @@ import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { SessionConflict, SessionNotFound, type HostSession, type HostSessionEvent } from "../../session/host.js"
 import { RuntimeUnavailable } from "../../errors.js"
+import { validate as validatePayload } from "../../execution/payload/index.js"
 import type { RunInspection } from "../../run.js"
 import { decodeEvent, decodeSqlInteger } from "../codec/codecs.js"
 import { isoFromSql } from "../store/run-decoding.js"
@@ -49,6 +50,7 @@ const loadSessionRow = (sessionId: string) =>
 
 export const createHostSession = (input: { readonly id: string; readonly title?: string }) =>
   Effect.gen(function* () {
+    yield* validatePayload({ value: input, boundary: "host Session metadata" })
     const sql = yield* SqlClient.SqlClient
     if ((yield* loadSessionRow(input.id)) !== undefined) {
       return yield* SessionConflict.make({
@@ -120,19 +122,27 @@ interface HostSessionEventRow {
   readonly event_json: string
 }
 
-const loadHostSessionEvents = (sessionId: string, cursor: number) =>
+const replayPageSize = 128
+
+const loadHostSessionCursor = (sessionId: string) =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
     const session = yield* loadSessionRow(sessionId)
     if (session === undefined) return yield* missing(sessionId)
-    const lastCursor = decodeSqlInteger(session.next_event_sequence) - 1
+    return decodeSqlInteger(session.next_event_sequence) - 1
+  })
+
+const loadHostSessionEventPage = (sessionId: string, cursor: number) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* loadHostSessionCursor(sessionId)
     const rows = yield* sql<HostSessionEventRow>`
       SELECT host_session_sequence, event_json
       FROM generalist_run_events
       WHERE host_session_id = ${sessionId} AND host_session_sequence > ${cursor}
       ORDER BY host_session_sequence
+      LIMIT ${replayPageSize}
     `
-    const replay = yield* Effect.forEach(rows, (row) =>
+    return yield* Effect.forEach(rows, (row) =>
       Effect.try({
         try: (): HostSessionEvent => ({
           cursor: decodeSqlInteger(row.host_session_sequence),
@@ -142,7 +152,6 @@ const loadHostSessionEvents = (sessionId: string, cursor: number) =>
           RuntimeUnavailable.make({ message: `invalid persisted host Session event: ${String(error)}` }),
       }),
     )
-    return { replay, lastCursor }
   })
 
 type Locked = <A, E>(
@@ -167,23 +176,35 @@ export const make = <DriverError>(input: {
   listHostSessions: input.runNoTransaction(listHostSessions),
   hostSessionRuns: (sessionId) => input.runNoTransaction(hostSessionRuns(sessionId)),
   hostSessionEvents: (request) => {
-    const loadReplay = input.runNoTransaction(loadHostSessionEvents(request.sessionId, request.cursor))
+    const loadReplay = input.runNoTransaction(
+      Effect.gen(function* () {
+        const lastCursor = yield* loadHostSessionCursor(request.sessionId)
+        const sql = yield* SqlClient.SqlClient
+        // Rewind removes event suffixes without reusing host cursor positions.
+        const rows = yield* sql<{ host_session_sequence: number | string | bigint }>`
+          SELECT host_session_sequence FROM generalist_run_events
+          WHERE host_session_id = ${request.sessionId} AND host_session_sequence <= ${lastCursor}
+          ORDER BY host_session_sequence DESC LIMIT 1
+        `
+        const replayCursor = rows[0] === undefined ? -1 : decodeSqlInteger(rows[0].host_session_sequence)
+        return { lastCursor, replayCursor }
+      }),
+    )
+    const loadAfter = (cursor: number) => input.runNoTransaction(loadHostSessionEventPage(request.sessionId, cursor))
     if (input.driver.hostSessionEvents !== undefined) {
       return input.driver.hostSessionEvents(request, {
         hub: input.hub,
         capacity: input.capacity,
         runNoTransaction: input.runNoTransaction,
         loadReplay,
-        loadAfter: (cursor) =>
-          input
-            .runNoTransaction(loadHostSessionEvents(request.sessionId, cursor))
-            .pipe(Effect.map(({ replay }) => replay)),
+        loadAfter,
       })
     }
     return input.hub.subscribeHostSession({
       sessionId: request.sessionId,
       cursor: request.cursor,
       loadReplay,
+      loadAfter,
       capacity: input.capacity,
     })
   },

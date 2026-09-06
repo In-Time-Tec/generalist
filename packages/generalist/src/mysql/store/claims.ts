@@ -33,15 +33,7 @@ export const mysqlClaimMechanics: SqlClaimMechanics = {
       const sql = yield* SqlClient.SqlClient
       const leaseMicros = Duration.toMillis(input.lease ?? "30 seconds") * 1_000
       const scanLimit = Math.max(input.limit, Math.min(4096, input.limit * 64))
-      const candidates = yield* sql<{ run_id: string }>`
-        SELECT ranked.run_id
-        FROM (
-          SELECT
-            r.run_id,
-            r.accepted_sequence,
-            ROW_NUMBER() OVER (PARTITION BY r.session_id ORDER BY r.accepted_sequence ASC) AS session_rank
-          FROM generalist_runs r
-          WHERE (
+      const eligible = sql`(
               (r.cancellation_requested = 1 AND r.status = 'cancelling')
               OR (
                 r.cancellation_requested = 0
@@ -71,6 +63,16 @@ export const mysqlClaimMechanics: SqlClaimMechanics = {
                 AND s.writer_run_id IS NOT NULL
                 AND s.writer_run_id <> r.run_id
             )
+      `
+      const candidates = yield* sql<{ run_id: string }>`
+        SELECT ranked.run_id
+        FROM (
+          SELECT
+            r.run_id,
+            r.accepted_sequence,
+            ROW_NUMBER() OVER (PARTITION BY r.session_id ORDER BY r.accepted_sequence ASC) AS session_rank
+          FROM generalist_runs r
+          WHERE ${eligible}
         ) ranked
         WHERE ranked.session_rank = 1
         ORDER BY ranked.accepted_sequence ASC
@@ -79,11 +81,10 @@ export const mysqlClaimMechanics: SqlClaimMechanics = {
       const claimed: Array<ClaimedRun & { readonly startedAttempt: boolean }> = []
       for (const candidate of candidates) {
         if (claimed.length >= input.limit) break
+        // The unlocked scan is only a hint: readiness may change before this row is locked.
         const locked = yield* sql<RunRow>`
-          SELECT * FROM generalist_runs
-          WHERE run_id = ${candidate.run_id}
-            AND status IN ('queued', 'running', 'cancelling')
-            AND (owner_worker_id IS NULL OR lease_expires_at IS NULL OR lease_expires_at < NOW(3))
+          SELECT r.* FROM generalist_runs r
+          WHERE r.run_id = ${candidate.run_id} AND ${eligible}
           FOR UPDATE SKIP LOCKED
         `
         const row = locked[0]

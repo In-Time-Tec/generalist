@@ -7,7 +7,7 @@ import { Address, Message } from "../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../src/runtime/errors.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { makeRunStore } from "../../../src/runtime/memory/store.js"
-import { make } from "../../../src/runtime/sql/worker.js"
+import { make, type Options } from "../../../src/runtime/sql/worker.js"
 import type { DecodedRun } from "../../../src/runtime/sql/codec/rows.js"
 import { RunClaims, type ClaimedRun, type Service as ClaimsService } from "../../../src/runtime/sql/run/claims.js"
 import { RunStore, type Service as StoreService } from "../../../src/runtime/run/store.js"
@@ -87,6 +87,43 @@ const storeService = (status: RunStatus): StoreService =>
         branches: [],
       } satisfies RunInspection),
   })
+
+it.effect("rejects invalid worker bounds before claiming or executing work", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const invalid: ReadonlyArray<Partial<Options>> = [
+        { workerId: " " },
+        ...[0, -1, 1.5, NaN, Infinity].map((concurrency) => ({ concurrency })),
+        { lease: "0 millis" },
+        { lease: "1 millis" },
+        { lease: Infinity },
+        { fallbackInterval: -1 },
+        { fallbackInterval: NaN },
+        { cancellationInterval: 0 },
+        { cancellationInterval: Infinity },
+      ]
+      for (const options of invalid) {
+        const failure = yield* make({ workerId: "worker-invalid", ...options }).pipe(
+          Effect.provideService(
+            RunExecutor,
+            RunExecutor.of({
+              execute: () => Effect.die("invalid worker must not execute"),
+              interrupt: () => Effect.void,
+            }),
+          ),
+          Effect.provideService(RunStore, storeService("running")),
+          Effect.provideService(
+            RunClaims,
+            claimsService(() => Effect.die("invalid worker must not renew")),
+          ),
+          Effect.flip,
+        )
+        expect(failure._tag).toBe("generalist/runtime/RuntimeUnavailable")
+        expect(failure.message).toContain("worker")
+      }
+    }),
+  ),
+)
 
 it.effect("renews a claim for the lifetime of agent execution", () =>
   Effect.scoped(

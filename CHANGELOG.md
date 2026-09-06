@@ -14,6 +14,10 @@
 
 ## Unreleased
 
+- Preserve fork/rewind operation identity and branch-local response bytes, authenticate source response digests before copying, and support nested-fork continuation after reopening storage. SQL schema authority advances to 11; incompatible older stores are refused, not automatically migrated.
+- Add purpose-specific Session reads and paged SQL replay, repair overtaken notifications per subscriber, and paginate lossless A2A/trajectory/RL exports. Public Runtime history limits are now 1–1000.
+- Reject oversized durable transitions and Session entries at 1 MiB and Run events at 256 KiB without silently truncating outcomes. Validate worker options and recheck MySQL claim eligibility after candidate scanning.
+- Require successful PostgreSQL/MySQL CI on the exact release commit before producing release assets; document the beta operating envelope and recovery data lifetimes.
 - Preserve the committed model-response replay cursor across interruption and reopen. Recovery consumes the recorded response without calling the model again, and restores already charged tokens only while replaying that response.
 - Expand MySQL's shared Runtime conformance coverage to admission, approvals, run trees, concurrent claims, transaction rollback, and notification recovery.
 - Reorganize the documentation into Start, Build, Operate, and Reference; correct tutorial installation commands and distinguish scripted search from live providers. Tutorial checks now typecheck extracted code and execute credential-free examples.
