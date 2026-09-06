@@ -8,7 +8,7 @@ Start with `generalist` and its matching `effect` version. Add provider or stora
 **Terminal**
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.61.1
+bun add effect@4.0.0-rc.112 generalist@0.61.2
 ```
 
 With npm or pnpm:
@@ -16,12 +16,12 @@ With npm or pnpm:
 **Terminal**
 
 ```bash
-npm install effect@4.0.0-rc.112 generalist@0.61.1
-pnpm add effect@4.0.0-rc.112 generalist@0.61.1
+npm install effect@4.0.0-rc.112 generalist@0.61.2
+pnpm add effect@4.0.0-rc.112 generalist@0.61.2
 ```
 
 <Warning title="Pin the Effect release candidate">
-Generalist 0.61.0 targets `effect@4.0.0-rc.112`. Effect AI APIs can change between release candidates. Use the documented version, and install optional `@effect/ai-*` and platform packages at the matching version.
+Generalist 0.61.2 targets `effect@4.0.0-rc.112`. Effect AI APIs can change between release candidates. Use the documented version, and install optional `@effect/ai-*` and platform packages at the matching version.
 </Warning>
 
 ## One package
@@ -30,7 +30,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 
 | Package      | Version | Runtime and role                                                                                                                     |
 | ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `generalist` | 0.61.0  | Node 22+ and Bun 1.4+: agent loop, generic Runtime, exact feature import subpaths, and the pg, mysql, cloudflare, and rivet adapters |
+| `generalist` | 0.61.2  | Node 22+ and Bun 1.4+: agent loop, generic Runtime, exact feature import subpaths, and the pg, mysql, cloudflare, and rivet adapters |
 
 ## Import subpaths and peers
 
