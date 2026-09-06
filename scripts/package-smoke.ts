@@ -634,14 +634,20 @@ const program = Effect.gen(function* () {
       if (unsafeTypes.length > 0) {
         return yield* smokeError(`${packageName} contains a non-regular entry`)
       }
-      const oversizedDeclarations = verboseListing
-        .split("\n")
-        .filter((entry) => entry.endsWith(".d.ts"))
-        .map((entry) => {
-          const fields = entry.trim().split(/\s+/)
-          return { bytes: Number(fields[2]), file: fields[5] }
-        })
-        .filter(({ bytes }) => bytes > declarationSizeLimit)
+      const unpackedDirectory = path.join(directory, "unpacked")
+      yield* fileSystem.makeDirectory(unpackedDirectory)
+      yield* run("tar", ["-xzf", tarball, "-C", unpackedDirectory], root)
+      const unpackedEntries = yield* Effect.forEach(
+        entries,
+        (file) =>
+          fileSystem
+            .stat(path.join(unpackedDirectory, file))
+            .pipe(Effect.map((info) => ({ file, bytes: info.type === "File" ? Number(info.size) : 0 }))),
+        { concurrency: 16 },
+      )
+      const oversizedDeclarations = unpackedEntries.filter(
+        ({ file, bytes }) => file.endsWith(".d.ts") && bytes > declarationSizeLimit,
+      )
       if (oversizedDeclarations.length > 0) {
         return yield* smokeError(
           `${packageName} declarations exceed ${declarationSizeLimit} bytes:\n${oversizedDeclarations
@@ -649,9 +655,9 @@ const program = Effect.gen(function* () {
             .join("\n")}`,
         )
       }
-      return entries
+      return { entries, unpackedBytes: unpackedEntries.reduce((total, entry) => total + entry.bytes, 0) }
     })
-    const entries = yield* validateArchive
+    const { entries, unpackedBytes } = yield* validateArchive
     const manifest = parsePackageManifest(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
     const source = parsePackageManifest(sourceManifest)
     const validateManifestIdentity = Effect.gen(function* () {
@@ -762,9 +768,9 @@ const program = Effect.gen(function* () {
     if ((yield* fileSystem.readFileString(manifestPath)) !== sourceManifest) {
       return yield* smokeError(`packing mutated ${manifestPath}`)
     }
-    return { manifest, tarball }
+    return { manifest, tarball, unpackedBytes }
   })
-  const { manifest: packedManifest, tarball } = yield* packAndValidatePackage
+  const { manifest: packedManifest, tarball, unpackedBytes } = yield* packAndValidatePackage
   const packageTarball = `file:${tarball}`
   const packageExports = sorted(
     [
@@ -1157,10 +1163,7 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
       version,
       filename,
       compressedBytes: archive.byteLength,
-      unpackedBytes: (yield* run("tar", ["-tvzf", path.join(tarballDirectory, filename)], root))
-        .split("\n")
-        .filter(Boolean)
-        .reduce((total, entry) => total + Number(entry.trim().split(/\s+/)[2]), 0),
+      unpackedBytes,
       sha256: new CryptoHasher("sha256").update(archive).digest("hex"),
       dependencies: packedManifest.dependencies ?? {},
       peerDependencies: packedManifest.peerDependencies ?? {},
