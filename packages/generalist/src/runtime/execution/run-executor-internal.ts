@@ -372,6 +372,10 @@ const makeFor = (
                               operationKey: operation.key,
                               operationId,
                             })
+                            yield* Option.match(journalFault, {
+                              onNone: () => Effect.void,
+                              onSome: (fault) => fault.afterCompletedOperation ?? Effect.void,
+                            })
                           }).pipe(Effect.mapError((error) => journalFailure("completion", operation.key, error))),
                         onCheckpoint: (checkpoint) => saveJournalCheckpoint({ store, claim, checkpoint }),
                       }

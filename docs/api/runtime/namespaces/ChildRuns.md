@@ -746,40 +746,6 @@ Runtime-owned child-group tool declarations.
 
 ***
 
-<a id="waitidforchild"></a>
-
-### waitIdForChild
-
-> `const` **waitIdForChild**: (`input`) => `string` \| `undefined`
-
-Return the exact aggregate wait owned by one direct child.
-
-#### Parameters
-
-##### input
-
-###### childRunId
-
-`string`
-
-###### metadata
-
-`SerializedMetadata`
-
-###### parentRunId
-
-`string`
-
-###### suspension
-
-`unknown`
-
-#### Returns
-
-`string` \| `undefined`
-
-***
-
 <a id="waitidforgroup"></a>
 
 ### waitIdForGroup
@@ -825,3 +791,37 @@ Return the exact wait that owns one child group in an aggregate Agent suspension
 ##### Returns
 
 `string` \| `undefined`
+
+***
+
+<a id="waitidsforchild"></a>
+
+### waitIdsForChild
+
+> `const` **waitIdsForChild**: (`input`) => `ReadonlyArray`\<`string`\>
+
+Return every exact aggregate wait owned by one direct child.
+
+#### Parameters
+
+##### input
+
+###### childRunId
+
+`string`
+
+###### metadata
+
+`SerializedMetadata`
+
+###### parentRunId
+
+`string`
+
+###### suspension
+
+`unknown`
+
+#### Returns
+
+`ReadonlyArray`\<`string`\>

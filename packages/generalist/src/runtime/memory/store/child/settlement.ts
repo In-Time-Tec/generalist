@@ -45,7 +45,7 @@ export const reconcileChildWait: {
   ): Effect.Effect<MemoryState, RuntimeUnavailable>
 } = Function.dual(4, (state: MemoryState, parent: StoredRun, child: StoredRun, event: RunEvent) =>
   Effect.gen(function* () {
-    const wait = openRunWaits(state, parent.runId).find((candidate) =>
+    const waits = openRunWaits(state, parent.runId).filter((candidate) =>
       ownsChildSuspension({
         parentRunId: parent.runId,
         waitId: candidate.waitId,
@@ -58,7 +58,7 @@ export const reconcileChildWait: {
       !isChildTerminalEvent(event) ||
       isTerminal(parent.status) ||
       parent.cancellationRequested ||
-      wait === undefined
+      waits.length === 0
     ) {
       return state
     }
@@ -68,23 +68,23 @@ export const reconcileChildWait: {
     const runs = new Map(state.runs)
     const { ownerId: _, ...released } = parent
     runs.set(parent.runId, released)
-    const transitioned = closeWait(
-      { ...state, runs },
-      {
+    let resumed: MemoryState = { ...state, runs }
+    for (const wait of waits) {
+      const transitioned = closeWait(resumed, {
         runId: parent.runId,
         waitId: wait.waitId,
         status: "responded",
         resolution,
         closedAt,
-      },
-    )
-    if (transitioned.affected !== 1) return state
-    const [, resumed] = yield* appendLifecycle(
-      transitioned.state,
-      parent.runId,
-      resumedEvent(wait.waitId, resolution),
-      "running",
-    )
+      })
+      if (transitioned.affected !== 1) continue
+      ;[, resumed] = yield* appendLifecycle(
+        transitioned.state,
+        parent.runId,
+        resumedEvent(wait.waitId, resolution),
+        "running",
+      )
+    }
     return resumed
   }),
 )

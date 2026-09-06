@@ -78,6 +78,7 @@ export interface RunLoopContext<
   readonly structured: StructuredRunConfig<S, OutputValue> | undefined
   readonly validatedResume: SuspensionCheckpoint | undefined
   readonly recoveredToolCheckpoint: ToolCheckpoint | undefined
+  readonly recoveringMemory: boolean
   readonly seedSystem: string | undefined
   readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter>
   readonly initialPrompt: Prompt.RawInput

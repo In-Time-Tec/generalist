@@ -53,11 +53,17 @@ export const commitDriverOperation = (input: {
   if (outcome._tag === "Succeeded") completion = { _tag: "Succeeded", value: outcome.value }
   else if (outcome._tag === "Failed") completion = { _tag: "Failed", error: outcome.error }
   else completion = { _tag: "Unknown" }
+  // Remember completes before the loop consumes its turn-end continuation. As with model
+  // responses, keep that exact cursor durable until the next operation advances the loop.
+  const { inputDigest: _inputDigest, ...pending } = operation
+  const remember =
+    operation.kind === "memory" &&
+    Schema.is(Schema.Struct({ turn: Schema.Finite, terminal: Schema.Boolean }))(operation.input)
   return store.completeOperation({
     ...claim,
     operationId,
     outcome: completion,
-    checkpoint,
+    checkpoint: remember ? withPending(checkpoint, pending, checkpoint.turn) : checkpoint,
     ...prepared,
   })
 }
