@@ -1,10 +1,10 @@
 /* oxlint-disable anti-slop-effect/no-service-constructor-imports -- This host composition root owns the SQL client, projection, and exclusive recovery. */
-import { Clock, Context, Effect, Function, Layer } from "effect"
+import { Clock, Context, Effect, Function, Layer, Semaphore } from "effect"
 import { SqlClient, SqlError } from "effect/unstable/sql"
 import type { ActorContext } from "rivetkit"
 import type { db } from "rivetkit/db"
 import { RuntimeUnavailable } from "../../../runtime/errors.js"
-import { ExecutableResolver } from "../../../runtime/executable/resolver.js"
+import type { SqliteRuntimeOptions, SqliteRuntimeResolverInput } from "../../../runtime/sql/run/exclusive-runtime.js"
 import { Runtime } from "../../../runtime/service.js"
 import {
   layerSqliteRuntime,
@@ -23,6 +23,15 @@ export type RuntimeActorContext = Pick<
   "actorId" | "db" | "schedule" | "cron"
 >
 
+/** @experimental Exact storage services owned by this actor activation. */
+export type ActorRuntimeResolverInput = SqliteRuntimeResolverInput
+
+/** @experimental Product initialization and projection share the host's incarnation and SQL client. */
+export interface ActorRuntimeContext {
+  readonly sql: SqlClient.SqlClient
+  readonly ownerId: string
+}
+
 /** @experimental Runtime construction inside an application-owned actor wake scope. */
 export interface ActorRuntimeOptions extends Omit<SqliteStoreOptions, "activationProjection" | "source"> {
   readonly drainFuel?: number
@@ -32,9 +41,15 @@ export interface ActorRuntimeOptions extends Omit<SqliteStoreOptions, "activatio
   /** Scheduled action that invokes ActorRuntime.drain. It must be present on the actor. */
   readonly drainAction: string
   /** Initialize product tables before Runtime construction and recovery. Must be safe on every wake. */
-  readonly initialize?: Effect.Effect<void, RuntimeUnavailable | SqlError.SqlError, SqlClient.SqlClient>
+  readonly initialize?: (context: ActorRuntimeContext) => Effect.Effect<void, RuntimeUnavailable | SqlError.SqlError>
   /** Product-only projection. The host always composes its own durable activation projection after this. */
-  readonly activationProjection?: (sql: SqlClient.SqlClient) => RunActivationProjection
+  readonly activationProjection?: (context: ActorRuntimeContext) => RunActivationProjection
+  readonly makeExecutableResolver: SqliteRuntimeOptions["makeExecutableResolver"]
+  readonly decorateRunExecutor?: SqliteRuntimeOptions["decorateRunExecutor"]
+  /** Reconcile product work before execution and before recovery is allowed to become idle. */
+  readonly reconcile?: (
+    context: ActorRuntimeContext,
+  ) => Effect.Effect<number | undefined, RuntimeUnavailable | SqlError.SqlError, SqliteRuntimeServices>
 }
 
 /** @experimental Host operations sharing the actor's Runtime and SQLite transaction domain. */
@@ -44,6 +59,8 @@ export class ActorRuntime extends Context.Service<
     readonly ownerId: string
     /** A best-effort doorbell, never durable acceptance. Call after committing product commands. */
     readonly notify: Effect.Effect<void>
+    /** Serialize admission/reconciliation without holding the gate during provider execution. */
+    readonly guarded: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
     readonly drain: Effect.Effect<
       SqliteRunActivation.DrainResult,
       RuntimeUnavailable | SqlError.SqlError,
@@ -109,17 +126,36 @@ const makeHost = Effect.fn("RivetActorRuntime.makeHost")(function* (
     catch: () => RuntimeUnavailable.make({ message: "Rivet Runtime periodic recovery could not be armed" }),
   })
   const ownerId = yield* allocateOwner(context.actorId)
-  yield* options.initialize ?? Effect.void
+  const sql = yield* SqlClient.SqlClient
+  const activationContext = { sql, ownerId }
+  yield* options.initialize?.(activationContext) ?? Effect.void
+  const admission = yield* Semaphore.make(1)
+  const execution = yield* Semaphore.make(1)
+  const guarded = admission.withPermits(1)
   const fuel = Math.max(1, Math.floor(options.drainFuel ?? 64))
-  const drain = Effect.gen(function* () {
-    const result = yield* SqliteRunActivation.drain({ ownerId, fuel, rearm: Effect.void })
-    if (result.nextDueAt !== undefined) {
-      const now = yield* Clock.currentTimeMillis
-      yield* notify(context, options.drainAction, result.hasMore ? 0 : result.nextDueAt - now)
-    }
-    return result
-  })
-  return ActorRuntime.of({ ownerId, notify: notify(context, options.drainAction), drain })
+  const reconcile = guarded(
+    Effect.gen(function* () {
+      if (options.reconcile !== undefined) return yield* options.reconcile(activationContext)
+      return undefined
+    }),
+  )
+  const drain = execution.withPermits(1)(
+    Effect.gen(function* () {
+      yield* reconcile
+      const result = yield* SqliteRunActivation.drain({ ownerId, fuel, rearm: Effect.void })
+      const productDue = yield* reconcile
+      const runDue = yield* SqliteRunActivation.nextDueAt
+      let nextDueAt = runDue
+      if (productDue !== undefined && (nextDueAt === undefined || productDue < nextDueAt)) nextDueAt = productDue
+      if (nextDueAt !== undefined) {
+        const now = yield* Clock.currentTimeMillis
+        yield* notify(context, options.drainAction, result.hasMore ? 0 : nextDueAt - now)
+        return { ...result, nextDueAt }
+      }
+      return result
+    }),
+  )
+  return ActorRuntime.of({ ownerId, notify: notify(context, options.drainAction), drain, guarded })
 })
 
 const recover = Effect.fn("RivetActorRuntime.recover")(function* (pageSize: number) {
@@ -145,7 +181,7 @@ const recover = Effect.fn("RivetActorRuntime.recover")(function* (pageSize: numb
 const layerActorRuntimeImpl = (
   context: RuntimeActorContext,
   options: ActorRuntimeOptions,
-): Layer.Layer<ActorRuntimeServices, SqliteStoreError | SqlError.SqlError | RuntimeUnavailable, ExecutableResolver> => {
+): Layer.Layer<ActorRuntimeServices, SqliteStoreError | SqlError.SqlError | RuntimeUnavailable> => {
   const {
     drainAction: _drainAction,
     drainFuel: _drainFuel,
@@ -153,15 +189,20 @@ const layerActorRuntimeImpl = (
     recoveryPageSize: pageSize,
     initialize: _initialize,
     activationProjection,
+    makeExecutableResolver,
+    decorateRunExecutor,
+    reconcile: _reconcile,
     ...storeOptions
   } = options
   const sql = layerSqlClient(context.db)
   const host = Layer.effect(ActorRuntime, makeHost(context, options))
   const projection = Layer.effect(
     ActivationProjection,
-    Effect.map(SqlClient.SqlClient, (client) => {
+    Effect.gen(function* () {
+      const client = yield* SqlClient.SqlClient
+      const { ownerId } = yield* ActorRuntime
       const native = SqliteRunActivation.makeProjection(client, Effect.void)
-      const application = activationProjection?.(client)
+      const application = activationProjection?.({ sql: client, ownerId })
       return {
         applyInTransaction: (changes: Parameters<RunActivationProjection["applyInTransaction"]>[0]) =>
           application === undefined
@@ -169,16 +210,19 @@ const layerActorRuntimeImpl = (
             : application.applyInTransaction(changes).pipe(Effect.andThen(native.applyInTransaction(changes))),
       }
     }),
-  )
+  ).pipe(Layer.provide(host))
   const runtime = Layer.unwrap(
     Effect.gen(function* () {
       const { ownerId } = yield* ActorRuntime
       const activation = yield* ActivationProjection
-      return layerSqliteRuntime({
+      const runtimeOptions: SqliteRuntimeOptions = {
         options: { ...storeOptions, source: "rivet-actor", activationProjection: activation },
         workerId: ownerId,
         schedulerMode: "external",
-      })
+        makeExecutableResolver,
+      }
+      if (decorateRunExecutor !== undefined) Object.assign(runtimeOptions, { decorateRunExecutor })
+      return layerSqliteRuntime(runtimeOptions)
     }),
   ).pipe(Layer.provideMerge(host), Layer.provideMerge(projection), Layer.provideMerge(sql))
   const initialize = Layer.effectDiscard(recover(Math.max(1, Math.min(1000, Math.floor(pageSize ?? 100))))).pipe(
@@ -198,10 +242,10 @@ export const layerActorRuntime: {
   (
     context: RuntimeActorContext,
     options: ActorRuntimeOptions,
-  ): Layer.Layer<ActorRuntimeServices, SqliteStoreError | SqlError.SqlError | RuntimeUnavailable, ExecutableResolver>
+  ): Layer.Layer<ActorRuntimeServices, SqliteStoreError | SqlError.SqlError | RuntimeUnavailable>
   (
     options: ActorRuntimeOptions,
   ): (
     context: RuntimeActorContext,
-  ) => Layer.Layer<ActorRuntimeServices, SqliteStoreError | SqlError.SqlError | RuntimeUnavailable, ExecutableResolver>
+  ) => Layer.Layer<ActorRuntimeServices, SqliteStoreError | SqlError.SqlError | RuntimeUnavailable>
 } = Function.dual(2, layerActorRuntimeImpl)

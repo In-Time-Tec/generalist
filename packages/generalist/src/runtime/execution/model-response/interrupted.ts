@@ -89,6 +89,7 @@ const interruptedSessionEntry = (input: {
 }
 
 const durableEvent = (input: {
+  readonly runId: string
   readonly sessionId: string
   readonly entryId: string
   readonly event: PendingModelResponseInterrupted
@@ -97,6 +98,8 @@ const durableEvent = (input: {
     {
       _tag: interruptedTag,
       turn: input.event.turn,
+      originRunId: input.runId,
+      originOperationKey: input.event.operationKey,
       operationKey: input.event.operationKey,
       modelCallId: input.event.modelCallId,
       modelAttemptId: input.event.modelAttemptId,
@@ -133,7 +136,10 @@ export const validateInterruptedModelResponse = (input: {
   }
   const entry = interruptedSessionEntry({ runId: input.runId, sessionId: input.sessionId, event })
   if (Schema.is(RuntimeUnavailable)(entry)) return entry
-  return { entry, event: durableEvent({ sessionId: input.sessionId, entryId: entry.entryId, event }) }
+  return {
+    entry,
+    event: durableEvent({ runId: input.runId, sessionId: input.sessionId, entryId: entry.entryId, event }),
+  }
 }
 
 export const sameInterruptedModelOutcome = (input: {
@@ -146,6 +152,8 @@ const durableUnsigned = (event: ModelResponseInterrupted) =>
     {
       _tag: event._tag,
       turn: event.turn,
+      originRunId: event.originRunId,
+      originOperationKey: event.originOperationKey,
       operationKey: event.operationKey,
       modelCallId: event.modelCallId,
       modelAttemptId: event.modelAttemptId,
@@ -188,7 +196,11 @@ export const resolveInterruptedModelResponse = (input: {
       event.finishReason === undefined ? undefined : { finishReason: event.finishReason },
     )
     const response = Schema.decodeSync(CompletedModelResponse)(encoded)
-    const pending: PendingModelResponseInterrupted = { ...event, response }
+    const pending: PendingModelResponseInterrupted = {
+      ...event,
+      operationKey: event.originOperationKey,
+      response,
+    }
     if (pinDigest(jsonValue(unsigned(pending))) !== event.digest) return corruptReference(event)
     return response
   } catch {

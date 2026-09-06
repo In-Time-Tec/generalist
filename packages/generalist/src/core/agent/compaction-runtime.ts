@@ -343,7 +343,7 @@ export const make = (context: CompactionContext) => {
                   onCommitted?.()
                 }),
               ),
-              Effect.flatMap((appended) => restore(session.path(appended.leafId))),
+              Effect.flatMap((appended) => restore(session.effectivePath(appended.leafId))),
               Effect.map(buildContext),
               Effect.tap((projection) => Ref.set(chat.history, withDerivedSystem({ system, projection }))),
               Effect.tap(() =>

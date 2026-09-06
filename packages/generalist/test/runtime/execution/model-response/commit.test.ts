@@ -6,6 +6,7 @@ import { Pins, Session } from "../../../../src/index.js"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { assistantAddress, memoryLayer, textPrompt } from "../fixtures.js"
 import { sqliteManualClaimLayer, tempDbPath } from "../../sql/scenario.js"
+import { provideScoped } from "../scoped-provide.js"
 
 const jsonValue = <Value>(value: Value): Schema.Json =>
   Schema.decodeSync(Schema.fromJsonString(Schema.Json))(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
@@ -291,7 +292,7 @@ it.live("observes SQLite model commits, exact retries, divergence, and stale cla
           span.name === "Generalist.Runtime.sqlTransition" &&
           span.attributes.get("generalist.runtime.sql.transition") === "migrate",
       )
-      expect(migration?.attributes.get("generalist.runtime.sql.schema.version")).toBe(10)
+      expect(migration?.attributes.get("generalist.runtime.sql.schema.version")).toBe(11)
       expect(migration?.attributes.get("generalist.runtime.sql.schema.status")).toBe("current")
       expect(migration?.attributes.get("generalist.runtime.sql.schema.checksum")).toMatch(/^[a-f\d]{64}$/)
 
@@ -546,7 +547,7 @@ it.live("rejects mutated completed model response references and Session storage
         })
 
       for (const candidate of [
-        { ...event, runId: "corrupt-run" },
+        { ...event, originRunId: "corrupt-run" },
         { ...event, operationKey: "corrupt-operation" },
         { ...event, sessionEntryId: "corrupt-entry" },
         { ...event, turn: event.turn + 1 },
@@ -624,4 +625,131 @@ it.live("rejects mutated completed model response references and Session storage
       expect(yield* runtime.resolveModelResponse(event)).toEqual(exact.event.response)
     }),
   )
+})
+
+it.effect("rejects source corruption atomically instead of re-signing it during fork", () => {
+  const filename = tempDbPath("corrupt-model-response-fork")
+  return Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const receipt = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "corrupt-model-response-source",
+      idempotencyKey: "corrupt-model-response-source",
+      prompt: textPrompt("answer"),
+    })
+    const { store, claim, operation, operationKey, sessionParentId } = yield* schedule(receipt.runId)
+    yield* store.commitModelResponse({
+      ...claim,
+      operationId: operation.operationId,
+      ...completion(operationKey, sessionParentId),
+    })
+    const event = (yield* runtime.history({ runId: receipt.runId, limit: 100 })).find(
+      (item) => item._tag === "ModelResponseCommitted",
+    )
+    if (event?._tag !== "ModelResponseCommitted") return yield* Effect.die("missing response")
+    const database = new Database(filename)
+    const sessionRow = database
+      .query<
+        { payload_json: string; parent_id: string | null },
+        [string, string]
+      >("SELECT payload_json, parent_id FROM generalist_session_entries WHERE session_id = ? AND entry_id = ?")
+      .get(event.sessionId, event.sessionEntryId)
+    const operationRow = database
+      .query<
+        { result_json: string },
+        [string, string]
+      >("SELECT result_json FROM generalist_run_operations WHERE run_id = ? AND operation_key = ?")
+      .get(receipt.runId, operationKey)
+    database.close()
+    if (sessionRow === null || operationRow === null) return yield* Effect.die("missing corruption fixture")
+
+    const mutations = [
+      {
+        name: "content",
+        apply: (db: Database) =>
+          db
+            .query(
+              "UPDATE generalist_session_entries SET payload_json = replace(payload_json, ?, ?) WHERE session_id = ? AND entry_id = ?",
+            )
+            .run("semantic answer", "corrupted answer", event.sessionId, event.sessionEntryId),
+      },
+      {
+        name: "digest metadata",
+        apply: (db: Database) => {
+          db.query(
+            "UPDATE generalist_session_entries SET payload_json = json_set(payload_json, '$.metadata.modelResponseDigest', 'corrupt-digest') WHERE session_id = ? AND entry_id = ?",
+          ).run(event.sessionId, event.sessionEntryId)
+        },
+      },
+      {
+        name: "parent",
+        apply: (db: Database) =>
+          db
+            .query("UPDATE generalist_session_entries SET parent_id = ? WHERE session_id = ? AND entry_id = ?")
+            .run("corrupt-parent", event.sessionId, event.sessionEntryId),
+      },
+      {
+        name: "origin",
+        apply: (db: Database) => {
+          db.query(
+            "UPDATE generalist_run_operations SET result_json = json_set(result_json, '$.originRunId', 'corrupt-origin') WHERE run_id = ? AND operation_key = ?",
+          ).run(receipt.runId, operationKey)
+        },
+      },
+    ]
+    for (const [index, mutation] of mutations.entries()) {
+      const corrupt = new Database(filename)
+      mutation.apply(corrupt)
+      corrupt.close()
+      const branchRunId = `corrupt-model-response-fork-${index}`
+      expect(
+        (yield* Effect.exit(store.fork({ runId: receipt.runId, newRunId: branchRunId, atSequence: event.sequence })))
+          ._tag,
+        mutation.name,
+      ).toBe("Failure")
+      const inspection = new Database(filename)
+      expect(
+        inspection.query("SELECT COUNT(*) AS count FROM generalist_runs WHERE run_id = ?").get(branchRunId),
+        mutation.name,
+      ).toEqual({ count: 0 })
+      expect(
+        inspection
+          .query("SELECT COUNT(*) AS count FROM generalist_sessions WHERE session_id LIKE ?")
+          .get(`%:fork:${branchRunId}`),
+        mutation.name,
+      ).toEqual({ count: 0 })
+      inspection
+        .query(
+          "UPDATE generalist_session_entries SET payload_json = ?, parent_id = ? WHERE session_id = ? AND entry_id = ?",
+        )
+        .run(sessionRow.payload_json, sessionRow.parent_id, event.sessionId, event.sessionEntryId)
+      inspection
+        .query("UPDATE generalist_run_operations SET result_json = ? WHERE run_id = ? AND operation_key = ?")
+        .run(operationRow.result_json, receipt.runId, operationKey)
+      inspection.close()
+    }
+
+    const corrupt = new Database(filename)
+    corrupt
+      .query(
+        "UPDATE generalist_session_entries SET payload_json = replace(payload_json, ?, ?) WHERE session_id = ? AND entry_id = ?",
+      )
+      .run("semantic answer", "corrupted answer", event.sessionId, event.sessionEntryId)
+    corrupt.close()
+    expect(
+      (yield* Effect.exit(
+        store.rewind({ runId: receipt.runId, branchRunId: "corrupt-model-response-rewind", toSequence: 0 }),
+      ))._tag,
+    ).toBe("Failure")
+    const inspection = new Database(filename, { readonly: true })
+    expect(
+      inspection
+        .query("SELECT COUNT(*) AS count FROM generalist_runs WHERE run_id = ?")
+        .get("corrupt-model-response-rewind"),
+    ).toEqual({ count: 0 })
+    expect(inspection.query("SELECT last_sequence FROM generalist_runs WHERE run_id = ?").get(receipt.runId)).toEqual({
+      last_sequence: event.sequence,
+    })
+    inspection.close()
+  }).pipe((effect) => provideScoped(sqliteManualClaimLayer(filename), effect))
 })

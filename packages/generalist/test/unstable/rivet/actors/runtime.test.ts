@@ -97,13 +97,18 @@ const makeDefinition = (
     onWake: async (c) => {
       const runtime = ManagedRuntime.make(
         Layer.merge(
-          layerActorRuntime(c, {
-            drainAction: "work.drain",
-            recoveryIntervalMillis: 60_000,
-            initialize,
-            activationProjection,
-            addresses,
-          }).pipe(Layer.provide(resolver), Layer.provide(application)),
+          Layer.unwrap(
+            Effect.map(ExecutableResolver.ExecutableResolver, (executableResolver) =>
+              layerActorRuntime(c, {
+                drainAction: "work.drain",
+                recoveryIntervalMillis: 60_000,
+                initialize: ({ sql }) => initialize.pipe(Effect.provideService(SqlClient.SqlClient, sql)),
+                activationProjection: ({ sql }) => activationProjection(sql),
+                makeExecutableResolver: () => executableResolver,
+                addresses,
+              }),
+            ),
+          ).pipe(Layer.provide(resolver), Layer.provide(application)),
           application,
         ),
       )
@@ -369,11 +374,16 @@ test("failed initialization releases every acquired application scope", async ()
   )
   const runtime = ManagedRuntime.make(
     Layer.merge(
-      layerActorRuntime(actorContext, {
-        drainAction: "work.drain",
-        addresses,
-        initialize: Errors.RuntimeUnavailable.make({ message: "test initialization failure" }),
-      }).pipe(Layer.provide(makeResolver())),
+      Layer.unwrap(
+        Effect.map(ExecutableResolver.ExecutableResolver, (executableResolver) =>
+          layerActorRuntime(actorContext, {
+            drainAction: "work.drain",
+            addresses,
+            initialize: () => Errors.RuntimeUnavailable.make({ message: "test initialization failure" }),
+            makeExecutableResolver: () => executableResolver,
+          }),
+        ),
+      ).pipe(Layer.provide(makeResolver())),
       application,
     ),
   )

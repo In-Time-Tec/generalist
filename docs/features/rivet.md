@@ -36,7 +36,7 @@ Use `layerActorRuntime` when the Rivet actor also owns application actions and t
 store that `ManagedRuntime` in actor vars, and dispose it from both `onSleep` and `onDestroy`:
 
 ```ts
-import { Effect, Layer, ManagedRuntime } from "effect"
+import { Effect, ManagedRuntime } from "effect"
 import { SqlClient, SqlError } from "effect/unstable/sql"
 import { actor } from "rivetkit"
 import { db } from "rivetkit/db"
@@ -86,9 +86,10 @@ const thread = actor({
       layerActorRuntime(c, {
         addresses,
         drainAction: "runtime.drain",
-        initialize,
-        activationProjection,
-      }).pipe(Layer.provide(resolver)),
+        initialize: ({ sql }) => initialize.pipe(Effect.provideService(SqlClient.SqlClient, sql)),
+        activationProjection: ({ sql }) => activationProjection(sql),
+        makeExecutableResolver,
+      }),
     )
     try {
       await host.runPromise(ActorRuntime, { signal: c.abortSignal })
@@ -131,6 +132,22 @@ const thread = actor({
 with the same `SqlClient`, during ordinary Runtime transactions and stale-owner recovery. Do not wrap `Runtime.send` in
 another `withTransaction`; the Runtime already owns the transaction. A projection failure rolls back the Run, product
 receipt, and native activation together.
+
+`makeExecutableResolver({ sql, ownerId, runStore, externalChildStore })` constructs the application's
+resolver from the exact services belonging to this activation, after product initialization and before
+recovery. Close Run-scoped capability providers over these services instead of opening another store.
+`decorateRunExecutor` adds application execution context around Generalist's actual storage-issued
+claim; it does not allocate or replace claims.
+
+For product queues or schedules, `reconcile({ sql, ownerId })` runs before a drain and again after
+execution, returning the earliest product wake time or `undefined`. The host rearms from both durable
+Run activations and that time; periodic recovery still covers a lost doorbell. `ActorRuntime.guarded`
+serializes application admission with reconciliation without holding its permit during provider
+execution. Do not call guarded admission recursively from reconciliation.
+
+The actor SQL adapter supports nested savepoints. A nested failure rolls back its subtree without
+discarding successful parent writes; concurrent sibling transactions are serialized at their parent
+depth. The adapter never closes the Rivet-owned raw handle.
 
 ## What runs
 

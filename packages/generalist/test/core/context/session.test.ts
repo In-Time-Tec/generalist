@@ -62,6 +62,58 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
+    "pages a fixed leaf while effective reads stop at projection boundaries",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const store = yield* Session.acquire("paged")
+          const appended = []
+          for (let index = 0; index < 10; index += 1) {
+            appended.push(yield* store.append({ _tag: "Message", message: user(`message-${index}`) }))
+          }
+          const fixedLeaf = appended.at(-1)!.id
+          let page = yield* store.pathPage({ leafId: fixedLeaf, limit: 3 })
+          expect(page.entries.map((entry) => entry.id)).toEqual(["7", "8", "9"])
+          expect(page).toMatchObject({ hasOlder: true, hasNewer: false })
+
+          yield* store.append({ _tag: "Message", message: user("later-append") })
+          const paged = [...page.entries]
+          while (page.nextCursor !== undefined) {
+            page = yield* store.pathPage({ leafId: fixedLeaf, cursor: page.nextCursor, limit: 3 })
+            paged.unshift(...page.entries)
+          }
+          expect(paged.map((entry) => entry.id)).toEqual(appended.map((entry) => entry.id))
+          expect(paged.some((entry) => promptTexts(Session.buildContext([entry])).includes("later-append"))).toBe(false)
+
+          const current = yield* store.leaf
+          const checkpointId = yield* store.reserveEntryId
+          const checkpoint = (yield* store.appendCheckpoint({
+            id: checkpointId,
+            parentId: current,
+            projectedHistory: Prompt.fromMessages([user("projected")]),
+            telemetry: [],
+          })).checkpoint
+          const suffix = yield* store.append({ _tag: "Message", message: assistant("suffix") })
+          expect((yield* store.effectivePath()).map((entry) => entry.id)).toEqual([checkpoint.id, suffix.id])
+          expect((yield* store.path()).length).toBeGreaterThan(2)
+          expect(yield* store.latestCompaction()).toEqual(checkpoint)
+
+          const handoff = yield* store.append({
+            _tag: "Handoff",
+            handoffId: "paged-handoff",
+            target: "specialist",
+            projectedHistory: Prompt.fromMessages([user("handoff projection")]),
+          })
+          const afterHandoff = yield* store.append({ _tag: "Message", message: assistant("after handoff") })
+          expect((yield* store.effectivePath()).map((entry) => entry.id)).toEqual([handoff.id, afterHandoff.id])
+          expect(yield* store.latestCompaction()).toEqual(checkpoint)
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
     "retries an ambiguously committed stable append without duplication or sequence advance",
     () =>
       [
@@ -848,6 +900,10 @@ describe("Session", () => {
               reserveEntryId: Effect.succeed("reserved"),
               append: () => Effect.die("unused"),
               appendCheckpoint: () => Effect.die("unused"),
+              entry: () => Effect.die("unused"),
+              pathPage: () => Effect.succeed({ entries: [], hasOlder: false, hasNewer: false }),
+              effectivePath: () => Effect.succeed([]),
+              latestCompaction: () => Effect.die("unused"),
               path: () => Effect.succeed([]),
               setLeaf: () => Effect.void,
               leaf: Effect.succeed("leaf"),

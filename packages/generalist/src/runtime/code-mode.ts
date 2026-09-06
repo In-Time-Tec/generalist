@@ -1,6 +1,6 @@
-import { Context, Effect, Function, Layer, Option, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
-import { type Agent, type ClosedServices, withTools } from "../core/agent/service.js"
+import { type Agent, withTools } from "../core/agent/service.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import type { ProgramAuthority } from "../core/durable/manifest/agent-manifest.js"
 import {
@@ -12,17 +12,7 @@ import {
 import { digest } from "../core/durable/pin.js"
 import { type ProgramBudget, make as makeProgramManifest } from "../core/durable/manifest/program-manifest.js"
 import type { AgentSuspended } from "../core/agent/event.js"
-import type { ToolContext } from "../core/tools/tool-context.js"
-import { managedToolHandlers } from "../core/artifact.js"
-import {
-  type CancellationRequest,
-  FrameworkFailure,
-  type Outcome,
-  type Request,
-  type Service as ToolExecutorService,
-  ToolExecutor,
-  executeToolkit,
-} from "../core/tools/tool-executor.js"
+import type { Outcome, Request } from "../core/tools/tool-executor.js"
 import type {
   AdmitProgramChildInput,
   ExecutionClaim,
@@ -36,8 +26,10 @@ import { make as makeAddress } from "./address.js"
 import { make as makeMessage } from "./messaging/message.js"
 import { narrow as narrowRegistrations } from "./executable/registration.js"
 import { normalizePrompt } from "./memory/prompt.js"
-import { supportsCancellation } from "../core/tools/tool-executor-cancellation.js"
-import { withoutFanOut } from "../core/agent/tool/fan-out.js"
+import { make as makeExecutor } from "./execution/agent/code-mode-executor.js"
+import { make as makeChildAdmission } from "./child/admission.js"
+import { RunOutcome, RunStatus } from "./run.js"
+import { ChildReadiness } from "./child/readiness.js"
 
 const SelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const SelectionIds = Schema.Array(SelectionId).pipe(Schema.check(Schema.isMaxLength(64)))
@@ -145,6 +137,46 @@ const makeDeclaration = (parameters: ReturnType<typeof makeParameters>) =>
 /** Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority. */
 export const makeTool = (authority: ProgramAuthority) => makeDeclaration(makeParameters(authority))
 
+/** A background Program handle identifies an admitted Run, not a completed tool result. */
+export const ProgramHandle = Schema.Struct({ childRunId: Schema.String })
+/** Current durable state and, only after settlement, the Program outcome. */
+export const ProgramInspection = Schema.Struct({
+  childRunId: Schema.String,
+  status: RunStatus,
+  readiness: ChildReadiness,
+  outcome: Schema.optionalKey(RunOutcome),
+})
+
+/** Nonblocking Program admission and explicit observation/cancellation tools. */
+export const makeBackgroundTools = (authority: ProgramAuthority) => ({
+  start: Tool.make("start_program", {
+    description:
+      "Admit independent work under the declared Program authority and return a durable handle immediately. Use await_program only when its result is needed. Existing tool authorization, replay policies and host conflict controls still apply.",
+    parameters: makeParameters(authority),
+    success: ProgramHandle,
+    failure: ProgramAdmissionFailed,
+  }),
+  inspect: Tool.make("inspect_program", {
+    description: "Read the current state of an owned background Program without waiting or consuming its output.",
+    parameters: ProgramHandle,
+    success: ProgramInspection,
+    failure: ProgramAdmissionFailed,
+  }),
+  await: Tool.make("await_program", {
+    description:
+      "Durably suspend until an owned background Program settles and return its result, as code_mode does. Interruption of this wait does not cancel the Program.",
+    parameters: ProgramHandle,
+    success: Schema.Unknown,
+    failure: ProgramAdmissionFailed,
+  }),
+  cancel: Tool.make("cancel_program", {
+    description: "Durably request cancellation of an owned background Program. Inspect or await to observe settlement.",
+    parameters: Schema.Struct({ childRunId: Schema.String, reason: Schema.optionalKey(Schema.String) }),
+    success: ProgramInspection,
+    failure: ProgramAdmissionFailed,
+  }),
+})
+
 const selected = <A>(
   requested: ReadonlyArray<string>,
   allowed: ReadonlyArray<A>,
@@ -232,6 +264,8 @@ const closureFor = (manifest: ExecutableManifest, roots: ReadonlyArray<string>):
 export interface Service {
   readonly parameters: ReturnType<typeof makeParameters>
   readonly tool: ReturnType<typeof makeTool>
+  readonly backgroundTools: ReturnType<typeof makeBackgroundTools>
+  readonly invokeBackground: (request: Request) => Effect.Effect<Outcome>
   readonly invoke: (request: Parameters & { readonly toolCallId: string }) => Effect.Effect<Outcome>
   readonly admitSuspension: (input: {
     readonly suspension: AgentSuspended
@@ -251,6 +285,8 @@ export const make = (input: {
 }): Service => {
   const parameters = makeParameters(input.authority)
   const declaration = makeDeclaration(parameters)
+  const backgroundTools = makeBackgroundTools(input.authority)
+  const childAdmission = makeChildAdmission(input.store)
   const prepare = (request: Parameters & { readonly toolCallId: string }) =>
     Effect.gen(function* () {
       const sourceBytes = new TextEncoder().encode(request.source).byteLength
@@ -323,6 +359,43 @@ export const make = (input: {
   return {
     parameters,
     tool: declaration,
+    backgroundTools,
+    invokeBackground: (request) =>
+      Effect.gen(function* () {
+        if (request.call.name === backgroundTools.start.name) {
+          const decoded = yield* Schema.decodeUnknownEffect(parameters, { onExcessProperty: "error" })(
+            request.call.params,
+          )
+          const prepared = yield* prepare({ ...decoded, toolCallId: request.call.id })
+          const receipt = yield* input.store.admitProgramChild({ ...input.claim, ...prepared })
+          const result = { childRunId: receipt.runId }
+          return { _tag: "Success" as const, result, encodedResult: result }
+        }
+        const decoded = yield* Schema.decodeUnknownEffect(backgroundTools.cancel.parametersSchema, {
+          onExcessProperty: "error",
+        })(request.call.params)
+        const owned = { parentRunId: input.claim.runId, childRunId: decoded.childRunId }
+        yield* childAdmission.inspect(owned)
+        const child = yield* input.store.loadExecution(decoded.childRunId)
+        if (child.message.metadata.codeMode !== true) {
+          return yield* ProgramAdmissionFailed.make({ message: "The owned child is not a Program admission" })
+        }
+        if (request.call.name === backgroundTools.cancel.name) {
+          yield* childAdmission.cancel({
+            ...owned,
+            ...Object.assign({}, decoded.reason === undefined ? undefined : { reason: decoded.reason }),
+          })
+        } else if (request.call.name === backgroundTools.await.name) {
+          return { _tag: "Suspend" as const, token: decoded.childRunId }
+        }
+        const result = yield* childAdmission.inspect(owned)
+        return { _tag: "Success" as const, result, encodedResult: result }
+      }).pipe(
+        Effect.catch((error) => {
+          const failure = admissionFailure({ message: String(error) })
+          return Effect.succeed({ _tag: "DomainFailure" as const, failure, encodedFailure: failure })
+        }),
+      ),
     invoke: (request) =>
       prepare(request).pipe(
         Effect.map((prepared) => ({ _tag: "Suspend" as const, token: prepared.childRunId })),
@@ -404,79 +477,16 @@ export const withTool: {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     implementation: Service,
   ): Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema> => {
-    const extended = withTools(agent, [implementation.tool])
+    const extended = withTools(agent, [implementation.tool, ...Object.values(implementation.backgroundTools)])
     return {
       ...extended,
       toolScheduling: {
         ...extended.toolScheduling,
-        parallelSafe: [...extended.toolScheduling.parallelSafe, "code_mode"],
+        parallelSafe: [...extended.toolScheduling.parallelSafe, "code_mode", "inspect_program", "await_program"],
       },
     }
   },
 )
-
-/** Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
-const makeExecutor = <
-  Tools extends Record<string, Tool.Any>,
-  R,
-  InputSchema extends Schema.Top,
-  OutputSchema extends Schema.Top,
->(options: {
-  readonly agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>
-  readonly environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>
-  readonly implementation: Service
-  readonly upstream: Option.Option<ToolExecutorService>
-}): ToolExecutorService => {
-  const upstream = Option.getOrUndefined(options.upstream)
-  const upstreamCancellation =
-    upstream?.cancel !== undefined
-      ? {
-          cancellable: (request: Request) =>
-            request.call.name !== options.implementation.tool.name && supportsCancellation(upstream, request),
-          cancel: (request: CancellationRequest) => upstream.cancel!(request),
-        }
-      : {}
-  const replayPolicy: ToolExecutorService["replayPolicy"] = (request) => {
-    if (request.call.name === options.implementation.tool.name) return "never"
-    return Option.isSome(options.upstream) ? (options.upstream.value.replayPolicy?.(request) ?? "never") : "never"
-  }
-  const execute: ToolExecutorService["execute"] = (request) => {
-    if (request.call.name === options.implementation.tool.name) {
-      return Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(
-        request.call.params,
-      ).pipe(
-        Effect.flatMap((parameters) => options.implementation.invoke({ ...parameters, toolCallId: request.call.id })),
-        Effect.mapError(() =>
-          FrameworkFailure.make({
-            stage: "decode-input",
-            tool: options.implementation.tool.name,
-            message: "code_mode input does not match its schema",
-          }),
-        ),
-      )
-    }
-    if (Option.isSome(options.upstream)) return options.upstream.value.execute(request)
-    const staticTool = options.agent.toolkit.tools[request.call.name]
-    const handlers = staticTool === undefined ? undefined : managedToolHandlers(staticTool)
-    const execution: unknown = Effect.flatMap(Effect.context<ToolContext>(), (context) =>
-      Effect.scoped(
-        Effect.flatMap(Layer.build(options.environment), (environment) =>
-          executeToolkit(withoutFanOut(options.agent.toolkit), request).pipe(
-            Effect.provideContext(handlers === undefined ? context : Context.merge(context, handlers)),
-            Effect.provideContext(environment),
-          ),
-        ),
-      ),
-    )
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: the environment contains every unmanaged handler; a managed Artifact tool contributes its selected handler Context above.
-    return execution as Effect.Effect<Outcome, FrameworkFailure, ToolContext>
-  }
-  return ToolExecutor.of({
-    replayPolicy,
-    execute,
-    ...upstreamCancellation,
-  })
-}
 
 /** Tool executor that owns the code_mode route. */
 export const Executor = { make: makeExecutor }

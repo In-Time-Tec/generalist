@@ -4,6 +4,8 @@ export {
   ActorRuntime,
   layerActorRuntime,
   type ActorRuntimeOptions,
+  type ActorRuntimeContext,
+  type ActorRuntimeResolverInput,
   type ActorRuntimeServices,
   type RuntimeActorContext,
 } from "./runtime.js"

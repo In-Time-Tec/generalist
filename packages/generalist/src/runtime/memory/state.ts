@@ -118,6 +118,14 @@ export interface MemorySession {
   }
 }
 
+export const emptySession = (): MemorySession => ({
+  entries: new Map(),
+  order: [],
+  leaf: null,
+  counter: 0,
+  writerEpoch: 0n,
+})
+
 export interface StoredHostSession {
   readonly session: HostSession
   readonly lastCursor: number

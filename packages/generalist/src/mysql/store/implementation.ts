@@ -117,7 +117,8 @@ export const mysqlDriver = (options: Options): SqlRuntimeDriver<RuntimeError> =>
           .subscribe({
             runId: input.runId,
             cursor: input.cursor,
-            loadReplay: context.loadReplay,
+            loadReplay: context.loadReplay.pipe(Effect.tap(({ lastSequence }) => Ref.set(pollCursor, lastSequence))),
+            loadAfter: context.loadAfter,
             capacity: context.capacity,
             onSubscribed: poll,
           })
@@ -150,7 +151,8 @@ export const mysqlDriver = (options: Options): SqlRuntimeDriver<RuntimeError> =>
           .subscribeHostSession({
             sessionId: input.sessionId,
             cursor: input.cursor,
-            loadReplay: context.loadReplay,
+            loadReplay: context.loadReplay.pipe(Effect.tap(({ lastCursor }) => Ref.set(pollCursor, lastCursor))),
+            loadAfter: context.loadAfter,
             capacity: context.capacity,
             onSubscribed: poll,
           })

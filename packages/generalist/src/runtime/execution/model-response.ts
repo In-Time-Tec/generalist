@@ -4,6 +4,7 @@ import {
   type DriverOperation,
   type OperationOutcome,
 } from "../../core/durable/driver.js"
+import { withPending } from "../../core/durable/loop-driver.js"
 import { Effect, Function, Option, Ref, Schema } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
@@ -12,10 +13,10 @@ import type { ExecutionContinuation } from "../run/steering.js"
 import type { OperationRecord } from "../sql/operations.js"
 import {
   completedOperationRefValue,
-  hydrateCompletedOperation,
   liveModelResponseEvent,
   type LiveModelResponseCommitted,
 } from "./model-response/commit.js"
+import { hydrateCompletedOperation } from "./model-response/hydration.js"
 
 interface PreparedCompletion {
   readonly continuation?: ExecutionContinuation | null
@@ -36,17 +37,33 @@ export const commitDriverOperation = (input: {
   if (operation.kind === "model" && outcome._tag === "Succeeded") {
     const event = liveModelResponseEvent(outcome.value)
     if (Schema.is(RuntimeUnavailable)(event)) return Effect.fail(event)
-    return store.commitModelResponse({ ...claim, operationId, outcome, checkpoint, ...prepared, event })
+    // The response is durable, but the loop has not consumed it or checkpointed its tool batch yet.
+    // Keep the replay cursor on this result; the next safe checkpoint advances it without redispatch.
+    const { inputDigest: _, ...pending } = operation
+    return store.commitModelResponse({
+      ...claim,
+      operationId,
+      outcome,
+      checkpoint: withPending(checkpoint, pending, checkpoint.turn),
+      ...prepared,
+      event,
+    })
   }
   let completion: Parameters<RunStoreService["completeOperation"]>[0]["outcome"]
   if (outcome._tag === "Succeeded") completion = { _tag: "Succeeded", value: outcome.value }
   else if (outcome._tag === "Failed") completion = { _tag: "Failed", error: outcome.error }
   else completion = { _tag: "Unknown" }
+  // Remember completes before the loop consumes its turn-end continuation. As with model
+  // responses, keep that exact cursor durable until the next operation advances the loop.
+  const { inputDigest: _inputDigest, ...pending } = operation
+  const remember =
+    operation.kind === "memory" &&
+    Schema.is(Schema.Struct({ turn: Schema.Finite, terminal: Schema.Boolean }))(operation.input)
   return store.completeOperation({
     ...claim,
     operationId,
     outcome: completion,
-    checkpoint,
+    checkpoint: remember ? withPending(checkpoint, pending, checkpoint.turn) : checkpoint,
     ...prepared,
   })
 }

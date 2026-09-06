@@ -70,39 +70,55 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
-const fixture = (options: { readonly calls?: number } = {}) => {
+const fixture = (options: { readonly calls?: number; readonly background?: "complete" | "await" | "cancel" } = {}) => {
   const calls = options.calls ?? 1
   const counts = { model: 0, capability: 0 }
   const model = Layer.effect(
     LanguageModel.LanguageModel,
     LanguageModel.make({
       generateText: () => Effect.succeed([]),
-      streamText: () =>
+      streamText: (request) =>
         Effect.sync(() => counts.model++).pipe(
-          Effect.map((call) =>
-            Stream.fromIterable<Response.StreamPartEncoded>(
-              call === 0
-                ? [
-                    ...Array.from({ length: calls }, (_, index) =>
-                      Response.makePart("tool-call", {
-                        id: `code-${index + 1}`,
-                        name: "code_mode",
-                        params: {
-                          source: `return 'program-result-${index + 1}'`,
-                          input: `run program ${index + 1}`,
-                          tools: [],
-                          agents: [],
-                          steps: [],
-                          budget,
-                        },
-                        providerExecuted: false,
-                      }),
-                    ),
-                    finish,
-                  ]
-                : [Response.makePart("text-delta", { id: "answer", delta: "root-complete" }), finish],
-            ),
-          ),
+          Effect.map((call): ReadonlyArray<Response.StreamPartEncoded> => {
+            if (call === 0)
+              return [
+                ...Array.from({ length: calls }, (_, index) =>
+                  Response.makePart("tool-call", {
+                    id: `code-${index + 1}`,
+                    name: options.background === undefined ? "code_mode" : "start_program",
+                    params: {
+                      source: `return 'program-result-${index + 1}'`,
+                      input: `run program ${index + 1}`,
+                      tools: [],
+                      agents: [],
+                      steps: [],
+                      budget,
+                    },
+                    providerExecuted: false,
+                  }),
+                ),
+                finish,
+              ]
+            if (options.background !== undefined && options.background !== "complete" && call === 1)
+              return [
+                Response.makePart("text-delta", { id: "independent", delta: "independent progress" }),
+                ...Array.from({ length: options.background === "await" ? 2 : 1 }, (_, index) =>
+                  Response.makePart("tool-call", {
+                    id: `observe-${index}`,
+                    name: options.background === "await" ? "await_program" : "cancel_program",
+                    params: request.prompt.content
+                      .flatMap((message) => (message.role === "tool" ? message.content : []))
+                      .flatMap((part) =>
+                        part.type === "tool-result" && part.name === "start_program" ? [part.result] : [],
+                      )[0],
+                    providerExecuted: false,
+                  }),
+                ),
+                finish,
+              ]
+            return [Response.makePart("text-delta", { id: "answer", delta: "root-complete" }), finish]
+          }),
+          Effect.map(Stream.fromIterable),
           Stream.unwrap,
         ),
     }),
@@ -185,6 +201,192 @@ const manifestWithAuthority = (programAuthority: AgentManifest.ProgramAuthority)
   })
 
 describe("Runtime code_mode Program children", () => {
+  standalone.effect("background Program admission is exact, bounded and parent-owned", () =>
+    withLayer(
+      Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 day" } }).pipe(
+        Layer.provide(fixture().resolverLayer),
+      ),
+    )(
+      Effect.gen(function* () {
+        const owner = yield* makeCodeMode(root.manifest.programAuthority!)
+        const stranger = yield* makeCodeMode(root.manifest.programAuthority!)
+        const request = (name: string, params: Schema.Json) => {
+          const call = Response.makePart("tool-call", { id: "background-1", name, params, providerExecuted: false })
+          return {
+            call,
+            toolCallBatch: { calls: [call] },
+            turn: 0,
+            toolCallIndex: 0,
+            agentName: rootAgent.name,
+            sessionId: "test",
+          }
+        }
+        const parameters = { source: "return 1", input: "input", tools: [], agents: [], steps: [], budget }
+        const first = yield* owner.invokeBackground(request("start_program", parameters))
+        expect(first._tag).toBe("Success")
+        if (first._tag !== "Success") return yield* Effect.die("expected admission")
+        const handle = yield* Schema.decodeUnknownEffect(CodeMode.ProgramHandle)(first.result)
+        expect(yield* owner.invokeBackground(request("start_program", parameters))).toEqual(first)
+        expect(
+          yield* owner.invokeBackground(request("start_program", { ...parameters, source: "return 2" })),
+        ).toMatchObject({ _tag: "DomainFailure" })
+        expect(
+          yield* owner.invokeBackground(request("start_program", { ...parameters, tools: ["not-granted"] })),
+        ).toMatchObject({ _tag: "DomainFailure" })
+        expect(
+          yield* owner.invokeBackground(
+            request("start_program", { ...parameters, budget: { ...budget, toolCalls: 1 } }),
+          ),
+        ).toMatchObject({ _tag: "DomainFailure" })
+        for (const name of ["inspect_program", "await_program", "cancel_program"]) {
+          expect(yield* stranger.invokeBackground(request(name, handle))).toMatchObject({ _tag: "DomainFailure" })
+        }
+        expect(yield* owner.invokeBackground(request("inspect_program", handle))).toMatchObject({
+          _tag: "Success",
+          result: { status: "queued" },
+        })
+        expect(
+          yield* owner.invokeBackground(request("cancel_program", { ...handle, reason: "explicit" })),
+        ).toMatchObject({ _tag: "Success", result: { status: "cancelled" } })
+      }),
+    ),
+  )
+  standalone.live("sqlite replays background admission after the child commit but before the tool receipt", () => {
+    const { resolverLayer, counts } = fixture({ background: "await" })
+    const runtimeLayer = SqliteRuntime.layerSqlite({
+      addresses: [],
+      filename: tempDbPath("background-admission-restart"),
+      scheduler: { pollInterval: "1 day", concurrency: 1 },
+    }).pipe(Layer.provide(resolverLayer))
+    let rootRunId = ""
+    let childRunId = ""
+    const crash = withLayer(runtimeLayer)(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        rootRunId = (yield* runtime.startExecution({
+          executable,
+          registrations,
+          sessionId: "background-admission",
+          idempotencyKey: "root",
+          prompt: "work",
+        })).runId
+        const crashStore = RunStore.RunStore.of({
+          ...store,
+          admitProgramChild: (input) => store.admitProgramChild(input).pipe(Effect.andThen(Effect.interrupt)),
+        })
+        yield* withLayer(
+          Layer.mergeAll(Layer.succeed(RunStore.RunStore, crashStore), activeExecutionsLayer, resolverLayer),
+        )(
+          Effect.gen(function* () {
+            const host = yield* makeRunExecutor
+            yield* host.execute(yield* store.claimExecution({ runId: rootRunId, ownerId: "crash" }))
+          }),
+        )
+        const children = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.filter(
+          (run) => run.parentRunId === rootRunId,
+        )
+        expect(children).toHaveLength(1)
+        childRunId = children[0]!.run.runId
+        expect(counts.model).toBe(1)
+        expect(counts.capability).toBe(0)
+        expect((yield* runtime.inspect(rootRunId)).status).toBe("running")
+      }),
+    )
+    const reopen = withLayer(runtimeLayer)(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        for (let index = 0; index < 6; index++) {
+          yield* scheduler.tick
+          yield* scheduler.idle
+        }
+        expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
+        expect((yield* runtime.treeCheckpoint(rootRunId)).inspection.runs).toHaveLength(2)
+        expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
+        expect(counts.model).toBe(3)
+        expect(counts.capability).toBe(1)
+        const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
+        // Admission was attempted twice, but its durable child and model receipt are singular.
+        expect(
+          history.filter((event) => event._tag === "ToolExecutionStarted" && event.call.name === "start_program"),
+        ).toHaveLength(2)
+        expect(
+          history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
+        ).toHaveLength(1)
+      }),
+    )
+    return crash.pipe(Effect.andThen(reopen))
+  })
+  for (const backend of ["memory", "sqlite"] as const) {
+    for (const background of ["complete", "await", "cancel"] as const) {
+      standalone.live(
+        `${backend} background Program ${background} permits independent parent progress and survives reopen`,
+        () => {
+          const { resolverLayer, counts } = fixture({ background })
+          const options = { addresses: [], scheduler: { pollInterval: "1 day" as const, concurrency: 1 } }
+          const runtimeLayer = (
+            backend === "memory"
+              ? Runtime.layerMemory(options)
+              : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("background-program") })
+          ).pipe(Layer.provide(resolverLayer))
+          let rootRunId = ""
+          let childRunId = ""
+          const admit = Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            rootRunId = (yield* runtime.startExecution({
+              executable,
+              registrations,
+              sessionId: "background-test",
+              idempotencyKey: "root",
+              prompt: "independent work",
+            })).runId
+            yield* scheduler.tick
+            yield* scheduler.idle
+            childRunId = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.find(
+              (run) => run.parentRunId === rootRunId,
+            )!.run.runId
+            expect(counts.model).toBe(background === "cancel" ? 3 : 2)
+            expect(counts.capability).toBe(0)
+            expect((yield* runtime.inspect(rootRunId)).status).toBe(background === "await" ? "waiting" : "succeeded")
+            expect((yield* runtime.inspect(childRunId)).status).toBe(background === "cancel" ? "cancelled" : "queued")
+            const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
+            expect(
+              history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
+            ).toHaveLength(1)
+            if (background === "await") expect((yield* runtime.inspect(rootRunId)).waits).toHaveLength(2)
+          })
+          const complete = Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            for (let index = 0; index < 3; index++) {
+              yield* scheduler.tick
+              yield* scheduler.idle
+            }
+            expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
+            expect((yield* runtime.inspect(childRunId)).status).toBe(
+              background === "cancel" ? "cancelled" : "succeeded",
+            )
+            expect(counts.capability).toBe(background === "cancel" ? 0 : 1)
+            const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
+            expect(
+              history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
+            ).toHaveLength(1)
+            if (background === "await")
+              expect(
+                history.filter(
+                  (event) => event._tag === "ToolExecutionCompleted" && event.call.name === "await_program",
+                ),
+              ).toHaveLength(2)
+          })
+          return backend === "memory"
+            ? withLayer(runtimeLayer)(admit.pipe(Effect.andThen(complete)))
+            : withLayer(runtimeLayer)(admit).pipe(Effect.andThen(withLayer(runtimeLayer)(complete)))
+        },
+      )
+    }
+  }
   for (const backend of ["memory", "sqlite"] as const) {
     standalone.live(`${backend} admits one exact Program child and resumes the same root Run`, () => {
       const filename = tempDbPath("code-mode")

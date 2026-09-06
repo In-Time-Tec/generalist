@@ -12,6 +12,9 @@ import { tempDbPath } from "../../sql/scenario.js"
 import { toolCancellationSuite } from "../../operation/suites/tool-cancellation.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { JournalFault } from "../../../../src/runtime/operation/journal-fault.js"
+import { memoryRecoverySuite } from "./memory.js"
+
+memoryRecoverySuite()
 
 const finish = Response.makePart("finish", {
   reason: "stop",

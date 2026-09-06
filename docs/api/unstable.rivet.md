@@ -46,6 +46,34 @@ Host operations sharing the actor's Runtime and SQLite transaction domain.
 
 ## Interfaces
 
+<a id="actorruntimecontext"></a>
+
+### ActorRuntimeContext
+
+**`Experimental`**
+
+Product initialization and projection share the host's incarnation and SQL client.
+
+#### Properties
+
+<a id="ownerid"></a>
+
+##### ownerId
+
+> `readonly` **ownerId**: `string`
+
+**`Experimental`**
+
+<a id="sql"></a>
+
+##### sql
+
+> `readonly` **sql**: `SqlClient`
+
+**`Experimental`**
+
+***
+
 <a id="actorruntimeoptions"></a>
 
 ### ActorRuntimeOptions
@@ -64,7 +92,7 @@ Runtime construction inside an application-owned actor wake scope.
 
 ##### activationProjection?
 
-> `readonly` `optional` **activationProjection?**: (`sql`) => [`RunActivationProjection`](./runtime.sql-driver/index#runactivationprojection)
+> `readonly` `optional` **activationProjection?**: (`context`) => [`RunActivationProjection`](./runtime.sql-driver/index#runactivationprojection)
 
 **`Experimental`**
 
@@ -72,9 +100,9 @@ Product-only projection. The host always composes its own durable activation pro
 
 ###### Parameters
 
-###### sql
+###### context
 
-`SqlClient`
+[`ActorRuntimeContext`](#actorruntimecontext)
 
 ###### Returns
 
@@ -91,6 +119,24 @@ Product-only projection. The host always composes its own durable activation pro
 ###### Inherited from
 
 [`LayerOptions`](./runtime/namespaces/Runtime#layeroptions).[`addresses`](./runtime/namespaces/Runtime#addresses)
+
+<a id="decoraterunexecutor"></a>
+
+##### decorateRunExecutor?
+
+> `readonly` `optional` **decorateRunExecutor?**: (`executor`) => [`Service`](./runtime/namespaces/RunExecutor#service)
+
+**`Experimental`**
+
+###### Parameters
+
+###### executor
+
+[`Service`](./runtime/namespaces/RunExecutor#service)
+
+###### Returns
+
+[`Service`](./runtime/namespaces/RunExecutor#service)
 
 <a id="drainaction"></a>
 
@@ -114,11 +160,39 @@ Scheduled action that invokes ActorRuntime.drain. It must be present on the acto
 
 ##### initialize?
 
-> `readonly` `optional` **initialize?**: `Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`, `SqlClient`\>
+> `readonly` `optional` **initialize?**: (`context`) => `Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`\>
 
 **`Experimental`**
 
 Initialize product tables before Runtime construction and recovery. Must be safe on every wake.
+
+###### Parameters
+
+###### context
+
+[`ActorRuntimeContext`](#actorruntimecontext)
+
+###### Returns
+
+`Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`\>
+
+<a id="makeexecutableresolver"></a>
+
+##### makeExecutableResolver
+
+> `readonly` **makeExecutableResolver**: (`input`) => [`Service`](./runtime/namespaces/ExecutableResolver#service)
+
+**`Experimental`**
+
+###### Parameters
+
+###### input
+
+`SqliteRuntimeResolverInput`
+
+###### Returns
+
+[`Service`](./runtime/namespaces/ExecutableResolver#service)
 
 <a id="messagingpolicy"></a>
 
@@ -145,6 +219,26 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Inherited from
 
 [`SqliteStoreOptions`](./runtime.sql-driver/index#sqlitestoreoptions).[`multiWorker`](./runtime.sql-driver/index#multiworker)
+
+<a id="reconcile"></a>
+
+##### reconcile?
+
+> `readonly` `optional` **reconcile?**: (`context`) => `Effect`\<`number` \| `undefined`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`, [`SqliteRuntimeServices`](./runtime.sql-driver/index#sqliteruntimeservices)\>
+
+**`Experimental`**
+
+Reconcile product work before execution and before recovery is allowed to become idle.
+
+###### Parameters
+
+###### context
+
+[`ActorRuntimeContext`](#actorruntimecontext)
+
+###### Returns
+
+`Effect`\<`number` \| `undefined`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`, [`SqliteRuntimeServices`](./runtime.sql-driver/index#sqliteruntimeservices)\>
 
 <a id="recoveryintervalmillis"></a>
 
@@ -218,7 +312,7 @@ Durable fallback doorbell interval. Rivet requires at least 5 seconds.
 
 #### Extends
 
-- `Omit`\<[`ActorRuntimeOptions`](#actorruntimeoptions), `"drainAction"`\>
+- `Omit`\<[`ActorRuntimeOptions`](#actorruntimeoptions), `"drainAction"` \| `"makeExecutableResolver"`\>
 
 #### Properties
 
@@ -226,7 +320,7 @@ Durable fallback doorbell interval. Rivet requires at least 5 seconds.
 
 ##### activationProjection?
 
-> `readonly` `optional` **activationProjection?**: (`sql`) => [`RunActivationProjection`](./runtime.sql-driver/index#runactivationprojection)
+> `readonly` `optional` **activationProjection?**: (`context`) => [`RunActivationProjection`](./runtime.sql-driver/index#runactivationprojection)
 
 **`Experimental`**
 
@@ -234,9 +328,9 @@ Product-only projection. The host always composes its own durable activation pro
 
 ###### Parameters
 
-###### sql
+###### context
 
-`SqlClient`
+[`ActorRuntimeContext`](#actorruntimecontext)
 
 ###### Returns
 
@@ -268,6 +362,28 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 
 [`LayerOptions`](./runtime/namespaces/Runtime#layeroptions).[`addresses`](./runtime/namespaces/Runtime#addresses)
 
+<a id="decoraterunexecutor-1"></a>
+
+##### decorateRunExecutor?
+
+> `readonly` `optional` **decorateRunExecutor?**: (`executor`) => [`Service`](./runtime/namespaces/RunExecutor#service)
+
+**`Experimental`**
+
+###### Parameters
+
+###### executor
+
+[`Service`](./runtime/namespaces/RunExecutor#service)
+
+###### Returns
+
+[`Service`](./runtime/namespaces/RunExecutor#service)
+
+###### Inherited from
+
+`Omit.decorateRunExecutor`
+
 <a id="drainfuel-1"></a>
 
 ##### drainFuel?
@@ -284,11 +400,21 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 
 ##### initialize?
 
-> `readonly` `optional` **initialize?**: `Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`, `SqlClient`\>
+> `readonly` `optional` **initialize?**: (`context`) => `Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`\>
 
 **`Experimental`**
 
 Initialize product tables before Runtime construction and recovery. Must be safe on every wake.
+
+###### Parameters
+
+###### context
+
+[`ActorRuntimeContext`](#actorruntimecontext)
+
+###### Returns
+
+`Effect`\<`void`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`\>
 
 ###### Inherited from
 
@@ -319,6 +445,30 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 ###### Inherited from
 
 [`SqliteStoreOptions`](./runtime.sql-driver/index#sqlitestoreoptions).[`multiWorker`](./runtime.sql-driver/index#multiworker)
+
+<a id="reconcile-1"></a>
+
+##### reconcile?
+
+> `readonly` `optional` **reconcile?**: (`context`) => `Effect`\<`number` \| `undefined`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`, [`SqliteRuntimeServices`](./runtime.sql-driver/index#sqliteruntimeservices)\>
+
+**`Experimental`**
+
+Reconcile product work before execution and before recovery is allowed to become idle.
+
+###### Parameters
+
+###### context
+
+[`ActorRuntimeContext`](#actorruntimecontext)
+
+###### Returns
+
+`Effect`\<`number` \| `undefined`, [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| `SqlError`, [`SqliteRuntimeServices`](./runtime.sql-driver/index#sqliteruntimeservices)\>
+
+###### Inherited from
+
+`Omit.reconcile`
 
 <a id="recoveryintervalmillis-1"></a>
 
@@ -402,6 +552,18 @@ Application-owned executable reconstruction composed into each actor incarnation
 
 ## Type Aliases
 
+<a id="actorruntimeresolverinput"></a>
+
+### ActorRuntimeResolverInput
+
+> **ActorRuntimeResolverInput** = `SqliteRuntimeResolverInput`
+
+**`Experimental`**
+
+Exact storage services owned by this actor activation.
+
+***
+
 <a id="actorruntimeservices"></a>
 
 ### ActorRuntimeServices
@@ -442,7 +604,7 @@ One typed Rivet Actor definition owning one Runtime partition.
 
 ### layerActorRuntime
 
-> `const` **layerActorRuntime**: \{(`context`, `options`): `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`, [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>; (`options`): (`context`) => `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`, [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>; \}
+> `const` **layerActorRuntime**: \{(`context`, `options`): `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`\>; (`options`): (`context`) => `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`\>; \}
 
 **`Experimental`**
 
@@ -454,7 +616,7 @@ No Rivet State copy, second SQLite client, independent scheduler, or independent
 
 #### Call Signature
 
-> (`context`, `options`): `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`, [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>
+> (`context`, `options`): `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`\>
 
 ##### Parameters
 
@@ -468,11 +630,11 @@ No Rivet State copy, second SQLite client, independent scheduler, or independent
 
 ##### Returns
 
-`Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`, [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>
+`Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`\>
 
 #### Call Signature
 
-> (`options`): (`context`) => `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`, [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>
+> (`options`): (`context`) => `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`\>
 
 ##### Parameters
 
@@ -482,7 +644,7 @@ No Rivet State copy, second SQLite client, independent scheduler, or independent
 
 ##### Returns
 
-(`context`) => `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`, [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver#executableresolver)\>
+(`context`) => `Layer`\<[`ActorRuntimeServices`](#actorruntimeservices), [`RuntimeUnavailable`](./runtime/namespaces/Errors#runtimeunavailable) \| [`SqliteStoreError`](./runtime.sql-driver/index#sqlitestoreerror) \| `SqlError`\>
 
 ***
 

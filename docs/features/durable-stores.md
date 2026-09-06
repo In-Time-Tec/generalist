@@ -38,7 +38,7 @@ Effect.runPromise(program.pipe(Effect.provide(store)))
 
 ```text
 construct SQLite Layer (source = "./generalist.sqlite")
-├── apply/verify schema { version: 8, dirty: false }
+├── apply/verify schema { version: 11, dirty: false }
 └── Runtime.start(agent, input, { sessionId: "session:42" })
     └── transaction
         ├── lock identity "answer:1"; persist Run + Session
@@ -91,9 +91,40 @@ RuntimeWorker.run (subscribe before catch-up)
 
 `RunClaims` claims bounded ready batches, refreshes leases, releases claims, and commits terminal transitions under the exact worker, Run fence, and Session write claim.
 
+## Beta operating envelope
+
+| Host                       | Recovery authority                          | Deployment boundary                                                                                               |
+| -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Memory                     | Process-local state                         | Tests and ephemeral execution; not restart-safe                                                                   |
+| Bun SQLite                 | One SQLite file                             | One owning process; not a shared-worker backend                                                                   |
+| PostgreSQL / MySQL         | Transactional SQL journal and fenced claims | Multiple workers; run the capability suite against the real server                                                |
+| Cloudflare Durable Objects | Object-owned SQLite stores                  | Storage primitives, not a complete hosted worker/alarm lifecycle; the application owns scheduling and recovery    |
+| Rivet actors               | Actor-local SQLite and incarnation fencing  | Experimental host integration; local tests are not a deployed Rivet outage certification                          |
+| Object storage             | No Runtime driver                           | Suitable for application-owned immutable payloads or backups, not a replacement for transactional claim authority |
+
+The SQL driver is not a generic key/value storage interface. A new backend must implement atomic multi-record transitions, exclusive ownership/fencing, ordered cursors, and recovery, then register the capabilities it actually proves. Object-only execution would need its own conditional-commit and ownership protocol; adding a blob client does not supply those guarantees.
+
+### Payload and read limits
+
+Durable admission and execution transitions reject JSON values over 1 MiB. The limit applies to the whole transition envelope, not just an individual field. Session entries, including Compaction and Handoff projections, have a 1 MiB encoded limit. Run events have a stricter 256 KiB encoded limit. Preflight rejects cycles, more than 64 levels of nesting, and more than 65,536 visited values before codec expansion. Oversized inputs return `RuntimeUnavailable` (or `SessionStoreError` at the Session boundary); they are not silently shortened into successful replay data. A rejected operation completion leaves the operation unresolved, so do not blindly redispatch a side effect after a size error.
+
+Keep large tool results, attachments, and binary data outside the execution journal and return a bounded, application-owned reference with exact retrieval semantics. The framework does not upload rejected data for you. Existing model-facing tool-output previews are not an exact archival retrieval service. Artifact/CRDT snapshots and updates are a separate store and are **not** covered by these journal limits; the host must apply its own quotas there and at HTTP request admission.
+
+SQL Run and Host Session replay fetch at most 128 event rows per page. New admitted event JSON therefore contributes at most 32 MiB per page, excluding SQL-driver buffers, decoded object/string overhead, checkpoints, and the separate live queue. Public `Runtime.history` accepts integer limits from 1 through 1000. Consumers use exclusive cursors; Session cursors may have gaps after rewind. Notifications are hints: each subscriber repairs missing delivery from durable pages before emitting a newer hint. Queue overflow fails explicitly rather than silently dropping committed events.
+
+These are bounded query/result units, **not a constant-memory Runtime claim**. Full history exports, forks/rewinds, tree projections, artifact reconstruction, and lossless Session paths still materialize retained history. Forks copy their prefixes. An uncompacted model context still grows with the conversation; compact before it exceeds the model or durable checkpoint budget. SQL Session paths use sequential ancestor lookups; cold history no longer has to be decoded for a compacted model prompt, but older telemetry lookup can still traverse the ancestry. MySQL's bounded candidate output still uses a windowed eligibility scan and can examine/sort many rows; `LIMIT` does not cap database work. No production-scale throughput, RSS, database-memory ceiling, or multi-region performance guarantee follows from conformance tests.
+
+### Before accepting beta traffic
+
+1. Start with a disposable database and the exact Generalist/Effect versions used to build the executable registrations. Apply and verify the schema; never edit the version/checksum to force an incompatible store to open.
+2. Exercise restart, interrupted operations, fork/rewind, and replay using `generalist/testing/runtime-driver`. PostgreSQL/MySQL suites that skip for missing URLs are not evidence.
+3. Set a positive integer worker concurrency and a nonblank worker ID. Lease must be finite and at least 2 ms; fallback and cancellation intervals must be finite and at least 1 ms. These minima prevent invalid loops, not realistic production lease recommendations. Start with the 30-second lease and measure latency before tuning.
+4. Load-test the application's actual Session lengths, compaction policy, payload sizes, subscribers, and worker contention. Track database query time/temp spill, process RSS, journal/branch growth, subscriber lag, and worker scan/wakeup failures. Bound retention and artifact usage operationally.
+5. Test restoring a consistent database backup together with pinned executables and referenced external bytes before advertising recovery. See [recovery](./recovery.md).
+
 ## Invariants
 
-- Version `8`, logical checksum, and baseline `{ id: 1, name: "generalist_runtime" }` are identical across adapters; physical DDL is adapter-owned.
+- Version `11`, logical checksum, and baseline `{ id: 1, name: "generalist_runtime" }` are identical across adapters; physical DDL is adapter-owned.
 - `generalist_host_sessions` persists product Session identity, optional title, creation time, and the next Session event sequence. Each `generalist_run_events` row may carry the root Run's Host Session ID plus its unique Session sequence, avoiding a copied Session event journal.
 - Schema checks reject absent/old, dirty, unsupported, checksum-mismatched, or migration-identity-mismatched schemas with typed errors.
 - Baseline creation refuses to overwrite existing Generalist application tables.

@@ -286,38 +286,36 @@ export const ownsChildSuspension = (input: {
     suspension.value.waits.some(
       (wait) =>
         wait.waitId === input.waitId &&
-        wait.call.id === metadata.value.parentToolCallId &&
         wait.token === input.childRunId &&
-        (wait.call.name === toolName || wait.call.name === "code_mode"),
+        ((wait.call.name === "await_program" && metadata.value.codeMode === true) ||
+          (wait.call.id === metadata.value.parentToolCallId &&
+            (wait.call.name === toolName || wait.call.name === "code_mode"))),
     )
   )
 }
 
-/** Return the exact aggregate wait owned by one direct child. */
-export const waitIdForChild = (input: {
+/** Return every exact aggregate wait owned by one direct child. */
+export const waitIdsForChild = (input: {
   readonly parentRunId: string
   readonly childRunId: string
   readonly metadata: SerializedMetadata
   readonly suspension: unknown
-}): string | undefined => {
+}): ReadonlyArray<string> => {
   const decoded = Schema.decodeOption(ChildMetadata)(input.metadata)
   if (
     decoded._tag === "None" ||
     decoded.value.runtimeChildTool !== true ||
     decoded.value.parentRunId !== input.parentRunId
   ) {
-    return undefined
+    return []
   }
   const toolCallId = decoded.value.parentToolCallId
-  if (toolCallId === undefined) return undefined
+  if (toolCallId === undefined) return []
   const suspension = Schema.decodeUnknownOption(AgentWaits)(input.suspension)
-  if (suspension._tag === "None") return undefined
-  return suspension.value.waits.find(
-    (wait) =>
-      wait.call.id === toolCallId &&
-      wait.token === input.childRunId &&
-      (wait.call.name === toolName || wait.call.name === "code_mode"),
-  )?.waitId
+  if (suspension._tag === "None") return []
+  return suspension.value.waits
+    .filter((wait) => ownsChildSuspension({ ...input, waitId: wait.waitId }))
+    .map((wait) => wait.waitId)
 }
 
 /** Project one persisted fan-out inspection into the model-facing ordered child-group result. */

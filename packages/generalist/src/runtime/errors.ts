@@ -311,6 +311,17 @@ export class TreeReplayLimitInvalid extends ActionableTaggedError<TreeReplayLimi
   },
 ) {}
 
+/** A Run history request falls outside the fixed page-size contract. */
+export class HistoryLimitInvalid extends ActionableTaggedError<HistoryLimitInvalid>()(
+  "generalist/runtime/HistoryLimitInvalid",
+  {
+    received: Schema.String,
+    minimum: Schema.Int,
+    maximum: Schema.Int,
+    hint: errorHint("Request a Run history page whose limit is within the reported minimum and maximum."),
+  },
+) {}
+
 export class SubscriberLagged extends ActionableTaggedError<SubscriberLagged>()("generalist/runtime/SubscriberLagged", {
   runId: Schema.String,
   lastDeliveredSequence: Schema.Int,

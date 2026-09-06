@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Path, Schema } from "effect"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const pins = new Set([
   "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -12,6 +13,13 @@ const pins = new Set([
   "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 ])
 
+const sorted = (values: ReadonlyArray<string>): Array<string> =>
+  values.reduce<Array<string>>((result, value) => {
+    const index = result.findIndex((item) => value.localeCompare(item) < 0)
+    result.splice(index < 0 ? result.length : index, 0, value)
+    return result
+  }, [])
+
 const readWorkflow = (name: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem
@@ -19,7 +27,65 @@ const readWorkflow = (name: string) =>
     return yield* fileSystem.readFileString(path.resolve(".", `.github/workflows/${name}`))
   })
 
+const workspacePackages = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const packageNames: Array<string> = yield* fileSystem.readDirectory(path.resolve(".", "packages"))
+  packageNames.sort()
+  return packageNames
+})
+
 layer(bunLayer)("release workflows", (it) => {
+  it.effect("executes the exact-commit CI gate against successful and contradictory evidence", () =>
+    Effect.gen(function* () {
+      const source = yield* readWorkflow("publish.yml")
+      const section = source.split("      - name: Require successful database CI for the exact release commit\n")[1]
+      const block = section.split("        run: |\n")[1].split("      - uses:")[0]
+      const script = block
+        .split("\n")
+        .map((line) => line.replace(/^ {10}/, ""))
+        .join("\n")
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const success = {
+        head_sha: "exact",
+        event: "push",
+        head_branch: "main",
+        run_number: 1,
+        status: "completed",
+        conclusion: "success",
+      }
+      const cases = [
+        { runs: [success], allowed: true },
+        { runs: [], allowed: false },
+        { runs: [{ ...success, head_sha: "other" }], allowed: false },
+        { runs: [{ ...success, event: "pull_request" }], allowed: false },
+        { runs: [{ ...success, head_branch: "release" }], allowed: false },
+        ...["failure", "cancelled", "skipped"].map((conclusion) => ({
+          runs: [{ ...success, conclusion }],
+          allowed: false,
+        })),
+        { runs: [success, { ...success, run_number: 2, status: "in_progress", conclusion: null }], allowed: false },
+        { runs: [success, { ...success, run_number: 2, conclusion: "failure" }], allowed: false },
+      ]
+      for (const item of cases) {
+        const command = ChildProcess.make("bash", [
+          "-c",
+          `
+          mock_evidence=$1
+          gh() { printf '%s' "$mock_evidence"; }
+          GH_REPO=test/repo
+          SOURCE_COMMIT=exact
+          ${script}
+        `,
+          "release-gate",
+          yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({ workflow_runs: item.runs }),
+        ])
+        const code = yield* spawner.exitCode(command)
+        expect(code === 0).toBe(item.allowed)
+      }
+    }),
+  )
+
   it.effect("requires the behavioral test suite in continuous integration", () =>
     Effect.gen(function* () {
       const source = yield* readWorkflow("ci.yml")
@@ -31,6 +97,7 @@ layer(bunLayer)("release workflows", (it) => {
   it.effect("keeps release recovery immutable, authenticated, and least-privileged", () =>
     Effect.gen(function* () {
       const source = yield* readWorkflow("publish.yml")
+      const packageNames = yield* workspacePackages
       expect(source).toMatch(/tag:\n(?: {8}.+\n)* {8}required: true\n {8}type: string/)
       expect(source).toMatch(/expected_commit:\n(?: {8}.+\n)* {8}required: true\n {8}type: string/)
       expect(source).toContain('tags: ["v*"]')
@@ -40,11 +107,11 @@ layer(bunLayer)("release workflows", (it) => {
       )
       expect(source).toContain("cancel-in-progress: false")
       expect(source).toMatch(
-        /produce:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write\n {6}attestations: write/,
+        /produce:[\s\S]*?permissions:\n {6}contents: read\n {6}actions: read\n {6}id-token: write\n {6}attestations: write/,
       )
       expect(source).toMatch(/release:[\s\S]*?permissions:\n {6}contents: write/)
       expect(source).toMatch(/publish:[\s\S]*?permissions:\n {6}contents: read\n {6}id-token: write/)
-      expect(source.match(/bun pm pack/g)).toHaveLength(1)
+      expect(source.match(/bun run package/g)).toHaveLength(1)
       expect(source).toContain("subject-path: release/*")
       expect(source).toContain("github.event.repository.private == false || github.event.enterprise != null")
       expect(source).toContain("sha256sum --check SHA256SUMS")
@@ -63,6 +130,16 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source).toContain('[[ "$registry_integrity" == "$local_integrity" ]]')
       expect(source).toContain('curl --fail --silent --show-error "https://registry.npmjs.org/${1/\\//%2f}/$2"')
       expect(source).not.toContain('npm view "$package@$VERSION"')
+      expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
+      expect(source.match(new RegExp(`\\(\\.packages \\| length\\) == ${packageNames.length}`, "g"))).toHaveLength(2)
+      expect(source.match(/\(\.packages \| length\) == \d+/g)).toHaveLength(2)
+      expect(source.match(/printf '%s\\n' generalist \| sort/g)).toHaveLength(2)
+      for (const manifests of source.matchAll(
+        /for manifest in package\.json((?: packages\/[a-z-]+\/package\.json)+); do/g,
+      )) {
+        const listed = [...manifests[1].matchAll(/packages\/([a-z-]+)\/package\.json/g)].map((match) => match[1])
+        expect(sorted(listed)).toEqual(packageNames)
+      }
       expect(source.match(/for manifest in package\.json packages\//g)).toHaveLength(1)
       expect(source).toContain(`generalist-\${VERSION}.tgz`)
       expect(source).not.toMatch(/bun publish|Rewrite package manifests/)
@@ -73,7 +150,7 @@ layer(bunLayer)("release workflows", (it) => {
         expect(uses.every((use) => pins.has(use))).toBe(true)
       }
       const release = source.split("  release:")[1].split("  publish:")[0]
-      expect(release).not.toMatch(/checkout|bun install|npm install|bun run build|pm pack/)
+      expect(release).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
     }),
   )
 })

@@ -1,10 +1,10 @@
 import type { Event } from "../../../core/agent/event.js"
 import { digest as pinDigest } from "../../../core/durable/pin.js"
-import { ModelResponseContent, type ModelResponseEntry } from "../../../core/context/session.js"
+import { ModelResponseContent, type Entry, type ModelResponseEntry } from "../../../core/context/session.js"
 import { CompletedModelOperation } from "../../../core/model/operation.js"
-import { Effect, Option, Schema } from "effect"
+import { Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
-import { RuntimeUnavailable, SessionEntryCorrupt, SessionEntryNotFound } from "../../errors.js"
+import { RuntimeUnavailable } from "../../errors.js"
 import type { ModelResponseCommitted } from "../agent/event.js"
 import type { ExecutionClaim } from "../../run/store.js"
 import type { ExecutionCheckpoint } from "../state.js"
@@ -28,6 +28,8 @@ export interface CommitModelResponseInput extends ExecutionClaim {
 export type CompletedOperation = CompletedModelOperation
 
 export interface CompletedOperationRef {
+  readonly originRunId: string
+  readonly originOperationKey: string
   readonly operationId: string
   readonly turn: number
   readonly modelCallId: string
@@ -88,6 +90,8 @@ const operationValue = (value: PersistedOperationValue): CompletedOperation | un
   Option.getOrUndefined(Schema.decodeUnknownOption(CompletedModelOperation, { onExcessProperty: "error" })(value))
 
 const CompletedOperationRefValue = Schema.Struct({
+  originRunId: Schema.String,
+  originOperationKey: Schema.String,
   operationId: Schema.String,
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   modelCallId: Schema.String,
@@ -117,6 +121,8 @@ const referenceFromOperation = (input: {
 }): CompletedOperationRef =>
   Object.assign(
     {
+      originRunId: input.runId,
+      originOperationKey: input.operation.operationId,
       operationId: input.operation.operationId,
       turn: input.operation.turn,
       modelCallId: input.operation.modelCallId,
@@ -154,10 +160,28 @@ const unsignedOperation = (input: {
   return operation
 }
 
+/** Move a model-response reference to one branch-local execution identity and re-sign that placement. */
+export const retargetCompletedOperationRef = ({
+  value,
+  sessionId,
+  operationId,
+  content,
+}: {
+  readonly value: PersistedOperationValue
+  readonly sessionId: string
+  readonly operationId: string
+  readonly content: CompletedOperation["content"]
+}): CompletedOperationRef | RuntimeUnavailable => {
+  const reference = completedOperationRefValue(value)
+  if (reference === undefined) return fail("copied model operation has an invalid completed reference")
+  const target = { ...reference, sessionId, operationId }
+  return { ...target, digest: pinDigest(jsonValue(unsignedOperation({ reference: target, content }))) }
+}
+
 const contentFromResponse = (response: LiveModelResponseCommitted["response"]): CompletedOperation["content"] =>
   Schema.encodeSync(CompletedModelResponse)(response).content
 
-const operationFromReference = (input: {
+export const operationFromReference = (input: {
   readonly reference: CompletedOperationRef
   readonly content: CompletedOperation["content"]
 }): CompletedOperation | RuntimeUnavailable => {
@@ -214,6 +238,8 @@ const eventFromReference = (reference: CompletedOperationRef): ModelResponseComm
     {
       _tag: committedTag,
       turn: reference.turn,
+      originRunId: reference.originRunId,
+      originOperationKey: reference.originOperationKey,
       operationKey: reference.operationId,
       modelCallId: reference.modelCallId,
       modelAttemptId: reference.modelAttemptId,
@@ -239,7 +265,10 @@ const validateReference = (input: {
   if (input.reference.sessionId !== input.sessionId) {
     return fail(`model operation ${input.request.operationId} session identity diverges`)
   }
-  const entryId = completedSessionEntryId({ runId: input.request.runId, operationKey: input.record.operationKey })
+  const entryId = completedSessionEntryId({
+    runId: input.reference.originRunId,
+    operationKey: input.reference.originOperationKey,
+  })
   if (input.reference.sessionEntryId !== entryId) {
     return fail(`model operation ${input.request.operationId} Session entry identity diverges`)
   }
@@ -331,27 +360,11 @@ export const validateModelResponseCommit = (request: {
   return { operation, reference, entry, event: eventFromReference(reference) }
 }
 
-const eventPayload = (event: ModelResponseCommitted) =>
-  Object.assign(
-    {
-      _tag: event._tag,
-      turn: event.turn,
-      operationKey: event.operationKey,
-      modelCallId: event.modelCallId,
-      modelAttemptId: event.modelAttemptId,
-      attempt: event.attempt,
-      sessionId: event.sessionId,
-      sessionParentId: event.sessionParentId,
-      sessionEntryId: event.sessionEntryId,
-      budgetCharge: event.budgetCharge,
-      digest: event.digest,
-    },
-    event.usage === undefined
-      ? undefined
-      : { usage: Schema.encodeSync(CompletedModelResponse)({ content: [], usage: event.usage }).usage! },
-    event.finishReason === undefined ? undefined : { finishReason: event.finishReason },
-    event.metadata === undefined ? undefined : { metadata: event.metadata },
-  )
+const eventPayload = (event: ModelResponseCommitted) => ({
+  _tag: event._tag,
+  ...referenceFromEvent(event),
+  metadata: event.metadata,
+})
 
 export const sameModelResponseEvent = (input: {
   readonly left: ModelResponseCommitted
@@ -361,6 +374,8 @@ export const sameModelResponseEvent = (input: {
 export const referenceFromEvent = (event: ModelResponseCommitted): CompletedOperationRef =>
   Object.assign(
     {
+      originRunId: event.originRunId,
+      originOperationKey: event.originOperationKey,
       operationId: event.operationKey,
       turn: event.turn,
       modelCallId: event.modelCallId,
@@ -378,71 +393,46 @@ export const referenceFromEvent = (event: ModelResponseCommitted): CompletedOper
     event.finishReason === undefined ? undefined : { finishReason: event.finishReason },
   )
 
-export const hydrateCompletedOperation = (input: {
-  readonly session: import("../../run/store.js").SessionReader
-  readonly reference: CompletedOperationRef
-}): Effect.Effect<CompletedOperation, SessionEntryNotFound | SessionEntryCorrupt> =>
-  Effect.gen(function* () {
-    const path = yield* input.session.path(input.reference.sessionEntryId).pipe(
-      Effect.mapError((error) =>
-        error.message.includes("does not exist")
-          ? SessionEntryNotFound.make({
-              sessionId: input.reference.sessionId,
-              entryId: input.reference.sessionEntryId,
-            })
-          : SessionEntryCorrupt.make({
-              sessionId: input.reference.sessionId,
-              entryId: input.reference.sessionEntryId,
-              message: error.message,
-            }),
-      ),
-      Effect.catchDefect((defect) =>
-        Effect.fail(
-          SessionEntryCorrupt.make({
-            sessionId: input.reference.sessionId,
-            entryId: input.reference.sessionEntryId,
-            message: `Session entry could not be decoded: ${String(defect)}`,
-          }),
-        ),
-      ),
-    )
-    const entry = path.at(-1)
-    if (entry?.id !== input.reference.sessionEntryId) {
-      return yield* SessionEntryNotFound.make({
-        sessionId: input.reference.sessionId,
-        entryId: input.reference.sessionEntryId,
-      })
-    }
-    if (
-      entry._tag !== "ModelResponse" ||
-      entry.parentId !== input.reference.sessionParentId ||
-      entry.metadata?.modelResponseDigest !== input.reference.digest
-    ) {
-      return yield* SessionEntryCorrupt.make({
-        sessionId: input.reference.sessionId,
-        entryId: input.reference.sessionEntryId,
-        message: "Session model response reference does not match its entry",
-      })
-    }
-    const content = yield* Schema.encodeEffect(ModelResponseContent)(entry.content).pipe(
-      Effect.mapError((error) =>
-        SessionEntryCorrupt.make({
-          sessionId: input.reference.sessionId,
-          entryId: input.reference.sessionEntryId,
-          message: `Session model response content is corrupt: ${String(error)}`,
-        }),
-      ),
-    )
-    const operation = operationFromReference({ reference: input.reference, content })
-    if (Schema.is(RuntimeUnavailable)(operation)) {
-      return yield* SessionEntryCorrupt.make({
-        sessionId: input.reference.sessionId,
-        entryId: input.reference.sessionEntryId,
-        message: operation.message,
-      })
-    }
-    return operation
-  })
+/** Authenticate one source response completely before a fork may issue a branch-local reference. */
+export const validateCompletedOperationSource = (input: {
+  readonly value: unknown
+  readonly sessionId: string
+  readonly operationKey: string
+  readonly entry: Entry | undefined
+  readonly event: ModelResponseCommitted | undefined
+}): CompletedOperation["content"] | RuntimeUnavailable => {
+  const reference = completedOperationRefValue(input.value)
+  if (reference === undefined) return fail("copied model operation has an invalid completed reference")
+  if (reference.sessionId !== input.sessionId || reference.operationId !== input.operationKey) {
+    return fail(`copied model operation ${input.operationKey} reference identity diverges`)
+  }
+  if (
+    reference.sessionEntryId !==
+    completedSessionEntryId({ runId: reference.originRunId, operationKey: reference.originOperationKey })
+  ) {
+    return fail(`copied model operation ${input.operationKey} authored entry identity diverges`)
+  }
+  const entry = input.entry
+  if (
+    entry?._tag !== "ModelResponse" ||
+    entry.id !== reference.sessionEntryId ||
+    entry.parentId !== reference.sessionParentId ||
+    entry.metadata?.modelResponseDigest !== reference.digest
+  ) {
+    return fail(`copied model operation ${input.operationKey} Session reference is corrupt`)
+  }
+  const content = Schema.encodeSync(ModelResponseContent)(entry.content)
+  if (Schema.is(RuntimeUnavailable)(operationFromReference({ reference, content }))) {
+    return fail(`copied model operation ${input.operationKey} result digest is corrupt`)
+  }
+  if (
+    input.event === undefined ||
+    !sameModelResponseEvent({ left: input.event, right: eventFromReference(reference) })
+  ) {
+    return fail(`copied model operation ${input.operationKey} event identity diverges`)
+  }
+  return content
+}
 
 export const resolvedModelResponse = (operation: CompletedOperation): LiveModelResponseCommitted["response"] => {
   const { content: _, ...response } = Schema.decodeSync(CompletedModelResponse)(

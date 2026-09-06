@@ -113,7 +113,9 @@ describe("durable RuleStore adapters", () => {
       const fileSystem = yield* FileSystem.FileSystem
       yield* Effect.sleep("10 millis")
       yield* fileSystem.writeFileString(watchedRuleFile, '[{"pattern":"shell","level":"allow"}]')
-      yield* Effect.sleep("10 millis")
+      for (let attempt = 0; attempt < 100 && (yield* store.rules).length === 0; attempt++) {
+        yield* Effect.sleep("10 millis")
+      }
       expect(yield* store.rules).toEqual([{ pattern: "shell", level: "allow" }])
       yield* fileSystem.remove(watchedRuleFile, { force: true })
     }).pipe(provide(watchedFileLayer)),

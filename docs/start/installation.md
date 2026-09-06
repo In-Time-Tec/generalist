@@ -8,7 +8,7 @@ Start with `generalist` and its matching `effect` version. Add provider or stora
 **Terminal**
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.62.0
+bun add effect@4.0.0-rc.112 generalist@0.63.0
 ```
 
 With npm or pnpm:
@@ -16,8 +16,8 @@ With npm or pnpm:
 **Terminal**
 
 ```bash
-npm install effect@4.0.0-rc.112 generalist@0.62.0
-pnpm add effect@4.0.0-rc.112 generalist@0.62.0
+npm install effect@4.0.0-rc.112 generalist@0.63.0
+pnpm add effect@4.0.0-rc.112 generalist@0.63.0
 ```
 
 <Warning title="Pin the Effect release candidate">
@@ -56,7 +56,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 
 | Generalist release | Tested Effect version |
 | ------------------ | --------------------- |
-| `0.62.0`           | `effect@4.0.0-rc.112` |
+| `0.63.0`           | `effect@4.0.0-rc.112` |
 
 `generalist/unstable/foldkit` declares the exact tested optional peer `foldkit@0.148.2`.
 

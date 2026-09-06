@@ -354,6 +354,8 @@ export const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("TurnStarted", { turn: Schema.Finite, ...optionalMetadata }),
   Schema.TaggedStruct("ModelResponseCommitted", {
     turn: Schema.Finite,
+    originRunId: RunId,
+    originOperationKey: Schema.String,
     operationKey: Schema.String,
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,
@@ -372,6 +374,8 @@ export const AgentLoopEventSchema = Schema.Union([
   }),
   Schema.TaggedStruct("ModelResponseInterrupted", {
     turn: Schema.Finite,
+    originRunId: RunId,
+    originOperationKey: Schema.String,
     operationKey: Schema.String,
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,

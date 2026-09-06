@@ -23,7 +23,7 @@ caller learns that history continues behind a compaction checkpoint rather than 
 
 ##### entries
 
-> `readonly` **entries**: readonly [`Entry`](./Session#entry)[]
+> `readonly` **entries**: readonly [`Entry`](./Session#entry-1)[]
 
 <a id="firstentryid"></a>
 
@@ -91,6 +91,92 @@ Return entries strictly before this entry. Omitted reads the newest page.
 
 > `readonly` **limit**: `number`
 
+***
+
+<a id="pathpage"></a>
+
+### PathPage
+
+One bounded path page in root-to-leaf order.
+
+#### Properties
+
+<a id="entries-1"></a>
+
+##### entries
+
+> `readonly` **entries**: readonly [`Entry`](./Session#entry-1)[]
+
+<a id="hasnewer"></a>
+
+##### hasNewer
+
+> `readonly` **hasNewer**: `boolean`
+
+<a id="hasolder"></a>
+
+##### hasOlder
+
+> `readonly` **hasOlder**: `boolean`
+
+<a id="nextcursor"></a>
+
+##### nextCursor?
+
+> `readonly` `optional` **nextCursor?**: [`PathPageCursor`](#pathpagecursor)
+
+***
+
+<a id="pathpagecursor"></a>
+
+### PathPageCursor
+
+Opaque continuation for an older page on one immutable Session leaf.
+
+#### Properties
+
+<a id="entryid"></a>
+
+##### entryId
+
+> `readonly` **entryId**: `string`
+
+<a id="leafid"></a>
+
+##### leafId
+
+> `readonly` **leafId**: `string`
+
+***
+
+<a id="pathpageinput"></a>
+
+### PathPageInput
+
+One bounded backward traversal anchored to the same immutable leaf on every page.
+
+#### Properties
+
+<a id="cursor"></a>
+
+##### cursor?
+
+> `readonly` `optional` **cursor?**: [`PathPageCursor`](#pathpagecursor)
+
+Use only a cursor returned by the preceding page for this leaf.
+
+<a id="leafid-1"></a>
+
+##### leafId
+
+> `readonly` **leafId**: `string` \| `null`
+
+<a id="limit-1"></a>
+
+##### limit
+
+> `readonly` **limit**: `number`
+
 ## Variables
 
 <a id="compactioncheckpoints"></a>
@@ -105,7 +191,7 @@ Every compaction checkpoint on one path, oldest first.
 
 ##### path
 
-`ReadonlyArray`\<[`Entry`](./Session#entry)\>
+`ReadonlyArray`\<[`Entry`](./Session#entry-1)\>
 
 #### Returns
 
@@ -146,7 +232,7 @@ checkpoint stay reachable. A checkpoint is an ordinary entry in the page, never 
 
 ###### path
 
-readonly [`Entry`](./Session#entry)[]
+readonly [`Entry`](./Session#entry-1)[]
 
 ###### input
 

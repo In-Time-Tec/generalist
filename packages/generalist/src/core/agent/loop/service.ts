@@ -40,6 +40,7 @@ import { terminalCompletedEvent, turnCompletedEvent } from "../model-turn/finish
 import { resumeBatch } from "../tools/resume-batch.js"
 import { isClosed } from "../lifecycle/closure-identity.js"
 import { afterTurnFor } from "./after-turn.js"
+import { resume as resumeMemory } from "./memory-recovery.js"
 import { runEnd as applyRunEnd, steer as applySteer, turnStart as applyTurnStart } from "../lifecycle/hooks.js"
 import { GateFailed } from "../gates/definition.js"
 import { evaluate as evaluateGates } from "../gates/evaluation.js"
@@ -303,12 +304,7 @@ export const make = <
     prompt: Prompt.RawInput,
     overrides?: TurnOverrides,
   ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
-    let next:
-      | {
-          readonly prompt: Prompt.RawInput
-          readonly overrides?: TurnOverrides
-        }
-      | undefined
+    let next: { readonly prompt: Prompt.RawInput; readonly overrides?: TurnOverrides } | undefined
     let structuredTurn: number | undefined
     const currentTurn = Stream.fromEffect(
       applyTurnStart({
@@ -360,12 +356,7 @@ export const make = <
     )
   }
   const resumeStream = (checkpoint: ToolCheckpoint, turn: number) => {
-    let next:
-      | {
-          readonly prompt: Prompt.RawInput
-          readonly overrides?: TurnOverrides
-        }
-      | undefined
+    let next: { readonly prompt: Prompt.RawInput; readonly overrides?: TurnOverrides } | undefined
     let alreadyProjectedPending: ReadonlyArray<PendingToolResult> | undefined
     const currentTurn = resetTurnState(turn).pipe(
       Stream.concat(
@@ -431,8 +422,19 @@ export const make = <
   const toolCheckpoint = validatedResume ?? recoveredToolCheckpoint
   const startTurn =
     options.turnStart ?? context.initialTurn ?? options.driverCheckpoint?.turn ?? toolCheckpoint?.checkpoint.turn ?? 0
-  const runStream =
-    toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
+  const runStream = Stream.suspend(() => {
+    if (context.recoveringMemory)
+      return resumeMemory({
+        turn: options.driverCheckpoint!.turn,
+        state,
+        history: chat.history,
+        afterTurn,
+        runTurn,
+        structuredFinalEvents: (turn, onPending) =>
+          structured === undefined ? Stream.empty : structuredFinalEvents(turn, structured, onPending),
+      })
+    return toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
+  })
   const guardedStream = runStream.pipe(
     Stream.catchCause((cause) => {
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined

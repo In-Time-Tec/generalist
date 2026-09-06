@@ -342,6 +342,28 @@ readonly `object`[]
 
 `Effect`\<`void`, [`ProgramAdmissionFailed`](#programadmissionfailed)\>
 
+<a id="backgroundtools"></a>
+
+##### backgroundTools
+
+> `readonly` **backgroundTools**: `object`
+
+###### await
+
+> **await**: `Tool`\<`"await_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; \}\>; `success`: `Unknown`; \}, `never`\>
+
+###### cancel
+
+> **cancel**: `Tool`\<`"cancel_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; `reason`: `optionalKey`\<`String`\>; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; `outcome`: `optionalKey`\<`Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: ...; `session`: ...; `text`: ...; `turns`: ...; \} \| \{ `_tag`: ...; `value`: ...; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+
+###### inspect
+
+> **inspect**: `Tool`\<`"inspect_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; `outcome`: `optionalKey`\<`Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: ...; `session`: ...; `text`: ...; `turns`: ...; \} \| \{ `_tag`: ...; `value`: ...; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+
+###### start
+
+> **start**: `Tool`\<`"start_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `agents`: `Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `budget`: `Struct`\<\{ `agentRuns`: `Int`; `concurrency`: `Int`; `logBytes`: `Int`; `outputBytes`: `Int`; `tokens`: `Int`; `toolCalls`: `Int`; `wallClockMillis`: `Int`; \}\>; `input`: `String`; `source`: `String`; `steps`: `Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `tools`: `Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; \}\>; \}, `never`\>
+
 <a id="invoke"></a>
 
 ##### invoke
@@ -353,6 +375,22 @@ readonly `object`[]
 ###### request
 
 [`Parameters`](#parameters) & `object`
+
+###### Returns
+
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
+
+<a id="invokebackground"></a>
+
+##### invokeBackground
+
+> `readonly` **invokeBackground**: (`request`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
+
+###### Parameters
+
+###### request
+
+[`Request`](../../generalist/namespaces/ToolExecutor#request)
 
 ###### Returns
 
@@ -424,6 +462,42 @@ Construct the Run-attempt scoped implementation; applications still own sandbox 
 
 ***
 
+<a id="makebackgroundtools"></a>
+
+### makeBackgroundTools
+
+> `const` **makeBackgroundTools**: (`authority`) => `object`
+
+Nonblocking Program admission and explicit observation/cancellation tools.
+
+#### Parameters
+
+##### authority
+
+[`ProgramAuthority`](../../generalist/namespaces/AgentManifest#programauthority-1)
+
+#### Returns
+
+`object`
+
+##### await
+
+> **await**: `Tool.Tool`\<`"await_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; \}\>; `success`: `Schema.Unknown`; \}, `never`\>
+
+##### cancel
+
+> **cancel**: `Tool.Tool`\<`"cancel_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: ... \| ...; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+
+##### inspect
+
+> **inspect**: `Tool.Tool`\<`"inspect_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: ... \| ...; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+
+##### start
+
+> **start**: `Tool.Tool`\<`"start_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `agents`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `input`: `Schema.String`; `source`: `Schema.String`; `steps`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `tools`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; \}\>; \}, `never`\>
+
+***
+
 <a id="makecatalog"></a>
 
 ### makeCatalog
@@ -481,6 +555,26 @@ Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority.
 #### Returns
 
 `Tool.Tool`\<`"code_mode"`, \{ `failure`: `Schema.Union`\<readonly \[*typeof* [`ProgramAuthorityMissing`](#programauthoritymissing), *typeof* [`ProgramAuthorityExceeded`](#programauthorityexceeded), *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed)\]\>; `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `agents`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `input`: `Schema.String`; `source`: `Schema.String`; `steps`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; `tools`: `Schema.Codec`\<readonly `string`[], readonly `string`[], `never`, `never`\>; \}\>; `success`: `Schema.Unknown`; \}, `never`\>
+
+***
+
+<a id="programhandle"></a>
+
+### ProgramHandle
+
+> `const` **ProgramHandle**: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; \}\>
+
+A background Program handle identifies an admitted Run, not a completed tool result.
+
+***
+
+<a id="programinspection"></a>
+
+### ProgramInspection
+
+> `const` **ProgramInspection**: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: `unknown`; `session`: \{ `leafId`: `string` \| `null`; `sessionId`: `string`; \}; `text`: `string`; `turns`: `number`; \} \| \{ `_tag`: `"Program"`; `value`: `unknown`; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>
+
+Current durable state and, only after settlement, the Program outcome.
 
 ***
 

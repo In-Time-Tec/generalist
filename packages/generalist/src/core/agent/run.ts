@@ -1,8 +1,8 @@
 import { Effect, Function, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, ToolNameCollision } from "./event.js"
-import { type Item, type MemoryError, projectTranscript } from "../context/memory.js"
-import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
+import type { MemoryError } from "../context/memory.js"
+import { SessionConflict, type SessionStoreError } from "../context/session.js"
 import { get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
 import type { SkillCatalogError } from "../context/skill-catalog.js"
@@ -21,28 +21,27 @@ import { make as makeSkillActivation } from "./tools/skill-activation.js"
 import { make as makeCompactionRuntime } from "./compaction-runtime.js"
 import { setupRun } from "./lifecycle/setup.js"
 import { make as makeRunLoop } from "./loop/service.js"
-import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
+import type { DriverInterpreter } from "../durable/driver/interpreter.js"
 import { layerForRun } from "../durable/driver/layer-for-run.js"
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import {
   isToolNameCollision,
   isPolicyDecision,
-  type RecallInput,
-  type RememberInput,
   type RunStream,
   suspensionApplicationIdentity,
   RunSupport,
 } from "./loop/run-support.js"
-import { intercept, setHandoffState, setToolBatch } from "../durable/driver/run.js"
+import { setHandoffState, setToolBatch } from "../durable/driver/run.js"
 import { type HandoffRunState, make as makeHandoffStateRef, takePendingContinuation } from "./handoff/state-ref.js"
 import type { ObjectSchema, StructuredRunConfig } from "./loop/context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
+import { make as makeMemoryOperations, pendingRemember } from "./loop/memory.js"
 import type { RunInbox } from "../turn/steering-inbox.js"
 import { modelCallMiddleware, runStartWithSteering } from "./lifecycle/hooks.js"
 import { recoveredRetry as recoveredGateRetry } from "./gates/prompt.js"
 import { make as makeVerifierRunner } from "./gates/verifier-runner.js"
 const errorMessage = String
-const { insertRecalledItems, steeringDrainedEvent } = RunSupport
+const { steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <
   Tools extends Record<string, Tool.Any>,
   R,
@@ -240,65 +239,13 @@ const streamInternalImpl = <
         AgentError.make({ message: error.message, turn, cause: error })
       const isSkillActivationCall = (call: AnyToolCall, registry: Registry): boolean =>
         get(registry, call.name)?.dispatch === "Builtin" && skillRuntime !== undefined
-      const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter> =>
-        Effect.gen(function* () {
-          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const recallEffect =
-            memoryRuntime === undefined
-              ? Effect.succeed(prompt)
-              : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
-                  Effect.mapError((error) => memoryError(0, error)),
-                  Effect.map((items: ReadonlyArray<Item>) => insertRecalledItems(prompt, items)),
-                )
-          const input: RecallInput = { turn: 0 }
-          if (memoryRuntime !== undefined) input.key = memoryRuntime.key
-          return yield* intercept(
-            {
-              kind: "memory",
-              key: operationKey(logicalId, "memory", "recall", 0),
-              input,
-              replayPolicy: "pure",
-              success: Prompt.Prompt,
-              failure: RunError,
-            },
-            recallEffect,
-          )
-        })
-      const rememberTurn = (
-        turn: number,
-        transcript: Prompt.Prompt,
-        terminal: boolean,
-        path: ReadonlyArray<Entry>,
-      ): Effect.Effect<void, RunError, DriverInterpreter> =>
-        Effect.gen(function* () {
-          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const rememberEffect =
-            memoryRuntime === undefined
-              ? Effect.void
-              : memoryRuntime.service
-                  .remember({
-                    key: memoryRuntime.key,
-                    turn,
-                    transcript: Option.isSome(activeSession) ? buildMemoryContext(path) : projectTranscript(transcript),
-                    terminal,
-                    evidence: [{ runId: inbox.runId, turn }],
-                  })
-                  .pipe(Effect.mapError((error) => memoryError(turn, error)))
-          const input: RememberInput = { turn, terminal }
-          if (memoryRuntime !== undefined) input.key = memoryRuntime.key
-          yield* intercept(
-            {
-              kind: "memory",
-              key: operationKey(logicalId, "memory", "remember", turn, terminal ? 1 : 0),
-              turn,
-              input,
-              replayPolicy: "pure",
-              success: Schema.Void,
-              failure: RunError,
-            },
-            rememberEffect,
-          )
-        })
+      const { recallInitialPrompt, rememberTurn } = makeMemoryOperations({
+        logicalId: options.logicalOperationId ?? options.sessionId ?? agent.name,
+        runId: inbox.runId,
+        activeSession,
+        runtime: memoryRuntime,
+        memoryError,
+      })
       const compactionRuntime = makeCompactionRuntime({
         runId: inbox.runId,
         activeSession,
@@ -384,7 +331,22 @@ const streamInternalImpl = <
         options.resume === undefined && recoveredToolCheckpoint === undefined && options.turnStart === undefined
           ? recoveredGateRetry({ agent, checkpoint: options.driverCheckpoint })
           : undefined
+      const pendingMemory = yield* pendingRemember(options.driverCheckpoint)
+      const recoveringMemory = pendingMemory !== undefined
       const loadInitialPrompt = () => {
+        if (recoveringMemory) {
+          // Session sync is also a memory operation. Reconstruct the exact pending remember
+          // before either sync or startup recall can ask the strict scheduler for another identity.
+          return Effect.gen(function* () {
+            const input = pendingMemory
+            const transcript = yield* Ref.get(chat.history)
+            const path = Option.isNone(activeSession)
+              ? []
+              : yield* activeSession.value.path().pipe(Effect.mapError((error) => sessionError(input.turn, error)))
+            yield* rememberTurn(input.turn, transcript, input.terminal, path)
+            return Prompt.empty
+          }).pipe(withInterpreter)
+        }
         if (gateRetry !== undefined) return Effect.succeed(gateRetry.prompt)
         if (options.resume === undefined && recoveredToolCheckpoint === undefined) {
           return recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
@@ -425,6 +387,7 @@ const streamInternalImpl = <
               structured,
               validatedResume,
               recoveredToolCheckpoint,
+              recoveringMemory,
               seedSystem,
               recallInitialPrompt,
               initialPrompt: prompt,

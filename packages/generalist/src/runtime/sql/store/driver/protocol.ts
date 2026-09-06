@@ -95,10 +95,7 @@ export interface SqlStoreDriver<Error = never> {
       readonly hub: EventHub
       readonly capacity: number
       readonly runNoTransaction: SqlStoreRun
-      readonly loadReplay: Effect.Effect<
-        { readonly replay: ReadonlyArray<RunEvent>; readonly lastSequence: number },
-        RunNotFound | RuntimeUnavailable
-      >
+      readonly loadReplay: Effect.Effect<{ readonly lastSequence: number }, RunNotFound | RuntimeUnavailable>
       readonly loadAfter: (cursor: number) => Effect.Effect<ReadonlyArray<RunEvent>, RuntimeUnavailable>
     },
   ) => ReturnType<RunStoreService["events"]>
@@ -108,10 +105,7 @@ export interface SqlStoreDriver<Error = never> {
       readonly hub: EventHub
       readonly capacity: number
       readonly runNoTransaction: SqlStoreRun
-      readonly loadReplay: Effect.Effect<
-        { readonly replay: ReadonlyArray<HostSessionEvent>; readonly lastCursor: number },
-        SessionNotFound | RuntimeUnavailable
-      >
+      readonly loadReplay: Parameters<EventHub["subscribeHostSession"]>[0]["loadReplay"]
       readonly loadAfter: (
         cursor: number,
       ) => Effect.Effect<ReadonlyArray<HostSessionEvent>, SessionNotFound | RuntimeUnavailable>

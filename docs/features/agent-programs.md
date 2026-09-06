@@ -59,6 +59,17 @@ Agent tool call: code_mode({ tools: ["search"], ... })
             └── suspend parent until terminal reconciliation
 ```
 
+The same authority also installs `start_program`, `inspect_program`, `await_program`, and `cancel_program`:
+
+- `start_program` accepts the same parameters as `code_mode`, commits the child Run, and returns `{ childRunId }` without waiting for execution. The parent can continue while the child is queued or running.
+- `inspect_program({ childRunId })` returns durable status, readiness, and an outcome only after settlement.
+- `await_program({ childRunId })` suspends durably and returns the Program result through the existing tool-result barrier. Multiple waits for the same owned child all settle, including across restart.
+- `cancel_program({ childRunId, reason? })` requests child cancellation and returns its inspection. Cancelling a wait is not an implicit request to cancel the child.
+
+The receipt completes the `start_program` model call exactly once; child completion never appends a second result to that call. A successfully completed parent does not cancel admitted work. Observation checks durable parentage, so a handle alone grants no authority over another Run's child.
+
+These are Program tools, not an automatic adapter for arbitrary Toolkit handlers. Applications must resolve the pinned Program with a matching `CodeExecutor` and `ProgramHandlers`; handler authorization, approval suspension, replay policy, placement, and conflict controls remain host-owned. `generalist/runtime` exports their declarations and receipt/inspection schemas through `CodeMode.makeBackgroundTools`, `CodeMode.ProgramHandle`, and `CodeMode.ProgramInspection`.
+
 ## Invariants
 
 - The Program manifest protocol is version `1`; its pin covers source bytes, sandbox, input/output schemas, capability identities, budgets, and every reachable Agent.

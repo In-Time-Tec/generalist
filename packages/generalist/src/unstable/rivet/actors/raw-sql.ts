@@ -52,6 +52,12 @@ const makeConnection = (
 export const makeSqlClient = (raw: RawAccess): Effect.Effect<SqlClient.SqlClient, never, Reactivity.Reactivity> =>
   Effect.gen(function* () {
     const lock = yield* Semaphore.make(1)
+    const frames = new WeakMap<Connection, { readonly access: RawAccess; readonly lock: Semaphore.Semaphore }>()
+    const transactionConnection = (access: RawAccess, transactionLock: Semaphore.Semaphore) => {
+      const connection = makeConnection(access, (effect) => transactionLock.withPermits(1)(effect))
+      frames.set(connection, { access, lock: transactionLock })
+      return connection
+    }
     const outer = makeConnection(raw, (effect) => lock.withPermits(1)(effect))
     const client = yield* SqlClient.make({
       acquirer: Effect.succeed(outer),
@@ -73,9 +79,7 @@ export const makeSqlClient = (raw: RawAccess): Effect.Effect<SqlClient.SqlClient
                     const rollback = new Error("Effect transaction failed")
                     const settled = raw
                       .transaction(async (transaction) => {
-                        const connection = makeConnection(transaction, (transactionEffect) =>
-                          transactionLock.withPermits(1)(transactionEffect),
-                        )
+                        const connection = transactionConnection(transaction, transactionLock)
                         const transactionContext = Context.add(context, client.transactionService, [
                           connection,
                           0,
@@ -101,8 +105,32 @@ export const makeSqlClient = (raw: RawAccess): Effect.Effect<SqlClient.SqlClient
                   })
                 }),
               ),
-            onSome: () =>
-              Effect.fail(sqlError(new Error("nested transactions are not supported"), "nested transaction")),
+            onSome: ([parent, depth]) => {
+              const frame = frames.get(parent)
+              if (frame === undefined) {
+                return Effect.fail(sqlError(new Error("foreign transaction connection"), "nested transaction"))
+              }
+              // Siblings share their parent's permit; descendants get a new permit while that
+              // parent is reserved. Reacquiring an ancestor permit deadlocks at the third depth.
+              return frame.lock.withPermits(1)(
+                Effect.uninterruptibleMask((restore) =>
+                  Effect.gen(function* () {
+                    const nestedLock = yield* Semaphore.make(1)
+                    const connection = transactionConnection(frame.access, nestedLock)
+                    const savepoint = `generalist_nested_${depth + 1}`
+                    yield* execute(frame.access, `SAVEPOINT ${savepoint}`, [])
+                    const exit = yield* restore(
+                      Effect.provideService(effect, client.transactionService, [connection, depth + 1] as const),
+                    ).pipe(Effect.exit)
+                    if (Exit.isFailure(exit)) {
+                      yield* execute(frame.access, `ROLLBACK TO SAVEPOINT ${savepoint}`, [])
+                    }
+                    yield* execute(frame.access, `RELEASE SAVEPOINT ${savepoint}`, [])
+                    return yield* exit
+                  }),
+                ),
+              )
+            },
           }),
         ),
       )

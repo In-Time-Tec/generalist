@@ -188,6 +188,17 @@ export interface SessionStore {
   readonly appendCheckpoint: (
     checkpoint: PreparedCheckpoint,
   ) => Effect.Effect<CheckpointAppend, SessionStoreError | SessionConflict>
+  /** Read one immutable entry without materializing its ancestor path. */
+  readonly entry: (id: EntryId) => Effect.Effect<Entry | undefined, SessionStoreError>
+  /** Read at most one backward page on an immutable leaf; continue only with the returned cursor. */
+  readonly pathPage: (
+    input: import("./session-history.js").PathPageInput,
+  ) => Effect.Effect<import("./session-history.js").PathPage, SessionStoreError>
+  /** Read only the latest Compaction/Handoff projection boundary and its suffix. */
+  readonly effectivePath: (leaf?: EntryId) => Effect.Effect<ReadonlyArray<Entry>, SessionStoreError>
+  /** Find checkpoint telemetry without materializing the complete ancestor path. */
+  readonly latestCompaction: (leaf?: EntryId) => Effect.Effect<CompactionEntry | undefined, SessionStoreError>
+  /** Complete lossless ancestry for audit, compaction input, and memory retention. */
   readonly path: (leaf?: EntryId) => Effect.Effect<ReadonlyArray<Entry>, SessionStoreError>
   readonly setLeaf: (id: EntryId | null) => Effect.Effect<void, SessionStoreError>
   readonly leaf: Effect.Effect<EntryId | null>

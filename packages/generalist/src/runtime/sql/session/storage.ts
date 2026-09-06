@@ -1,4 +1,4 @@
-import { Predicate, Schema } from "effect"
+import { Effect, Predicate, Schema } from "effect"
 import {
   type AppendInput,
   type Entry,
@@ -8,6 +8,7 @@ import {
   SessionStoreError,
 } from "../../../core/context/session.js"
 import { decodeSqlInteger } from "../codec/codecs.js"
+import { encode as encodeBounded } from "../../execution/payload/index.js"
 import { decodeSessionPayload, encodeSessionPayload, sessionPayloadEquivalence } from "./payload-codec.js"
 
 export interface EntryRow {
@@ -28,7 +29,10 @@ export interface SessionRow {
 }
 
 const storeError = (message: string) => SessionStoreError.make({ message })
-const encodePayload = encodeSessionPayload
+const encodePayload = (payload: EntryPayload) =>
+  encodeBounded({ value: payload, boundary: "Session entry", serialize: encodeSessionPayload }).pipe(
+    Effect.mapError((error) => storeError(error.message)),
+  )
 const parseEntry = Schema.decodeUnknownSync(
   Schema.declare<Entry>(
     (input): input is Entry =>
@@ -78,7 +82,7 @@ const requireActive = (
       })
 }
 
-const fromEntry = (entry: Entry | AppendInput): string => {
+const fromEntry = (entry: Entry | AppendInput) => {
   if (!("id" in entry)) return encodePayload(entry)
   const { id: _id, parentId: _parentId, ...payload } = entry
   return encodePayload(payload)

@@ -2,7 +2,7 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Context, Deferred, Effect, Exit, Fiber, Schema } from "effect"
-import { SqlClient, SqlError } from "effect/unstable/sql"
+import { SqlClient } from "effect/unstable/sql"
 import type { RawAccess } from "rivetkit/db"
 import { layerSqlClient } from "../../../../src/unstable/rivet/actors/raw-sql.js"
 
@@ -74,7 +74,7 @@ it.live("keeps raw SQL lazy, preserves requirements, and leaves the actor-owned 
   }),
 )
 
-it.live("rolls back with the original typed failure and rejects nested transactions", () =>
+it.live("rolls back with the original typed failure", () =>
   Effect.gen(function* () {
     const fixture = makeRaw()
     yield* withClient(
@@ -93,13 +93,57 @@ it.live("rolls back with the original typed failure and rejects nested transacti
           .pipe(Effect.flip)
         expect(failure).toBe(expected)
         expect(yield* sql<{ count: number }>`SELECT COUNT(*) AS count FROM test_values`).toEqual([{ count: 0 }])
-
-        const nested = yield* sql.withTransaction(sql.withTransaction(Effect.void)).pipe(Effect.flip)
-        expect(nested).toBeInstanceOf(SqlError.SqlError)
-        expect(nested.reason.operation).toBe("nested transaction")
       }),
     )
     fixture.database.close()
+  }),
+)
+
+it.live("isolates nested sibling rollbacks across three transaction depths", () =>
+  Effect.gen(function* () {
+    const fixture = makeRaw()
+    yield* withClient(
+      fixture.raw,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`CREATE TABLE test_values (value TEXT NOT NULL)`
+        yield* sql.withTransaction(
+          Effect.gen(function* () {
+            yield* sql`INSERT INTO test_values VALUES ('root')`
+            yield* Effect.all(
+              [
+                sql
+                  .withTransaction(
+                    Effect.gen(function* () {
+                      yield* sql`INSERT INTO test_values VALUES ('discarded')`
+                      yield* sql.withTransaction(sql`INSERT INTO test_values VALUES ('discarded-child')`)
+                      return yield* ExpectedFailure.make()
+                    }),
+                  )
+                  .pipe(
+                    Effect.flip,
+                    Effect.tap((failure) => Effect.sync(() => expect(failure).toBeInstanceOf(ExpectedFailure))),
+                  ),
+                sql.withTransaction(
+                  Effect.gen(function* () {
+                    yield* sql`INSERT INTO test_values VALUES ('sibling')`
+                    yield* sql.withTransaction(sql`INSERT INTO test_values VALUES ('grandchild')`)
+                  }),
+                ),
+              ],
+              { concurrency: "unbounded" },
+            )
+            yield* sql`INSERT INTO test_values VALUES ('root-after')`
+          }),
+        )
+        expect(yield* sql<{ value: string }>`SELECT value FROM test_values ORDER BY value`).toEqual([
+          { value: "grandchild" },
+          { value: "root" },
+          { value: "root-after" },
+          { value: "sibling" },
+        ])
+      }),
+    ).pipe(Effect.ensuring(Effect.sync(() => fixture.database.close())))
   }),
 )
 

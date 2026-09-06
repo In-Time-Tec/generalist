@@ -10,6 +10,8 @@ import {
   sqlTransactionFaultConformance,
   type ClaimExecution,
   type ModelResponseFaultBoundary,
+  type MultiWorkerClaimCapability,
+  type SqlTransactionCapability,
 } from "generalist/testing/runtime-driver"
 import { Testing } from "generalist/testing"
 import { Effect, Layer } from "effect"
@@ -64,6 +66,50 @@ const conformanceClaim: ClaimExecution = (services, { runId, workerId }) => {
 const withConformanceClient = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
   Effect.scoped(
     Effect.flatMap(Layer.build(conformanceDatabase.client), (context) => effect.pipe(Effect.provideContext(context))),
+  )
+
+const expire: MultiWorkerClaimCapability["expire"] = (stale) =>
+  withConformanceClient(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql`
+        UPDATE generalist_runs
+        SET lease_expires_at = DATE_SUB(NOW(3), INTERVAL 1 SECOND)
+        WHERE run_id = ${stale.runId}
+          AND owner_worker_id = ${stale.workerId}
+          AND attempt_fence = ${stale.attemptFence}
+      `
+    }),
+  ).pipe(Effect.orDie)
+
+const forceRollback: SqlTransactionCapability["forceRollback"] = (effect) =>
+  Effect.acquireUseRelease(
+    withConformanceClient(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql.unsafe(`
+          CREATE TRIGGER generalist_conformance_rollback
+          AFTER INSERT ON generalist_tree_event_index
+          FOR EACH ROW
+          BEGIN
+            IF EXISTS (
+              SELECT 1 FROM generalist_run_events
+              WHERE event_id = NEW.event_id AND event_json LIKE '%"_tag":"RunCompleted"%'
+            ) THEN
+              SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced conformance rollback';
+            END IF;
+          END
+        `).unprepared
+      }),
+    ).pipe(Effect.orDie),
+    () => effect,
+    () =>
+      withConformanceClient(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql.unsafe("DROP TRIGGER IF EXISTS generalist_conformance_rollback").unprepared
+        }),
+      ).pipe(Effect.orDie),
   )
 
 const faultTarget = (boundary: ModelResponseFaultBoundary) => {
@@ -121,11 +167,13 @@ Testing.runtimeDriver({
   setup: conformanceDatabase.truncated.pipe(Effect.orDie),
   skip,
   capabilities: {
+    admission: true,
     runtime: { claim: conformanceClaim },
     "host-sessions": { claim: conformanceClaim },
     "start-by-agent": { claim: conformanceClaim },
     "idempotent-start": { claim: conformanceClaim },
     "unknown-agent-on-recovery": { claim: conformanceClaim },
+    "approval-suspend": { claim: conformanceClaim, recovery: "rebuild" },
     "await-event": { claim: conformanceClaim, recovery: "rebuild" },
     schedules: { definition: scheduleDefinition, recovery: "rebuild" },
     "child-runs": { claim: conformanceClaim, recovery: "rebuild" },
@@ -133,9 +181,13 @@ Testing.runtimeDriver({
     "operator-retry": { claim: conformanceClaim },
     "operator-resolve-unknown": { claim: conformanceClaim },
     "operator-scan": { claim: conformanceClaim },
+    runTree: { claim: conformanceClaim },
     "fork-rewind": { claim: conformanceClaim },
     artifacts: true,
     steering: { claim: conformanceClaim, recovery: "rebuild" },
+    sqlTransactions: { claim: conformanceClaim, forceRollback },
+    multiWorkerClaims: { layer: conformanceLayer, expire },
+    notificationRecovery: { claim: conformanceClaim },
   },
 })
 

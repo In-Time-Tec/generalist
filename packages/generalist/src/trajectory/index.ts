@@ -5,6 +5,7 @@ import { BudgetLimits } from "../core/durable/run-budget.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { CompactionInspection, RawUsageFact, RunId, type RunSnapshot } from "../runtime/run.js"
 import { CompletedModelResponse, type RunEvent } from "../runtime/run/event.js"
+import { collect as collectHistory } from "../runtime/run/history/index.js"
 import type { InspectError, EventsError, Service as RuntimeService, SessionEntryError } from "../runtime/service.js"
 import { Result as GateResult } from "../core/agent/gates/definition.js"
 
@@ -76,6 +77,7 @@ const pathTo = Effect.fn("Trajectory.pathTo")(function* (
   while (current !== null) {
     const entry = yield* runtime.sessionEntry({ sessionId, entryId: current })
     reversed.push(entry)
+    if (entry._tag === "Compaction" || entry._tag === "Handoff") break
     current = entry.parentId
   }
   return reversed.toReversed()
@@ -118,7 +120,7 @@ export const fromJournal = Effect.fn("Trajectory.fromJournal")(function* (
   runId: string,
 ): Effect.fn.Return<Trajectory, FromJournalError> {
   const snapshot = yield* runtime.snapshot(runId)
-  const events = yield* runtime.history({ runId, limit: snapshot.cursor + 1 })
+  const events = yield* collectHistory(runtime, runId, snapshot.cursor)
   const modelEvents = events.filter(
     (event): event is ModelResponseEvent =>
       event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted",

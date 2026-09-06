@@ -14,6 +14,10 @@ export type TurnCompleted = Omit<CoreTurnCompleted, "transcript">
 export interface ModelResponseCommitted {
   readonly _tag: "ModelResponseCommitted"
   readonly turn: number
+  /** Run that authored the immutable operation and Session entry identities. */
+  readonly originRunId: string
+  /** Operation key that authored the immutable Session entry identity. */
+  readonly originOperationKey: string
   readonly operationKey: string
   readonly modelCallId: string
   readonly modelAttemptId: string
@@ -32,6 +36,10 @@ export interface ModelResponseCommitted {
 export interface ModelResponseInterrupted {
   readonly _tag: "ModelResponseInterrupted"
   readonly turn: number
+  /** Run that authored the immutable operation and Session entry identities. */
+  readonly originRunId: string
+  /** Operation key that authored the immutable Session entry identity. */
+  readonly originOperationKey: string
   readonly operationKey: string
   readonly modelCallId: string
   readonly modelAttemptId: string

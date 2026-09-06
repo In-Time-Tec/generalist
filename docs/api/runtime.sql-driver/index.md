@@ -857,9 +857,13 @@ Load and publish authoritative Session events after a lossy wakeup.
 
 `number`
 
+###### loadAfter
+
+(`cursor`) => `Effect`\<readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[], [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable)\>
+
 ###### loadReplay
 
-`Effect`\<\{ `lastSequence`: `number`; `replay`: readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
+`Effect`\<\{ `lastSequence`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
 
 ###### onSubscribed?
 
@@ -891,9 +895,13 @@ Load and publish authoritative Session events after a lossy wakeup.
 
 `number`
 
+###### loadAfter
+
+(`cursor`) => `Effect`\<readonly [`HostSessionEvent`](../runtime/namespaces/HostSession#hostsessionevent)[], [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
+
 ###### loadReplay
 
-`Effect`\<\{ `lastCursor`: `number`; `replay`: readonly [`HostSessionEvent`](../runtime/namespaces/HostSession#hostsessionevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
+`Effect`\<\{ `lastCursor`: `number`; `replayCursor`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
 
 ###### onSubscribed?
 
@@ -1285,6 +1293,38 @@ readonly [`RunActivation`](#runactivation)[]
 
 #### Properties
 
+<a id="decoraterunexecutor"></a>
+
+##### decorateRunExecutor?
+
+> `readonly` `optional` **decorateRunExecutor?**: (`executor`) => [`Service`](../runtime/namespaces/RunExecutor#service)
+
+###### Parameters
+
+###### executor
+
+[`Service`](../runtime/namespaces/RunExecutor#service)
+
+###### Returns
+
+[`Service`](../runtime/namespaces/RunExecutor#service)
+
+<a id="makeexecutableresolver"></a>
+
+##### makeExecutableResolver
+
+> `readonly` **makeExecutableResolver**: (`input`) => [`Service`](../runtime/namespaces/ExecutableResolver#service)
+
+###### Parameters
+
+###### input
+
+`SqliteRuntimeResolverInput`
+
+###### Returns
+
+[`Service`](../runtime/namespaces/ExecutableResolver#service)
+
 <a id="options"></a>
 
 ##### options
@@ -1643,7 +1683,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### loadReplay
 
-`Effect`\<\{ `lastSequence`: `number`; `replay`: readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
+`Effect`\<\{ `lastSequence`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`RunNotFound`](../runtime/namespaces/Errors#runnotfound)\>
 
 ###### runNoTransaction
 
@@ -1687,7 +1727,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### loadReplay
 
-`Effect`\<\{ `lastCursor`: `number`; `replay`: readonly [`HostSessionEvent`](../runtime/namespaces/HostSession#hostsessionevent)[]; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound)\>
+`Effect`\<\{ `lastCursor`: `number`; `replayCursor`: `number`; \}, [`RuntimeUnavailable`](../runtime/namespaces/Errors#runtimeunavailable) \| [`SessionNotFound`](../host#sessionnotfound), `never`\>
 
 ###### runNoTransaction
 
@@ -2334,7 +2374,7 @@ Check the shared version/checksum/dirty state before dialect-owned verification.
 
 ### layerSqliteRuntime
 
-> `const` **layerSqliteRuntime**: (`input`) => `Layer.Layer`\<[`SqliteRuntimeServices`](#sqliteruntimeservices), [`SqliteStoreError`](#sqlitestoreerror), `SqlClient.SqlClient` \| [`ExecutableResolver`](../runtime/namespaces/ExecutableResolver#executableresolver)\>
+> `const` **layerSqliteRuntime**: (`input`) => `Layer.Layer`\<[`SqliteRuntimeServices`](#sqliteruntimeservices), [`SqliteStoreError`](#sqlitestoreerror), `SqlClient.SqlClient`\>
 
 Assemble one exclusive SQLite host around Runtime's lifecycle kernel.
 
@@ -2346,7 +2386,7 @@ Assemble one exclusive SQLite host around Runtime's lifecycle kernel.
 
 #### Returns
 
-`Layer.Layer`\<[`SqliteRuntimeServices`](#sqliteruntimeservices), [`SqliteStoreError`](#sqlitestoreerror), `SqlClient.SqlClient` \| [`ExecutableResolver`](../runtime/namespaces/ExecutableResolver#executableresolver)\>
+`Layer.Layer`\<[`SqliteRuntimeServices`](#sqliteruntimeservices), [`SqliteStoreError`](#sqlitestoreerror), `SqlClient.SqlClient`\>
 
 ***
 
@@ -2553,7 +2593,7 @@ The single logical SQL Runtime schema identity.
 
 ### SQL\_SCHEMA\_VERSION
 
-> `const` **SQL\_SCHEMA\_VERSION**: `10` = `10`
+> `const` **SQL\_SCHEMA\_VERSION**: `11` = `11`
 
 The single logical SQL Runtime schema version.
 

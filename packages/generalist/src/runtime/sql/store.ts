@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- the SQL store wires one storage service contract. */
 import { Context, Effect, Layer, Option, Semaphore, type Scope } from "effect"
+import { validate as validatePayload } from "../execution/payload/index.js"
 import { listRuns } from "./store/list.js"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
@@ -37,6 +38,7 @@ import {
 import { recoverRunningOperations } from "./store/operation/recovery.js"
 import { resolveOperation } from "./store/operation/resolution.js"
 import { appendEvent, hasAdmission, loadEventsAfter, loadRun, loadRunWaitsByStatus } from "./store/statements.js"
+import { loadEventPageAfter, eventReplayPageSize } from "./run/events.js"
 import { commitInterruptedModelResponse } from "./model-response/interrupted-model-response.js"
 import { encodeContinuation } from "../run/steering.js"
 import {
@@ -47,7 +49,8 @@ import {
   retryExecution,
   saveExecution,
 } from "./store/execution.js"
-import { claimedStore as sqliteClaimedSessionStore, reader as sqliteSessionReader } from "./session/store.js"
+import { claimedStore as sqliteClaimedSessionStore } from "./session/store.js"
+import { reader as sqliteSessionReader } from "./session/reader.js"
 import {
   admitSteering,
   readPendingSteering,
@@ -169,7 +172,14 @@ const makeSqlStoreServices = <DriverError>(
       lock: Effect.Effect<void, SqlError, SqlClient.SqlClient>,
       input: import("../run/store.js").ExecutionClaim,
       effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-    ) => run(lock.pipe(Effect.andThen(requireExecutionClaim(input)), Effect.andThen(effect)))
+    ) =>
+      run(
+        lock.pipe(
+          Effect.andThen(requireExecutionClaim(input)),
+          Effect.andThen(validatePayload({ value: input, boundary: "transition" })),
+          Effect.andThen(effect),
+        ),
+      )
     const fenced = <A, E>(
       input: import("../run/store.js").ExecutionClaim,
       effect: Effect.Effect<A, E, SqlClient.SqlClient>,
@@ -205,18 +215,26 @@ const makeSqlStoreServices = <DriverError>(
               idempotencyKey: input.message.idempotencyKey,
               ...(input.runId === undefined ? undefined : { runId: input.runId }),
             }),
-            admitSend(transactionHub, addressBindings, input, {
-              lockRegistrations: locks.admissionRegistrations,
-              promote: !driver.multiWorker,
-            }),
+            validatePayload({ value: input, boundary: "admission" }).pipe(
+              Effect.andThen(
+                admitSend(transactionHub, addressBindings, input, {
+                  lockRegistrations: locks.admissionRegistrations,
+                  promote: !driver.multiWorker,
+                }),
+              ),
+            ),
           ),
         admitStart: (input, startOptions) =>
           locked(
             locks.registrations,
-            admitStart(transactionHub, input, {
-              ...startOptions,
-              activate: startOptions?.activate ?? true,
-            }),
+            validatePayload({ value: input, boundary: "admission" }).pipe(
+              Effect.andThen(
+                admitStart(transactionHub, input, {
+                  ...startOptions,
+                  activate: startOptions?.activate ?? true,
+                }),
+              ),
+            ),
           ),
         activate: (input) =>
           locked(
@@ -224,7 +242,10 @@ const makeSqlStoreServices = <DriverError>(
             transactionHub.touchRun(input.runId).pipe(Effect.andThen(activateRoot(transactionHub, input.runId))),
           ),
         extendBudget: (runId, delta) => locked(locks.run(runId), extendBudget(transactionHub, runId, delta)),
-        admitSpawn: (input) => locked(locks.spawn(input.parentRunId), admitSpawn(transactionHub, input)),
+        admitSpawn: (input) =>
+          validatePayload({ value: input, boundary: "child admission" }).pipe(
+            Effect.andThen(locked(locks.spawn(input.parentRunId), admitSpawn(transactionHub, input))),
+          ),
         admitProgramChild: (input) => fenced(input, admitProgramChild(transactionHub, input)),
         admitProgramChildAndSuspend: (input) =>
           fenced(
@@ -244,23 +265,25 @@ const makeSqlStoreServices = <DriverError>(
             Effect.gen(function* () {
               const loaded = yield* loadRun(input.runId)
               if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
-              const replay = yield* loadEventsAfter(input.runId, input.cursor)
-              return { replay, lastSequence: loaded.lastSequence }
+              return { lastSequence: loaded.lastSequence }
             }),
           )
+          const loadAfter = (cursor: number) =>
+            runNoTxn(loadEventPageAfter({ runId: input.runId, cursor, limit: eventReplayPageSize }))
           if (driver.events !== undefined) {
             return driver.events(input, {
               hub,
               capacity,
               runNoTransaction: runNoTxn,
               loadReplay,
-              loadAfter: (cursor) => runNoTxn(loadEventsAfter(input.runId, cursor)),
+              loadAfter,
             })
           }
           return hub.subscribe({
             runId: input.runId,
             cursor: input.cursor,
             loadReplay,
+            loadAfter,
             capacity,
           })
         },
@@ -284,7 +307,8 @@ const makeSqlStoreServices = <DriverError>(
         wake: (input) => locked(locks.run(input.runId), wake(transactionHub, input)),
         dueAwaitEvents: (input) => runNoTxn(dueAwaitEvents(input)),
         timeoutAwaitEvent: (input) => locked(locks.run(input.runId), timeoutAwaitEvent(transactionHub, input)),
-        registerSchedule: (record) => run(registerSchedule(record)),
+        registerSchedule: (record) =>
+          validatePayload({ value: record, boundary: "schedule" }).pipe(Effect.andThen(run(registerSchedule(record)))),
         claimSchedules: (input) => run(claimSchedules(input)),
         advanceSchedule: (input) => run(advanceSchedule(input)),
         cancel: (input) => locked(locks.hierarchy(input.runId), cancel(transactionHub, input)),
@@ -364,7 +388,10 @@ const makeSqlStoreServices = <DriverError>(
               return inspection
             }),
           ),
-        fork: (input) => locked(locks.run(input.runId), fork(transactionHub, input)),
+        fork: (input) =>
+          validatePayload({ value: input, boundary: "fork substitution" }).pipe(
+            Effect.andThen(locked(locks.run(input.runId), fork(transactionHub, input))),
+          ),
         rewind: (input) => locked(locks.run(input.runId), rewind(transactionHub, input)),
         snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
         acknowledge: (input) => locked(locks.run(input.runId), acknowledge(input)),
@@ -381,7 +408,7 @@ const makeSqlStoreServices = <DriverError>(
               if (input.cursor < -1 || input.cursor > loaded.lastSequence) {
                 return yield* CursorExpired.make({ runId: input.runId, cursor: input.cursor, earliestSequence: 0 })
               }
-              return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
+              return yield* loadEventPageAfter(input)
             }),
           ),
         recordReward: (input) =>
@@ -493,17 +520,21 @@ const makeSqlStoreServices = <DriverError>(
             ),
           ),
         resolveUnknown: (input) =>
-          mapSqlError(
-            locked(
-              locks.hierarchy(input.runId),
-              transactionHub
-                .touchRun(input.runId)
-                .pipe(
-                  Effect.andThen(
-                    resolveUnknownOperation(input, driver.multiWorker ? "queued" : "running", driver.multiWorker),
-                  ),
-                  Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+          validatePayload({ value: input, boundary: "operator resolution" }).pipe(
+            Effect.andThen(
+              mapSqlError(
+                locked(
+                  locks.hierarchy(input.runId),
+                  transactionHub
+                    .touchRun(input.runId)
+                    .pipe(
+                      Effect.andThen(
+                        resolveUnknownOperation(input, driver.multiWorker ? "queued" : "running", driver.multiWorker),
+                      ),
+                      Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+                    ),
                 ),
+              ),
             ),
           ),
         claimExecution: (input) =>
@@ -519,7 +550,10 @@ const makeSqlStoreServices = <DriverError>(
           ),
         saveExecution: (input) => fenced(input, saveExecution(input)),
         retryExecution: (input) => fencedWith(locks.run(input.runId), input, retryExecution(transactionHub, input)),
-        admitFanOut: (input) => locked(locks.fanOut(input), admitFanOut(transactionHub, input)),
+        admitFanOut: (input) =>
+          validatePayload({ value: input, boundary: "child admission" }).pipe(
+            Effect.andThen(locked(locks.fanOut(input), admitFanOut(transactionHub, input))),
+          ),
         inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
         reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),
         admitProgramAgents: (input) => fenced(input, admitProgramAgents(transactionHub, input, suspend)),

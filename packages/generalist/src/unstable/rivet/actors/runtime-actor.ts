@@ -125,7 +125,7 @@ export type RuntimeActorDefinition = ActorDefinition<
 >
 
 /** @experimental */
-export interface RuntimeActorOptions extends Omit<ActorRuntimeOptions, "drainAction"> {
+export interface RuntimeActorOptions extends Omit<ActorRuntimeOptions, "drainAction" | "makeExecutableResolver"> {
   /** Application-owned executable reconstruction composed into each actor incarnation. */
   readonly resolver: Layer.Layer<ExecutableResolver>
   /** Rivet process-lifecycle tuning; it never carries Runtime authority. */
@@ -176,7 +176,15 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
     actionInputSchemas,
     onWake: async (c) => {
       const runtime = ManagedRuntime.make(
-        layerActorRuntime(c, { ...storeOptions, drainAction: "runtime.drain" }).pipe(Layer.provide(resolver)),
+        Layer.unwrap(
+          Effect.map(ExecutableResolver, (executableResolver) =>
+            layerActorRuntime(c, {
+              ...storeOptions,
+              drainAction: "runtime.drain",
+              makeExecutableResolver: () => executableResolver,
+            }),
+          ),
+        ).pipe(Layer.provide(resolver)),
       )
       try {
         const { ownerId } = await runtime.runPromise(ActorRuntime, { signal: c.abortSignal })

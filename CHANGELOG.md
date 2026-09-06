@@ -1,8 +1,32 @@
 # Changelog
 
-## 0.62.0
+## 0.63.0
 
 - Add `layerActorRuntime(context, options)` and `ActorRuntime` to `generalist/unstable/rivet` for application-owned Rivet actors. A custom actor can initialize product tables, compose a product activation projection into the same `Runtime.send` transaction as Generalist's durable activation projection, run typed actions through one wake-scoped `ManagedRuntime`, and dispose it on sleep or destroy. Startup and periodic recovery use that same projection and SQLite authority; `makeRuntimeActor` now delegates to the same Layer. Pin the raw RivetKit SDK to `2.3.15`; `@rivetkit/effect` is not used.
+- Construct actor executable resolvers from the activation's actual SQL, RunStore, ExternalChildStore and owner. Add product reconciliation, a separate admission gate, and RunExecutor decoration without duplicating Runtime authority. Initialization and projection callbacks now receive `{ sql, ownerId }`.
+- Support nested actor SQLite savepoints, including three-level nesting and isolated concurrent sibling rollback. Wait for rollback and in-flight statements before interruption completes.
+
+## 0.62.0
+
+- Preserve fork/rewind operation identity and branch-local response bytes, authenticate source response digests before copying, and support nested-fork continuation after reopening storage. SQL schema authority advances to 11; incompatible older stores are refused, not automatically migrated.
+- Add purpose-specific Session reads and paged SQL replay, repair overtaken notifications per subscriber, and paginate lossless A2A/trajectory/RL exports. Public Runtime history limits are now 1–1000.
+- Reject oversized durable transitions and Session entries at 1 MiB and Run events at 256 KiB without silently truncating outcomes. Validate worker options and recheck MySQL claim eligibility after candidate scanning.
+- Require successful PostgreSQL/MySQL CI on the exact release commit before producing release assets; document the beta operating envelope and recovery data lifetimes.
+- Preserve the committed model-response replay cursor across interruption and reopen. Recovery consumes the recorded response without calling the model again, and restores already charged tokens only while replaying that response.
+- Expand MySQL's shared Runtime conformance coverage to admission, approvals, run trees, concurrent claims, transaction rollback, and notification recovery.
+- Reorganize the documentation into Start, Build, Operate, and Reference; correct tutorial installation commands and distinguish scripted search from live providers. Tutorial checks now typecheck extracted code and execute credential-free examples.
+
+## 0.61.2
+
+- Recover the exact pending Agent memory remember operation before startup recall or Session sync, including interruption before and after its outcome commits, without redispatching completed model or tool calls.
+- Add Runtime-owned `start_program`, `inspect_program`, `await_program`, and `cancel_program` tools under the existing pinned Program authority. Admission returns a durable child handle without blocking parent progress; explicit waits retain the normal tool-result barrier and reconcile across restart.
+- Automatically install `start_child_group` and `await_child_group` alongside the existing blocking child tools. Admission follows the persisted depth and capacity limits, while joining an admitted group remains available when active-child capacity is full.
+- Settle every owned wait for a completed Program child. The experimental `ChildRuns.waitIdForChild` helper is replaced by `waitIdsForChild`, which returns all matching wait IDs.
+
+## 0.61.1
+
+- Discard PostgreSQL connections when queries are interrupted or transactions fail, preventing pool starvation and reuse after ambiguous commits.
+- Expose `layerClientPool` from `generalist/pg` for applications sharing the same scoped PostgreSQL connection behavior.
 
 ## 0.61.0
 

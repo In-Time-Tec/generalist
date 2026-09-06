@@ -36,7 +36,7 @@ it.effect("replays a base larger than the bounded subscriber queue and follows l
         prompt: textPrompt("hello"),
       })
       const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })
-      const replayBase = 60
+      const replayBase = 300
       for (let turn = 0; turn < replayBase; turn++) {
         yield* store.emitAgentEvent({ ...claim, runId: receipt.runId, event: { _tag: "TurnStarted", turn } })
       }
@@ -61,6 +61,57 @@ it.effect("replays a base larger than the bounded subscriber queue and follows l
       expect([...events].every((event, index, all) => index === 0 || event.sequence > all[index - 1]!.sequence)).toBe(
         true,
       )
+    }),
+  ),
+)
+
+it.effect("replays a rewound host Session without waiting for its deleted high-water row", () =>
+  scopedWith(highWaterLayer(16))(
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const sessionId = "session:rewound-replay"
+      yield* runtime.createSession({ id: sessionId })
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId,
+        idempotencyKey: "rewound-replay",
+        prompt: textPrompt("hello"),
+      })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-rewind" })
+      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 0 } })
+      const before = yield* runtime.sessionEvents({ sessionId }).pipe(
+        Stream.takeUntil(({ event }) => event._tag === "TurnStarted"),
+        Stream.runCollect,
+      )
+      const oldCursor = before.at(-1)!.cursor
+      yield* store.rewind({ runId: receipt.runId, branchRunId: "retained-replay", toSequence: 0 })
+      const replayed = yield* Deferred.make<void>()
+      const follower = yield* runtime.sessionEvents({ sessionId }).pipe(
+        Stream.tap(() => Deferred.succeed(replayed, undefined)),
+        Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 999),
+        Stream.runCollect,
+        Effect.forkChild({ startImmediately: true }),
+      )
+      yield* Deferred.await(replayed)
+      const resumed = yield* runtime.sessionEvents({ sessionId, cursor: oldCursor }).pipe(
+        Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 999),
+        Stream.runCollect,
+        Effect.forkChild({ startImmediately: true }),
+      )
+      const runFollower = yield* runtime.events({ runId: receipt.runId }).pipe(
+        Stream.takeUntil((event) => event._tag === "TurnStarted" && event.turn === 999),
+        Stream.runCollect,
+        Effect.forkChild({ startImmediately: true }),
+      )
+      yield* store.activate({ runId: receipt.runId })
+      const nextClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "after-rewind" })
+      yield* store.emitAgentEvent({ ...nextClaim, event: { _tag: "TurnStarted", turn: 999 } })
+      const entries = yield* Fiber.join(follower)
+      expect(entries[0]?.cursor).toBe(0)
+      expect(entries.slice(1).every((entry) => entry.cursor > oldCursor)).toBe(true)
+      expect(yield* Fiber.join(resumed)).toEqual(entries.slice(1))
+      expect((yield* Fiber.join(runFollower)).map((event) => event.sequence)).toEqual([0, 1, 2])
     }),
   ),
 )

@@ -6,7 +6,7 @@ import "./suites/session-storage-suite.js"
 import { beforeAll } from "vitest"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
-import { SqlClient } from "effect/unstable/sql"
+import { SqlClient, Statement } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { RuntimeSchema } from "generalist/mysql"
 import { Steering } from "generalist"
@@ -63,6 +63,41 @@ const exactRegistrations = () => {
 
 describeMysql("mysql run store", () => {
   beforeAll(database.provisioned, 60_000)
+  it.live("rechecks lane eligibility after the unlocked candidate scan", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("stale-candidate"),
+          idempotencyKey: "stale-candidate",
+          prompt: textPrompt("claim only while at lane head"),
+        })
+        let invalidated = false
+        const batch = yield* claims.claimReadyRuns({ workerId: "stale-scan", limit: 1 }).pipe(
+          Effect.provideService(Statement.CurrentTransformer, (statement, sql) =>
+            Effect.gen(function* () {
+              const [query] = statement.compile()
+              if (!invalidated && query.includes("FOR UPDATE SKIP LOCKED")) {
+                invalidated = true
+                yield* sql`
+                  UPDATE generalist_lanes SET queue_json = '[]'
+                  WHERE JSON_UNQUOTE(JSON_EXTRACT(queue_json, '$[0]')) = ${receipt.runId}
+                `.pipe(Effect.orDie)
+              }
+              return statement
+            }),
+          ),
+        )
+        expect(invalidated).toBe(true)
+        expect(batch).toEqual([])
+        expect((yield* store.inspect(receipt.runId)).status).toBe("queued")
+      }).pipe(scopedWith(mysqlLayer(url))),
+    ),
+  )
+
   it.live("returns exactly one then zero rows for a conditional wait transition", () =>
     withSchema(
       Effect.gen(function* () {

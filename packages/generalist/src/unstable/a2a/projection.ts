@@ -2,6 +2,7 @@ import { Role, TaskState, type Artifact, type Message, type Part, type Task, typ
 import { ProgramExecutionResult } from "../../runtime/execution/state.js"
 import type { RunInspection } from "../../runtime/run.js"
 import type { RunCompleted, RunEvent } from "../../runtime/run/event.js"
+import { collect as collectHistory } from "../../runtime/run/history/index.js"
 import type { Service as RuntimeService } from "../../runtime/service.js"
 import { Effect, Function, Predicate, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
@@ -104,7 +105,7 @@ export const fromRuntime: {
   (runtime: RuntimeService, taskId: string): Effect.Effect<Task, TaskProjectionFailed> =>
     Effect.gen(function* () {
       const snapshot = yield* runtime.snapshot(taskId)
-      const events = yield* runtime.history({ runId: taskId, limit: snapshot.cursor + 1 })
+      const events = yield* collectHistory(runtime, taskId, snapshot.cursor)
       const contextId = contextIdFrom(taskId, events)
       const completed = events.findLast((event): event is RunCompleted => event._tag === "RunCompleted")
       return {

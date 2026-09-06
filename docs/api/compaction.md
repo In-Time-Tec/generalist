@@ -428,7 +428,7 @@ Request passed to a compaction implementation.
 
 ##### path?
 
-> `readonly` `optional` **path?**: readonly [`Entry`](./generalist/namespaces/Session#entry)[]
+> `readonly` `optional` **path?**: readonly [`Entry`](./generalist/namespaces/Session#entry-1)[]
 
 <a id="prompt"></a>
 

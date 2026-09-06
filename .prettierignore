@@ -11,6 +11,7 @@ docs/api
 docs/features/hosts-report.json
 
 # Local agent/tooling state directories.
+.amp
 .claude
 .rika
 .logs

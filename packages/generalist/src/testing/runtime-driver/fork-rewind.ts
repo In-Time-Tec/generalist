@@ -4,6 +4,8 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
 import { layerAutoApprove } from "../../core/policy/approvals.js"
 import { layerAllowAll } from "../../core/policy/permissions.js"
+import { AgentExecutionFailure } from "../../runtime/errors.js"
+import { make as interruptedResponse } from "../../runtime/execution/model-response/interrupted.js"
 import type { ForkRewindCapability, Options, Services } from "./contract.js"
 
 interface Registration<LayerError, ClaimsLayerError> {
@@ -39,6 +41,263 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
   registration: Registration<LayerError, ClaimsLayerError>,
 ): void => {
   const { capability, open, options, prepare, provide } = registration
+  it.effect("preserves retained completed operations across rewind and reopen", () => {
+    const operationKey = `conformance:${slug(options.name)}:retained-never-operation`
+    const scenario = (services: Services) =>
+      Effect.gen(function* () {
+        const source = yield* services.runtime.send({
+          to: options.address,
+          sessionId: `session:${operationKey}`,
+          idempotencyKey: operationKey,
+          prompt: "retain completed unsafe operation",
+        })
+        const claim = yield* capability.claim(services, { runId: source.runId, workerId: "retained-operation" })
+        const operation = yield* services.store.recordOperation({
+          ...claim,
+          operationKey,
+          kind: "tool",
+          inputDigest: "retained-input",
+          input: { value: "unchanged" },
+          replayPolicy: "never",
+          attempt: 0,
+        })
+        yield* services.store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* services.store.completeOperation({
+          ...claim,
+          operationId: operation.operationId,
+          outcome: { _tag: "Succeeded", value: "external-effect-already-completed" },
+        })
+        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+        const branchRunId = `${source.runId}:retained`
+        yield* services.store.rewind({ runId: source.runId, branchRunId, toSequence: 0 })
+        const retained = yield* services.store.getOperationByKey({ runId: branchRunId, operationKey })
+        expect(retained).toMatchObject({
+          status: "succeeded",
+          replayPolicy: "never",
+          result: "external-effect-already-completed",
+        })
+        return { branchRunId, durability: (yield* services.store.info).durability }
+      })
+    const verify = (services: Services, branchRunId: string) =>
+      services.store.getOperationByKey({ runId: branchRunId, operationKey }).pipe(
+        Effect.tap((retained) =>
+          Effect.sync(() =>
+            expect(retained).toMatchObject({
+              status: "succeeded",
+              replayPolicy: "never",
+              result: "external-effect-already-completed",
+            }),
+          ),
+        ),
+        Effect.asVoid,
+      )
+    return prepare(
+      open(scenario).pipe(
+        Effect.flatMap((result) =>
+          result.durability === "durable" ? open((services) => verify(services, result.branchRunId)) : Effect.void,
+        ),
+        Effect.orDie,
+      ),
+    )
+  })
+
+  it.effect("keeps inherited model responses self-contained through nested forks and source rewind", () => {
+    const name = slug(options.name)
+    const agent = makeAgent({ name: `driver-${name}-inherited-response` })
+    let modelCalls = 0
+    const environment = Layer.mergeAll(
+      Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text" as const, text: "unused" }]),
+          streamText: () => {
+            modelCalls += 1
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("text-delta", { id: "inherited", delta: "inherited response" }),
+              finish,
+            ])
+          },
+        }),
+      ),
+      layerAllowAll,
+      layerAutoApprove,
+    )
+    const register = (runtime: Services["runtime"]) =>
+      Effect.scoped(
+        Layer.build(environment).pipe(
+          Effect.flatMap((context) => runtime.register(agent).pipe(Effect.provideContext(context))),
+        ),
+      )
+    const resolveCopied = (services: Services, runId: string) =>
+      Effect.gen(function* () {
+        const event = (yield* services.runtime.history({ runId, limit: 100 })).find(
+          (candidate) => candidate._tag === "ModelResponseCommitted",
+        )
+        if (event?._tag !== "ModelResponseCommitted") return yield* Effect.die(`missing model response for ${runId}`)
+        const response = yield* services.runtime.resolveModelResponse(event)
+        expect(response.content.some((part) => part.type === "text" && part.text === "inherited response")).toBe(true)
+        const operation = yield* services.store.getOperationByKey({ runId, operationKey: event.operationKey })
+        expect(operation).toMatchObject({ status: "succeeded", replayPolicy: "never" })
+      })
+    const continueCopied = (services: Services, runId: string, registerAgent: boolean) =>
+      Effect.gen(function* () {
+        if (services.executor === undefined)
+          return yield* Effect.die(`${options.name} inherited response continuation requires RunExecutor`)
+        if (registerAgent) yield* register(services.runtime)
+        yield* services.store.activate({ runId })
+        yield* services.executor.execute(
+          yield* capability.claim(services, { runId, workerId: "inherited-response-continuation" }),
+        )
+        expect((yield* services.store.snapshot(runId)).run.status).toBe("succeeded")
+        expect(modelCalls).toBe(1)
+      })
+    const scenario = (services: Services) =>
+      Effect.gen(function* () {
+        if (services.executor === undefined)
+          return yield* Effect.die(`${options.name} inherited response requires RunExecutor`)
+        yield* register(services.runtime)
+        const handle = yield* services.runtime.start(agent, "produce one response", {
+          sessionId: `session:conformance:${name}:inherited-response`,
+          idempotencyKey: `inherited-response:${name}`,
+        })
+        yield* services.executor.execute(
+          yield* capability.claim(services, { runId: handle.runId, workerId: "inherited-response" }),
+        )
+        const event = (yield* services.runtime.history({ runId: handle.runId, limit: 100 })).find(
+          (candidate) => candidate._tag === "ModelResponseCommitted",
+        )
+        if (event?._tag !== "ModelResponseCommitted") return yield* Effect.die("missing source model response")
+        yield* services.runtime.resolveModelResponse(event)
+        const forkRunId = `${handle.runId}:response-fork`
+        const nestedRunId = `${handle.runId}:response-nested`
+        yield* services.store.fork({ runId: handle.runId, newRunId: forkRunId, atSequence: event.sequence })
+        yield* services.store.fork({ runId: forkRunId, newRunId: nestedRunId, atSequence: event.sequence })
+        yield* services.store.rewind({
+          runId: handle.runId,
+          branchRunId: `${handle.runId}:discarded-after-response`,
+          toSequence: 0,
+        })
+        yield* resolveCopied(services, forkRunId)
+        yield* resolveCopied(services, nestedRunId)
+        const durability = (yield* services.store.info).durability
+        if (durability !== "durable") yield* continueCopied(services, nestedRunId, false)
+        return {
+          durability,
+          runIds: [forkRunId, nestedRunId] as const,
+        }
+      })
+    return prepare(
+      open(scenario).pipe(
+        Effect.flatMap((result) =>
+          result.durability === "durable"
+            ? open((services) =>
+                Effect.gen(function* () {
+                  yield* Effect.forEach(result.runIds, (runId) => resolveCopied(services, runId), { discard: true })
+                  yield* continueCopied(services, result.runIds[1], true)
+                }),
+              )
+            : Effect.void,
+        ),
+        Effect.orDie,
+      ),
+    )
+  })
+
+  it.effect("keeps inherited interrupted responses self-contained through source rewind and reopen", () => {
+    const name = slug(options.name)
+    const scenario = (services: Services) =>
+      Effect.gen(function* () {
+        const receipt = yield* services.runtime.send({
+          to: options.address,
+          sessionId: `session:conformance:${name}:inherited-interruption`,
+          idempotencyKey: `inherited-interruption:${name}`,
+          prompt: "retain an interrupted response",
+        })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "inherited-interruption" })
+        const operationKey = `${receipt.runId}:model:interrupted`
+        const operation = yield* services.store.recordOperation({
+          ...claim,
+          operationKey,
+          kind: "model",
+          inputDigest: "interrupted-input",
+          input: { turn: 0 },
+          replayPolicy: "never",
+          attempt: 0,
+        })
+        yield* services.store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* services.store.commitInterruptedModelResponse({
+          ...claim,
+          operationId: operation.operationId,
+          outcome: {
+            _tag: "Failed",
+            error: AgentExecutionFailure.make({ message: "model interrupted after durable output" }),
+          },
+          event: interruptedResponse({
+            turn: 0,
+            operationKey,
+            modelCallId: `${receipt.runId}:call`,
+            modelAttemptId: `${receipt.runId}:attempt`,
+            attempt: 0,
+            sessionParentId: null,
+            response: { content: [Response.makePart("text", { text: "retained partial response" })] },
+            reason: "failure",
+          }),
+        })
+        const event = (yield* services.runtime.history({ runId: receipt.runId, limit: 100 })).find(
+          (candidate) => candidate._tag === "ModelResponseInterrupted",
+        )
+        if (event?._tag !== "ModelResponseInterrupted") return yield* Effect.die("missing interrupted response")
+        const forkRunId = `${receipt.runId}:interrupted-fork`
+        yield* services.store.fork({ runId: receipt.runId, newRunId: forkRunId, atSequence: event.sequence })
+        yield* services.store.rewind({
+          runId: receipt.runId,
+          branchRunId: `${receipt.runId}:interrupted-discarded`,
+          toSequence: 0,
+        })
+        const copied = (yield* services.runtime.history({ runId: forkRunId, limit: 100 })).find(
+          (candidate) => candidate._tag === "ModelResponseInterrupted",
+        )
+        if (copied?._tag !== "ModelResponseInterrupted") return yield* Effect.die("missing copied interruption")
+        const response = yield* services.runtime.resolveModelResponse(copied)
+        expect(response.content.some((part) => part.type === "text" && part.text === "retained partial response")).toBe(
+          true,
+        )
+        expect(
+          yield* services.store.getOperationByKey({ runId: forkRunId, operationKey: copied.operationKey }),
+        ).toMatchObject({
+          status: "failed",
+          replayPolicy: "never",
+        })
+        return {
+          durability: (yield* services.store.info).durability,
+          forkRunId,
+          operationKey: copied.operationKey,
+        }
+      })
+    const verify = (services: Services, forkRunId: string, operationKey: string) =>
+      Effect.gen(function* () {
+        const copied = (yield* services.runtime.history({ runId: forkRunId, limit: 100 })).find(
+          (candidate) => candidate._tag === "ModelResponseInterrupted",
+        )
+        if (copied?._tag !== "ModelResponseInterrupted") return yield* Effect.die("missing reopened interruption")
+        yield* services.runtime.resolveModelResponse(copied)
+        expect(yield* services.store.getOperationByKey({ runId: forkRunId, operationKey })).toMatchObject({
+          status: "failed",
+          replayPolicy: "never",
+        })
+      })
+    return prepare(
+      open(scenario).pipe(
+        Effect.flatMap((result) =>
+          result.durability === "durable"
+            ? open((services) => verify(services, result.forkRunId, result.operationKey))
+            : Effect.void,
+        ),
+        Effect.orDie,
+      ),
+    )
+  })
+
   it.effect("forks an exact prefix and retains the discarded rewind suffix as a branch", () =>
     provide((services) =>
       Effect.gen(function* () {

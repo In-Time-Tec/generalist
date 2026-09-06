@@ -1,7 +1,7 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { resultFromChildEvent, waitIdForChild } from "../../../child/group.js"
+import { resultFromChildEvent, waitIdsForChild } from "../../../child/group.js"
 import { isTerminal, type RunStatus } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"
 import { decodeEvent } from "../../codec/codecs.js"
@@ -82,7 +82,7 @@ export const reconcileChildWaitWith = <E, R>(input: {
   readonly append: AppendFn<E, R>
 }): Effect.Effect<boolean, E | SqlError, R | SqlClient.SqlClient> =>
   Effect.gen(function* () {
-    const waitId = waitIdForChild({
+    const waitIds = waitIdsForChild({
       parentRunId: input.parent.runId,
       childRunId: input.child.runId,
       metadata: input.child.message.metadata,
@@ -91,7 +91,7 @@ export const reconcileChildWaitWith = <E, R>(input: {
     if (
       isTerminal(input.parent.status) ||
       input.parent.cancellationRequested ||
-      waitId === undefined ||
+      waitIds.length === 0 ||
       (input.event._tag !== "RunCompleted" && input.event._tag !== "RunFailed" && input.event._tag !== "RunCancelled")
     ) {
       return false
@@ -102,14 +102,20 @@ export const reconcileChildWaitWith = <E, R>(input: {
       event: input.event,
     })
     const resolution = { _tag: "ToolResult" as const, result, encodedResult: result }
-    const affected = yield* transitionRunWait({
-      runId: input.parent.runId,
-      waitId,
-      status: "responded",
-      resolution,
-      closedAt: yield* DateTime.now.pipe(Effect.map(DateTime.formatIso)),
-    })
-    if (affected !== 1) return false
-    yield* input.append(input.hub, input.parent, { _tag: "RunResumed", waitId, resolution }, "running")
-    return true
+    let resumed = false
+    let parent = input.parent
+    for (const waitId of waitIds) {
+      const affected = yield* transitionRunWait({
+        runId: input.parent.runId,
+        waitId,
+        status: "responded",
+        resolution,
+        closedAt: yield* DateTime.now.pipe(Effect.map(DateTime.formatIso)),
+      })
+      if (affected !== 1) continue
+      const event = yield* input.append(input.hub, parent, { _tag: "RunResumed", waitId, resolution }, "running")
+      parent = Object.assign({}, parent, { lastSequence: event.sequence, status: "running" as const })
+      resumed = true
+    }
+    return resumed
   })

@@ -347,7 +347,9 @@ const inspectFourChildReferences = (filename: string, expectedMarkers: ReadonlyA
   )
   expect(childOperations).toHaveLength(40)
   expect(childCommitted).toHaveLength(40)
-  expect(Math.max(...childOperations.map((row) => row.bytes))).toBeLessThanOrEqual(1_100)
+  // References now retain two authored identity fields so copied branches can authenticate their source.
+  // Keep a fixed envelope ceiling and the unchanged turn-to-turn growth bound below.
+  expect(Math.max(...childOperations.map((row) => row.bytes))).toBeLessThanOrEqual(1_536)
   expect(
     Math.max(...childOperations.map((row) => row.bytes)) - Math.min(...childOperations.map((row) => row.bytes)),
   ).toBeLessThanOrEqual(64)

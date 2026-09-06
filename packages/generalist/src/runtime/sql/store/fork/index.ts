@@ -10,10 +10,24 @@ import {
 import type { Message } from "../../../messaging/message.js"
 import { eventIdFor, RunEvent } from "../../../run/event.js"
 import type { ForkRunInput, RewindRunInput } from "../../../run/store-types.js"
-import { decodeEvent, decodeMessage, encodeEvent, encodeJsonValue, encodeMessage } from "../../codec/codecs.js"
+import { ExecutionCheckpoint } from "../../../execution/state.js"
+import { copyModelResponse } from "./model-response.js"
+import { ForkCheckpoint } from "../../../execution/recovery/fork-checkpoint.js"
+import { encode as encodeBounded, maximumEventBytes } from "../../../execution/payload/index.js"
+import {
+  decodeEvent,
+  decodeJson,
+  decodeMessage,
+  encodeEvent,
+  encodeJson,
+  encodeJsonValue,
+  encodeMessage,
+} from "../../codec/codecs.js"
 import type { EventRow, OperationRow, RunRow } from "../../codec/rows.js"
 import type { EventHub } from "../../subscribers.js"
 import { appendEvent, loadRun, sqlFalse } from "../statements.js"
+
+const { forkCheckpoint, forkOperationKey } = ForkCheckpoint
 
 export const loadRunBranches = (runId: string) =>
   Effect.gen(function* () {
@@ -86,12 +100,25 @@ const cloneSession = (sourceSessionId: string, targetSessionId: string, leafId: 
   })
 
 const leafAt = (events: ReadonlyArray<RunEvent>): string | null => {
-  const committed = events.findLast(
-    (event): event is Extract<RunEvent, { readonly _tag: "ModelResponseCommitted" }> =>
-      event._tag === "ModelResponseCommitted",
+  const response = events.findLast(
+    (event): event is Extract<RunEvent, { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }> =>
+      event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted",
   )
-  return committed?.sessionEntryId ?? null
+  return response?.sessionEntryId ?? null
 }
+
+const copyCheckpointJson = (
+  value: string | null,
+  sourceRunId: string,
+  targetRunId: string,
+  targetSessionId: string,
+): string | null =>
+  value === null
+    ? null
+    : encodeJson(
+        ExecutionCheckpoint,
+        forkCheckpoint(decodeJson(ExecutionCheckpoint, value), sourceRunId, targetRunId, targetSessionId),
+      )
 
 const rewindSession = (sessionId: string, leafId: string | null) =>
   Effect.gen(function* () {
@@ -152,12 +179,18 @@ const copyRun = (input: {
         runId: input.targetRunId,
         rootRunId: input.targetRunId,
         eventId: eventIdFor(input.targetRunId, row.sequence),
+        ...(sourceEvent._tag === "ModelResponseCommitted" || sourceEvent._tag === "ModelResponseInterrupted"
+          ? {
+              sessionId,
+              operationKey: forkOperationKey(sourceEvent.operationKey, input.source.run_id, input.targetRunId),
+            }
+          : undefined),
       }).pipe(Effect.orDie)
       yield* sql`
         INSERT INTO generalist_run_events (run_id, sequence, event_id, event_json, checkpoint_json)
         VALUES (
-          ${input.targetRunId}, ${row.sequence}, ${event.eventId}, ${encodeEvent(event)},
-          ${row.checkpoint_json?.replaceAll(input.source.run_id, input.targetRunId) ?? null}
+          ${input.targetRunId}, ${row.sequence}, ${event.eventId}, ${yield* encodeBounded({ value: event, boundary: "fork event", serialize: encodeEvent, limit: maximumEventBytes })},
+          ${copyCheckpointJson(row.checkpoint_json, input.source.run_id, input.targetRunId, sessionId)}
         )
       `
       yield* sql`
@@ -192,8 +225,20 @@ const loadOperations = (input: ForkRunInput, maximumSequence: number) =>
     return { rows, substituted, cutoff: substituted?.completed_sequence ?? maximumSequence }
   })
 
+const loadRetainedOperations = (runId: string, maximumSequence: number) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<OperationRow>`
+      SELECT * FROM generalist_run_operations WHERE run_id = ${runId}
+        AND completed_sequence IS NOT NULL AND completed_sequence <= ${maximumSequence}
+      ORDER BY completed_sequence ASC, operation_id ASC
+    `
+    return { rows, substituted: undefined, cutoff: maximumSequence }
+  })
+
 const copyOperations = (
   input: ForkRunInput,
+  targetSessionId: string,
   selected: {
     readonly rows: ReadonlyArray<OperationRow>
     readonly substituted: OperationRow | undefined
@@ -205,12 +250,15 @@ const copyOperations = (
     const { cutoff, rows, substituted } = selected
     for (const row of rows) {
       if (row.completed_sequence === null || row.completed_sequence > cutoff) continue
-      const result =
+      let result =
         row === substituted && input.substitute !== undefined
           ? encodeJsonValue(input.substitute.result)
           : row.result_json
-      const operationKey = row.operation_key.replaceAll(input.runId, input.newRunId)
-      const checkpoint = row.checkpoint_json?.replaceAll(input.runId, input.newRunId) ?? null
+      if (row.kind === "model" && row.status === "succeeded" && row !== substituted) {
+        result = yield* copyModelResponse({ runId: input.runId, newRunId: input.newRunId, targetSessionId, row })
+      }
+      const operationKey = forkOperationKey(row.operation_key, input.runId, input.newRunId)
+      const checkpoint = copyCheckpointJson(row.checkpoint_json, input.runId, input.newRunId, targetSessionId)
       yield* sql`
         INSERT INTO generalist_run_operations (
           run_id, operation_id, operation_key, kind, status, input_digest, input_json, result_json, error_json,
@@ -224,15 +272,20 @@ const copyOperations = (
         )
       `
     }
-    return substituted?.checkpoint_json?.replaceAll(input.runId, input.newRunId)
+    return copyCheckpointJson(substituted?.checkpoint_json ?? null, input.runId, input.newRunId, targetSessionId)
   })
 
 const forkEffect = (hub: EventHub, input: ForkRunInput) =>
   Effect.gen(function* () {
     const selected = yield* prefix(input.runId, input.atSequence)
     const operations = yield* loadOperations(input, input.atSequence)
-    const checkpoint =
-      (operations.substituted?.checkpoint_json ?? selected.checkpoint)?.replaceAll(input.runId, input.newRunId) ?? null
+    const targetSessionId = `${selected.source.session_id}:fork:${input.newRunId}`
+    const checkpoint = copyCheckpointJson(
+      operations.substituted?.checkpoint_json ?? selected.checkpoint,
+      input.runId,
+      input.newRunId,
+      targetSessionId,
+    )
     const run = yield* copyRun({
       ...selected,
       targetRunId: input.newRunId,
@@ -241,7 +294,7 @@ const forkEffect = (hub: EventHub, input: ForkRunInput) =>
       status: "queued",
     })
     if (run === undefined) return yield* RunNotFound.make({ runId: input.newRunId })
-    yield* copyOperations(input, operations)
+    yield* copyOperations(input, run.message.sessionId, operations)
     if (input.substitute !== undefined) {
       yield* appendEvent(hub, run, { _tag: "Substituted", operationId: input.substitute.operationId }, "queued")
     }
@@ -260,15 +313,31 @@ const rewindEffect = (hub: EventHub, input: RewindRunInput) =>
       SELECT * FROM generalist_run_events WHERE run_id = ${input.runId} ORDER BY sequence ASC
     `
     const fullEvents = fullRows.map((row) => decodeEvent(row.event_json))
-    yield* copyRun({
+    const branch = yield* copyRun({
       source: selected.source,
       eventRows: fullRows,
       events: fullEvents,
       targetRunId: input.branchRunId,
       forkSequence: input.toSequence,
-      checkpoint: selected.source.driver_checkpoint_json,
+      checkpoint: copyCheckpointJson(
+        selected.source.driver_checkpoint_json,
+        input.runId,
+        input.branchRunId,
+        `${selected.source.session_id}:fork:${input.branchRunId}`,
+      ),
       status: selected.source.status,
     })
+    if (branch === undefined) return yield* RunNotFound.make({ runId: input.branchRunId })
+    const branchInput: ForkRunInput = {
+      runId: input.runId,
+      newRunId: input.branchRunId,
+      atSequence: selected.source.last_sequence,
+    }
+    yield* copyOperations(
+      branchInput,
+      branch.message.sessionId,
+      yield* loadRetainedOperations(input.runId, selected.source.last_sequence),
+    )
     const sql = yield* SqlClient.SqlClient
     yield* sql`DELETE FROM generalist_tree_event_index WHERE root_run_id = ${input.runId} AND position > ${input.toSequence}`
     yield* sql`DELETE FROM generalist_run_events WHERE run_id = ${input.runId} AND sequence > ${input.toSequence}`

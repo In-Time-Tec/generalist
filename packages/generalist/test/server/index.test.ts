@@ -1,12 +1,12 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
-import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
+import { Config, Deferred, Effect, Layer, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
 import { layerMemory as layerBlobStoreMemory } from "generalist/blob-store"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
+import { ExecutableResolver, LocalScheduler, RunStore, Runtime } from "generalist/runtime"
 import { Server, type Client } from "generalist/server"
 
 const usage = Response.Usage.make({
@@ -181,6 +181,181 @@ layer(services)("Server", (it) => {
           Effect.flip,
         )
         expect(unauthorized).toMatchObject({ _tag: "generalist/server/Unauthorized" })
+      }),
+    ),
+  )
+
+  it.effect("keeps an admitted Run alive after its SSE response is cancelled and replays completion", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        let calls = 0
+        const controlledModel = yield* LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: () =>
+            Stream.fromEffect(
+              Effect.sync(() => {
+                calls += 1
+              }).pipe(Effect.andThen(Deferred.succeed(entered, undefined)), Effect.andThen(Deferred.await(release))),
+            ).pipe(
+              Stream.drain,
+              Stream.concat(Stream.make(Response.makePart("text-delta", { id: "answer", delta: "complete" }), finish)),
+            ),
+        })
+        const agent = Agent.make({ name: "server-disconnect" })
+        const host = yield* Generalist.create({ agents: [agent] }).pipe(
+          Effect.provideService(LanguageModel.LanguageModel, controlledModel),
+        )
+        const app = HttpRouter.toWebHandler(
+          Server.layer({ host, auth: Server.authBearer(Config.succeed(Redacted.make("secret"))) }).pipe(
+            Layer.provide(HttpServer.layerServices),
+          ),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const client = yield* makeClient(makeTransport(app.handler), "secret")
+        const session = yield* client.sessions.create({ id: "session:server:disconnect" })
+        const input = { sessionId: session.id, agent: agent.name, input: "answer", idempotencyKey: "answer-once" }
+        const run = yield* client.runs.start(input)
+        expect((yield* client.runs.start(input)).id).toBe(run.id)
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        yield* scheduler.tick
+        yield* Deferred.await(entered)
+
+        const response = yield* Effect.promise(() =>
+          app.handler(
+            new Request(`http://generalist.test/sessions/${session.id}/events`, {
+              headers: { authorization: "Bearer secret" },
+            }),
+          ),
+        )
+        expect(response.status).toBe(200)
+        const reader = response.body!.getReader()
+        const first = yield* Effect.promise(() => reader.read())
+        expect(new TextDecoder().decode(first.value)).toContain("RunStarted")
+        yield* Effect.promise(() => reader.cancel())
+        expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "running" })
+
+        yield* Deferred.succeed(release, undefined)
+        yield* scheduler.idle
+        expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
+        expect(calls).toBe(1)
+        const events = yield* client.events.subscribe({ sessionId: session.id }).pipe(
+          Stream.takeUntil((event) => event._tag === "Completed"),
+          Stream.runCollect,
+        )
+        expect(events.filter((event) => event._tag === "RunStarted")).toHaveLength(1)
+        expect(events.filter((event) => event._tag === "Completed")).toHaveLength(1)
+      }),
+    ),
+  )
+
+  it.effect("resolves an unknown operation through the enabled authenticated operator endpoint", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "server-unknown" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({ host, auth: Server.authBearer(Config.succeed(Redacted.make("secret"))), operator: true }).pipe(
+            Layer.provide(HttpServer.layerServices),
+          ),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const transport = makeTransport(app.handler)
+        const client = yield* makeClient(transport, "secret")
+        const session = yield* client.sessions.create({ id: "session:server:unknown" })
+        const run = yield* client.runs.start({ sessionId: session.id, agent: agent.name, input: "answer" })
+        const store = yield* RunStore.RunStore
+        const claim = yield* store.claimExecution({ runId: run.id, ownerId: "failed-worker" })
+        const operation = yield* store.recordOperation({
+          ...claim,
+          operationKey: "tool:external-write",
+          kind: "tool",
+          inputDigest: "write:1",
+          input: { value: "once" },
+          replayPolicy: "never",
+          attempt: 1,
+        })
+        yield* store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+        expect(yield* client.operator.explain({ runId: run.id })).toMatchObject({
+          status: "needs-resolution",
+          decision: { _tag: "Unknown", operationId: operation.operationId },
+        })
+        const resolution = {
+          runId: run.id,
+          operationId: operation.operationId,
+          operator: "operator:test",
+          resolution: { outcome: "succeeded" as const, result: "confirmed external receipt" },
+        }
+        const unauthorized = yield* makeClient(transport, "wrong")
+        expect(yield* unauthorized.operator.resolveUnknown(resolution).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/server/Unauthorized",
+        })
+        expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "needs-resolution" })
+        yield* client.operator.resolveUnknown(resolution)
+        expect(yield* store.getOperation({ runId: run.id, operationId: operation.operationId })).toMatchObject({
+          status: "succeeded",
+          result: "confirmed external receipt",
+        })
+        expect(yield* client.operator.explain({ runId: run.id })).toMatchObject({ decision: { _tag: "Resume" } })
+      }),
+    ),
+  )
+
+  it.effect("isolates tenant-owned Hosts, stores, and bearer credentials", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tenants = yield* Effect.forEach(
+          ["tenant-a", "tenant-b"],
+          Effect.fn(function* (tenant) {
+            const context = yield* Layer.build(Layer.fresh(services))
+            const agent = Agent.make({ name: "tenant-assistant" })
+            const host = yield* Generalist.create({ agents: [agent] }).pipe(Effect.provideContext(context))
+            const app = HttpRouter.toWebHandler(
+              Server.layer({ host, auth: Server.authBearer(Config.succeed(Redacted.make(tenant))) }).pipe(
+                Layer.provide(HttpServer.layerServices),
+              ),
+              { disableLogger: true },
+            )
+            yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+            const transport = makeTransport(app.handler)
+            return { client: yield* makeClient(transport, tenant), transport, agent }
+          }),
+        )
+        const [alice, bob] = tenants
+        const session = yield* alice!.client.sessions.create({ id: "session:private-a", title: "Private A" })
+        const run = yield* alice!.client.runs.start({
+          sessionId: session.id,
+          agent: alice!.agent.name,
+          input: "private",
+        })
+        const attachment = yield* alice!.client.attachments.put({
+          data: new TextEncoder().encode("private attachment"),
+          mediaType: "text/plain",
+        })
+
+        expect(yield* bob!.client.sessions.list()).toEqual([])
+        expect(yield* bob!.client.sessions.get({ sessionId: session.id }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/host/SessionNotFound",
+        })
+        expect(yield* bob!.client.runs.inspect({ runId: run.id }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/RunNotFound",
+        })
+        expect(yield* bob!.client.attachments.get({ sha256: attachment.sha256 }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/blob-store/BlobNotFound",
+        })
+        expect(
+          yield* bob!.client.events.subscribe({ sessionId: session.id }).pipe(Stream.runCollect, Effect.flip),
+        ).toMatchObject({
+          _tag: "generalist/host/SessionNotFound",
+        })
+        const wrongTenant = yield* makeClient(alice!.transport, "tenant-b")
+        expect(yield* wrongTenant.sessions.list().pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/server/Unauthorized",
+        })
       }),
     ),
   )

@@ -1582,6 +1582,82 @@ A fork or rewind sequence is outside the committed journal.
 
 ***
 
+<a id="historylimitinvalid"></a>
+
+### HistoryLimitInvalid
+
+A Run history request falls outside the fixed page-size contract.
+
+#### Extends
+
+- `HistoryLimitInvalid_base`
+
+#### Constructors
+
+<a id="constructor-22"></a>
+
+##### Constructor
+
+> **new HistoryLimitInvalid**(...`args`): [`HistoryLimitInvalid`](#historylimitinvalid)
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`HistoryLimitInvalid`](#historylimitinvalid)
+
+###### Inherited from
+
+`HistoryLimitInvalid_base.constructor`
+
+#### Properties
+
+<a id="hint-22"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+###### Inherited from
+
+`HistoryLimitInvalid_base.hint`
+
+<a id="maximum"></a>
+
+##### maximum
+
+> `readonly` **maximum**: `number`
+
+###### Inherited from
+
+`HistoryLimitInvalid_base.maximum`
+
+<a id="minimum"></a>
+
+##### minimum
+
+> `readonly` **minimum**: `number`
+
+###### Inherited from
+
+`HistoryLimitInvalid_base.minimum`
+
+<a id="received"></a>
+
+##### received
+
+> `readonly` **received**: `string`
+
+###### Inherited from
+
+`HistoryLimitInvalid_base.received`
+
+***
+
 <a id="idempotencyconflict"></a>
 
 ### IdempotencyConflict
@@ -1592,7 +1668,7 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Constructors
 
-<a id="constructor-22"></a>
+<a id="constructor-23"></a>
 
 ##### Constructor
 
@@ -1634,7 +1710,7 @@ A fork or rewind sequence is outside the committed journal.
 
 `IdempotencyConflict_base.existingRunId`
 
-<a id="hint-22"></a>
+<a id="hint-23"></a>
 
 ##### hint
 
@@ -1676,7 +1752,7 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Constructors
 
-<a id="constructor-23"></a>
+<a id="constructor-24"></a>
 
 ##### Constructor
 
@@ -1718,7 +1794,7 @@ A fork or rewind sequence is outside the committed journal.
 
 `IllegalOperatorAction_base.decision`
 
-<a id="hint-23"></a>
+<a id="hint-24"></a>
 
 ##### hint
 
@@ -1750,7 +1826,7 @@ A fork or rewind sequence is outside the committed journal.
 
 #### Constructors
 
-<a id="constructor-24"></a>
+<a id="constructor-25"></a>
 
 ##### Constructor
 
@@ -1782,7 +1858,7 @@ A fork or rewind sequence is outside the committed journal.
 
 `MultiWorkerUnsupported_base.backend`
 
-<a id="hint-24"></a>
+<a id="hint-25"></a>
 
 ##### hint
 
@@ -1816,7 +1892,7 @@ A fork point includes sandbox state that has no committed image to restore.
 
 #### Constructors
 
-<a id="constructor-25"></a>
+<a id="constructor-26"></a>
 
 ##### Constructor
 
@@ -1848,7 +1924,7 @@ A fork point includes sandbox state that has no committed image to restore.
 
 `NoSnapshot_base.atSequence`
 
-<a id="hint-25"></a>
+<a id="hint-26"></a>
 
 ##### hint
 
@@ -1882,7 +1958,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Constructors
 
-<a id="constructor-26"></a>
+<a id="constructor-27"></a>
 
 ##### Constructor
 
@@ -1914,7 +1990,7 @@ One Run attempted to message a target outside its durable Run family.
 
 `NotInFamily_base.fromRunId`
 
-<a id="hint-26"></a>
+<a id="hint-27"></a>
 
 ##### hint
 
@@ -1946,7 +2022,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Constructors
 
-<a id="constructor-27"></a>
+<a id="constructor-28"></a>
 
 ##### Constructor
 
@@ -1968,7 +2044,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
-<a id="hint-27"></a>
+<a id="hint-28"></a>
 
 ##### hint
 
@@ -2020,7 +2096,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Constructors
 
-<a id="constructor-28"></a>
+<a id="constructor-29"></a>
 
 ##### Constructor
 
@@ -2042,7 +2118,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
-<a id="hint-28"></a>
+<a id="hint-29"></a>
 
 ##### hint
 
@@ -2086,7 +2162,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-29"></a>
+<a id="constructor-30"></a>
 
 ##### Constructor
 
@@ -2108,7 +2184,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-29"></a>
+<a id="hint-30"></a>
 
 ##### hint
 
@@ -2140,7 +2216,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-30"></a>
+<a id="constructor-31"></a>
 
 ##### Constructor
 
@@ -2172,7 +2248,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `RunIdConflict_base.existingRunId`
 
-<a id="hint-30"></a>
+<a id="hint-31"></a>
 
 ##### hint
 
@@ -2204,7 +2280,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-31"></a>
+<a id="constructor-32"></a>
 
 ##### Constructor
 
@@ -2226,7 +2302,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-31"></a>
+<a id="hint-32"></a>
 
 ##### hint
 
@@ -2258,7 +2334,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-32"></a>
+<a id="constructor-33"></a>
 
 ##### Constructor
 
@@ -2280,7 +2356,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-32"></a>
+<a id="hint-33"></a>
 
 ##### hint
 
@@ -2322,7 +2398,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-33"></a>
+<a id="constructor-34"></a>
 
 ##### Constructor
 
@@ -2344,7 +2420,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-33"></a>
+<a id="hint-34"></a>
 
 ##### hint
 
@@ -2376,7 +2452,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-34"></a>
+<a id="constructor-35"></a>
 
 ##### Constructor
 
@@ -2408,7 +2484,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryCorrupt_base.entryId`
 
-<a id="hint-34"></a>
+<a id="hint-35"></a>
 
 ##### hint
 
@@ -2450,7 +2526,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-35"></a>
+<a id="constructor-36"></a>
 
 ##### Constructor
 
@@ -2482,7 +2558,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryNotFound_base.entryId`
 
-<a id="hint-35"></a>
+<a id="hint-36"></a>
 
 ##### hint
 
@@ -2514,7 +2590,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-36"></a>
+<a id="constructor-37"></a>
 
 ##### Constructor
 
@@ -2546,7 +2622,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `StaleClaim_base.attemptFence`
 
-<a id="hint-36"></a>
+<a id="hint-37"></a>
 
 ##### hint
 
@@ -2588,7 +2664,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-37"></a>
+<a id="constructor-38"></a>
 
 ##### Constructor
 
@@ -2610,7 +2686,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-37"></a>
+<a id="hint-38"></a>
 
 ##### hint
 
@@ -2642,7 +2718,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-38"></a>
+<a id="constructor-39"></a>
 
 ##### Constructor
 
@@ -2664,7 +2740,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-38"></a>
+<a id="hint-39"></a>
 
 ##### hint
 
@@ -2706,7 +2782,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-39"></a>
+<a id="constructor-40"></a>
 
 ##### Constructor
 
@@ -2728,7 +2804,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-39"></a>
+<a id="hint-40"></a>
 
 ##### hint
 
@@ -2772,7 +2848,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Constructors
 
-<a id="constructor-40"></a>
+<a id="constructor-41"></a>
 
 ##### Constructor
 
@@ -2794,7 +2870,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Properties
 
-<a id="hint-40"></a>
+<a id="hint-41"></a>
 
 ##### hint
 
@@ -2836,7 +2912,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Constructors
 
-<a id="constructor-41"></a>
+<a id="constructor-42"></a>
 
 ##### Constructor
 
@@ -2878,7 +2954,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 `TreeCursorExpired_base.earliestCursor`
 
-<a id="hint-41"></a>
+<a id="hint-42"></a>
 
 ##### hint
 
@@ -2912,7 +2988,7 @@ The cursor names a position that has not committed.
 
 #### Constructors
 
-<a id="constructor-42"></a>
+<a id="constructor-43"></a>
 
 ##### Constructor
 
@@ -2944,7 +3020,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorFuture_base.cursor`
 
-<a id="hint-42"></a>
+<a id="hint-43"></a>
 
 ##### hint
 
@@ -2986,7 +3062,7 @@ The cursor names a position that has not committed.
 
 #### Constructors
 
-<a id="constructor-43"></a>
+<a id="constructor-44"></a>
 
 ##### Constructor
 
@@ -3018,7 +3094,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorInvalid_base.cursor`
 
-<a id="hint-43"></a>
+<a id="hint-44"></a>
 
 ##### hint
 
@@ -3062,7 +3138,7 @@ The cursor belongs to a different root Run.
 
 #### Constructors
 
-<a id="constructor-44"></a>
+<a id="constructor-45"></a>
 
 ##### Constructor
 
@@ -3104,7 +3180,7 @@ The cursor belongs to a different root Run.
 
 `TreeCursorRootMismatch_base.cursorRootRunId`
 
-<a id="hint-44"></a>
+<a id="hint-45"></a>
 
 ##### hint
 
@@ -3136,7 +3212,7 @@ The cursor belongs to a different root Run.
 
 #### Constructors
 
-<a id="constructor-45"></a>
+<a id="constructor-46"></a>
 
 ##### Constructor
 
@@ -3158,7 +3234,7 @@ The cursor belongs to a different root Run.
 
 #### Properties
 
-<a id="hint-45"></a>
+<a id="hint-46"></a>
 
 ##### hint
 
@@ -3192,7 +3268,7 @@ A replay request falls outside the fixed page-size contract.
 
 #### Constructors
 
-<a id="constructor-46"></a>
+<a id="constructor-47"></a>
 
 ##### Constructor
 
@@ -3214,7 +3290,7 @@ A replay request falls outside the fixed page-size contract.
 
 #### Properties
 
-<a id="hint-46"></a>
+<a id="hint-47"></a>
 
 ##### hint
 
@@ -3224,7 +3300,7 @@ A replay request falls outside the fixed page-size contract.
 
 `TreeReplayLimitInvalid_base.hint`
 
-<a id="maximum"></a>
+<a id="maximum-1"></a>
 
 ##### maximum
 
@@ -3234,7 +3310,7 @@ A replay request falls outside the fixed page-size contract.
 
 `TreeReplayLimitInvalid_base.maximum`
 
-<a id="minimum"></a>
+<a id="minimum-1"></a>
 
 ##### minimum
 
@@ -3244,7 +3320,7 @@ A replay request falls outside the fixed page-size contract.
 
 `TreeReplayLimitInvalid_base.minimum`
 
-<a id="received"></a>
+<a id="received-1"></a>
 
 ##### received
 
@@ -3268,7 +3344,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Constructors
 
-<a id="constructor-47"></a>
+<a id="constructor-48"></a>
 
 ##### Constructor
 
@@ -3290,7 +3366,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
-<a id="hint-47"></a>
+<a id="hint-48"></a>
 
 ##### hint
 
@@ -3332,7 +3408,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Constructors
 
-<a id="constructor-48"></a>
+<a id="constructor-49"></a>
 
 ##### Constructor
 
@@ -3354,7 +3430,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
-<a id="hint-48"></a>
+<a id="hint-49"></a>
 
 ##### hint
 

@@ -221,7 +221,7 @@ const gatesFor = (run: InspectionRun): Effect.Effect<ReadonlyArray<GateResult>, 
     return results
   })
 
-const factTokens = (fact: RawUsageFact): number => {
+export const factTokens = (fact: RawUsageFact): number => {
   if (fact._tag === "Failed") {
     return (
       fact.providerUsage.totalTokens ?? (fact.providerUsage.inputTokens ?? 0) + (fact.providerUsage.outputTokens ?? 0)

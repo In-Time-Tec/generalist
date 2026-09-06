@@ -32,6 +32,8 @@ const representativeEvents: ReadonlyArray<RunTree.TreeEvent> = [
       ...base(0),
       _tag: "ModelResponseCommitted",
       turn: 0,
+      originRunId: rootRunId,
+      originOperationKey: "operation:model:1",
       operationKey: "operation:model:1",
       modelCallId: "model-call:1",
       modelAttemptId: "model-attempt:1",
