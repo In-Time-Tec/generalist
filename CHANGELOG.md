@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.61.2
+
+- Recover the exact pending Agent memory remember operation before startup recall or Session sync, including interruption before and after its outcome commits, without redispatching completed model or tool calls.
+- Add Runtime-owned `start_program`, `inspect_program`, `await_program`, and `cancel_program` tools under the existing pinned Program authority. Admission returns a durable child handle without blocking parent progress; explicit waits retain the normal tool-result barrier and reconcile across restart.
+- Automatically install `start_child_group` and `await_child_group` alongside the existing blocking child tools. Admission follows the persisted depth and capacity limits, while joining an admitted group remains available when active-child capacity is full.
+- Settle every owned wait for a completed Program child. The experimental `ChildRuns.waitIdForChild` helper is replaced by `waitIdsForChild`, which returns all matching wait IDs.
+
 ## 0.61.1
 
 - Discard PostgreSQL connections when queries are interrupted or transactions fail, preventing pool starvation and reuse after ambiguous commits.
