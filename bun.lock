@@ -318,7 +318,7 @@
     },
     "packages/generalist": {
       "name": "generalist",
-      "version": "0.61.2",
+      "version": "0.62.0",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
