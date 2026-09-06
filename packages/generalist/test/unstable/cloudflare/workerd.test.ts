@@ -114,11 +114,11 @@ const worker :Workerd.Worker = (
           const listening = yield* process.stdout.pipe(
             Stream.decodeText,
             Stream.splitLines,
-            Stream.mapEffect(Schema.decodeEffect(ListeningEvent)),
+            Stream.mapEffect((line) => Schema.decodeEffect(ListeningEvent)(line)),
             Stream.runHead,
             Effect.timeout("30 seconds"),
           )
-          if (Option.isNone(listening)) return yield* Effect.dieMessage("workerd exited before listening")
+          if (Option.isNone(listening)) return yield* Effect.die(new Error("workerd exited before listening"))
           const port = listening.value.port
 
           const request = HttpClient.get(`http://127.0.0.1:${port}`).pipe(
