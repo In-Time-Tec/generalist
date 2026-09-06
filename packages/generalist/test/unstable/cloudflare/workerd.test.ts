@@ -1,6 +1,6 @@
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 import { expect, layer } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Path, Random, Schedule, Schema } from "effect"
+import { Effect, FileSystem, Layer, Option, Path, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { build } from "esbuild"
@@ -45,6 +45,10 @@ const AgentConformanceResponse = Schema.Struct({
 
 const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String))
 
+const ListeningEvent = Schema.fromJsonString(
+  Schema.Struct({ event: Schema.Literal("listen"), socket: Schema.Literal("http"), port: Schema.Int }),
+)
+
 layer(Layer.merge(bunLayer, FetchHttpClient.layer), { excludeTestServices: true, timeout: 60_000 })(
   "workerd conformance",
   (it) => {
@@ -59,7 +63,6 @@ layer(Layer.merge(bunLayer, FetchHttpClient.layer), { excludeTestServices: true,
           const bundle = path.join(directory, "worker.js")
           const config = path.join(directory, "config.capnp")
           const storage = path.join(directory, "storage")
-          const port = yield* Random.nextIntBetween(20_000, 40_000, { halfOpen: true })
 
           yield* fileSystem.makeDirectory(storage)
           yield* Effect.tryPromise(() =>
@@ -84,7 +87,7 @@ const config :Workerd.Config = (
     (name = "main", worker = .worker),
     (name = "storage", disk = (path = ${encodeString(storage)}, writable = true)),
   ],
-  sockets = [(name = "http", address = "127.0.0.1:${port}", http = (), service = "main")],
+  sockets = [(name = "http", address = "127.0.0.1:0", http = (), service = "main")],
 );
 
 const worker :Workerd.Worker = (
@@ -101,18 +104,26 @@ const worker :Workerd.Worker = (
 `,
           )
 
-          yield* spawner.spawn(
+          const process = yield* spawner.spawn(
             ChildProcess.make(
               path.join(repositoryRoot, "packages/generalist/node_modules/.bin/workerd"),
-              ["serve", config],
-              { cwd: directory, stderr: "inherit", stdout: "inherit" },
+              ["serve", config, "--control-fd=1"],
+              { cwd: directory, stderr: "inherit", stdout: "pipe" },
             ),
           )
+          const listening = yield* process.stdout.pipe(
+            Stream.decodeText,
+            Stream.splitLines,
+            Stream.mapEffect(Schema.decodeEffect(ListeningEvent)),
+            Stream.runHead,
+            Effect.timeout("30 seconds"),
+          )
+          if (Option.isNone(listening)) return yield* Effect.dieMessage("workerd exited before listening")
+          const port = listening.value.port
 
           const request = HttpClient.get(`http://127.0.0.1:${port}`).pipe(
             Effect.flatMap(HttpClientResponse.filterStatusOk),
             Effect.flatMap(HttpClientResponse.schemaBodyJson(ConformanceResponse)),
-            Effect.retry({ times: 100, schedule: Schedule.spaced("25 millis") }),
           )
           const responses = yield* Effect.forEach([1, 2], () => request)
 
