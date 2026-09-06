@@ -1503,6 +1503,80 @@ describe("RunExecutor", () => {
     })
   })
 
+  it.effect("auto-installs nonblocking child admission for the root but not its depth-limited leaf", () => {
+    const profile = Agent.make({ name: "background-child-profile" })
+    const pinned = pinnedTestAgent(profile, "background-child-v1", [{ selection: "recursive" }])
+    const executable = ExecutableManifest.make({
+      root: pinned.pin,
+      profiles: [{ selection: "recursive", agent: pinned.pin }],
+      entries: [{ _tag: "Agent", ...pinned }],
+    })
+    const advertised: Array<ReadonlyArray<string>> = []
+    let calls = 0
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([]),
+        streamText: (options) => {
+          advertised.push(options.tools.map((tool) => Schema.decodeUnknownSync(Schema.String)(tool.name)))
+          calls += 1
+          if (calls === 1)
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("tool-call", {
+                id: "start-independent",
+                name: "start_child_group",
+                params: { members: [{ key: "one", selection: "recursive", prompt: "independent work" }] },
+                providerExecuted: false,
+              }),
+              finish,
+            ])
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "done", delta: "parent can progress" }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const runtimeLayer = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 day" } }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          { executable, agent: Agent.close(profile, Layer.mergeAll(allowAllAuthorization, model)) },
+        ]).pipe(Layer.orDie),
+      ),
+    )
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const host = yield* RunExecutor.RunExecutor
+      const parent = yield* runtime.startExecution({
+        executable,
+        registrations: registrationsFor(executable),
+        sessionId: "automatic-background",
+        idempotencyKey: "root",
+        prompt: "start work",
+        treePolicy: { maxDepth: 1, maxSubagents: 1 },
+      })
+      yield* host.execute(yield* store.claimExecution({ runId: parent.runId, ownerId: "root" }))
+      expect(yield* runtime.inspect(parent.runId)).toMatchObject({ status: "waiting" })
+      expect(calls).toBe(2)
+      const history = yield* runtime.history({ runId: parent.runId, limit: 100 })
+      const receipt = history.find(
+        (event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_child_group",
+      )
+      expect(receipt).toBeDefined()
+      const tree = (yield* runtime.treeCheckpoint(parent.runId)).inspection
+      const child = tree.runs.find((run) => run.parentRunId === parent.runId)!
+      expect(child.run.status).toBe("queued")
+      yield* host.execute(yield* store.claimExecution({ runId: child.run.runId, ownerId: "leaf" }))
+      expect((yield* runtime.inspect(child.run.runId)).status).toBe("succeeded")
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("succeeded")
+      expect(advertised[0]).toEqual(
+        expect.arrayContaining(["run_child", "run_child_group", "start_child_group", "await_child_group"]),
+      )
+      expect(advertised[2]).toEqual([])
+    }).pipe((effect) => provideScoped(runtimeLayer, effect), Effect.scoped)
+  })
+
   it.effect("advertises recursive child tools only while persisted tree capacity remains", () => {
     const ordinaryTool = Tool.make("typescript", {
       parameters: Schema.Struct({ code: Schema.String }),
@@ -1517,6 +1591,7 @@ describe("RunExecutor", () => {
       entries: [{ _tag: "Agent", ...pinned }],
     })
     const advertisedTools: Array<ReadonlyArray<string>> = []
+    let groupToAwait: string | undefined
     const model = Layer.effect(
       LanguageModel.LanguageModel,
       LanguageModel.make({
@@ -1527,7 +1602,23 @@ describe("RunExecutor", () => {
               .map((tool) => Schema.decodeUnknownSync(Schema.String)(tool.name))
               .toSorted((left, right) => left.localeCompare(right)),
           )
-          return Stream.make(finish)
+          if (groupToAwait !== undefined) {
+            const groupId = groupToAwait
+            groupToAwait = undefined
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("tool-call", {
+                id: "join-full-group",
+                name: "await_child_group",
+                params: { groupId },
+                providerExecuted: false,
+              }),
+              finish,
+            ])
+          }
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "answer", delta: "completed" }),
+            finish,
+          ])
         },
       }),
     )
@@ -1592,20 +1683,27 @@ describe("RunExecutor", () => {
       yield* execute(disabled.runId)
 
       const exhausted = yield* root({ maxDepth: 2, maxSubagents: 1 })
-      yield* runtime.spawn({
+      const admission = yield* ChildRuns.make(store).startGroup({
         parentRunId: exhausted.runId,
-        invocationId: "quota",
-        selection: "recursive",
-        prompt: "use quota",
+        toolCallId: "quota",
+        members: [{ key: "one", selection: "recursive", prompt: "use quota" }],
       })
+      if (admission._tag !== "Success") return yield* Effect.die("group admission failed")
+      const group = yield* Schema.decodeUnknownEffect(ChildRuns.GroupReceipt)(admission.result)
+      groupToAwait = group.groupId
       yield* execute(exhausted.runId)
+      expect((yield* runtime.inspect(exhausted.runId)).status).toBe("waiting")
+      yield* runtime.cancel({ runId: group.children[0]!.childRunId, reason: "settle admitted group" })
+      yield* execute(exhausted.runId)
+      expect(yield* runtime.inspect(exhausted.runId)).toMatchObject({ status: "succeeded" })
 
       expect(advertisedTools).toEqual([
-        ["run_child", "run_child_group", "typescript"],
-        ["run_child", "run_child_group", "typescript"],
+        ["await_child_group", "run_child", "run_child_group", "start_child_group", "typescript"],
+        ["await_child_group", "run_child", "run_child_group", "start_child_group", "typescript"],
         ["typescript"],
         ["typescript"],
-        ["typescript"],
+        ["await_child_group", "typescript"],
+        ["await_child_group", "run_child", "run_child_group", "start_child_group", "typescript"],
       ])
     }).pipe((effect) => provideScoped(runtimeLayer, effect), Effect.scoped)
   })

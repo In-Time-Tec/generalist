@@ -143,7 +143,7 @@ const makeFor = (
               activeEntry?._tag === "Agent" &&
               activeEntry.manifest.children.length > 0 &&
               claimed.depth < claimed.treePolicy.maxDepth &&
-              claimed.activeChildCount < claimed.treePolicy.maxSubagents
+              claimed.treePolicy.maxSubagents > 0
                 ? ChildRunTools.make({ children: activeEntry.manifest.children })
                 : undefined
             const programAuthority = activeEntry?._tag === "Agent" ? activeEntry.manifest.programAuthority : undefined
@@ -518,7 +518,12 @@ const makeFor = (
                 const withChildren =
                   childRunTools === undefined
                     ? agent
-                    : withTools(agent, [childRunTools.runChild, childRunTools.runChildGroup])
+                    : withTools(agent, [
+                        childRunTools.awaitChildGroup,
+                        ...(claimed.activeChildCount < claimed.treePolicy.maxSubagents
+                          ? [childRunTools.runChild, childRunTools.runChildGroup, childRunTools.startChildGroup]
+                          : []),
+                      ])
                 yield* runHosted(codeMode === undefined ? withChildren : withCodeModeTool(withChildren, codeMode))
               })
 
