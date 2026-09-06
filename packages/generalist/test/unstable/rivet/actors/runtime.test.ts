@@ -225,6 +225,7 @@ const incarnation = (ownerId: string) => Number(ownerId.slice(ownerId.lastIndexO
 
 // The local engine outlives registries. Isolate test factories from other tests and
 // processes, while keeping every recovery incarnation in the same pool.
+// Bind handles explicitly: actor-name discovery can select a different local pool.
 const testPool = (context: Parameters<typeof setupTest>[0]) => ({
   poolName: `generalist-${process.pid}-${context.task.id}`,
 })
@@ -242,7 +243,7 @@ test("executes the convenience Runtime actor through actor-local SQLite", async 
   })
   context.onTestFinished(() => registry.shutdown())
   const { client } = await setupTest(context, registry)
-  const partition = client.runtimePartition.getOrCreate(partitionKey("convenience"))
+  const partition = client.runtimePartition.getOrCreate(partitionKey("convenience"), testPool(context))
   const command = input(`convenience-${process.pid}`)
   const receipt = await partition.runtime.send(command)
 
@@ -258,7 +259,7 @@ test("composes application projection atomically and preserves typed custom acti
   const definition = makeDefinition(observed)
   const registry = registerShutdown(context, setup({ envoy: testPool(context), use: { partition: definition } }))
   const { client } = await setupTest(context, registry)
-  const partition = client.partition.getOrCreate(partitionKey("atomic"))
+  const partition = client.partition.getOrCreate(partitionKey("atomic"), testPool(context))
   const command = input(`atomic-${process.pid}`)
   const runId = command.runId
   if (runId === undefined) throw new Error("test input must include a run ID")
@@ -286,7 +287,7 @@ test("a fresh registry recovers a missed notification exactly once during startu
     setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
   )
   const { client: firstClient } = await setupTest(context, firstRegistry)
-  const first = firstClient.partition.getOrCreate(key)
+  const first = firstClient.partition.getOrCreate(key, testPool(context))
   const command = input(`recovery-${process.pid}`)
   const receipt = await first.work.admitWithoutNotify(command)
   const firstOwner = (await first.work.snapshot(receipt.runId)).ownerId
@@ -299,7 +300,7 @@ test("a fresh registry recovers a missed notification exactly once during startu
     setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
   )
   const { client: secondClient } = await setupTest(context, secondRegistry)
-  const reopened = secondClient.partition.getOrCreate(key)
+  const reopened = secondClient.partition.getOrCreate(key, testPool(context))
   const recovered = await reopened.work.snapshot(receipt.runId)
   expect(incarnation(recovered.ownerId)).toBe(incarnation(firstOwner) + 1)
   expect(recovered).toMatchObject({ status: "succeeded", runs: 1, receipts: 1, activations: 0 })
@@ -316,7 +317,7 @@ test("a fresh registry recovers a missed notification exactly once during startu
     setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
   )
   const { client: thirdClient } = await setupTest(context, thirdRegistry)
-  const third = thirdClient.partition.getOrCreate(key)
+  const third = thirdClient.partition.getOrCreate(key, testPool(context))
   const final = await third.work.snapshot(receipt.runId)
   expect(incarnation(final.ownerId)).toBe(incarnation(secondOwner) + 1)
   expect(final.status).toBe("succeeded")
@@ -402,7 +403,7 @@ test("cancellation drains through the same runtime and leaves no activation", as
     setup({ envoy: testPool(context), use: { partition: makeDefinition(observed) } }),
   )
   const { client } = await setupTest(context, registry)
-  const partition = client.partition.getOrCreate(partitionKey("cancellation"))
+  const partition = client.partition.getOrCreate(partitionKey("cancellation"), testPool(context))
   const command = input(`cancel-${process.pid}`)
   const receipt = await partition.work.admitWithoutNotify(command)
 
@@ -437,7 +438,7 @@ test("scope interruption leaves never-replay work for explicit resolution withou
     }),
   )
   const { client: firstClient } = await setupTest(context, firstRegistry)
-  const first = firstClient.partition.getOrCreate(key)
+  const first = firstClient.partition.getOrCreate(key, testPool(context))
   const receipt = await first.work.send(input(`unknown-${process.pid}`))
   const firstOwner = (await first.work.snapshot(receipt.runId)).ownerId
   await started
@@ -464,7 +465,7 @@ test("scope interruption leaves never-replay work for explicit resolution withou
     }),
   )
   const { client: secondClient } = await setupTest(context, secondRegistry)
-  const reopened = secondClient.partition.getOrCreate(key)
+  const reopened = secondClient.partition.getOrCreate(key, testPool(context))
   const recovered = await reopened.work.snapshot(receipt.runId)
   expect(incarnation(recovered.ownerId)).toBe(incarnation(firstOwner) + 1)
   expect(recovered.status).toBe("needs-resolution")
