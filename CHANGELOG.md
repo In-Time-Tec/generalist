@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.64.0
 
 - **Breaking:** replace every production Runtime storage backend with the shared object-storage engine. Use `generalist/durability` with `generalist/durability/s3` or `generalist/durability/r2` and explicit environment, tenant, and partition identities. Remove SQL drivers, schemas, peers, production Runtime memory storage, and the optional pgvector integration; there are no compatibility exports or automatic legacy data conversion.
 - **Breaking:** replace BlobStore backend constructors with `BlobStore.layer({ environment, tenant, maxBytes? })` over the same ObjectStore and Crypto services. Durable permission rules, memo entries, instruction revisions, and snapshot references use object-backed storage; process-local core services remain available without restart guarantees.
 - Move Cloudflare Durable Objects and Rivet actors to host-only integration over canonical object state. Host alarms, schedules, and caches are wake hints, not commit authority; external schedulers need independent reconciliation.
 - Add conditional immutable commits, input-bound receipts, indeterminate-write reconciliation, and ownership fencing. Retain committed slots even after snapshots; automatic live-history deletion is not supported. Document provider-contract requirements, namespace isolation, conservative backup/restore, and explicit external-operation uncertainty.
 - Migrate hosted examples and tutorials to explicit S3/R2 configuration. All public exports remain `@experimental`; no real-provider performance or deployed recovery certification is implied by this cutover.
+- Add committed Session conversation snapshots and cursor-ordered live updates. Reconnects restore the active path, and rewinds or branches replace the abandoned suffix rather than duplicating it.
+- Add schema-pinned durable components with bounded state, commands, and immutable command receipts. Ordered Hook decisions are checkpointed and reused during recovery instead of rerunning a completed hook chain.
 
 ## 0.63.0
 
