@@ -8,6 +8,7 @@ import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
 import { RunInspection } from "../runtime/run.js"
 import { RuntimeInspectionResponse } from "../runtime/inspection.js"
+import type { RuntimeInspection } from "../runtime/service.js"
 import { Authentication } from "./auth.js"
 import { apiErrors, artifactApiErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
@@ -116,9 +117,10 @@ const listRuns = HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
   success: Schema.Array(RunInspection),
   error: apiErrors,
 })
+const inspectRunResponse: Schema.Codec<RuntimeInspection, unknown> = RuntimeInspectionResponse
 const inspectRun = HttpApiEndpoint.get("inspect", "/runs/:id", {
   params: { id: Schema.String },
-  success: RuntimeInspectionResponse,
+  success: inspectRunResponse,
   error: apiErrors,
 })
 const cancelRun = HttpApiEndpoint.post("cancel", "/runs/:id/cancel", {
