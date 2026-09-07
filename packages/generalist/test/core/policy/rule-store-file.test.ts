@@ -83,23 +83,24 @@ const request = {
 }
 
 describe("durable RuleStore adapters", () => {
-  const watchedRuleFile = `/tmp/generalist-permissions-watch-${process.pid}.json`
-  const watchedFileLayer = Permissions.layerRuleStoreFile({ path: watchedRuleFile }).pipe(
-    Layer.provideMerge(Layer.merge(BunFileSystem.layer, Path.layer)),
-  )
-
   it.live("loads watched external changes", () =>
     Effect.gen(function* () {
-      const store = yield* Permissions.RuleStore
       const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-permissions-watch-" })
+      const watchedRuleFile = path.join(directory, "permissions.json")
+      const temporary = path.join(directory, "permissions.next.json")
+      const context = yield* Layer.build(Permissions.layerRuleStoreFile({ path: watchedRuleFile }))
+      const store = yield* Permissions.RuleStore.pipe(Effect.provideContext(context))
+      expect(yield* store.rules).toEqual([])
       yield* Effect.sleep("10 millis")
-      yield* fileSystem.writeFileString(watchedRuleFile, '[{"pattern":"shell","level":"allow"}]')
+      yield* fileSystem.writeFileString(temporary, '[{"pattern":"shell","level":"allow"}]')
+      yield* fileSystem.rename(temporary, watchedRuleFile)
       for (let attempt = 0; attempt < 100 && (yield* store.rules).length === 0; attempt++) {
         yield* Effect.sleep("10 millis")
       }
       expect(yield* store.rules).toEqual([{ pattern: "shell", level: "allow" }])
-      yield* fileSystem.remove(watchedRuleFile, { force: true })
-    }).pipe(provide(watchedFileLayer)),
+    }).pipe(Effect.scoped, provide(Layer.merge(BunFileSystem.layer, Path.layer))),
   )
 
   it.effect("fails with InvalidRuleFile for invalid persisted rules", () =>
