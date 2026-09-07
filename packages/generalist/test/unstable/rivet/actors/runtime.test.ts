@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/async-function -- These integration tests exercise Rivet's Promise-only actor API. */
 import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import { actor, setup, type Registry, type RegistryActors, type RegistryConfigInput } from "rivetkit"
-import { setupTest } from "rivetkit/test"
+import { setupTest as setupRivetTest } from "rivetkit/test"
 import { afterAll, expect, test, type TestContext } from "vitest"
 import { Context, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
@@ -28,6 +28,12 @@ const engineRuntime = ManagedRuntime.make(engineLayer)
 afterAll(() => engineRuntime.dispose())
 const setupRegistry = <Actors extends RegistryActors>(config: RegistryConfigInput<Actors>): Promise<Registry<Actors>> =>
   engineRuntime.runPromise(Effect.map(Engine, (engine) => setup({ ...config, ...engine })))
+
+const setupTest = async <Actors extends RegistryActors>(context: TestContext, registry: Registry<Actors>) => {
+  const result = await setupRivetTest(context, registry)
+  await registry.startAndWait()
+  return result
+}
 
 class Application extends Context.Service<Application, { readonly incarnation: number }>()(
   "generalist/test/unstable/rivet/actors/runtime.test/Application",

@@ -41,6 +41,18 @@ export const layer = Layer.effect(
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const directory = yield* fs.makeTempDirectoryScoped({ prefix: "generalist-rivet-engine-" })
+    const configPath = path.join(directory, "rivet.json")
+    yield* fs.writeFileString(
+      configPath,
+      yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Json))({
+        runtime: {
+          worker_load_shedding_curve: [
+            [0, 1000],
+            [1000, 999],
+          ],
+        },
+      }),
+    )
     const sdkRequire = createRequire(createRequire(import.meta.url).resolve("rivetkit"))
     const module = yield* Effect.try({
       try: () => decodeEngineModule(sdkRequire("@rivetkit/engine-cli")),
@@ -56,10 +68,9 @@ export const layer = Layer.effect(
       Effect.all([reservePort, reservePort, reservePort]),
     )
     const process = yield* spawner.spawn(
-      ChildProcess.make(binary, ["start"], {
+      ChildProcess.make(binary, ["--config", configPath, "start"], {
         cwd: directory,
         env: {
-          RUST_LOG: "info,pegboard=debug,pegboard_envoy=debug,guard=debug,gasoline=debug",
           RIVET__FILE_SYSTEM__PATH: path.join(directory, "data"),
           RIVET__GUARD__HOST: "127.0.0.1",
           RIVET__GUARD__PORT: String(enginePort),
