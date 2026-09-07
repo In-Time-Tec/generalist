@@ -4,7 +4,83 @@ The revised harness plan below defines the required behavior, not a requirement 
 
 Preserve compliant work: this is a state-model and harness refactor, not a mechanical SQL-to-JSON port. Remove all SQL integrations from Generalist, with no alternate production durability backend. Preserve invariant coverage while replacing its implementation; the finished tree must contain no temporary reference harness.
 
-## Worktree and observed baseline
+## Completion and release execution plan — September 7, 2026
+
+This section owns the remaining execution order. The normative revision below still owns behavior; earlier checkpoint observations are historical, not current proof. The September 7 request authorizes completing this migration, pushing its branch, merging the verified result to `main`, and publishing a documented new Generalist version. It does not authorize production data deletion, live data cutover, credential changes, or deployment of a qualification Worker.
+
+Object storage means one production durability engine over S3 and native R2, not Cloudflare Durable Objects as the only compute host. Hosts remain separate from storage authority. Keep non-durable Core execution, a test-only object store, clean Generalist-owned v1 contracts, and fresh namespaces. Do not restore SQL, a second memory Runtime, filesystem durability, compatibility readers, aliases, or old-format migrations.
+
+### Verified restart baseline
+
+- Inspected checkpoint: `dfec0dba24222ab3599135c574163288e8c6fc7a`, branch `object-storage-only-durability`, version `0.62.0`; clean checkout before this planning change. Its diff from its merge base contains 554 files, 21,198 insertions, and 39,701 deletions.
+- `origin/main` is now `bb1f9154a2e0c870c401ce5cb5a955a70805b414`. Seven commits after the branch base include the native Rivet runtime host, recovery fixes, package-size measurement, and release `0.63.0`. GitHub's latest release and npm both report `0.63.0`. These changes must be reconciled, not overwritten by the older checkpoint.
+- Installed the pinned Bun `1.4.0` and release-consumer npm `11.19.0`. `bun install --frozen-lockfile` passed without a lockfile change.
+- A fresh `bun run build` failed: 70 source diagnostics across 24 files. Current failures include missing runtime-state type imports, declaration emit names, command identities, Prompt boundaries, captured-observation requirements, and omitted typed durability failures. This replaces the old compiler count as the current build observation; it is not a full workspace typecheck result.
+- The completed focused run passed 91/92 tests across 11 files: shared runtime driver 37/37, interrupted model responses 5/5, runtime boundary 6/6, runtime-state codec 10/10, protocol model 21/21, and Artifact 12/13. The remaining Artifact fork failure is a missing `commandId` through `host.sessions.fork`, not the old missing-model/worker failure. A separate `bun --bun vitest run packages/generalist/test/durability/branch.test.ts --no-file-parallelism --maxWorkers=1` passed 7/7. Combined current evidence is 98/99; it does not certify the broader migrated suite or build.
+- Native R2 qualification still drops the failed case from its evidence array in `packages/generalist/src/testing/durability/native-r2.ts`. A failed run must preserve the case name, duration, and sanitized failure classification, mark later cases not run, and retain uncertain-writer cleanup protection.
+- Configuration-only provider preflight reports all three provider gates unmet: remote-write authorization, scoped bucket identities, credentials, and the authenticated native Worker endpoint/token are absent. No live provider requests were made by this preflight.
+
+### Dependency-ordered milestones
+
+Each milestone requires an inspected diff, current checks, and evidence tied to a commit before it is complete. One integration owner controls canonical schemas, command identity, receipts, fencing, and branch policy. Parallel contributors own disjoint consumers only after those contracts are fixed. Build success alone never closes a behavioral milestone.
+
+| Milestone                                                     | Required work                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Exit gate                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| M1 — Recover a trustworthy baseline                           | Fix source command IDs, typed failure channels, captured observations, declaration emit, and Prompt boundaries. Rebuild before diagnosing declaration-dependent callers. Rerun the focused runtime, Artifact, codec, branch, and protocol suites, then migrated state, operation, run, Program, child, messaging, Core, and memo tests. Fix qualification evidence reporting with failure-path regression coverage.                                                       | Fresh package build and typecheck pass; focused and migrated tests pass without weakening existing expectations. Record exact commands, counts, failures, and skips.                                                                                                                                                                                                     |
+| M2 — Reconcile current main and freeze canonical contracts    | Merge current `origin/main` into the migration branch, preserving the new Rivet host and recovery behavior while converting its durability to the single object engine. Complete the state inventory: per-kind codecs, semantic records versus indexes, command/observation/receipt identity, atomic scopes, field-level branch policies, executable pins, payload references, and bounded recovery.                                                                      | Every recoverability-critical category has one authoritative mutation and recovery consumer; no transitional unknown payload substitutes for a required codec. Main's retained host behavior has object-backed tests. Rebuild and rerun M1 gates after integration.                                                                                                      |
+| M3 — Finish durable harness state                             | Implement durable component declarations and instance identity, versioned hooks and recorded decisions, representative built-ins, settings ownership/inheritance/effective values, and resumable Program control through the canonical command path. Retain current security restrictions and monotonic cost/receipt evidence across branches.                                                                                                                            | Reopen/fork/rewind tests cover abandoned extension state, accepted mutation before tool completion, missing component code/version, settings changes, nested control/retry ownership, and distinct detach/switch/cancel/shutdown reasons. Reconstruction invokes no effectful hook.                                                                                      |
+| M4 — Finish execution, inference, and workspace contracts     | Unify operation/job identity and durable intent/outcomes; enforce separate intake, persisted-output, and projection bounds; represent uncertain effects and termination limitations honestly. Persist inference compatibility decisions and exact request/normalization references. Pin workspace identity/base/snapshots/patches and executable requirements; keep credentials and live handles outside persisted state.                                                 | Fresh-host tests prove no redispatch of settled or unknown unsafe operations, bounded excessive output, honest uncooperative cancellation, exact inference recovery, stale-file rejection, isolated child workspaces, and explicit activation failure for missing code/workspace.                                                                                        |
+| M5 — Finish host, discovery, retention, and client guarantees | Add durable partition discovery independent of catalog notifications; reconcile sender/receiver obligations and receipts after lost delivery. Keep active journal slots and receipt dependencies retained; define safe namespace retirement without online GC claims. Complete host start/reconcile/drain/stop, client initial snapshots, committed cursors, subscription epochs/gap resync, stale-preview rejection, and server-enforced spectator/tenant authorization. | Crash immediately after a new partition commit but before notification and recover it from a fresh host. Exercise delayed writers versus retirement, retained fork/blob dependencies, sleeping work, projection deletion, stale epochs, duplicate/gapped delivery, snapshot without a new message, and denied spectator mutations.                                       |
+| M6 — Complete independent correctness and provider proof      | Extend the independent domain oracle/property sequences across admit, claim, operate, cancel, fork, rewind, restart, compact, and project. Tie bounded sequencing/takeover/lost-response/deletion models to real integration traces. Qualify AWS S3, R2 S3, and native R2/S3 interoperability using isolated authorized namespaces. Measure workload-specific latency, request/byte amplification, replay, memory, artifacts, and idle reconciliation.                    | All 18 invariants and the normative required-case matrix link to actual test symbols and current results. Publish model assumptions/bounds/seeds. All three live provider gates pass; local simulators and skipped remote tests cannot substitute. Numeric performance acceptance uses an agreed product workload, not invented provider promises.                       |
+| M7 — Finish public surfaces and release candidate             | Update supported host examples, manifests/exports, generated API/OpenAPI/host surfaces, READMEs, guides, architecture/tradeoffs, `CONTEXT.md`, repository instructions, and release skill to the shipped object-only contract. Remove stale SQL examples/dependencies/check requirements rather than suppressing checks. Document breaking changes, fresh-namespace setup, recovery, retention, credentials, and honest limitations.                                      | `bun run check`, `bun run test`, and `PACKAGE_ARTIFACT_DIR=<new-directory> bun run package` pass. Audit source and the packed tarball for removed imports/exports and SQL durability dependencies; fresh core-only, Bun, npm, Node, and optional transport consumers pass. Runnable S3/R2 and supported-host examples compile and execute under their stated conditions. |
+| M8 — Merge and publish one verified version                   | Prepare the lockstep version and changelog, independently review the final diff, verify one exact detached candidate, land that exact release commit on `main`, wait for its successful main CI, then tag and publish through the existing workflow.                                                                                                                                                                                                                      | The immutable tag points at the verified main commit; the workflow succeeds; GitHub assets, npm version, tarball integrity, checksums, and post-publication isolated consumer installation agree. Report the release URL, workflow run, full SHA, version, and remaining limitations.                                                                                    |
+
+M1 precedes destructive integration. M2 is the shared contract boundary for M3–M5. After M2, component/settings work, execution/workspace work, and host/client work can run in parallel only with disjoint file ownership; discovery and journal retention remain with the canonical-engine owner. Independent tests and documentation can grow alongside implementation but cannot certify unfinished features. M6 and M7 both block M8.
+
+### Bounded implementation slices
+
+The source audit distinguishes missing contracts from existing foundations. Reuse the latter instead of replacing useful behavior with a second framework. Paths below are relative to `packages/generalist/`.
+
+1. **Canonical schema and mutation boundary:** extend `src/durability/internal/runtime-state/schema.ts` and the existing runtime command families with approved semantic records. Define per-kind operation codecs and branch policy before consumers add fields. A schema that exhaustively covers today's `RuntimeState` is not proof that the governing recovery inventory is complete.
+2. **Component vertical slice:** build on `src/hooks/index.ts` and the canonical engine, with stable component/instance identity, bounded authorized state, schema/handler pins, and branch/redaction policies. Migrate Tasks first from `src/tasks/internal.ts` and the loop checkpoint. Add pinned hook-chain identity and operation-backed effectful outcomes to `src/core/agent/lifecycle/hooks.ts`; existing decision checkpointing alone leaves a crash window between an effectful callback and its recorded decision. Memo and administrative rules follow their distinct cache/security branch policies, not blanket rewind.
+3. **Settings before control and inference:** reuse normalization and child narrowing in `src/core/agent/lifecycle/fan-out.ts` and the pinned Agent manifest. Add declared ownership/defaults/precedence/access, deterministic conflicts, effective values and accepted-change provenance. Extend existing Program state and runner with bounded control ownership, plan/verification/yield state, suspension relationships, and capability expiry; do not invent another workflow primitive.
+4. **Output and one concrete job adapter:** close typed operation input/outcome contracts before adding job admission/reconnect/settlement. `src/core/tools/tool-output.ts` currently bounds already-materialized values; implement intake limits and incremental spill before accumulation. Preserve exact final-result semantics, separately bounded provisional previews, and the honest cancellation evidence in `src/core/tools/tool-executor-cancellation.ts`. Begin with one adapter whose termination/reconnect capabilities are real; not every operation must become a job.
+5. **Inference and workspace activation:** persist selected provider/model/settings, tool-contract and compatibility-policy identities, and bounded request/normalization evidence under the existing model operation and budget. Extend `src/runtime/executable/resolver.ts` rather than replacing its pin checks. A snapshot ID recovered by `src/runtime/execution/agent/sandbox-snapshot.ts` is not yet a portable workspace contract: pin base/references/restore adapter and validate the dependency closure before activation.
+6. **Discovery and host lifecycle:** `src/runtime/child/external/store.ts` already owns placement/admission/settlement/acknowledgement but needs bounded outstanding-obligation enumeration and recovery of newly committed partitions. A known-run missed-event test cannot prove unknown-partition discovery. Preserve Rivet's periodic reconciliation and sleep/destroy disposal, incorporate current main's native host work, and add a real Cloudflare host recovery example rather than treating the qualification Worker as a runtime host example.
+7. **Authorization and resumable clients:** extend the current server authorization boundary with application-supplied principal/resource permissions, including read-only spectators. Apply it before HTTP mutations, cancel sockets, Artifact edits, and operator actions. Add a snapshot-plus-exclusive-cursor and epoch contract to host/client transport; deduplicate and resync without assuming filtered opaque cursors are arithmetically contiguous. Artifact already sends a snapshot; preserve it while closing its authenticated-peer edit policy.
+8. **Retention and release evidence:** retain active committed slots, receipts, and referenced payloads; publish capacity/receipt-growth limits and an offline fenced-retirement procedure. Online GC is not required for this release and is not certified by snapshotting. Keep negative legacy-import tests in package smoke and historical release prose. Audit supported production import closure and packed exports rather than claiming incidental SQLite dependencies anywhere in the lockfile necessarily represent Generalist durability. Add exact-source provider evidence to release acceptance: local CI alone does not qualify AWS or R2.
+
+### Verification ladder and evidence rules
+
+Use the repository's existing commands and authoritative shared runtime-driver suite. Do not add a second conformance harness or a new release script.
+
+1. Run `bun run build`, then `bun run --cwd packages/generalist typecheck` against fresh declarations. Do not hide `DurabilityFailure`, manufacture nondeterministic retry identities, weaken schemas, or erase Effect requirements to satisfy the compiler.
+2. Run the actual focused destinations: `packages/generalist/test/testing/runtime-driver/index.test.ts`, `packages/generalist/test/durability/{branch,runtime,runtime-state,protocol-model}.test.ts`, `packages/generalist/test/runtime/execution/model-response/interrupted.test.ts`, and `packages/generalist/test/artifact`, using `bun --bun vitest run <paths> --no-file-parallelism --maxWorkers=1`.
+3. Run the broader migrated suites and new invariant regressions. Every persistence claim crosses a fresh Layer or close/reopen boundary. Read-only reconstruction must not probe, heartbeat, dispatch, publish, or acquire execution authority. Replay must use the exact authoritative cursor without redispatch.
+4. Run provider qualification with `bun scripts/durability-provider.ts aws-s3 r2-s3 r2-native-s3-interoperability` only after explicit scoped authorization and complete configuration. Retain sanitized per-case evidence including failures, not just aggregate status. Uncertain writers prohibit cleanup.
+5. Run the complete check/test/package gates. The final object-only instruction update must replace obsolete SQL requirements with the real object-backed conformance and provider gates; removing SQL cannot mean removing its preserved behavior from verification.
+6. Follow `generalist-release` from an exact detached commit and a new artifact directory. If source, version, tools, or generated output changes, create new evidence. Dirty-worktree package output is never commit proof.
+
+For each required invariant/case, record the implementation path, test file and symbol, commit, command, observed result, and whether the evidence is local, host-native, or live-provider. Use explicit statuses: implemented/unverified, verified, missing, blocked, or deliberately excluded by the governing scope. Historical local counts and inaccessible prior-agent artifact references are not current release evidence.
+
+### Version, merge, and publication policy
+
+Target `0.64.0` as the next pre-1.0 breaking minor release, subject to rechecking `main`, tags, and npm immediately before creating the candidate. Do not reuse `0.62.0` or republish `0.63.0`. Keep root and package versions identical, regenerate the locked/public version surfaces, and document removed storage imports and their object-native replacements in `CHANGELOG.md`. Generalist-owned schema v1 does not mean package 1.0 or stable Effect AI APIs.
+
+Keep the unfinished migration on its branch and expose it as a draft PR; do not merge a plan-only checkpoint or enable auto-merge while behavioral gates are open. Preserve concurrent main work through a normal merge into the branch and rerun affected gates. Review the full net diff, including deletions, dependency closure, examples, and host recovery.
+
+The release source must be exactly the commit tested in detached proof and present on `main`. Prefer a merge that preserves the verified candidate commit. If repository policy requires squash/rebase or creates a different release source, run detached proof for the resulting main commit before tagging; do not transfer evidence between SHAs. Wait for successful latest push CI on that exact main commit before pushing `v<version>`, as `.github/workflows/publish.yml` requires. Never publish from the workstation. Manual workflow dispatch only reconciles an existing immutable tag with its full expected SHA.
+
+### External release gates
+
+The user has authorized branch pushes, the final verified merge, and publication. These do not imply authorization to write to a production bucket or deploy infrastructure. Local implementation continues while external gates are arranged.
+
+- Obtain approval for billable AWS/R2 qualification writes in isolated test namespaces, identify the buckets/regions and acceptable cost/request budget, and either supply an existing authenticated native R2 Worker or authorize its isolated deployment. Do not delete production data or perform a retained-data migration.
+- Configure `GENERALIST_DURABILITY_REMOTE=1`, `GENERALIST_DURABILITY_ENVIRONMENT`, and `GENERALIST_DURABILITY_TENANT`; AWS bucket/region/access-key/secret-key values under `GENERALIST_DURABILITY_AWS_*`; R2 bucket/endpoint/access-key/secret-key values under `GENERALIST_DURABILITY_R2_*`; and `GENERALIST_DURABILITY_NATIVE_R2_ENDPOINT`/`GENERALIST_DURABILITY_NATIVE_R2_TOKEN`. Supply secrets through secure environment configuration, never the plan, chat, logs, or commits. Optional session tokens remain secret. Leave cleanup disabled unless separately scoped and safe.
+- Agree on the representative workload and numerical acceptance limits for durable admission/outcome latency, cold/wake recovery, requests per command, replay/memory bounds, and idle reconciliation. Report measurements without a pass claim until those limits exist.
+- Verify GitHub branch/PR/merge/workflow access and the repository's npm publication identity before M8. Missing credentials or permissions are external blockers, not permission to bypass the canonical release workflow.
+
+## Historical worktree and observed baseline
 
 - Worktree: `/Users/dallenpyrah/Projects/in-time-tec/generalist-object-storage-only`.
 - Branch: `object-storage-only-durability`, created from freshly fetched `main` at `7042211fb3d29c8ff74234e9b400dc6286c03d1d` (0.62.0).
@@ -25,26 +101,26 @@ Preserve compliant work: this is a state-model and harness refactor, not a mecha
 
 Main is the single integration authority for domain schemas and the commit protocol. Existing workers implement bounded slices under that contract; they may not independently widen canonical APIs. Transport and host work resumes only against approved contracts. An independent reviewer must use a separate invariant oracle, not only implementation-generated digests.
 
-| Invariant | Accountable owner / implementation slice | Required responsibility |
-|---|---|---|
-| INV-01 | Main / ObjectRuntime | Versioned entities, bounded partition materialization, no giant authority object |
-| INV-02 | Main / RuntimeStateCodec | Complete runtime, extension, settings, workspace and job recovery inventory |
-| INV-03 | Main / ObjectRuntime | Authorized commands; one durable mutation and committed application path |
-| INV-04 | Main / ObjectRuntime | Explicit captured observations; no reducer clocks or callbacks |
-| INV-05 | Main / JournalEngine | Partition atomicity and ordered canonical commit protocol |
-| INV-06 | Main / JournalEngine | Durable acknowledgement and indeterminate-write reconciliation |
-| INV-07 | Main / JournalEngine | Scoped idempotency, original receipts and retention |
-| INV-08 | Main / ObjectRuntime | Separate run/session fencing and fresh activation authority |
-| INV-09 | Main / ObjectRuntime | Intent barriers and honest external Unknown outcomes |
-| INV-10 | Main / ObjectRuntime | Read-only reconstruction separated from activation and probes |
-| INV-11 | Main | Branch policy, monotonic cost/receipts and non-rewindable security |
-| INV-12 | Main / JournalEngine | Snapshot anchors and retained journal/payload dependencies |
-| INV-13 | Main / PackageTrain | Non-authoritative views and honest projection lag |
-| INV-14 | Main | Attempt-scoped previews and committed cursor subscriptions |
-| INV-15 | Main / ObjectHosts | Host authorization, credential isolation and spectator enforcement |
-| INV-16 | Main | Bounded jobs, input/storage/projection limits and honest termination |
-| INV-17 | Main | Versioned extension/tool/config descriptors and missing-code rejection |
-| INV-18 | Main / PackageTrain | SQL-free production graph, no alternate authority or fallback |
+| Invariant | Accountable owner / implementation slice | Required responsibility                                                          |
+| --------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
+| INV-01    | Main / ObjectRuntime                     | Versioned entities, bounded partition materialization, no giant authority object |
+| INV-02    | Main / RuntimeStateCodec                 | Complete runtime, extension, settings, workspace and job recovery inventory      |
+| INV-03    | Main / ObjectRuntime                     | Authorized commands; one durable mutation and committed application path         |
+| INV-04    | Main / ObjectRuntime                     | Explicit captured observations; no reducer clocks or callbacks                   |
+| INV-05    | Main / JournalEngine                     | Partition atomicity and ordered canonical commit protocol                        |
+| INV-06    | Main / JournalEngine                     | Durable acknowledgement and indeterminate-write reconciliation                   |
+| INV-07    | Main / JournalEngine                     | Scoped idempotency, original receipts and retention                              |
+| INV-08    | Main / ObjectRuntime                     | Separate run/session fencing and fresh activation authority                      |
+| INV-09    | Main / ObjectRuntime                     | Intent barriers and honest external Unknown outcomes                             |
+| INV-10    | Main / ObjectRuntime                     | Read-only reconstruction separated from activation and probes                    |
+| INV-11    | Main                                     | Branch policy, monotonic cost/receipts and non-rewindable security               |
+| INV-12    | Main / JournalEngine                     | Snapshot anchors and retained journal/payload dependencies                       |
+| INV-13    | Main / PackageTrain                      | Non-authoritative views and honest projection lag                                |
+| INV-14    | Main                                     | Attempt-scoped previews and committed cursor subscriptions                       |
+| INV-15    | Main / ObjectHosts                       | Host authorization, credential isolation and spectator enforcement               |
+| INV-16    | Main                                     | Bounded jobs, input/storage/projection limits and honest termination             |
+| INV-17    | Main                                     | Versioned extension/tool/config descriptors and missing-code rejection           |
+| INV-18    | Main / PackageTrain                      | SQL-free production graph, no alternate authority or fallback                    |
 
 The invariant-to-test map is pending reconciliation and must name real test symbols and observed results. Existing tests are evidence candidates, not automatically certified coverage. All 50 phase steps, 34 required test cases, three model/property verification tasks, and ten final deliverables are tracked separately in the active todo list.
 The initial state-category and branch-policy decision is recorded in `docs/decisions/object-native-state-model.md`; extension, settings, job/workspace and client inventories are still being reconciled.
@@ -115,19 +191,19 @@ Routine reversible edits and tests need no additional confirmation. This assignm
 
 The Stencil article is architectural input, not a specification or validation of an object-storage commit protocol. [W1]
 
-| Article area | Generalist disposition |
-|---|---|
-| Design envelope | Test concurrent local use, remote control, spectators, and unattended execution. |
-| State | Require complete recovery and branch-aware state. |
-| Runtime | Centralize bounded execution and enforce host authority. |
-| Control plane | Persist settings and multi-turn control state. |
-| Inference | Centralize compatibility decisions and validate normalized results. |
-| Tool surface | Version contracts and measure discovery costs. |
-| Interface | Provide typed, resumable views and an executable debug contract. |
-| Stack | Keep Effect and enforce one repository style. |
-| Closing principles | Assign each invariant an owner and a test. |
-| Appendix A | Add adversarial extension-lifecycle regressions. |
-| Appendix B | Apply model-based verification; defer its specific terminal algorithm. |
+| Article area       | Generalist disposition                                                           |
+| ------------------ | -------------------------------------------------------------------------------- |
+| Design envelope    | Test concurrent local use, remote control, spectators, and unattended execution. |
+| State              | Require complete recovery and branch-aware state.                                |
+| Runtime            | Centralize bounded execution and enforce host authority.                         |
+| Control plane      | Persist settings and multi-turn control state.                                   |
+| Inference          | Centralize compatibility decisions and validate normalized results.              |
+| Tool surface       | Version contracts and measure discovery costs.                                   |
+| Interface          | Provide typed, resumable views and an executable debug contract.                 |
+| Stack              | Keep Effect and enforce one repository style.                                    |
+| Closing principles | Assign each invariant an owner and a test.                                       |
+| Appendix A         | Add adversarial extension-lifecycle regressions.                                 |
+| Appendix B         | Apply model-based verification; defer its specific terminal algorithm.           |
 
 Do not copy XML state, language choices, terminal machinery, or a shell interpreter merely because the article uses them. The sections below specify Generalist requirements independently.
 
@@ -143,17 +219,17 @@ A new Bash interpreter, Python extension runtime, Rust rewrite, terminal layout 
 
 The reviewed source already contains valuable semantics. Preserve those semantics instead of replacing them with a minimal transcript store.
 
-| Existing source | Observed behavior | Refactor action |
-|---|---|---|
-| `runtime/run/store-types.ts` | SQL backend types, execution claims, session-writer claims, and atomic child-admission inputs. | Extract domain types and retain atomic scopes. [R2] |
-| `runtime/run/store.ts` | Broad runtime contract for sessions, operations, waits, schedules, children, and artifacts. | Route these capabilities through one engine. [R3] |
-| `runtime/sql/store.ts` | Transactions combine claim checks, domain changes, and validation. | Replace mechanics without weakening invariants. [R4] |
-| `core/durable/driver/contract.ts` | Deterministic operation identities, replay policies, checkpoints, and unknown outcomes. | Retain and integrate these concepts. [R5] |
-| `hooks/index.ts` | Typed lifecycle events and serializable hook decisions. | Extend recovery coverage instead of creating another hook system. [R6] |
-| `core/tools/tool-executor.ts` | Typed outcomes, routing, cancellation, and toolkit stream handling. | Preserve integration and define preliminary-versus-durable output. [R7] |
-| `blob-store/index.ts` | Several backends and a small injected S3 client without a journal contract. | Reuse content references over the new object transport. [R8] |
-| Cloudflare and Rivet adapters | SQL-backed runtime composition. | Retain hosting responsibilities and remove SQL authority. [R9, R10] |
-| `testing/runtime-driver/contract.ts` | Existing behavioral conformance scenarios. | Convert them into mandatory engine and host suites. [R11] |
+| Existing source                      | Observed behavior                                                                              | Refactor action                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `runtime/run/store-types.ts`         | SQL backend types, execution claims, session-writer claims, and atomic child-admission inputs. | Extract domain types and retain atomic scopes. [R2]                     |
+| `runtime/run/store.ts`               | Broad runtime contract for sessions, operations, waits, schedules, children, and artifacts.    | Route these capabilities through one engine. [R3]                       |
+| `runtime/sql/store.ts`               | Transactions combine claim checks, domain changes, and validation.                             | Replace mechanics without weakening invariants. [R4]                    |
+| `core/durable/driver/contract.ts`    | Deterministic operation identities, replay policies, checkpoints, and unknown outcomes.        | Retain and integrate these concepts. [R5]                               |
+| `hooks/index.ts`                     | Typed lifecycle events and serializable hook decisions.                                        | Extend recovery coverage instead of creating another hook system. [R6]  |
+| `core/tools/tool-executor.ts`        | Typed outcomes, routing, cancellation, and toolkit stream handling.                            | Preserve integration and define preliminary-versus-durable output. [R7] |
+| `blob-store/index.ts`                | Several backends and a small injected S3 client without a journal contract.                    | Reuse content references over the new object transport. [R8]            |
+| Cloudflare and Rivet adapters        | SQL-backed runtime composition.                                                                | Retain hosting responsibilities and remove SQL authority. [R9, R10]     |
+| `testing/runtime-driver/contract.ts` | Existing behavioral conformance scenarios.                                                     | Convert them into mandatory engine and host suites. [R11]               |
 
 Paths in this table are relative to `packages/generalist/src/`.
 
@@ -408,12 +484,12 @@ R2 supports native conditional writes, but a failed native `put()` precondition 
 
 Keep these responsibilities separate:
 
-| Interface | Responsibility |
-|---|---|
-| Runtime object access | Read, conditional create, metadata inspection, and paginated discovery. |
-| Advisory metadata | Optional conditional replacement where the selected protocol needs it. |
-| Blob access | Bounded upload, range reads, integrity checks, and completed-upload references. |
-| Maintenance access | Controlled deletion and retention operations with separate credentials where possible. |
+| Interface             | Responsibility                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------- |
+| Runtime object access | Read, conditional create, metadata inspection, and paginated discovery.                |
+| Advisory metadata     | Optional conditional replacement where the selected protocol needs it.                 |
+| Blob access           | Bounded upload, range reads, integrity checks, and completed-upload references.        |
+| Maintenance access    | Controlled deletion and retention operations with separate credentials where possible. |
 
 Do not expose unrestricted object overwrite to the normal journal path.
 
@@ -518,15 +594,15 @@ A recovered operation can require provider reconciliation rather than retry. Pre
 
 ## Branch policies
 
-| State class | Fork and rewind behavior |
-|---|---|
-| Conversation, plans, todo state, branch-local configuration | Restore the selected branch state. |
-| Future operation identities and ownership | Allocate fresh identities and generations. |
-| Incurred usage and external-operation receipts | Retain monotonic evidence; do not erase history. |
-| Approval grants and security restrictions | Apply declared scope and current authorization rules. |
-| Shared budget allocation | Reserve a new branch allocation. |
-| Immutable prompts, artifacts, and workspace references | Share retained references when policy permits. |
-| Process handles and provider connections | Reconstruct, reconnect, or report unsupported recovery. |
+| State class                                                 | Fork and rewind behavior                                |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| Conversation, plans, todo state, branch-local configuration | Restore the selected branch state.                      |
+| Future operation identities and ownership                   | Allocate fresh identities and generations.              |
+| Incurred usage and external-operation receipts              | Retain monotonic evidence; do not erase history.        |
+| Approval grants and security restrictions                   | Apply declared scope and current authorization rules.   |
+| Shared budget allocation                                    | Reserve a new branch allocation.                        |
+| Immutable prompts, artifacts, and workspace references      | Share retained references when policy permits.          |
+| Process handles and provider connections                    | Reconstruct, reconnect, or report unsupported recovery. |
 
 Do not describe all persistent values as automatically rewindable. Their declared policies determine behavior.
 
@@ -768,19 +844,19 @@ Do not solve uncertainty by supporting three canonical engines. Any later canoni
 
 Verify paths against the actual implementation branch. The paths below describe the reviewed baseline, not an instruction to delete equivalent compliant replacements.
 
-| Area | Required outcome |
-|---|---|
-| `src/pg/**`, `src/mysql/**` | Remove production durability implementations and public exports. |
-| `src/runtime/sql/**` | Extract domain semantics, then remove SQL persistence, locks, migrations, and row codecs. |
-| `src/runtime/sql-driver.ts`, `src/runtime/sqlite-bun.ts` | Remove backend composition and exports. |
-| `src/runtime/memory/store*` | Remove duplicate runtime behavior; test the production engine through a test object store. |
-| `src/runtime/memory/layer/**` | Move generic composition to storage-neutral modules. |
-| `src/blob-store/index.ts` | Retain useful references and access semantics over object storage; remove alternate production backing stores. |
-| `src/unstable/cloudflare/durable-objects/**` | Remove SQL bridges; retain the thin host integration. |
-| `src/unstable/rivet/actors/**` | Remove SQL ownership and recovery; retain the thin host integration. |
-| `src/testing/runtime-driver/**` | Preserve behavioral cases and remove backend-specific exemptions. |
-| Package manifests and lockfile | Remove unused SQL drivers, SQL peers, and obsolete exports. |
-| Docs, examples, generated surfaces | Replace backend matrices with one durability model and transport setup. |
+| Area                                                     | Required outcome                                                                                               |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `src/pg/**`, `src/mysql/**`                              | Remove production durability implementations and public exports.                                               |
+| `src/runtime/sql/**`                                     | Extract domain semantics, then remove SQL persistence, locks, migrations, and row codecs.                      |
+| `src/runtime/sql-driver.ts`, `src/runtime/sqlite-bun.ts` | Remove backend composition and exports.                                                                        |
+| `src/runtime/memory/store*`                              | Remove duplicate runtime behavior; test the production engine through a test object store.                     |
+| `src/runtime/memory/layer/**`                            | Move generic composition to storage-neutral modules.                                                           |
+| `src/blob-store/index.ts`                                | Retain useful references and access semantics over object storage; remove alternate production backing stores. |
+| `src/unstable/cloudflare/durable-objects/**`             | Remove SQL bridges; retain the thin host integration.                                                          |
+| `src/unstable/rivet/actors/**`                           | Remove SQL ownership and recovery; retain the thin host integration.                                           |
+| `src/testing/runtime-driver/**`                          | Preserve behavioral cases and remove backend-specific exemptions.                                              |
+| Package manifests and lockfile                           | Remove unused SQL drivers, SQL peers, and obsolete exports.                                                    |
+| Docs, examples, generated surfaces                       | Replace backend matrices with one durability model and transport setup.                                        |
 
 Paths are relative to `packages/generalist/` unless stated otherwise.
 
@@ -929,42 +1005,42 @@ Integrate each subagent result into the primary branch. Do not leave completed w
 
 Use deterministic simulation, public-API integration tests, real-provider conformance, and host tests. Keep seeds and failure traces.
 
-| Case | Required result |
-|---|---|
-| Concurrent creates for one sequence | One commit wins; losing commands re-evaluate without external re-execution. |
-| Successful PUT with lost response | Reconciliation returns the original receipt. |
-| Same idempotency key, different input | A typed conflict prevents acceptance. |
-| Crash before publication | No partial transition becomes canonical. |
-| Crash after publication | Fresh recovery includes the committed transition. |
-| Stale owner after takeover | Protected writes fail under the old generation. |
-| Unknown external result | Recovery does not invent success or blindly retry. |
-| Atomic model/session update | Operation outcome, session ancestry, and continuation agree. |
-| Parent suspension plus child admission | The declared atomic scope contains all required changes. |
-| Cross-partition duplicate delivery | The receiver applies the identified message once within its guarantee. |
-| Admission before lost wake | Reconciliation discovers the obligation. |
-| New partition before catalog notification | Recovery still discovers the committed partition. |
-| Duplicate schedule occurrence | The occurrence produces one accepted transition. |
-| Corrupt or unsupported record | Recovery fails explicitly before mutation. |
-| Snapshot failure | A retained valid recovery path still exists. |
-| Paused writer versus GC | No retired sequence reappears as an accepted new commit. |
-| Fork with historical references | Required blobs and state remain available. |
-| Rewind after incurred cost | Historical costs and external receipts remain intact. |
-| Rewind after ownership transfer | Old execution authority never returns. |
-| Extension state on an abandoned branch | Current recovery excludes the abandoned branch's local state. |
-| Crash between extension mutation and tool result | Accepted extension state survives without a synthetic tool result. |
-| Missing extension version | Execution rejects incompatibility instead of resetting state. |
-| Session switch versus process exit | Switching views does not run shutdown-only side effects. |
-| Composed control behaviors | Recovery preserves ownership, retries, and nesting. |
-| Tool emits excessive output | Intake, storage, and projection limits apply independently. |
-| Uncooperative execution | The backend terminates it or reports an honest limitation. |
-| Old-attempt preview after restart | Clients reject obsolete provisional updates. |
-| Subscription gap or duplicate | Clients resync or deduplicate without hidden state loss. |
-| New client opens an existing session | The initial snapshot appears without a new user message. |
-| Untrusted output or spectator request | Rendering and server authorization preserve their boundaries. |
-| Projection deletion | Runtime correctness survives; supported projections rebuild. |
-| Tenant or resource escape attempt | Access fails before bytes or mutations cross the boundary. |
-| R2 native/S3 interoperability | Both transports recover the same logical state and receipt history. |
-| Host change with missing executable/workspace | Activation fails explicitly rather than starting different work. |
+| Case                                             | Required result                                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------- |
+| Concurrent creates for one sequence              | One commit wins; losing commands re-evaluate without external re-execution. |
+| Successful PUT with lost response                | Reconciliation returns the original receipt.                                |
+| Same idempotency key, different input            | A typed conflict prevents acceptance.                                       |
+| Crash before publication                         | No partial transition becomes canonical.                                    |
+| Crash after publication                          | Fresh recovery includes the committed transition.                           |
+| Stale owner after takeover                       | Protected writes fail under the old generation.                             |
+| Unknown external result                          | Recovery does not invent success or blindly retry.                          |
+| Atomic model/session update                      | Operation outcome, session ancestry, and continuation agree.                |
+| Parent suspension plus child admission           | The declared atomic scope contains all required changes.                    |
+| Cross-partition duplicate delivery               | The receiver applies the identified message once within its guarantee.      |
+| Admission before lost wake                       | Reconciliation discovers the obligation.                                    |
+| New partition before catalog notification        | Recovery still discovers the committed partition.                           |
+| Duplicate schedule occurrence                    | The occurrence produces one accepted transition.                            |
+| Corrupt or unsupported record                    | Recovery fails explicitly before mutation.                                  |
+| Snapshot failure                                 | A retained valid recovery path still exists.                                |
+| Paused writer versus GC                          | No retired sequence reappears as an accepted new commit.                    |
+| Fork with historical references                  | Required blobs and state remain available.                                  |
+| Rewind after incurred cost                       | Historical costs and external receipts remain intact.                       |
+| Rewind after ownership transfer                  | Old execution authority never returns.                                      |
+| Extension state on an abandoned branch           | Current recovery excludes the abandoned branch's local state.               |
+| Crash between extension mutation and tool result | Accepted extension state survives without a synthetic tool result.          |
+| Missing extension version                        | Execution rejects incompatibility instead of resetting state.               |
+| Session switch versus process exit               | Switching views does not run shutdown-only side effects.                    |
+| Composed control behaviors                       | Recovery preserves ownership, retries, and nesting.                         |
+| Tool emits excessive output                      | Intake, storage, and projection limits apply independently.                 |
+| Uncooperative execution                          | The backend terminates it or reports an honest limitation.                  |
+| Old-attempt preview after restart                | Clients reject obsolete provisional updates.                                |
+| Subscription gap or duplicate                    | Clients resync or deduplicate without hidden state loss.                    |
+| New client opens an existing session             | The initial snapshot appears without a new user message.                    |
+| Untrusted output or spectator request            | Rendering and server authorization preserve their boundaries.               |
+| Projection deletion                              | Runtime correctness survives; supported projections rebuild.                |
+| Tenant or resource escape attempt                | Access fails before bytes or mutations cross the boundary.                  |
+| R2 native/S3 interoperability                    | Both transports recover the same logical state and receipt history.         |
+| Host change with missing executable/workspace    | Activation fails explicitly rather than starting different work.            |
 
 Add property-based sequences for admit, claim, operate, cancel, fork, rewind, restart, compact, and project.
 
@@ -1078,4 +1154,3 @@ Repository sources use the verified review commit. The implementation agent must
 - [W7] SlateDB write semantics: https://slatedb.io/docs/design/writes/
 - [W8] R2 S3 compatibility: https://developers.cloudflare.com/r2/api/s3/api/
 - [W9] Tonbo project: https://tonbo.io/
-
