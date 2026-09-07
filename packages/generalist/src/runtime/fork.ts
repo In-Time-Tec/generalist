@@ -9,6 +9,7 @@ export interface Substitution {
 
 /** Select one committed journal prefix for a new Run. */
 export interface ForkOptions {
+  readonly commandId: string
   readonly atSequence: number
   /** New allocation reserved from the current budget owner; required for a bounded source. */
   readonly budget?: BudgetLimits
@@ -19,6 +20,7 @@ export interface ForkOptions {
 
 /** Select one committed journal prefix for in-place continuation. */
 export interface RewindOptions {
+  readonly commandId: string
   readonly toSequence: number
   /** Required when a settled child must reserve new capacity from its current ancestor budget owner. */
   readonly budget?: BudgetLimits

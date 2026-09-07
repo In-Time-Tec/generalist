@@ -1,3 +1,4 @@
+import { digest } from "../../core/durable/pin.js"
 import { Effect, Option, Ref, Schema } from "effect"
 import type { ExecutionResult } from "../execution/state.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore, WorkerMutationError } from "../run/store.js"
@@ -28,7 +29,14 @@ const commitDeferredProgramChildTerminal = (
   Ref.get(terminal).pipe(
     Effect.flatMap((outcome) => {
       if (outcome === undefined) return Effect.void
-      if (outcome._tag === "Complete") return store.complete({ ...claim, result: outcome.result }).pipe(Effect.asVoid)
+      if (outcome._tag === "Complete")
+        return store
+          .complete({
+            ...claim,
+            commandId: digest(["program-child-complete", claim.runId, claim.attemptFence]),
+            result: outcome.result,
+          })
+          .pipe(Effect.asVoid)
       return fail(outcome.error)
     }),
   )

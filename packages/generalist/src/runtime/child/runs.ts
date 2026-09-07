@@ -106,7 +106,7 @@ export const make = (store: RunStoreService): Service => {
           invocationId: input.toolCallId,
           selection: input.selection,
           origin,
-          prompt: input.prompt,
+          prompt: normalizePrompt(input.prompt),
           message: makeMessage({
             id: `spawn:${idempotencyKey}`,
             to: makeAddress(`spawn:${input.parentRunId}`),

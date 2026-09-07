@@ -1,0 +1,13 @@
+diff --git a/dist/src/workers/r2/bucket.worker.js b/dist/src/workers/r2/bucket.worker.js
+index 837a405d4e0e2b62d19bbc0aa678d192ec05f9c6..e6b3df37c6c96bb3a45e0248fbc506a71e7d888c 100644
+--- a/dist/src/workers/r2/bucket.worker.js
++++ b/dist/src/workers/r2/bucket.worker.js
+@@ -526,7 +526,7 @@ var Validator = class {
+         if (suffix <= 0) throw new InvalidRange();
+         suffix > size && (suffix = size), offset = size - suffix, length = suffix;
+       }
+-      if (offset === void 0 && (offset = 0), length === void 0 && (length = size - offset), offset < 0 || offset > size || length <= 0) throw new InvalidRange();
++      if (offset === void 0 && (offset = 0), length === void 0 && (length = size - offset), offset < 0 || offset >= size || length <= 0) throw new InvalidRange();
+       return offset + length > size && (length = size - offset), { start: offset, end: offset + length - 1 };
+     }
+   }

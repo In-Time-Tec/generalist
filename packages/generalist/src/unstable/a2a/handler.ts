@@ -1,3 +1,4 @@
+import { digest } from "../../core/durable/pin.js"
 import {
   TaskState,
   type AgentCard,
@@ -195,7 +196,10 @@ const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExe
           correlationId: context.contextId,
           prompt,
         })
-        yield* runtime.activate({ runId: receipt.runId })
+        yield* runtime.activate({
+          runId: receipt.runId,
+          commandId: digest(["a2a-activate", receipt.runId, context.userMessage.messageId]),
+        })
         const task = yield* fromRuntime(runtime, receipt.runId)
         bus.publish(AgentEvent.task(task))
         yield* follow(runtime, task, origin, bus)
@@ -232,7 +236,11 @@ const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExe
   cancelTask: (taskId: string, bus: ExecutionEventBus): Promise<void> =>
     Effect.runPromise(
       Effect.gen(function* () {
-        yield* runtime.cancel({ runId: taskId, reason: "A2A cancel request" })
+        yield* runtime.cancel({
+          runId: taskId,
+          commandId: digest(["a2a-cancel", taskId]),
+          reason: "A2A cancel request",
+        })
         const snapshot = yield* runtime.snapshot(taskId)
         const task = yield* fromRuntime(runtime, taskId)
         const event = (yield* runtime.history({ runId: taskId, cursor: snapshot.cursor - 1, limit: 1 }))[0]
@@ -309,7 +317,11 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     const runtime = this.runtime
     return Effect.runPromise(
       Effect.gen(function* () {
-        yield* runtime.cancel({ runId: params.id, reason: "A2A cancel request" })
+        yield* runtime.cancel({
+          runId: params.id,
+          commandId: digest(["a2a-cancel", params.id]),
+          reason: "A2A cancel request",
+        })
         const snapshot = yield* runtime.snapshot(params.id)
         if (snapshot.run.status !== "cancelled") {
           return yield* Effect.fail(new TaskNotCancelableError(`Task not cancelable: ${params.id}`))

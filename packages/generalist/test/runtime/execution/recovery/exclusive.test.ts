@@ -25,7 +25,7 @@ const objectClaim = (runId: string, label: string) =>
     }).pipe(
       Effect.tap((claim) =>
         Effect.sync(() => {
-          objectClaims.set(runId, { claim, release: () => store.releaseExecution(claim) })
+          objectClaims.set(runId, { claim, release: store.releaseExecution(claim) })
         }),
       ),
     ),
@@ -36,7 +36,7 @@ const expireObjectClaim = (runId: string) =>
     const entry = objectClaims.get(runId)
     if (entry === undefined) return Effect.void
     objectClaims.delete(runId)
-    return entry.release()
+    return entry.release
   })
 
 memoryRecoverySuite()

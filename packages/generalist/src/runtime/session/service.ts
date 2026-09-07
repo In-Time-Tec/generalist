@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect"
+import { DurabilityFailure } from "../../durability/errors.js"
 import type { Entry } from "../../core/context/session.js"
 import { RuntimeUnavailable, SessionEntryCorrupt, SessionEntryNotFound } from "../errors.js"
 import type { Service as RunStoreService } from "../run/store.js"
@@ -13,14 +14,20 @@ import { interruptedSessionEntryId, resolveInterruptedModelResponse } from "../e
 
 export const readEntry =
   (store: RunStoreService) =>
-  (input: SessionEntryInput): Effect.Effect<Entry, SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable> =>
+  (
+    input: SessionEntryInput,
+  ): Effect.Effect<Entry, SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable | DurabilityFailure> =>
     Effect.gen(function* () {
       const session = yield* store.sessionReader(input.sessionId)
       if (Option.isNone(session)) {
         return yield* RuntimeUnavailable.make({ message: `Session ${input.sessionId} is unavailable` })
       }
       const entry = yield* session.value.entry(input.entryId).pipe(
-        Effect.mapError((error) => SessionEntryCorrupt.make({ ...input, message: error.message })),
+        Effect.mapError((error) =>
+          Schema.is(DurabilityFailure)(error.cause) || Schema.is(RuntimeUnavailable)(error.cause)
+            ? error.cause
+            : SessionEntryCorrupt.make({ ...input, message: error.message }),
+        ),
         Effect.catchDefect((defect) =>
           Effect.fail(
             SessionEntryCorrupt.make({

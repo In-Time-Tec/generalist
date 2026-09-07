@@ -1,4 +1,4 @@
-import { Clock, DateTime, Effect, Option, Predicate, Schema, Stream } from "effect"
+import { Clock, DateTime, Effect, Option, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { InvalidOutput } from "../../core/agent/event.js"
 import { encode as encodeAgentInput } from "../../core/agent/lifecycle/input.js"
@@ -29,8 +29,7 @@ const decodeEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event:
   if ("_tag" in event.result) {
     return Effect.succeed<StartEvent<OutputCodec["Type"]>>({ ...event, result: event.result })
   }
-  const encoded = Predicate.hasProperty(event.result, "output") ? event.result.output : event.result.text
-  return Schema.decodeEffect(schema)(encoded).pipe(
+  return Schema.decodeEffect(schema)(event.result.output).pipe(
     Effect.map((output) => ({ ...event, result: { ...event.result, output } })),
     Effect.mapError((error) => InvalidOutput.make({ issues: [error.message] })),
   )

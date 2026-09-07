@@ -1,4 +1,6 @@
 import { Context, Effect, Layer, Schema } from "effect"
+import { DurabilityFailure } from "../../durability/errors.js"
+import { Exhausted as BudgetExhausted, Invalid as BudgetInvalid } from "../../core/durable/run-budget.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
@@ -78,6 +80,9 @@ export interface SendMessageInput {
 
 /** Durable send failure. */
 export const SendMessageError = Schema.Union([
+  DurabilityFailure,
+  BudgetExhausted,
+  BudgetInvalid,
   AddressNotFound,
   AddressInvalid,
   NotInFamily,
@@ -92,7 +97,7 @@ export const SendMessageError = Schema.Union([
   RuntimeUnavailable,
 ])
 export type SendMessageError = typeof SendMessageError.Type
-export type DirectoryError = RunNotFound | RuntimeUnavailable
+export type DirectoryError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 
 /**
  * Decide one addressing attempt.

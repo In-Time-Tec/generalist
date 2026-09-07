@@ -111,7 +111,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly sessions: {
     readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
     readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
-    readonly list: () => Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable>
+    readonly list: () => Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | import("../durability/errors.js").DurabilityFailure>
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {

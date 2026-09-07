@@ -1,4 +1,5 @@
 import { Context, Effect, type Option } from "effect"
+import type { DurabilityFailure } from "../../../durability/errors.js"
 import type { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import type {
   ExternalChildCapacityUnavailable,
@@ -32,18 +33,22 @@ export interface Service {
     | StaleClaim
     | StaleSessionClaim
     | RuntimeUnavailable
+    | DurabilityFailure
   >
   readonly acknowledge: (
     placementId: string,
-  ) => Effect.Effect<Placement, ExternalChildPlacementNotFound | RuntimeUnavailable>
+  ) => Effect.Effect<Placement, ExternalChildPlacementNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly settle: (input: {
     readonly placementId: string
     readonly settlementId: string
     readonly outcome: RunOutcome
-  }) => Effect.Effect<Placement, ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable>
+  }) => Effect.Effect<
+    Placement,
+    ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable | DurabilityFailure
+  >
   readonly cancel: (
     placementId: string,
-  ) => Effect.Effect<Placement, ExternalChildPlacementNotFound | RuntimeUnavailable>
+  ) => Effect.Effect<Placement, ExternalChildPlacementNotFound | RuntimeUnavailable | DurabilityFailure>
   /** Admit an independently executable depth-zero root, initially fenced from execution. */
   readonly admitRoot: (input: {
     readonly placementId: string
@@ -54,24 +59,31 @@ export interface Service {
     readonly root: Omit<AdmitStartInput, "runId" | "initialChildren" | "initialFanOuts">
   }) => Effect.Effect<ExternalRoot, ExternalRootConflict | ExternalRootExecutableMismatch | StartError>
   /** Release one admitted root's durable execution gate. Exact retries are no-ops. */
-  readonly activateRoot: (placementId: string) => Effect.Effect<ExternalRoot, ExternalRootNotFound | RuntimeUnavailable>
-  readonly inspectRoot: (placementId: string) => Effect.Effect<ExternalRoot, ExternalRootNotFound | RuntimeUnavailable>
+  readonly activateRoot: (
+    placementId: string,
+  ) => Effect.Effect<ExternalRoot, ExternalRootNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly inspectRoot: (
+    placementId: string,
+  ) => Effect.Effect<ExternalRoot, ExternalRootNotFound | RuntimeUnavailable | DurabilityFailure>
   /** Request authoritative cancellation on the child partition, including before activation. */
   readonly cancelRoot: (
     placementId: string,
     reason?: string,
-  ) => Effect.Effect<ExternalRoot, ExternalRootNotFound | RuntimeUnavailable>
+  ) => Effect.Effect<ExternalRoot, ExternalRootNotFound | RuntimeUnavailable | DurabilityFailure>
   /** Read the stable terminal delivery. None means the root is not terminal yet. */
   readonly rootSettlement: (
     placementId: string,
-  ) => Effect.Effect<Option.Option<ExternalRootSettlement>, ExternalRootNotFound | RuntimeUnavailable>
+  ) => Effect.Effect<
+    Option.Option<ExternalRootSettlement>,
+    ExternalRootNotFound | RuntimeUnavailable | DurabilityFailure
+  >
   /** Acknowledge exactly the terminal identity received by the parent. */
   readonly acknowledgeRootSettlement: (input: {
     readonly placementId: string
     readonly settlementId: string
   }) => Effect.Effect<
     ExternalRootSettlement,
-    ExternalRootNotFound | ExternalChildSettlementConflict | RuntimeUnavailable
+    ExternalRootNotFound | ExternalChildSettlementConflict | RuntimeUnavailable | DurabilityFailure
   >
 }
 

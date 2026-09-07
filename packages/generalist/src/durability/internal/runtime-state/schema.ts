@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { ArtifactHead, ArtifactUpdate } from "../../../core/artifact.js"
+import { Denied as NestedOperationDenied } from "../../../core/tools/nested-operation.js"
 import { WakeEvent } from "../../../core/agent/tools/wake-event.js"
 import { Ref as MediaRef } from "../../../media/ref.js"
 import { Address } from "../../../runtime/address.js"
@@ -94,15 +95,17 @@ const Run = Schema.Struct({
 } satisfies { readonly [K in keyof Omit<StoredRun, "subscribers">]-?: Schema.Constraint })
 
 /** Known framework failures use their domain codec; malformed tagged failures cannot fall through as opaque data. */
+const FrameworkOperationError = Schema.Union([...RunFailure.members, NestedOperationDenied]).pipe(Schema.toTaggedUnion("_tag"))
+
 export const OperationError = Schema.Union([
-  RunFailure,
+  FrameworkOperationError,
   Schema.Unknown.check(Schema.makeFilter(
     (value) =>
       value === null ||
       typeof value !== "object" ||
       !("_tag" in value) ||
       typeof value._tag !== "string" ||
-      !Object.hasOwn(RunFailure.cases, value._tag),
+      !Object.hasOwn(FrameworkOperationError.cases, value._tag),
     { message: "Framework operation failures must match their RunFailure schema" },
   )),
 ])

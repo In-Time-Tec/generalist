@@ -1,4 +1,5 @@
 import { Schema, type Effect, type Stream } from "effect"
+import type { DurabilityFailure } from "../../durability/errors.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import type { Cursor } from "../cursor.js"
 import type { RuntimeUnavailable } from "../errors.js"
@@ -63,15 +64,20 @@ export class SessionSubscriberLagged extends ActionableTaggedError<SessionSubscr
   },
 ) {}
 
-export type SessionError = SessionNotFound | RuntimeUnavailable
-export type CreateSessionError = SessionConflict | RuntimeUnavailable
-export type SessionEventsError = SessionNotFound | SessionCursorExpired | SessionSubscriberLagged | RuntimeUnavailable
+export type SessionError = SessionNotFound | RuntimeUnavailable | DurabilityFailure
+export type CreateSessionError = SessionConflict | RuntimeUnavailable | DurabilityFailure
+export type SessionEventsError =
+  | SessionNotFound
+  | SessionCursorExpired
+  | SessionSubscriberLagged
+  | RuntimeUnavailable
+  | DurabilityFailure
 
 /** Runtime operations that persist and observe product-facing Sessions. */
 export interface RuntimeHostSessions {
   readonly createSession: (input: CreateSessionInput) => Effect.Effect<HostSession, CreateSessionError>
   readonly session: (sessionId: string) => Effect.Effect<HostSession, SessionError>
-  readonly listSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable>
+  readonly listSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
   readonly sessionRuns: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
   readonly sessionEvents: (input: SessionEventsInput) => Stream.Stream<HostSessionEvent, SessionEventsError>
 }

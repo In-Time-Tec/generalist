@@ -22,7 +22,10 @@ const executable = makeTest("branch-evidence", "1")
 const address = Address.make("agent:branch-evidence")
 const options = {
   environment: "test", tenant: "branch-evidence", partition: "shared",
-  addresses: [{ address, executable }, { address: programAddress, executable: programExecutable }],
+  addresses: [
+    { address, executable, registrations: registrationsFor(executable) },
+    { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
+  ],
 }
 const open = (client: Client) => makeRunStore(options).pipe(Effect.provideService(ObjectStore, client.store))
 const openActive = (client: Client, workerId: string) => Effect.gen(function* () {
@@ -96,7 +99,7 @@ describe("object branch evidence", () => {
       const b = yield* commitLeaf(second, ownerB, "B", a.leaf)
       const writerB = Option.getOrThrow(yield* second.claimedSessionStore(ownerB))
       const before = yield* history(second, run.runId)
-      yield* second.rewind({ runId: run.runId, toSequence: a.sequence, branchRunId: "archive-ab" })
+      yield* second.rewind({ runId: run.runId, toSequence: a.sequence, commandId: "archive-ab", branchRunId: "archive-ab" })
       const recovered = yield* openActive(yield* bucket.connect, "c")
       const reader = Option.getOrThrow(yield* recovered.sessionReader("session:rewind"))
       expect(yield* reader.leaf).toBe(a.leaf)
@@ -129,12 +132,12 @@ describe("object branch evidence", () => {
       yield* store.emitAgentEvent({ ...claim, commandId: "incurred-cost", event: { _tag: "ToolExecutionStarted", turn: 0, call } })
       yield* store.releaseExecution(claim)
       const atSequence = (yield* store.inspect(run.runId)).lastSequence
-      expect(yield* store.fork({ runId: run.runId, atSequence, newRunId: "missing-grant" }).pipe(Effect.flip)).toMatchObject({ _tag: "generalist/core/RunBudgetInvalid" })
-      yield* store.fork({ runId: run.runId, atSequence, newRunId: "allocated", budget: { toolCalls: 1, children: 0 } })
+      expect(yield* store.fork({ runId: run.runId, atSequence, commandId: "missing-grant", newRunId: "missing-grant" }).pipe(Effect.flip)).toMatchObject({ _tag: "generalist/core/RunBudgetInvalid" })
+      yield* store.fork({ runId: run.runId, atSequence, commandId: "allocated", newRunId: "allocated", budget: { toolCalls: 1, children: 0 } })
       expect((yield* store.snapshot("allocated")).budget.toolCalls).toBe(1)
       expect((yield* store.snapshot(run.runId)).budget.toolCalls).toBe(1)
-      expect(yield* store.fork({ runId: run.runId, atSequence, newRunId: "overspend", budget: { toolCalls: 2, children: 0 } }).pipe(Effect.flip)).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted" })
-      yield* store.rewind({ runId: run.runId, toSequence: 0, branchRunId: "budget-archive" })
+      expect(yield* store.fork({ runId: run.runId, atSequence, commandId: "overspend", newRunId: "overspend", budget: { toolCalls: 2, children: 0 } }).pipe(Effect.flip)).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted" })
+      yield* store.rewind({ runId: run.runId, toSequence: 0, commandId: "budget-archive", branchRunId: "budget-archive" })
       const recovered = yield* open(yield* bucket.connect)
       expect((yield* recovered.snapshot(run.runId)).budget.toolCalls).toBe(1)
       expect((yield* recovered.snapshot(run.runId)).budget.children).toBe(2)
@@ -161,7 +164,7 @@ describe("object branch evidence", () => {
       expect(yield* execute(store, run.runId, "source")).toBe("value:1|value:1")
       const echo = yield* store.getProgramOperation({ runId: run.runId, operation: "echo" })
       yield* store.fork({
-        runId: run.runId, atSequence: echo!.completedSequence!, newRunId: "program-fork", budget: {},
+        runId: run.runId, atSequence: echo!.completedSequence!, commandId: "program-fork", newRunId: "program-fork", budget: {},
         programBudget: { ...program.pinned.manifest.budget, toolCalls: 1, logBytes: 500, wallClockMillis: 30_000 },
       })
       const recovered = yield* openActive(yield* bucket.connect, "fork")
@@ -169,12 +172,12 @@ describe("object branch evidence", () => {
       expect(fixture.counts().toolCalls).toBe(1)
       expect(yield* recovered.loadProgramState(run.runId)).toMatchObject({ toolCalls: 2 })
       const before = yield* recovered.loadProgramState("program-fork")
-      yield* recovered.rewind({ runId: "program-fork", toSequence: 0, branchRunId: "program-archive" })
+      yield* recovered.rewind({ runId: "program-fork", toSequence: 0, commandId: "program-archive", branchRunId: "program-archive" })
       const reopened = yield* openActive(yield* bucket.connect, "rewound")
       expect(yield* execute(reopened, "program-fork", "rewound")).toBe("value:2|value:2")
       expect(yield* reopened.getProgramOperation({ runId: "program-fork", operation: "echo" })).toMatchObject({ status: "succeeded", result: "value:1" })
       expect(yield* reopened.loadProgramState("program-fork")).toMatchObject({ toolCalls: 1, deadlineMillis: before!.deadlineMillis })
-      yield* reopened.rewind({ runId: "program-fork", toSequence: 0, branchRunId: "program-archive-two" })
+      yield* reopened.rewind({ runId: "program-fork", toSequence: 0, commandId: "program-archive-two", branchRunId: "program-archive-two" })
       const exhausted = yield* openActive(yield* bucket.connect, "exhausted")
       expect(yield* execute(exhausted, "program-fork", "exhausted").pipe(Effect.flip)).toMatchObject({ dimension: "toolCalls", limit: 1 })
       expect(fixture.counts().toolCalls).toBe(2)
@@ -203,15 +206,15 @@ describe("object branch evidence", () => {
       yield* childStore.releaseExecution(childOwner)
       yield* store.releaseExecution(owner)
       const atSequence = (yield* store.inspect(child.runId)).lastSequence
-      yield* store.fork({ runId: child.runId, atSequence, newRunId: "child-fork", budget: { toolCalls: 1, children: 0 } })
+      yield* store.fork({ runId: child.runId, atSequence, commandId: "child-fork", newRunId: "child-fork", budget: { toolCalls: 1, children: 0 } })
       const recovered = yield* open(yield* bucket.connect)
       expect((yield* recovered.snapshot(parent.runId)).budget.toolCalls).toBe(2)
       expect((yield* history(recovered, "child-fork")).findLast((event) => event._tag === "RunForked")).toMatchObject({
         sourceRunId: child.runId, allocationRunId: parent.runId, role: "target",
       })
-      yield* recovered.fork({ runId: parent.runId, atSequence: 0, newRunId: "remaining-grant", budget: { toolCalls: 2, children: 0 } })
+      yield* recovered.fork({ runId: parent.runId, atSequence: 0, commandId: "remaining-grant", newRunId: "remaining-grant", budget: { toolCalls: 2, children: 0 } })
       expect(yield* recovered.fork({
-        runId: child.runId, atSequence, newRunId: "stale-child-allowance", budget: { toolCalls: 1, children: 0 },
+        runId: child.runId, atSequence, commandId: "stale-child-allowance", newRunId: "stale-child-allowance", budget: { toolCalls: 1, children: 0 },
       }).pipe(Effect.flip)).toMatchObject({ _tag: "generalist/core/RunBudgetExhausted" })
     }).pipe(Effect.scoped, Effect.provide(BunCrypto.layer)),
   )
@@ -238,10 +241,10 @@ describe("object branch evidence", () => {
       yield* store.releaseExecution(owner)
       const before = yield* history(store, child.runId)
       expect(yield* store.rewind({
-        runId: child.runId, toSequence: 0, branchRunId: "missing-reallocation",
+        runId: child.runId, toSequence: 0, commandId: "missing-reallocation", branchRunId: "missing-reallocation",
       }).pipe(Effect.flip)).toMatchObject({ _tag: "generalist/core/RunBudgetInvalid" })
       yield* store.rewind({
-        runId: child.runId, toSequence: 0, branchRunId: "reallocated-history", budget: { toolCalls: 1, children: 0 },
+        runId: child.runId, toSequence: 0, commandId: "reallocated-history", branchRunId: "reallocated-history", budget: { toolCalls: 1, children: 0 },
       })
       const recovered = yield* openActive(yield* bucket.connect, "fresh")
       expect((yield* history(recovered, child.runId)).slice(0, before.length)).toEqual(before)
@@ -249,7 +252,7 @@ describe("object branch evidence", () => {
       expect((yield* recovered.snapshot(parent.runId)).budget.toolCalls).toBe(1)
       const fresh = yield* recovered.claimExecution({ runId: child.runId, ownerId: "fresh", commandId: "reallocated-claim" })
       yield* recovered.emitAgentEvent({ ...fresh, commandId: "new-child-cost", event: { _tag: "ToolExecutionStarted", turn: 1, call } })
-      yield* recovered.rewind({ runId: child.runId, toSequence: 0, branchRunId: "second-reallocated-history" })
+      yield* recovered.rewind({ runId: child.runId, toSequence: 0, commandId: "second-reallocated-history", branchRunId: "second-reallocated-history" })
       expect((yield* recovered.snapshot(child.runId)).budget.toolCalls).toBe(0)
       expect((yield* recovered.snapshot(parent.runId)).budget.toolCalls).toBe(1)
       expect((yield* history(recovered, child.runId)).filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(2)
@@ -270,7 +273,7 @@ describe("object branch evidence", () => {
       yield* store.startProgramOperation({ ...owner, operation: "holder" })
       yield* store.releaseExecution(owner)
       yield* store.fork({
-        runId: run.runId, atSequence: 0, newRunId: "pool-fork", budget: {},
+        runId: run.runId, atSequence: 0, commandId: "pool-fork", newRunId: "pool-fork", budget: {},
         programBudget: { ...program.pinned.manifest.budget, toolCalls: 1, logBytes: 100, wallClockMillis: 30_000 },
       })
       const independent = yield* openActive(yield* bucket.connect, "target")
@@ -316,7 +319,7 @@ describe("object branch evidence", () => {
       yield* store.fork({
         runId: child.runId,
         atSequence: 0,
-        newRunId: "root-fork-target",
+        commandId: "root-fork-target", newRunId: "root-fork-target",
         budget: { toolCalls: 1, children: 0 },
       })
 

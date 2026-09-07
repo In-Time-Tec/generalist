@@ -355,12 +355,13 @@ const makeStoreServices = (options: Options) =>
         modifyState(commands.recordReward, [input], (state, [input]) =>
           Effect.gen(function* () {
             if (!state.runs.has(input.runId)) return yield* RunNotFound.make({ runId: input.runId })
-            return yield* appendLifecycle(state, input.runId, {
+            const [, next] = yield* appendLifecycle(state, input.runId, {
               _tag: "Rewarded",
               leaf: input.leaf,
               value: input.value,
               source: input.source,
             })
+            return [undefined, next] as const
           }),
         ).pipe(Effect.asVoid),
       treeReplay: (input) =>

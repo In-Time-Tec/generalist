@@ -5,8 +5,7 @@ import { Prompt } from "effect/unstable/ai"
 import * as Durability from "../../../durability/index.js"
 import type { ObjectStore } from "../../../durability/object-store.js"
 import { LocalScheduler, type DrainResult } from "../../../runtime/execution/local-scheduler.js"
-import type { DurabilityFailure } from "../../../durability/errors.js"
-import type { RuntimeUnavailable } from "../../../runtime/errors.js"
+import type { ActivationFailure } from "../../../durability/internal/runtime.js"
 import {
   actor,
   type ActionContext,
@@ -78,7 +77,7 @@ const actionInputSchemas = {
   },
 }
 
-type RuntimeHost = ManagedRuntime.ManagedRuntime<Durability.RuntimeServices, DurabilityFailure | RuntimeUnavailable>
+type RuntimeHost = ManagedRuntime.ManagedRuntime<Durability.RuntimeServices, ActivationFailure>
 
 interface Host {
   readonly runtime: RuntimeHost

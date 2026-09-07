@@ -100,7 +100,11 @@ export const make = (input: {
                 Effect.flatMap((data) => context.emit({ toolCallId, message: `${request.kind} ${status}`, data })),
               )
 
-        const record = yield* input.store
+        const prior = yield* input.store.getOperationByKey({
+          runId: input.claim.runId,
+          operationKey: nestedKey,
+        }).pipe(Effect.orDie)
+        const receipt = prior ?? (yield* input.store
           .recordOperation({
             ...input.claim,
             operationKey: nestedKey,
@@ -110,9 +114,14 @@ export const make = (input: {
             replayPolicy: request.replayPolicy,
             attempt: input.claimed.attempt,
           })
-          .pipe(Effect.orDie)
+          .pipe(Effect.orDie))
+        const record = yield* input.store.getOperation({
+          runId: input.claim.runId,
+          operationId: receipt.operationId,
+        }).pipe(Effect.orDie)
         const unknown = () => Unknown.make({ operationKey, ordinal, operationId: record.operationId })
         const replayFailure = (recorded: { readonly error?: unknown }) => {
+          if (Schema.is(Denied)(recorded.error)) return Effect.fail(recorded.error)
           if (request.failure === undefined) return Effect.fail(unknown())
           return Schema.decodeUnknownEffect(request.failure)(recorded.error).pipe(
             Effect.matchEffect({ onFailure: () => Effect.fail(unknown()), onSuccess: Effect.fail }),

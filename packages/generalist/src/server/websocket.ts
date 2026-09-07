@@ -20,6 +20,8 @@ const closeForStreamError = (
       return writer(new Socket.CloseEvent(4004, "session-not-found"))
     case "generalist/runtime/RuntimeUnavailable":
       return writer(new Socket.CloseEvent(1011, "event-stream-failed"))
+    case "generalist/durability/DurabilityFailure":
+      return writer(new Socket.CloseEvent(1011, `durability:${error.reason}`))
   }
 }
 

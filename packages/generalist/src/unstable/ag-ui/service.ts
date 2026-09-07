@@ -1,3 +1,4 @@
+import { digest } from "../../core/durable/pin.js"
 import { RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/core"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { origin, type Cursor } from "../../runtime/cursor.js"
@@ -180,7 +181,10 @@ export const layer = (options: LayerOptions): Layer.Layer<AGUI, never, Runtime> 
                 messageId: final.messageId,
                 prompt: final.prompt,
               })
-              yield* runtime.activate({ runId: receipt.runId })
+              yield* runtime.activate({
+                runId: receipt.runId,
+                commandId: digest(["ag-ui-activate", receipt.runId, final.messageId]),
+              })
             }
             return recover(runtime, input.runId, input.threadId, cursor)
           }),

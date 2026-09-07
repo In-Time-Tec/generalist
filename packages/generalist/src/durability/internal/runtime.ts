@@ -1,5 +1,5 @@
 import { Clock, Context, Crypto, DateTime, Deferred, Duration, Effect, Exit, Fiber, Ref, Scope, SynchronizedRef, Schema } from "effect"
-import type { LayerOptions } from "../../runtime/service.js"
+import type { LayerOptions, StartExecutionError } from "../../runtime/service.js"
 import { DurabilityFailure } from "../errors.js"
 import * as Journal from "./journal.js"
 import * as Codec from "./runtime-state.js"
@@ -21,7 +21,7 @@ export interface Options extends LayerOptions, Journal.Options {
   readonly ownershipLeaseMillis?: number
 }
 
-export type ActivationFailure = DurabilityFailure | RuntimeUnavailable
+export type ActivationFailure = DurabilityFailure | RuntimeUnavailable | StartExecutionError
 
 /** The returned fiber reports ownership failure and is interrupted with the caller's scope. */
 export class Activation extends Context.Service<Activation, {

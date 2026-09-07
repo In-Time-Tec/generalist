@@ -1,3 +1,4 @@
+import { digest } from "../../core/durable/pin.js"
 import { Effect, Function, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import packageManifest from "../../../package.json" with { type: "json" }
@@ -402,7 +403,13 @@ const encodeLeaf = <R, E>(
     const messages = state.messages.get(leaf)!
     const value = yield* options.reward.evaluate({ leaf, runId: node.runId, messages, trajectory })
     if (!Number.isFinite(value)) return yield* RewardInvalid.make({ leaf, source: options.reward.source, value })
-    yield* state.runtime.recordReward({ runId: node.runId, leaf, value, source: options.reward.source })
+    yield* state.runtime.recordReward({
+      commandId: digest(["rl-export-reward", node.runId, leaf, options.reward.source]),
+      runId: node.runId,
+      leaf,
+      value,
+      source: options.reward.source,
+    })
     const record: VerifiersV1Record = {
       messages: messages.content,
       ...tokenFields(path, options.include),

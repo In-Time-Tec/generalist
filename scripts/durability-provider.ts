@@ -1,9 +1,12 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- this script is an application entry point. */
 import { layer } from "@effect/platform-bun/BunServices"
-import { Console, Effect, Result, Schema } from "effect"
+import { Console, Effect, Layer, Result, Schema } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
 import { configuration, providers, qualify, writeEvidence } from "../packages/generalist/src/testing/durability/remote.js"
 import type { Evidence, Provider } from "../packages/generalist/src/testing/durability/remote.js"
-import { nativeR2Configuration, nativeR2Provider, qualifyNativeR2, type NativeR2Evidence } from "../packages/generalist/src/testing/durability/native-r2.js"
+import { nativeR2Configuration } from "../packages/generalist/src/testing/durability/native-r2-configuration.js"
+import { nativeR2Provider } from "../packages/generalist/src/testing/durability/native-r2-worker.js"
+import { qualifyNativeR2, type NativeR2Evidence } from "../packages/generalist/src/testing/durability/native-r2.js"
 
 class QualificationFailed extends Schema.TaggedError<QualificationFailed>()(
   "generalist/scripts/QualificationFailed",
@@ -125,4 +128,4 @@ const program = Effect.gen(function* () {
   if (!passed) return yield* new QualificationFailed({ message: "At least one required real-provider scenario failed; inspect the machine-readable evidence" })
 })
 
-await Effect.runPromise(program.pipe(Effect.provide(layer)))
+await Effect.runPromise(program.pipe(Effect.provide(Layer.mergeAll(layer, FetchHttpClient.layer))))

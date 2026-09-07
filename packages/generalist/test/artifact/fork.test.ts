@@ -50,7 +50,7 @@ layer(services)("Artifact Runtime fork", (it) => {
       const source = yield* host.runs.start(session.id, writer, "read the plan")
       const store = yield* RunStore.RunStore
       const executor = yield* RunExecutor.RunExecutor
-      yield* executor.execute(yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId }))
+      yield* executor.execute(yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId, commandId: "artifact-source-claim" }))
       expect(yield* source.await).toBe("source done")
 
       const runtimeService = yield* Runtime.Runtime
@@ -67,8 +67,8 @@ layer(services)("Artifact Runtime fork", (it) => {
         operation: { _tag: "Replace", from: 0, to: 4, text: "main" },
         attribution: { _tag: "Human", actor: "alice" },
       })
-      const branch = yield* host.sessions.fork(source.id, { atSequence: read.sequence })
-      yield* executor.execute(yield* store.claimExecution({ runId: branch.id, ownerId: objectWorkerId }))
+      const branch = yield* host.sessions.fork(source.id, { commandId: "artifact-fork", atSequence: read.sequence })
+      yield* executor.execute(yield* store.claimExecution({ runId: branch.id, ownerId: objectWorkerId, commandId: "artifact-branch-claim" }))
       expect(yield* branch.await).toBe("branch done")
       expect(yield* Artifact.read(document)).toMatchObject({ version: 1, content: "main" })
 

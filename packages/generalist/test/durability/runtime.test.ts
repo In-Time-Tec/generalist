@@ -11,10 +11,12 @@ import { Address } from "../../src/runtime/address.js"
 import { Cursor } from "../../src/runtime/cursor.js"
 import { makeTest } from "../../src/runtime/executable/manifest.js"
 import { make as makeSimulator, type Client } from "../../src/testing/durability/index.js"
+import { registrationsFor } from "../runtime/execution/fixtures.js"
+import { provideScoped } from "../runtime/execution/scoped-provide.js"
 
 const executable = makeTest("durable-runtime", "1")
 const address = Address.make("agent:durable-runtime")
-const options = { environment: "test", tenant: "runtime", partition: "shared", addresses: [{ address, executable }] }
+const options = { environment: "test", tenant: "runtime", partition: "shared", addresses: [{ address, executable, registrations: registrationsFor(executable) }] }
 const slot = (sequence: string) => `environments/test/v1/tenants/runtime/partitions/shared/commits/${sequenceName(sequence)}.json`
 const open = (client: Client) => makeRunStore(options).pipe(Effect.provideService(ObjectStore, client.store))
 const openActive = (client: Client, workerId: string) => Effect.gen(function* () {
@@ -34,6 +36,23 @@ const admission = (key: string) => ({
 
 /** INV-02/03/06/07/08/09: real RunStore commands over the production journal, not a parallel reducer. */
 describe("object Runtime canonical mutations", () => {
+  it.effect("reconciles a reward's void receipt after restart without duplicating the event", () =>
+    provideScoped(BunCrypto.layer, Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const first = yield* open(bucket)
+      const run = yield* first.admitSend(admission("reward"))
+      const command = { commandId: "reward-1", runId: run.runId, leaf: "leaf-1", value: 1, source: "test" }
+      yield* bucket.faults.failNextCreate({ key: slot("1"), phase: "after" })
+      yield* bucket.faults.failNextRead({ key: slot("1") })
+      expect(yield* first.recordReward(command).pipe(Effect.flip)).toMatchObject({ reason: "indeterminate" })
+      const recovered = yield* open(yield* bucket.connect)
+      expect(yield* recovered.recordReward(command)).toBeUndefined()
+      const history = yield* recovered.history({ runId: run.runId, cursor: Cursor.make(-1), limit: 100 })
+      expect(history.filter((event) => event._tag === "Rewarded")).toHaveLength(1)
+      expect(yield* recovered.recordReward({ ...command, value: 2 }).pipe(Effect.flip)).toMatchObject({ reason: "input-conflict" })
+    })).pipe(Effect.scoped),
+  )
+
   it.effect("recovers an admitted run and its host session on a fresh independent layer", () =>
     Effect.gen(function* () {
       const bucket = yield* makeSimulator({ pageSize: 1 })

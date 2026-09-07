@@ -45,7 +45,7 @@ export const layer = (
         : Effect.succeed(running))
       const prepare = <A, E, R>(command: (scheduler: SchedulerService) => Effect.Effect<A, E, R>) => {
         let prepared: { readonly scheduler: SchedulerService; readonly effect: Effect.Effect<A, E, R> } | undefined
-        return current.pipe(Effect.flatMap((scheduler) => {
+        return current.pipe(Effect.flatMap((scheduler): Effect.Effect<A, E | RuntimeUnavailable, R> => {
           if (prepared !== undefined && prepared.scheduler !== scheduler) {
             return RuntimeUnavailable.make({ message: "scheduler invocation belongs to a retired activation" })
           }

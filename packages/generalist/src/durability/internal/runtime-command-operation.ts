@@ -177,7 +177,7 @@ type Commands = {
   readonly [K in Method]: Definition<Input<K>, Effect.Success<ReturnType<Service[K]>>> & { readonly tag: K }
 }
 
-export const commands = {
+export const commands: Commands = {
   complete: {
     tag: "complete" as const,
     input: Schema.Tuple([Schema.Struct({ ...IdentifiedClaim.fields, result: ExecutionResult })]),

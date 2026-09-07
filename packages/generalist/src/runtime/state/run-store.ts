@@ -3,7 +3,6 @@ export { RunStore } from "../run/store.js"
 export type {
   Service,
   Durability,
-  StoreBackend,
   StoreInfo,
   AdmitSendInput,
   AdmitStartInput,

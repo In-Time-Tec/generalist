@@ -1,4 +1,5 @@
 import { Effect, Pull, Stream } from "effect"
+import type { DurabilityFailure } from "../../durability/errors.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { Service as RunStore } from "../run/store.js"
@@ -8,7 +9,7 @@ const rootSubscriptionConcurrency = 16
 export const awaitSessionTerminal = (input: {
   readonly store: RunStore
   readonly sessionId: string
-}): Effect.Effect<void, RuntimeUnavailable> =>
+}): Effect.Effect<void, RuntimeUnavailable | DurabilityFailure> =>
   Effect.gen(function* () {
     const roots = yield* input.store.sessionRoots(input.sessionId)
     yield* Effect.forEach(
@@ -17,7 +18,7 @@ export const awaitSessionTerminal = (input: {
         Effect.scoped(
           Effect.gen(function* () {
             const pull = yield* Stream.toPull(input.store.treeChanges(rootRunId))
-            const awaitTerminal: Effect.Effect<void, RuntimeUnavailable> = Effect.suspend(() =>
+            const awaitTerminal: Effect.Effect<void, RuntimeUnavailable | DurabilityFailure> = Effect.suspend(() =>
               input.store.treeCheckpoint(rootRunId).pipe(
                 Effect.flatMap((checkpoint) =>
                   checkpoint.inspection.runs.every((entry) => isTerminal(entry.run.status))
@@ -27,7 +28,8 @@ export const awaitSessionTerminal = (input: {
                       ),
                 ),
                 Effect.mapError((error) =>
-                  error._tag === "generalist/runtime/RuntimeUnavailable"
+                  error._tag === "generalist/runtime/RuntimeUnavailable" ||
+                  error._tag === "generalist/durability/DurabilityFailure"
                     ? error
                     : RuntimeUnavailable.make({ message: `session tree ${rootRunId} unavailable` }),
                 ),

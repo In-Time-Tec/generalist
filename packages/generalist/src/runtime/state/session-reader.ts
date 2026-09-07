@@ -18,6 +18,7 @@ export const sessionStorageFailure = (cause: DurabilityFailure | RuntimeUnavaila
     "unsupported-version": "unsupported",
     limit: "unsupported",
     "input-conflict": "conflict",
+    contention: "conflict",
     indeterminate: "indeterminate",
     configuration: "unsupported",
     encoding: "corrupt",

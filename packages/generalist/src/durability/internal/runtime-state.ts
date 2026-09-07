@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect"
+import type { RuntimeSession, RuntimeState } from "../../runtime/state/state.js"
 import type { CanonicalState } from "./runtime-state/schema.js"
 import { DurabilityFailure } from "../errors.js"
 import type { Patch, State } from "./protocol.js"

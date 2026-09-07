@@ -301,6 +301,43 @@ describe("native R2 object transport", () => {
     expect(canceled).toBe(true)
   })
 
+  it.effect("accepts complete-span range metadata on full native reads including empty objects", () =>
+    Effect.gen(function* () {
+      for (const bytes of [new Uint8Array([1, 2, 3]), new Uint8Array()]) {
+        const bucket = new NativeBucket()
+        bucket.get = () => Promise.resolve({
+          ...metadata,
+          size: bytes.length,
+          range: { offset: 0, length: bytes.length },
+          body: new Response(bytes).body!,
+        })
+        expect(yield* make(bucket).read("journal/0", { maxBytes: 3 })).toEqual({
+          bytes,
+          etag: metadata.etag,
+        })
+      }
+    }),
+  )
+
+  for (const [name, range] of [
+    ["short length", { offset: 0, length: 2 }],
+    ["nonzero offset", { offset: 1, length: 3 }],
+    ["suffix", { suffix: 3 }],
+    ["missing span", {}],
+  ] as const) {
+    it.effect(`rejects ${name} metadata on a full read`, () =>
+      Effect.gen(function* () {
+        const bucket = new NativeBucket()
+        bucket.get = () => Promise.resolve({
+          ...metadata,
+          range,
+          body: new Response(new Uint8Array([1, 2, 3])).body!,
+        })
+        expect((yield* failureOf(make(bucket).read("journal/0", { maxBytes: 3 }))).reason).toBe("invalid-response")
+      }),
+    )
+  }
+
   it.effect("reads a bounded range of a larger object and permits EOF truncation", () =>
     Effect.gen(function* () {
       const store = make(new NativeBucket())
@@ -323,7 +360,7 @@ describe("native R2 object transport", () => {
       Effect.gen(function* () {
         const bucket = new NativeBucket()
         bucket.get = async () => ({
-          ...metadata, size: 6, range, body: new Response(new Uint8Array([2, 3])).body!,
+          ...metadata, size: 6, ...(range === undefined ? {} : { range }), body: new Response(new Uint8Array([2, 3])).body!,
         })
         expect((yield* failureOf(make(bucket).read("journal/0", {
           maxBytes: 2, range: { offset: 2, length: 2 },

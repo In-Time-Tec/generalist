@@ -284,7 +284,7 @@ const makeFor = (
                               current: currentContinuation,
                             })
                             const attempt = yield* executionRetry.attempt
-                            const record = yield* store.recordOperation({
+                            const receipt = yield* store.recordOperation({
                               ...claim,
                               operationKey: operation.key,
                               kind: operation.kind,
@@ -302,6 +302,7 @@ const makeFor = (
                               steeringEntryIds,
                               steeringEvents,
                             })
+                            const record = yield* store.getOperation({ runId, operationId: receipt.operationId })
                             yield* Option.match(journalFault, {
                               onNone: () => Effect.void,
                               onSome: (fault) => fault.afterJournaledOperation,

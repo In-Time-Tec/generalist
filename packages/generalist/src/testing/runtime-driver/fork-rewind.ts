@@ -81,7 +81,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnStarted"}:${1}`, event: { _tag: "TurnStarted", turn: 1 } })
         yield* services.store.releaseExecution(claim)
         const branchRunId = `${source.runId}:retained`
-        yield* services.store.rewind({ runId: source.runId, branchRunId, toSequence: 0 })
+        yield* services.store.rewind({ runId: source.runId, commandId: `rewind:${branchRunId}`, branchRunId, toSequence: 0 })
         const retained = yield* services.store.getOperationByKey({ runId: branchRunId, operationKey })
         expect(retained).toMatchObject({
           status: "succeeded",
@@ -182,10 +182,11 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         yield* services.runtime.resolveModelResponse(event)
         const forkRunId = `${handle.runId}:response-fork`
         const nestedRunId = `${handle.runId}:response-nested`
-        yield* services.store.fork({ runId: handle.runId, newRunId: forkRunId, atSequence: event.sequence })
-        yield* services.store.fork({ runId: forkRunId, newRunId: nestedRunId, atSequence: event.sequence })
+        yield* services.store.fork({ runId: handle.runId, commandId: `fork:${forkRunId}`, newRunId: forkRunId, atSequence: event.sequence })
+        yield* services.store.fork({ runId: forkRunId, commandId: `fork:${nestedRunId}`, newRunId: nestedRunId, atSequence: event.sequence })
         yield* services.store.rewind({
           runId: handle.runId,
+          commandId: `rewind:${handle.runId}:discarded-after-response`,
           branchRunId: `${handle.runId}:discarded-after-response`,
           toSequence: 0,
         })
@@ -256,9 +257,10 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         if (event?._tag !== "ModelResponseInterrupted") return yield* Effect.die("missing interrupted response")
         yield* services.store.releaseExecution(claim)
         const forkRunId = `${receipt.runId}:interrupted-fork`
-        yield* services.store.fork({ runId: receipt.runId, newRunId: forkRunId, atSequence: event.sequence })
+        yield* services.store.fork({ runId: receipt.runId, commandId: `fork:${forkRunId}`, newRunId: forkRunId, atSequence: event.sequence })
         yield* services.store.rewind({
           runId: receipt.runId,
+          commandId: `rewind:${receipt.runId}:interrupted-discarded`,
           branchRunId: `${receipt.runId}:interrupted-discarded`,
           toSequence: 0,
         })
@@ -314,7 +316,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           prompt: "fork and rewind",
         })
         const plainForkRunId = `${source.runId}:plain-fork`
-        yield* services.store.fork({ runId: source.runId, newRunId: plainForkRunId, atSequence: 0 })
+        yield* services.store.fork({ runId: source.runId, commandId: `fork:${plainForkRunId}`, newRunId: plainForkRunId, atSequence: 0 })
         expect((yield* services.store.inspect(source.runId)).branches).toContainEqual({
           runId: plainForkRunId,
           forkedAt: 0,
@@ -334,7 +336,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         const unavailableAt = (yield* services.store.inspect(source.runId)).lastSequence
         yield* services.store.releaseExecution(claim)
         const noSnapshot = yield* services.store
-          .fork({ runId: source.runId, newRunId: `${source.runId}:no-snapshot`, atSequence: unavailableAt })
+          .fork({ runId: source.runId, commandId: `fork:${source.runId}:no-snapshot`, newRunId: `${source.runId}:no-snapshot`, atSequence: unavailableAt })
           .pipe(Effect.flip)
         expect(noSnapshot._tag).toBe("generalist/runtime/NoSnapshot")
         const availableClaim = yield* capability.claim(services, {
@@ -360,7 +362,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         })
         yield* services.store.releaseExecution(availableClaim)
         const forkRunId = `${source.runId}:fork`
-        yield* services.store.fork({ runId: source.runId, newRunId: forkRunId, atSequence: forkAt })
+        yield* services.store.fork({ runId: source.runId, commandId: `fork:${forkRunId}`, newRunId: forkRunId, atSequence: forkAt })
         const sourcePrefix = yield* services.store.history({ runId: source.runId, cursor: -1, limit: forkAt + 1 })
         const forkPrefix = yield* services.store.history({ runId: forkRunId, cursor: -1, limit: forkAt + 1 })
         expect(forkPrefix.map(semanticEvent)).toEqual(sourcePrefix.map(semanticEvent))
@@ -370,7 +372,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         })
 
         const branchRunId = `${source.runId}:discarded`
-        yield* services.store.rewind({ runId: source.runId, branchRunId, toSequence: forkAt })
+        yield* services.store.rewind({ runId: source.runId, commandId: `rewind:${branchRunId}`, branchRunId, toSequence: forkAt })
         const inspection = yield* services.store.inspect(source.runId)
         // Rewind restores the selected execution branch while retaining the canonical audit suffix.
         expect(inspection.lastSequence).toBeGreaterThan(forkAt)

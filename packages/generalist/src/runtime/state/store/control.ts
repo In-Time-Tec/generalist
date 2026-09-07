@@ -4,7 +4,7 @@ import { occurredAt as preparedOccurredAt } from "../observation.js"
 import { Effect, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
 import { isTerminal } from "../../run.js"
-import type { CancelInput } from "../../service.js"
+import type { CancelInput as CancelCommand } from "../../service.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
 import type { ExecutionResult } from "../../execution/state.js"
 import type { RunFailure } from "../../run/event.js"
@@ -29,6 +29,7 @@ import { hasPendingOperationCancellation, markOperationCancellations } from "./o
 import { closeWait } from "./control/wait.js"
 
 type SignalResult = Effect.Effect<RuntimeState, RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+type CancelInput = Pick<CancelCommand, "runId" | "reason">
 type CancelResult = Effect.Effect<RuntimeState, RunNotFound | RuntimeUnavailable, PreparedObservation>
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
 type ResumeResult = Effect.Effect<

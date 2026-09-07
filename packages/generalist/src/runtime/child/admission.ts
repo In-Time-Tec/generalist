@@ -1,3 +1,4 @@
+import { digest } from "../../core/durable/pin.js"
 import { Context, Effect, Schema } from "effect"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
@@ -72,6 +73,7 @@ export interface ChildInspection {
  * that does not own it.
  */
 export type AdmitChildError =
+  | import("../../durability/errors.js").DurabilityFailure
   | import("../errors.js").ChildDepthExceeded
   | import("../errors.js").ChildLimitExceeded
   | ChildSelectionMissing
@@ -81,7 +83,11 @@ export type AdmitChildError =
   | RunTerminal
   | RuntimeUnavailable
   | import("../../core/durable/run-budget.js").Exhausted
-export type ChildLookupError = ChildParentageInvalid | RunNotFound | RuntimeUnavailable
+export type ChildLookupError =
+  | ChildParentageInvalid
+  | RunNotFound
+  | RuntimeUnavailable
+  | import("../../durability/errors.js").DurabilityFailure
 
 export interface Service {
   readonly admit: (input: {
@@ -94,7 +100,10 @@ export interface Service {
   }) => Effect.Effect<AdmitReceipt, AdmitChildError>
   readonly listDirect: (
     parentRunId: string,
-  ) => Effect.Effect<ReadonlyArray<ChildInspection>, RunNotFound | RuntimeUnavailable>
+  ) => Effect.Effect<
+    ReadonlyArray<ChildInspection>,
+    RunNotFound | RuntimeUnavailable | import("../../durability/errors.js").DurabilityFailure
+  >
   readonly inspect: (input: {
     readonly parentRunId: string
     readonly childRunId: string
@@ -225,7 +234,7 @@ export const make = (store: RunStoreService): Service => {
           parentRunId: input.parentRunId,
           invocationId,
           selection: input.selection,
-          prompt: input.prompt,
+          prompt: normalizePrompt(input.prompt),
           message: makeMessage({
             id: `spawn:${idempotencyKey}`,
             to: makeAddress(`spawn:${input.parentRunId}`),
@@ -274,11 +283,13 @@ export const make = (store: RunStoreService): Service => {
     inspect: (input) => Effect.map(owned(input), inspection),
     join: (input) => Effect.map(owned(input), inspection),
     cancel: (input) =>
-      Effect.flatMap(owned(input), () =>
-        store.cancel(
-          input.reason === undefined ? { runId: input.childRunId } : { runId: input.childRunId, reason: input.reason },
-        ),
-      ),
+      Effect.flatMap(owned(input), () => {
+        const command = {
+          commandId: digest(["child-cancel", input.parentRunId, input.childRunId, input.reason ?? null]),
+          runId: input.childRunId,
+        }
+        return store.cancel(input.reason === undefined ? command : { ...command, reason: input.reason })
+      }),
   }
 }
 

@@ -150,7 +150,12 @@ export const make = (bucket: Bucket, options: Options = {}): Service => ({
         }
         let expectedLength = object.size
         if (range === undefined) {
-          if (object.range !== undefined) throw invalidResponse("read", key, "R2 returned a partial body for a complete read")
+          if (
+            object.range !== undefined &&
+            (object.range.offset !== 0 || object.range.length !== object.size || object.range.suffix !== undefined)
+          ) {
+            throw invalidResponse("read", key, "R2 returned a partial body for a complete read")
+          }
         } else {
           expectedLength = Math.min(range.length, object.size - range.offset)
           if (

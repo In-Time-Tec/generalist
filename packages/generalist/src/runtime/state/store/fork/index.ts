@@ -7,7 +7,7 @@ import {
   SubstitutionInvalid,
 } from "../../../errors.js"
 import { eventIdFor, type RunEvent } from "../../../run/event.js"
-import type { ForkRunInput, RewindRunInput } from "../../../run/store-types.js"
+import type { ForkRunInput as ForkCommand, RewindRunInput as RewindCommand } from "../../../run/store-types.js"
 import type { OperationRecord } from "../../../operation/record.js"
 import { copyModelResponse } from "./model-response.js"
 import { ForkCheckpoint } from "../../../execution/recovery/fork-checkpoint.js"
@@ -28,6 +28,8 @@ import {
 } from "../../state.js"
 
 const { forkCheckpoint, forkOperationKey } = ForkCheckpoint
+type ForkRunInput = Omit<ForkCommand, "commandId">
+type RewindRunInput = Omit<RewindCommand, "commandId">
 
 const dimensions = ["tokens", "usd", "duration", "toolCalls", "children"] as const
 

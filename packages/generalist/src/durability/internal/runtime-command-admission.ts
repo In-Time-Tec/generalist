@@ -285,6 +285,7 @@ export const commands: Commands = {
   fork: {
     tag: "fork" as const,
     input: Schema.Tuple([Schema.Struct({
+      commandId: Schema.String.check(Schema.isNonEmpty()),
       runId: Schema.String,
       newRunId: Schema.String,
       atSequence: Schema.Number,
@@ -293,18 +294,19 @@ export const commands: Commands = {
       substitute: Schema.optionalKey(Schema.Struct({ operationId: Schema.String, result: Schema.Unknown })),
     })]),
     receipt: RunReceipt,
-    identity: ([input]) => input.newRunId,
+    identity: ([input]) => input.commandId,
   },
   rewind: {
     tag: "rewind" as const,
     input: Schema.Tuple([Schema.Struct({
+      commandId: Schema.String.check(Schema.isNonEmpty()),
       runId: Schema.String,
       branchRunId: Schema.String,
       toSequence: Schema.Number,
       budget: Schema.optionalKey(BudgetLimits),
     })]),
     receipt: Schema.Void,
-    identity: ([input]) => input.branchRunId,
+    identity: ([input]) => input.commandId,
   },
   admitFanOut: {
     tag: "admitFanOut" as const,
