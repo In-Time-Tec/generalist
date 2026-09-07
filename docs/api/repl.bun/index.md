@@ -1,15 +1,15 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / repl.bun
+[generalist](../index.md) / repl.bun
 
 # repl.bun
 
 ## Namespaces
 
-- [BunKernelPool](./namespaces/BunKernelPool)
-- [BunKernelSnapshotStore](./namespaces/BunKernelSnapshotStore)
+- [BunKernelPool](./namespaces/BunKernelPool.md)
+- [BunKernelSnapshotStore](./namespaces/BunKernelSnapshotStore.md)
 
 ## Variables
 

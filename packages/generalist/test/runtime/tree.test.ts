@@ -18,6 +18,7 @@ import {
   textPrompt,
 } from "./execution/fixtures.js"
 import { pinnedTestAgent } from "./run/identity.js"
+import { objectWorkerId } from "./execution/object.js"
 const encodeJson = <Value>(value: Value): string => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 testIt("retains the exact active Agent registration closure", () => {
@@ -90,10 +91,16 @@ const blockRootOnChild = (sessionId: string, invocationId: string) =>
       prompt: textPrompt("child"),
     })
     const childClaim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-1", runId: child.runId, ownerId: "child-worker" })
+      commandId: `runtime-tree-test-ts-claim-1:${sessionId}`,
+      runId: child.runId,
+      ownerId: objectWorkerId,
+    })
     yield* store.suspend({
       ...(yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-2", runId: root.runId, ownerId: "root-worker" })),
+        commandId: `runtime-tree-test-ts-claim-2:${sessionId}`,
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })),
       runId: root.runId,
       waits: [openWait({ waitId: invocationId })],
       suspension: suspension({ waitId: invocationId }),
@@ -131,9 +138,15 @@ layer(objectLayer)("RunTree", (it) => {
         prompt: textPrompt("grandchild"),
       })
       const rootClaim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-3", runId: root.runId, ownerId: "root-worker" })
+        commandId: "runtime-tree-test-ts-claim-3",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.complete({
-          commandId: "runtime-tree-test-ts-complete-1", ...rootClaim, result: completedResult("root result") })
+        commandId: "runtime-tree-test-ts-complete-1",
+        ...rootClaim,
+        result: completedResult("root result"),
+      })
 
       const active = (yield* RunTree.checkpoint(root.runId)).inspection
       expect(active._tag).toBe("Active")
@@ -142,10 +155,16 @@ layer(objectLayer)("RunTree", (it) => {
       expect(active.runs.map(({ run }) => run.runId)).toEqual([root.runId, child.runId, grandchild.runId])
 
       const childClaim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-4", runId: child.runId, ownerId: "child-worker" })
+        commandId: "runtime-tree-test-ts-claim-4",
+        runId: child.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.fail({ ...childClaim, error: Errors.AgentExecutionFailure.make({ message: "child failed" }) })
       yield* runtime.cancel({
-          commandId: "runtime-tree-test-ts-cancel-2", runId: grandchild.runId, reason: "not needed" })
+        commandId: "runtime-tree-test-ts-cancel-2",
+        runId: grandchild.runId,
+        reason: "not needed",
+      })
       const checkpoint = yield* RunTree.checkpoint(root.runId)
       const terminal = checkpoint.inspection
       expect(terminal._tag).toBe("Terminal")
@@ -168,9 +187,15 @@ layer(objectLayer)("RunTree", (it) => {
       })
       const waiting = yield* RunTree.awaitTerminal(root.runId).pipe(Effect.forkChild({ startImmediately: true }))
       const claim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-5", runId: root.runId, ownerId: "await-worker" })
+        commandId: "runtime-tree-test-ts-claim-5",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.complete({
-          commandId: "runtime-tree-test-ts-complete-3", ...claim, result: completedResult("done") })
+        commandId: "runtime-tree-test-ts-complete-3",
+        ...claim,
+        result: completedResult("done"),
+      })
       yield* TestClock.adjust("50 millis")
       expect((yield* Fiber.join(waiting))._tag).toBe("Terminal")
     }),
@@ -191,9 +216,15 @@ layer(objectLayer)("RunTree", (it) => {
         Effect.forkChild({ startImmediately: true }),
       )
       const rootClaim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-6", runId: root.runId, ownerId: "root-worker" })
+        commandId: "runtime-tree-test-ts-claim-6",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.complete({
-          commandId: "runtime-tree-test-ts-complete-4", ...rootClaim, result: completedResult("root result") })
+        commandId: "runtime-tree-test-ts-complete-4",
+        ...rootClaim,
+        result: completedResult("root result"),
+      })
       yield* TestClock.adjust("50 millis")
       const watched = Array.from(yield* Fiber.join(watching))
       expect(watched.some(({ runId, event }) => runId === root.runId && event._tag === "RunCompleted")).toBe(true)
@@ -268,14 +299,17 @@ layer(objectLayer)("RunTree", (it) => {
         prompt: textPrompt("calls"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-7", runId: root.runId, ownerId: "tree-test" })
+        commandId: "runtime-tree-test-ts-claim-7",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-tree-test-ts-emitAgentEvent-5",
+        commandId: "runtime-tree-test-ts-emitAgentEvent-5",
         ...claim,
         event: { _tag: "ToolProgress", turn: 0, toolCallId: "tool:1", message: "working" },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-tree-test-ts-emitAgentEvent-6",
+        commandId: "runtime-tree-test-ts-emitAgentEvent-6",
         ...claim,
         event: {
           _tag: "ModelAttemptStarted",
@@ -342,12 +376,18 @@ layer(objectLayer)("RunTree", (it) => {
         prompt: textPrompt("checkpoint race"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-8", runId: root.runId, ownerId: "checkpoint-race" })
+        commandId: "runtime-tree-test-ts-claim-8",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       const [checkpoint] = yield* Effect.all(
         [
           RunTree.checkpoint(root.runId),
           store.emitAgentEvent({
-          commandId: "runtime-tree-test-ts-emitAgentEvent-7", ...claim, event: { _tag: "TurnStarted", turn: 41 } }),
+            commandId: "runtime-tree-test-ts-emitAgentEvent-7",
+            ...claim,
+            event: { _tag: "TurnStarted", turn: 41 },
+          }),
         ] as const,
         { concurrency: "unbounded" },
       )
@@ -437,12 +477,21 @@ layer(objectLayer)("RunTree", (it) => {
         Effect.forkChild({ startImmediately: true }),
       )
       const claim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-9", runId: root.runId, ownerId: "tree-live" })
+        commandId: "runtime-tree-test-ts-claim-9",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-tree-test-ts-emitAgentEvent-8", ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+        commandId: "runtime-tree-test-ts-emitAgentEvent-8",
+        ...claim,
+        event: { _tag: "TurnStarted", turn: 1 },
+      })
       yield* TestClock.adjust("50 millis")
       yield* store.emitAgentEvent({
-          commandId: "runtime-tree-test-ts-emitAgentEvent-9", ...claim, event: { _tag: "TurnStarted", turn: 2 } })
+        commandId: "runtime-tree-test-ts-emitAgentEvent-9",
+        ...claim,
+        event: { _tag: "TurnStarted", turn: 2 },
+      })
       yield* TestClock.adjust("50 millis")
       const events = Array.from(yield* Fiber.join(next))
       expect(events.map(({ event }) => (event._tag === "TurnStarted" ? event.turn : undefined))).toEqual([1, 2])
@@ -463,9 +512,15 @@ layer(objectLayer)("RunTree", (it) => {
       })
       const checkpoint = yield* RunTree.checkpoint(root.runId)
       const claim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-10", runId: root.runId, ownerId: "checkpoint-live" })
+        commandId: "runtime-tree-test-ts-claim-10",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-tree-test-ts-emitAgentEvent-10", ...claim, event: { _tag: "TurnStarted", turn: 42 } })
+        commandId: "runtime-tree-test-ts-emitAgentEvent-10",
+        ...claim,
+        event: { _tag: "TurnStarted", turn: 42 },
+      })
       const following = yield* RunTree.events({ rootRunId: root.runId, cursor: checkpoint.cursor }).pipe(
         Stream.take(1),
         Stream.runCollect,
@@ -492,7 +547,10 @@ layer(objectLayer)("RunTree", (it) => {
       })
       yield* store.suspend({
         ...(yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-11", runId: root.runId, ownerId: "root-worker" })),
+          commandId: "runtime-tree-test-ts-claim-11",
+          runId: root.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: root.runId,
         waits: [openWait({ waitId: "approval:root", reason: "approval" })],
         suspension: suspension({ waitId: "approval:root", reason: "approval" }),
@@ -535,9 +593,15 @@ layer(objectLayer)("RunTree", (it) => {
         attempt: claim.attempt,
       })
       yield* store.startOperation({
-          commandId: "runtime-tree-test-ts-startOperation-11", ...claim, operationId: operation.operationId })
+        commandId: "runtime-tree-test-ts-startOperation-11",
+        ...claim,
+        operationId: operation.operationId,
+      })
       yield* store.expireRunningOperation({
-          commandId: "runtime-tree-test-ts-expireRunningOperation-12", ...claim, operationId: operation.operationId })
+        commandId: "runtime-tree-test-ts-expireRunningOperation-12",
+        ...claim,
+        operationId: operation.operationId,
+      })
       expect((yield* store.inspect(child.runId)).status).toBe("needs-resolution")
       const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
       expect(watched.some(({ runId }) => runId === child.runId)).toBe(true)
@@ -572,11 +636,20 @@ layer(objectLayer)("RunTree", (it) => {
         prompt: textPrompt("child"),
       })
       yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-12", runId: child.runId, ownerId: "child-worker" })
+        commandId: "runtime-tree-test-ts-claim-12",
+        runId: child.runId,
+        ownerId: objectWorkerId,
+      })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-13", runId: root.runId, ownerId: "root-worker" })
+        commandId: "runtime-tree-test-ts-claim-13",
+        runId: root.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.complete({
-          commandId: "runtime-tree-test-ts-complete-13", ...claim, result: completedResult("root result") })
+        commandId: "runtime-tree-test-ts-complete-13",
+        ...claim,
+        result: completedResult("root result"),
+      })
       const watching = yield* watchBlocked(root.runId)
       yield* TestClock.adjust("50 millis")
       yield* TestClock.adjust("50 millis")
@@ -597,7 +670,10 @@ layer(objectLayer)("RunTree", (it) => {
       })
       yield* store.suspend({
         ...(yield* store.claimExecution({
-          commandId: "runtime-tree-test-ts-claim-14", runId: root.runId, ownerId: "root-worker" })),
+          commandId: "runtime-tree-test-ts-claim-14",
+          runId: root.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: root.runId,
         waits: [openWait({ waitId: "gate", reason: "external" })],
         suspension: suspension({ waitId: "gate" }),

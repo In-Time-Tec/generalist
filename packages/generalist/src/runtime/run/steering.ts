@@ -112,7 +112,13 @@ export const make = (services: Options) =>
         .history({ runId, cursor: cursorOrigin, limit: Number.MAX_SAFE_INTEGER })
         .pipe(
           Effect.map((events) =>
-            events.find((event) => event._tag === "Inbox" && event.idempotencyKey === idempotencyKey),
+            events.reduce<{ readonly digest: string; readonly entryId: string; readonly sequence: number } | undefined>(
+              (prior, event) =>
+                event._tag === "Inbox" && event.idempotencyKey === idempotencyKey
+                  ? { digest: event.digest, entryId: event.entryId, sequence: event.inboxSequence }
+                  : prior,
+              undefined,
+            ),
           ),
         )
 
@@ -127,7 +133,6 @@ export const make = (services: Options) =>
         const from = options.from ?? { system: true }
         yield* authorizeSource(runId, from)
         const idempotencyKey = options.idempotencyKey ?? `inbox:${yield* generateId}`
-        const prior = policy === "rollback" ? yield* existingInbox(runId, idempotencyKey) : undefined
         const admission: AdmitSteeringInput = {
           runId,
           idempotencyKey,
@@ -141,6 +146,10 @@ export const make = (services: Options) =>
           policy,
           from,
           ...(options.addressed === undefined ? undefined : { addressed: options.addressed }),
+        }
+        const prior = yield* existingInbox(runId, idempotencyKey)
+        if (prior !== undefined && prior.digest === admission.digest) {
+          return { receipt: { entryId: prior.entryId, sequence: prior.sequence }, duplicate: false }
         }
         if (policy === "rollback") {
           if (prior === undefined) yield* services.active.interruptAndAwait(runId)

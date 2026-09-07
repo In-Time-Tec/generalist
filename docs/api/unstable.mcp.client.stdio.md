@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.mcp.client.stdio
+[generalist](./index.md) / unstable.mcp.client.stdio
 
 # unstable.mcp.client.stdio
 
@@ -82,7 +82,7 @@ Node/Bun-only stdio transport options.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](./unstable.mcp.client#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](./unstable.mcp.client.md#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 **`Experimental`**
 
@@ -94,7 +94,7 @@ Node/Bun-only stdio transport options.
 
 #### Returns
 
-`Layer.Layer`\<[`MCPClient`](./unstable.mcp.client#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+`Layer.Layer`\<[`MCPClient`](./unstable.mcp.client.md#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ***
 
@@ -102,13 +102,13 @@ Node/Bun-only stdio transport options.
 
 ### layerTagged
 
-> `const` **layerTagged**: \{(`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>; \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>; \}
+> `const` **layerTagged**: \{(`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>; \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>; \}
 
 **`Experimental`**
 
 #### Call Signature
 
-> (`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> (`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ##### Parameters
 
@@ -118,11 +118,11 @@ Node/Bun-only stdio transport options.
 
 ##### Returns
 
-\<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+\<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 #### Call Signature
 
-> \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ##### Type Parameters
 
@@ -134,7 +134,7 @@ Node/Bun-only stdio transport options.
 
 ###### tag
 
-`Key`\<`Identifier`, [`Service`](./unstable.mcp.client#service)\>
+`Key`\<`Identifier`, [`Service`](./unstable.mcp.client.md#service)\>
 
 ###### options
 
@@ -142,7 +142,7 @@ Node/Bun-only stdio transport options.
 
 ##### Returns
 
-`Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+`Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ***
 

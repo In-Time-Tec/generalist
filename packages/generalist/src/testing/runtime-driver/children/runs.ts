@@ -99,9 +99,7 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
             (event) => event._tag === "RunFailed",
           )
           if (failure?._tag === "RunFailed") {
-            throw new Error(
-              `child suspension RunFailed: ${failure.error._tag}: ${failure.error.message}`,
-            )
+            throw new Error(`child suspension RunFailed: ${failure.error._tag}: ${failure.error.message}`)
           }
         }
         expect(inspection.status).toBe("waiting")
@@ -142,12 +140,16 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
         ])
         for (const [index, runId] of suspended.childRunIds.entries()) {
           const claim = yield* capability.claim(services, { runId, commandId: `child-runs-child-${index}` })
-          yield* services.store.complete({ ...claim, commandId: `${claim.runId}:complete:${claim.attemptFence}`, result: {
-            text: `child-${index}`,
-            output: `child-${index}`,
-            turns: 1,
-            session: { sessionId: `session:${name}:child:${index}`, leafId: null },
-          }, })
+          yield* services.store.complete({
+            ...claim,
+            commandId: `${claim.runId}:complete:${claim.attemptFence}`,
+            result: {
+              text: `child-${index}`,
+              output: `child-${index}`,
+              turns: 1,
+              session: { sessionId: `session:${name}:child:${index}`, leafId: null },
+            },
+          })
         }
         expect(yield* services.runtime.inspect(suspended.runId)).toMatchObject({
           status: "running",
@@ -174,11 +176,7 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
               }
             })()
             const details = serialized.length > 512 ? `${serialized.slice(0, 512)}...` : serialized
-            const cause =
-              "cause" in failure.error && failure.error.cause !== undefined
-                ? ` cause=${String(failure.error.cause).slice(0, 256)}`
-                : ""
-            throw new Error(`child resume RunFailed: ${failure.error._tag}: ${details}${cause}`)
+            throw new Error(`child resume RunFailed: ${failure.error._tag}: ${details}`)
           }
         }
         expect(finalInspection).toMatchObject({

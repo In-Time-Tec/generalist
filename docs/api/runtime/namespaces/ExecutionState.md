@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ExecutionState
+[generalist](../../index.md) / [runtime](../index.md) / ExecutionState
 
 # ExecutionState
 
@@ -42,7 +42,7 @@ Executable-neutral terminal result.
 
 ### ExecutionSuspension
 
-> **ExecutionSuspension** = [`AgentSuspended`](../../generalist/namespaces/AgentEvent#agentsuspended) \| [`ProgramSuspended`](../../generalist/namespaces/ProgramCapabilities#programsuspended) \| [`UnknownAgent`](./Errors#unknownagent) \| [`BudgetExhausted`](../../generalist/namespaces/RunBudget#budgetexhausted) \| [`Suspended`](../../generalist/namespaces/NestedOperation#suspended)
+> **ExecutionSuspension** = [`AgentSuspended`](../../generalist/namespaces/AgentEvent.md#agentsuspended) \| [`ProgramSuspended`](../../generalist/namespaces/ProgramCapabilities.md#programsuspended) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`BudgetExhausted`](../../generalist/namespaces/RunBudget.md#budgetexhausted) \| [`Suspended`](../../generalist/namespaces/NestedOperation.md#suspended)
 
 Executable-neutral persisted suspension state.
 
@@ -80,7 +80,7 @@ Terminal value produced by an Agent Program execution.
 
 ### AgentExecutionResult
 
-> `const` **AgentExecutionResult**: `Schema.Struct`\<\{ `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `session`: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>; `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>
+> `const` **AgentExecutionResult**: `Schema.Struct`\<\{ `output`: `Schema.Unknown`; `session`: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>; `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>
 
 Terminal value produced by an Agent execution.
 
@@ -90,7 +90,7 @@ Terminal value produced by an Agent execution.
 
 ### ExecutionCheckpoint
 
-> `const` **ExecutionCheckpoint**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `version`: `Schema.Literal`\<`"1"`\>; \}\>\]\>
+> `const` **ExecutionCheckpoint**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `branch`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `namespace`: `Schema.String`; `replay`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; \}\>\>; `version`: `Schema.Literal`\<`"1"`\>; \}\>\]\>
 
 Executable-neutral persisted continuation state.
 
@@ -100,7 +100,7 @@ Executable-neutral persisted continuation state.
 
 ### ExecutionResult
 
-> `const` **ExecutionResult**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `session`: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>; `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `value`: `Schema.Unknown`; \}\>\]\>
+> `const` **ExecutionResult**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `output`: `Schema.Unknown`; `session`: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>; `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `value`: `Schema.Unknown`; \}\>\]\>
 
 Executable-neutral terminal result.
 
@@ -118,7 +118,7 @@ Executable-neutral terminal result.
 
 ### ProgramCheckpoint
 
-> `const` **ProgramCheckpoint**: `Schema.TaggedStruct`\<`"Program"`, \{ `version`: `Schema.Literal`\<`"1"`\>; \}\>
+> `const` **ProgramCheckpoint**: `Schema.TaggedStruct`\<`"Program"`, \{ `branch`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `namespace`: `Schema.String`; `replay`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; \}\>\>; `version`: `Schema.Literal`\<`"1"`\>; \}\>
 
 Fresh-sandbox replay frontier for an Agent Program.
 

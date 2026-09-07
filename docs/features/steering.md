@@ -31,6 +31,8 @@ The default policy is `steer`; the default source is `{ system: true }`. A calle
 
 An accepted call returns `{ entryId, sequence }`. A retry with the same Run, `idempotencyKey`, prompt, policy, source, and addressed metadata returns the same receipt. Different content under the same key fails with `SteeringConflict`.
 
+Supply the caller identity explicitly and retain it across lost acknowledgements. The current high-level `Runtime.send` spelling is `options.idempotencyKey`; omitting it generates a new identity, so a caller retry is then distinct work. This differs from `runtime.wake({ runId, commandId, event })`, where `commandId` identifies the command and `event.dedupeKey` identifies environmental delivery. Neither a notification nor an interrupted HTTP response establishes whether admission committed.
+
 ```text
 runtime.send(runId, message, options)
 ├── resolve target and authoritative source

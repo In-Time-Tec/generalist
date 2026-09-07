@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Gate
+[generalist](../../index.md) / [generalist](../index.md) / Gate
 
 # Gate
 
@@ -186,7 +186,7 @@ Run one independent Agent and compare its structured score to a threshold.
 
 ##### agent
 
-> `readonly` **agent**: [`Any`](./Agent#any)
+> `readonly` **agent**: [`Any`](./Agent.md#any)
 
 <a id="name-2"></a>
 
@@ -304,7 +304,7 @@ Whether one completion gate accepted or rejected a proposed terminal output.
 
 ### VerifierAgent
 
-> **VerifierAgent**\<`R`\> = [`Agent`](./Agent#agent)\<`Record`\<`string`, `Tool.Any`\>, `R`, `R`, `R`, `Schema.Top`, `Schema.Top`\>
+> **VerifierAgent**\<`R`\> = [`Agent`](./Agent.md#agent)\<`Record`\<`string`, `Tool.Any`\>, `R`, `R`, `R`, `Schema.Top`, `Schema.Top`\>
 
 Verifier Agent shape retained after type erasure.
 
@@ -434,7 +434,7 @@ Validate Agent-owned gate configuration while the Agent is constructed.
 
 ###### sandbox
 
-[`SandboxService`](../../sandbox#sandboxservice) \| `undefined`
+[`SandboxService`](../../sandbox.md#sandboxservice) \| `undefined`
 
 #### Returns
 
@@ -456,7 +456,7 @@ Whether one completion gate accepted or rejected a proposed terminal output.
 
 ### verifier
 
-> `const` **verifier**: \<`A`\>(`options`) => [`Verifier`](#verifier)\<[`Requirements`](./Agent#requirements-1)\<`A`\>\>
+> `const` **verifier**: \<`A`\>(`options`) => [`Verifier`](#verifier)\<[`Requirements`](./Agent.md#requirements-1)\<`A`\>\>
 
 Construct an isolated Agent verifier completion gate.
 
@@ -464,7 +464,7 @@ Construct an isolated Agent verifier completion gate.
 
 ##### A
 
-`A` *extends* [`Any`](./Agent#any)
+`A` *extends* [`Any`](./Agent.md#any)
 
 #### Parameters
 
@@ -484,7 +484,7 @@ Construct an isolated Agent verifier completion gate.
 
 #### Returns
 
-[`Verifier`](#verifier)\<[`Requirements`](./Agent#requirements-1)\<`A`\>\>
+[`Verifier`](#verifier)\<[`Requirements`](./Agent.md#requirements-1)\<`A`\>\>
 
 ***
 

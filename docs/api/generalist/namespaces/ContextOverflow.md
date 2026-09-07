@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ContextOverflow
+[generalist](../../index.md) / [generalist](../index.md) / ContextOverflow
 
 # ContextOverflow
 
@@ -12,7 +12,7 @@
 
 ### classify
 
-> `const` **classify**: (`cause`) => [`FailureClassification`](./ModelRegistry#failureclassification)
+> `const` **classify**: (`cause`) => [`FailureClassification`](./ModelRegistry.md#failureclassification)
 
 Classify every model failure as a context-window overflow by its semantic evidence, independent of provider, error shape, or decode success.
 
@@ -24,4 +24,4 @@ Classify every model failure as a context-window overflow by its semantic eviden
 
 #### Returns
 
-[`FailureClassification`](./ModelRegistry#failureclassification)
+[`FailureClassification`](./ModelRegistry.md#failureclassification)

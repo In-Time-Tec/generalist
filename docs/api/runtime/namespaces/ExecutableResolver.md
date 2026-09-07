@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ExecutableResolver
+[generalist](../../index.md) / [runtime](../index.md) / ExecutableResolver
 
 # ExecutableResolver
 
@@ -62,13 +62,13 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 ##### agentManifest
 
-> `readonly` **agentManifest**: [`AgentManifest`](../../generalist/namespaces/AgentManifest#agentmanifest)
+> `readonly` **agentManifest**: [`AgentManifest`](../../generalist/namespaces/AgentManifest.md#agentmanifest)
 
 <a id="manifest"></a>
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 ###### Inherited from
 
@@ -88,7 +88,7 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 ##### program
 
-> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest.md#pinnedprogram)
 
 ###### Inherited from
 
@@ -174,7 +174,7 @@ Live executable resources owned by the caller's scope.
 
 ##### agent
 
-> `readonly` **agent**: [`Closed`](../../generalist/namespaces/Agent#closed)
+> `readonly` **agent**: [`Closed`](../../generalist/namespaces/Agent.md#closed)
 
 <a id="attestation"></a>
 
@@ -202,7 +202,7 @@ Resolver-owned proof of the reconstructed executable identity.
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="ref-1"></a>
 
@@ -238,7 +238,7 @@ Exact persisted authority for one reconstructed Program capability pin.
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="pin-1"></a>
 
@@ -250,7 +250,7 @@ Exact persisted authority for one reconstructed Program capability pin.
 
 ##### program
 
-> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest.md#pinnedprogram)
 
 <a id="ref-2"></a>
 
@@ -318,7 +318,7 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 ###### Inherited from
 
@@ -338,7 +338,7 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 ##### program
 
-> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest.md#pinnedprogram)
 
 ###### Inherited from
 
@@ -412,7 +412,7 @@ Exact persisted identity supplied to executable reconstruction.
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="ref-4"></a>
 
@@ -458,7 +458,7 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 ###### Inherited from
 
@@ -484,7 +484,7 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 ##### program
 
-> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest.md#pinnedprogram)
 
 ###### Inherited from
 
@@ -560,7 +560,7 @@ resources finalized with the resolver scope.
 
 ##### agent
 
-> `readonly` **agent**: (`request`) => `Effect`\<[`AnyAgent`](../../generalist/namespaces/ProgramHandlers#anyagent), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+> `readonly` **agent**: (`request`) => `Effect`\<[`AnyAgent`](../../generalist/namespaces/ProgramHandlers.md#anyagent), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 ###### Parameters
 
@@ -570,7 +570,7 @@ resources finalized with the resolver scope.
 
 ###### Returns
 
-`Effect`\<[`AnyAgent`](../../generalist/namespaces/ProgramHandlers#anyagent), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+`Effect`\<[`AnyAgent`](../../generalist/namespaces/ProgramHandlers.md#anyagent), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 <a id="codec"></a>
 
@@ -592,7 +592,7 @@ resources finalized with the resolver scope.
 
 ##### executor
 
-> `readonly` **executor**: (`request`) => `Effect`\<[`Service`](../../generalist/namespaces/CodeExecutor#service), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+> `readonly` **executor**: (`request`) => `Effect`\<[`Service`](../../generalist/namespaces/CodeExecutor.md#service), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 ###### Parameters
 
@@ -602,7 +602,7 @@ resources finalized with the resolver scope.
 
 ###### Returns
 
-`Effect`\<[`Service`](../../generalist/namespaces/CodeExecutor#service), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+`Effect`\<[`Service`](../../generalist/namespaces/CodeExecutor.md#service), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 <a id="services"></a>
 
@@ -624,7 +624,7 @@ resources finalized with the resolver scope.
 
 ##### step
 
-> `readonly` **step**: (`request`) => `Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+> `readonly` **step**: (`request`) => `Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers.md#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 ###### Parameters
 
@@ -634,13 +634,13 @@ resources finalized with the resolver scope.
 
 ###### Returns
 
-`Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+`Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers.md#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 <a id="tool"></a>
 
 ##### tool
 
-> `readonly` **tool**: (`request`) => `Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+> `readonly` **tool**: (`request`) => `Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers.md#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 ###### Parameters
 
@@ -650,7 +650,7 @@ resources finalized with the resolver scope.
 
 ###### Returns
 
-`Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
+`Effect`\<[`AnyTool`](../../generalist/namespaces/ProgramHandlers.md#anytool), [`ReconstructionError`](#reconstructionerror), `Scope`\>
 
 ***
 
@@ -678,19 +678,19 @@ Live Agent Program resources owned by the caller's scope.
 
 ##### executor
 
-> `readonly` **executor**: [`Service`](../../generalist/namespaces/CodeExecutor#service)
+> `readonly` **executor**: [`Service`](../../generalist/namespaces/CodeExecutor.md#service)
 
 <a id="handlers"></a>
 
 ##### handlers
 
-> `readonly` **handlers**: [`Handlers`](../../generalist/namespaces/ProgramHandlers#handlers)
+> `readonly` **handlers**: [`Handlers`](../../generalist/namespaces/ProgramHandlers.md#handlers)
 
 <a id="program-4"></a>
 
 ##### program
 
-> `readonly` **program**: [`Program`](../../generalist/namespaces/AgentProgram#program)\<`unknown`, `unknown`, `unknown`, `unknown`\>
+> `readonly` **program**: [`Program`](../../generalist/namespaces/AgentProgram.md#program)\<`unknown`, `unknown`, `unknown`, `unknown`\>
 
 <a id="services-1"></a>
 
@@ -736,13 +736,13 @@ Exact persisted authority for the Run-scoped services of one reconstructed Progr
 
 ##### manifest
 
-> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="program-5"></a>
 
 ##### program
 
-> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest#pinnedprogram)
+> `readonly` **program**: [`PinnedProgram`](../../generalist/namespaces/ProgramManifest.md#pinnedprogram)
 
 <a id="ref-6"></a>
 
@@ -790,13 +790,13 @@ One exact static Agent executable bound to its persisted Agent pin.
 
 ##### agent
 
-> `readonly` **agent**: [`Closed`](../../generalist/namespaces/Agent#closed)
+> `readonly` **agent**: [`Closed`](../../generalist/namespaces/Agent.md#closed)
 
 <a id="executable"></a>
 
 ##### executable
 
-> `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+> `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 <a id="runoptions-1"></a>
 
@@ -824,25 +824,25 @@ One exact static Program executable bound to its persisted Program pin.
 
 ##### executable
 
-> `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+> `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 <a id="executor-2"></a>
 
 ##### executor
 
-> `readonly` **executor**: [`Service`](../../generalist/namespaces/CodeExecutor#service)
+> `readonly` **executor**: [`Service`](../../generalist/namespaces/CodeExecutor.md#service)
 
 <a id="handlers-1"></a>
 
 ##### handlers
 
-> `readonly` **handlers**: [`Handlers`](../../generalist/namespaces/ProgramHandlers#handlers)
+> `readonly` **handlers**: [`Handlers`](../../generalist/namespaces/ProgramHandlers.md#handlers)
 
 <a id="program-6"></a>
 
 ##### program
 
-> `readonly` **program**: [`Program`](../../generalist/namespaces/AgentProgram#program)\<`unknown`, `unknown`, `unknown`, `unknown`\>
+> `readonly` **program**: [`Program`](../../generalist/namespaces/AgentProgram.md#program)\<`unknown`, `unknown`, `unknown`, `unknown`\>
 
 <a id="services-2"></a>
 
@@ -880,7 +880,7 @@ Resolver-owned static options attested by the persisted Agent manifest.
 
 ### ReconstructionError
 
-> **ReconstructionError** = [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)
+> **ReconstructionError** = [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)
 
 Typed failures allowed while reconstructing an admitted executable.
 
@@ -900,7 +900,7 @@ Exactly one reconstructed executable kind.
 
 ### ResolveError
 
-> **ResolveError** = [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)
+> **ResolveError** = [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)
 
 Typed failures allowed while resolving one executable.
 
@@ -936,7 +936,7 @@ One exact static executable used by tests and process-local hosts.
 
 ### layerDynamic
 
-> `const` **layerDynamic**: (`options`) => `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+> `const` **layerDynamic**: (`options`) => `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 Canonical resolver Layer helper.
 
@@ -954,7 +954,7 @@ Canonical resolver Layer helper.
 
 #### Returns
 
-`Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+`Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 ***
 
@@ -962,7 +962,7 @@ Canonical resolver Layer helper.
 
 ### layerStatic
 
-> `const` **layerStatic**: (`executables`) => `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+> `const` **layerStatic**: (`executables`) => `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 Exact static resolver Layer helper.
 
@@ -974,7 +974,7 @@ Exact static resolver Layer helper.
 
 #### Returns
 
-`Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+`Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 ***
 
@@ -982,7 +982,7 @@ Exact static resolver Layer helper.
 
 ### makeDynamic
 
-> `const` **makeDynamic**: (`options`) => `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+> `const` **makeDynamic**: (`options`) => `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 Construct the canonical resolver: static Agents keyed by their exact persisted Agent pin, and
 every admitted Agent Program reconstructed from its exact manifest and persisted registrations.
@@ -1001,7 +1001,7 @@ every admitted Agent Program reconstructed from its exact manifest and persisted
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+`Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 ***
 
@@ -1009,7 +1009,7 @@ every admitted Agent Program reconstructed from its exact manifest and persisted
 
 ### makeStatic
 
-> `const` **makeStatic**: (`executables`) => `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+> `const` **makeStatic**: (`executables`) => `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 Construct an exact static resolver without resolving at admission or startup.
 
@@ -1021,7 +1021,7 @@ Construct an exact static resolver without resolving at admission or startup.
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid)\>
+`Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
 ***
 
@@ -1041,7 +1041,7 @@ Verify resolver-owned static options against the persisted active Agent.
 
 ###### manifest
 
-[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 ###### options
 
@@ -1069,7 +1069,7 @@ Verify resolver-owned static options against the persisted active Agent.
 
 ###### manifest
 
-[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 ###### options
 

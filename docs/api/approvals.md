@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / approvals
+[generalist](./index.md) / approvals
 
 # approvals
 
@@ -124,7 +124,7 @@ A Runtime approval token was malformed or did not carry a Run identity.
 
 ##### remember?
 
-> `readonly` `optional` **remember?**: [`Rule`](./permissions#rule)
+> `readonly` `optional` **remember?**: [`Rule`](./permissions.md#rule)
 
 ***
 
@@ -196,7 +196,7 @@ One durable approval notification.
 
 ##### level
 
-> `readonly` **level**: [`Level`](./permissions#level-1)
+> `readonly` **level**: [`Level`](./permissions.md#level-1)
 
 <a id="reason-1"></a>
 
@@ -232,7 +232,7 @@ An unresolved authorization request.
 
 #### Extends
 
-- [`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest)
+- [`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest)
 
 #### Properties
 
@@ -250,7 +250,7 @@ An unresolved authorization request.
 
 ###### Inherited from
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`agentName`](./generalist/namespaces/ToolAuthorization#agentname)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest).[`agentName`](./generalist/namespaces/ToolAuthorization.md#agentname)
 
 <a id="call"></a>
 
@@ -260,13 +260,13 @@ An unresolved authorization request.
 
 ###### Inherited from
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`call`](./generalist/namespaces/ToolAuthorization#call)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest).[`call`](./generalist/namespaces/ToolAuthorization.md#call)
 
 <a id="level-1"></a>
 
 ##### level
 
-> `readonly` **level**: [`Level`](./permissions#level-1)
+> `readonly` **level**: [`Level`](./permissions.md#level-1)
 
 <a id="reason-2"></a>
 
@@ -282,7 +282,7 @@ An unresolved authorization request.
 
 ###### Inherited from
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`runId`](./generalist/namespaces/ToolAuthorization#runid)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest).[`runId`](./generalist/namespaces/ToolAuthorization.md#runid)
 
 <a id="sessionid"></a>
 
@@ -292,7 +292,7 @@ An unresolved authorization request.
 
 ###### Inherited from
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`sessionId`](./generalist/namespaces/ToolAuthorization#sessionid)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest).[`sessionId`](./generalist/namespaces/ToolAuthorization.md#sessionid)
 
 <a id="token-2"></a>
 
@@ -308,7 +308,7 @@ An unresolved authorization request.
 
 ###### Inherited from
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest).[`turn`](./generalist/namespaces/ToolAuthorization#turn)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest).[`turn`](./generalist/namespaces/ToolAuthorization.md#turn)
 
 ***
 
@@ -378,7 +378,7 @@ Operator identity journaled with the decision; also requires the token to be an 
 
 ##### askAbove
 
-> `readonly` **askAbove**: [`Level`](./permissions#level-1)
+> `readonly` **askAbove**: [`Level`](./permissions.md#level-1)
 
 ## Type Aliases
 
@@ -394,7 +394,7 @@ Operator identity journaled with the decision; also requires the token to be an 
 
 ### ResolveError
 
-> **ResolveError** = [`ApprovalTokenInvalid`](#approvaltokeninvalid) \| [`RespondApprovalError`](./runtime/namespaces/Runtime#respondapprovalerror) \| [`RuleStoreError`](./permissions#rulestoreerror) \| [`IllegalOperatorAction`](./runtime/namespaces/Errors#illegaloperatoraction)
+> **ResolveError** = [`ApprovalTokenInvalid`](#approvaltokeninvalid) \| [`RespondApprovalError`](./runtime/namespaces/Runtime.md#respondapprovalerror) \| [`RuleStoreError`](./permissions.md#rulestoreerror) \| [`IllegalOperatorAction`](./runtime/namespaces/Errors.md#illegaloperatoraction)
 
 ## Variables
 
@@ -476,7 +476,7 @@ Every request resolves Denied.
 
 ### layerDurable
 
-> `const` **layerDurable**: \<`R`\>(`options`) => `Layer.Layer`\<[`Approvals`](#approvals), `never`, [`Runtime`](./runtime/namespaces/Runtime#runtime) \| `R`\>
+> `const` **layerDurable**: \<`R`\>(`options`) => `Layer.Layer`\<[`Approvals`](#approvals), `never`, [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| `R`\>
 
 Park approval requests in the Runtime and notify one external operator boundary.
 
@@ -494,7 +494,7 @@ Park approval requests in the Runtime and notify one external operator boundary.
 
 #### Returns
 
-`Layer.Layer`\<[`Approvals`](#approvals), `never`, [`Runtime`](./runtime/namespaces/Runtime#runtime) \| `R`\>
+`Layer.Layer`\<[`Approvals`](#approvals), `never`, [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| `R`\>
 
 ***
 

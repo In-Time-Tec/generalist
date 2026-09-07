@@ -11,17 +11,32 @@ import type {
   ExternalRootExecutableMismatch,
   ExternalRootNotFound,
   ExternalRootSettlement,
-  ExternalRunRef,
   Placement,
   ReserveInput,
+  RootAdmission,
+  PageInput,
 } from "./placement.js"
 import type { RunOutcome } from "../../run.js"
-import type { AdmitStartInput } from "../../run/store.js"
 import type { StartError } from "../../service.js"
 import type { StaleClaim, StaleSessionClaim } from "../../run/ownership-errors.js"
 
+/** One bounded immutable-key scan window; an empty item page may still have a continuation. @experimental */
+export interface Page<A> {
+  readonly items: ReadonlyArray<A>
+  readonly cursor?: string
+}
+
 /** Cross-partition child placement operations supported by single-partition stores. */
 export interface Service {
+  readonly inspectPlacement: (
+    placementId: string,
+  ) => Effect.Effect<Placement, ExternalChildPlacementNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly outstandingPlacements: (
+    input: PageInput,
+  ) => Effect.Effect<Page<Placement>, RuntimeUnavailable | DurabilityFailure>
+  readonly outstandingRoots: (
+    input: PageInput,
+  ) => Effect.Effect<Page<ExternalRoot>, RuntimeUnavailable | DurabilityFailure>
   readonly reserve: (
     input: ReserveInput,
   ) => Effect.Effect<
@@ -50,14 +65,9 @@ export interface Service {
     placementId: string,
   ) => Effect.Effect<Placement, ExternalChildPlacementNotFound | RuntimeUnavailable | DurabilityFailure>
   /** Admit an independently executable depth-zero root, initially fenced from execution. */
-  readonly admitRoot: (input: {
-    readonly placementId: string
-    readonly parent: ExternalRunRef
-    readonly ref: ExternalRunRef
-    readonly requestDigest: string
-    readonly executableDigest: string
-    readonly root: Omit<AdmitStartInput, "runId" | "initialChildren" | "initialFanOuts">
-  }) => Effect.Effect<ExternalRoot, ExternalRootConflict | ExternalRootExecutableMismatch | StartError>
+  readonly admitRoot: (
+    input: RootAdmission,
+  ) => Effect.Effect<ExternalRoot, ExternalRootConflict | ExternalRootExecutableMismatch | StartError>
   /** Release one admitted root's durable execution gate. Exact retries are no-ops. */
   readonly activateRoot: (
     placementId: string,

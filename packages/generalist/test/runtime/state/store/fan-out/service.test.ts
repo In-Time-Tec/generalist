@@ -14,8 +14,6 @@ import {
   textPrompt,
 } from "../../../execution/fixtures.js"
 
-
-
 const admit = (
   key: string,
   options?: {
@@ -235,9 +233,15 @@ layer(objectLayer)("Runtime fan-out", (it) => {
       const store = yield* RunStore.RunStore
       yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-state-store-fan-out-service-test-ts-claim-3", runId: parent.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-fan-out-service-test-ts-claim-3",
+        runId: parent.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.complete({
-          commandId: "runtime-memory-store-fan-out-service-test-ts-complete-2", ...claim, result: { _tag: "Program", value: "preserved" } })
+        commandId: "runtime-memory-store-fan-out-service-test-ts-complete-2",
+        ...claim,
+        result: { _tag: "Program", value: "preserved" },
+      })
       expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
       yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
       expect(yield* runtime.send(parent.runId, "late", { idempotencyKey: "late" }).pipe(Effect.flip)).toBeInstanceOf(
@@ -255,7 +259,6 @@ layer(objectLayer)("Runtime fan-out", (it) => {
     }),
   )
 
-
   it.effect("atomically rejects terminal and cancelling parents", () =>
     Effect.gen(function* () {
       for (const status of ["terminal", "cancelling"] as const) {
@@ -266,9 +269,15 @@ layer(objectLayer)("Runtime fan-out", (it) => {
         } else {
           const store = yield* RunStore.RunStore
           yield* store.claimExecution({
-          commandId: "runtime-state-store-fan-out-service-test-ts-claim-5", runId: admitted.parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-state-store-fan-out-service-test-ts-claim-5",
+            runId: admitted.parent.runId,
+            ownerId: objectWorkerId,
+          })
           yield* store.cancel({
-          commandId: "runtime-memory-store-fan-out-service-test-ts-cancel-3", runId: admitted.parent.runId, reason: "stop" })
+            commandId: "runtime-memory-store-fan-out-service-test-ts-cancel-3",
+            runId: admitted.parent.runId,
+            reason: "stop",
+          })
         }
         const error = yield* admitted.runtime
           .fanOut({ ...admitted.input, idempotencyKey: `${admitted.input.idempotencyKey}:late` })
@@ -364,7 +373,10 @@ layer(objectLayer)("Runtime fan-out", (it) => {
     Effect.gen(function* () {
       const { runtime, parent, receipt } = yield* admit("cancel", { concurrency: 1 })
       yield* runtime.cancel({
-          commandId: "runtime-memory-store-fan-out-service-test-ts-cancel-4", runId: parent.runId, reason: "stop" })
+        commandId: "runtime-memory-store-fan-out-service-test-ts-cancel-4",
+        runId: parent.runId,
+        reason: "stop",
+      })
       expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
       expect(
         yield* Effect.forEach(receipt.childRunIds, (runId) =>
@@ -379,9 +391,15 @@ layer(objectLayer)("Runtime fan-out", (it) => {
       const { runtime, parent, receipt } = yield* admit("cancel-claimed", { count: 1 })
       const store = yield* RunStore.RunStore
       const claim = yield* store.claimExecution({
-          commandId: "runtime-state-store-fan-out-service-test-ts-claim-6", runId: receipt.childRunIds[0]!, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-fan-out-service-test-ts-claim-6",
+        runId: receipt.childRunIds[0]!,
+        ownerId: objectWorkerId,
+      })
       yield* runtime.cancel({
-          commandId: "runtime-memory-store-fan-out-service-test-ts-cancel-5", runId: parent.runId, reason: "stop" })
+        commandId: "runtime-memory-store-fan-out-service-test-ts-cancel-5",
+        runId: parent.runId,
+        reason: "stop",
+      })
       expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
       expect((yield* runtime.inspect(receipt.childRunIds[0]!)).status).toBe("cancelling")
       expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("running")
@@ -455,7 +473,14 @@ const withObject =
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     Effect.scoped(
       Layer.build(
-        objectRuntimeLayer({ addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }] }, storage).pipe(Layer.provide(resolverLayer)),
+        objectRuntimeLayer(
+          {
+            addresses: [
+              { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+            ],
+          },
+          storage,
+        ).pipe(Layer.provide(resolverLayer)),
       ).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
     )
 
@@ -508,8 +533,16 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
         const before = yield* runtime.inspectFanOut(admitted.fanOutId)
         expect(before.members.map((member) => member.status)).toEqual(["running", "pending", "pending"])
         expect(before.members.map((member) => member.readiness)).toEqual(["ready", "queued", "queued"])
-        const first = yield* store.claimExecution({ commandId: "runtime-sql-store-fan-out-service-test-ts-claim-1", runId: admitted.childRunIds[0]!, ownerId: objectWorkerId })
-        yield* store.complete({ commandId: "runtime-sql-store-fan-out-service-test-ts-complete-2", ...first, result: completedResult("first") })
+        const first = yield* store.claimExecution({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-claim-1",
+          runId: admitted.childRunIds[0]!,
+          ownerId: objectWorkerId,
+        })
+        yield* store.complete({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-complete-2",
+          ...first,
+          result: completedResult("first"),
+        })
         expect(yield* runtime.inspect(admitted.childRunIds[1]!)).toMatchObject({
           status: "queued",
           childReadiness: "ready",
@@ -521,8 +554,16 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
-        const second = yield* store.claimExecution({ commandId: "runtime-sql-store-fan-out-service-test-ts-claim-2", runId: admitted.childRunIds[1]!, ownerId: objectWorkerId })
-        yield* store.complete({ commandId: "runtime-sql-store-fan-out-service-test-ts-complete-3", ...second, result: completedResult("second") })
+        const second = yield* store.claimExecution({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-claim-2",
+          runId: admitted.childRunIds[1]!,
+          ownerId: objectWorkerId,
+        })
+        yield* store.complete({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-complete-3",
+          ...second,
+          result: completedResult("second"),
+        })
         const joined = yield* runtime.inspectFanOut(admitted.fanOutId)
         expect(joined.status).toBe("succeeded")
         const linked = (yield* runtime.history({ runId: admitted.parentRunId, limit: 100 })).filter(
@@ -578,8 +619,16 @@ standalone.live("recovers a pending object storage root outcome and settles it a
         }
         const receipt = yield* runtime.fanOut(fanOutInput)
         yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
-        const parentClaim = yield* store.claimExecution({ commandId: "runtime-sql-store-fan-out-service-test-ts-claim-3", runId: parent.runId, ownerId: objectWorkerId })
-        yield* store.complete({ commandId: "runtime-sql-store-fan-out-service-test-ts-complete-4", ...parentClaim, result: { _tag: "Program", value: "parent" } })
+        const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-claim-3",
+          runId: parent.runId,
+          ownerId: objectWorkerId,
+        })
+        yield* store.complete({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-complete-4",
+          ...parentClaim,
+          result: { _tag: "Program", value: "parent" },
+        })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
         yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
         expect(yield* runtime.send(parent.runId, "late", { idempotencyKey: "late" }).pipe(Effect.flip)).toBeInstanceOf(
@@ -597,8 +646,16 @@ standalone.live("recovers a pending object storage root outcome and settles it a
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
-        const childClaim = yield* store.claimExecution({ commandId: "runtime-sql-store-fan-out-service-test-ts-claim-4", runId: admitted.childRunId, ownerId: objectWorkerId })
-        yield* store.complete({ commandId: "runtime-sql-store-fan-out-service-test-ts-complete-5", ...childClaim, result: completedResult("child") })
+        const childClaim = yield* store.claimExecution({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-claim-4",
+          runId: admitted.childRunId,
+          ownerId: objectWorkerId,
+        })
+        yield* store.complete({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-complete-5",
+          ...childClaim,
+          result: completedResult("child"),
+        })
         const rootEvents = yield* runtime.history({ runId: admitted.parentRunId, limit: 100 })
         const completed = rootEvents.find((event) => event._tag === "RunCompleted")!
         const joined = rootEvents.find((event) => event._tag === "FanOutJoined")!
@@ -625,70 +682,62 @@ standalone.live("recovers a pending object storage root outcome and settles it a
   }),
 )
 
-layer(objectLayer)(
-  "rejects an undeclared object storage fan-out member without side effects",
-  (it) => {
-    it.effect("rejects an undeclared object storage fan-out member without side effects", () =>
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const parent = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "object:fan-out-missing",
-          idempotencyKey: "parent",
-          prompt: "parent",
+layer(objectLayer)("rejects an undeclared object storage fan-out member without side effects", (it) => {
+  it.effect("rejects an undeclared object storage fan-out member without side effects", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "object:fan-out-missing",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const before = yield* RunTree.checkpoint(parent.runId)
+      const failure = yield* runtime
+        .fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: "missing",
+          members: [
+            { key: "valid", selection: "researcher", prompt: "valid" },
+            { key: "missing", selection: "undeclared", prompt: "missing" },
+          ],
+          concurrency: 2,
+          join: { _tag: "AllSuccess" },
+          remainder: "await",
         })
-        const before = yield* RunTree.checkpoint(parent.runId)
-        const failure = yield* runtime
-          .fanOut({
-            parentRunId: parent.runId,
-            idempotencyKey: "missing",
-            members: [
-              { key: "valid", selection: "researcher", prompt: "valid" },
-              { key: "missing", selection: "undeclared", prompt: "missing" },
-            ],
-            concurrency: 2,
-            join: { _tag: "AllSuccess" },
-            remainder: "await",
-          })
-          .pipe(Effect.flip)
-        expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-        expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
-      }),
-    )
-  },
-)
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+      expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
+    }),
+  )
+})
 
-layer(objectLayer)(
-  "rejects object storage fan-out terminate remainder before admission",
-  (it) => {
-    it.effect("rejects object storage fan-out terminate remainder before admission", () =>
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const parent = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "object:fan-out-terminate",
-          idempotencyKey: "parent",
-          prompt: "parent",
+layer(objectLayer)("rejects object storage fan-out terminate remainder before admission", (it) => {
+  it.effect("rejects object storage fan-out terminate remainder before admission", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "object:fan-out-terminate",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const before = yield* RunTree.checkpoint(parent.runId)
+      const failure = yield* runtime
+        .fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: "terminate",
+          members: [{ key: "review", selection: "researcher", prompt: "review" }],
+          concurrency: 1,
+          join: { _tag: "AllSuccess" },
+          remainder: "terminate",
         })
-        const before = yield* RunTree.checkpoint(parent.runId)
-        const failure = yield* runtime
-          .fanOut({
-            parentRunId: parent.runId,
-            idempotencyKey: "terminate",
-            members: [{ key: "review", selection: "researcher", prompt: "review" }],
-            concurrency: 1,
-            join: { _tag: "AllSuccess" },
-            remainder: "terminate",
-          })
-          .pipe(Effect.flip)
-        expect(failure).toEqual(
-          Errors.FanOutRemainderUnsupported.make({ remainder: "terminate", durability: "durable" }),
-        )
-        expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
-      }),
-    )
-  },
-)
+        .pipe(Effect.flip)
+      expect(failure).toEqual(Errors.FanOutRemainderUnsupported.make({ remainder: "terminate", durability: "durable" }))
+      expect(yield* RunTree.checkpoint(parent.runId)).toEqual(before)
+    }),
+  )
+})
 
 standalone.live("atomically reconciles object storage parent cancellation across fan-out members", () =>
   Effect.gen(function* () {
@@ -714,7 +763,11 @@ standalone.live("atomically reconciles object storage parent cancellation across
           join: { _tag: "AllSuccess" },
           remainder: "await",
         })
-        yield* runtime.cancel({ commandId: "runtime-sql-store-fan-out-service-test-ts-cancel-1", runId: parent.runId, reason: "stop" })
+        yield* runtime.cancel({
+          commandId: "runtime-sql-store-fan-out-service-test-ts-cancel-1",
+          runId: parent.runId,
+          reason: "stop",
+        })
         expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
         expect(
           yield* Effect.forEach(receipt.childRunIds, (runId) =>
@@ -726,66 +779,76 @@ standalone.live("atomically reconciles object storage parent cancellation across
   }).pipe(Effect.asVoid),
 )
 
-layer(objectLayer)(
-  "keeps object storage fan-out cancellation pending for a claimed member",
-  (it) => {
-    it.effect("keeps object storage fan-out cancellation pending for a claimed member", () =>
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const parent = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "object:fan-out-cancel-claimed",
-          idempotencyKey: "parent",
-          prompt: "parent",
-        })
-        const receipt = yield* runtime.fanOut({
+layer(objectLayer)("keeps object storage fan-out cancellation pending for a claimed member", (it) => {
+  it.effect("keeps object storage fan-out cancellation pending for a claimed member", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "object:fan-out-cancel-claimed",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const receipt = yield* runtime.fanOut({
+        parentRunId: parent.runId,
+        idempotencyKey: "reviews",
+        members: [{ key: "review", selection: "researcher", prompt: "review" }],
+        concurrency: 1,
+        join: { _tag: "AllSuccess" },
+        remainder: "await",
+      })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-sql-store-fan-out-service-test-ts-claim-5",
+        runId: receipt.childRunIds[0]!,
+        ownerId: objectWorkerId,
+      })
+      yield* runtime.cancel({
+        commandId: "runtime-sql-store-fan-out-service-test-ts-cancel-1",
+        runId: parent.runId,
+        reason: "stop",
+      })
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
+      expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("running")
+      yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
+      expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
+    }),
+  )
+})
+
+layer(objectLayer)("rejects object storage fan-out admission after the parent is terminal", (it) => {
+  it.effect("rejects object storage fan-out admission after the parent is terminal", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "object:terminal-parent-fan-out",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-sql-store-fan-out-service-test-ts-claim-6",
+        runId: parent.runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.complete({
+        commandId: "runtime-sql-store-fan-out-service-test-ts-complete-6",
+        ...claim,
+        result: completedResult("done"),
+      })
+      const failure = yield* runtime
+        .fanOut({
           parentRunId: parent.runId,
-          idempotencyKey: "reviews",
-          members: [{ key: "review", selection: "researcher", prompt: "review" }],
+          idempotencyKey: "late",
+          members: [{ key: "late", selection: "researcher", prompt: "late" }],
           concurrency: 1,
           join: { _tag: "AllSuccess" },
           remainder: "await",
         })
-        const claim = yield* store.claimExecution({ commandId: "runtime-sql-store-fan-out-service-test-ts-claim-5", runId: receipt.childRunIds[0]!, ownerId: objectWorkerId })
-        yield* runtime.cancel({ commandId: "runtime-sql-store-fan-out-service-test-ts-cancel-1", runId: parent.runId, reason: "stop" })
-        expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
-        expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("running")
-        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
-        expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
-        expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
-      }),
-    )
-  },
-)
-
-layer(objectLayer)(
-  "rejects object storage fan-out admission after the parent is terminal",
-  (it) => {
-    it.effect("rejects object storage fan-out admission after the parent is terminal", () =>
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const parent = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "object:terminal-parent-fan-out",
-          idempotencyKey: "parent",
-          prompt: "parent",
-        })
-        const claim = yield* store.claimExecution({ commandId: "runtime-sql-store-fan-out-service-test-ts-claim-6", runId: parent.runId, ownerId: objectWorkerId })
-        yield* store.complete({ commandId: "runtime-sql-store-fan-out-service-test-ts-complete-6", ...claim, result: completedResult("done") })
-        const failure = yield* runtime
-          .fanOut({
-            parentRunId: parent.runId,
-            idempotencyKey: "late",
-            members: [{ key: "late", selection: "researcher", prompt: "late" }],
-            concurrency: 1,
-            join: { _tag: "AllSuccess" },
-            remainder: "await",
-          })
-          .pipe(Effect.flip)
-        expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      }),
-    )
-  },
-)
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.RunTerminal)
+    }),
+  )
+})

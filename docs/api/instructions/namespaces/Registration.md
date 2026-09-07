@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / Registration
+[generalist](../../index.md) / [instructions](../index.md) / Registration
 
 # Registration
 
@@ -20,7 +20,7 @@ One named capability and the exact secret-free payload that reconstructs its pin
 
 ##### capability
 
-> `readonly` **capability**: [`NamedCapability`](../../generalist/namespaces/AgentManifest#namedcapability)
+> `readonly` **capability**: [`NamedCapability`](../../generalist/namespaces/AgentManifest.md#namedcapability)
 
 <a id="id"></a>
 

@@ -1,5 +1,4 @@
-import type { PreparedObservation } from "../observation.js"
-import { occurredAt as preparedOccurredAt, occurredAtMillis as preparedOccurredAtMillis } from "../observation.js"
+import { type PreparedObservation, occurredAtMillis as preparedOccurredAtMillis } from "../observation.js"
 import { Effect, Function, Schema } from "effect"
 import type { Address } from "../../address.js"
 import {
@@ -11,7 +10,7 @@ import {
   type DirectoryEntry,
 } from "../../execution/agent/directory.js"
 import { AddressNotFound, AgentNameConflict, RunNotFound, RuntimeUnavailable } from "../../errors.js"
-import { agentNameKey, type RuntimeState, type StoredRun } from "../state.js"
+import { agentNameKey, type RuntimeState, type StoredRun } from "../projection.js"
 import {
   fromMailboxEntry,
   notificationIdFor,
@@ -96,11 +95,19 @@ export const registerAgentName: {
     readonly name: AgentName
   }): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [DirectoryEntry, RuntimeState], RunNotFound | AgentNameConflict | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [DirectoryEntry, RuntimeState],
+    RunNotFound | AgentNameConflict | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: { readonly runId: string; readonly name: AgentName },
-  ): Effect.Effect<readonly [DirectoryEntry, RuntimeState], RunNotFound | AgentNameConflict | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [DirectoryEntry, RuntimeState],
+    RunNotFound | AgentNameConflict | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly name: AgentName }) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / NestedOperation
+[generalist](../../index.md) / [generalist](../index.md) / NestedOperation
 
 # NestedOperation
 
@@ -488,7 +488,7 @@ call's journal.
 
 ##### run
 
-> `readonly` **run**: \<`A`, `E`, `R`\>(`request`, `effect`) => `Effect`\<`A`, `E` \| [`Failure`](#failure-1), [`ToolContext`](./ToolContext#toolcontext) \| `R`\>
+> `readonly` **run**: \<`A`, `E`, `R`\>(`request`, `effect`) => `Effect`\<`A`, `E` \| [`Failure`](#failure-1), [`ToolContext`](./ToolContext.md#toolcontext) \| `R`\>
 
 ###### Type Parameters
 
@@ -516,7 +516,7 @@ call's journal.
 
 ###### Returns
 
-`Effect`\<`A`, `E` \| [`Failure`](#failure-1), [`ToolContext`](./ToolContext#toolcontext) \| `R`\>
+`Effect`\<`A`, `E` \| [`Failure`](#failure-1), [`ToolContext`](./ToolContext.md#toolcontext) \| `R`\>
 
 ## Type Aliases
 
@@ -606,7 +606,7 @@ Authorization the host must settle before the handler crosses its boundary.
 
 ### catchSuspension
 
-> `const` **catchSuspension**: \<`E`, `R`\>(`effect`) => `Effect.Effect`\<[`Outcome`](./ToolExecutor#outcome), `Exclude`\<`E`, `E` & [`Suspended`](#suspended)\>, `R`\>
+> `const` **catchSuspension**: \<`E`, `R`\>(`effect`) => `Effect.Effect`\<[`Outcome`](./ToolExecutor.md#outcome), `Exclude`\<`E`, `E` & [`Suspended`](#suspended)\>, `R`\>
 
 Translate a nested-operation approval suspension into the tool executor's Suspend outcome.
 
@@ -624,11 +624,11 @@ Translate a nested-operation approval suspension into the tool executor's Suspen
 
 ##### effect
 
-`Effect.Effect`\<[`Outcome`](./ToolExecutor#outcome), `E`, `R`\>
+`Effect.Effect`\<[`Outcome`](./ToolExecutor.md#outcome), `E`, `R`\>
 
 #### Returns
 
-`Effect.Effect`\<[`Outcome`](./ToolExecutor#outcome), `Exclude`\<`E`, `E` & [`Suspended`](#suspended)\>, `R`\>
+`Effect.Effect`\<[`Outcome`](./ToolExecutor.md#outcome), `Exclude`\<`E`, `E` & [`Suspended`](#suspended)\>, `R`\>
 
 ***
 
@@ -847,13 +847,13 @@ Replay policy for one nested durable operation.
 
 ### run
 
-> `const` **run**: \{\<`A`, `E`, `R`\>(`effect`): (`request`) => `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext#toolcontext) \| [`Operations`](#operations) \| `R`\>; \<`A`, `E`, `R`\>(`request`, `effect`): `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext#toolcontext) \| [`Operations`](#operations) \| `R`\>; \}
+> `const` **run**: \{\<`A`, `E`, `R`\>(`effect`): (`request`) => `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| [`Operations`](#operations) \| `R`\>; \<`A`, `E`, `R`\>(`request`, `effect`): `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| [`Operations`](#operations) \| `R`\>; \}
 
 Run one nested durable operation through the ambient host seam.
 
 #### Call Signature
 
-> \<`A`, `E`, `R`\>(`effect`): (`request`) => `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext#toolcontext) \| [`Operations`](#operations) \| `R`\>
+> \<`A`, `E`, `R`\>(`effect`): (`request`) => `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| [`Operations`](#operations) \| `R`\>
 
 ##### Type Parameters
 
@@ -877,11 +877,11 @@ Run one nested durable operation through the ambient host seam.
 
 ##### Returns
 
-(`request`) => `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext#toolcontext) \| [`Operations`](#operations) \| `R`\>
+(`request`) => `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| [`Operations`](#operations) \| `R`\>
 
 #### Call Signature
 
-> \<`A`, `E`, `R`\>(`request`, `effect`): `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext#toolcontext) \| [`Operations`](#operations) \| `R`\>
+> \<`A`, `E`, `R`\>(`request`, `effect`): `Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| [`Operations`](#operations) \| `R`\>
 
 ##### Type Parameters
 
@@ -909,4 +909,4 @@ Run one nested durable operation through the ambient host seam.
 
 ##### Returns
 
-`Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext#toolcontext) \| [`Operations`](#operations) \| `R`\>
+`Effect`\<`A`, [`Failure`](#failure-1) \| `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| [`Operations`](#operations) \| `R`\>

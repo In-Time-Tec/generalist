@@ -9,18 +9,29 @@ import type { AgentError } from "../event.js"
 import { type RecallInput, type RememberInput, RunSupport } from "./run-support.js"
 import { DriverStateInvalid } from "../../durable/service.js"
 import type { DriverCheckpoint } from "../../durable/driver/contract.js"
-import { LoopDriverState } from "../../durable/loop-driver-state.js"
+import { LoopDriverState, RememberInput as Remember } from "../../durable/loop-driver-state.js"
 
-const Remember = Schema.Struct({ turn: Schema.Finite, terminal: Schema.Boolean })
-export const pendingRemember = (checkpoint: DriverCheckpoint | undefined) =>
+export const pendingRemember = (options: {
+  readonly checkpoint: DriverCheckpoint | undefined
+  readonly turnStart: number | undefined
+}) =>
   Effect.gen(function* () {
+    const { checkpoint, turnStart } = options
     if (checkpoint === undefined) return undefined
     const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state).pipe(
       Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
     )
-    return state.pending?.kind === "memory" && Schema.is(Remember)(state.pending.input)
-      ? state.pending.input
-      : undefined
+    const pending = state.pending
+    if (pending?.kind !== "memory" || !Schema.is(Remember)(pending.input)) return undefined
+    if (
+      pending.completed === true &&
+      pending.input.terminal &&
+      turnStart !== undefined &&
+      turnStart > pending.input.turn
+    ) {
+      return undefined
+    }
+    return { input: pending.input, completed: pending.completed }
   })
 
 /** Memory operations share their live and recovered identities. */

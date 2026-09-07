@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / hooks
+[generalist](./index.md) / hooks
 
 # hooks
 
@@ -466,6 +466,10 @@ Continue the guarded operation unchanged.
 
 Plugin-facing type-erased declaration shape accepted by Hooks.layer.
 
+#### Extends
+
+- [`Identity`](#identity)
+
 #### Properties
 
 <a id="event-1"></a>
@@ -479,6 +483,36 @@ Plugin-facing type-erased declaration shape accepted by Hooks.layer.
 ##### hook
 
 > `readonly` **hook**: [`Hook`](#hook-1)\<`never`\>
+
+<a id="key"></a>
+
+##### key
+
+> `readonly` **key**: `string`
+
+###### Inherited from
+
+`Identity.key`
+
+<a id="replaypolicy"></a>
+
+##### replayPolicy
+
+> `readonly` **replayPolicy**: `"pure"` \| `"provider-idempotent"` \| `"never"`
+
+###### Inherited from
+
+`Identity.replayPolicy`
+
+<a id="version"></a>
+
+##### version
+
+> `readonly` **version**: `string`
+
+###### Inherited from
+
+`Identity.version`
 
 ***
 
@@ -673,6 +707,12 @@ Ordered lifecycle hook declarations for one Agent execution context.
 ##### declarations
 
 > `readonly` **declarations**: readonly [`Declaration`](#declaration)[]
+
+<a id="pin"></a>
+
+##### pin
+
+> `readonly` **pin**: `string` & `Brand`\<`"generalist/capability-pin"`\>
 
 ***
 
@@ -962,6 +1002,14 @@ Serializable decision recorded in the durable driver checkpoint.
 
 ***
 
+<a id="evaluationfailure"></a>
+
+### EvaluationFailure
+
+> **EvaluationFailure** = [`HookFailed`](#hookfailed) \| [`DriverError`](./generalist/namespaces/DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./generalist/namespaces/DurableDriver.md#driverunknownreplay) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted)
+
+***
+
 <a id="event-2"></a>
 
 ### Event
@@ -976,7 +1024,7 @@ Typed lifecycle boundary exposed to a hook declaration.
 
 ### Hook
 
-> **Hook**\<`Input`, `HookDecision`\> = (`input`) => `Effect.Effect`\<`HookDecision` \| `void`, `unknown`\>
+> **Hook**\<`Input`, `HookDecision`\> = (`input`, `context`) => `Effect.Effect`\<`HookDecision` \| `void`, `unknown`\>
 
 One Effectful typed lifecycle interceptor. `void` is shorthand for Continue.
 
@@ -996,9 +1044,23 @@ One Effectful typed lifecycle interceptor. `void` is shorthand for Continue.
 
 `Input`
 
+##### context
+
+###### operationKey
+
+`string`
+
 #### Returns
 
 `Effect.Effect`\<`HookDecision` \| `void`, `unknown`\>
+
+***
+
+<a id="identity"></a>
+
+### Identity
+
+> **Identity** = *typeof* `Identity.Type`
 
 ***
 
@@ -1120,11 +1182,29 @@ Stop the guarded operation before it crosses its boundary.
 
 ***
 
+<a id="chainpin"></a>
+
+### chainPin
+
+> `const` **chainPin**: (`declarations`) => [`CapabilityPin`](./generalist/namespaces/Pins.md#capabilitypin)
+
+#### Parameters
+
+##### declarations
+
+`ReadonlyArray`\<[`Declaration`](#declaration)\>
+
+#### Returns
+
+[`CapabilityPin`](./generalist/namespaces/Pins.md#capabilitypin)
+
+***
+
 <a id="checkpoint-1"></a>
 
 ### Checkpoint
 
-> `const` **Checkpoint**: `Schema.Struct`\<\{ `complete`: `Schema.Boolean`; `decisions`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Continue"`, \{ \}\>, `Schema.TaggedStruct`\<`"Block"`, \{ `reason`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Replace"`, \{ `value`: `Schema.Unknown`; \}\>, `Schema.TaggedStruct`\<`"AddContext"`, \{ `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Ask"`, \{ \}\>\]\>\>; `event`: `Schema.Literals`\<readonly \[`"RunStart"`, `"TurnStart"`, `"ModelCall"`, `"ToolCall"`, `"ToolResult"`, `"ApprovalRequest"`, `"Compaction"`, `"ChildStart"`, `"ChildEnd"`, `"Steer"`, `"RunEnd"`\]\>; `key`: `Schema.String`; \}\>
+> `const` **Checkpoint**: `Schema.Struct`\<\{ `chain`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `complete`: `Schema.Boolean`; `decisions`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Continue"`, \{ \}\>, `Schema.TaggedStruct`\<`"Block"`, \{ `reason`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Replace"`, \{ `value`: `Schema.Unknown`; \}\>, `Schema.TaggedStruct`\<`"AddContext"`, \{ `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Ask"`, \{ \}\>\]\>\>; `event`: `Schema.Literals`\<readonly \[`"RunStart"`, `"TurnStart"`, `"ModelCall"`, `"ToolCall"`, `"ToolResult"`, `"ApprovalRequest"`, `"Compaction"`, `"ChildStart"`, `"ChildEnd"`, `"Steer"`, `"RunEnd"`\]\>; `key`: `Schema.String`; \}\>
 
 **`Internal`**
 
@@ -1166,6 +1246,14 @@ Typed lifecycle boundary exposed to a hook declaration.
 
 ***
 
+<a id="identity-1"></a>
+
+### Identity
+
+> `const` **Identity**: `Schema.Struct`\<\{ `key`: `Schema.String`; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; `version`: `Schema.String`; \}\>
+
+***
+
 <a id="layer"></a>
 
 ### layer
@@ -1196,17 +1284,37 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ***
 
+<a id="make"></a>
+
+### make
+
+> `const` **make**: (`input`) => [`Service`](#service)
+
+#### Parameters
+
+##### input
+
+###### declarations
+
+`ReadonlyArray`\<[`Declaration`](#declaration)\>
+
+#### Returns
+
+[`Service`](#service)
+
+***
+
 <a id="onapprovalrequest"></a>
 
 ### onApprovalRequest
 
-> `const` **onApprovalRequest**: (`hook`) => [`ApprovalRequest`](#approvalrequest)
+> `const` **onApprovalRequest**: (`input`) => [`ApprovalRequest`](#approvalrequest)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`ApprovalRequest`](#approvalrequest)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1218,13 +1326,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onChildEnd
 
-> `const` **onChildEnd**: (`hook`) => [`ChildEnd`](#childend)
+> `const` **onChildEnd**: (`input`) => [`ChildEnd`](#childend)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`ChildEnd`](#childend)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1236,13 +1344,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onChildStart
 
-> `const` **onChildStart**: (`hook`) => [`ChildStart`](#childstart)
+> `const` **onChildStart**: (`input`) => [`ChildStart`](#childstart)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`ChildStart`](#childstart)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1254,13 +1362,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onCompaction
 
-> `const` **onCompaction**: (`hook`) => [`Compaction`](#compaction)
+> `const` **onCompaction**: (`input`) => [`Compaction`](#compaction)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`Compaction`](#compaction)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1272,13 +1380,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onModelCall
 
-> `const` **onModelCall**: (`hook`) => [`ModelCall`](#modelcall)
+> `const` **onModelCall**: (`input`) => [`ModelCall`](#modelcall)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`ModelCall`](#modelcall)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1290,7 +1398,7 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onRunEnd
 
-> `const` **onRunEnd**: \<`Output`\>(`hook`) => [`RunEnd`](#runend)\<`Output`\>
+> `const` **onRunEnd**: \<`Output`\>(`input`) => [`RunEnd`](#runend)\<`Output`\>
 
 #### Type Parameters
 
@@ -1300,9 +1408,9 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 #### Parameters
 
-##### hook
+##### input
 
-[`RunEnd`](#runend)\<`Output`\>\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1314,13 +1422,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onRunStart
 
-> `const` **onRunStart**: (`hook`) => [`RunStart`](#runstart)
+> `const` **onRunStart**: (`input`) => [`RunStart`](#runstart)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`RunStart`](#runstart)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1332,13 +1440,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onSteer
 
-> `const` **onSteer**: (`hook`) => [`Steer`](#steer)
+> `const` **onSteer**: (`input`) => [`Steer`](#steer)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`Steer`](#steer)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1350,13 +1458,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onToolCall
 
-> `const` **onToolCall**: (`hook`) => [`ToolCall`](#toolcall)
+> `const` **onToolCall**: (`input`) => [`ToolCall`](#toolcall)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`ToolCall`](#toolcall)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1368,13 +1476,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onToolResult
 
-> `const` **onToolResult**: (`hook`) => [`ToolResult`](#toolresult)
+> `const` **onToolResult**: (`input`) => [`ToolResult`](#toolresult)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`ToolResult`](#toolresult)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 
@@ -1386,13 +1494,13 @@ Explicit empty hook chain. Omitting Hooks has the same behavior.
 
 ### onTurnStart
 
-> `const` **onTurnStart**: (`hook`) => [`TurnStart`](#turnstart)
+> `const` **onTurnStart**: (`input`) => [`TurnStart`](#turnstart)
 
 #### Parameters
 
-##### hook
+##### input
 
-[`TurnStart`](#turnstart)\[`"hook"`\]
+[`Identity`](#identity) & `object`
 
 #### Returns
 

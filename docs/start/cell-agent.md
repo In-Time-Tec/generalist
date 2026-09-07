@@ -63,7 +63,7 @@ await Effect.runPromise(program)
 tool: typescript
 parameters: code
 scheduling: maxConcurrency=1 parallelSafe=0
-epoch digest: 12f2803b14c8b96bc3580bb6fdc07ca792eab971f31260feb0922f030c588991
+epoch digest: d1109db3f759cc3a2cb83b57727c589b67c9fbdab6f591421f076ef976df4645
 ```
 
 Three facts are already visible. The agent gets exactly one tool, named `typescript`, with exactly one parameter, `code`. Because one namespace is shared, scheduling is always `maxConcurrency: 1` with no parallel-safe tool, so every cell is an authored-order exclusive barrier. And the profile has a digest: change the pinned runtime, the mounted bindings, the workspace, the limits, or the trust mode, and you get a different epoch rather than a reused one.

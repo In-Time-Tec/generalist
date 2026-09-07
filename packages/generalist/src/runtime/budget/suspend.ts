@@ -7,7 +7,6 @@ import type { Service as Operations } from "../operation/nested-operations.js"
 import type { ExecutionClaim, Service as RunStore } from "../run/store.js"
 import { suspend } from "../execution/agent/suspend.js"
 import { completedOperationRefValue } from "../execution/model-response/commit.js"
-import { factTokens } from "../execution/inspection.js"
 import { firstExhausted, replayCheckpoint, runnableLimits } from "./state.js"
 
 export const suspendIfExhausted = (input: {
@@ -51,12 +50,7 @@ export const prepare = (input: {
         const operation = yield* input.store.getOperationByKey({ runId: input.runId, operationKey: state.pending.key })
         const completed = operation?.status === "succeeded" ? completedOperationRefValue(operation.result) : undefined
         if (completed !== undefined) {
-          // Replay applies the whole recorded charge. Restore only the portion already deducted
-          // by canonical usage facts; interruption may have prevented terminal telemetry delivery.
-          const charged = snapshot.usageFacts
-            .filter((fact) => fact.modelCallId === completed.modelCallId)
-            .reduce((total, fact) => total + factTokens(fact), 0)
-          replayBudget = make({ ...remaining, tokens: remaining.tokens + charged })
+          replayBudget = make({ ...remaining, tokens: remaining.tokens + completed.budgetCharge })
         }
       }
     }

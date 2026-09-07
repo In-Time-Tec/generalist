@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ModelRegistry
+[generalist](../../index.md) / [generalist](../index.md) / ModelRegistry
 
 # ModelRegistry
 

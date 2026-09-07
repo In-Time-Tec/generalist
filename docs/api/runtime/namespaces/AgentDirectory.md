@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / AgentDirectory
+[generalist](../../index.md) / [runtime](../index.md) / AgentDirectory
 
 # AgentDirectory
 
@@ -120,7 +120,7 @@ One resolved, authoritative directory record.
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 ## Type Aliases
 
@@ -194,7 +194,7 @@ Host-assigned friendly name for one addressable agent.
 
 ### nameAddress
 
-> `const` **nameAddress**: (`input`) => [`Address`](./Address#address)
+> `const` **nameAddress**: (`input`) => [`Address`](./Address.md#address)
 
 Address of one host-assigned name inside the scope that owns it.
 
@@ -212,7 +212,7 @@ Address of one host-assigned name inside the scope that owns it.
 
 #### Returns
 
-[`Address`](./Address#address)
+[`Address`](./Address.md#address)
 
 ***
 
@@ -258,7 +258,7 @@ directory resolves to.
 
 ##### address
 
-[`Address`](./Address#address)
+[`Address`](./Address.md#address)
 
 #### Returns
 
@@ -325,7 +325,7 @@ Relationship Generalist derives from authoritative Run records, never from Addre
 
 ### runAddress
 
-> `const` **runAddress**: (`runId`) => [`Address`](./Address#address)
+> `const` **runAddress**: (`runId`) => [`Address`](./Address.md#address)
 
 Address of one exact durable execution.
 
@@ -337,7 +337,7 @@ Address of one exact durable execution.
 
 #### Returns
 
-[`Address`](./Address#address)
+[`Address`](./Address.md#address)
 
 ***
 
@@ -345,7 +345,7 @@ Address of one exact durable execution.
 
 ### sessionAddress
 
-> `const` **sessionAddress**: (`sessionId`) => [`Address`](./Address#address)
+> `const` **sessionAddress**: (`sessionId`) => [`Address`](./Address.md#address)
 
 Address of one durable agent identity across its successive Runs.
 
@@ -357,4 +357,4 @@ Address of one durable agent identity across its successive Runs.
 
 #### Returns
 
-[`Address`](./Address#address)
+[`Address`](./Address.md#address)

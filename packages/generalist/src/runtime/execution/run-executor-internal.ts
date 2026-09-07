@@ -23,7 +23,7 @@ import { JournalFault } from "../operation/journal-fault.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { make as makeAgentExecutionFailure } from "./agent/failure.js"
-import { make as makeExecutionRetry } from "./retry.js"
+import { make as makeExecutionRetry } from "./recovery/retry.js"
 import { ExecutionResolution } from "./resolution/resolve.js"
 import { make as makeToolCancellation } from "../operation/tool-cancellation.js"
 import { make as makeAgentRunOptions } from "./agent/run-options.js"
@@ -60,6 +60,8 @@ import { Descriptor as CapabilityDescriptor } from "../../core/capability/state.
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
+
+const commandIdentity = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema.Json)))
 
 type SteeringQueue = NonNullable<ExecutionContinuation["queue"]>
 
@@ -99,7 +101,7 @@ const makeFor = (
         if (claimed.attemptFence !== claim.attemptFence) {
           yield* store.saveExecution({
             ...claim,
-            commandId: JSON.stringify(["verify-claim", claim.runId, claim.attemptFence]),
+            commandId: commandIdentity(["verify-claim", claim.runId, claim.attemptFence]),
           })
           return
         }
@@ -107,10 +109,13 @@ const makeFor = (
           yield* reconcileCancellation(claim, claimed)
           return
         }
-        if ((yield* store.recoverRunningOperations({
-          ...claim,
-          commandId: JSON.stringify(["recover-operations", claim.runId, claim.attemptFence]),
-        })) === "blocked") return
+        if (
+          (yield* store.recoverRunningOperations({
+            ...claim,
+            commandId: commandIdentity(["recover-operations", claim.runId, claim.attemptFence]),
+          })) === "blocked"
+        )
+          return
         const runId = claim.runId
         const activeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const completingRetrySafeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
@@ -196,20 +201,25 @@ const makeFor = (
                     Effect.gen(function* () {
                       const budget = yield* prepareBudget({ ...budgetContext, checkpoint: initialCheckpoint })
                       const executionAttempt = yield* executionRetry.attempt
+                      const {
+                        nextTurn = null,
+                        steeringEntryIds: continuedEntryIds = [],
+                        prompt: continuedPrompt,
+                      } = continuation ?? {}
                       // Every new activation has a fresh fence; in-claim segments advance through
                       // a persisted retry attempt or an admitted steering continuation.
-                      const segment = JSON.stringify([
+                      const segment = commandIdentity([
                         runId,
                         claim.attemptFence,
                         executionAttempt,
-                        continuation?.nextTurn ?? null,
-                        continuation?.steeringEntryIds ?? [],
+                        nextTurn,
+                        continuedEntryIds,
                       ])
                       let checkpointOrdinal = 0
                       let eventOrdinal = 0
                       if (budget === undefined) return
-                      const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
-                      const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
+                      const observed = yield* Ref.make<ReadonlyArray<string>>(continuedEntryIds)
+                      const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuedPrompt)
                       const observedQueue = yield* Ref.make(continuationQueue(continuation))
                       const activeContinuation = yield* Ref.make(continuation)
                       const bufferedEvents = yield* Ref.make<ReadonlyArray<DurableAgentLoopEvent>>(
@@ -351,7 +361,13 @@ const makeFor = (
                                 ? yield* store.expireRunningOperation({
                                     ...claim,
                                     operationId: record.operationId,
-                                    commandId: JSON.stringify(["expire-operation", claim.runId, claim.attemptFence, record.operationId, attempt]),
+                                    commandId: commandIdentity([
+                                      "expire-operation",
+                                      claim.runId,
+                                      claim.attemptFence,
+                                      record.operationId,
+                                      attempt,
+                                    ]),
                                   })
                                 : undefined
                             if (recovered?.outcome === "unknown") {
@@ -360,7 +376,13 @@ const makeFor = (
                             yield* store.startOperation({
                               ...claim,
                               operationId: record.operationId,
-                              commandId: JSON.stringify(["start-operation", claim.runId, claim.attemptFence, record.operationId, attempt]),
+                              commandId: commandIdentity([
+                                "start-operation",
+                                claim.runId,
+                                claim.attemptFence,
+                                record.operationId,
+                                attempt,
+                              ]),
                             })
                             yield* Ref.update(activeOperationIds, (current) => new Set(current).add(record.operationId))
                             return undefined
@@ -404,12 +426,16 @@ const makeFor = (
                               onSome: (fault) => fault.afterCompletedOperation ?? Effect.void,
                             })
                           }).pipe(Effect.mapError((error) => journalFailure("completion", operation.key, error))),
-                        onCheckpoint: (checkpoint) => saveJournalCheckpoint({
-                          store,
-                          claim,
+                        onCheckpoint: (
                           checkpoint,
-                          commandId: JSON.stringify(["checkpoint", segment, checkpointOrdinal++]),
-                        }),
+                          commandId = commandIdentity(["checkpoint", segment, checkpointOrdinal++]),
+                        ) =>
+                          saveJournalCheckpoint({
+                            store,
+                            claim,
+                            checkpoint,
+                            commandId,
+                          }),
                       }
                       const context = Context.merge(baseContext, Context.make(DriverJournal, journal))
                       if (
@@ -438,7 +464,7 @@ const makeFor = (
                         return yield* deferProgramChildFailure(undecodableSuspension)
                       }
                       const persistEvent = (event: Event) => {
-                        const commandId = JSON.stringify(["agent-event", segment, eventOrdinal++])
+                        const commandId = commandIdentity(["agent-event", segment, eventOrdinal++])
                         return Effect.gen(function* () {
                           yield* executionRetry.observe(event)
                           if (event._tag === "ModelPart") return yield* preview.offer(event)
@@ -447,7 +473,6 @@ const makeFor = (
                             return yield* preview.discard
                           }
                           if (event._tag === "Completed") {
-                            yield* requireRunAvailable(runId)(store)
                             const output = yield* Schema.encodeEffect(hostedAgent.output)(event.output).pipe(
                               Effect.mapError((error) =>
                                 AgentError.make({
@@ -459,11 +484,16 @@ const makeFor = (
                             )
                             const leafId = yield* Option.match(boundSession.session, {
                               onNone: () => Effect.succeed(null),
-                              onSome: (service) => service.leaf.pipe(Effect.mapError((cause) => AgentError.make({
-                                message: "Cannot read the committed Session leaf",
-                                turn: Math.max(0, event.turns - 1),
-                                cause,
-                              }))),
+                              onSome: (service) =>
+                                service.leaf.pipe(
+                                  Effect.mapError((cause) =>
+                                    AgentError.make({
+                                      message: "Cannot read the committed Session leaf",
+                                      turn: Math.max(0, event.turns - 1),
+                                      cause,
+                                    }),
+                                  ),
+                                ),
                             })
                             const result = {
                               text: event.text,

@@ -4,6 +4,7 @@ import { FanOutMemberStatus, FanOutStatus, type FanOutInspection } from "./fan-o
 import { MAX_FAN_OUT_MEMBERS } from "./fan-out-internal.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
 import type { RunEvent } from "../run/event.js"
+import { RunFailure } from "../run.js"
 import { ChildReadiness } from "./readiness.js"
 
 /** Exact declared child authority used to constrain model-visible selections. */
@@ -340,7 +341,7 @@ export const resultFromInspection = (inspection: FanOutInspection): GroupResult 
       child.turns = result.value.turns
     }
     if (message !== undefined) child.message = message
-    if (member.error !== undefined) child.error = member.error
+    if (member.error !== undefined) child.error = Schema.encodeUnknownSync(RunFailure)(member.error)
     if (member.reason !== undefined) child.reason = member.reason
     return child
   }),

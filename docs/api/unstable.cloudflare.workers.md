@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.cloudflare.workers
+[generalist](./index.md) / unstable.cloudflare.workers
 
 # unstable.cloudflare.workers
 

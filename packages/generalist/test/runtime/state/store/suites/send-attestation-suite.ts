@@ -10,7 +10,8 @@ import {
   registrationsFor,
   textPrompt,
 } from "../../../execution/fixtures.js"
-import { makeObjectStorage, objectRuntimeLayer } from "../../../execution/object.js"
+import { objectRuntimeLayer } from "../../../execution/object.js"
+import { make as makeSimulator } from "../../../../../src/testing/durability/index.js"
 import { closedTestAgent } from "../../../run/identity.js"
 
 const input = {
@@ -43,7 +44,12 @@ const objectLayerFor = (
   addresses: Parameters<typeof objectRuntimeLayer>[0]["addresses"],
   resolver: Layer.Layer<ExecutableResolver.ExecutableResolver, never, never> = assistantResolverLayer,
 ) =>
-  objectRuntimeLayer({ addresses }, makeObjectStorage()).pipe(Layer.provide(resolver))
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const storage = yield* makeSimulator()
+      return objectRuntimeLayer({ addresses }, storage).pipe(Layer.provide(resolver))
+    }),
+  )
 
 const objectAdmissions = Ref.makeUnsafe(0)
 layer(
@@ -82,26 +88,28 @@ layer(
   )
 })
 
-layer(
-  objectLayerFor([{ address: assistantAddress, executable: assistantRef, registrations: [] }]),
-)("rejects missing address registrations without admitting a Run", (it) => {
-  it.effect("rejects missing registrations", () =>
-    Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
-      const runtime = yield* Runtime.Runtime
-      const error = yield* runtime.send(input).pipe(Effect.flip)
-      expect(error).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
-      expect(yield* store.list({ limit: 10 })).toHaveLength(0)
-    }),
-  )
-})
+layer(objectLayerFor([{ address: assistantAddress, executable: assistantRef, registrations: [] }]))(
+  "rejects missing address registrations without admitting a Run",
+  (it) => {
+    it.effect("rejects missing registrations", () =>
+      Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const runtime = yield* Runtime.Runtime
+        const error = yield* runtime.send(input).pipe(Effect.flip)
+        expect(error).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
+        expect(yield* store.list({ limit: 10 })).toHaveLength(0)
+      }),
+    )
+  },
+)
 
 layer(
   objectLayerFor(
     [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     resolverLayer(
       ExecutableResolver.ExecutableResolver.of({
-        resolve: (resolved) => Effect.fail(Errors.ExecutablePinMissing.make({ runId: resolved.runId, ref: resolved.ref })),
+        resolve: (resolved) =>
+          Effect.fail(Errors.ExecutablePinMissing.make({ runId: resolved.runId, ref: resolved.ref })),
       }),
     ),
   ),

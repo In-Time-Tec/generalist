@@ -10,7 +10,7 @@ import {
   type Invalid,
 } from "../run-budget.js"
 import { CurrentModelCallOrdinal } from "../operation-context.js"
-import { LoopDriverState } from "../loop-driver-state.js"
+import { LoopDriverState, encode as encodeLoopState } from "../loop-driver-state.js"
 import { applyCommit, chargeUsage as chargeCheckpointUsage, withBudget, withHandoffState } from "../loop-driver.js"
 import type { ControlState } from "../../agent/handoff/state.js"
 import { OperationOutcomeResolution } from "./operation-outcome.js"
@@ -18,9 +18,13 @@ import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
 import { scheduleOperations } from "./schedule.js"
-import type { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
+import { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
 import type { Checkpoint as GateCheckpoint } from "../../agent/gates/definition.js"
 import { capabilityCheckpointMethods, type CapabilityCheckpointService } from "./capability-checkpoint.js"
+import { Registry, validate as validateComponents, type Registration } from "../component.js"
+import { componentCheckpointMethods, type ComponentCheckpointService } from "./component-checkpoint.js"
+import type { StreamSuccessCodec } from "./stream-success.js"
+import { make as makeAcknowledgedJournal } from "./journal-acceptance.js"
 export type { OperationSpec } from "./operation.js"
 type OperationFailure = Extract<OperationOutcome, { readonly _tag: "Failed" }>["error"]
 /** Recorded operation for tests and future runtime journaling. */
@@ -40,33 +44,16 @@ export interface Journal {
     outcome: OperationOutcome,
     checkpoint: DriverCheckpoint,
   ) => Effect.Effect<void, DriverError>
-  readonly onCheckpoint: (checkpoint: DriverCheckpoint) => Effect.Effect<void, DriverError>
+  readonly onCheckpoint: (checkpoint: DriverCheckpoint, commandId?: string) => Effect.Effect<void, DriverError>
 }
 /** Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournal extends Context.Service<DriverJournal, Journal>()(
   "generalist/core/durable/driver/interpreter/DriverJournal",
 ) {}
-/** Caller-owned successful stream result and replay codec. */
-export interface StreamSuccessCodec<A, Success, ReplayError = never, ReplayServices = never> {
-  readonly observe: (value: A) => void
-  /** Whether the source reached its authored semantic terminal value rather than a downstream consumer stopping early. */
-  readonly isComplete?: () => boolean
-  readonly complete: () => Success
-  readonly replay: (success: Success) => Stream.Stream<A, ReplayError, ReplayServices>
-}
-/** Collect and replay one stream as its emitted values. */
-export const arrayStreamCodec = <A>(): StreamSuccessCodec<A, ReadonlyArray<A>> => {
-  const values = new Array<A>()
-  return {
-    observe: (value) => void values.push(value),
-    complete: () => values,
-    replay: Stream.fromIterable,
-  }
-}
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
 type OperationSpecServices<SRD, SRE, FRD, FRE> = SRD | SRE | FRD | FRE
 /** Inline interpreter executing driver operations through Effect services. */
-export interface Service extends CapabilityCheckpointService {
+export interface Service extends CapabilityCheckpointService, ComponentCheckpointService {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
   readonly run: <A, E, R, SRD, SRE, FRD, FRE>(
     spec: OperationSpec<A, E, SRD, SRE, FRD, FRE>,
@@ -132,12 +119,18 @@ export const make = (input: {
   readonly driver: DurableAgentDriver
   readonly journal?: Journal
   readonly initial: DriverCheckpoint
+  readonly components?: ReadonlyArray<Registration>
 }): Effect.Effect<Service> =>
   Effect.gen(function* () {
     const checkpointRef = yield* Ref.make(input.initial)
     const recordedRef = yield* Ref.make<ReadonlyArray<RecordedOperation>>([])
     const commitSemaphore = yield* Semaphore.make(1)
-    const journal = input.journal ?? journalNoop
+    const journal = yield* makeAcknowledgedJournal(input.journal ?? journalNoop)
+    const validateComponentState = Ref.get(checkpointRef).pipe(
+      Effect.flatMap((checkpoint) => Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state)),
+      Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid component checkpoint" })),
+      Effect.flatMap((state) => validateComponents(state.components ?? [], input.components ?? [])),
+    )
     const schedule = scheduleOperations({ checkpointRef, driver: input.driver, journal, semaphore: commitSemaphore })
     const codecFailure = (spec: { readonly key: string }, branch: "success" | "failure", error: Schema.SchemaError) =>
       DriverStateInvalid.make({ message: `Operation ${spec.key} has an invalid ${branch} outcome: ${error.message}` })
@@ -187,9 +180,9 @@ export const make = (input: {
             after = outcome._tag === "Unknown" ? before : yield* input.driver.apply(before, outcome)
             if (applyCheckpoint !== undefined) after = applyCheckpoint(after, outcome)
           }
+          yield* journal.onCompleted(operation, outcome, after)
           yield* Ref.set(checkpointRef, after)
           yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: after }])
-          yield* journal.onCompleted(operation, outcome, after)
         }),
       )
     const applyReplay = (
@@ -229,6 +222,7 @@ export const make = (input: {
       R | OperationSpecServices<SRD, SRE, FRD, FRE>
     > =>
       Effect.gen(function* () {
+        yield* validateComponentState
         const { operation, replay, batchTool, nested = false } = yield* schedule(spec)
         if (replay !== undefined) {
           yield* guardUnknownNeverReplay(operation, replay)
@@ -280,6 +274,7 @@ export const make = (input: {
           SRD | FRD
         >(
           Effect.gen(function* () {
+            yield* validateComponentState
             const { operation, replay, batchTool, nested = false } = yield* schedule(spec)
             const codec = options.successCodec
             if (replay !== undefined) {
@@ -351,9 +346,9 @@ export const make = (input: {
             )
             const nextState =
               toolBatch === undefined ? (({ toolBatch: _toolBatch, ...rest }) => rest)(state) : { ...state, toolBatch }
-            const next = { ...current, state: nextState }
-            yield* Ref.set(checkpointRef, next)
+            const next = { ...current, state: yield* encodeLoopState(nextState) }
             yield* journal.onCheckpoint(next)
+            yield* Ref.set(checkpointRef, next)
           }),
         ),
       updateToolBatch: (update) =>
@@ -367,13 +362,19 @@ export const make = (input: {
               return yield* DriverStateInvalid.make({ message: "Tool batch checkpoint is missing" })
             }
             const toolBatch = update(state.toolBatch)
-            const next = { ...current, state: { ...state, toolBatch } }
-            yield* Ref.set(checkpointRef, next)
+            const next = { ...current, state: yield* encodeLoopState({ ...state, toolBatch }) }
             yield* journal.onCheckpoint(next)
+            yield* Ref.set(checkpointRef, next)
             return toolBatch
           }),
         ),
       ...capabilityCheckpointMethods({ checkpointRef, commitSemaphore, onCheckpoint: journal.onCheckpoint }),
+      ...componentCheckpointMethods({
+        checkpointRef,
+        commitSemaphore,
+        registrations: input.components ?? [],
+        onCheckpoint: journal.onCheckpoint,
+      }),
       recordHookDecisions: (hookCheckpoint) =>
         commitSemaphore.withPermit(
           Effect.gen(function* () {
@@ -384,7 +385,7 @@ export const make = (input: {
             const existingIndex = state.hooks?.findIndex((entry) => entry.key === hookCheckpoint.key) ?? -1
             const existing = state.hooks?.[existingIndex]
             if (existing !== undefined) {
-              if (existing.event !== hookCheckpoint.event) {
+              if (existing.event !== hookCheckpoint.event || existing.chain !== hookCheckpoint.chain) {
                 return yield* DriverStateInvalid.make({
                   message: `Hook checkpoint ${hookCheckpoint.key} changed from ${existing.event} to ${hookCheckpoint.event}`,
                 })
@@ -394,9 +395,9 @@ export const make = (input: {
             const hooks = [...(state.hooks ?? [])]
             if (existingIndex === -1) hooks.push(hookCheckpoint)
             else hooks[existingIndex] = hookCheckpoint
-            const next = { ...current, state: { ...state, hooks } }
-            yield* Ref.set(checkpointRef, next)
+            const next = { ...current, state: yield* encodeLoopState({ ...state, hooks }) }
             yield* journal.onCheckpoint(next)
+            yield* Ref.set(checkpointRef, next)
             return hookCheckpoint
           }),
         ),
@@ -411,9 +412,9 @@ export const make = (input: {
             const existing = state.gates?.[existingIndex]
             if (existing !== undefined) return existing
             const gates = [...(state.gates ?? []), gateCheckpoint]
-            const next = { ...current, state: { ...state, gates } }
-            yield* Ref.set(checkpointRef, next)
+            const next = { ...current, state: yield* encodeLoopState({ ...state, gates }) }
             yield* journal.onCheckpoint(next)
+            yield* Ref.set(checkpointRef, next)
             return gateCheckpoint
           }),
         ),
@@ -423,7 +424,7 @@ export const make = (input: {
           const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(before.state).pipe(
             Effect.mapError((invalid) => DriverStateInvalid.make({ message: String(invalid) })),
           )
-          if (state.pending === undefined) return
+          if (state.pending === undefined || state.pending.completed === true) return
           const operation = operationFrom(state.pending)
           yield* commit(operation, { _tag: "Failed", error })
         }),
@@ -432,8 +433,8 @@ export const make = (input: {
           Effect.gen(function* () {
             const before = yield* Ref.get(checkpointRef)
             const after = yield* chargeCheckpointUsage(before, usage)
-            yield* Ref.set(checkpointRef, after)
             yield* journal.onCheckpoint(after)
+            yield* Ref.set(checkpointRef, after)
           }),
         ),
       setBudget: (budget) =>
@@ -441,8 +442,8 @@ export const make = (input: {
           Effect.gen(function* () {
             const before = yield* Ref.get(checkpointRef)
             const after = withBudget(before, budget)
-            yield* Ref.set(checkpointRef, after)
             yield* journal.onCheckpoint(after)
+            yield* Ref.set(checkpointRef, after)
           }),
         ),
       reserveChild: (grant) =>
@@ -451,8 +452,8 @@ export const make = (input: {
             const before = yield* Ref.get(checkpointRef)
             const reserved = yield* reserveChild(before.budget, grant)
             const after = withBudget(before, reserved.parent)
-            yield* Ref.set(checkpointRef, after)
             yield* journal.onCheckpoint(after)
+            yield* Ref.set(checkpointRef, after)
             return reserved.child
           }),
         ),
@@ -461,8 +462,8 @@ export const make = (input: {
           Effect.gen(function* () {
             const before = yield* Ref.get(checkpointRef)
             const after = withBudget(before, refundUnused(before.budget, child))
-            yield* Ref.set(checkpointRef, after)
             yield* journal.onCheckpoint(after)
+            yield* Ref.set(checkpointRef, after)
           }),
         ),
       setHandoffState: (handoff) =>
@@ -470,8 +471,8 @@ export const make = (input: {
           Effect.gen(function* () {
             const before = yield* Ref.get(checkpointRef)
             const after = yield* withHandoffState(before, handoff)
-            yield* Ref.set(checkpointRef, after)
             yield* journal.onCheckpoint(after)
+            yield* Ref.set(checkpointRef, after)
           }),
         ),
       recorded: Ref.get(recordedRef),
@@ -487,14 +488,11 @@ export const layerInline = (input: {
     DriverInterpreter,
     Effect.gen(function* () {
       const hostJournal = yield* Effect.serviceOption(DriverJournal)
+      const components = yield* Effect.serviceOption(Registry)
       const journal = input.journal ?? Option.getOrElse(hostJournal, () => journalNoop)
-      return yield* make({ ...input, journal })
+      return yield* make({ ...input, journal, components: Option.getOrElse(components, () => []) })
     }),
   )
-export const layerTest = (input: {
-  readonly driver: DurableAgentDriver
-  readonly initial: DriverCheckpoint
-  readonly journal?: Journal
-}): Layer.Layer<DriverInterpreter> => layerInline(input)
+export const layerTest = layerInline
 export const operationKey = (logicalOperationId: string, ...parts: ReadonlyArray<string | number>): string =>
   [logicalOperationId, ...parts.map(String)].join(":")

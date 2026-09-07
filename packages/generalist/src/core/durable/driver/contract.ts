@@ -26,6 +26,7 @@ export type ReplayPolicy = typeof ReplayPolicy.Type
 
 /** Bounded operation kinds the driver may schedule. */
 export const DriverOperationKind = Schema.Literals([
+  "hook",
   "model",
   "tool",
   "memory",

@@ -11,7 +11,7 @@ Wrap an Effect AI tool with `Memo.pure({ ttl: "6 hours", dependsOn: ["index-vers
 
 ## Provide storage and key context
 
-Provide `Memo.layerMemory()` or `Memo.layerSql()` together with `Memo.layerDependencies({ tenant, capabilityScope, versions })`. SQL storage requires Runtime schema version 7.
+Provide `Memo.layerMemory()` together with `Memo.layerDependencies({ tenant, capabilityScope, versions })`. This is process-local cross-Run reuse, not a durability backend; canonical operation replay does not consult the cache.
 
 <Warning title="Purity is a promise">
 The repository rule catches common direct Sandbox, SQL-write, and non-GET HTTP handlers, but aliases and transitive side effects still require review.

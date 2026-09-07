@@ -92,7 +92,7 @@ const registerAwaitEvent = <LayerError, ClaimsLayerError>(input: {
     const wake = (services: Services, runId: string) =>
       Effect.gen(function* () {
         expect((yield* services.runtime.inspect(runId)).status).toBe("waiting")
-        const first = yield* services.runtime.wake(runId, event)
+        const first = yield* services.runtime.wake({ runId, event, commandId: "wake-delivery" })
         expect(first).toEqual({ _tag: "Resumed", waitId })
         return first
       })
@@ -104,7 +104,7 @@ const registerAwaitEvent = <LayerError, ClaimsLayerError>(input: {
         yield* open((services) =>
           Effect.gen(function* () {
             // A retry after host recovery returns the durable receipt, not a synthetic duplicate.
-            expect(yield* services.runtime.wake(runId, event)).toEqual(first)
+            expect(yield* services.runtime.wake({ runId, event, commandId: "wake-delivery" })).toEqual(first)
             const claim = yield* capability.claim(services, { runId, commandId: "await-after" })
             yield* services.store.complete({
               ...claim,

@@ -3,7 +3,7 @@ import { AiError, LanguageModel } from "effect/unstable/ai"
 import { Memory, type MemoryError } from "../../core/context/memory.js"
 import { ModelRegistry } from "../../core/model/registry.js"
 import { Approvals, type Service as ApprovalsService } from "../../core/policy/approvals.js"
-import { type Declaration, Hooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
+import { type Declaration, Hooks, make as makeHooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
 import {
   Denied as NestedOperationDenied,
   Operations,
@@ -235,24 +235,28 @@ export const declaration = <ProposeR, ProposeE, ApplyR, ApplyE>(
     const runtime = yield* Runtime
     const approvals = yield* Approvals
     const context = yield* Effect.context<Runtime | Approvals | ProposeR | ApplyR>()
-    return onRunEnd((input) =>
-      Effect.gen(function* () {
-        const operations = yield* Effect.serviceOption(Operations)
-        if (Option.isNone(operations)) {
-          return yield* Effect.die(
-            new Error("Learning requires a hosted Runtime nested-operation journal at Hooks.onRunEnd"),
-          )
-        }
-        yield* runLearning({
-          input,
-          runtime,
-          operations: operations.value,
-          approvals,
-          context,
-          configured: options,
-        })
-      }),
-    )
+    return onRunEnd({
+      key: "generalist.learning",
+      version: "1",
+      replayPolicy: "provider-idempotent",
+      hook: (input) =>
+        Effect.gen(function* () {
+          const operations = yield* Effect.serviceOption(Operations)
+          if (Option.isNone(operations)) {
+            return yield* Effect.die(
+              new Error("Learning requires a hosted Runtime nested-operation journal at Hooks.onRunEnd"),
+            )
+          }
+          yield* runLearning({
+            input,
+            runtime,
+            operations: operations.value,
+            approvals,
+            context,
+            configured: options,
+          })
+        }),
+    })
   })
 
 /**
@@ -283,11 +287,11 @@ export function layer<ProposeR, ProposeE, ApplyR, ApplyE>(
         ApplyE
       >(configured)
       const configuration = configurationOf(configured.propose)
-      if (configuration === undefined) return Hooks.of({ declarations: [learning] })
+      if (configuration === undefined) return makeHooks({ declarations: [learning] })
       const runtime = yield* Runtime
       const memory = yield* Memory
       const models = yield* ModelRegistry
-      const hooks = Hooks.of({ declarations: [runStartDeclaration(runtime, memory, configuration), learning] })
+      const hooks = makeHooks({ declarations: [runStartDeclaration(runtime, memory, configuration), learning] })
       const background = consolidationAgent(
         configuration,
         yield* resolveModel(configuration.model, yield* models.registrations),

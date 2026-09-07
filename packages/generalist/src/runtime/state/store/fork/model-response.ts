@@ -7,7 +7,7 @@ import {
 } from "../../../execution/model-response/commit.js"
 import type { RunEvent } from "../../../run/event.js"
 import type { OperationRecord } from "../../../operation/record.js"
-import type { RuntimeSession } from "../../state.js"
+import type { RuntimeSession } from "../../projection.js"
 
 export const copyModelResponse = (input: {
   readonly operation: OperationRecord

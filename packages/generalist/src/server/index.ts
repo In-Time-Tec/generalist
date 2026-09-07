@@ -1,8 +1,9 @@
 import { api, ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
-import { Authentication, layerBearer } from "./auth.js"
+import { Authentication, CurrentPrincipal, Principal, layerBearer } from "./auth.js"
 import { client, defaultReconnectSchedule } from "./client.js"
 import {
   ApiError,
+  Forbidden,
   InvalidConnectOptions,
   OperatorDisabled,
   ReconnectExhausted,
@@ -14,6 +15,7 @@ import {
 import { layer } from "./layer.js"
 import { ClientCommand, CursorFromString, eventCodec } from "./wire.js"
 import { HostEvent } from "../host/event.js"
+import { HostSessionSnapshot, SessionSnapshotTooLarge } from "../runtime/session/host.js"
 export type {
   Client,
   ClientStreamError,
@@ -26,6 +28,8 @@ export type {
 export type { AttachmentDownload, EventStreamItem, RunStarted } from "./api.js"
 export type { ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
 export type { Options as LayerOptions } from "./layer.js"
+export type { Principal, Authorization, Resource } from "./auth.js"
+export type { HostSessionSnapshot } from "../runtime/session/host.js"
 export type { ApiError } from "./errors.js"
 export type { ClientCommand, EventCodec } from "./wire.js"
 
@@ -35,6 +39,11 @@ export interface Server {
   readonly authBearer: typeof layerBearer
   readonly client: typeof client
   readonly Authentication: typeof Authentication
+  readonly CurrentPrincipal: typeof CurrentPrincipal
+  readonly Principal: typeof Principal
+  readonly Forbidden: typeof Forbidden
+  readonly SessionSnapshot: typeof HostSessionSnapshot
+  readonly SessionSnapshotTooLarge: typeof SessionSnapshotTooLarge
   readonly HostEvent: typeof HostEvent
   readonly ClientCommand: typeof ClientCommand
   readonly CursorFromString: typeof CursorFromString
@@ -59,6 +68,11 @@ export const Server: Server = {
   authBearer: layerBearer,
   client,
   Authentication,
+  CurrentPrincipal,
+  Principal,
+  Forbidden,
+  SessionSnapshot: HostSessionSnapshot,
+  SessionSnapshotTooLarge,
   HostEvent,
   ClientCommand,
   CursorFromString,

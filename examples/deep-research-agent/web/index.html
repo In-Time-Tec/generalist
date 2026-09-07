@@ -7,6 +7,19 @@
     <title>Deep Research Agent</title>
   </head>
   <body>
+    <form id="server-login" style="max-width: 28rem; margin: 4rem auto; padding: 1rem">
+      <h1>Connect to the research server</h1>
+      <label for="server-token">Server token</label>
+      <input
+        id="server-token"
+        type="password"
+        autocomplete="off"
+        required
+        style="display: block; width: 100%; margin: 1rem 0; padding: 0.5rem"
+      />
+      <button type="submit">Connect</button>
+      <p id="login-status" role="status">Enter the configured GENERALIST_SERVER_TOKEN.</p>
+    </form>
     <div id="root"></div>
     <script type="module" src="./src/entry.ts"></script>
   </body>

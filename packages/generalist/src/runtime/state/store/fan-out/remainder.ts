@@ -10,7 +10,7 @@ import {
   childReadinessChangedEvent,
   childSettledEvent,
 } from "../../append.js"
-import type { RuntimeState, StoredFanOut } from "../../state.js"
+import type { RuntimeState, StoredFanOut } from "../../projection.js"
 import { admitChildSettlement } from "../directory.js"
 
 export interface RemainderAction {

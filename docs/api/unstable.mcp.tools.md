@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.mcp.tools
+[generalist](./index.md) / unstable.mcp.tools
 
 # unstable.mcp.tools
 
@@ -20,7 +20,7 @@
 
 ##### executorLayer
 
-> `readonly` **executorLayer**: `Layer`\<`Handler`\<`string`\> \| [`ToolExecutor`](./generalist/namespaces/ToolExecutor#toolexecutor)\>
+> `readonly` **executorLayer**: `Layer`\<`Handler`\<`string`\> \| [`ToolExecutor`](./generalist/namespaces/ToolExecutor.md#toolexecutor)\>
 
 **`Experimental`**
 
@@ -28,7 +28,7 @@
 
 ##### toolkit
 
-> `readonly` **toolkit**: `Toolkit`\<`Record`\<`string`, [`MCPTool`](./unstable.mcp.client#mcptool)\>\>
+> `readonly` **toolkit**: `Toolkit`\<`Record`\<`string`, [`MCPTool`](./unstable.mcp.client.md#mcptool)\>\>
 
 **`Experimental`**
 
@@ -72,7 +72,7 @@
 
 ### connect
 
-> `const` **connect**: (`options`) => `Effect.Effect`\<[`MCPTools`](#mcptools), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope.Scope`\>
+> `const` **connect**: (`options`) => `Effect.Effect`\<[`MCPTools`](#mcptools), [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope.Scope`\>
 
 **`Experimental`**
 
@@ -86,7 +86,7 @@ Acquires one MCP connection and assembles its complete Generalist tool integrati
 
 #### Returns
 
-`Effect.Effect`\<[`MCPTools`](#mcptools), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope.Scope`\>
+`Effect.Effect`\<[`MCPTools`](#mcptools), [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope.Scope`\>
 
 ***
 
@@ -104,7 +104,7 @@ Effect AI handler layer that proxies MCP tool calls to the MCP server.
 
 ##### client
 
-[`Service`](./unstable.mcp.client#service)
+[`Service`](./unstable.mcp.client.md#service)
 
 #### Returns
 
@@ -116,7 +116,7 @@ Effect AI handler layer that proxies MCP tool calls to the MCP server.
 
 ### toolkit
 
-> `const` **toolkit**: (`client`) => `Effect.Effect`\<`Toolkit.Toolkit`\<`Record`\<`string`, [`MCPTool`](./unstable.mcp.client#mcptool)\>\>\>
+> `const` **toolkit**: (`client`) => `Effect.Effect`\<`Toolkit.Toolkit`\<`Record`\<`string`, [`MCPTool`](./unstable.mcp.client.md#mcptool)\>\>\>
 
 **`Experimental`**
 
@@ -127,8 +127,8 @@ so tool calls are proxied to the MCP server through Effect AI handlers.
 
 ##### client
 
-[`Service`](./unstable.mcp.client#service)
+[`Service`](./unstable.mcp.client.md#service)
 
 #### Returns
 
-`Effect.Effect`\<`Toolkit.Toolkit`\<`Record`\<`string`, [`MCPTool`](./unstable.mcp.client#mcptool)\>\>\>
+`Effect.Effect`\<`Toolkit.Toolkit`\<`Record`\<`string`, [`MCPTool`](./unstable.mcp.client.md#mcptool)\>\>\>

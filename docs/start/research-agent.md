@@ -3,7 +3,7 @@ title: "Tutorial: a research agent with approvals and a live UI"
 description: "Build an approval and chat transport demo with canned search; optionally connect a live model."
 ---
 
-Build a research-shaped agent with human approval and a FoldKit chat UI. Search results are canned, not fetched from the web. With no credentials the model is scripted too. `OPENROUTER_API_KEY` enables a live model but does not enable live search in this tutorial.
+Build a research-shaped agent with human approval and a FoldKit chat UI. Search results are canned, not fetched from the web. With no model credentials the model is scripted too. Durable hosting still requires object-service configuration; use local MinIO for local-only development. `OPENROUTER_API_KEY` enables a live model with provider costs but does not enable live search in this tutorial.
 
 Three parts: a Bun server that streams agent runs over SSE and WebSocket, an approval resolved over the wire, and a browser chat UI. If you have not done [the quickstart](/start/quickstart), start there. The finished, styled version of this app lives in the repository at [examples/deep-research-agent](https://github.com/In-Time-Tec/generalist/tree/main/examples/deep-research-agent).
 
@@ -16,7 +16,7 @@ Three parts: a Bun server that streams agent runs over SSE and WebSocket, an app
 ```bash
 mkdir research-agent && cd research-agent
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.62.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112
+bun add effect@4.0.0-rc.112 generalist@0.62.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
 ```
 
 ### A web search service
@@ -230,13 +230,17 @@ import { BunCrypto } from "@effect/platform-bun"
 import { Config, Effect, Layer, Option } from "effect"
 import { Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { Generalist } from "generalist/host"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
-import { ExecutableResolver } from "generalist/runtime"
+import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
+import { type Options, layer as layerS3 } from "generalist/durability/s3"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
+import { agent } from "./agent"
+import { modelLayer } from "./model"
+import { toolkit, toolkitLayer } from "./tools"
+import { cannedLayer } from "./web-search"
 
-export const approvalsLayer = Approvals.layerDurable({
+export const approvalsLayer: Layer.Layer<Approvals.Approvals, never, Runtime.Runtime> = Approvals.layerDurable({
   notify: (request) => Effect.logInfo("approval requested", request),
 })
 
@@ -257,35 +261,53 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
-  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-    Layer.provide(S3.layer({
-      bucket,
-      region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : {
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    let credentials: Options["credentials"] = { accessKeyId, secretAccessKey }
+    if (sessionToken !== undefined) credentials = { ...credentials, sessionToken }
+    let transport: Options = { bucket, region, credentials }
+    if (endpoint !== undefined) {
+      transport = {
+        ...transport,
         endpoint,
         forcePathStyle: true,
-        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-      }),
-    })),
-    Layer.provide(BunCrypto.layer),
-  )
-  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
-}))
+        capabilities: {
+          conditionalCreate: confirmed,
+          strongReadAfterWrite: confirmed,
+          consistentListing: confirmed,
+        },
+      }
+    }
+    const reconstructed = layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      Layer.provide(layerS3(transport)),
+      Layer.provide(BunCrypto.layer),
+    )
+    return Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed))
+  }),
+)
 
-const demoAuth = Layer.succeed(Server.Authentication, Server.Authentication.of({ bearer: (httpEffect) => httpEffect }))
+const demoAuth = Layer.succeed(
+  Server.Authentication,
+  Server.Authentication.of({
+    bearer: (httpEffect) =>
+      Effect.provideService(httpEffect, Server.CurrentPrincipal, {
+        id: "local-research-controller",
+        tenantId: "research-demo",
+        role: "controller",
+      }),
+  }),
+)
 
 const apiLayer = Layer.unwrap(
   Generalist.create({ agents: [agent] }).pipe(
@@ -293,15 +315,21 @@ const apiLayer = Layer.unwrap(
       Server.layer({
         host,
         auth: demoAuth,
+        authorization: { tenantId: "research-demo", authorize: () => Effect.succeed(true) },
       }),
     ),
     Effect.orDie,
   ),
 )
 
-export const httpLayer = HttpRouter.serve(
-  Layer.merge(apiLayer, HttpRouter.cors()).pipe(Layer.provide(HttpServer.layerServices)),
-).pipe(Layer.provideMerge(agentServices), Layer.provideMerge(runtimeLayer))
+export const httpLayer: Layer.Layer<
+  Layer.Success<typeof agentServices> | RuntimeServices,
+  Config.ConfigError | Effect.Error<typeof activate> | Layer.Error<ReturnType<typeof layerS3>>,
+  HttpServer.HttpServer
+> = HttpRouter.serve(Layer.merge(apiLayer, HttpRouter.cors()).pipe(Layer.provide(HttpServer.layerServices))).pipe(
+  Layer.provideMerge(agentServices),
+  Layer.provideMerge(runtimeLayer),
+)
 ```
 
 ### Serve it with Bun
@@ -691,9 +719,9 @@ The view uses the repository's typed HTML helper, not a FoldKit export. Copy [ex
 
 Run `bunx vite` next to the `index.html` and open the printed URL.
 
-## You have built the whole thing
+## Try the local flow
 
-Ask a question in the browser; the Agent pauses with an approval card; click Approve; watch the tool and Run reach their terminal states. Set `OPENROUTER_API_KEY` and restart the server to run the same flow against a real model.
+With the local object service and server running, ask a question in the browser, approve the tool, and inspect the terminal Run. This minimal scaffold deliberately assigns a development principal without validating a credential; it is not an authenticated deployment. The repository example includes browser authentication and Session snapshot/resync, but full browser acceptance is a separate gate, not established by this tutorial's typecheck. Set `OPENROUTER_API_KEY` only when you intend a live model call and its costs.
 
 ## Next steps
 

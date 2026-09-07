@@ -9,7 +9,7 @@ import {
 } from "./driver/contract.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver, type DriverInput } from "./service.js"
 import { charge, settleModelTokens, type RunBudget, type Exhausted, type BudgetLimits } from "./run-budget.js"
-import { LoopDriverState, type PendingOperation } from "./loop-driver-state.js"
+import { LoopDriverState, RememberInput, type PendingOperation } from "./loop-driver-state.js"
 import { Commit, type ControlState } from "../agent/handoff/state.js"
 import { isCompletedModelOperation } from "../model/operation.js"
 export interface LoopDriverOptions {
@@ -30,7 +30,7 @@ const encodeCheckpoint = (
 ): DriverCheckpoint => ({
   ...checkpoint,
   budget,
-  state,
+  state: Schema.encodeSync(LoopDriverState)(state),
 })
 
 const applyDecodedCommit = (
@@ -160,6 +160,9 @@ const applySucceededOutcome = (
 ): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
   Effect.gen(function* () {
     let nextState: LoopDriverState = (({ pending: _pending, ...rest }) => rest)(state)
+    if (pending.kind === "memory" && Schema.is(RememberInput)(pending.input)) {
+      return encodeCheckpoint(checkpoint, { ...state, pending: { ...pending, completed: true } })
+    }
     const budget = checkpoint.budget
     if (pending.kind === "handoff") {
       const commit = yield* Schema.decodeUnknownEffect(Commit)(outcome.value).pipe(
@@ -224,13 +227,10 @@ export const make = (options: LoopDriverOptions): DurableAgentDriver => ({
           result: state.terminal,
         } satisfies DriverDecision
       }
-      if (state.pending === undefined) {
-        return yield* DriverStateInvalid.make({ message: "Loop driver decide without pending operation or wait" })
+      if (state.pending !== undefined && state.pending.completed !== true) {
+        return { _tag: "Execute", operation: makeOperation(state.pending) } satisfies DriverDecision
       }
-      return {
-        _tag: "Execute",
-        operation: makeOperation(state.pending),
-      } satisfies DriverDecision
+      return yield* DriverStateInvalid.make({ message: "Loop driver decide without pending operation or wait" })
     }),
   apply: applyOutcome,
 })
@@ -241,5 +241,5 @@ export const withPending: {
   (checkpoint: DriverCheckpoint, pending: PendingOperation, turn: number): DriverCheckpoint
 } = Function.dual(3, (checkpoint: DriverCheckpoint, pending: PendingOperation, turn: number): DriverCheckpoint => {
   const state = Schema.decodeUnknownSync(LoopDriverState)(checkpoint.state)
-  return { ...checkpoint, turn, state: { ...state, pending } }
+  return { ...checkpoint, turn, state: Schema.encodeSync(LoopDriverState)({ ...state, pending }) }
 })

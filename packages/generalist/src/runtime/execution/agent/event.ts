@@ -2,6 +2,8 @@ import type { Completed, Event, Metadata as CoreMetadata } from "../../../core/a
 import type { ModelResponseEntry } from "../../../core/context/session.js"
 import type { Response } from "effect/unstable/ai"
 import type { CompletedModelResponse } from "../../run/event.js"
+import { Schema } from "effect"
+import { Denied as CapabilityDenied } from "../../../core/capability/errors.js"
 
 export type Metadata = CoreMetadata
 
@@ -77,7 +79,10 @@ export const durableEvent = (
       ...event,
       result: {
         ...event.result,
-        result: event.result.encodedResult,
+        result:
+          event.result.isFailure && Schema.is(CapabilityDenied)(event.result.result)
+            ? event.result.result
+            : event.result.encodedResult,
       },
     }
   }

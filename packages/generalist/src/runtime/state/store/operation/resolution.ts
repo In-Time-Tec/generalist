@@ -3,7 +3,7 @@ import { Effect, Function } from "effect"
 import { OperationResolutionConflict, RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import { digest as resolutionDigest, type ResolveOperationInput } from "../../../operation/resolution.js"
 import type { OperationRecord } from "../../../operation/record.js"
-import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../state.js"
+import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../projection.js"
 import { revokeRunSession } from "../execution.js"
 
 const getRun = (state: RuntimeState, runId: string) => {
@@ -15,7 +15,9 @@ const getRun = (state: RuntimeState, runId: string) => {
 export const resolveOperation: {
   (
     input: ResolveOperationInput,
-  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<RuntimeState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     input: ResolveOperationInput,

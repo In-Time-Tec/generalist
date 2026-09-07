@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / Authorship
+[generalist](../../index.md) / [instructions](../index.md) / Authorship
 
 # Authorship
 
@@ -88,7 +88,7 @@ Why untrusted proposal input was refused before it could reach the engine.
 
 ### author
 
-> `const` **author**: (`input`, `options?`) => `Effect.Effect`\<[`AuthoredRefinementProposal`](./Entry#authoredrefinementproposal), [`AuthorshipRejected`](#authorshiprejected), `never`\>
+> `const` **author**: (`input`, `options?`) => `Effect.Effect`\<[`AuthoredRefinementProposal`](./Entry.md#authoredrefinementproposal), [`AuthorshipRejected`](#authorshiprejected), `never`\>
 
 Accept one proposal from an untrusted author. A pinned `revision` is refused rather than trusted or
 silently dropped, so model-originated input can never choose an entry's createdAt, updatedAt, or version.
@@ -105,7 +105,7 @@ silently dropped, so model-originated input can never choose an entry's createdA
 
 #### Returns
 
-`Effect.Effect`\<[`AuthoredRefinementProposal`](./Entry#authoredrefinementproposal), [`AuthorshipRejected`](#authorshiprejected), `never`\>
+`Effect.Effect`\<[`AuthoredRefinementProposal`](./Entry.md#authoredrefinementproposal), [`AuthorshipRejected`](#authorshiprejected), `never`\>
 
 ***
 
@@ -123,4 +123,4 @@ Why untrusted proposal input was refused before it could reach the engine.
 
 ### isAuthored
 
-Re-exports [isAuthored](./Refinement#isauthored)
+Re-exports [isAuthored](./Refinement.md#isauthored)

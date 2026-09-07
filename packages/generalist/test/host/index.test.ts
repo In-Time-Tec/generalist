@@ -1,3 +1,4 @@
+import { register as registerSnapshots } from "./snapshot-suite.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
@@ -8,6 +9,8 @@ import { Generalist } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
+
+registerSnapshots({ makeObjectStorage })
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: 1, total: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -29,9 +32,7 @@ const authorization = Layer.mergeAll(Permissions.layerAllowAll, Approvals.layerA
 const runtimeStorage = makeObjectStorage()
 const attachmentStorage = makeObjectStorage()
 const blobStore = blobStoreLayer({ environment: "test", tenant: "host" }).pipe(
-  Layer.provide(
-    Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, attachmentStorage.store)),
-  ),
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, attachmentStorage.store))),
 )
 const runtimeLayer = objectRuntimeLayer({ addresses: [] }, runtimeStorage).pipe(Layer.provide(resolver))
 const completeRun = (runId: string, commandId: string) =>
@@ -80,7 +81,21 @@ const backend = "object" as const
             Stream.runCollect,
           ),
         )
-        expect(events.map(({ _tag }) => _tag)).toEqual(["RunStarted", "Turn", "Turn", "Completed"])
+        expect(events.map(({ _tag }) => _tag)).toEqual([
+          "RunStarted",
+          "Turn",
+          "Conversation",
+          "Conversation",
+          "Turn",
+          "Completed",
+        ])
+        expect(
+          events
+            .filter((event) => event._tag === "Conversation")
+            .flatMap((event) => event.update.entries)
+            .flatMap((entry) => entry.messages)
+            .map((message) => message.role),
+        ).toEqual(["user", "assistant"])
         expect(events.map(({ cursor }) => cursor)).toEqual(
           events.map(({ cursor }) => cursor).toSorted((left, right) => left - right),
         )
@@ -178,7 +193,14 @@ layer(Layer.mergeAll(runtimeLayer, model, authorization, handlers))("host plugin
         name: "echo-plugin",
         tools: [pluginTool],
         instructions: [Instructions.fromText("echo-plugin", "Plugin guidance")],
-        hooks: [Hooks.onRunEnd(() => Effect.succeed(Hooks.Replace("plugin hook complete")))],
+        hooks: [
+          Hooks.onRunEnd({
+            key: "test.host.index.onRunEnd.1",
+            version: "1",
+            replayPolicy: "never",
+            hook: () => Effect.succeed(Hooks.Replace("plugin hook complete")),
+          }),
+        ],
         skills: [
           {
             name: "plugin-skill",

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / AgentEvent
+[generalist](../../index.md) / [generalist](../index.md) / AgentEvent
 
 # AgentEvent
 
@@ -1195,7 +1195,7 @@ One ordered completion gate verdict for a proposed terminal output.
 
 #### Extends
 
-- [`Result`](./Gate#result)
+- [`Result`](./Gate.md#result)
 
 #### Properties
 
@@ -1684,7 +1684,7 @@ Canonical identity and payload for one authorization request.
 
 ### Event
 
-> **Event**\<`Output`\> = [`TurnStarted`](#turnstarted) \| [`ModelPart`](#modelpart) \| `ModelResponseCommitted` \| [`ToolExecutionStarted`](#toolexecutionstarted) \| [`ToolProgress`](#toolprogress) \| [`ToolExecutionCompleted`](#toolexecutioncompleted) \| [`ToolExecutionWaiting`](#toolexecutionwaiting) \| `HandoffRequested` \| `HandoffCompleted` \| `RejectedEvent` \| [`ApprovalRequested`](#approvalrequested) \| [`SteeringDrained`](#steeringdrained) \| [`TurnCompleted`](#turncompleted) \| [`GateResult`](#gateresult) \| [`Completed`](#completed)\<`Output`\> \| [`Event`](./ModelTelemetry#event)
+> **Event**\<`Output`\> = [`TurnStarted`](#turnstarted) \| [`ModelPart`](#modelpart) \| `ModelResponseCommitted` \| [`ToolExecutionStarted`](#toolexecutionstarted) \| [`ToolProgress`](#toolprogress) \| [`ToolExecutionCompleted`](#toolexecutioncompleted) \| [`ToolExecutionWaiting`](#toolexecutionwaiting) \| `HandoffRequested` \| `HandoffCompleted` \| `RejectedEvent` \| [`ApprovalRequested`](#approvalrequested) \| [`SteeringDrained`](#steeringdrained) \| [`TurnCompleted`](#turncompleted) \| [`GateResult`](#gateresult) \| [`Completed`](#completed)\<`Output`\> \| [`Event`](./ModelTelemetry.md#event)
 
 Closed union of Generalist loop events.
 

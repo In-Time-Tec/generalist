@@ -86,7 +86,10 @@ const execute = (input: {
                 Effect.forkChild({ startImmediately: true }),
               )
         const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-1",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
         const preview = input.observer === "absent" ? undefined : yield* Deferred.await(previewSeen)
         if (input.observer === "disconnected" && subscriber !== undefined) yield* Fiber.interrupt(subscriber)
@@ -205,7 +208,10 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
           Effect.forkChild({ startImmediately: true }),
         )
         const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-2", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-2",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
 
         expect(yield* Deferred.await(secondPreview)).toMatchObject({
@@ -311,7 +317,10 @@ it.effect("retires the published frame when a response commits while keeping the
           Effect.forkChild({ startImmediately: true }),
         )
         const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-3",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(secondPreview)

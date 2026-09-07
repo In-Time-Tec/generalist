@@ -1,14 +1,14 @@
-[**generalist**](../../../index)
+[**generalist**](../../../index.md)
 
 ***
 
-[generalist](../../../index) / [runtime](../../index) / Messaging
+[generalist](../../../index.md) / [runtime](../../index.md) / Messaging
 
 # Messaging
 
 ## Namespaces
 
-- [MessagingPolicy](./namespaces/MessagingPolicy)
+- [MessagingPolicy](./namespaces/MessagingPolicy.md)
 
 ## Classes
 
@@ -113,13 +113,13 @@ One authorization question about one exact sender and target.
 
 ##### sender
 
-> `readonly` **sender**: [`DirectoryEntry`](../AgentDirectory#directoryentry)
+> `readonly` **sender**: [`DirectoryEntry`](../AgentDirectory.md#directoryentry)
 
 <a id="target"></a>
 
 ##### target
 
-> `readonly` **target**: [`DirectoryEntry`](../AgentDirectory#directoryentry)
+> `readonly` **target**: [`DirectoryEntry`](../AgentDirectory.md#directoryentry)
 
 ***
 
@@ -201,7 +201,7 @@ Input for one addressed send. Sender identity is a Run id, never caller-supplied
 
 ### DirectoryError
 
-> **DirectoryError** = [`RunNotFound`](../Errors#runnotfound) \| [`RuntimeUnavailable`](../Errors#runtimeunavailable)
+> **DirectoryError** = [`RunNotFound`](../Errors.md#runnotfound) \| [`RuntimeUnavailable`](../Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../../durability.md#durabilityfailure)
 
 ***
 
@@ -219,7 +219,7 @@ Durable send failure.
 
 ### authorize
 
-> `const` **authorize**: (`input`) => `Effect.Effect`\<`void`, [`NotInFamily`](../Errors#notinfamily)\>
+> `const` **authorize**: (`input`) => `Effect.Effect`\<`void`, [`NotInFamily`](../Errors.md#notinfamily)\>
 
 Decide one addressing attempt.
 
@@ -232,19 +232,19 @@ nothing on its own.
 
 ###### policy
 
-[`Service`](./namespaces/MessagingPolicy#service)
+[`Service`](./namespaces/MessagingPolicy.md#service)
 
 ###### sender
 
-[`DirectoryEntry`](../AgentDirectory#directoryentry)
+[`DirectoryEntry`](../AgentDirectory.md#directoryentry)
 
 ###### target
 
-[`DirectoryEntry`](../AgentDirectory#directoryentry)
+[`DirectoryEntry`](../AgentDirectory.md#directoryentry)
 
 #### Returns
 
-`Effect.Effect`\<`void`, [`NotInFamily`](../Errors#notinfamily)\>
+`Effect.Effect`\<`void`, [`NotInFamily`](../Errors.md#notinfamily)\>
 
 ***
 
@@ -260,7 +260,7 @@ Host policy over exact sender and target identity.
 
 ##### policy
 
-`Partial`\<[`Service`](./namespaces/MessagingPolicy#service)\>
+`Partial`\<[`Service`](./namespaces/MessagingPolicy.md#service)\>
 
 #### Returns
 
@@ -285,15 +285,15 @@ can become visible to the target Run.
 
 ###### policy
 
-[`Service`](./namespaces/MessagingPolicy#service)
+[`Service`](./namespaces/MessagingPolicy.md#service)
 
 ###### sendMessage
 
-(`request`) => `Effect.Effect`\<[`MessageReceipt`](../Mailbox#messagereceipt), [`SendMessageError`](#sendmessageerror)\>
+(`request`) => `Effect.Effect`\<[`MessageReceipt`](../Mailbox.md#messagereceipt), [`SendMessageError`](#sendmessageerror)\>
 
 ###### store
 
-[`Service`](../RunStore#service)
+[`Service`](../RunStore.md#service)
 
 #### Returns
 
@@ -323,7 +323,7 @@ Host messaging policy construction.
 
 ### reachable
 
-> `const` **reachable**: (`input`) => `Effect.Effect`\<`ReadonlyArray`\<[`DirectoryEntry`](../AgentDirectory#directoryentry)\>, [`DirectoryError`](#directoryerror)\>
+> `const` **reachable**: (`input`) => `Effect.Effect`\<`ReadonlyArray`\<[`DirectoryEntry`](../AgentDirectory.md#directoryentry)\>, [`DirectoryError`](#directoryerror)\>
 
 Directory entries one Run may reach under Generalist relationships plus host policy.
 
@@ -333,7 +333,7 @@ Directory entries one Run may reach under Generalist relationships plus host pol
 
 ###### policy
 
-[`Service`](./namespaces/MessagingPolicy#service)
+[`Service`](./namespaces/MessagingPolicy.md#service)
 
 ###### runId
 
@@ -341,11 +341,11 @@ Directory entries one Run may reach under Generalist relationships plus host pol
 
 ###### store
 
-[`Service`](../RunStore#service)
+[`Service`](../RunStore.md#service)
 
 #### Returns
 
-`Effect.Effect`\<`ReadonlyArray`\<[`DirectoryEntry`](../AgentDirectory#directoryentry)\>, [`DirectoryError`](#directoryerror)\>
+`Effect.Effect`\<`ReadonlyArray`\<[`DirectoryEntry`](../AgentDirectory.md#directoryentry)\>, [`DirectoryError`](#directoryerror)\>
 
 ***
 
@@ -353,6 +353,6 @@ Directory entries one Run may reach under Generalist relationships plus host pol
 
 ### SendMessageError
 
-> `const` **SendMessageError**: `Schema.Union`\<readonly \[*typeof* [`AddressNotFound`](../Errors#addressnotfound), *typeof* [`AddressInvalid`](../AgentDirectory#addressinvalid), *typeof* [`NotInFamily`](../Errors#notinfamily), *typeof* [`RunBusy`](../Errors#runbusy), *typeof* [`SteeringConflict`](../Errors#steeringconflict), *typeof* [`ForkSequenceInvalid`](../Errors#forksequenceinvalid), *typeof* [`NoSnapshot`](../Errors#nosnapshot), *typeof* [`CursorExpired`](../Errors#cursorexpired), *typeof* [`InboxFull`](../../../generalist/namespaces/Steering#inboxfull), *typeof* [`RunTerminal`](../Errors#runterminal), *typeof* [`RunNotFound`](../Errors#runnotfound), *typeof* [`RuntimeUnavailable`](../Errors#runtimeunavailable)\]\>
+> `const` **SendMessageError**: `Schema.Union`\<readonly \[*typeof* [`DurabilityFailure`](../../../durability.md#durabilityfailure), *typeof* [`Exhausted`](../../../generalist/namespaces/RunBudget.md#exhausted), *typeof* [`Invalid`](../../../generalist/namespaces/RunBudget.md#invalid), *typeof* [`AddressNotFound`](../Errors.md#addressnotfound), *typeof* [`AddressInvalid`](../AgentDirectory.md#addressinvalid), *typeof* [`NotInFamily`](../Errors.md#notinfamily), *typeof* [`RunBusy`](../Errors.md#runbusy), *typeof* [`SteeringConflict`](../Errors.md#steeringconflict), *typeof* [`ForkSequenceInvalid`](../Errors.md#forksequenceinvalid), *typeof* [`NoSnapshot`](../Errors.md#nosnapshot), *typeof* [`CursorExpired`](../Errors.md#cursorexpired), *typeof* [`InboxFull`](../../../generalist/namespaces/Steering.md#inboxfull), *typeof* [`RunTerminal`](../Errors.md#runterminal), *typeof* [`RunNotFound`](../Errors.md#runnotfound), *typeof* [`RuntimeUnavailable`](../Errors.md#runtimeunavailable)\]\>
 
 Durable send failure.

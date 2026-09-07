@@ -81,9 +81,12 @@ export const executeProgram = (input: {
             yield* store.suspend({
               ...claim,
               suspension: error,
-              checkpoint: claimed.checkpoint !== undefined && "_tag" in claimed.checkpoint && claimed.checkpoint._tag === "Program"
-                ? claimed.checkpoint
-                : { _tag: "Program", version: "1" },
+              checkpoint:
+                claimed.checkpoint !== undefined &&
+                "_tag" in claimed.checkpoint &&
+                claimed.checkpoint._tag === "Program"
+                  ? claimed.checkpoint
+                  : { _tag: "Program", version: "1" },
               waits: [{ ...wait, status: "open", openedAt }],
             })
           })

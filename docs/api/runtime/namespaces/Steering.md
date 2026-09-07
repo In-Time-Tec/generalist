@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Steering
+[generalist](../../index.md) / [runtime](../index.md) / Steering
 
 # Steering
 
@@ -80,7 +80,7 @@ Stable digest used for inbox idempotency.
 
 ###### addressed?
 
-[`Message`](./Message#message)
+[`Message`](./Message.md#message)
 
 ###### from
 
@@ -88,7 +88,7 @@ Stable digest used for inbox idempotency.
 
 ###### policy
 
-[`AdmissionPolicy`](../../generalist/namespaces/Steering#admissionpolicy)
+[`AdmissionPolicy`](../../generalist/namespaces/Steering.md#admissionpolicy)
 
 ###### prompt
 
@@ -172,13 +172,13 @@ Stable identity returned for durable steering admission and every identical retr
 
 ### toolkit
 
-> `const` **toolkit**: () => `Toolkit.Toolkit`\<\{ `list_inbox`: `Tool.Tool`\<`"list_inbox"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `limit`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>; `success`: `Schema.$Array`\<`Schema.Struct`\<\{ `addressed`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `causationId`: ...; `correlationId`: ...; `from`: ...; `id`: ...; `idempotencyKey`: ...; `inReplyTo`: ...; `metadata`: ...; `prompt`: ...; `sessionId`: ...; `to`: ...; \}\>\>; `digest`: `Schema.String`; `entryId`: `Schema.String`; `from`: `Schema.Union`\<readonly \[..., ..., ...\]\>; `idempotencyKey`: `Schema.String`; `policy`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>; `prompt`: `Schema.Codec`\<`Prompt`, `PromptEncoded`, `never`, `never`\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}\>\>; \}, [`AgentMessaging`](./Messaging/index#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>; `send_to_child`: `Tool.Tool`\<`"send_to_child"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox#messagereceipt), [`MessageReceipt`](./Mailbox#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>; `send_to_parent`: `Tool.Tool`\<`"send_to_parent"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox#messagereceipt), [`MessageReceipt`](./Mailbox#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>; \}\>
+> `const` **toolkit**: () => `Toolkit.Toolkit`\<\{ `list_inbox`: `Tool.Tool`\<`"list_inbox"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `limit`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>; `success`: `Schema.$Array`\<`Schema.Struct`\<\{ `addressed`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `causationId`: ...; `correlationId`: ...; `from`: ...; `id`: ...; `idempotencyKey`: ...; `inReplyTo`: ...; `metadata`: ...; `prompt`: ...; `sessionId`: ...; `to`: ...; \}\>\>; `digest`: `Schema.String`; `entryId`: `Schema.String`; `from`: `Schema.Union`\<readonly \[..., ..., ...\]\>; `idempotencyKey`: `Schema.String`; `policy`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>; `prompt`: `Schema.Codec`\<`Prompt`, `PromptEncoded`, `never`, `never`\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}\>\>; \}, [`AgentMessaging`](./Messaging/index.md#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>; `send_to_child`: `Tool.Tool`\<`"send_to_child"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox.md#messagereceipt), [`MessageReceipt`](./Mailbox.md#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index.md#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>; `send_to_parent`: `Tool.Tool`\<`"send_to_parent"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox.md#messagereceipt), [`MessageReceipt`](./Mailbox.md#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index.md#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>; \}\>
 
 Effect AI tools for messaging direct children and parents and inspecting this Run's inbox.
 
 #### Returns
 
-`Toolkit.Toolkit`\<\{ `list_inbox`: `Tool.Tool`\<`"list_inbox"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `limit`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>; `success`: `Schema.$Array`\<`Schema.Struct`\<\{ `addressed`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `causationId`: ...; `correlationId`: ...; `from`: ...; `id`: ...; `idempotencyKey`: ...; `inReplyTo`: ...; `metadata`: ...; `prompt`: ...; `sessionId`: ...; `to`: ...; \}\>\>; `digest`: `Schema.String`; `entryId`: `Schema.String`; `from`: `Schema.Union`\<readonly \[..., ..., ...\]\>; `idempotencyKey`: `Schema.String`; `policy`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>; `prompt`: `Schema.Codec`\<`Prompt`, `PromptEncoded`, `never`, `never`\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}\>\>; \}, [`AgentMessaging`](./Messaging/index#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>; `send_to_child`: `Tool.Tool`\<`"send_to_child"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox#messagereceipt), [`MessageReceipt`](./Mailbox#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>; `send_to_parent`: `Tool.Tool`\<`"send_to_parent"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox#messagereceipt), [`MessageReceipt`](./Mailbox#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>; \}\>
+`Toolkit.Toolkit`\<\{ `list_inbox`: `Tool.Tool`\<`"list_inbox"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `limit`: `Schema.optionalKey`\<`Schema.Int`\>; \}\>; `success`: `Schema.$Array`\<`Schema.Struct`\<\{ `addressed`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `causationId`: ...; `correlationId`: ...; `from`: ...; `id`: ...; `idempotencyKey`: ...; `inReplyTo`: ...; `metadata`: ...; `prompt`: ...; `sessionId`: ...; `to`: ...; \}\>\>; `digest`: `Schema.String`; `entryId`: `Schema.String`; `from`: `Schema.Union`\<readonly \[..., ..., ...\]\>; `idempotencyKey`: `Schema.String`; `policy`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>; `prompt`: `Schema.Codec`\<`Prompt`, `PromptEncoded`, `never`, `never`\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}\>\>; \}, [`AgentMessaging`](./Messaging/index.md#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>; `send_to_child`: `Tool.Tool`\<`"send_to_child"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox.md#messagereceipt), [`MessageReceipt`](./Mailbox.md#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index.md#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>; `send_to_parent`: `Tool.Tool`\<`"send_to_parent"`, \{ `failure`: `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `message`: `Schema.String`; `policy`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ..., ..., ...\]\>\>; \}\>; `success`: `Schema.Codec`\<[`MessageReceipt`](./Mailbox.md#messagereceipt), [`MessageReceipt`](./Mailbox.md#messagereceipt), `never`, `never`\>; \}, [`AgentMessaging`](./Messaging/index.md#agentmessaging) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>; \}\>
 
 ## References
 
@@ -186,7 +186,7 @@ Effect AI tools for messaging direct children and parents and inspecting this Ru
 
 ### AdmissionPolicy
 
-Re-exports [AdmissionPolicy](../../generalist/namespaces/Steering#admissionpolicy-1)
+Re-exports [AdmissionPolicy](../../generalist/namespaces/Steering.md#admissionpolicy-1)
 
 ***
 
@@ -194,7 +194,7 @@ Re-exports [AdmissionPolicy](../../generalist/namespaces/Steering#admissionpolic
 
 ### defaultCapacity
 
-Re-exports [defaultCapacity](../../generalist/namespaces/Steering#defaultcapacity)
+Re-exports [defaultCapacity](../../generalist/namespaces/Steering.md#defaultcapacity)
 
 ***
 
@@ -202,7 +202,7 @@ Re-exports [defaultCapacity](../../generalist/namespaces/Steering#defaultcapacit
 
 ### defaultMaxPendingBytes
 
-Re-exports [defaultMaxPendingBytes](../../generalist/namespaces/Steering#defaultmaxpendingbytes)
+Re-exports [defaultMaxPendingBytes](../../generalist/namespaces/Steering.md#defaultmaxpendingbytes)
 
 ***
 
@@ -210,7 +210,7 @@ Re-exports [defaultMaxPendingBytes](../../generalist/namespaces/Steering#default
 
 ### InboxFull
 
-Re-exports [InboxFull](../../generalist/namespaces/Steering#inboxfull)
+Re-exports [InboxFull](../../generalist/namespaces/Steering.md#inboxfull)
 
 ***
 
@@ -218,4 +218,4 @@ Re-exports [InboxFull](../../generalist/namespaces/Steering#inboxfull)
 
 ### promptBytes
 
-Re-exports [promptBytes](../../generalist/namespaces/Steering#promptbytes)
+Re-exports [promptBytes](../../generalist/namespaces/Steering.md#promptbytes)

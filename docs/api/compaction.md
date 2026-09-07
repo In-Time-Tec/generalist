@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / compaction
+[generalist](./index.md) / compaction
 
 # compaction
 
@@ -428,7 +428,7 @@ Request passed to a compaction implementation.
 
 ##### path?
 
-> `readonly` `optional` **path?**: readonly [`Entry`](./generalist/namespaces/Session#entry-1)[]
+> `readonly` `optional` **path?**: readonly [`Entry`](./generalist/namespaces/Session.md#entry-1)[]
 
 <a id="prompt"></a>
 

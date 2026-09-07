@@ -1,9 +1,8 @@
-import type { PreparedObservation } from "../observation.js"
-import { occurredAt as preparedOccurredAt } from "../observation.js"
+import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../observation.js"
 import { Effect, Function } from "effect"
 import { type Point, validateBoundary, validateRange } from "../../run/acknowledgement.js"
 import { AckBeyondCommitted, AckInvalid, RunNotFound, RuntimeUnavailable } from "../../errors.js"
-import type { RuntimeState, StoredRun } from "../state.js"
+import type { RuntimeState, StoredRun } from "../projection.js"
 
 const getRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -18,11 +17,19 @@ export const acknowledge: {
     readonly sequence: number
   }): (
     state: RuntimeState,
-  ) => Effect.Effect<RuntimeState, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    RuntimeState,
+    RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: { readonly runId: string; readonly sequence: number },
-  ): Effect.Effect<RuntimeState, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    RuntimeState,
+    RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly sequence: number }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)

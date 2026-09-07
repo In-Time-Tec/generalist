@@ -1,7 +1,7 @@
 import { Schema, type Effect } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Inheritance } from "../../core/agent/lifecycle/fan-out.js"
-import { ArtifactAppendReceipt, ArtifactHead, ArtifactUpdate, Attribution, RangeOperation, Version } from "../../core/artifact.js"
+import { ArtifactAppendReceipt, ArtifactHead, Attribution, RangeOperation, Version } from "../../core/artifact.js"
 import { BudgetLimits } from "../../core/durable/run-budget.js"
 import { ProgramBudget } from "../../core/durable/manifest/program-manifest.js"
 import { Ref as MediaRef } from "../../media/ref.js"
@@ -55,7 +55,7 @@ const InitialFanOutMember = Schema.Struct({
 const InitialFanOutInput = Schema.Struct({
   idempotencyKey: Schema.String,
   members: Schema.Array(InitialFanOutMember),
-  concurrency: Schema.optionalKey(Schema.Number),
+  concurrency: Schema.optionalKey(Schema.Finite),
   join: FanOutJoin,
   remainder: FanOutRemainder,
 })
@@ -133,20 +133,22 @@ export const AdmitFanOutInput = Schema.Struct({
   fanOutId: Schema.String,
   parentRunId: Schema.String,
   idempotencyKey: Schema.String,
-  members: Schema.Array(Schema.Struct({
-    ordinal: Schema.Number,
-    key: Schema.String,
-    childRunId: Schema.String,
-    selection: Schema.String,
-    label: Schema.optionalKey(Schema.String),
-    prompt: Prompt.Prompt,
-    sessionId: Schema.String,
-    metadata: Metadata,
-    origin: Schema.optionalKey(FanOutMemberOrigin),
-    inherit: Inheritance,
-  })),
-  concurrency: Schema.optionalKey(Schema.Number),
-  budgetDivisor: Schema.optionalKey(Schema.Number),
+  members: Schema.Array(
+    Schema.Struct({
+      ordinal: Schema.Finite,
+      key: Schema.String,
+      childRunId: Schema.String,
+      selection: Schema.String,
+      label: Schema.optionalKey(Schema.String),
+      prompt: Prompt.Prompt,
+      sessionId: Schema.String,
+      metadata: Metadata,
+      origin: Schema.optionalKey(FanOutMemberOrigin),
+      inherit: Inheritance,
+    }),
+  ),
+  concurrency: Schema.optionalKey(Schema.Finite),
+  budgetDivisor: Schema.optionalKey(Schema.Finite),
   join: FanOutJoin,
   remainder: FanOutRemainder,
 })
@@ -188,7 +190,6 @@ export const artifactAppendCommandId = (input: {
   readonly commandId: string
   readonly branch?: string
 }): string => `appendArtifact:${artifactAppendIdentity(input)}`
-
 
 type Method =
   | "admitSend"
@@ -268,7 +269,8 @@ export const commands: Commands = {
     tag: "admitProgramChildAndSuspend" as const,
     input: Schema.Tuple([AdmitProgramChildAndSuspendInput]),
     receipt: Schema.Array(RunReceipt),
-    identity: ([input]) => JSON.stringify([input.runId, input.attemptFence, input.children.map((child) => child.childRunId)]),
+    identity: ([input]) =>
+      JSON.stringify([input.runId, input.attemptFence, input.children.map((child) => child.childRunId)]),
   },
   admitSteering: {
     tag: "admitSteering" as const,
@@ -284,27 +286,31 @@ export const commands: Commands = {
   },
   fork: {
     tag: "fork" as const,
-    input: Schema.Tuple([Schema.Struct({
-      commandId: Schema.String.check(Schema.isNonEmpty()),
-      runId: Schema.String,
-      newRunId: Schema.String,
-      atSequence: Schema.Number,
-      budget: Schema.optionalKey(BudgetLimits),
-      programBudget: Schema.optionalKey(ProgramBudget),
-      substitute: Schema.optionalKey(Schema.Struct({ operationId: Schema.String, result: Schema.Unknown })),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        commandId: Schema.String.check(Schema.isNonEmpty()),
+        runId: Schema.String,
+        newRunId: Schema.String,
+        atSequence: Schema.Finite,
+        budget: Schema.optionalKey(BudgetLimits),
+        programBudget: Schema.optionalKey(ProgramBudget),
+        substitute: Schema.optionalKey(Schema.Struct({ operationId: Schema.String, result: Schema.Unknown })),
+      }),
+    ]),
     receipt: RunReceipt,
     identity: ([input]) => input.commandId,
   },
   rewind: {
     tag: "rewind" as const,
-    input: Schema.Tuple([Schema.Struct({
-      commandId: Schema.String.check(Schema.isNonEmpty()),
-      runId: Schema.String,
-      branchRunId: Schema.String,
-      toSequence: Schema.Number,
-      budget: Schema.optionalKey(BudgetLimits),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        commandId: Schema.String.check(Schema.isNonEmpty()),
+        runId: Schema.String,
+        branchRunId: Schema.String,
+        toSequence: Schema.Finite,
+        budget: Schema.optionalKey(BudgetLimits),
+      }),
+    ]),
     receipt: Schema.Void,
     identity: ([input]) => input.commandId,
   },
@@ -322,19 +328,21 @@ export const commands: Commands = {
   },
   acknowledge: {
     tag: "acknowledge" as const,
-    input: Schema.Tuple([Schema.Struct({ runId: Schema.String, sequence: Schema.Number })]),
+    input: Schema.Tuple([Schema.Struct({ runId: Schema.String, sequence: Schema.Finite })]),
     receipt: Schema.Void,
     identity: ([input]) => JSON.stringify([input.runId, input.sequence]),
   },
   recordReward: {
     tag: "recordReward" as const,
-    input: Schema.Tuple([Schema.Struct({
-      runId: Schema.String,
-      leaf: Schema.String,
-      value: Schema.Number,
-      source: Schema.String,
-      commandId: Schema.String,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        runId: Schema.String,
+        leaf: Schema.String,
+        value: Schema.Finite,
+        source: Schema.String,
+        commandId: Schema.String,
+      }),
+    ]),
     receipt: Schema.Void,
     identity: ([input]) => JSON.stringify([input.runId, input.commandId]),
   },

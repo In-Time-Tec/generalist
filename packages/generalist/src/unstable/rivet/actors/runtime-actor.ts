@@ -1,10 +1,9 @@
 /* oxlint-disable effecttsgo/async-function -- Rivet actor hooks and actions are Promise-only host boundaries. */
 /* oxlint-disable anti-slop-effect/no-service-constructor-imports -- the actor is the scoped object-runtime composition root. */
-import { Clock, Crypto, Effect, Layer, ManagedRuntime, Schema } from "effect"
+import { Crypto, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import * as Durability from "../../../durability/index.js"
 import type { ObjectStore } from "../../../durability/object-store.js"
-import { LocalScheduler, type DrainResult } from "../../../runtime/execution/local-scheduler.js"
+import type { DrainResult } from "../../../runtime/execution/local-scheduler.js"
 import type { ActivationFailure } from "../../../durability/internal/runtime.js"
 import {
   actor,
@@ -18,6 +17,7 @@ import { Address } from "../../../runtime/address.js"
 import { ExecutableResolver } from "../../../runtime/executable/resolver.js"
 import { Metadata } from "../../../runtime/messaging/message.js"
 import { ResolveOperationInput } from "../../../runtime/operation/resolution.js"
+import { RuntimeInspectionResponse } from "../../../runtime/inspection.js"
 import {
   Runtime,
   type CancelInput as RuntimeCancelInput,
@@ -27,6 +27,7 @@ import {
   type SignalInput as RuntimeSignalInput,
 } from "../../../runtime/service.js"
 import { TreePolicy } from "../../../runtime/tree/policy.js"
+import { ActorRuntime, layerActorRuntime, type ActorRuntimeOptions, type ActorRuntimeServices } from "./runtime.js"
 
 const SendInput = Schema.Struct({
   runId: Schema.optionalKey(Schema.String),
@@ -77,7 +78,7 @@ const actionInputSchemas = {
   },
 }
 
-type RuntimeHost = ManagedRuntime.ManagedRuntime<Durability.RuntimeServices, ActivationFailure>
+type RuntimeHost = ManagedRuntime.ManagedRuntime<ActorRuntimeServices, ActivationFailure>
 
 interface Host {
   readonly runtime: RuntimeHost
@@ -100,10 +101,7 @@ type RuntimeActions = {
     readonly respond: (c: RuntimeActionContext, input: RuntimeRespondInput) => Promise<void>
     readonly cancel: (c: RuntimeActionContext, input: RuntimeCancelInput) => Promise<void>
     readonly resolveOperation: (c: RuntimeActionContext, input: ResolveOperationInput) => Promise<void>
-    readonly inspect: (
-      c: RuntimeActionContext,
-      runId: string,
-    ) => Promise<Effect.Success<ReturnType<RuntimeService["inspect"]>>>
+    readonly inspect: (c: RuntimeActionContext, runId: string) => Promise<typeof RuntimeInspectionResponse.Encoded>
     readonly drain: (c: RuntimeActionContext, fire?: ScheduledFireInfo) => Promise<DrainResult>
   }
 }
@@ -122,15 +120,11 @@ export type RuntimeActorDefinition = ActorDefinition<
 >
 
 /** @experimental */
-export interface RuntimeActorOptions extends Omit<Durability.Options, "schedulerMode"> {
+export interface RuntimeActorOptions extends Omit<ActorRuntimeOptions, "drainAction"> {
   /** Application-owned transport and cryptography; never actor-local durability. */
   readonly storage: Layer.Layer<ObjectStore | Crypto.Crypto>
   /** Application-owned executable reconstruction composed into each actor incarnation. */
   readonly resolver: Layer.Layer<ExecutableResolver>
-  /** Bounded authoritative candidates processed per wake. */
-  readonly drainFuel?: number
-  /** Durable fallback doorbell interval. Rivet requires at least 5 seconds. */
-  readonly recoveryIntervalMillis?: number
   /** Rivet process-lifecycle tuning; it never carries Runtime authority. */
   readonly actorOptions?: InstanceActorOptionsInput
 }
@@ -144,34 +138,14 @@ const requireHost = (c: Context): Host => {
   return c.vars.host
 }
 
-const arm = async (c: Context, delayMillis = 0): Promise<void> => {
-  try {
-    await c.schedule.after(Math.max(0, delayMillis), "runtime.drain")
-  } catch (cause) {
-    // Rivet's logger is intentionally untyped at this raw SDK boundary.
-    // oxlint-disable-next-line typescript/no-unsafe-call
-    c.log.warn({ msg: "Generalist Runtime doorbell failed; periodic recovery remains armed", cause })
-  }
-}
-
-const runDrain = async (c: Context, fuel: number) => {
-  const host = requireHost(c)
-  const result = await host.runtime.runPromise(
-    Effect.flatMap(LocalScheduler, (scheduler) => scheduler.drain({ fuel })),
-    { signal: c.abortSignal },
-  )
-  if (result.nextDueAt !== undefined) {
-    const now = await host.runtime.runPromise(Clock.currentTimeMillis)
-    await arm(c, result.hasMore ? 0 : result.nextDueAt - now)
-  }
-  return result
-}
-
 const runAction = async <A, E>(c: Context, effect: (runtime: RuntimeService) => Effect.Effect<A, E>): Promise<A> => {
   const host = requireHost(c)
-  const result = await c.keepAwake(host.runtime.runPromise(Effect.flatMap(Runtime, effect), { signal: c.abortSignal }))
-  await arm(c)
-  return result
+  return c.keepAwake(
+    host.runtime.runPromise(
+      Effect.flatMap(Runtime, effect).pipe(Effect.tap(() => Effect.flatMap(ActorRuntime, (runtime) => runtime.notify))),
+      { signal: c.abortSignal },
+    ),
+  )
 }
 
 const dispose = async (c: Context): Promise<void> => {
@@ -186,16 +160,7 @@ const dispose = async (c: Context): Promise<void> => {
  * The object journal is the only Runtime authority. Schedules and cron are wake hints.
  */
 export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefinition => {
-  const {
-    actorOptions,
-    drainFuel,
-    recoveryIntervalMillis,
-    resolver,
-    storage,
-    ...storeOptions
-  } = options
-  const fuel = Math.max(1, Math.floor(drainFuel ?? 64))
-  const recoveryInterval = Math.max(5_000, Math.floor(recoveryIntervalMillis ?? 5_000))
+  const { actorOptions, resolver, storage, ...storeOptions } = options
   const configuredOptions: ConfiguredActorOptions = {}
   if (actorOptions !== undefined) configuredOptions.options = actorOptions
 
@@ -204,28 +169,15 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
     ...configuredOptions,
     actionInputSchemas,
     onWake: async (c) => {
-      await c.cron.every({
-        name: "generalist-runtime-recovery",
-        interval: recoveryInterval,
-        action: "runtime.drain",
-        maxHistory: 0,
-      })
-
       const runtime = ManagedRuntime.make(
-        Layer.effectDiscard(Durability.activate).pipe(
-          Layer.provideMerge(Durability.layer({
-            ...storeOptions,
-            schedulerMode: "external",
-          })),
+        layerActorRuntime(c, { ...storeOptions, drainAction: "runtime.drain" }).pipe(
           Layer.provide(resolver),
           Layer.provide(storage),
         ),
       )
       try {
-        await runtime.runPromise(Runtime, { signal: c.abortSignal })
+        await runtime.runPromise(ActorRuntime, { signal: c.abortSignal })
         c.vars.host = { runtime }
-        const result = await runDrain(c, fuel)
-        if (result.nextDueAt !== undefined) await arm(c)
       } catch (cause) {
         c.vars.host = undefined
         await runtime.dispose()
@@ -246,14 +198,22 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
           const host = requireHost(c)
           return c.keepAwake(
             host.runtime.runPromise(
-              Effect.flatMap(Runtime, (runtime) => runtime.inspect(runId)),
+              Effect.flatMap(Runtime, (runtime) => runtime.inspect(runId)).pipe(
+                Effect.flatMap(Schema.encodeEffect(RuntimeInspectionResponse)),
+              ),
               {
                 signal: c.abortSignal,
               },
             ),
           )
         },
-        drain: (c, _fire?: ScheduledFireInfo) => c.keepAwake(runDrain(c, fuel)),
+        drain: (c, _fire?: ScheduledFireInfo) =>
+          c.keepAwake(
+            requireHost(c).runtime.runPromise(
+              Effect.flatMap(ActorRuntime, (runtime) => runtime.drain),
+              { signal: c.abortSignal },
+            ),
+          ),
       },
     },
   })

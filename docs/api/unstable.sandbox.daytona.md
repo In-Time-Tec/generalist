@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.daytona
+[generalist](./index.md) / unstable.sandbox.daytona
 
 # unstable.sandbox.daytona
 
@@ -132,7 +132,7 @@ Daytona sandbox class supported by this leaf.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 **`Experimental`**
 
@@ -146,7 +146,7 @@ Provide the hosted Daytona Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -154,7 +154,7 @@ Provide the hosted Daytona Sandbox leaf.
 
 ### makeProvider
 
-> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
+> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
 
 **`Experimental`**
 
@@ -168,4 +168,4 @@ Construct the Daytona provider over Effect HttpClient.
 
 #### Returns
 
-`Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
+`Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>

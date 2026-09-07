@@ -1,4 +1,7 @@
-# Server
+---
+title: "Server"
+description: "Authenticate and authorize a Host API with committed Session snapshots and event cursors."
+---
 
 `generalist/server` is the stable HTTP boundary over one `Host`. One schema-first `Server.api` declares authenticated attachment, Session, Run, event, approval, and operator groups; `Server.layer` implements that API, serves its OpenAPI document, and delegates all state and execution to the Host.
 
@@ -18,7 +21,11 @@ const apiLayer = Layer.unwrap(
     Effect.map((host) =>
       Server.layer({
         host,
-        auth: Server.authBearer(Config.redacted("GENERALIST_SERVER_TOKEN")),
+        auth: Server.authBearer({
+          token: Config.redacted("GENERALIST_SERVER_TOKEN"),
+          principal: { id: "support-service", tenantId: "support", role: "controller" },
+        }),
+        authorization: { tenantId: "support", authorize: () => Effect.succeed(true) },
       }),
     ),
   ),
@@ -30,9 +37,11 @@ void app
 void services
 ```
 
-`Server.layer({ host, auth, operator? })` returns an Effect `HttpApiBuilder` Layer. Mount that Layer with the platform `HttpServer` used by the application. `operator` defaults to false. Operator reads remain available, while mutation routes return `OperatorDisabled` until the server is built with `operator: true`.
+This is a composition fragment, not a runnable server. Provide the activated object-backed Host dependencies and platform HTTP server. The permissive resource callback above is for a single-principal demonstration; a real application must authorize each resource.
 
-`Server.authBearer(Config.redacted(...))` supplies the built-in bearer-token policy. Authentication is an Effect HttpApi middleware Layer, so a host can provide its own `Server.Authentication` implementation. `/openapi.json` is public so tools can discover the contract; every declared API route uses Authentication.
+`Server.layer({ host, auth, authorization, operator? })` returns an Effect `HttpApiBuilder` Layer. `operator` defaults to false. Operator reads remain available, while mutation routes return `OperatorDisabled` until the server is built with `operator: true`.
+
+`Server.authBearer({ token, principal })` rejects an empty token or invalid principal at construction. The principal has nonempty `id` and `tenantId` plus role `controller` or `spectator`. Authorization checks tenant identity, prevents spectator mutations, and invokes the application resource policy before bytes or mutations cross the boundary. Custom `Server.Authentication` implementations must provide `Server.CurrentPrincipal`. Operator attribution uses that authenticated principal. `/openapi.json` is public; every declared API route uses Authentication.
 
 ## Typed client
 
@@ -62,10 +71,10 @@ void program.pipe(Effect.provideService(HttpClient.HttpClient, authenticatedHttp
 ```text
 client.attachments.put({ data, mediaType, filename? })
 client.attachments.get({ sha256 }) -> { body: Uint8Array, headers }
-client.sessions.create/get/list
+client.sessions.create/get/list/snapshot
 client.runs.start/list/inspect/cancel
 client.events.subscribe({ sessionId, cursor?, reconnect? })
-client.events.connect({ sessionId, cursor?, eventCapacity?, reconnect? })
+client.events.connect({ sessionId, eventCapacity?, reconnect? })
 client.approvals.resolve({ runId, token, decision, operator })
 client.operator.explain/retry/wake/resolveUnknown/extendBudget
 ```
@@ -81,6 +90,7 @@ The caller provides an Effect `HttpClient`. Add the bearer token there with `Htt
 | sessions    | POST   | `/sessions`                  | `sessions.create`         |
 | sessions    | GET    | `/sessions`                  | `sessions.list`           |
 | sessions    | GET    | `/sessions/:id`              | `sessions.get`            |
+| sessions    | GET    | `/sessions/:id/snapshot`     | `sessions.snapshot`       |
 | runs        | POST   | `/sessions/:sessionId/runs`  | `runs.start`              |
 | runs        | GET    | `/sessions/:sessionId/runs`  | `runs.list`               |
 | runs        | GET    | `/runs/:id`                  | `runs.inspect`            |
@@ -104,11 +114,17 @@ Both streaming transports carry the same Schema-validated `Server.HostEvent`. Ev
 
 Both event routes resolve the Session before committing an SSE response or upgrading a WebSocket. An unknown Session therefore returns the declared `SessionNotFound` JSON body with HTTP 404. If an SSE stream fails after its HTTP 200 headers have been committed—for example, because its cursor expired or its subscriber lagged—Effect HttpApi emits one terminal `effect/httpapi/stream/failure` event containing the encoded `ApiError`, then closes the stream. The generated client decodes that event into the typed stream failure.
 
-The WebSocket URL is `/sessions/:id/ws`. Server frames use `Server.eventCodec`. The only client command is `{ _tag: "Cancel", runId, reason? }`; the server verifies that the Run belongs to the path Session before cancelling it. Closing a stream only stops observation.
+The WebSocket URL is `/sessions/:id/ws`. Server frames use `Server.eventCodec`. The client cancellation command is `{ _tag: "Cancel", runId, commandId, reason? }`; the server verifies that the Run belongs to the path Session before cancelling it. Preserve `commandId` when retrying. Closing a stream only stops observation.
 
 The default client reconnect schedule is jittered exponential backoff bounded by two elapsed minutes. Reconnection resumes strictly after the last admitted Host cursor. A bounded WebSocket queue prevents an unbounded slow-client buffer.
 
 Browser WebSocket constructors cannot attach an Authorization header. A bearer-protected browser should use the SSE and HTTP methods, or the application should provide an Authentication implementation compatible with its cookie or gateway policy rather than putting credentials in a WebSocket URL.
+
+## Session snapshot and resynchronization
+
+`client.sessions.snapshot({ sessionId })` reads a bounded authoritative Session snapshot with its exclusive cursor. `client.events.connect({ sessionId })` obtains that snapshot before observation; the connection exposes `snapshot`, events, and status. FoldKit establishes a connection-local epoch from the snapshot and rejects events from obsolete epochs. A reconnect can rebuild the view from committed state without submitting a new user message. Snapshots are inspection resources, not a second journal, and oversized snapshots fail with `SessionSnapshotTooLarge`.
+
+Browser authentication and snapshot/resync are implemented contracts, not a claim of completed browser acceptance. Verify your own cookie/header policy, tenant denials, initial view, reconnect, lag, and spectator behavior before deployment.
 
 ## Invariants
 
@@ -121,6 +137,8 @@ Browser WebSocket constructors cannot attach an Authorization header. A bearer-p
 
 ## Related
 
+- Snapshot tests: [`host/snapshot-suite.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/host/snapshot-suite.ts)
+- Authorization tests: [`server/auth.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/server/auth.test.ts)
 - Source: `packages/generalist/src/server/`
 - OpenAPI: [`../openapi.json`](../openapi.json)
 - Sibling features: [`media.md`](./media.md), [`host.md`](./host.md), [`transport.md`](./transport.md), [`recovery.md`](./recovery.md)

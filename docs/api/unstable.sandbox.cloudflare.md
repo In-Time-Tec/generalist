@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.cloudflare
+[generalist](./index.md) / unstable.sandbox.cloudflare
 
 # unstable.sandbox.cloudflare
 
@@ -288,7 +288,7 @@ Cloudflare Sandbox Durable Object RPC surface used by Generalist.
 
 ### layer
 
-> `const` **layer**: \<`Id`\>(`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
+> `const` **layer**: \<`Id`\>(`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider)\>
 
 **`Experimental`**
 
@@ -308,7 +308,7 @@ Provide the hosted Cloudflare Container Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider)\>
 
 ***
 
@@ -316,7 +316,7 @@ Provide the hosted Cloudflare Container Sandbox leaf.
 
 ### makeProvider
 
-> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice)\>
+> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice)\>
 
 **`Experimental`**
 
@@ -330,4 +330,4 @@ Construct the Cloudflare Container Sandbox provider.
 
 #### Returns
 
-`Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice)\>
+`Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice)\>

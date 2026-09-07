@@ -4,12 +4,14 @@
 
 ## Usage
 
+This composition fragment expects an object-backed Runtime activated inside its host scope; see [object durability](./durable-stores.md).
+
 ```ts
 import { Effect, Layer, Schema } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as Durability from "generalist/durability"
 
 const triage = Agent.make({
   name: "triage",
@@ -18,6 +20,7 @@ const triage = Agent.make({
 })
 
 const program = Effect.gen(function* () {
+  yield* Durability.activate
   const host = yield* Generalist.create({ agents: [triage] })
   const attachment = yield* host.attachments.put({
     data: new TextEncoder().encode("attachment"),
@@ -32,12 +35,13 @@ const program = Effect.gen(function* () {
   return { session, runId: run.id, events, answer }
 })
 
-const runtime = Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+declare const runtime: Layer.Layer<Durability.RuntimeServices>
 declare const model: Layer.Layer<LanguageModel.LanguageModel>
 declare const blobStore: Layer.Layer<BlobStore.BlobStore>
 
 Effect.runPromise(
   program.pipe(
+    Effect.scoped,
     Effect.provide(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerAutoApprove, blobStore)),
   ),
 )
@@ -54,7 +58,7 @@ host.attachments.get(sha256)                         -> { ref, data }
 host.sessions.create({ id?, title? }) -> HostSession
 host.sessions.get(sessionId)          -> HostSession
 host.sessions.list()                  -> HostSession[]
-host.sessions.fork(runId, { atSequence, substitute? }) -> HostRun<unknown>
+host.sessions.fork(runId, { commandId, atSequence, budget?, programBudget?, substitute? }) -> HostRun<unknown>
 
 host.runs.start(sessionId, agent, typedInput, { idempotencyKey? })
   -> { id, await, events, send }
@@ -64,8 +68,8 @@ host.runs.list(sessionId)             -> root Run inspections
 host.runs.inspect(runId)              -> Runtime inspection, including Inspector snapshot fields
 host.runs.send(runId, prompt, { policy?, from?, idempotencyKey? })
                                       -> { entryId, sequence }
-host.runs.cancel(runId, reason?)       -> void
-host.runs.rewind(runId, { toSequence }) -> void
+host.runs.cancel(runId, commandId, reason?)       -> void
+host.runs.rewind(runId, { commandId, toSequence, budget? }) -> void
 
 host.events.subscribe(sessionId, cursor?)
   -> Effect<Stream<RunStarted | Turn | ToolCall | TasksUpdated | ApprovalRequested | Compacted | Completed>, SessionError>
@@ -73,10 +77,10 @@ host.events.subscribe(sessionId, cursor?)
 host.approvals.resolve(runId, token, decision, operator) -> void
 
 host.operator.explain(runId) -> Explanation
-host.operator.retry(runId, operator) -> void
-host.operator.wake(runId, operator) -> void
-host.operator.resolveUnknown(runId, operationId, resolution, operator) -> void
-host.operator.extendBudget(runId, delta, operator) -> void
+host.operator.retry(runId, operator, commandId) -> void
+host.operator.wake(runId, operator, commandId) -> void
+host.operator.resolveUnknown(runId, operationId, resolution, operator, commandId) -> void
+host.operator.extendBudget(runId, delta, operator, commandId) -> void
 ```
 
 `runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
@@ -111,7 +115,14 @@ const git = Generalist.plugin({
   name: "git",
   tools: [status],
   instructions: [Instructions.fromText("git", "Inspect status before changing files.")],
-  hooks: [Hooks.onToolCall(() => Effect.succeed(Hooks.Continue()))],
+  hooks: [
+    Hooks.onToolCall({
+      key: "plugin-tool-policy",
+      version: "1",
+      replayPolicy: "pure",
+      hook: () => Effect.succeed(Hooks.Continue()),
+    }),
+  ],
   skills: [],
 })
 ```
@@ -125,7 +136,7 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 - Host delegates Run registration, execution, inspection, cancellation, and replay to Runtime; it has no second executor or event journal.
 - `HostRun.send(message, options?)` and `host.runs.send(runId, prompt, options?)` delegate to Runtime's unified durable inbox admission.
 - `sessions.fork` and `runs.rewind` delegate to Runtime's atomic branch transitions. Future server routes can join at these Host methods without owning replay behavior.
-- Memory Sessions live for the Layer lifetime. SQLite, PostgreSQL, and MySQL persist Session metadata, root membership, and Session event cursors in the shared Runtime schema.
+- The object engine persists Session metadata, root membership, snapshots, and Session event cursors in the canonical namespace; host process memory is not recovery authority.
 - A Session identity is created explicitly before Host starts a Run in it. Omitted Session IDs use Generalist's Effect-based ID generator.
 - Loading a plugin performs no module-level side effects.
 - Host imports only stable Generalist sources and is safe to import in Worker consumers.

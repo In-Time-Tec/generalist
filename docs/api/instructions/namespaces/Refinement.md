@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / Refinement
+[generalist](../../index.md) / [instructions](../index.md) / Refinement
 
 # Refinement
 
@@ -190,7 +190,7 @@ stays the engine's: a create lands at version 1 and an update bumps the entry it
 
 ###### proposal
 
-[`AuthoredRefinementProposal`](./Entry#authoredrefinementproposal)
+[`AuthoredRefinementProposal`](./Entry.md#authoredrefinementproposal)
 
 ###### options?
 
@@ -226,7 +226,7 @@ stays the engine's: a create lands at version 1 and an update bumps the entry it
 
 ###### proposal
 
-[`AuthoredRefinementProposal`](./Entry#authoredrefinementproposal)
+[`AuthoredRefinementProposal`](./Entry.md#authoredrefinementproposal)
 
 ###### options?
 
@@ -370,7 +370,7 @@ Whether every edit of one proposal leaves its revision to the engine.
 
 ##### proposal
 
-[`RefinementProposal`](./Entry#refinementproposal)
+[`RefinementProposal`](./Entry.md#refinementproposal)
 
 #### Returns
 
@@ -478,7 +478,7 @@ The next state and the durable record of one applied proposal.
 
 ### rollbackTarget
 
-> `const` **rollbackTarget**: (`result`) => [`GuidanceSnapshotId`](./Entry#guidancesnapshotid)
+> `const` **rollbackTarget**: (`result`) => [`GuidanceSnapshotId`](./Entry.md#guidancesnapshotid)
 
 The exact snapshot one rollback proposal restores.
 
@@ -490,4 +490,4 @@ The exact snapshot one rollback proposal restores.
 
 #### Returns
 
-[`GuidanceSnapshotId`](./Entry#guidancesnapshotid)
+[`GuidanceSnapshotId`](./Entry.md#guidancesnapshotid)

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / Overview
+[generalist](../../index.md) / [instructions](../index.md) / Overview
 
 # Overview
 

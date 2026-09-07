@@ -1,3 +1,5 @@
+import { register as registerProjection } from "./session/projection-suite.js"
+import "./session/terminalization-suite.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -10,6 +12,8 @@ import { pinnedTestAgent } from "../run/identity.js"
 import { provideScoped } from "../execution/scoped-provide.js"
 
 import { allowAllAuthorization } from "../../authorization.js"
+
+registerProjection({ makeObjectStorage })
 const probeParameters = Schema.Struct({ marker: Schema.String })
 const probe = Tool.make("linear_storage_probe", {
   parameters: probeParameters,
@@ -45,15 +49,12 @@ const boundedFailureEvidence = (events: ReadonlyArray<RunEvent>) =>
     .slice(-8)
     .map((event) => {
       if (event._tag === "OperationUnknown") return { _tag: event._tag, operationId: event.operationId }
-      const message =
-        "message" in event.error && typeof event.error.message === "string"
-          ? event.error.message.slice(0, 256)
-          : undefined
-      return {
+      const message = event.error.message?.slice(0, 256)
+      const failure = {
         _tag: event._tag,
         errorTag: event.error._tag,
-        ...(message === undefined ? {} : { message }),
       }
+      return message === undefined ? failure : { ...failure, message }
     })
 
 const makeFourChildFixture = () => {
@@ -189,10 +190,13 @@ const makeFourChildFixture = () => {
   return {
     address,
     runtimeLayer: () =>
-      objectRuntimeLayer({
-        addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],
-        scheduler: { pollInterval: "1 day" },
-      }, storage).pipe(Layer.provide(resolverLayer)),
+      objectRuntimeLayer(
+        {
+          addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],
+          scheduler: { pollInterval: "1 day" },
+        },
+        storage,
+      ).pipe(Layer.provide(resolverLayer)),
     counts: () => ({
       parentCalls: parentCalls.length,
       childCalls: [...childCalls],
@@ -201,7 +205,6 @@ const makeFourChildFixture = () => {
     resumedParentPrompt: () => parentCalls[1],
   }
 }
-
 
 it.live("preserves 42 provider-free model calls across four durable children and an object-storage reopen", () =>
   Effect.gen(function* () {
@@ -222,11 +225,13 @@ it.live("preserves 42 provider-free model calls across four durable children and
             prompt: "Run the four-child durable storage proof.",
             treePolicy: { maxDepth: 1, maxSubagents: 4 },
           })
-          yield* host.execute(yield* store.claimExecution({
-            commandId: "runtime-state-session-store-test-ts-claim-parent-before",
-            runId: parent.runId,
-            ownerId: objectWorkerId,
-          }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-state-session-store-test-ts-claim-parent-before",
+              runId: parent.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           expect(yield* runtime.inspect(parent.runId)).toMatchObject({ status: "waiting" })
           const history = yield* runtime.history({ runId: parent.runId, limit: 200 })
           const fanOut = history.find((event) => event._tag === "FanOutAdmitted")
@@ -238,7 +243,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
           const childRunIds = group.members.map((member) => member.childRunId)
           yield* Effect.forEach(
             childRunIds.slice(0, 2),
-            (runId, index) =>
+            (runId) =>
               store
                 .claimExecution({
                   commandId: `runtime-state-session-store-test-ts-claim-child-before-${runId}`,
@@ -261,7 +266,10 @@ it.live("preserves 42 provider-free model calls across four durable children and
                 Effect.map(boundedFailureEvidence),
               ),
             )
-            const details = JSON.stringify({ statuses: childStatuses, evidence }).slice(0, 4096)
+            const details = (yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+              statuses: childStatuses,
+              evidence,
+            }).pipe(Effect.orDie)).slice(0, 4096)
             return yield* Effect.die(new Error(`four-child execution evidence: ${details}`))
           }
           expect(childStatuses).toEqual(["succeeded", "succeeded", "queued", "queued"])
@@ -290,7 +298,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
           ).toEqual(["succeeded", "succeeded", "queued", "queued"])
           yield* Effect.forEach(
             admitted.childRunIds.slice(2),
-            (runId, index) =>
+            (runId) =>
               store
                 .claimExecution({
                   commandId: `runtime-state-session-store-test-ts-claim-child-after-${runId}`,
@@ -311,7 +319,10 @@ it.live("preserves 42 provider-free model calls across four durable children and
                 Effect.map(boundedFailureEvidence),
               ),
             )
-            const details = JSON.stringify({ status: resumedParent.status, evidence }).slice(0, 4096)
+            const details = (yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+              status: resumedParent.status,
+              evidence,
+            }).pipe(Effect.orDie)).slice(0, 4096)
             return yield* Effect.die(new Error(`four-child recovery evidence: ${details}`))
           }
           expect(resumedParent.status).toBe("running")
@@ -368,6 +379,5 @@ it.live("preserves 42 provider-free model calls across four durable children and
     )
     expect(authoredOrder.every((index) => index >= 0)).toBe(true)
     expect(authoredOrder).toEqual([...authoredOrder].toSorted((left, right) => left - right))
-
   }),
 )

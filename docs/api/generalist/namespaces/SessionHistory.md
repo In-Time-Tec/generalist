@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / SessionHistory
+[generalist](../../index.md) / [generalist](../index.md) / SessionHistory
 
 # SessionHistory
 
@@ -23,7 +23,7 @@ caller learns that history continues behind a compaction checkpoint rather than 
 
 ##### entries
 
-> `readonly` **entries**: readonly [`Entry`](./Session#entry-1)[]
+> `readonly` **entries**: readonly [`Entry`](./Session.md#entry-1)[]
 
 <a id="firstentryid"></a>
 
@@ -105,7 +105,7 @@ One bounded path page in root-to-leaf order.
 
 ##### entries
 
-> `readonly` **entries**: readonly [`Entry`](./Session#entry-1)[]
+> `readonly` **entries**: readonly [`Entry`](./Session.md#entry-1)[]
 
 <a id="hasnewer"></a>
 
@@ -183,7 +183,7 @@ Use only a cursor returned by the preceding page for this leaf.
 
 ### compactionCheckpoints
 
-> `const` **compactionCheckpoints**: (`path`) => `ReadonlyArray`\<[`CompactionEntry`](./Session#compactionentry)\>
+> `const` **compactionCheckpoints**: (`path`) => `ReadonlyArray`\<[`CompactionEntry`](./Session.md#compactionentry)\>
 
 Every compaction checkpoint on one path, oldest first.
 
@@ -191,11 +191,11 @@ Every compaction checkpoint on one path, oldest first.
 
 ##### path
 
-`ReadonlyArray`\<[`Entry`](./Session#entry-1)\>
+`ReadonlyArray`\<[`Entry`](./Session.md#entry-1)\>
 
 #### Returns
 
-`ReadonlyArray`\<[`CompactionEntry`](./Session#compactionentry)\>
+`ReadonlyArray`\<[`CompactionEntry`](./Session.md#compactionentry)\>
 
 ***
 
@@ -232,7 +232,7 @@ checkpoint stay reachable. A checkpoint is an ordinary entry in the page, never 
 
 ###### path
 
-readonly [`Entry`](./Session#entry-1)[]
+readonly [`Entry`](./Session.md#entry-1)[]
 
 ###### input
 

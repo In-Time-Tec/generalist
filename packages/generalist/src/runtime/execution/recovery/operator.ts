@@ -162,7 +162,7 @@ export const explain = (journal: Journal): Explanation => {
   const budget = Schema.is(BudgetExhausted)(journal.suspension) ? journal.suspension.budget : undefined
   const budgetObligation: ReadonlyArray<RecoveryDecision> =
     budget === undefined ? [] : [{ _tag: "AwaitBudget", budget }]
-  const obligations = [...unknowns, ...retries, ...approvals, ...budgetObligation]
+  const obligations = [...unknowns, ...approvals, ...retries, ...budgetObligation]
   let decision = obligations[0]
   if (decision === undefined) {
     decision =

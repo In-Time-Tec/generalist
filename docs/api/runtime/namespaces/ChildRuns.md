@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ChildRuns
+[generalist](../../index.md) / [runtime](../index.md) / ChildRuns
 
 # ChildRuns
 
@@ -134,7 +134,7 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ##### awaitGroup
 
-> `readonly` **awaitGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+> `readonly` **awaitGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 ###### Parameters
 
@@ -144,13 +144,13 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 <a id="fanout"></a>
 
 ##### fanOut
 
-> `readonly` **fanOut**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+> `readonly` **fanOut**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 ###### Parameters
 
@@ -160,13 +160,13 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 <a id="invoke"></a>
 
 ##### invoke
 
-> `readonly` **invoke**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+> `readonly` **invoke**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 ###### Parameters
 
@@ -176,13 +176,13 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 <a id="rungroup"></a>
 
 ##### runGroup
 
-> `readonly` **runGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+> `readonly` **runGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 ###### Parameters
 
@@ -192,13 +192,13 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 <a id="startgroup"></a>
 
 ##### startGroup
 
-> `readonly` **startGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+> `readonly` **startGroup**: (`input`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 ###### Parameters
 
@@ -208,27 +208,27 @@ Runtime-owned child execution operations used by the model-facing routes.
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome), `ChildHookError`\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome), `ChildHookError`\>
 
 <a id="transformresolved"></a>
 
 ##### transformResolved?
 
-> `readonly` `optional` **transformResolved?**: (`request`, `outcome`) => `Effect`\<[`SettledOutcome`](../../generalist/namespaces/ToolExecutor#settledoutcome), `ChildHookError`\>
+> `readonly` `optional` **transformResolved?**: (`request`, `outcome`) => `Effect`\<[`SettledOutcome`](../../generalist/namespaces/ToolExecutor.md#settledoutcome), `ChildHookError`\>
 
 ###### Parameters
 
 ###### request
 
-[`Request`](../../generalist/namespaces/ToolExecutor#request)
+[`Request`](../../generalist/namespaces/ToolExecutor.md#request)
 
 ###### outcome
 
-[`SettledOutcome`](../../generalist/namespaces/ToolExecutor#settledoutcome)
+[`SettledOutcome`](../../generalist/namespaces/ToolExecutor.md#settledoutcome)
 
 ###### Returns
 
-`Effect`\<[`SettledOutcome`](../../generalist/namespaces/ToolExecutor#settledoutcome), `ChildHookError`\>
+`Effect`\<[`SettledOutcome`](../../generalist/namespaces/ToolExecutor.md#settledoutcome), `ChildHookError`\>
 
 ## Type Aliases
 
@@ -384,7 +384,7 @@ Parameters for durably joining one previously admitted child group.
 
 ### awaitGroupTool
 
-> `const` **awaitGroupTool**: `Tool.Tool`\<`"await_child_group"`, \{ `failure`: `Schema.Union`\<readonly \[*typeof* [`ChildDepthExceeded`](./Errors#childdepthexceeded), *typeof* [`ChildLimitExceeded`](./Errors#childlimitexceeded), `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>\]\>; `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `groupId`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `children`: `Schema.$Array`\<`Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `error`: `Schema.optionalKey`\<`Schema.Unknown`\>; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `selection`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"pending"`, `"running"`, `"succeeded"`, `"failed"`, `"cancelled"`, `"abandoned"`\]\>; `text`: `Schema.optionalKey`\<`Schema.String`\>; `turns`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `groupId`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"running"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+> `const` **awaitGroupTool**: `Tool.Tool`\<`"await_child_group"`, \{ `failure`: `Schema.Union`\<readonly \[*typeof* [`ChildDepthExceeded`](./Errors.md#childdepthexceeded), *typeof* [`ChildLimitExceeded`](./Errors.md#childlimitexceeded), `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>\]\>; `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `groupId`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `children`: `Schema.$Array`\<`Schema.Struct`\<\{ `childRunId`: `Schema.String`; `depth`: `Schema.Int`; `error`: `Schema.optionalKey`\<`Schema.Unknown`\>; `key`: `Schema.String`; `label`: `Schema.optionalKey`\<`Schema.String`\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `selection`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"pending"`, `"running"`, `"succeeded"`, `"failed"`, `"cancelled"`, `"abandoned"`\]\>; `text`: `Schema.optionalKey`\<`Schema.String`\>; `turns`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `groupId`: `Schema.String`; `status`: `Schema.Literals`\<readonly \[`"running"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
 
 Durable join tool for a previously admitted child group.
 
@@ -422,7 +422,7 @@ Tool executor that owns Runtime child routes.
 
 ### Failure
 
-> `const` **Failure**: `Schema.Union`\<readonly \[*typeof* [`ChildDepthExceeded`](./Errors#childdepthexceeded), *typeof* [`ChildLimitExceeded`](./Errors#childlimitexceeded), `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>\]\>
+> `const` **Failure**: `Schema.Union`\<readonly \[*typeof* [`ChildDepthExceeded`](./Errors.md#childdepthexceeded), *typeof* [`ChildLimitExceeded`](./Errors.md#childlimitexceeded), `Schema.Struct`\<\{ `message`: `Schema.String`; \}\>\]\>
 
 Typed policy failures preserved through model-facing child tools.
 
@@ -532,7 +532,7 @@ Construct Runtime-owned child execution operations over one RunStore.
 
 ##### store
 
-[`Service`](./RunStore#service)
+[`Service`](./RunStore.md#service)
 
 #### Returns
 
@@ -640,7 +640,7 @@ Project one persisted fan-out inspection into the model-facing ordered child-gro
 
 ##### inspection
 
-[`FanOutInspection`](./FanOut#fanoutinspection)
+[`FanOutInspection`](./FanOut.md#fanoutinspection)
 
 #### Returns
 
@@ -652,7 +652,7 @@ Project one persisted fan-out inspection into the model-facing ordered child-gro
 
 ### route
 
-> `const` **route**: [`Route`](../../generalist/namespaces/ToolPlacement#route)\<[`ChildRuns`](#childruns) \| [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>
+> `const` **route**: [`Route`](../../generalist/namespaces/ToolPlacement.md#route)\<[`ChildRuns`](#childruns) \| [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>
 
 Route for the blocking and grouped child tools.
 

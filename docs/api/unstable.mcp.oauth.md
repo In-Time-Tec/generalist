@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.mcp.oauth
+[generalist](./index.md) / unstable.mcp.oauth
 
 # unstable.mcp.oauth
 

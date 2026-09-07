@@ -28,10 +28,21 @@ const forkCheckpoint = (
   const state = decoded.value
   return {
     ...copied,
-    state: {
+    state: Schema.encodeSync(LoopDriverState)({
       ...state,
       logicalOperationId: targetLogicalOperationId,
       sessionId: targetSessionId,
+      ...(state.components === undefined
+        ? undefined
+        : {
+            components: state.components.map((component) => ({
+              ...component,
+              receipts: component.receipts.map((receipt) => ({
+                ...receipt,
+                id: forkOperationKey(receipt.id, sourceRunId, targetRunId),
+              })),
+            })),
+          }),
       ...(state.pending === undefined
         ? undefined
         : {
@@ -58,7 +69,7 @@ const forkCheckpoint = (
               })),
             },
           }),
-    },
+    }),
   }
 }
 

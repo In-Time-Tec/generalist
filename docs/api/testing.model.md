@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / testing.model
+[generalist](./index.md) / testing.model
 
 # testing.model
 
@@ -72,13 +72,13 @@
 
 ##### registration
 
-> `readonly` **registration**: [`Registration`](./generalist/namespaces/ModelRegistry#registration-1)
+> `readonly` **registration**: [`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1)
 
 <a id="registrylayer"></a>
 
 ##### registryLayer
 
-> `readonly` **registryLayer**: `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+> `readonly` **registryLayer**: `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 <a id="remaining"></a>
 
@@ -96,7 +96,7 @@
 
 ##### selection
 
-> `readonly` **selection**: [`ModelSelection`](./generalist/namespaces/ModelRegistry#modelselection)
+> `readonly` **selection**: [`ModelSelection`](./generalist/namespaces/ModelRegistry.md#modelselection)
 
 ***
 
@@ -683,25 +683,25 @@ readonly [`Step`](#step)[]
 
 ### layerRegistry
 
-> `const` **layerRegistry**: \{(`governance?`): (`fixtures`) => `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>; (`fixtures`, `governance?`): `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>; \}
+> `const` **layerRegistry**: \{(`governance?`): (`fixtures`) => `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>; (`fixtures`, `governance?`): `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>; \}
 
 #### Call Signature
 
-> (`governance?`): (`fixtures`) => `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+> (`governance?`): (`fixtures`) => `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 ##### Parameters
 
 ###### governance?
 
-[`GovernanceOptions`](./generalist/namespaces/ModelRegistry#governanceoptions)
+[`GovernanceOptions`](./generalist/namespaces/ModelRegistry.md#governanceoptions)
 
 ##### Returns
 
-(`fixtures`) => `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+(`fixtures`) => `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 #### Call Signature
 
-> (`fixtures`, `governance?`): `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+> (`fixtures`, `governance?`): `Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 ##### Parameters
 
@@ -711,11 +711,11 @@ readonly [`Fixture`](#fixture)[]
 
 ###### governance?
 
-[`GovernanceOptions`](./generalist/namespaces/ModelRegistry#governanceoptions)
+[`GovernanceOptions`](./generalist/namespaces/ModelRegistry.md#governanceoptions)
 
 ##### Returns
 
-`Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+`Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 ***
 

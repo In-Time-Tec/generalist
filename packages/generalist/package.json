@@ -64,6 +64,14 @@
       "types": "./dist/durability/index.d.ts",
       "import": "./dist/durability/index.js"
     },
+    "./durability/discovery": {
+      "types": "./dist/durability/discovery.d.ts",
+      "import": "./dist/durability/discovery.js"
+    },
+    "./durability/host": {
+      "types": "./dist/durability/host.d.ts",
+      "import": "./dist/durability/host.js"
+    },
     "./durability/s3": {
       "types": "./dist/durability/s3.d.ts",
       "import": "./dist/durability/s3.js"
@@ -215,6 +223,10 @@
     "./unstable/runtime/external-child-store": {
       "types": "./dist/runtime/child/external/store.d.ts",
       "import": "./dist/runtime/child/external/store.js"
+    },
+    "./unstable/runtime/external-child-reconciliation": {
+      "types": "./dist/runtime/child/external/reconciliation.d.ts",
+      "import": "./dist/runtime/child/external/reconciliation.js"
     },
     "./unstable/mcp": {
       "types": "./dist/unstable/mcp/index.d.ts",

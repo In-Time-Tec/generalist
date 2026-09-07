@@ -1,12 +1,12 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / unstable.foldkit
+[generalist](../index.md) / unstable.foldkit
 
 # unstable.foldkit
 
 ## Namespaces
 
-- [Chat](./namespaces/Chat)
-- [Connection](./namespaces/Connection)
+- [Chat](./namespaces/Chat.md)
+- [Connection](./namespaces/Connection.md)

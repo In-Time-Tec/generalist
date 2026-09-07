@@ -1,4 +1,4 @@
-import { objectRuntimeLayer } from "../runtime/execution/object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import "./suites/bun-cell-isolation-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
@@ -424,7 +424,13 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
           })
           const processStopped = yield* Deferred.make<void>()
           const firstProcess = yield* host
-            .execute(yield* store.claimExecution({ runId: first.runId, ownerId: "sandbox-process-before-reopen" }))
+            .execute(
+              yield* store.claimExecution({
+                commandId: "sandbox-process-before-reopen:claim",
+                runId: first.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             .pipe(
               Effect.andThen(Deferred.succeed(processStopped, undefined)),
               Effect.andThen(Effect.never),
@@ -473,8 +479,9 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
             prompt: "continue from the recovered counter",
           })
           const secondClaim = yield* store.claimExecution({
+            commandId: "sandbox-process-after-reopen:claim",
             runId: second.runId,
-            ownerId: "sandbox-process-after-reopen",
+            ownerId: objectWorkerId,
           })
           yield* provideScoped(
             Layer.mergeAll(

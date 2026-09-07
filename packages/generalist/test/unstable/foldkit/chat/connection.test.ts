@@ -1,3 +1,4 @@
+import "./websocket-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Chat, Connection } from "../../../../src/unstable/foldkit/index.js"

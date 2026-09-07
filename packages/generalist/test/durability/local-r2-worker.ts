@@ -1,5 +1,5 @@
 import { Crypto, Effect, PlatformError, Schema } from "effect"
-import * as R2 from "../../src/durability/r2.js"
+import { type Bucket, make } from "../../src/durability/r2.js"
 import { append, exercise, objectConformance, open } from "./local-operations.js"
 
 const cryptoService = Crypto.make({
@@ -12,11 +12,11 @@ const cryptoService = Crypto.make({
 })
 
 export default {
-  fetch(request: Request, environment: { readonly BUCKET: R2.Bucket }): Promise<Response> {
+  fetch(request: Request, environment: { readonly BUCKET: Bucket }): Promise<Response> {
     return Effect.gen(function* () {
-      const store = R2.make(environment.BUCKET)
+      const store = make(environment.BUCKET)
       if (new URL(request.url).pathname === "/conformance") {
-        yield* objectConformance(Effect.sync(() => R2.make(environment.BUCKET)))
+        yield* objectConformance(Effect.sync(() => make(environment.BUCKET)))
         return Response.json({ result: "passed" })
       }
       if (new URL(request.url).pathname === "/range-boundaries") {
@@ -35,7 +35,7 @@ export default {
         return Response.json(failures)
       }
       if (new URL(request.url).pathname === "/exercise")
-        return Response.json(yield* exercise(Effect.sync(() => R2.make(environment.BUCKET))))
+        return Response.json(yield* exercise(Effect.sync(() => make(environment.BUCKET))))
       if (new URL(request.url).pathname === "/contend")
         return Response.json(yield* append({ store, id: "native-interop" }))
       const journal = yield* open(store)

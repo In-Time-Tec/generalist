@@ -1,7 +1,7 @@
 import { Effect, Ref, Schema, Semaphore } from "effect"
 import { updateCall, type ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { chargeScheduled, withPending } from "../loop-driver.js"
-import { LoopDriverState, type PendingOperation } from "../loop-driver-state.js"
+import { LoopDriverState, encode as encodeLoopState, type PendingOperation } from "../loop-driver-state.js"
 import { OperationTurn } from "../operation-turn.js"
 import { Exhausted } from "../run-budget.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
@@ -62,8 +62,7 @@ const scheduleBatchTool = (
           replayPolicy: requested.replayPolicy,
         },
       })
-      scheduled = { ...scheduled, turn: operationTurn, state: { ...state, toolBatch } }
-      yield* Ref.set(input.checkpointRef, scheduled)
+      scheduled = { ...scheduled, turn: operationTurn, state: yield* encodeLoopState({ ...state, toolBatch }) }
     } else if (
       entry.state._tag !== "Scheduled" ||
       entry.state.inputDigest !== requested.inputDigest ||
@@ -72,6 +71,7 @@ const scheduleBatchTool = (
       return yield* invalid(`Tool operation ${requested.key} does not match its scheduled batch call`)
     }
     const replay = yield* input.journal.onScheduled(requested, scheduled)
+    yield* Ref.set(input.checkpointRef, scheduled)
     return { operation: requested, replay, batchTool: true }
   })
 
@@ -109,7 +109,6 @@ const scheduleNew = (
     const operationTurn = yield* OperationTurn.resolve(charged.turn, spec.turn)
     const { turn: _turn, success: _success, failure: _failure, applyCheckpoint: _applyCheckpoint, ...pending } = spec
     const scheduled = withPending(charged, pending, operationTurn)
-    yield* Ref.set(input.checkpointRef, scheduled)
     const decision = yield* input.driver.decide(scheduled)
     if (decision._tag !== "Execute") {
       return yield* invalid(`Expected Execute decision for ${spec.key}, received ${decision._tag}`)
@@ -118,6 +117,7 @@ const scheduleNew = (
       return yield* invalid(`Driver operation mismatch for ${spec.key}`)
     }
     const replay = yield* input.journal.onScheduled(decision.operation, scheduled)
+    yield* Ref.set(input.checkpointRef, scheduled)
     return { operation: decision.operation, replay, batchTool: false, nested: false }
   })
 
@@ -130,6 +130,18 @@ export const scheduleOperations = (input: SchedulerInput) => (spec: AnyOperation
       )
       if (state.postCommitFailure !== undefined) return yield* state.postCommitFailure
       const requested = operationFrom(spec)
+      if (spec.kind === "hook") {
+        const replay = yield* input.journal.onScheduled(requested, before)
+        return { operation: requested, replay, batchTool: false, nested: true }
+      }
+      if (state.pending?.completed === true) {
+        const pending = operationFrom(state.pending)
+        if (matches(pending, requested)) {
+          const replay = yield* input.journal.onScheduled(requested, before)
+          return { operation: requested, replay, batchTool: false, nested: true }
+        }
+        return yield* scheduleNew(input, before, spec)
+      }
       if (spec.kind === "tool" && state.toolBatch !== undefined) {
         const callIndex = state.toolBatch.calls.findIndex((entry) => entry.operationKey === requested.key)
         if (callIndex < 0) {

@@ -1,4 +1,4 @@
-import { objectRuntimeLayer } from "../../runtime/execution/object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../../runtime/execution/object.js"
 import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "../json"
@@ -539,7 +539,9 @@ const typedStartResolver = ExecutableResolver.layerStatic([
     agent: Agent.close(nullStartAgent, deterministicModel({ response: '{"output":null}' })),
   },
 ]).pipe(Layer.orDie)
-const typedStartRuntime = objectRuntimeLayer({ addresses: [], schedulerMode: "poll" }).pipe(Layer.provide(typedStartResolver))
+const typedStartRuntime = objectRuntimeLayer({ addresses: [], schedulerMode: "poll" }).pipe(
+  Layer.provide(typedStartResolver),
+)
 
 layer(typedStartRuntime)("Agent.start", (it) => {
   it.effect("starts a registered Agent and decodes its durable completion", () =>
@@ -557,7 +559,11 @@ layer(typedStartRuntime)("Agent.start", (it) => {
       )
       const store = yield* RunStore.RunStore
       const host = yield* RunExecutor.RunExecutor
-      const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: "typed-start-test" })
+      const claim = yield* store.claimExecution({
+        commandId: "typed-start-test:claim",
+        runId: handle.runId,
+        ownerId: objectWorkerId,
+      })
       yield* host.execute(claim)
       const events = yield* Stream.runCollect(handle.events)
       const completed = events.find((event) => event._tag === "RunCompleted")
@@ -580,7 +586,11 @@ layer(typedStartRuntime)("Agent.start", (it) => {
       })
       const store = yield* RunStore.RunStore
       const host = yield* RunExecutor.RunExecutor
-      const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: "null-start-test" })
+      const claim = yield* store.claimExecution({
+        commandId: "null-start-test:claim",
+        runId: handle.runId,
+        ownerId: objectWorkerId,
+      })
       yield* host.execute(claim)
       const events = yield* Stream.runCollect(handle.events)
       const completed = events.find((event) => event._tag === "RunCompleted")
@@ -3676,7 +3686,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const sessionId = "prepopulated-session"
         yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
-            Effect.flatMap((session) => session.append({ _tag: "Message", message: seed }, { commandId: "fixture-3678" })),
+            Effect.flatMap((session) =>
+              session.append({ _tag: "Message", message: seed }, { commandId: "fixture-3678" }),
+            ),
           ),
         )
         const agent = Agent.make({ name: "prepopulated-session-agent" })
@@ -4485,7 +4497,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
             Effect.flatMap((session) =>
-              session.append({ _tag: "Message", message: toolMessage({ first: 1, second: 2 }) }, { commandId: "fixture-4489" }),
+              session.append(
+                { _tag: "Message", message: toolMessage({ first: 1, second: 2 }) },
+                { commandId: "fixture-4489" },
+              ),
             ),
           ),
         )
@@ -8844,7 +8859,31 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(modelCalls).toBe(13)
         expect(safeCheckpoint?.turn).toBe(12)
         const safeState = yield* Schema.decodeUnknownEffect(checkpointStateSchema)(safeCheckpoint?.state)
-        expect(safeState.pending).toBeUndefined()
+        expect(safeState.pending).toEqual({
+          kind: "memory",
+          key: "journal-restart:memory:remember:12:1",
+          input: { turn: 12, terminal: true },
+          replayPolicy: "pure",
+          completed: true,
+        })
+
+        for (const turnStart of [undefined, 12]) {
+          const beforeTerminalRecovery = scheduled.length
+          const recoveryOptions = {
+            logicalOperationId: "journal-restart",
+            executableRef: executable.ref,
+            driverCheckpoint: safeCheckpoint!,
+            sessionId: "journal-restart",
+          }
+          if (turnStart !== undefined) Object.assign(recoveryOptions, { turnStart })
+          const recoveredTerminal = yield* Agent.stream(agent, "", recoveryOptions).pipe(
+            Stream.runCollect,
+            Effect.provideService(DurableDriver.DriverJournal, resumedJournal),
+          )
+          expect(recoveredTerminal.at(-1)).toMatchObject({ _tag: "Completed", text: "done" })
+          expect(scheduled.slice(beforeTerminalRecovery).some((key) => key.includes(":model:"))).toBe(false)
+          expect(modelCalls).toBe(13)
+        }
 
         const overrideScheduled: Array<{ readonly key: string; readonly turn: number }> = []
         const overrideJournal: DurableDriver.Journal = {

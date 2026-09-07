@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.openai-compatible
+[generalist](./index.md) / providers.openai-compatible
 
 # providers.openai-compatible
 
@@ -36,17 +36,17 @@
 
 ###### Inherited from
 
-[`ClientOptions`](./providers.openai-chat-completions#clientoptions).[`baseUrl`](./providers.openai-chat-completions#baseurl)
+[`ClientOptions`](./providers.openai-chat-completions.md#clientoptions).[`baseUrl`](./providers.openai-chat-completions.md#baseurl)
 
 <a id="classifyfailure"></a>
 
 ##### classifyFailure?
 
-> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 ###### Inherited from
 
-[`Options`](./providers.openai-chat-completions#options).[`classifyFailure`](./providers.openai-chat-completions#classifyfailure-1)
+[`Options`](./providers.openai-chat-completions.md#options).[`classifyFailure`](./providers.openai-chat-completions.md#classifyfailure-1)
 
 <a id="clientconfig"></a>
 
@@ -62,11 +62,11 @@
 
 ##### config?
 
-> `readonly` `optional` **config?**: [`Config`](./providers.openai-chat-completions#config-2)
+> `readonly` `optional` **config?**: [`Config`](./providers.openai-chat-completions.md#config-2)
 
 ###### Inherited from
 
-[`Options`](./providers.openai-chat-completions#options).[`config`](./providers.openai-chat-completions#config-1)
+[`Options`](./providers.openai-chat-completions.md#options).[`config`](./providers.openai-chat-completions.md#config-1)
 
 <a id="metadata"></a>
 
@@ -80,7 +80,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`metadata`](./providers.openai.md#metadata-3)
 
 <a id="model"></a>
 
@@ -90,7 +90,7 @@
 
 ###### Inherited from
 
-[`Options`](./providers.openai-chat-completions#options).[`model`](./providers.openai-chat-completions#model-1)
+[`Options`](./providers.openai-chat-completions.md#options).[`model`](./providers.openai-chat-completions.md#model-1)
 
 <a id="registrationkey"></a>
 
@@ -100,7 +100,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`registrationKey`](./providers.openai.md#registrationkey-3)
 
 <a id="resource"></a>
 
@@ -116,7 +116,7 @@
 
 #### Extends
 
-- `Omit`\<[`ClientOptions`](./providers.openai-chat-completions#clientoptions), `"provider"`\>
+- `Omit`\<[`ClientOptions`](./providers.openai-chat-completions.md#clientoptions), `"provider"`\>
 
 #### Extended by
 
@@ -132,7 +132,7 @@
 
 ###### Overrides
 
-[`ClientOptions`](./providers.openai-chat-completions#clientoptions).[`apiKey`](./providers.openai-chat-completions#apikey)
+[`ClientOptions`](./providers.openai-chat-completions.md#clientoptions).[`apiKey`](./providers.openai-chat-completions.md#apikey)
 
 <a id="baseurl-1"></a>
 
@@ -142,17 +142,17 @@
 
 ###### Inherited from
 
-[`ClientOptions`](./providers.openai-chat-completions#clientoptions).[`baseUrl`](./providers.openai-chat-completions#baseurl)
+[`ClientOptions`](./providers.openai-chat-completions.md#clientoptions).[`baseUrl`](./providers.openai-chat-completions.md#baseurl)
 
 <a id="classifyfailure-1"></a>
 
 ##### classifyFailure?
 
-> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 ###### Inherited from
 
-[`Options`](./providers.openai-chat-completions#options).[`classifyFailure`](./providers.openai-chat-completions#classifyfailure-1)
+[`Options`](./providers.openai-chat-completions.md#options).[`classifyFailure`](./providers.openai-chat-completions.md#classifyfailure-1)
 
 <a id="clientconfig-1"></a>
 
@@ -162,17 +162,17 @@
 
 ###### Overrides
 
-[`ClientOptions`](./providers.openai-chat-completions#clientoptions).[`clientConfig`](./providers.openai-chat-completions#clientconfig)
+[`ClientOptions`](./providers.openai-chat-completions.md#clientoptions).[`clientConfig`](./providers.openai-chat-completions.md#clientconfig)
 
 <a id="config-1"></a>
 
 ##### config?
 
-> `readonly` `optional` **config?**: [`Config`](./providers.openai-chat-completions#config-2)
+> `readonly` `optional` **config?**: [`Config`](./providers.openai-chat-completions.md#config-2)
 
 ###### Inherited from
 
-[`Options`](./providers.openai-chat-completions#options).[`config`](./providers.openai-chat-completions#config-1)
+[`Options`](./providers.openai-chat-completions.md#options).[`config`](./providers.openai-chat-completions.md#config-1)
 
 <a id="metadata-1"></a>
 
@@ -186,7 +186,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`metadata`](./providers.openai.md#metadata-3)
 
 <a id="model-1"></a>
 
@@ -196,7 +196,7 @@
 
 ###### Inherited from
 
-[`Options`](./providers.openai-chat-completions#options).[`model`](./providers.openai-chat-completions#model-1)
+[`Options`](./providers.openai-chat-completions.md#options).[`model`](./providers.openai-chat-completions.md#model-1)
 
 <a id="registrationkey-1"></a>
 
@@ -206,7 +206,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`registrationKey`](./providers.openai.md#registrationkey-3)
 
 ## Variables
 
@@ -214,7 +214,7 @@
 
 ### layerAzureOpenAI
 
-> `const` **layerAzureOpenAI**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerAzureOpenAI**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -224,7 +224,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -232,7 +232,7 @@
 
 ### layerDeepSeek
 
-> `const` **layerDeepSeek**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerDeepSeek**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -242,7 +242,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -250,7 +250,7 @@
 
 ### layerGoogleAIStudio
 
-> `const` **layerGoogleAIStudio**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerGoogleAIStudio**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -260,7 +260,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -268,7 +268,7 @@
 
 ### layerGroq
 
-> `const` **layerGroq**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerGroq**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -278,7 +278,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -286,7 +286,7 @@
 
 ### layerMistral
 
-> `const` **layerMistral**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerMistral**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -296,7 +296,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -304,7 +304,7 @@
 
 ### layerOllama
 
-> `const` **layerOllama**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerOllama**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -314,7 +314,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -322,7 +322,7 @@
 
 ### layerXAI
 
-> `const` **layerXAI**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerXAI**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -332,4 +332,4 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>

@@ -1,7 +1,14 @@
 import { Effect, Equivalence, Option, Schema, Stream } from "effect"
 import { dual } from "effect/Function"
 import { make } from "foldkit/subscription"
-import { Connection, ConnectionFailed, ConnectionLost, ConnectionOpened } from "./connection.js"
+import {
+  Connection,
+  ConnectionFailed,
+  ConnectionLost,
+  ConnectionOpened,
+  HostDelivery,
+  SessionSnapshot,
+} from "./connection.js"
 import {
   Action,
   type ChatCommand,
@@ -15,11 +22,10 @@ import {
   ResolveApproval,
   RunFailed,
   SendUserMessage,
-  UserEntry,
 } from "./service.js"
 import { chatUpdateRuntime } from "./update.js"
 
-const { applyHostEvent, isHostEvent } = chatUpdateRuntime
+const { applyHostEvent, applySnapshot } = chatUpdateRuntime
 
 type UpdateResult = readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<Output>]
 
@@ -28,16 +34,26 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
     sessionId: changes.sessionId ?? model.sessionId,
     connection: changes.connection ?? model.connection,
     lastSeq: changes.lastSeq ?? model.lastSeq,
+    connectionEpoch: changes.connectionEpoch ?? model.connectionEpoch,
     run: changes.run ?? model.run,
     entries: changes.entries ?? model.entries,
+    conversation: changes.conversation ?? model.conversation,
     draft: changes.draft ?? model.draft,
   })
 
 const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): UpdateResult => {
-  if (isHostEvent(action.event)) {
-    const [next, output] = applyHostEvent(model, action.event)
+  if (Schema.is(SessionSnapshot)(action.event)) {
+    return [applySnapshot(model, action.event.snapshot, action.event.epoch), [], Option.none()]
+  }
+  if (Schema.is(HostDelivery)(action.event)) {
+    if (action.event.epoch !== model.connectionEpoch) return [model, [], Option.none()]
+    const [next, output] = applyHostEvent(model, action.event.event)
     return [next, [], output]
   }
+  if (action.event.sessionId !== model.sessionId || action.event.epoch < model.connectionEpoch)
+    return [model, [], Option.none()]
+  if (!Schema.is(ConnectionFailed)(action.event) && action.event.epoch !== model.connectionEpoch)
+    return [model, [], Option.none()]
   if (Schema.is(ConnectionOpened)(action.event)) {
     return [changeModel(model, { connection: "open" }), [], Option.none()]
   }
@@ -50,7 +66,11 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
   }
   if (Schema.is(ConnectionFailed)(action.event)) {
     return [
-      changeModel(model, { connection: "disconnected", run: Failed({ message: action.event.reason }) }),
+      changeModel(model, {
+        connectionEpoch: action.event.epoch,
+        connection: "disconnected",
+        run: Failed({ message: action.event.reason }),
+      }),
       [],
       Option.some(RunFailed({ message: action.event.reason })),
     ]
@@ -61,11 +81,7 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
 const submitMessage = (model: Model): UpdateResult => {
   const text = model.draft.trim()
   if (model.sessionId === null || text.length === 0) return [model, [], Option.none()]
-  return [
-    changeModel(model, { draft: "", entries: [...model.entries, UserEntry({ text })] }),
-    [SendUserMessage({ sessionId: model.sessionId, text })],
-    Option.none(),
-  ]
+  return [changeModel(model, { draft: "" }), [SendUserMessage({ sessionId: model.sessionId, text })], Option.none()]
 }
 
 const resolveApproval = (model: Model, approved: boolean, reason: string | null): UpdateResult => {
@@ -82,7 +98,12 @@ const cancelRun = (model: Model): UpdateResult =>
     ? [model, [], Option.none()]
     : [
         model,
-        [CancelRun({ sessionId: model.sessionId, commandId: JSON.stringify(["cancel", model.sessionId, model.lastSeq]) })],
+        [
+          CancelRun({
+            sessionId: model.sessionId,
+            commandId: JSON.stringify(["cancel", model.sessionId, model.lastSeq]),
+          }),
+        ],
         Option.none(),
       ]
 
@@ -95,11 +116,13 @@ export const update: {
     case "ReceivedConnection":
       return updateReceived(model, action)
     case "OpenedSession":
+      if (action.sessionId === model.sessionId) return [model, [], Option.none()]
       return [
         changeModel(model, {
           sessionId: action.sessionId,
           connection: "connecting",
           lastSeq: -1,
+          connectionEpoch: -1,
           run: Idle(),
           entries: [],
         }),
@@ -128,23 +151,22 @@ export const update: {
 /** @experimental */
 export const subscriptions = make<Model, Action, Connection>()((entry) => ({
   agentFrames: entry(
-    { sessionId: Schema.NullOr(Schema.String), afterSeq: Schema.Finite },
+    { sessionId: Schema.NullOr(Schema.String) },
     {
-      modelToDependencies: (model) => ({ sessionId: model.sessionId, afterSeq: model.lastSeq }),
+      modelToDependencies: (model) => ({ sessionId: model.sessionId }),
       keepAliveEquivalence: Equivalence.make((left, right) => left.sessionId === right.sessionId),
-      dependenciesToStream: ({ sessionId }, readDependencies) => {
+      dependenciesToStream: ({ sessionId }: { readonly sessionId: string | null }) => {
         if (sessionId === null) return Stream.empty
         return Stream.unwrap(
-          Connection.use((connection) => {
-            const afterSeq = readDependencies().afterSeq
-            return connection
-              .session(afterSeq < 0 ? { sessionId } : { sessionId, afterSeq })
+          Connection.use((connection) =>
+            connection
+              .session({ sessionId })
               .pipe(
                 Effect.map((sessionConnection) =>
                   sessionConnection.frames.pipe(Stream.map((event) => ReceivedConnection({ event }))),
                 ),
-              )
-          }),
+              ),
+          ),
         )
       },
     },

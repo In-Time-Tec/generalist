@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.anthropic
+[generalist](./index.md) / providers.anthropic
 
 # providers.anthropic
 
@@ -166,7 +166,7 @@
 
 #### Extends
 
-- [`RegistrationOptions`](./providers.openai#registrationoptions)
+- [`RegistrationOptions`](./providers.openai.md#registrationoptions)
 
 #### Extended by
 
@@ -276,7 +276,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`metadata`](./providers.openai.md#metadata-3)
 
 <a id="model-1"></a>
 
@@ -292,7 +292,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`registrationKey`](./providers.openai.md#registrationkey-3)
 
 ## Type Aliases
 
@@ -308,7 +308,7 @@
 
 ### classifyFailure
 
-> `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 ***
 
@@ -334,7 +334,7 @@
 
 ### layer
 
-> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `EffectConfig.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `EffectConfig.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -344,7 +344,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `EffectConfig.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `EffectConfig.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -404,7 +404,7 @@ Model layer over `AnthropicClient`; provide it to a run with `Effect.provide`.
 
 ### registration
 
-> `const` **registration**: (`input`) => `ReturnType`\<*typeof* [`registration`](./generalist/namespaces/ModelRegistry#registration-2)\>
+> `const` **registration**: (`input`) => `ReturnType`\<*typeof* [`registration`](./generalist/namespaces/ModelRegistry.md#registration-2)\>
 
 Bare registration effect; the consumer provides the Anthropic client (see layerConfig).
 
@@ -416,7 +416,7 @@ Bare registration effect; the consumer provides the Anthropic client (see layerC
 
 #### Returns
 
-`ReturnType`\<*typeof* [`registration`](./generalist/namespaces/ModelRegistry#registration-2)\>
+`ReturnType`\<*typeof* [`registration`](./generalist/namespaces/ModelRegistry.md#registration-2)\>
 
 ***
 
@@ -444,4 +444,4 @@ Effective Anthropic request config; callers opt into top-level automatic caching
 
 ### toolJsonSchemaCompiler
 
-> `const` **toolJsonSchemaCompiler**: [`ToolJsonSchemaCompiler`](./generalist/namespaces/ModelRegistry#tooljsonschemacompiler-1)
+> `const` **toolJsonSchemaCompiler**: [`ToolJsonSchemaCompiler`](./generalist/namespaces/ModelRegistry.md#tooljsonschemacompiler-1)

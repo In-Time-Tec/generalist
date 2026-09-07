@@ -29,7 +29,12 @@ const identity = (name: string, test: string) => {
   }
 }
 
-const completedResult = (sessionId: string, text: string): ExecutionResult => ({ text, output: text, turns: 1, session: { sessionId, leafId: null } })
+const completedResult = (sessionId: string, text: string): ExecutionResult => ({
+  text,
+  output: text,
+  turns: 1,
+  session: { sessionId, leafId: null },
+})
 
 /** Admission conformance: exact idempotent replay and caller-supplied Run identity. */
 export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
@@ -121,12 +126,16 @@ const registerStartByAgent = <LayerError, ClaimsLayerError>(
           { sessionId: id.sessionId, idempotencyKey: id.idempotencyKey },
         )
         const claim = yield* capability.claim(services, { runId: handle.runId, commandId: "start-by-agent" })
-        yield* services.store.complete({ ...claim, commandId: `${claim.runId}:complete:${claim.attemptFence}`, result: {
-          text: "typed answer",
-          output: { answer: "typed answer" },
-          turns: 1,
-          session: { sessionId: id.sessionId, leafId: null },
-        }, })
+        yield* services.store.complete({
+          ...claim,
+          commandId: `${claim.runId}:complete:${claim.attemptFence}`,
+          result: {
+            text: "typed answer",
+            output: { answer: "typed answer" },
+            turns: 1,
+            session: { sessionId: id.sessionId, leafId: null },
+          },
+        })
 
         expect(yield* handle.await).toEqual({ answer: "typed answer" })
         const events = yield* Stream.runCollect(handle.events)
@@ -189,7 +198,11 @@ const registerIdempotentStart = <LayerError, ClaimsLayerError>(
         )
         expect(accepted).toHaveLength(1)
         const claim = yield* capability.claim(services, { runId: first.runId, commandId: "idempotent-start" })
-        yield* services.store.complete({ ...claim, commandId: `${claim.runId}:complete:${claim.attemptFence}`, result: completedResult(id.sessionId, "completed") })
+        yield* services.store.complete({
+          ...claim,
+          commandId: `${claim.runId}:complete:${claim.attemptFence}`,
+          result: completedResult(id.sessionId, "completed"),
+        })
       }),
     ),
   )

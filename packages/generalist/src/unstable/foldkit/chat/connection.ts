@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Ref, Result, Schedule, Schema, Scope, Stream } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
@@ -11,31 +11,47 @@ import {
   type ConnectionStatus,
 } from "../../../server/client.js"
 import { TransportError } from "../../../server/errors.js"
+import { HostSessionSnapshot } from "../../../runtime/session/host.js"
 import type { AgentCommand } from "./connection-command.js"
+import { applyConversationUpdate } from "../../../runtime/session/conversation.js"
 
 /** @experimental */
-export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", Record<never, never>> = m("ConnectionOpened")
+const DeliveryIdentity = { sessionId: Schema.String, epoch: Schema.Int }
+export const ConnectionOpened = m("ConnectionOpened", DeliveryIdentity)
 /** @experimental */
-export const ConnectionLost: CallableTaggedStruct<"ConnectionLost", Record<never, never>> = m("ConnectionLost")
+export const ConnectionLost = m("ConnectionLost", DeliveryIdentity)
 /** @experimental */
 export const ConnectionFailed: CallableTaggedStruct<
   "ConnectionFailed",
-  { operation: Schema.Literal<"connect">; error: typeof TransportError; reason: typeof Schema.String }
+  typeof DeliveryIdentity & {
+    operation: Schema.Literal<"connect">
+    error: typeof TransportError
+    reason: typeof Schema.String
+  }
 > = m("ConnectionFailed", {
+  ...DeliveryIdentity,
   operation: Schema.Literal("connect"),
   error: TransportError,
   reason: Schema.String,
 })
 
+/** A committed snapshot establishes a new connection-local delivery epoch. @experimental */
+export const SessionSnapshot = m("SessionSnapshot", { epoch: Schema.Int, snapshot: HostSessionSnapshot })
+
+/** One committed Host event delivered within an established snapshot epoch. @experimental */
+export const HostDelivery = m("HostDelivery", { epoch: Schema.Int, event: HostEvent })
+
 /** @experimental */
 export type Incoming =
-  | HostEvent
+  | typeof SessionSnapshot.Type
+  | typeof HostDelivery.Type
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type
 /** @experimental */
 export const Incoming: Schema.Schema<Incoming> = Schema.Union([
-  HostEvent,
+  SessionSnapshot,
+  HostDelivery,
   ConnectionOpened,
   ConnectionLost,
   ConnectionFailed,
@@ -63,10 +79,7 @@ export interface SessionConnection {
 }
 /** @experimental */
 export interface Service {
-  readonly session: (options: {
-    readonly sessionId: string
-    readonly afterSeq?: number
-  }) => Effect.Effect<SessionConnection, never, Scope.Scope>
+  readonly session: (options: { readonly sessionId: string }) => Effect.Effect<SessionConnection, never, Scope.Scope>
   readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
 /** @experimental */
@@ -74,7 +87,7 @@ export class Connection extends Context.Service<Connection, Service>()("generali
 
 interface ActiveConnection {
   readonly runId: Ref.Ref<string | undefined>
-  readonly connection: ServerConnection
+  readonly connection: Ref.Ref<Option.Option<ServerConnection>>
 }
 
 const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
@@ -85,13 +98,16 @@ const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<ne
   return reasons.length === 0 ? Option.none() : Option.some(Cause.fromReasons(reasons))
 }
 
-const statusIncoming = (status: ConnectionStatus): Option.Option<Incoming> => {
+const statusIncoming = (
+  status: ConnectionStatus,
+  identity: { readonly sessionId: string; readonly epoch: number },
+): Option.Option<Incoming> => {
   switch (status._tag) {
     case "Connected":
-      return Option.some(ConnectionOpened())
+      return Option.some(ConnectionOpened(identity))
     case "Disconnected":
     case "Retrying":
-      return Option.some(ConnectionLost())
+      return Option.some(ConnectionLost(identity))
     case "Connecting":
       return Option.none()
   }
@@ -111,27 +127,32 @@ export const layerWebSocket = (options: {
       const client = yield* serverClient({ baseUrl: options.baseUrl })
       const webSocketConstructor = yield* Socket.WebSocketConstructor
       const active = yield* Ref.make<ReadonlyMap<string, ActiveConnection>>(new Map())
+      const nextEpoch = yield* Ref.make(0)
 
       const sendThrough = (owner: ActiveConnection, command: AgentCommand): Effect.Effect<void, AgentCommandError> => {
         if (command._tag !== "Cancel") {
           return Effect.fail(SendFailed.make({ reason: `${command._tag} requires a Host command adapter` }))
         }
         return Effect.gen(function* () {
+          if ((yield* Ref.get(active)).get(command.sessionId) !== owner) {
+            return yield* SendFailed.make({ reason: "The Session connection has been replaced" })
+          }
           const runId = yield* Ref.get(owner.runId)
           if (runId === undefined) {
             return yield* SendFailed.make({ reason: "No Run event has been received for this Session" })
           }
-          yield* owner.connection.cancel(runId, command.commandId)
+          const connection = yield* Ref.get(owner.connection)
+          if (Option.isNone(connection)) return yield* SendFailed.make({ reason: "The Session is resynchronizing" })
+          yield* connection.value.cancel(runId, command.commandId)
         })
       }
 
-      const session = ({ sessionId, afterSeq }: { readonly sessionId: string; readonly afterSeq?: number }) =>
+      const session = ({ sessionId }: { readonly sessionId: string }) =>
         Effect.gen(function* () {
-          const connection = yield* client.events
-            .connect(afterSeq === undefined ? { sessionId } : { sessionId, cursor: afterSeq })
-            .pipe(Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor), Effect.orDie)
           const runId = yield* Ref.make<string | undefined>(undefined)
-          const owner = { runId, connection }
+          const owner = { runId, connection: yield* Ref.make(Option.none<ServerConnection>()) }
+          const resyncs = yield* Ref.make(0)
+          const epochRef = yield* Ref.make(-1)
           yield* Effect.acquireRelease(
             Ref.update(active, (current) => new Map(current).set(sessionId, owner)),
             () =>
@@ -142,21 +163,90 @@ export const layerWebSocket = (options: {
                 return updated
               }),
           )
-          const statuses = connection.status.pipe(
-            Stream.filterMap((status) =>
-              Option.match(statusIncoming(status), { onNone: () => Result.fail(undefined), onSome: Result.succeed }),
+          const frames = Stream.unwrap(
+            Effect.gen(function* () {
+              const epoch = yield* Ref.getAndUpdate(nextEpoch, (current) => current + 1)
+              yield* Ref.set(epochRef, epoch)
+              const connection = yield* client.events.connect({ sessionId }).pipe(
+                Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+                Effect.mapError((error) =>
+                  TransportError.make({
+                    message: "message" in error ? error.message : "Snapshot request requested an unsupported retry",
+                    kind: "protocol",
+                  }),
+                ),
+              )
+              yield* Ref.set(
+                runId,
+                connection.snapshot.runs.findLast((run) => run.run.parentRunId === undefined)?.run.runId,
+              )
+              const conversation = yield* Ref.make(connection.snapshot.conversation)
+              yield* Effect.acquireRelease(Ref.set(owner.connection, Option.some(connection)), () =>
+                Ref.update(owner.connection, (current) =>
+                  Option.isSome(current) && current.value === connection ? Option.none() : current,
+                ),
+              )
+              const statuses = connection.status.pipe(
+                Stream.filterMap((status) =>
+                  Option.match(statusIncoming(status, { sessionId, epoch }), {
+                    onNone: () => Result.fail(undefined),
+                    onSome: Result.succeed,
+                  }),
+                ),
+              )
+              const events = connection.events.pipe(
+                Stream.tap((event) => {
+                  if (event._tag !== "Conversation")
+                    return "event" in event && event.event.parentRunId === undefined
+                      ? Ref.set(runId, event.runId)
+                      : Effect.void
+                  return Effect.gen(function* () {
+                    const next = applyConversationUpdate({
+                      conversation: yield* Ref.get(conversation),
+                      update: event.update,
+                    })
+                    if (Option.isNone(next))
+                      return yield* TransportError.make({
+                        message: "Committed conversation has a missing parent or stale leaf",
+                        kind: "lagged",
+                      })
+                    yield* Ref.set(conversation, next.value)
+                  })
+                }),
+                Stream.map((event): Incoming => HostDelivery({ epoch, event })),
+              )
+              return Stream.succeed<Incoming>(SessionSnapshot({ epoch, snapshot: connection.snapshot })).pipe(
+                Stream.concat(statuses.pipe(Stream.merge(events))),
+              )
+            }),
+          ).pipe(
+            Stream.scoped,
+            Stream.retry(
+              Schedule.recurs(3).pipe(
+                Schedule.addDelay(() => Effect.succeed("250 millis")),
+                Schedule.while(({ input }) =>
+                  Ref.modify(resyncs, (count) => [
+                    Schema.is(TransportError)(input) &&
+                      (input.kind === "cursor-expired" || input.kind === "lagged") &&
+                      count < 3,
+                    count + 1,
+                  ]),
+                ),
+              ),
             ),
-          )
-          const events = connection.events.pipe(
-            Stream.tap((event) => Ref.set(runId, event.runId)),
-            Stream.map((event): Incoming => event),
             Stream.catchCause((cause) =>
               Option.match(unexpectedCause(cause), {
                 onNone: () =>
                   Result.match(Cause.findError(cause), {
                     onFailure: Stream.failCause,
                     onSuccess: (error) =>
-                      Stream.succeed(ConnectionFailed({ operation: "connect", error, reason: error.message })),
+                      Stream.fromEffect(
+                        Ref.get(epochRef).pipe(
+                          Effect.map((epoch) =>
+                            ConnectionFailed({ sessionId, epoch, operation: "connect", error, reason: error.message }),
+                          ),
+                        ),
+                      ),
                   }),
                 onSome: Stream.failCause,
               }),
@@ -164,7 +254,7 @@ export const layerWebSocket = (options: {
           )
           return {
             sessionId,
-            frames: statuses.pipe(Stream.merge(events)),
+            frames,
             send: (command: AgentCommand) =>
               command.sessionId === sessionId
                 ? sendThrough(owner, command)

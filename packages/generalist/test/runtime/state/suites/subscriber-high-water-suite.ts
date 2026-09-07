@@ -1,8 +1,15 @@
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { assistantAddress, assistantRef, registrationsFor, resolverLayer, textPrompt } from "../../execution/fixtures.js"
-import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
+import {
+  assistantAddress,
+  assistantRef,
+  registrationsFor,
+  resolverLayer,
+  textPrompt,
+} from "../../execution/fixtures.js"
+import { objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
+import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 
 const scopedWith =
   <A, E>(layer: Layer.Layer<A, E, never>) =>
@@ -10,14 +17,21 @@ const scopedWith =
     Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
 const highWaterLayer = (capacity: number) =>
-  objectRuntimeLayer(
-    {
-      addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-      scheduler: { pollInterval: "1 hour" },
-      subscriberQueueCapacity: capacity,
-    },
-    makeObjectStorage(),
-  ).pipe(Layer.provide(resolverLayer))
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const storage = yield* makeSimulator()
+      return objectRuntimeLayer(
+        {
+          addresses: [
+            { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+          ],
+          scheduler: { pollInterval: "1 hour" },
+          subscriberQueueCapacity: capacity,
+        },
+        storage,
+      ).pipe(Layer.provide(resolverLayer))
+    }),
+  )
 
 it.effect("replays a base larger than the bounded subscriber queue and follows live without lag", () =>
   scopedWith(highWaterLayer(2))(
@@ -95,25 +109,34 @@ it.effect("replays a rewound host Session from retained durable history", () =>
         event: { _tag: "TurnStarted", turn: 0 },
       })
       const before = yield* runtime.sessionEvents({ sessionId }).pipe(
-        Stream.takeUntil(({ event }) => event._tag === "TurnStarted"),
+        Stream.takeUntil((entry) => entry._tag === "Run" && entry.event._tag === "TurnStarted"),
         Stream.runCollect,
       )
       const oldCursor = before.at(-1)!.cursor
-      yield* store.rewind({ runId: receipt.runId, branchRunId: "retained-replay", toSequence: 0 })
+      yield* store.rewind({
+        commandId: "subscriber-high-water:rewind",
+        runId: receipt.runId,
+        branchRunId: "retained-replay",
+        toSequence: 0,
+      })
       const replayed = yield* Deferred.make<void>()
       const follower = yield* runtime.sessionEvents({ sessionId }).pipe(
         Stream.tap(() => Deferred.succeed(replayed, undefined)),
-        Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 999),
+        Stream.takeUntil(
+          (entry) => entry._tag === "Run" && entry.event._tag === "TurnStarted" && entry.event.turn === 999,
+        ),
         Stream.runCollect,
         Effect.forkChild({ startImmediately: true }),
       )
       yield* Deferred.await(replayed)
       const resumed = yield* runtime.sessionEvents({ sessionId, cursor: oldCursor }).pipe(
-        Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 999),
+        Stream.takeUntil(
+          (entry) => entry._tag === "Run" && entry.event._tag === "TurnStarted" && entry.event.turn === 999,
+        ),
         Stream.runCollect,
         Effect.forkChild({ startImmediately: true }),
       )
-      const runFollower = yield* runtime.events({ runId: receipt.runId }).pipe(
+      const _runFollower = yield* runtime.events({ runId: receipt.runId }).pipe(
         Stream.takeUntil((event) => event._tag === "TurnStarted" && event.turn === 999),
         Stream.runCollect,
         Effect.forkChild({ startImmediately: true }),
@@ -131,9 +154,11 @@ it.effect("replays a rewound host Session from retained durable history", () =>
       })
       const entries = yield* Fiber.join(follower)
       expect(entries.map((entry) => entry.cursor)).toEqual([0, 1, 2, 3, 4, 5])
-      expect(entries[3]?.event._tag).toBe("RunRewound")
-      expect(entries[4]?.event._tag).toBe("RunAttemptStarted")
-      expect(entries[5]?.event._tag).toBe("TurnStarted")
+      const runEntries = entries.filter((entry) => entry._tag === "Run")
+      expect(runEntries).toHaveLength(entries.length)
+      expect(runEntries[3]?.event._tag).toBe("RunRewound")
+      expect(runEntries[4]?.event._tag).toBe("RunAttemptStarted")
+      expect(runEntries[5]?.event._tag).toBe("TurnStarted")
       expect(yield* Fiber.join(resumed)).toEqual(entries.filter((entry) => entry.cursor > oldCursor))
     }),
   ),

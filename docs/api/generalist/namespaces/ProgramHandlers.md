@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ProgramHandlers
+[generalist](../../index.md) / [generalist](../index.md) / ProgramHandlers
 
 # ProgramHandlers
 
@@ -46,7 +46,7 @@ One exact Agent implementation callable by a program host.
 
 ##### execute
 
-> `readonly` **execute**: (`input`) => `Effect`\<[`AgentRunResult`](./ProgramCapabilities#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| `E`\>
+> `readonly` **execute**: (`input`) => `Effect`\<[`AgentRunResult`](./ProgramCapabilities.md#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| `E`\>
 
 ###### Parameters
 
@@ -56,7 +56,7 @@ One exact Agent implementation callable by a program host.
 
 ###### Returns
 
-`Effect`\<[`AgentRunResult`](./ProgramCapabilities#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| `E`\>
+`Effect`\<[`AgentRunResult`](./ProgramCapabilities.md#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| `E`\>
 
 <a id="input"></a>
 
@@ -96,7 +96,7 @@ One decoded Agent invocation, exposing only the prompt every Agent input must pr
 
 ##### authorize
 
-> `readonly` **authorize**: (`operation`) => `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
+> `readonly` **authorize**: (`operation`) => `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended)\>
 
 ###### Parameters
 
@@ -106,13 +106,13 @@ One decoded Agent invocation, exposing only the prompt every Agent input must pr
 
 ###### Returns
 
-`Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
+`Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended)\>
 
 <a id="execute-1"></a>
 
 ##### execute
 
-> `readonly` **execute**: `Effect`\<[`AgentRunResult`](./ProgramCapabilities#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities#programinvocationfailure)\>
+> `readonly` **execute**: `Effect`\<[`AgentRunResult`](./ProgramCapabilities.md#agentrunresult), [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities.md#programinvocationfailure)\>
 
 <a id="prompt"></a>
 
@@ -191,7 +191,7 @@ boundary codecs stay observable; its decoded input type is reachable only throug
 
 ##### decode
 
-> `readonly` **decode**: (`encoded`) => `Effect`\<[`Invocation`](#invocation)\<`unknown`, [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities#programinvocationfailure)\>, `SchemaError`\>
+> `readonly` **decode**: (`encoded`) => `Effect`\<[`Invocation`](#invocation)\<`unknown`, [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities.md#programinvocationfailure)\>, `SchemaError`\>
 
 ###### Parameters
 
@@ -201,7 +201,7 @@ boundary codecs stay observable; its decoded input type is reachable only throug
 
 ###### Returns
 
-`Effect`\<[`Invocation`](#invocation)\<`unknown`, [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities#programinvocationfailure)\>, `SchemaError`\>
+`Effect`\<[`Invocation`](#invocation)\<`unknown`, [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled) \| [`ProgramInvocationFailure`](./ProgramCapabilities.md#programinvocationfailure)\>, `SchemaError`\>
 
 <a id="input-2"></a>
 
@@ -278,7 +278,7 @@ authorization and execution keep the exact type the handler declared.
 
 ##### E
 
-`E` = [`ProgramInvocationFailure`](./ProgramCapabilities#programinvocationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled)
+`E` = [`ProgramInvocationFailure`](./ProgramCapabilities.md#programinvocationfailure) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled)
 
 #### Properties
 
@@ -286,7 +286,7 @@ authorization and execution keep the exact type the handler declared.
 
 ##### authorize
 
-> `readonly` **authorize**: (`operation`) => `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
+> `readonly` **authorize**: (`operation`) => `Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended)\>
 
 ###### Parameters
 
@@ -296,7 +296,7 @@ authorization and execution keep the exact type the handler declared.
 
 ###### Returns
 
-`Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
+`Effect`\<`boolean`, [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended)\>
 
 <a id="execute-2"></a>
 
@@ -516,7 +516,7 @@ Host-facing view of one named step, with the same hidden input as [AnyTool](#any
 
 ### Authorize
 
-> **Authorize**\<`I`\> = (`request`) => `Effect.Effect`\<`boolean`, [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
+> **Authorize**\<`I`\> = (`request`) => `Effect.Effect`\<`boolean`, [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended)\>
 
 Host-owned authorization callback for one decoded invocation.
 
@@ -536,11 +536,11 @@ Host-owned authorization callback for one decoded invocation.
 
 ###### operation
 
-[`ProgramOperationName`](./ProgramCapabilities#programoperationname)
+[`ProgramOperationName`](./ProgramCapabilities.md#programoperationname)
 
 #### Returns
 
-`Effect.Effect`\<`boolean`, [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended)\>
+`Effect.Effect`\<`boolean`, [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended)\>
 
 ***
 

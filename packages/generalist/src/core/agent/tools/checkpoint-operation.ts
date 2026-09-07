@@ -4,7 +4,6 @@ import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { domainFailureResult, successResult, type AnyToolCall } from "./result.js"
 import { completed, effectiveCall, updateCall } from "./checkpoint.js"
 import { AwaitEvent } from "./wake-event.js"
-import { Items as TaskItems, writeToolName } from "../../../tasks/item.js"
 import {
   Source as CapabilitySource,
   accumulate,
@@ -104,10 +103,6 @@ export const applyToolOutcome =
         invocationPath: input.invocationPath,
       })
     })()
-    const tasks = (() => {
-      if (input.call.name !== writeToolName || decoded === undefined) return state.tasks
-      return decoded._tag === "Success" ? Schema.decodeUnknownSync(TaskItems)(decoded.result) : state.tasks
-    })()
     const capabilities = capabilityCheckpoint(state.capabilities, decoded)
     const artifacts = (() => {
       if (decoded?._tag !== "Success") return state.artifacts
@@ -124,12 +119,11 @@ export const applyToolOutcome =
     })()
     return {
       ...checkpoint,
-      state: {
+      state: Schema.encodeSync(LoopDriverState)({
         ...state,
         toolBatch: nextBatch,
-        ...Object.assign({}, tasks === undefined ? undefined : { tasks }),
         ...Object.assign({}, capabilities === undefined ? undefined : { capabilities }),
         ...Object.assign({}, artifacts === undefined ? undefined : { artifacts }),
-      },
+      }),
     }
   }

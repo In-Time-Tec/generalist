@@ -13,6 +13,8 @@ bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
 export OPENAI_API_KEY="your-api-key"
 ```
 
+Durability and compute placement are independent: local/server, Cloudflare Durable Objects, and Rivet actors use the same S3/native R2 engine. The clean v1 cutover uses fresh namespaces with no SQL backend, compatibility reader, or migration fallback. Local MinIO/Miniflare/workerd qualification does not certify AWS or deployed R2, and this in-flight work is not a release-readiness claim.
+
 ## Run an agent
 
 Save this as `index.ts` and run `bun index.ts`:

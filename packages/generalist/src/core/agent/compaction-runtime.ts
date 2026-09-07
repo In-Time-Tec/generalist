@@ -24,7 +24,7 @@ import {
   SessionCursor,
   type SessionCursor as SessionCursorType,
 } from "./session/cursor.js"
-import { type CompactionCommit, type Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
+import type { CompactionCommit, Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 import type { RunOptions } from "./service.js"
 import { RunError } from "./run/error.js"
 import type { AgentRunState } from "./run-state.js"
@@ -155,28 +155,28 @@ export const make = (context: CompactionContext) => {
       const key = operationKey(yield* logicalOperationId, "memory", "sync", turn, invocationId)
       const transcriptDigest = promptDigest(conversationOnly(transcript).content)
       return yield* intercept(
-      {
-        kind: "memory",
-        key,
-        turn,
-        input: {
+        {
+          kind: "memory",
+          key,
           turn,
-          messageCount: transcript.content.length,
-          transcriptDigest,
+          input: {
+            turn,
+            messageCount: transcript.content.length,
+            transcriptDigest,
+          },
+          replayPolicy: "pure",
+          success: SessionCursor,
+          failure: RunError,
         },
-        replayPolicy: "pure",
-        success: SessionCursor,
-        failure: RunError,
-      },
-      syncSessionBody(turn, transcript, key),
-    ).pipe(
-      Effect.flatMap(Schema.decodeUnknownEffect(SessionCursor)),
-      Effect.mapError((error) =>
-        Schema.is(RunError)(error)
-          ? error
-          : AgentError.make({ message: `Invalid Session cursor: ${String(error)}`, turn, cause: error }),
-      ),
-      Effect.flatMap((cursor) => resolveCursor(turn, cursor)),
+        syncSessionBody(turn, transcript, key),
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(SessionCursor)),
+        Effect.mapError((error) =>
+          Schema.is(RunError)(error)
+            ? error
+            : AgentError.make({ message: `Invalid Session cursor: ${String(error)}`, turn, cause: error }),
+        ),
+        Effect.flatMap((cursor) => resolveCursor(turn, cursor)),
       )
     })
   const sessionPathForCompaction = (
@@ -289,14 +289,15 @@ export const make = (context: CompactionContext) => {
           const id = yield* session.reserveEntryId(commandId)
           const existing = yield* session.entry(id)
           const previous: CompactionEntry | undefined = existing?._tag === "Compaction" ? existing : undefined
+          const previousTelemetry = previous?.telemetry
           const telemetryBeforeApplied = Object.freeze([...undeliveredTelemetry])
-          const isSummaryCall = (
-            event: ModelTelemetryEvent,
-          ): event is Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> =>
-            event._tag === "ModelCallStarted" && event.compactionId === commitData?.compactionId
-          const summaryCall = commitData === undefined ? undefined : (previous?.telemetry ?? telemetryBeforeApplied).findLast(isSummaryCall)
           let compactionCommit: CompactionCommit | undefined
           if (commitData !== undefined) {
+            const isSummaryCall = (
+              event: ModelTelemetryEvent,
+            ): event is Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> =>
+              event._tag === "ModelCallStarted" && event.compactionId === commitData.compactionId
+            const summaryCall = (previousTelemetry ?? telemetryBeforeApplied).findLast(isSummaryCall)
             const commitBase = { ...commitData, checkpointId: id }
             compactionCommit =
               summaryCall === undefined ? commitBase : { ...commitBase, summaryModelCallId: summaryCall.modelCallId }
@@ -304,9 +305,10 @@ export const make = (context: CompactionContext) => {
           const applied =
             compactionCommit === undefined
               ? undefined
-              : previous?.telemetry.findLast(
+              : (previousTelemetry?.findLast(
                   (event) => event._tag === "CompactionApplied" && event.checkpointId === id,
-                ) ?? prepareTelemetry({
+                ) ??
+                prepareTelemetry({
                   _tag: "CompactionApplied",
                   turn,
                   compactionId: compactionCommit.compactionId,
@@ -314,8 +316,9 @@ export const make = (context: CompactionContext) => {
                   kind: result._tag === "Summarize" ? "summarize" : "microcompact",
                   appliedAt: yield* Clock.currentTimeMillis,
                   commit: compactionCommit,
-                })
-          const telemetry = previous?.telemetry ?? Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
+                }))
+          const telemetry =
+            previousTelemetry ?? Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
           const projectedHistory = conversationOnly(result.history)
           const checkpointBase = {
             id,
@@ -386,7 +389,9 @@ export const make = (context: CompactionContext) => {
         tag: retained._tag,
         applicationIdentity,
         parentId,
-        result: Schema.encodeSync(CompactionResult)(retained),
+        result: yield* Schema.encodeEffect(CompactionResult)(retained).pipe(
+          Effect.mapError((error) => AgentError.make({ turn, message: error.message })),
+        ),
       }
       const interceptionInput =
         commitData === undefined ? interceptionBase : { ...interceptionBase, compactionCommit: commitData }

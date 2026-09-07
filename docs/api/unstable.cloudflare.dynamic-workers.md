@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.cloudflare.dynamic-workers
+[generalist](./index.md) / unstable.cloudflare.dynamic-workers
 
 # unstable.cloudflare.dynamic-workers
 
@@ -90,7 +90,7 @@ Inputs for adapting one Sandbox provider to the Worker Loader CodeExecutor ident
 
 ##### provider
 
-> `readonly` **provider**: [`SandboxProviderService`](./sandbox#sandboxproviderservice)
+> `readonly` **provider**: [`SandboxProviderService`](./sandbox.md#sandboxproviderservice)
 
 **`Experimental`**
 
@@ -106,7 +106,7 @@ Cloudflare Worker Loader adapter construction options.
 
 #### Extended by
 
-- [`WorkerLoaderOptions`](./unstable.sandbox.worker-loader#workerloaderoptions)
+- [`WorkerLoaderOptions`](./unstable.sandbox.worker-loader.md#workerloaderoptions)
 
 #### Properties
 
@@ -294,7 +294,7 @@ Strict requests accepted by the sole multiplexed capability binding.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor#codeexecutor)\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor.md#codeexecutor)\>
 
 **`Experimental`**
 
@@ -308,7 +308,7 @@ Provide the Worker Loader CodeExecutor.
 
 #### Returns
 
-`Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor#codeexecutor)\>
+`Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor.md#codeexecutor)\>
 
 ***
 
@@ -316,7 +316,7 @@ Provide the Worker Loader CodeExecutor.
 
 ### layerUnavailable
 
-> `const` **layerUnavailable**: (`message?`) => `Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor#codeexecutor)\>
+> `const` **layerUnavailable**: (`message?`) => `Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor.md#codeexecutor)\>
 
 **`Experimental`**
 
@@ -330,7 +330,7 @@ Provide an explicitly disabled Worker Loader boundary.
 
 #### Returns
 
-`Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor#codeexecutor)\>
+`Layer.Layer`\<[`CodeExecutor`](./generalist/namespaces/CodeExecutor.md#codeexecutor)\>
 
 ***
 
@@ -338,7 +338,7 @@ Provide an explicitly disabled Worker Loader boundary.
 
 ### make
 
-> `const` **make**: (`options`) => [`Service`](./generalist/namespaces/CodeExecutor#service)
+> `const` **make**: (`options`) => [`Service`](./generalist/namespaces/CodeExecutor.md#service)
 
 **`Experimental`**
 
@@ -352,7 +352,7 @@ Construct a CodeExecutor as a thin adapter over an explicit Sandbox provider.
 
 #### Returns
 
-[`Service`](./generalist/namespaces/CodeExecutor#service)
+[`Service`](./generalist/namespaces/CodeExecutor.md#service)
 
 ***
 
@@ -360,7 +360,7 @@ Construct a CodeExecutor as a thin adapter over an explicit Sandbox provider.
 
 ### makeUnavailable
 
-> `const` **makeUnavailable**: (`message?`) => [`Service`](./generalist/namespaces/CodeExecutor#service)
+> `const` **makeUnavailable**: (`message?`) => [`Service`](./generalist/namespaces/CodeExecutor.md#service)
 
 **`Experimental`**
 
@@ -374,4 +374,4 @@ Construct an explicitly disabled Worker Loader boundary.
 
 #### Returns
 
-[`Service`](./generalist/namespaces/CodeExecutor#service)
+[`Service`](./generalist/namespaces/CodeExecutor.md#service)

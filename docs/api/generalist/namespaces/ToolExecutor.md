@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ToolExecutor
+[generalist](../../index.md) / [generalist](../index.md) / ToolExecutor
 
 # ToolExecutor
 
@@ -384,7 +384,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 #### Extended by
 
-- [`PlacementRequest`](./ToolPlacement#placementrequest)
+- [`PlacementRequest`](./ToolPlacement.md#placementrequest)
 
 #### Properties
 
@@ -444,7 +444,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ##### R
 
-`R` = [`ToolContext`](./ToolContext#toolcontext)
+`R` = [`ToolContext`](./ToolContext.md#toolcontext)
 
 #### Properties
 
@@ -484,7 +484,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
 
 ###### Parameters
 
@@ -494,7 +494,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ###### Returns
 
-`Effect`\<[`Outcome`](#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
+`Effect`\<[`Outcome`](#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
 
 <a id="replaypolicy"></a>
 
@@ -516,7 +516,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ##### transformResolved?
 
-> `readonly` `optional` **transformResolved?**: (`request`, `outcome`) => `Effect`\<[`SettledOutcome`](#settledoutcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
+> `readonly` `optional` **transformResolved?**: (`request`, `outcome`) => `Effect`\<[`SettledOutcome`](#settledoutcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
 
 ###### Parameters
 
@@ -530,7 +530,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ###### Returns
 
-`Effect`\<[`SettledOutcome`](#settledoutcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
+`Effect`\<[`SettledOutcome`](#settledoutcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](#frameworkfailure) \| [`RemoteRetryMisconfigured`](#remoteretrymisconfigured), `R`\>
 
 ***
 
@@ -540,7 +540,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 #### Extended by
 
-- [`BoundedSuccess`](./ToolOutput#boundedsuccess)
+- [`BoundedSuccess`](./ToolOutput.md#boundedsuccess)
 
 #### Properties
 
@@ -690,7 +690,7 @@ A completed tool outcome reported while cancelling an exact durable operation.
 
 ### client
 
-> `const` **client**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `const` **client**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 Route tool calls to a user/browser/desktop client.
 
@@ -708,11 +708,11 @@ Route tool calls to a user/browser/desktop client.
 
 ##### options
 
-[`PlacementRouteOptions`](./ToolPlacement#placementrouteoptions)\<`Tools`, `E`\>
+[`PlacementRouteOptions`](./ToolPlacement.md#placementrouteoptions)\<`Tools`, `E`\>
 
 #### Returns
 
-[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ***
 
@@ -720,7 +720,7 @@ Route tool calls to a user/browser/desktop client.
 
 ### executeToolkit
 
-> `const` **executeToolkit**: *typeof* `executeToolkitUncurried` & \{\<`R`, `T`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), [`ToolContext`](./ToolContext#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>; \<`Name`, `Parameters`, `SuccessSchema`, `R`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](#frameworkfailure), [`ToolContext`](./ToolContext#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>; \<`Tools`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), `HandlerServices`\<`Tools`\[keyof `Tools`\]\>\>; \<`Tools`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), `HandlersFor`\<`Tools`\> \| `HandlerServices`\<`Tools`\[keyof `Tools`\]\>\>; \}
+> `const` **executeToolkit**: *typeof* `executeToolkitUncurried` & \{\<`R`, `T`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), [`ToolContext`](./ToolContext.md#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>; \<`Name`, `Parameters`, `SuccessSchema`, `R`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](#frameworkfailure), [`ToolContext`](./ToolContext.md#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>; \<`Tools`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), `HandlerServices`\<`Tools`\[keyof `Tools`\]\>\>; \<`Tools`\>(`request`): (`toolkit`) => `Effect`\<[`Outcome`](#outcome), [`FrameworkFailure`](#frameworkfailure), `HandlersFor`\<`Tools`\> \| `HandlerServices`\<`Tools`\[keyof `Tools`\]\>\>; \}
 
 ***
 
@@ -754,7 +754,7 @@ Route tool calls to a user/browser/desktop client.
 
 ### mcp
 
-> `const` **mcp**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `const` **mcp**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 Route tool calls to an MCP placement adapter.
 
@@ -772,11 +772,11 @@ Route tool calls to an MCP placement adapter.
 
 ##### options
 
-[`PlacementRouteOptions`](./ToolPlacement#placementrouteoptions)\<`Tools`, `E`\>
+[`PlacementRouteOptions`](./ToolPlacement.md#placementrouteoptions)\<`Tools`, `E`\>
 
 #### Returns
 
-[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ***
 
@@ -794,7 +794,7 @@ Durable tool execution outcome.
 
 ### remote
 
-> `const` **remote**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `const` **remote**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 Route tool calls to a remote tool worker or service.
 
@@ -812,11 +812,11 @@ Route tool calls to a remote tool worker or service.
 
 ##### options
 
-[`RemoteRouteOptions`](./ToolPlacement#remoterouteoptions)\<`Tools`, `E`\>
+[`RemoteRouteOptions`](./ToolPlacement.md#remoterouteoptions)\<`Tools`, `E`\>
 
 #### Returns
 
-[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ***
 
@@ -824,7 +824,7 @@ Route tool calls to a remote tool worker or service.
 
 ### sandbox
 
-> `const` **sandbox**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `const` **sandbox**: \<`Tools`, `E`\>(`options`) => [`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 Route tool calls to a workspace or sandbox runtime.
 
@@ -842,11 +842,11 @@ Route tool calls to a workspace or sandbox runtime.
 
 ##### options
 
-[`PlacementRouteOptions`](./ToolPlacement#placementrouteoptions)\<`Tools`, `E`\>
+[`PlacementRouteOptions`](./ToolPlacement.md#placementrouteoptions)\<`Tools`, `E`\>
 
 #### Returns
 
-[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ## Functions
 
@@ -856,21 +856,21 @@ Route tool calls to a workspace or sandbox runtime.
 
 #### Call Signature
 
-> **layerRouter**(`routes`): `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext#toolcontext)\>
+> **layerRouter**(`routes`): `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Parameters
 
 ###### routes
 
-`Iterable`\<[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\>\>
+`Iterable`\<[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\>\>
 
 ##### Returns
 
-`Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext#toolcontext)\>
+`Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 #### Call Signature
 
-> **layerRouter**\<`R`\>(`routes`): `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext#toolcontext) \| `R`\>
+> **layerRouter**\<`R`\>(`routes`): `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext.md#toolcontext) \| `R`\>
 
 ##### Type Parameters
 
@@ -882,15 +882,15 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### routes
 
-`Iterable`\<[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\> \| `Effect`\<[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\>, `never`, `R`\>\>
+`Iterable`\<[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\> \| `Effect`\<[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\>, `never`, `R`\>\>
 
 ##### Returns
 
-`Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext#toolcontext) \| `R`\>
+`Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext.md#toolcontext) \| `R`\>
 
 #### Call Signature
 
-> **layerRouter**\<`R`\>(`routes`): `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext#toolcontext) \| `R`\>
+> **layerRouter**\<`R`\>(`routes`): `Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext.md#toolcontext) \| `R`\>
 
 ##### Type Parameters
 
@@ -902,11 +902,11 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### routes
 
-`Iterable`\<[`RouteInput`](./ToolPlacement#routeinput)\<[`ToolContext`](./ToolContext#toolcontext)\> \| [`RouteInput`](./ToolPlacement#routeinput)\<`R`\>\>
+`Iterable`\<[`RouteInput`](./ToolPlacement.md#routeinput)\<[`ToolContext`](./ToolContext.md#toolcontext)\> \| [`RouteInput`](./ToolPlacement.md#routeinput)\<`R`\>\>
 
 ##### Returns
 
-`Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext#toolcontext) \| `R`\>
+`Layer`\<[`ToolExecutor`](#toolexecutor), `never`, [`ToolContext`](./ToolContext.md#toolcontext) \| `R`\>
 
 #### Call Signature
 
@@ -926,7 +926,7 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### routes
 
-`Iterable`\<[`RouteInput`](./ToolPlacement#routeinput)\<`R1`\> \| [`RouteInput`](./ToolPlacement#routeinput)\<`R2`\>\>
+`Iterable`\<[`RouteInput`](./ToolPlacement.md#routeinput)\<`R1`\> \| [`RouteInput`](./ToolPlacement.md#routeinput)\<`R2`\>\>
 
 ##### Returns
 
@@ -946,7 +946,7 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### routes
 
-`Iterable`\<[`RouteInput`](./ToolPlacement#routeinput)\<`R`\>\>
+`Iterable`\<[`RouteInput`](./ToolPlacement.md#routeinput)\<`R`\>\>
 
 ##### Returns
 
@@ -984,7 +984,7 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### toolkit
 
-[`AgentToolToolkit`](./AgentTool#agenttooltoolkit)\<`Name`, `Parameters`, `SuccessSchema`, `R`\>
+[`AgentToolToolkit`](./AgentTool.md#agenttooltoolkit)\<`Name`, `Parameters`, `SuccessSchema`, `R`\>
 
 ##### Returns
 
@@ -1082,21 +1082,21 @@ Route tool calls to a workspace or sandbox runtime.
 
 #### Call Signature
 
-> **route**(`options`): [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\>
+> **route**(`options`): [`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Parameters
 
 ###### options
 
-[`RouteOptions`](./ToolPlacement#routeoptions)\<[`ToolContext`](./ToolContext#toolcontext)\>
+[`RouteOptions`](./ToolPlacement.md#routeoptions)\<[`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Returns
 
-[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\>
+[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\>
 
 #### Call Signature
 
-> **route**\<`R`\>(`options`): [`Route`](./ToolPlacement#route)\<`R`\>
+> **route**\<`R`\>(`options`): [`Route`](./ToolPlacement.md#route)\<`R`\>
 
 ##### Type Parameters
 
@@ -1108,11 +1108,11 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### options
 
-[`RouteOptions`](./ToolPlacement#routeoptions)\<`R`\>
+[`RouteOptions`](./ToolPlacement.md#routeoptions)\<`R`\>
 
 ##### Returns
 
-[`Route`](./ToolPlacement#route)\<`R`\>
+[`Route`](./ToolPlacement.md#route)\<`R`\>
 
 ***
 
@@ -1122,7 +1122,7 @@ Route tool calls to a workspace or sandbox runtime.
 
 #### Call Signature
 
-> **routeToolkit**\<`Name`, `Parameters`, `SuccessSchema`, `R`\>(`toolkit`): [`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>
+> **routeToolkit**\<`Name`, `Parameters`, `SuccessSchema`, `R`\>(`toolkit`): [`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>
 
 ##### Type Parameters
 
@@ -1146,15 +1146,15 @@ Route tool calls to a workspace or sandbox runtime.
 
 ###### toolkit
 
-[`AgentToolToolkit`](./AgentTool#agenttooltoolkit)\<`Name`, `Parameters`, `SuccessSchema`, `R`\>
+[`AgentToolToolkit`](./AgentTool.md#agenttooltoolkit)\<`Name`, `Parameters`, `SuccessSchema`, `R`\>
 
 ##### Returns
 
-[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>
+[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `R` \| `AgentToolSchemaServices`\<`Parameters`, `SuccessSchema`\>\>
 
 #### Call Signature
 
-> **routeToolkit**\<`R`, `T`\>(`toolkit`): [`RouteInput`](./ToolPlacement#routeinput)\<[`ToolContext`](./ToolContext#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>
+> **routeToolkit**\<`R`, `T`\>(`toolkit`): [`RouteInput`](./ToolPlacement.md#routeinput)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>
 
 ##### Type Parameters
 
@@ -1174,11 +1174,11 @@ Route tool calls to a workspace or sandbox runtime.
 
 ##### Returns
 
-[`RouteInput`](./ToolPlacement#routeinput)\<[`ToolContext`](./ToolContext#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>
+[`RouteInput`](./ToolPlacement.md#routeinput)\<[`ToolContext`](./ToolContext.md#toolcontext) \| `R` \| `ToolSchemaServices`\<`T`\>\>
 
 #### Call Signature
 
-> **routeToolkit**\<`Tools`\>(`toolkit`): [`Route`](./ToolPlacement#route)
+> **routeToolkit**\<`Tools`\>(`toolkit`): [`Route`](./ToolPlacement.md#route)
 
 ##### Type Parameters
 
@@ -1194,11 +1194,11 @@ Route tool calls to a workspace or sandbox runtime.
 
 ##### Returns
 
-[`Route`](./ToolPlacement#route)
+[`Route`](./ToolPlacement.md#route)
 
 #### Call Signature
 
-> **routeToolkit**\<`Tools`\>(`toolkit`): `Effect`\<[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\>, `never`, `HandlersFor`\<`Tools`\>\>
+> **routeToolkit**\<`Tools`\>(`toolkit`): `Effect`\<[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\>, `never`, `HandlersFor`\<`Tools`\>\>
 
 ##### Type Parameters
 
@@ -1214,4 +1214,4 @@ Route tool calls to a workspace or sandbox runtime.
 
 ##### Returns
 
-`Effect`\<[`Route`](./ToolPlacement#route)\<[`ToolContext`](./ToolContext#toolcontext)\>, `never`, `HandlersFor`\<`Tools`\>\>
+`Effect`\<[`Route`](./ToolPlacement.md#route)\<[`ToolContext`](./ToolContext.md#toolcontext)\>, `never`, `HandlersFor`\<`Tools`\>\>

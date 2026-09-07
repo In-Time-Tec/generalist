@@ -353,7 +353,7 @@ export const checkCall = Effect.fn("Capability.checkCall")(function* (input: {
   const decodedArguments = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Json))(input.arguments)
   const arguments_ = Option.getOrUndefined(decodedArguments)
   const argumentsDigest = digest(arguments_ ?? null)
-  return yield* interpreter.updateCapabilityCheckpoint((checkpoint) => {
+  return yield* interpreter.updateCapabilityCheckpoint<CallDecision>((checkpoint) => {
     const initialized = initialize(checkpoint, input.descriptors ?? [])
     const argumentTaint = taintForArguments(initialized, toolBatch)
     const revokedAuthority = descriptor?.lineage.find((authority) => revoked.has(authority.id))
@@ -361,14 +361,14 @@ export const checkCall = Effect.fn("Capability.checkCall")(function* (input: {
       revokedAuthority === undefined
         ? initialized
         : append(initialized, { _tag: "Revocation", id: revokedAuthority.id, revokedAt: now })
-    const reason =
-      input.untaintedArguments.length > 0 && argumentTaint.length > 0
-        ? ("tainted" as const)
-        : descriptor === undefined
-          ? input.descriptors === undefined
-            ? undefined
-            : "missing"
-          : denialReason(descriptor, withRevocation, now, arguments_)
+    let reason: Use["reason"]
+    if (input.untaintedArguments.length > 0 && argumentTaint.length > 0) {
+      reason = "tainted"
+    } else if (descriptor !== undefined) {
+      reason = denialReason(descriptor, withRevocation, now, arguments_)
+    } else if (input.descriptors !== undefined) {
+      reason = "missing"
+    }
     // Receipts describe checked inputs and outcomes; they never substitute for current authority.
     const key = JSON.stringify([
       input.turn,
@@ -384,22 +384,32 @@ export const checkCall = Effect.fn("Capability.checkCall")(function* (input: {
       descriptor === undefined
         ? undefined
         : { capabilityId: descriptor.id, tool: descriptor.tool, toolCallId: input.toolCallId }
-    const use: Use = {
-      _tag: "Use",
+    const use = {
+      _tag: "Use" as const,
       key,
       ...(descriptor === undefined ? undefined : { id: descriptor.id }),
       tool: input.tool,
       toolCallId: input.toolCallId,
       turn: input.turn,
-      decision: reason === undefined ? "allow" : "deny",
-      ...(reason === undefined ? (source === undefined ? undefined : { source }) : { reason }),
       argumentTaint,
     }
-    const value: CallDecision =
-      reason === undefined
-        ? { _tag: "Allowed" }
-        : { _tag: "Denied", error: denial(reason, descriptor, argumentTaint), taint: argumentTaint }
-    return { checkpoint: append(withRevocation, use), value }
+    if (reason !== undefined) {
+      const value: CallDecision = {
+        _tag: "Denied",
+        error: denial(reason, descriptor, argumentTaint),
+        taint: argumentTaint,
+      }
+      return { checkpoint: append(withRevocation, { ...use, decision: "deny", reason }), value }
+    }
+    const value: CallDecision = { _tag: "Allowed" }
+    return {
+      checkpoint: append(withRevocation, {
+        ...use,
+        decision: "allow",
+        ...(source === undefined ? undefined : { source }),
+      }),
+      value,
+    }
   })
 })
 

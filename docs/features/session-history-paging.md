@@ -7,7 +7,7 @@
 `SessionHistory.page` slices an already materialized array; it does not bound the database read that produced that array. Use the Session store's purpose-specific reads instead when fetching durable history:
 
 - `entry(id)` reads one exact immutable entry for response resolution.
-- `pathPage({ leafId, limit, cursor? })` reads backward on a fixed leaf with a leaf-bound continuation cursor. SQL performs at most `limit + 1` point lookups; later appends do not change the selected path. Reuse the returned cursor, not an arbitrary entry ID.
+- `pathPage({ leafId, limit, cursor? })` reads backward on a fixed leaf with a leaf-bound continuation cursor. Later appends do not change the selected path. Paging bounds returned history, not the object engine's complete partition-state memory. Reuse the returned cursor, not an arbitrary entry ID.
 - `effectivePath(leaf?)` reads only the latest Compaction/Handoff projection and its suffix for model context. Without a projection boundary, the complete context still grows.
 - `latestCompaction(leaf?)` finds compaction telemetry independently, including across a later Handoff. It may traverse many ancestors, but does not materialize their complete path.
 - `path(leaf?)` is the complete lossless ancestry for audit, compaction input, and memory retention. It is deliberately not silently truncated.

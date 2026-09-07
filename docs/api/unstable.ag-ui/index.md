@@ -1,12 +1,12 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / unstable.ag-ui
+[generalist](../index.md) / unstable.ag-ui
 
 # unstable.ag-ui
 
 ## Namespaces
 
-- [AGUI](./namespaces/AGUI)
-- [Errors](./namespaces/Errors)
+- [AGUI](./namespaces/AGUI.md)
+- [Errors](./namespaces/Errors.md)

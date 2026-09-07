@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / RunBudget
+[generalist](../../index.md) / [generalist](../index.md) / RunBudget
 
 # RunBudget
 

@@ -3,9 +3,13 @@ import { Effect, Function } from "effect"
 import type { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { ExecutionClaim } from "../../../run/store.js"
 import { expireRunningOperation } from "./expiry.js"
-import type { RuntimeState } from "../../state.js"
+import type { RuntimeState } from "../../projection.js"
 
-type RecoveryEffect = Effect.Effect<readonly ["ready" | "blocked", RuntimeState], RunNotFound | RuntimeUnavailable, PreparedObservation>
+type RecoveryEffect = Effect.Effect<
+  readonly ["ready" | "blocked", RuntimeState],
+  RunNotFound | RuntimeUnavailable,
+  PreparedObservation
+>
 
 export const recoverRunningOperations: {
   (input: ExecutionClaim): (state: RuntimeState) => RecoveryEffect

@@ -124,12 +124,16 @@ it.effect("denies a child's widened operation before hooks and permissions while
       return textResponse("child observed denial")
     })
     const hooks = Hooks.layer([
-      Hooks.onToolCall(() =>
-        Effect.sync(() => {
-          childHookCalls += 1
-          return Hooks.Continue()
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.unstable.capability.index.onToolCall.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            childHookCalls += 1
+            return Hooks.Continue()
+          }),
+      }),
     ])
     const journal = Layer.succeed(DurableDriver.DriverJournal, {
       onScheduled: () => Effect.void,
@@ -216,21 +220,34 @@ it.effect("checks hook-replaced arguments before approval and retains authored a
         }),
     })
     const hooks = Hooks.layer([
-      Hooks.onToolCall(({ call }) =>
-        Effect.succeed(
-          Hooks.Replace({
-            path: call.id === "restricted-replacement" ? "secrets/token.ts" : "src/auth/normalized.ts",
-            op: "read",
+      Hooks.onToolCall({
+        key: "test.unstable.capability.index.onToolCall.2",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ call }) =>
+          Effect.succeed(
+            Hooks.Replace({
+              path: call.id === "restricted-replacement" ? "secrets/token.ts" : "src/auth/normalized.ts",
+              op: "read",
+            }),
+          ),
+      }),
+      Hooks.onToolCall({
+        key: "test.unstable.capability.index.onToolCall.3",
+        version: "1",
+        replayPolicy: "never",
+        hook: () => Effect.succeed(Hooks.Ask()),
+      }),
+      Hooks.onApprovalRequest({
+        key: "test.unstable.capability.index.onApprovalRequest.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ call }) =>
+          Effect.sync(() => {
+            approved.push(call.id)
+            return Hooks.Continue()
           }),
-        ),
-      ),
-      Hooks.onToolCall(() => Effect.succeed(Hooks.Ask())),
-      Hooks.onApprovalRequest(({ call }) =>
-        Effect.sync(() => {
-          approved.push(call.id)
-          return Hooks.Continue()
-        }),
-      ),
+      }),
     ])
     const journal = Layer.succeed(DurableDriver.DriverJournal, {
       onScheduled: () => Effect.void,
@@ -315,11 +332,24 @@ it.effect("denies a capability revoked by a ToolCall hook before approval or dis
     const base = Agent.make({ name: "capability-hook-revocation", toolkit })
     const constrained = yield* applyInheritance(base, base, inheritance({ tools: [handle] }))
     const hooks = Hooks.layer([
-      Hooks.onToolCall(() =>
-        revoke(handle).pipe(Effect.as(Hooks.Replace({ path: "src/normalized.ts", op: "read" }))),
-      ),
-      Hooks.onToolCall(() => Effect.succeed(Hooks.Ask())),
-      Hooks.onApprovalRequest(() => Effect.die("Revoked effective calls must not request approval")),
+      Hooks.onToolCall({
+        key: "test.unstable.capability.index.onToolCall.4",
+        version: "1",
+        replayPolicy: "never",
+        hook: () => revoke(handle).pipe(Effect.as(Hooks.Replace({ path: "src/normalized.ts", op: "read" }))),
+      }),
+      Hooks.onToolCall({
+        key: "test.unstable.capability.index.onToolCall.5",
+        version: "1",
+        replayPolicy: "never",
+        hook: () => Effect.succeed(Hooks.Ask()),
+      }),
+      Hooks.onApprovalRequest({
+        key: "test.unstable.capability.index.onApprovalRequest.2",
+        version: "1",
+        replayPolicy: "never",
+        hook: () => Effect.die("Revoked effective calls must not request approval"),
+      }),
     ])
     const handlers = toolkit.toLayer({
       capability_file: () => Effect.die("Revoked effective calls must not execute"),

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl.bun](../index) / BunKernelPool
+[generalist](../../index.md) / [repl.bun](../index.md) / BunKernelPool
 
 # BunKernelPool
 
@@ -82,7 +82,7 @@ Host source evaluated on every worker start, after restore, before any cell.
 
 ###### contractVersion
 
-> `readonly` **contractVersion**: `2`
+> `readonly` **contractVersion**: `1`
 
 ###### image
 
@@ -176,7 +176,7 @@ Host source evaluated on every worker start, after restore, before any cell.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`KernelPool`](../../repl/namespaces/KernelPool#kernelpool), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore)\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`KernelPool`](../../repl/namespaces/KernelPool.md#kernelpool), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore)\>
 
 One Server-scoped pool of live Bun kernels, one per Session.
 
@@ -188,7 +188,7 @@ One Server-scoped pool of live Bun kernels, one per Session.
 
 #### Returns
 
-`Layer.Layer`\<[`KernelPool`](../../repl/namespaces/KernelPool#kernelpool), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore)\>
+`Layer.Layer`\<[`KernelPool`](../../repl/namespaces/KernelPool.md#kernelpool), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore)\>
 
 ***
 
@@ -196,7 +196,7 @@ One Server-scoped pool of live Bun kernels, one per Session.
 
 ### make
 
-> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](../../repl/namespaces/KernelPool#service), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore) \| `Scope.Scope`\>
+> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](../../repl/namespaces/KernelPool.md#service), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore) \| `Scope.Scope`\>
 
 One live Bun kernel per Session, owned by a Server-scoped reference-counted map.
 A Session reuses its kernel across Runs, and the map's own scope releases every kernel on Server
@@ -212,4 +212,4 @@ reference-count expiry rather than a sweep.
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](../../repl/namespaces/KernelPool#service), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore) \| `Scope.Scope`\>
+`Effect.Effect`\<[`Service`](../../repl/namespaces/KernelPool.md#service), `never`, [`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore) \| `Scope.Scope`\>

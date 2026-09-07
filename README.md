@@ -44,6 +44,8 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 
 **No API key?** The [offline quickstart](docs/start/quickstart.md) runs a tool-calling agent with a scripted model.
 
+Durability and compute placement are independent: local/server, Cloudflare Durable Objects, and Rivet actors use the same S3/native R2 engine. The clean v1 cutover uses fresh namespaces with no SQL backend, compatibility reader, or migration fallback. Local MinIO/Miniflare/workerd qualification does not certify AWS or deployed R2, and this in-flight work is not a release-readiness claim.
+
 ## Build from here
 
 | I want to…                            | Read                                                  |

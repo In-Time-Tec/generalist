@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ModelResilience
+[generalist](../../index.md) / [generalist](../index.md) / ModelResilience
 
 # ModelResilience
 

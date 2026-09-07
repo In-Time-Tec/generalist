@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Hooks
+[generalist](../../index.md) / [generalist](../index.md) / Hooks
 
 # Hooks
 
@@ -12,7 +12,7 @@
 
 ### AddContext
 
-Re-exports [AddContext](../../hooks#addcontext-1)
+Re-exports [AddContext](../../hooks.md#addcontext-1)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [AddContext](../../hooks#addcontext-1)
 
 ### Approval
 
-Re-exports [Approval](../../hooks#approval)
+Re-exports [Approval](../../hooks.md#approval)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [Approval](../../hooks#approval)
 
 ### ApprovalRequest
 
-Re-exports [ApprovalRequest](../../hooks#approvalrequest)
+Re-exports [ApprovalRequest](../../hooks.md#approvalrequest)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [ApprovalRequest](../../hooks#approvalrequest)
 
 ### ApprovalRequestInput
 
-Re-exports [ApprovalRequestInput](../../hooks#approvalrequestinput)
+Re-exports [ApprovalRequestInput](../../hooks.md#approvalrequestinput)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [ApprovalRequestInput](../../hooks#approvalrequestinput)
 
 ### Ask
 
-Re-exports [Ask](../../hooks#ask-1)
+Re-exports [Ask](../../hooks.md#ask-1)
 
 ***
 
@@ -52,7 +52,15 @@ Re-exports [Ask](../../hooks#ask-1)
 
 ### Block
 
-Re-exports [Block](../../hooks#block-1)
+Re-exports [Block](../../hooks.md#block-1)
+
+***
+
+<a id="chainpin"></a>
+
+### chainPin
+
+Re-exports [chainPin](../../hooks.md#chainpin)
 
 ***
 
@@ -60,7 +68,7 @@ Re-exports [Block](../../hooks#block-1)
 
 ### Checkpoint
 
-Re-exports [Checkpoint](../../hooks#checkpoint-1)
+Re-exports [Checkpoint](../../hooks.md#checkpoint-1)
 
 ***
 
@@ -68,7 +76,7 @@ Re-exports [Checkpoint](../../hooks#checkpoint-1)
 
 ### Child
 
-Re-exports [Child](../../hooks#child)
+Re-exports [Child](../../hooks.md#child)
 
 ***
 
@@ -76,7 +84,7 @@ Re-exports [Child](../../hooks#child)
 
 ### ChildEnd
 
-Re-exports [ChildEnd](../../hooks#childend)
+Re-exports [ChildEnd](../../hooks.md#childend)
 
 ***
 
@@ -84,7 +92,7 @@ Re-exports [ChildEnd](../../hooks#childend)
 
 ### ChildEndInput
 
-Re-exports [ChildEndInput](../../hooks#childendinput)
+Re-exports [ChildEndInput](../../hooks.md#childendinput)
 
 ***
 
@@ -92,7 +100,7 @@ Re-exports [ChildEndInput](../../hooks#childendinput)
 
 ### ChildStart
 
-Re-exports [ChildStart](../../hooks#childstart)
+Re-exports [ChildStart](../../hooks.md#childstart)
 
 ***
 
@@ -100,7 +108,7 @@ Re-exports [ChildStart](../../hooks#childstart)
 
 ### ChildStartInput
 
-Re-exports [ChildStartInput](../../hooks#childstartinput)
+Re-exports [ChildStartInput](../../hooks.md#childstartinput)
 
 ***
 
@@ -108,7 +116,7 @@ Re-exports [ChildStartInput](../../hooks#childstartinput)
 
 ### Compaction
 
-Re-exports [Compaction](../../hooks#compaction)
+Re-exports [Compaction](../../hooks.md#compaction)
 
 ***
 
@@ -116,7 +124,7 @@ Re-exports [Compaction](../../hooks#compaction)
 
 ### CompactionInput
 
-Re-exports [CompactionInput](../../hooks#compactioninput)
+Re-exports [CompactionInput](../../hooks.md#compactioninput)
 
 ***
 
@@ -124,7 +132,7 @@ Re-exports [CompactionInput](../../hooks#compactioninput)
 
 ### Continue
 
-Re-exports [Continue](../../hooks#continue-1)
+Re-exports [Continue](../../hooks.md#continue-1)
 
 ***
 
@@ -132,7 +140,7 @@ Re-exports [Continue](../../hooks#continue-1)
 
 ### Decision
 
-Re-exports [Decision](../../hooks#decision-1)
+Re-exports [Decision](../../hooks.md#decision-1)
 
 ***
 
@@ -140,7 +148,15 @@ Re-exports [Decision](../../hooks#decision-1)
 
 ### Declaration
 
-Re-exports [Declaration](../../hooks#declaration)
+Re-exports [Declaration](../../hooks.md#declaration)
+
+***
+
+<a id="evaluationfailure"></a>
+
+### EvaluationFailure
+
+Re-exports [EvaluationFailure](../../hooks.md#evaluationfailure)
 
 ***
 
@@ -148,7 +164,7 @@ Re-exports [Declaration](../../hooks#declaration)
 
 ### Event
 
-Re-exports [Event](../../hooks#event-3)
+Re-exports [Event](../../hooks.md#event-3)
 
 ***
 
@@ -156,7 +172,7 @@ Re-exports [Event](../../hooks#event-3)
 
 ### Hook
 
-Re-exports [Hook](../../hooks#hook-1)
+Re-exports [Hook](../../hooks.md#hook-1)
 
 ***
 
@@ -164,7 +180,7 @@ Re-exports [Hook](../../hooks#hook-1)
 
 ### HookFailed
 
-Re-exports [HookFailed](../../hooks#hookfailed)
+Re-exports [HookFailed](../../hooks.md#hookfailed)
 
 ***
 
@@ -172,7 +188,15 @@ Re-exports [HookFailed](../../hooks#hookfailed)
 
 ### Hooks
 
-Re-exports [Hooks](../../hooks#hooks)
+Re-exports [Hooks](../../hooks.md#hooks)
+
+***
+
+<a id="identity"></a>
+
+### Identity
+
+Re-exports [Identity](../../hooks.md#identity-1)
 
 ***
 
@@ -180,7 +204,7 @@ Re-exports [Hooks](../../hooks#hooks)
 
 ### layer
 
-Re-exports [layer](../../hooks#layer)
+Re-exports [layer](../../hooks.md#layer)
 
 ***
 
@@ -188,7 +212,15 @@ Re-exports [layer](../../hooks#layer)
 
 ### layerIdentity
 
-Re-exports [layerIdentity](../../hooks#layeridentity)
+Re-exports [layerIdentity](../../hooks.md#layeridentity)
+
+***
+
+<a id="make"></a>
+
+### make
+
+Re-exports [make](../../hooks.md#make)
 
 ***
 
@@ -196,7 +228,7 @@ Re-exports [layerIdentity](../../hooks#layeridentity)
 
 ### ModelCall
 
-Re-exports [ModelCall](../../hooks#modelcall)
+Re-exports [ModelCall](../../hooks.md#modelcall)
 
 ***
 
@@ -204,7 +236,7 @@ Re-exports [ModelCall](../../hooks#modelcall)
 
 ### ModelCallInput
 
-Re-exports [ModelCallInput](../../hooks#modelcallinput)
+Re-exports [ModelCallInput](../../hooks.md#modelcallinput)
 
 ***
 
@@ -212,7 +244,7 @@ Re-exports [ModelCallInput](../../hooks#modelcallinput)
 
 ### onApprovalRequest
 
-Re-exports [onApprovalRequest](../../hooks#onapprovalrequest)
+Re-exports [onApprovalRequest](../../hooks.md#onapprovalrequest)
 
 ***
 
@@ -220,7 +252,7 @@ Re-exports [onApprovalRequest](../../hooks#onapprovalrequest)
 
 ### onChildEnd
 
-Re-exports [onChildEnd](../../hooks#onchildend)
+Re-exports [onChildEnd](../../hooks.md#onchildend)
 
 ***
 
@@ -228,7 +260,7 @@ Re-exports [onChildEnd](../../hooks#onchildend)
 
 ### onChildStart
 
-Re-exports [onChildStart](../../hooks#onchildstart)
+Re-exports [onChildStart](../../hooks.md#onchildstart)
 
 ***
 
@@ -236,7 +268,7 @@ Re-exports [onChildStart](../../hooks#onchildstart)
 
 ### onCompaction
 
-Re-exports [onCompaction](../../hooks#oncompaction)
+Re-exports [onCompaction](../../hooks.md#oncompaction)
 
 ***
 
@@ -244,7 +276,7 @@ Re-exports [onCompaction](../../hooks#oncompaction)
 
 ### onModelCall
 
-Re-exports [onModelCall](../../hooks#onmodelcall)
+Re-exports [onModelCall](../../hooks.md#onmodelcall)
 
 ***
 
@@ -252,7 +284,7 @@ Re-exports [onModelCall](../../hooks#onmodelcall)
 
 ### onRunEnd
 
-Re-exports [onRunEnd](../../hooks#onrunend)
+Re-exports [onRunEnd](../../hooks.md#onrunend)
 
 ***
 
@@ -260,7 +292,7 @@ Re-exports [onRunEnd](../../hooks#onrunend)
 
 ### onRunStart
 
-Re-exports [onRunStart](../../hooks#onrunstart)
+Re-exports [onRunStart](../../hooks.md#onrunstart)
 
 ***
 
@@ -268,7 +300,7 @@ Re-exports [onRunStart](../../hooks#onrunstart)
 
 ### onSteer
 
-Re-exports [onSteer](../../hooks#onsteer)
+Re-exports [onSteer](../../hooks.md#onsteer)
 
 ***
 
@@ -276,7 +308,7 @@ Re-exports [onSteer](../../hooks#onsteer)
 
 ### onToolCall
 
-Re-exports [onToolCall](../../hooks#ontoolcall)
+Re-exports [onToolCall](../../hooks.md#ontoolcall)
 
 ***
 
@@ -284,7 +316,7 @@ Re-exports [onToolCall](../../hooks#ontoolcall)
 
 ### onToolResult
 
-Re-exports [onToolResult](../../hooks#ontoolresult)
+Re-exports [onToolResult](../../hooks.md#ontoolresult)
 
 ***
 
@@ -292,7 +324,7 @@ Re-exports [onToolResult](../../hooks#ontoolresult)
 
 ### onTurnStart
 
-Re-exports [onTurnStart](../../hooks#onturnstart)
+Re-exports [onTurnStart](../../hooks.md#onturnstart)
 
 ***
 
@@ -300,7 +332,7 @@ Re-exports [onTurnStart](../../hooks#onturnstart)
 
 ### Replace
 
-Re-exports [Replace](../../hooks#replace-1)
+Re-exports [Replace](../../hooks.md#replace-1)
 
 ***
 
@@ -308,7 +340,7 @@ Re-exports [Replace](../../hooks#replace-1)
 
 ### RunEnd
 
-Re-exports [RunEnd](../../hooks#runend)
+Re-exports [RunEnd](../../hooks.md#runend)
 
 ***
 
@@ -316,7 +348,7 @@ Re-exports [RunEnd](../../hooks#runend)
 
 ### RunEndInput
 
-Re-exports [RunEndInput](../../hooks#runendinput)
+Re-exports [RunEndInput](../../hooks.md#runendinput)
 
 ***
 
@@ -324,7 +356,7 @@ Re-exports [RunEndInput](../../hooks#runendinput)
 
 ### RunStart
 
-Re-exports [RunStart](../../hooks#runstart)
+Re-exports [RunStart](../../hooks.md#runstart)
 
 ***
 
@@ -332,7 +364,7 @@ Re-exports [RunStart](../../hooks#runstart)
 
 ### RunStartInput
 
-Re-exports [RunStartInput](../../hooks#runstartinput)
+Re-exports [RunStartInput](../../hooks.md#runstartinput)
 
 ***
 
@@ -340,7 +372,7 @@ Re-exports [RunStartInput](../../hooks#runstartinput)
 
 ### Service
 
-Re-exports [Service](../../hooks#service)
+Re-exports [Service](../../hooks.md#service)
 
 ***
 
@@ -348,7 +380,7 @@ Re-exports [Service](../../hooks#service)
 
 ### Steer
 
-Re-exports [Steer](../../hooks#steer)
+Re-exports [Steer](../../hooks.md#steer)
 
 ***
 
@@ -356,7 +388,7 @@ Re-exports [Steer](../../hooks#steer)
 
 ### SteerInput
 
-Re-exports [SteerInput](../../hooks#steerinput)
+Re-exports [SteerInput](../../hooks.md#steerinput)
 
 ***
 
@@ -364,7 +396,7 @@ Re-exports [SteerInput](../../hooks#steerinput)
 
 ### ToolCall
 
-Re-exports [ToolCall](../../hooks#toolcall)
+Re-exports [ToolCall](../../hooks.md#toolcall)
 
 ***
 
@@ -372,7 +404,7 @@ Re-exports [ToolCall](../../hooks#toolcall)
 
 ### ToolCallInput
 
-Re-exports [ToolCallInput](../../hooks#toolcallinput)
+Re-exports [ToolCallInput](../../hooks.md#toolcallinput)
 
 ***
 
@@ -380,7 +412,7 @@ Re-exports [ToolCallInput](../../hooks#toolcallinput)
 
 ### ToolResult
 
-Re-exports [ToolResult](../../hooks#toolresult)
+Re-exports [ToolResult](../../hooks.md#toolresult)
 
 ***
 
@@ -388,7 +420,7 @@ Re-exports [ToolResult](../../hooks#toolresult)
 
 ### ToolResultInput
 
-Re-exports [ToolResultInput](../../hooks#toolresultinput)
+Re-exports [ToolResultInput](../../hooks.md#toolresultinput)
 
 ***
 
@@ -396,7 +428,7 @@ Re-exports [ToolResultInput](../../hooks#toolresultinput)
 
 ### TurnStart
 
-Re-exports [TurnStart](../../hooks#turnstart)
+Re-exports [TurnStart](../../hooks.md#turnstart)
 
 ***
 
@@ -404,4 +436,4 @@ Re-exports [TurnStart](../../hooks#turnstart)
 
 ### TurnStartInput
 
-Re-exports [TurnStartInput](../../hooks#turnstartinput)
+Re-exports [TurnStartInput](../../hooks.md#turnstartinput)

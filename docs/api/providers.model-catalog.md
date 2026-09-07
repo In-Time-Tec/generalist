@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.model-catalog
+[generalist](./index.md) / providers.model-catalog
 
 # providers.model-catalog
 

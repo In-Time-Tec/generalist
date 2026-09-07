@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Predicate, Schema } from "effect"
 import {
   CapabilityFailure,
   type ProgramBudgetExhausted,
@@ -32,15 +32,16 @@ const programOperationFailureCases = ProgramOperationFailure.cases
 /** Known Program failures use their domain codec; malformed tagged failures cannot fall through as opaque data. */
 const ProgramOperationError = Schema.Union([
   ProgramOperationFailure,
-  Schema.Unknown.check(Schema.makeFilter(
-    (value) =>
-      value === null ||
-      typeof value !== "object" ||
-      !("_tag" in value) ||
-      typeof value._tag !== "string" ||
-      !Object.hasOwn(programOperationFailureCases, value._tag),
-    { message: "Program operation failures must match their domain schema" },
-  )),
+  Schema.Unknown.check(
+    Schema.makeFilter(
+      (value) =>
+        !Predicate.isObjectOrArray(value) ||
+        !("_tag" in value) ||
+        !Predicate.isString(value._tag) ||
+        !Object.hasOwn(programOperationFailureCases, value._tag),
+      { message: "Program operation failures must match their domain schema" },
+    ),
+  ),
 ])
 
 /** Persisted counters and the fixed deadline for one Program Run. */
@@ -105,6 +106,7 @@ export type ProgramOperationOutcome =
   | { readonly _tag: "Failed"; readonly error: unknown }
   | { readonly _tag: "Unknown" }
 export interface SettleProgramOperationInput extends ExecutionClaim {
+  readonly commandId: string
   readonly operation: ProgramOperationName
   readonly outcome: ProgramOperationOutcome
   readonly releaseSlots: number

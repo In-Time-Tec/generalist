@@ -77,10 +77,7 @@ export const programBudgetContract: Effect.Effect<void, ProgramContractError, Pr
         else if (dimension === "logBytes") reservation = { logBytes: 1 }
         else reservation = { activeSlots: budget.concurrency + 1 }
         expect(
-          yield* reserve(store, execution, dimension, budget, reservation).pipe(
-            Effect.flip,
-            Effect.orDie,
-          ),
+          yield* reserve(store, execution, dimension, budget, reservation).pipe(Effect.flip, Effect.orDie),
         ).toMatchObject({ dimension, limit: dimension === "concurrency" ? budget.concurrency : 0 })
       })
 
@@ -89,10 +86,11 @@ export const programBudgetContract: Effect.Effect<void, ProgramContractError, Pr
     })
 
     const tokenClaim = yield* claim("tokens")
-    yield* reserve(store, tokenClaim, "tokens", { ...program.pinned.manifest.budget, tokens: 0 }, {}, )
+    yield* reserve(store, tokenClaim, "tokens", { ...program.pinned.manifest.budget, tokens: 0 }, {})
     expect(
       yield* store.settleProgramOperation({
         ...tokenClaim,
+        commandId: "program:settle:tokens",
         operation: "tokens",
         outcome: { _tag: "Succeeded", value: "result", tokens: 1 },
         releaseSlots: 0,
@@ -120,10 +118,24 @@ export const programReplayDivergenceContract: Effect.Effect<void, ProgramContrac
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
     const execution = yield* claimProgram("replay-divergence")
-    yield* reserve(store, execution, "same-operation", program.pinned.manifest.budget, { toolCalls: 1 }, {
-      value: "first",
-    })
-    const divergence = yield* reserve(store, execution, "same-operation", program.pinned.manifest.budget, { toolCalls: 1 }, { value: "changed" },).pipe(Effect.flip, Effect.orDie)
+    yield* reserve(
+      store,
+      execution,
+      "same-operation",
+      program.pinned.manifest.budget,
+      { toolCalls: 1 },
+      {
+        value: "first",
+      },
+    )
+    const divergence = yield* reserve(
+      store,
+      execution,
+      "same-operation",
+      program.pinned.manifest.budget,
+      { toolCalls: 1 },
+      { value: "changed" },
+    ).pipe(Effect.flip, Effect.orDie)
     expect(divergence).toMatchObject({ _tag: "generalist/core/ProgramReplayDivergence", operation: "same-operation" })
     expect(yield* store.loadProgramState(execution.runId)).toMatchObject({ toolCalls: 1 })
     expect(yield* store.getProgramOperation({ runId: execution.runId, operation: "same-operation" })).toMatchObject({
@@ -137,14 +149,21 @@ export const programCancellationFenceContract: Effect.Effect<void, ProgramContra
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
     const execution = yield* claimProgram("cancel-fence")
-    yield* reserve(store, execution, "cancelled-operation", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 }, )
+    yield* reserve(store, execution, "cancelled-operation", program.pinned.manifest.budget, {
+      toolCalls: 1,
+      activeSlots: 1,
+    })
     yield* store.startProgramOperation({ ...execution, operation: "cancelled-operation" })
     yield* runtime.cancel({
-          commandId: "runtime-program-store-contract-ts-cancel-1", runId: execution.runId, reason: "cancel active Program operation" })
+      commandId: "runtime-program-store-contract-ts-cancel-1",
+      runId: execution.runId,
+      reason: "cancel active Program operation",
+    })
 
     const staleCommit = yield* store
       .settleProgramOperation({
         ...execution,
+        commandId: "program:settle:cancelled-stale",
         operation: "cancelled-operation",
         outcome: { _tag: "Succeeded", value: "stale value" },
         releaseSlots: 1,
@@ -163,12 +182,13 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
     const success = yield* claimProgram("settled-replay-success")
-    yield* reserve(store, success, "replayed-success", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 }, )
+    yield* reserve(store, success, "replayed-success", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 })
     yield* store.startProgramOperation({ ...success, operation: "replayed-success" })
     const successOutcome = { _tag: "Succeeded" as const, value: { value: "result" } }
     expect(
       yield* store.settleProgramOperation({
         ...success,
+        commandId: "program:settle:success",
         operation: "replayed-success",
         outcome: successOutcome,
         releaseSlots: 1,
@@ -177,6 +197,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     expect(
       yield* store.settleProgramOperation({
         ...success,
+        commandId: "program:settle:success",
         operation: "replayed-success",
         outcome: successOutcome,
         releaseSlots: 1,
@@ -186,6 +207,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     const divergentSuccess = yield* store
       .settleProgramOperation({
         ...success,
+        commandId: "program:settle:success:divergent",
         operation: "replayed-success",
         outcome: { _tag: "Succeeded", value: { value: "changed" } },
         releaseSlots: 1,
@@ -194,12 +216,13 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     expect(divergentSuccess).toBeInstanceOf(Errors.StaleClaim)
 
     const failure = yield* claimProgram("settled-replay-failure")
-    yield* reserve(store, failure, "replayed-failure", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 }, )
+    yield* reserve(store, failure, "replayed-failure", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 })
     yield* store.startProgramOperation({ ...failure, operation: "replayed-failure" })
     const failureOutcome = { _tag: "Failed" as const, error: { _tag: "test", message: "boom" } }
     expect(
       yield* store.settleProgramOperation({
         ...failure,
+        commandId: "program:settle:failure",
         operation: "replayed-failure",
         outcome: failureOutcome,
         releaseSlots: 1,
@@ -208,6 +231,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     expect(
       yield* store.settleProgramOperation({
         ...failure,
+        commandId: "program:settle:failure",
         operation: "replayed-failure",
         outcome: failureOutcome,
         releaseSlots: 1,
@@ -216,6 +240,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     const divergentFailure = yield* store
       .settleProgramOperation({
         ...failure,
+        commandId: "program:settle:failure:divergent",
         operation: "replayed-failure",
         outcome: { _tag: "Failed", error: { _tag: "test", message: "changed" } },
         releaseSlots: 1,
@@ -224,11 +249,12 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     expect(divergentFailure).toBeInstanceOf(Errors.StaleClaim)
 
     const unknown = yield* claimProgram("settled-replay-unknown")
-    yield* reserve(store, unknown, "replayed-unknown", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 }, )
+    yield* reserve(store, unknown, "replayed-unknown", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 })
     yield* store.startProgramOperation({ ...unknown, operation: "replayed-unknown" })
     expect(
       yield* store.settleProgramOperation({
         ...unknown,
+        commandId: "program:settle:unknown",
         operation: "replayed-unknown",
         outcome: { _tag: "Unknown" },
         releaseSlots: 1,
@@ -237,6 +263,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     expect(
       yield* store.settleProgramOperation({
         ...unknown,
+        commandId: "program:settle:unknown",
         operation: "replayed-unknown",
         outcome: { _tag: "Unknown" },
         releaseSlots: 1,
@@ -245,6 +272,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
     const divergentUnknown = yield* store
       .settleProgramOperation({
         ...unknown,
+        commandId: "program:settle:unknown:divergent",
         operation: "replayed-unknown",
         outcome: { _tag: "Succeeded", value: "late" },
         releaseSlots: 1,
@@ -259,11 +287,18 @@ export const programCancellationFinalizerContract: Effect.Effect<void, ProgramCo
     const store = yield* RunStore.RunStore
     const execution = yield* claimProgram("cancel-finalizer")
     const reason = "cancel finalizer settlement"
-    yield* reserve(store, execution, "finalized-operation", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 }, )
+    yield* reserve(store, execution, "finalized-operation", program.pinned.manifest.budget, {
+      toolCalls: 1,
+      activeSlots: 1,
+    })
     yield* store.startProgramOperation({ ...execution, operation: "finalized-operation" })
     yield* runtime.cancel({
-          commandId: "runtime-program-store-contract-ts-cancel-2", runId: execution.runId, reason })
+      commandId: "runtime-program-store-contract-ts-cancel-2",
+      runId: execution.runId,
+      reason,
+    })
     const settled = yield* store.settleProgramOperation({
+      commandId: "program:settle:cancel-finalizer",
       ...execution,
       operation: "finalized-operation",
       outcome: { _tag: "Failed", error: ProgramCapabilities.ProgramCancelled.make({ reason }) },

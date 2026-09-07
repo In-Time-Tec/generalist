@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Approval
+[generalist](../../index.md) / [runtime](../index.md) / Approval
 
 # Approval
 
@@ -82,7 +82,7 @@ Stable identity for one approval request.
 
 ### approve
 
-> `const` **approve**: (`input`) => `Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime#respondapprovalerror), [`Runtime`](./Runtime#runtime)\>
+> `const` **approve**: (`input`) => `Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime.md#respondapprovalerror), [`Runtime`](./Runtime.md#runtime)\>
 
 Approve through the active Runtime service.
 
@@ -94,7 +94,7 @@ Approve through the active Runtime service.
 
 #### Returns
 
-`Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime#respondapprovalerror), [`Runtime`](./Runtime#runtime)\>
+`Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime.md#respondapprovalerror), [`Runtime`](./Runtime.md#runtime)\>
 
 ***
 
@@ -122,7 +122,7 @@ One terminal response to an approval request.
 
 ### deny
 
-> `const` **deny**: (`input`) => `Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime#respondapprovalerror), [`Runtime`](./Runtime#runtime)\>
+> `const` **deny**: (`input`) => `Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime.md#respondapprovalerror), [`Runtime`](./Runtime.md#runtime)\>
 
 Deny through the active Runtime service.
 
@@ -134,7 +134,7 @@ Deny through the active Runtime service.
 
 #### Returns
 
-`Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime#respondapprovalerror), [`Runtime`](./Runtime#runtime)\>
+`Effect.Effect`\<`void`, [`RespondApprovalError`](./Runtime.md#respondapprovalerror), [`Runtime`](./Runtime.md#runtime)\>
 
 ***
 
@@ -162,7 +162,7 @@ The exact operation and capability awaiting authorization.
 
 ### resolveWith
 
-> `const` **resolveWith**: (`runtime`, `token`, `decision`, `options?`) => `Effect.Effect`\<`void`, [`ResolveError`](../../approvals#resolveerror), [`RuleStore`](../../permissions#rulestore)\>
+> `const` **resolveWith**: (`runtime`, `token`, `decision`, `options?`) => `Effect.Effect`\<`void`, [`ResolveError`](../../approvals.md#resolveerror), [`RuleStore`](../../permissions.md#rulestore)\>
 
 **`Internal`**
 
@@ -172,7 +172,7 @@ Resolve one exact durable approval token through the supplied Runtime.
 
 ##### runtime
 
-[`Service`](./Runtime#service)
+[`Service`](./Runtime.md#service)
 
 ##### token
 
@@ -180,15 +180,15 @@ Resolve one exact durable approval token through the supplied Runtime.
 
 ##### decision
 
-[`Approved`](../../approvals#approved) \| [`Denied`](../../approvals#denied)
+[`Approved`](../../approvals.md#approved) \| [`Denied`](../../approvals.md#denied)
 
 ##### options?
 
-[`ResolveOptions`](../../approvals#resolveoptions)
+[`ResolveOptions`](../../approvals.md#resolveoptions)
 
 #### Returns
 
-`Effect.Effect`\<`void`, [`ResolveError`](../../approvals#resolveerror), [`RuleStore`](../../permissions#rulestore)\>
+`Effect.Effect`\<`void`, [`ResolveError`](../../approvals.md#resolveerror), [`RuleStore`](../../permissions.md#rulestore)\>
 
 ***
 
@@ -206,7 +206,7 @@ Respond to exactly one stable approval request.
 
 ### ApprovalTokenInvalid
 
-Re-exports [ApprovalTokenInvalid](../../approvals#approvaltokeninvalid)
+Re-exports [ApprovalTokenInvalid](../../approvals.md#approvaltokeninvalid)
 
 ***
 
@@ -214,7 +214,7 @@ Re-exports [ApprovalTokenInvalid](../../approvals#approvaltokeninvalid)
 
 ### resolve
 
-Re-exports [resolve](../../approvals#resolve-1)
+Re-exports [resolve](../../approvals.md#resolve-1)
 
 ***
 
@@ -222,7 +222,7 @@ Re-exports [resolve](../../approvals#resolve-1)
 
 ### ResolveError
 
-Re-exports [ResolveError](../../approvals#resolveerror)
+Re-exports [ResolveError](../../approvals.md#resolveerror)
 
 ***
 
@@ -230,4 +230,4 @@ Re-exports [ResolveError](../../approvals#resolveerror)
 
 ### ResolveOptions
 
-Re-exports [ResolveOptions](../../approvals#resolveoptions)
+Re-exports [ResolveOptions](../../approvals.md#resolveoptions)

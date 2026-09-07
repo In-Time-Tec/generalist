@@ -33,6 +33,7 @@ export const requiredField = <T, E, RD, RE>(schema: Schema.Codec<T, E, RD, RE>):
   Schema.make<RequiredFieldCodec<T, E, RD, RE>>(schema.ast, { schema })
 export interface StructuredRunConfig<S extends ObjectSchema, OutputValue> {
   readonly schema: S
+  readonly outputSchema: Schema.Codec<OutputValue, unknown, S["DecodingServices"], S["EncodingServices"]>
   readonly objectName: string
   readonly objectPrompt: Prompt.RawInput
   readonly output: (value: S["Type"]) => OutputValue

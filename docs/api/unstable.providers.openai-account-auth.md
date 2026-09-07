@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.providers.openai-account-auth
+[generalist](./index.md) / unstable.providers.openai-account-auth
 
 # unstable.providers.openai-account-auth
 
@@ -60,7 +60,7 @@
 
 ##### kind
 
-> `readonly` **kind**: `"timeout"` \| `"cancelled"` \| `"network"` \| `"protocol"` \| `"host"` \| `"account-mismatch"` \| `"login-required"`
+> `readonly` **kind**: `"protocol"` \| `"timeout"` \| `"cancelled"` \| `"network"` \| `"host"` \| `"account-mismatch"` \| `"login-required"`
 
 **`Experimental`**
 

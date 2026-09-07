@@ -20,6 +20,13 @@ const failure = (message: string): ApiDocumentationFailed => ApiDocumentationFai
 const entryName = (specifier: string): string =>
   specifier === "." ? "generalist" : specifier.slice(2).replaceAll("/", ".")
 
+export const normalizeMarkdownLinks = (source: string): string =>
+  source.replaceAll(
+    /\]\(([^)\s]+\.md)(?=(?:#[^)]+)?\))/g,
+    (_, target: string) =>
+      `](${target.startsWith(".") || target.startsWith("/") || URL.canParse(target) ? target : `./${target}`}`,
+  )
+
 const generatedFiles = Effect.fn("DocsApi.generatedFiles")(function* (
   fileSystem: FileSystem.FileSystem,
   directory: string,
@@ -112,13 +119,7 @@ const program = Effect.fn("DocsApi.program")(function* (check: boolean) {
   for (const name of markdownFiles) {
     const file = path.join(generatedDirectory, name)
     const source = yield* fileSystem.readFileString(file)
-    yield* fileSystem.writeFileString(
-      file,
-      source.replaceAll(
-        /\]\(([^)\s]+)\.md(?=(?:#[^)]+)?\))/g,
-        (_, target: string) => `](${target.startsWith(".") ? target : `./${target}`}`,
-      ),
-    )
+    yield* fileSystem.writeFileString(file, normalizeMarkdownLinks(source))
   }
   const pages = markdownFiles.map((name) => `api/${name.slice(0, -3).replaceAll("\\", "/")}`)
   pages.sort((left, right) => {
@@ -162,4 +163,6 @@ const command = Command.make("docs-api", { check: Flag.boolean("check").pipe(Fla
   program(check),
 )
 
-await Effect.runPromise(Command.run(command, { version: "1" }).pipe(Effect.scoped, Effect.provide(layer)))
+if (import.meta.main === true) {
+  await Effect.runPromise(Command.run(command, { version: "1" }).pipe(Effect.scoped, Effect.provide(layer)))
+}

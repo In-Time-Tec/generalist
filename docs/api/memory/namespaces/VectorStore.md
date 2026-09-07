@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [memory](../index) / VectorStore
+[generalist](../../index.md) / [memory](../index.md) / VectorStore
 
 # VectorStore
 
@@ -110,7 +110,7 @@
 
 ##### key
 
-> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory#key-1)
+> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory.md#key-1)
 
 ***
 
@@ -146,7 +146,7 @@
 
 ##### key
 
-> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory#key-1)
+> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory.md#key-1)
 
 <a id="metadata"></a>
 
@@ -224,7 +224,7 @@
 
 ##### key
 
-> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory#key-1)
+> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory.md#key-1)
 
 ###### Inherited from
 
@@ -308,7 +308,7 @@
 
 ##### key
 
-> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory#key-1)
+> `readonly` **key**: [`Key`](../../generalist/namespaces/Memory.md#key-1)
 
 <a id="limit"></a>
 

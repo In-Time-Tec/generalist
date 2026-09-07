@@ -1,7 +1,7 @@
 import { Effect, Function } from "effect"
 import { FanOutNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { FanOutInspection } from "../../../child/fan-out.js"
-import type { RuntimeState, StoredFanOut } from "../../state.js"
+import type { RuntimeState, StoredFanOut } from "../../projection.js"
 
 const inspection = (fanOut: StoredFanOut): FanOutInspection => ({
   fanOutId: fanOut.fanOutId,

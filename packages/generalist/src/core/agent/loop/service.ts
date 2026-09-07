@@ -46,6 +46,7 @@ import { GateFailed } from "../gates/definition.js"
 import { evaluate as evaluateGates } from "../gates/evaluation.js"
 import { retryPrompt as gateRetryPrompt } from "../gates/prompt.js"
 import { persistResponsePart, promptFromResponseParts, resolvePrompt } from "../../../media/prompt.js"
+import { resume as resumeRunEnd } from "./run-end-recovery.js"
 
 type ActiveAgent = HandoffRunState["active"]["agent"]
 type ClosedPolicyAgent = Omit<ActiveAgent, "policy"> & { readonly policy: Policy<never> }
@@ -98,6 +99,7 @@ export const make = <
     transformResolved,
     handoffStateRef,
   } = context
+  const hookContext = { runId: inbox.runId, agentName: agent.name }
   const structuredFinalEvents = (
     structuredTurn: number,
     config: StructuredRunConfig<StructuredOutputSchema, OutputValue>,
@@ -106,8 +108,7 @@ export const make = <
     Stream.unwrap(
       Effect.gen(function* () {
         const turnPrompt = yield* applyTurnStart({
-          runId: inbox.runId,
-          agentName: agent.name,
+          ...hookContext,
           turn: structuredTurn,
           prompt: Prompt.make(config.objectPrompt),
         })
@@ -244,8 +245,7 @@ export const make = <
           )
         }
         const prompt = yield* applySteer({
-          runId: inbox.runId,
-          agentName: agent.name,
+          ...hookContext,
           turn: structuredTurn,
           queue: completion.queue,
           count: completion.inputs.length,
@@ -308,8 +308,7 @@ export const make = <
     let structuredTurn: number | undefined
     const currentTurn = Stream.fromEffect(
       applyTurnStart({
-        runId: inbox.runId,
-        agentName: agent.name,
+        ...hookContext,
         turn,
         prompt: Prompt.make(prompt),
       }),
@@ -422,19 +421,24 @@ export const make = <
   const toolCheckpoint = validatedResume ?? recoveredToolCheckpoint
   const startTurn =
     options.turnStart ?? context.initialTurn ?? options.driverCheckpoint?.turn ?? toolCheckpoint?.checkpoint.turn ?? 0
-  const runStream = Stream.suspend(() => {
-    if (context.recoveringMemory)
-      return resumeMemory({
-        turn: options.driverCheckpoint!.turn,
-        state,
-        history: chat.history,
-        afterTurn,
-        runTurn,
-        structuredFinalEvents: (turn, onPending) =>
-          structured === undefined ? Stream.empty : structuredFinalEvents(turn, structured, onPending),
-      })
-    return toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
-  })
+  const outputSchema = structured?.outputSchema ?? Schema.String
+  const runStream = Stream.unwrap(
+    Effect.gen(function* () {
+      const completed = yield* resumeRunEnd({ outputSchema, turnStart: options.turnStart })
+      if (completed !== undefined) return Stream.succeed<Event>(completed)
+      if (context.recoveringMemory)
+        return resumeMemory({
+          turn: options.driverCheckpoint!.turn,
+          state,
+          history: chat.history,
+          afterTurn,
+          runTurn,
+          structuredFinalEvents: (turn, onPending) =>
+            structured === undefined ? Stream.empty : structuredFinalEvents(turn, structured, onPending),
+        })
+      return toolCheckpoint === undefined ? runTurn(startTurn, initialPrompt) : resumeStream(toolCheckpoint, startTurn)
+    }),
+  )
   const guardedStream = runStream.pipe(
     Stream.catchCause((cause) => {
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
@@ -464,12 +468,14 @@ export const make = <
     Stream.mapEffect((event) => {
       if (event._tag !== "Completed") return Effect.succeed(event)
       return applyRunEnd({
-        runId: inbox.runId,
-        agentName: agent.name,
-        turns: event.turns,
-        text: event.text,
-        output: event.output,
-        transcript: event.transcript,
+        input: {
+          ...hookContext,
+          turns: event.turns,
+          text: event.text,
+          output: event.output,
+          transcript: event.transcript,
+        },
+        outputSchema,
       }).pipe(Effect.map((result): Event => ({ ...event, output: result.output })))
     }),
     Stream.mapEffect(

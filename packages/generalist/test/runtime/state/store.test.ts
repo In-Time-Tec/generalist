@@ -1,7 +1,7 @@
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, ExecutableManifest, Handoff, Pins, Session, ToolExecutor } from "../../../src/index.js"
+import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor } from "../../../src/index.js"
 import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache.js"
 import {
   Address,
@@ -42,50 +42,51 @@ const scopedWith =
 layer(objectRuntimeLayer(parentRelativeOptions).pipe(Layer.provide(resolverLayer)))(
   "resolves object child selections relative to each persisted parent closure",
   (suite) => {
-  suite.effect("resolves selections per persisted parent closure", () =>
-    Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const first = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "object:relative:first",
-        idempotencyKey: "parent:first",
-        prompt: "first",
-      })
-      const second = yield* runtime.send({
-        to: alternateAssistantAddress,
-        sessionId: "object:relative:second",
-        idempotencyKey: "parent:second",
-        prompt: "second",
-      })
-      const firstChild = yield* runtime.spawn({
-        parentRunId: first.runId,
-        invocationId: "child",
-        selection: "researcher",
-        prompt: "child",
-      })
-      const secondChild = yield* runtime.spawn({
-        parentRunId: second.runId,
-        invocationId: "child",
-        selection: "researcher",
-        prompt: "child",
-      })
-      expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
-      expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
-
-      const before = yield* RunTree.checkpoint(first.runId)
-      const failure = yield* runtime
-        .spawn({
-          parentRunId: first.runId,
-          invocationId: "missing",
-          selection: "undeclared",
-          prompt: "missing",
+    suite.effect("resolves selections per persisted parent closure", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const first = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "object:relative:first",
+          idempotencyKey: "parent:first",
+          prompt: "first",
         })
-        .pipe(Effect.flip)
-      expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-      expect(yield* RunTree.checkpoint(first.runId)).toEqual(before)
-    }),
-  )
-})
+        const second = yield* runtime.send({
+          to: alternateAssistantAddress,
+          sessionId: "object:relative:second",
+          idempotencyKey: "parent:second",
+          prompt: "second",
+        })
+        const firstChild = yield* runtime.spawn({
+          parentRunId: first.runId,
+          invocationId: "child",
+          selection: "researcher",
+          prompt: "child",
+        })
+        const secondChild = yield* runtime.spawn({
+          parentRunId: second.runId,
+          invocationId: "child",
+          selection: "researcher",
+          prompt: "child",
+        })
+        expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
+        expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
+
+        const before = yield* RunTree.checkpoint(first.runId)
+        const failure = yield* runtime
+          .spawn({
+            parentRunId: first.runId,
+            invocationId: "missing",
+            selection: "undeclared",
+            prompt: "missing",
+          })
+          .pipe(Effect.flip)
+        expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+        expect(yield* RunTree.checkpoint(first.runId)).toEqual(before)
+      }),
+    )
+  },
+)
 
 it.live("resumes tree replay from an opaque cursor after an object-store reopen", () => {
   const storage = makeObjectStorage()
@@ -105,25 +106,25 @@ it.live("resumes tree replay from an opaque cursor after an object-store reopen"
     return { receipt, cursor: page.cursor }
   })
   const initial = scopedWith(layerFor())(admit)
-  const resume = (initial: {
+  const resume = (result: {
     readonly receipt: { readonly runId: string }
     readonly cursor: RunTree.ReplayPage["cursor"]
   }) =>
     Effect.gen(function* () {
       const store = yield* RunStore.RunStore
       const claim = yield* store.claimExecution({
-        commandId: `${initial.receipt.runId}:cursor:claim`,
-        runId: initial.receipt.runId,
+        commandId: `${result.receipt.runId}:cursor:claim`,
+        runId: result.receipt.runId,
         ownerId: objectWorkerId,
       })
       yield* store.emitAgentEvent({
-        commandId: `${initial.receipt.runId}:cursor:event`,
+        commandId: `${result.receipt.runId}:cursor:event`,
         ...claim,
         event: { _tag: "TurnStarted", turn: 1 },
       })
       return yield* RunTree.replay({
-        rootRunId: initial.receipt.runId,
-        cursor: initial.cursor,
+        rootRunId: result.receipt.runId,
+        cursor: result.cursor,
         limit: 100,
       })
     })
@@ -133,7 +134,6 @@ it.live("resumes tree replay from an opaque cursor after an object-store reopen"
     expect(resumed.events.map((entry) => entry.event._tag)).toEqual(["TurnStarted"])
   })
 })
-
 
 it.live("persists a handoff checkpoint and active pin atomically across object-store reopen", () => {
   const storage = makeObjectStorage()
@@ -335,10 +335,9 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
           const failWithEvidence = (boundary: string) =>
             Effect.gen(function* () {
               yield* Fiber.interrupt(fiber).pipe(Effect.timeoutOption("1 second"), Effect.asVoid)
-              const inspection = yield* runtime.inspect(receipt.runId).pipe(
-                Effect.exit,
-                Effect.timeoutOption("1 second"),
-              )
+              const inspection = yield* runtime
+                .inspect(receipt.runId)
+                .pipe(Effect.exit, Effect.timeoutOption("1 second"))
               const history = yield* runtime
                 .history({ runId: receipt.runId, cursor: -1, limit: 100 })
                 .pipe(Effect.exit, Effect.timeoutOption("1 second"))
@@ -353,7 +352,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
               })
               return yield* Effect.die(
                 new Error(
-                  `handoff executor ended before ${boundary}: ${JSON.stringify({ inspection, evidence })}`,
+                  `handoff executor ended before ${boundary}: ${yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({ inspection, evidence }).pipe(Effect.orDie)}`,
                 ),
               )
             })
@@ -467,11 +466,13 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
           value: { _tag: "Success", result: accepted, encodedResult: accepted },
         },
       })
-      const resumed = yield* store.claimExecution({
-        commandId: `${committedResult.runId}:handoff:after-resolution:claim`,
-        runId: committedResult.runId,
-        ownerId: objectWorkerId,
-      })
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: `${committedResult.runId}:handoff:after-resolution:claim`,
+          runId: committedResult.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect(resolvedActive).toBe(child.pin)
       expect((yield* runtime.inspect(committedResult.runId)).status).toBe("succeeded")
       expect(

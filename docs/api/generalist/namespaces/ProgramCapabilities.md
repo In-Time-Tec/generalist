@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ProgramCapabilities
+[generalist](../../index.md) / [generalist](../index.md) / ProgramCapabilities
 
 # ProgramCapabilities
 

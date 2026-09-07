@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { digest, sha256Text } from "../../../src/core/durable/canonical-json.js"
+import { canonicalize, digest, sha256Text } from "../../../src/core/durable/canonical-json.js"
 
 const rotate = (value: number, amount: number): number => (value >>> amount) | (value << (32 - amount))
 
@@ -183,6 +183,25 @@ it("derives one digest from object content regardless of key insertion order", (
   const reverse = { gamma: { x: "y" }, beta: [1, 2], alpha: 1 }
   expect(digest(forward)).toBe(digest(reverse))
   expect(digest(forward)).toBe(referenceDigest(forward))
+})
+
+it("visits each nested object once during canonicalization", () => {
+  const depth = 64
+  let keyReads = 0
+  let value: Schema.Json = 0
+  for (let index = 0; index < depth; index++) {
+    value = new Proxy(
+      { next: value },
+      {
+        ownKeys: (target) => {
+          keyReads += 1
+          return Reflect.ownKeys(target)
+        },
+      },
+    )
+  }
+  canonicalize(value)
+  expect(keyReads).toBe(depth)
 })
 
 it("separates values that differ only slightly", () => {

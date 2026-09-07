@@ -43,6 +43,38 @@ const resolveContentMount = Scene.Mount.resolve(
 const resolveScrollerCommand = Scene.Command.resolve(ScrollToBottom, CompletedScrollToBottom())
 
 describe("deep-research-agent web view", () => {
+  for (const approved of [true, false]) {
+    test(`a restored pending approval can be ${approved ? "approved" : "denied"} without transcript entries`, () => {
+      const command = Chat.ResolveApproval({
+        sessionId: "deep-research-scene",
+        token: "approval:1",
+        approved,
+        reason: null,
+      })
+      Scene.scene(
+        { update, view },
+        Scene.given({
+          ...baseModel(),
+          chat: {
+            ...baseModel().chat,
+            run: Chat.AwaitingApproval({
+              token: "approval:1",
+              toolName: "web_search",
+              params: { query: "Generalist" },
+            }),
+          },
+        }),
+        resolveViewportMount,
+        resolveContentMount,
+        resolveScrollerCommand,
+        Scene.expect(Scene.text("Approval required: web_search")).toExist(),
+        Scene.click(Scene.role("button", { name: approved ? "Approve once" : "Deny" })),
+        Scene.Command.expectExact(command),
+        Scene.Command.resolve(command, Chat.ResolvedApproval()),
+      )
+    })
+  }
+
   test("idle state renders the prompt and enables submit after draft text", () => {
     Scene.scene(
       { update, view },
@@ -107,8 +139,13 @@ describe("deep-research-agent web view", () => {
       resolveScrollerCommand,
       Scene.expect(Scene.role("button", { name: "Stop" })).toBeEnabled(),
       Scene.click(Scene.role("button", { name: "Stop" })),
-      Scene.Command.expectExact(Chat.CancelRun({ sessionId: "deep-research-scene" })),
-      Scene.Command.resolve(Chat.CancelRun({ sessionId: "deep-research-scene" }), Chat.CancelledRun()),
+      Scene.Command.expectExact(
+        Chat.CancelRun({ sessionId: "deep-research-scene", commandId: '["cancel","deep-research-scene",-1]' }),
+      ),
+      Scene.Command.resolve(
+        Chat.CancelRun({ sessionId: "deep-research-scene", commandId: '["cancel","deep-research-scene",-1]' }),
+        Chat.CancelledRun(),
+      ),
     )
   })
 

@@ -1,5 +1,5 @@
-import { Config, Console, Effect, ManagedRuntime, Option, Stream } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Redacted, Stream } from "effect"
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { Server } from "generalist/server"
 
 const program = Effect.gen(function* () {
@@ -28,6 +28,15 @@ const program = Effect.gen(function* () {
   yield* Console.log(`approved ${approval.event.request.capability} for ${approval.runId}`)
 })
 
-const runtime = ManagedRuntime.make(FetchHttpClient.layer)
+const authenticatedLayer = Layer.effect(
+  HttpClient.HttpClient,
+  Effect.gen(function* () {
+    const base = yield* HttpClient.HttpClient
+    const token = yield* Config.redacted("GENERALIST_SERVER_TOKEN")
+    return base.pipe(HttpClient.mapRequest(HttpClientRequest.bearerToken(Redacted.value(token))))
+  }),
+).pipe(Layer.provide(FetchHttpClient.layer))
+
+const runtime = ManagedRuntime.make(authenticatedLayer)
 await runtime.runPromise(program)
 await runtime.dispose()

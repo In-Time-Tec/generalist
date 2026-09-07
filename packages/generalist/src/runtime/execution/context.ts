@@ -92,10 +92,13 @@ export const hostContext = <
 export const sessionBinding = (input: {
   readonly store: RunStoreService
   readonly claim: import("../run/store.js").ExecutionClaim
-}): Effect.Effect<{
-  readonly session: Option.Option<SessionService>
-  readonly context: Context.Context<SessionDirectory>
-}, DurabilityFailure> =>
+}): Effect.Effect<
+  {
+    readonly session: Option.Option<SessionService>
+    readonly context: Context.Context<SessionDirectory>
+  },
+  DurabilityFailure
+> =>
   input.store.claimedSessionStore(input.claim).pipe(
     Effect.map((session) => ({
       session,

@@ -6,15 +6,16 @@ import { TestClock } from "effect/testing"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime, RunStore } from "generalist/runtime"
+import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
 import { ObjectStore } from "../../src/durability/object-store.js"
 
 const storage = makeObjectStorage()
-const runtime = objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([])),
-)
+const runtime = objectRuntimeLayer(
+  { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
+  storage,
+).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
 const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
   Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
 )

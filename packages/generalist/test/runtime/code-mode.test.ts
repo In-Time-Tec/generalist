@@ -1,4 +1,4 @@
-import { makeObjectStorage, objectRuntimeLayer } from "./execution/object.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
@@ -180,7 +180,10 @@ const makeCodeMode = (authority: AgentManifest.ProgramAuthority) =>
       prompt: "fixture",
     })).runId
     const claim = yield* store.claimExecution({
-          commandId: "runtime-code-mode-test-ts-claim-1", runId, ownerId: "code-mode-fixture" })
+      commandId: `runtime-code-mode-test-ts-claim-${codeModeFixtureId}`,
+      runId,
+      ownerId: objectWorkerId,
+    })
     const claimed = yield* store.loadExecution(runId)
     return CodeMode.make({ claim, claimed, authority, store })
   })
@@ -253,13 +256,25 @@ describe("Runtime code_mode Program children", () => {
   standalone.live("object replays background admission after the child commit but before the tool receipt", () => {
     const { resolverLayer, counts } = fixture({ background: "await" })
     const storage = makeObjectStorage()
-    const runtimeLayer = objectRuntimeLayer({
-      addresses: [],
-      scheduler: { pollInterval: "1 day", concurrency: 1 },
-    }, storage).pipe(Layer.provide(resolverLayer))
+    const crashRuntimeLayer = objectRuntimeLayer(
+      {
+        addresses: [],
+        scheduler: { pollInterval: "1 day", concurrency: 1 },
+        workerId: "code-mode-admission-crash",
+      },
+      storage,
+    ).pipe(Layer.provide(resolverLayer))
+    const recoveryRuntimeLayer = objectRuntimeLayer(
+      {
+        addresses: [],
+        scheduler: { pollInterval: "1 day", concurrency: 1 },
+        workerId: "code-mode-admission-recovery",
+      },
+      storage,
+    ).pipe(Layer.provide(resolverLayer))
     let rootRunId = ""
     let childRunId = ""
-    const crash = withLayer(runtimeLayer)(
+    const crash = withLayer(crashRuntimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
@@ -279,8 +294,13 @@ describe("Runtime code_mode Program children", () => {
         )(
           Effect.gen(function* () {
             const host = yield* makeRunExecutor
-            yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-code-mode-test-ts-claim-2", runId: rootRunId, ownerId: "crash" }))
+            const claim = yield* store.claimExecution({
+              commandId: "runtime-code-mode-test-ts-claim-2",
+              runId: rootRunId,
+              ownerId: "code-mode-admission-crash",
+            })
+            yield* host.execute(claim)
+            yield* store.releaseExecution(claim)
           }),
         )
         const children = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.filter(
@@ -293,7 +313,7 @@ describe("Runtime code_mode Program children", () => {
         expect((yield* runtime.inspect(rootRunId)).status).toBe("running")
       }),
     )
-    const reopen = withLayer(runtimeLayer)(
+    const reopen = withLayer(recoveryRuntimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const scheduler = yield* LocalScheduler.LocalScheduler
@@ -319,66 +339,62 @@ describe("Runtime code_mode Program children", () => {
     return crash.pipe(Effect.andThen(reopen))
   })
   for (const background of ["complete", "await", "cancel"] as const) {
-      standalone.live(
-        `object background Program ${background} permits independent parent progress and survives reopen`,
-        () => {
-          const { resolverLayer, counts } = fixture({ background })
-          const options = { addresses: [], scheduler: { pollInterval: "1 day" as const, concurrency: 1 } }
-          const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(resolverLayer))
-          let rootRunId = ""
-          let childRunId = ""
-          const admit = Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            rootRunId = (yield* runtime.startExecution({
-              executable,
-              registrations,
-              sessionId: "background-test",
-              idempotencyKey: "root",
-              prompt: "independent work",
-            })).runId
+    standalone.live(
+      `object background Program ${background} permits independent parent progress and survives reopen`,
+      () => {
+        const { resolverLayer, counts } = fixture({ background })
+        const options = { addresses: [], scheduler: { pollInterval: "1 day" as const, concurrency: 1 } }
+        const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(resolverLayer))
+        let rootRunId = ""
+        let childRunId = ""
+        const admit = Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const scheduler = yield* LocalScheduler.LocalScheduler
+          rootRunId = (yield* runtime.startExecution({
+            executable,
+            registrations,
+            sessionId: "background-test",
+            idempotencyKey: "root",
+            prompt: "independent work",
+          })).runId
+          yield* scheduler.tick
+          yield* scheduler.idle
+          childRunId = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.find(
+            (run) => run.parentRunId === rootRunId,
+          )!.run.runId
+          expect(counts.model).toBe(background === "cancel" ? 3 : 2)
+          expect(counts.capability).toBe(0)
+          expect((yield* runtime.inspect(rootRunId)).status).toBe(background === "await" ? "waiting" : "succeeded")
+          expect((yield* runtime.inspect(childRunId)).status).toBe(background === "cancel" ? "cancelled" : "queued")
+          const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
+          expect(
+            history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
+          ).toHaveLength(1)
+          if (background === "await") expect((yield* runtime.inspect(rootRunId)).waits).toHaveLength(2)
+        })
+        const complete = Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const scheduler = yield* LocalScheduler.LocalScheduler
+          for (let index = 0; index < 3; index++) {
             yield* scheduler.tick
             yield* scheduler.idle
-            childRunId = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.find(
-              (run) => run.parentRunId === rootRunId,
-            )!.run.runId
-            expect(counts.model).toBe(background === "cancel" ? 3 : 2)
-            expect(counts.capability).toBe(0)
-            expect((yield* runtime.inspect(rootRunId)).status).toBe(background === "await" ? "waiting" : "succeeded")
-            expect((yield* runtime.inspect(childRunId)).status).toBe(background === "cancel" ? "cancelled" : "queued")
-            const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
+          }
+          expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
+          expect((yield* runtime.inspect(childRunId)).status).toBe(background === "cancel" ? "cancelled" : "succeeded")
+          expect(counts.capability).toBe(background === "cancel" ? 0 : 1)
+          const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
+          expect(
+            history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
+          ).toHaveLength(1)
+          if (background === "await")
             expect(
-              history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
-            ).toHaveLength(1)
-            if (background === "await") expect((yield* runtime.inspect(rootRunId)).waits).toHaveLength(2)
-          })
-          const complete = Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            for (let index = 0; index < 3; index++) {
-              yield* scheduler.tick
-              yield* scheduler.idle
-            }
-            expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
-            expect((yield* runtime.inspect(childRunId)).status).toBe(
-              background === "cancel" ? "cancelled" : "succeeded",
-            )
-            expect(counts.capability).toBe(background === "cancel" ? 0 : 1)
-            const history = yield* runtime.history({ runId: rootRunId, limit: 100 })
-            expect(
-              history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "start_program"),
-            ).toHaveLength(1)
-            if (background === "await")
-              expect(
-                history.filter(
-                  (event) => event._tag === "ToolExecutionCompleted" && event.call.name === "await_program",
-                ),
-              ).toHaveLength(2)
-          })
-          return withLayer(runtimeLayer)(admit.pipe(Effect.andThen(complete)))
-        },
-      )
-    }
+              history.filter((event) => event._tag === "ToolExecutionCompleted" && event.call.name === "await_program"),
+            ).toHaveLength(2)
+        })
+        return withLayer(runtimeLayer)(admit.pipe(Effect.andThen(complete)))
+      },
+    )
+  }
   {
     standalone.live("object admits one exact Program child and resumes the same root Run", () => {
       const storage = makeObjectStorage()
@@ -419,7 +435,7 @@ describe("Runtime code_mode Program children", () => {
         })
         expect((yield* runtime.treeCheckpoint(rootRunId)).inspection.runs).toHaveLength(2)
       })
-      return withLayer(objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))) (
+      return withLayer(objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)))(
         admit.pipe(Effect.andThen(finishRun)),
       )
     })
@@ -517,7 +533,10 @@ describe("Runtime code_mode Program children", () => {
               (run) => run.parentRunId === rootRunId,
             )!.run.runId
             yield* runtime.cancel({
-          commandId: "runtime-code-mode-test-ts-cancel-1", runId: rootRunId, reason: "operator cancelled" })
+              commandId: "runtime-code-mode-test-ts-cancel-1",
+              runId: rootRunId,
+              reason: "operator cancelled",
+            })
             expect((yield* runtime.inspect(rootRunId)).status).toBe("cancelled")
             expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
           }),
@@ -533,8 +552,15 @@ describe("Runtime code_mode Program children", () => {
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
       let childRunIds: ReadonlyArray<string> = []
-      const runtimeLayer = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
-      const crash = withLayer(runtimeLayer)(
+      const crashWorkerId = `code-mode-${crashPoint}-crash`
+      const recoveryWorkerId = `code-mode-${crashPoint}-recovery`
+      const crashRuntimeLayer = objectRuntimeLayer({ ...options, workerId: crashWorkerId }, storage).pipe(
+        Layer.provide(resolverLayer),
+      )
+      const recoveryRuntimeLayer = objectRuntimeLayer({ ...options, workerId: recoveryWorkerId }, storage).pipe(
+        Layer.provide(resolverLayer),
+      )
+      const crash = withLayer(crashRuntimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -567,7 +593,10 @@ describe("Runtime code_mode Program children", () => {
             Effect.gen(function* () {
               const host = yield* makeRunExecutor
               const claim = yield* store.claimExecution({
-          commandId: "runtime-code-mode-test-ts-claim-3", runId: rootRunId, ownerId: `crash:${crashPoint}` })
+                commandId: "runtime-code-mode-test-ts-claim-3",
+                runId: rootRunId,
+                ownerId: crashWorkerId,
+              })
               const scope = yield* Scope.make()
               const fiber = yield* host.execute(claim).pipe(Effect.forkIn(scope))
               yield* Deferred.await(reached)
@@ -581,11 +610,12 @@ describe("Runtime code_mode Program children", () => {
               }
               yield* Fiber.interrupt(fiber)
               yield* Scope.close(scope, Exit.succeed(undefined))
+              yield* store.releaseExecution(claim)
             }),
           )
         }),
       )
-      const reopen = withLayer(runtimeLayer)(
+      const reopen = withLayer(recoveryRuntimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           if (crashPoint === "before-admission") {

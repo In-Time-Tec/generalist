@@ -16,6 +16,7 @@ import {
   SessionCursorExpired,
   SessionNotFound,
   SessionSubscriberLagged,
+  SessionSnapshotTooLarge,
 } from "../runtime/session/host.js"
 import {
   ArtifactAlreadyOpen,
@@ -36,6 +37,13 @@ export class Unauthorized extends ActionableTaggedError<Unauthorized>()(
     hint: errorHint("Send the configured bearer token in the Authorization header."),
   },
   { httpApiStatus: 401 },
+) {}
+
+/** The authenticated principal cannot access this resource or perform this operation. @experimental */
+export class Forbidden extends ActionableTaggedError<Forbidden>()(
+  "generalist/server/Forbidden",
+  { hint: errorHint("Use an identity authorized for this tenant, resource, and operation.") },
+  { httpApiStatus: 403 },
 ) {}
 
 /** An operator mutation was requested from a read-only server. */
@@ -62,7 +70,7 @@ export class RequestFailed extends ActionableTaggedError<RequestFailed>()(
 /** Client transport framing, encoding, or connection operation failed. */
 export class TransportError extends ActionableTaggedError<TransportError>()("generalist/server/TransportError", {
   message: Schema.String,
-  kind: Schema.optional(Schema.Literals(["socket", "protocol", "encoding", "not-open"])),
+  kind: Schema.optional(Schema.Literals(["socket", "protocol", "encoding", "not-open", "cursor-expired", "lagged"])),
   hint: errorHint("Inspect kind and message, restore the connection, then retry only if the operation is safe."),
 }) {}
 
@@ -97,6 +105,8 @@ const payloadTooLarge = HttpApiSchema.status(413)
 const unavailable = HttpApiSchema.status(503)
 
 export const apiErrors = [
+  Forbidden,
+  Unauthorized,
   AgentInputInvalid.pipe(badRequest),
   AgentNotRegistered.pipe(notFound),
   ApprovalMismatch.pipe(conflict),
@@ -114,9 +124,12 @@ export const apiErrors = [
   SessionCursorExpired.pipe(conflict),
   SessionNotFound.pipe(notFound),
   SessionSubscriberLagged.pipe(conflict),
+  SessionSnapshotTooLarge.pipe(payloadTooLarge),
 ] as const
 
 export const artifactApiErrors = [
+  Forbidden,
+  Unauthorized,
   ArtifactAlreadyOpen.pipe(conflict),
   ArtifactBaseStale.pipe(conflict),
   ArtifactCrdtMismatch.pipe(conflict),
@@ -133,6 +146,8 @@ export const ApiError = Schema.Union([...apiErrors, ...artifactApiErrors])
 export type ApiError = typeof ApiError.Type
 
 const dedicatedErrors = Schema.Union([
+  Forbidden,
+  Unauthorized,
   AgentInputInvalid,
   AgentNotRegistered,
   ApprovalMismatch,
@@ -150,6 +165,7 @@ const dedicatedErrors = Schema.Union([
   SessionCursorExpired,
   SessionNotFound,
   SessionSubscriberLagged,
+  SessionSnapshotTooLarge,
 ])
 type EndpointError = typeof dedicatedErrors.Type
 

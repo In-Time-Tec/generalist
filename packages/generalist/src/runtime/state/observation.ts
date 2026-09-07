@@ -9,7 +9,7 @@ export interface Observations {
 
 /** No default exists: a transition cannot execute without its persisted command observations. */
 export class PreparedObservation extends Context.Service<PreparedObservation, Observations>()(
-  "generalist/runtime/state/PreparedObservation",
+  "generalist/runtime/state/observation/PreparedObservation",
 ) {}
 
 export const occurredAt = PreparedObservation.pipe(Effect.map((observation) => observation.occurredAt))

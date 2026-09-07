@@ -82,11 +82,18 @@ export const settleInterruptedExecution = (input: {
       const executionAttempt = (yield* input.store.loadExecution(input.runId)).attempt
       yield* Effect.forEach(
         requiresRecovery,
-        (operationId) => input.store.expireRunningOperation({
-          ...input.claim,
-          operationId,
-          commandId: JSON.stringify(["expire-operation", input.claim.runId, input.claim.attemptFence, operationId, executionAttempt]),
-        }),
+        (operationId) =>
+          input.store.expireRunningOperation({
+            ...input.claim,
+            operationId,
+            commandId: JSON.stringify([
+              "expire-operation",
+              input.claim.runId,
+              input.claim.attemptFence,
+              operationId,
+              executionAttempt,
+            ]),
+          }),
         { discard: true },
       )
     }

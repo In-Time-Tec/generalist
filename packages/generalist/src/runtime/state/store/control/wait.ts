@@ -1,16 +1,16 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAt as preparedOccurredAt } from "../../observation.js"
+import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../../observation.js"
 import { Effect, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../../errors.js"
 import type { RespondInput, SignalInput as SignalCommand } from "../../../service.js"
 import type { RunWait, WaitResolution } from "../../../run/wait.js"
 import { classifyResponse } from "../../../run/wait-internal.js"
 import { appendLifecycle, rejectIfTerminal, resumedEvent } from "../../append.js"
-import { waitMapKey, type RuntimeState, type StoredRun } from "../../state.js"
+import { waitMapKey, type RuntimeState, type StoredRun } from "../../projection.js"
 
 type RespondResult = Effect.Effect<
   RuntimeState,
-  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable, PreparedObservation
+  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable,
+  PreparedObservation
 >
 type SignalResult = Effect.Effect<RuntimeState, RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
 type SignalInput = Pick<SignalCommand, "runId" | "name" | "payload">

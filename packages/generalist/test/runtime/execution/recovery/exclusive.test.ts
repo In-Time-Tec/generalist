@@ -14,21 +14,26 @@ import { JournalFault } from "../../../../src/runtime/operation/journal-fault.js
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { memoryRecoverySuite } from "./memory.js"
 
-const objectClaims = new Map<string, { readonly claim: ExecutionClaim; readonly release: Effect.Effect<void, WorkerMutationError> }>()
+const objectClaims = new Map<
+  string,
+  { readonly claim: ExecutionClaim; readonly release: Effect.Effect<void, WorkerMutationError> }
+>()
 
 const objectClaim = (runId: string, label: string) =>
   Effect.flatMap(RunStore.RunStore, (store) =>
-    store.claimExecution({
-      commandId: `runtime-execution-recovery-exclusive-test-ts-claim-${label}`,
-      runId,
-      ownerId: objectWorkerId,
-    }).pipe(
-      Effect.tap((claim) =>
-        Effect.sync(() => {
-          objectClaims.set(runId, { claim, release: store.releaseExecution(claim) })
-        }),
+    store
+      .claimExecution({
+        commandId: `runtime-execution-recovery-exclusive-test-ts-claim-${label}`,
+        runId,
+        ownerId: objectWorkerId,
+      })
+      .pipe(
+        Effect.tap((claim) =>
+          Effect.sync(() => {
+            objectClaims.set(runId, { claim, release: store.releaseExecution(claim) })
+          }),
+        ),
       ),
-    ),
   )
 
 const expireObjectClaim = (runId: string) =>
@@ -141,8 +146,13 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
         const store = yield* RunStore.RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "write exactly once", startOptions)
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-1", runId: handle.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-recovery-exclusive-test-ts-claim-1",
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
 
         expect((yield* runtime.inspect(handle.runId)).status).toBe("running")
         expect(toolCalls).toBe(1)
@@ -180,8 +190,13 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
         const handle = yield* runtime.start(agent, "write exactly once", startOptions)
 
         expect(handle.runId).toBe(runId)
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-2", runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-recovery-exclusive-test-ts-claim-2",
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         expect(yield* handle.await).toBe("complete after restart")
         expect(toolCalls).toBe(1)
         expect(recoveredModelCalls).toBe(1)
@@ -240,10 +255,13 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
       },
     ]).pipe(Layer.orDie)
     const first = yield* scopedWith(
-      objectRuntimeLayer({
-        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        scheduler: { pollInterval: "1 hour" },
-      }, storage).pipe(Layer.provide(firstResolverLayer)),
+      objectRuntimeLayer(
+        {
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        },
+        storage,
+      ).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -256,8 +274,13 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
           prompt: "write once",
         })
         const fiber = yield* host
-          .execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId }))
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-recovery-exclusive-test-ts-claim-3",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           .pipe(Effect.forkIn(crashScope))
         const progress = yield* runtime.events({ runId: receipt.runId }).pipe(
           Stream.filter((event) => event._tag === "ToolProgress"),
@@ -321,10 +344,13 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     ]).pipe(Layer.orDie)
 
     yield* scopedWith(
-      objectRuntimeLayer({
-        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        scheduler: { pollInterval: "1 hour" },
-      }, storage).pipe(Layer.provide(recoveredResolverLayer)),
+      objectRuntimeLayer(
+        {
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        },
+        storage,
+      ).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -333,8 +359,13 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
 
         const reopened = yield* runtime.inspect(first.runId)
         if (reopened.status === "running") {
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-4", runId: first.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-recovery-exclusive-test-ts-claim-4",
+              runId: first.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
         }
 
         expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
@@ -366,8 +397,13 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
           "operator:crash-recovery",
           "runtime-execution-recovery-exclusive-test-ts-resolveUnknown-1",
         )
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-5", runId: first.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-recovery-exclusive-test-ts-claim-5",
+            runId: first.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
 
         const completedHistory = yield* runtime.history({ runId: first.runId, limit: 100 })
         expect((yield* runtime.inspect(first.runId)).status).toBe("succeeded")
@@ -431,10 +467,13 @@ it.live("keeps one tool operation key across approval suspension and object stor
     ]).pipe(Layer.orDie)
 
     const suspended = yield* scopedWith(
-      objectRuntimeLayer({
-        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        scheduler: { pollInterval: "1 hour" },
-      }, storage).pipe(Layer.provide(firstResolverLayer)),
+      objectRuntimeLayer(
+        {
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        },
+        storage,
+      ).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -446,8 +485,13 @@ it.live("keeps one tool operation key across approval suspension and object stor
           idempotencyKey: "approval-operation-key-restart",
           prompt: "write once after approval",
         })
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-recovery-exclusive-test-ts-claim-6",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
 
         const inspection = yield* runtime.inspect(receipt.runId)
         const approvalToken = `runtime-approval:${encodeURIComponent(receipt.runId)}:approval:gated-write-1`
@@ -512,10 +556,13 @@ it.live("keeps one tool operation key across approval suspension and object stor
     ]).pipe(Layer.orDie)
 
     yield* scopedWith(
-      objectRuntimeLayer({
-        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        scheduler: { pollInterval: "1 hour" },
-      }, storage).pipe(Layer.provide(recoveredResolverLayer)),
+      objectRuntimeLayer(
+        {
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        },
+        storage,
+      ).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -535,8 +582,13 @@ it.live("keeps one tool operation key across approval suspension and object stor
           waitId: suspended.approvalToken,
           resolution: { _tag: "Approved" },
         })
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-7", runId: suspended.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-recovery-exclusive-test-ts-claim-7",
+            runId: suspended.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
 
         expect((yield* runtime.inspect(suspended.runId)).status).toBe("succeeded")
         expect(invocation?.operationKey).toBe(suspended.operationKey)
@@ -593,7 +645,10 @@ it.effect("object storage reconciles every running operation before execution", 
         prompt: "recover",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-8", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-recovery-exclusive-test-ts-claim-8",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const pure = yield* store.recordOperation({
         ...claim,
         operationKey: "memory:pure",

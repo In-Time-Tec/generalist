@@ -1,4 +1,4 @@
-import { objectRuntimeLayer } from "../execution/object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
@@ -103,7 +103,6 @@ it.effect("runs typed durable children under the parent and returns their ordere
   })
   const parent = Agent.make({ name: "durable-parent", toolkit: Toolkit.make(delegate) })
   let parentCalls = 0
-  let parentPrefix: ReadonlyArray<unknown> = []
   const childPrompts: Array<ReadonlyArray<unknown>> = []
   const model = Layer.effect(
     LanguageModel.LanguageModel,
@@ -113,7 +112,6 @@ it.effect("runs typed durable children under the parent and returns their ordere
         if (tools(options).includes("delegate_research")) {
           parentCalls += 1
           if (parentCalls === 1) {
-            parentPrefix = options.prompt.content
             return Stream.fromIterable([
               Response.makePart("tool-call", {
                 id: "fan-out-call",
@@ -164,8 +162,14 @@ it.effect("runs typed durable children under the parent and returns their ordere
       const handle = yield* runtime.start(parent, "research", {
         budget: RunBudget.make({ tokens: 100, children: 4 }),
       })
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-1", runId: handle.runId, ownerId: "fan-out-parent-1" }))
+      const parentPrefix = (yield* store.loadExecution(handle.runId)).message.prompt.content
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-1",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
 
       const checkpoint = yield* runtime.treeCheckpoint(handle.runId)
       const children = checkpoint.inspection.runs.filter((entry) => entry.parentRunId === handle.runId)
@@ -174,7 +178,10 @@ it.effect("runs typed durable children under the parent and returns their ordere
       for (const [index, child] of children.entries()) {
         yield* executor.execute(
           yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-2", runId: child.run.runId, ownerId: `fan-out-child-${index}` }),
+            commandId: `runtime-child-executor-test-ts-claim-2-${index}`,
+            runId: child.run.runId,
+            ownerId: objectWorkerId,
+          }),
         )
       }
       const fullChildPrompt = childPrompts.find((prompt) => JSON.stringify(prompt).includes("alpha")) ?? []
@@ -185,8 +192,13 @@ it.effect("runs typed durable children under the parent and returns their ordere
         budget: { children: 2 },
         children: [{ status: "succeeded" }, { status: "succeeded" }],
       })
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-3", runId: handle.runId, ownerId: "fan-out-parent-2" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-3",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect(yield* handle.await).toBe("parent complete")
 
       const history = yield* runtime.history({ runId: handle.runId, limit: 100 })
@@ -260,8 +272,13 @@ it.effect("rejects a child tool set wider than its parent before admission", () 
       const store = yield* RunStore.RunStore
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "delegate")
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-4", runId: handle.runId, ownerId: "authority-parent" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-4",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect(yield* handle.await).toBe("recovered")
       expect((yield* runtime.inspect(handle.runId)).children).toEqual([])
       const history = yield* runtime.history({ runId: handle.runId, limit: 100 })
@@ -285,21 +302,34 @@ it.effect("encodes a durable child failure in collect results without failing th
       const store = yield* RunStore.RunStore
       yield* runtime.register(fixture.parent)
       const handle = yield* runtime.start(fixture.parent, "collect failures")
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-5", runId: handle.runId, ownerId: "collect-parent-1" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-5",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       const children = (yield* runtime.inspect(handle.runId)).children
       for (const [index, child] of children.entries()) {
         yield* executor.execute(
           yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-6", runId: child.childRunId, ownerId: `collect-child-${index}` }),
+            commandId: `runtime-child-executor-test-ts-claim-6-${index}`,
+            runId: child.childRunId,
+            ownerId: objectWorkerId,
+          }),
         )
       }
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "running",
         children: [{ status: "failed" }, { status: "succeeded" }],
       })
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-7", runId: handle.runId, ownerId: "collect-parent-2" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-7",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect(yield* handle.await).toBe("parent recovered")
       const history = yield* runtime.history({ runId: handle.runId, limit: 100 })
       const completion = history.find(
@@ -323,19 +353,32 @@ it.effect("fails the durable parent and requests cancellation of siblings in fai
       const store = yield* RunStore.RunStore
       yield* runtime.register(fixture.parent)
       const handle = yield* runtime.start(fixture.parent, "fail fast")
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-8", runId: handle.runId, ownerId: "fail-fast-parent-1" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-8",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       const children = (yield* runtime.inspect(handle.runId)).children
       yield* executor.execute(
         yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-9", runId: children[0]!.childRunId, ownerId: "fail-fast-child" }),
+          commandId: "runtime-child-executor-test-ts-claim-9",
+          runId: children[0]!.childRunId,
+          ownerId: objectWorkerId,
+        }),
       )
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "running",
         children: [{ status: "failed" }, { status: "cancelled" }],
       })
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-child-executor-test-ts-claim-10", runId: handle.runId, ownerId: "fail-fast-parent-2" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-child-executor-test-ts-claim-10",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       const failed = yield* handle.await.pipe(Effect.flip)
       expect(failed).toMatchObject({ _tag: "RunFailed" })
       const siblingHistory = yield* runtime.history({ runId: children[1]!.childRunId, limit: 100 })

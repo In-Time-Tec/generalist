@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / memo
+[generalist](./index.md) / memo
 
 # memo
 
@@ -40,6 +40,92 @@
 
 ***
 
+<a id="memoerror"></a>
+
+### MemoError
+
+Optional reuse storage failed; operation replay remains the driver's authority.
+
+#### Extends
+
+- `MemoError_base`
+
+#### Constructors
+
+<a id="constructor-1"></a>
+
+##### Constructor
+
+> **new MemoError**(...`args`): [`MemoError`](#memoerror)
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`MemoError`](#memoerror)
+
+###### Inherited from
+
+`MemoError_base.constructor`
+
+#### Properties
+
+<a id="cause"></a>
+
+##### cause?
+
+> `readonly` `optional` **cause?**: `unknown`
+
+###### Inherited from
+
+`MemoError_base.cause`
+
+<a id="hint"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+###### Inherited from
+
+`MemoError_base.hint`
+
+<a id="key"></a>
+
+##### key
+
+> `readonly` **key**: `string`
+
+###### Inherited from
+
+`MemoError_base.key`
+
+<a id="message"></a>
+
+##### message
+
+> `readonly` **message**: `string`
+
+###### Inherited from
+
+`MemoError_base.message`
+
+<a id="operation"></a>
+
+##### operation
+
+> `readonly` **operation**: `"get"` \| `"put"`
+
+###### Inherited from
+
+`MemoError_base.operation`
+
+***
+
 <a id="store"></a>
 
 ### Store
@@ -50,7 +136,7 @@
 
 #### Constructors
 
-<a id="constructor-1"></a>
+<a id="constructor-2"></a>
 
 ##### Constructor
 
@@ -274,7 +360,7 @@
 
 ##### get
 
-> `readonly` **get**: (`key`) => `Effect`\<`Option`\<[`Entry`](#entry)\>\>
+> `readonly` **get**: (`key`) => `Effect`\<`Option`\<[`Entry`](#entry)\>, [`MemoError`](#memoerror)\>
 
 ###### Parameters
 
@@ -284,7 +370,7 @@
 
 ###### Returns
 
-`Effect`\<`Option`\<[`Entry`](#entry)\>\>
+`Effect`\<`Option`\<[`Entry`](#entry)\>, [`MemoError`](#memoerror)\>
 
 <a id="modelsenabled-1"></a>
 
@@ -296,7 +382,7 @@
 
 ##### put
 
-> `readonly` **put**: (`key`, `entry`) => `Effect`\<`void`\>
+> `readonly` **put**: (`key`, `entry`) => `Effect`\<`void`, [`MemoError`](#memoerror)\>
 
 ###### Parameters
 
@@ -310,7 +396,7 @@
 
 ###### Returns
 
-`Effect`\<`void`\>
+`Effect`\<`void`, [`MemoError`](#memoerror)\>
 
 ## Variables
 
@@ -347,24 +433,6 @@
 #### Returns
 
 `Layer.Layer`\<[`Store`](#store)\>
-
-***
-
-<a id="layersql"></a>
-
-### layerSql
-
-> `const` **layerSql**: (`options?`) => `Layer.Layer`\<[`Store`](#store), `never`, `SqlClient.SqlClient`\>
-
-#### Parameters
-
-##### options?
-
-[`LayerOptions`](#layeroptions)
-
-#### Returns
-
-`Layer.Layer`\<[`Store`](#store), `never`, `SqlClient.SqlClient`\>
 
 ***
 

@@ -84,7 +84,11 @@ export const pluralWaitsConformance = (input: {
         resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
       })
       .pipe(Effect.flip)
-    expect(conflict).toMatchObject({ _tag: "generalist/durability/DurabilityFailure", reason: "input-conflict" })
+    expect(conflict).toMatchObject({
+      _tag: "generalist/runtime/ResponseConflict",
+      runId: receipt.runId,
+      waitId: waitIds[0],
+    })
     expect((yield* input.services.runtime.inspect(receipt.runId)).waits.map((wait) => wait.waitId)).toEqual([
       waitIds[1],
     ])

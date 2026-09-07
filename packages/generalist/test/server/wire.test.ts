@@ -26,7 +26,11 @@ describe("Server event wire contract", () => {
   it.effect("requires caller identity on cancellation commands", () =>
     Effect.gen(function* () {
       const missingIdentity = yield* Schema.decodeEffect(Schema.fromJsonString(Server.ClientCommand))(
-        JSON.stringify({ _tag: "Cancel", runId: "run-1", reason: "user" }),
+        yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+          _tag: "Cancel",
+          runId: "run-1",
+          reason: "user",
+        }),
       ).pipe(Effect.flip)
       expect(missingIdentity._tag).toBe("SchemaError")
       const command = Server.ClientCommand.make({

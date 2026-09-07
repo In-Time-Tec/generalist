@@ -20,7 +20,9 @@ export const isSqlGraphEntry = (value: string): boolean => {
   const normalized = value.replaceAll("\\", "/").toLowerCase()
   return (
     /@effect[+/]sql(?:[-/@]|$)/.test(normalized) ||
-    /(?:^|[/+])(?:sql|sqlite3?|better-sqlite3|postgres(?:ql)?|mysql2?|pg|pgpass|@libsql|libsql|pglite|drizzle-orm|kysely)(?:[-/@+.]|$)/.test(normalized) ||
+    /(?:^|[/+])(?:sql|sqlite3?|better-sqlite3|postgres(?:ql)?|mysql2?|pg|pgpass|@libsql|libsql|pglite|drizzle-orm|kysely)(?:[-/@+.]|$)/.test(
+      normalized,
+    ) ||
     normalized.startsWith("bun:sqlite")
   )
 }
@@ -34,6 +36,7 @@ export interface ConsumerImport {
 export interface MinimumConsumerProfile {
   readonly name: string
   readonly peers: ReadonlyArray<string>
+  readonly nativeHostPeers?: ReadonlyArray<string>
   readonly imports: ReadonlyArray<ConsumerImport>
 }
 
@@ -59,6 +62,8 @@ export const minimumConsumerProfiles = [
         runtimes: ["bun", "node", "worker"],
         exports: ["layer", "layerRunStore", "activate", "Activation", "DurabilityFailure"],
       },
+      { specifier: "generalist/durability/discovery", runtimes: nodeAndBun, exports: ["page", "inspect"] },
+      { specifier: "generalist/durability/host", runtimes: nodeAndBun, exports: ["reconcilePage"] },
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
       { specifier: "generalist/hooks", runtimes: nodeAndBun, exports: ["Hooks", "onToolCall"] },
       { specifier: "generalist/eval", runtimes: nodeAndBun, exports: ["score", "runSuite"] },
@@ -95,6 +100,11 @@ export const minimumConsumerProfiles = [
         exports: ["Scope", "Source", "grant", "attenuate", "revoke", "check", "requireUntainted"],
       },
       { specifier: "generalist/unstable/runtime/external-child-placement", runtimes: nodeAndBun },
+      {
+        specifier: "generalist/unstable/runtime/external-child-reconciliation",
+        runtimes: nodeAndBun,
+        exports: ["reconcilePage"],
+      },
       { specifier: "generalist/unstable/runtime/external-child-store", runtimes: nodeAndBun },
       { specifier: "generalist/instructions", runtimes: nodeAndBun, exports: ["load"] },
       { specifier: "generalist/instructions/skills", runtimes: nodeAndBun },
@@ -109,16 +119,25 @@ export const minimumConsumerProfiles = [
   {
     name: "durability-r2",
     peers: [],
-    imports: [{ specifier: "generalist/durability/r2", runtimes: ["bun", "node", "worker"], exports: ["make", "layer"] }],
+    imports: [
+      { specifier: "generalist/durability/r2", runtimes: ["bun", "node", "worker"], exports: ["make", "layer"] },
+    ],
   },
   {
     name: "test-durability",
     peers: [],
-    imports: [{ specifier: "generalist/testing/durability", runtimes: nodeAndBun, exports: ["make", "atomicCreates", "freshReads", "listing", "byteIntegrity"] }],
+    imports: [
+      {
+        specifier: "generalist/testing/durability",
+        runtimes: nodeAndBun,
+        exports: ["make", "atomicCreates", "freshReads", "listing", "byteIntegrity"],
+      },
+    ],
   },
   {
     name: "sandbox",
     peers: ["@rivet-dev/agentos", "es-module-lexer", "modal"],
+    nativeHostPeers: ["@rivet-dev/agentos"],
     imports: [
       {
         specifier: "generalist/sandbox",
@@ -257,6 +276,7 @@ export const minimumConsumerProfiles = [
   {
     name: "rivet",
     peers: ["@standard-schema/spec", "rivetkit"],
+    nativeHostPeers: ["rivetkit"],
     imports: [{ specifier: "generalist/unstable/rivet", runtimes: nodeAndBun, exports: ["makeRuntimeActor"] }],
   },
 ] as const satisfies ReadonlyArray<MinimumConsumerProfile>
@@ -318,6 +338,8 @@ export const exactPackageExports = [
   "./blob-store",
   "./compaction",
   "./durability",
+  "./durability/discovery",
+  "./durability/host",
   "./durability/r2",
   "./durability/s3",
   "./eval",
@@ -373,6 +395,7 @@ export const exactPackageExports = [
   "./unstable/rl-export",
   "./unstable/rlm",
   "./unstable/runtime/external-child-placement",
+  "./unstable/runtime/external-child-reconciliation",
   "./unstable/runtime/external-child-store",
   "./unstable/sandbox/agentos",
   "./unstable/sandbox/cloudflare",

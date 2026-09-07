@@ -39,7 +39,9 @@ export class BlobTooLarge extends ActionableTaggedError<BlobTooLarge>()("general
 export class BlobStoreError extends ActionableTaggedError<BlobStoreError>()("generalist/blob-store/BlobStoreError", {
   operation: Schema.String,
   reason: Schema.String,
-  hint: errorHint("Check object storage configuration and availability; investigate integrity failures without overwriting content."),
+  hint: errorHint(
+    "Check object storage configuration and availability; investigate integrity failures without overwriting content.",
+  ),
 }) {}
 
 /** Provider transport preference for resolving a reference. @experimental */
@@ -103,7 +105,8 @@ const encode = (ref: RefValue, data: Uint8Array): Effect.Effect<Uint8Array, Blob
         try: () => {
           if (json.length > maxMetadataBytes) throw new Error(`Blob reference exceeds ${maxMetadataBytes} bytes`)
           const metadata = encoder.encode(json)
-          if (metadata.byteLength > maxMetadataBytes) throw new Error(`Blob reference exceeds ${maxMetadataBytes} bytes`)
+          if (metadata.byteLength > maxMetadataBytes)
+            throw new Error(`Blob reference exceeds ${maxMetadataBytes} bytes`)
           const bytes = new Uint8Array(headerBytes + metadata.byteLength + data.byteLength)
           const header = new DataView(bytes.buffer)
           header.setUint32(0, magic)
@@ -117,7 +120,12 @@ const encode = (ref: RefValue, data: Uint8Array): Effect.Effect<Uint8Array, Blob
     ),
   )
 
-const decode = (crypto: Crypto.Crypto, hash: string, bytes: Uint8Array, maxBytes: number): Effect.Effect<Blob, BlobStoreError> =>
+const decode = (
+  crypto: Crypto.Crypto,
+  hash: string,
+  bytes: Uint8Array,
+  maxBytes: number,
+): Effect.Effect<Blob, BlobStoreError> =>
   Effect.gen(function* () {
     const envelope = yield* Effect.try({
       try: () => {
@@ -149,15 +157,13 @@ const decode = (crypto: Crypto.Crypto, hash: string, bytes: Uint8Array, maxBytes
   })
 
 /** Immutable object-backed content storage; requires no maintenance credentials. @experimental */
-export const layer = (
-  options: LayerOptions,
-): Layer.Layer<BlobStore, BlobStoreError, Crypto.Crypto | ObjectStore> =>
+export const layer = (options: LayerOptions): Layer.Layer<BlobStore, BlobStoreError, Crypto.Crypto | ObjectStore> =>
   Layer.effect(
     BlobStore,
     Effect.gen(function* () {
       const crypto = yield* Crypto.Crypto
       const objects = yield* ObjectStore
-      const settings = yield* Schema.decodeUnknownEffect(Options)(options).pipe(
+      const settings = yield* Schema.decodeEffect(Options)(options).pipe(
         Effect.mapError((cause) => error("initialize", cause)),
       )
       const limit = settings.maxBytes ?? defaultMaxBytes
@@ -174,7 +180,9 @@ export const layer = (
       const read = (hash: string): Effect.Effect<Blob, BlobNotFound | BlobStoreError> =>
         Effect.gen(function* () {
           if (!Schema.is(Sha256)(hash)) return yield* BlobNotFound.make({ sha256: hash })
-          const object = yield* objects.read(key(hash), { maxBytes: maxObjectBytes }).pipe(Effect.mapError((cause) => error("read", cause)))
+          const object = yield* objects
+            .read(key(hash), { maxBytes: maxObjectBytes })
+            .pipe(Effect.mapError((cause) => error("read", cause)))
           if (object === undefined) return yield* BlobNotFound.make({ sha256: hash })
           return yield* decode(crypto, hash, object.bytes, limit)
         })
@@ -207,7 +215,10 @@ export const layer = (
                 ),
               ),
             )
-            if (stored.data.byteLength !== data.byteLength || !stored.data.every((value, index) => value === data[index])) {
+            if (
+              stored.data.byteLength !== data.byteLength ||
+              !stored.data.every((value, index) => value === data[index])
+            ) {
               return yield* error("integrity", "Existing immutable payload differs from the uploaded bytes")
             }
             return stored.ref

@@ -1,4 +1,5 @@
-import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../object.js"
+import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -22,7 +23,7 @@ export const memoryRecoverySuite = () => {
     for (const committed of [false, true]) {
       it.live(`reopens Agent remember terminal=${terminal} committed=${committed} without startup recall`, () =>
         Effect.gen(function* () {
-          const storage = makeObjectStorage()
+          const storage = yield* makeSimulator()
           const toolkit = Toolkit.make(Tool.make("work", { parameters: Schema.Struct({}), success: Schema.String }))
           const agent = Agent.make({
             name: "remember-restart",

@@ -2,11 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
 import { Errors, Runtime } from "../../../src/runtime/index.js"
-import {
-  assistantAddress,
-  objectLayer,
-  textPrompt,
-} from "../execution/fixtures.js"
+import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 
 layer(objectLayer)("Runtime idempotency", (it) => {
   it.effect("returns the original receipt for an exact duplicate", () =>

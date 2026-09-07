@@ -1,6 +1,6 @@
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Clock, Effect, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { Pins } from "../../../src/index.js"
 import {
   Approval,
@@ -125,8 +125,13 @@ describe("durable Agent Programs", () => {
           idempotencyKey: "approval-run",
           prompt: "run",
         })
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-execute-program-test-ts-claim-1",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         const waiting = (yield* runtime.inspect(receipt.runId)).waits[0]
         expect(waiting).toMatchObject({
           waitId: "approval:echo",
@@ -157,8 +162,13 @@ describe("durable Agent Programs", () => {
             resolution: { _tag: "Approved" },
           }),
         )
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-2", runId: receipt.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-execute-program-test-ts-claim-2",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
         const stale = yield* runtime
           .respondApproval({ runId: receipt.runId, approvalId: "approval:stale", decision: { _tag: "Approved" } })
@@ -189,8 +199,13 @@ describe("durable Agent Programs", () => {
         prompt: "run",
       })
       runId = receipt.runId
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-3", runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-3",
+          runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({
         reason: {
           _tag: "Approval",
@@ -216,8 +231,13 @@ describe("durable Agent Programs", () => {
           suspension: { operation: "echo", reason: "approval" },
           resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
         })
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-4", runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-execute-program-test-ts-claim-4",
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
         expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
       }),
@@ -242,20 +262,33 @@ describe("durable Agent Programs", () => {
           idempotencyKey: `program-${resolution}`,
           prompt: "run",
         })
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-5", runId: receipt.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-execute-program-test-ts-claim-5",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         if (resolution === "Denied") {
           yield* Approval.deny({
             runId: receipt.runId,
             approvalId: "approval:echo",
             reason: "operator denied",
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-execute-program-test-ts-claim-6",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
         } else {
           yield* runtime.cancel({
-          commandId: "runtime-execution-execute-program-test-ts-cancel-1", runId: receipt.runId, reason: "operator cancelled" })
+            commandId: "runtime-execution-execute-program-test-ts-cancel-1",
+            runId: receipt.runId,
+            reason: "operator cancelled",
+          })
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "cancelled", waits: [] })
         }
         expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
@@ -327,7 +360,10 @@ describe("durable Agent Programs", () => {
         prompt: "run",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-7", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-execute-program-test-ts-claim-7",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const request = { operation: "echo", tool: "echo", input: "value" }
       yield* store.reserveProgramOperation({
         ...claim,
@@ -365,13 +401,18 @@ describe("durable Agent Programs", () => {
           runtime.resolveOperation({
             runId: receipt.runId,
             operationId: "echo",
-            idempotencyKey: "program-resolution",
+            idempotencyKey: "program-resolution:changed",
             resolution: { _tag: "Failed", error: "changed" },
           }),
         ),
       ).toMatchObject({ _tag: "generalist/runtime/OperationResolutionConflict" })
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-execute-program-test-ts-claim-8", runId: receipt.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-8",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect((yield* runtime.snapshot(receipt.runId)).outcome).toMatchObject({
         _tag: "Succeeded",
         result: { _tag: "Program", value: "recovered|recovered" },

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.rl-export](../index) / Reward
+[generalist](../../index.md) / [unstable.rl-export](../index.md) / Reward
 
 # Reward
 
@@ -266,7 +266,7 @@ Average existing eval scorer values into one scalar reward.
 
 ##### scorers
 
-`ReadonlyArray`\<[`Scorer`](../../eval#scorer)\<`R`, `E`\>\>
+`ReadonlyArray`\<[`Scorer`](../../eval.md#scorer)\<`R`, `E`\>\>
 
 #### Returns
 

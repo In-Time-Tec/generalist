@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Memo
+[generalist](../../index.md) / [generalist](../index.md) / Memo
 
 # Memo
 
@@ -12,7 +12,7 @@
 
 ### Dependencies
 
-Re-exports [Dependencies](../../memo#dependencies)
+Re-exports [Dependencies](../../memo.md#dependencies)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [Dependencies](../../memo#dependencies)
 
 ### DependencyOptions
 
-Re-exports [DependencyOptions](../../memo#dependencyoptions)
+Re-exports [DependencyOptions](../../memo.md#dependencyoptions)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [DependencyOptions](../../memo#dependencyoptions)
 
 ### DependencyService
 
-Re-exports [DependencyService](../../memo#dependencyservice)
+Re-exports [DependencyService](../../memo.md#dependencyservice)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [DependencyService](../../memo#dependencyservice)
 
 ### Entry
 
-Re-exports [Entry](../../memo#entry)
+Re-exports [Entry](../../memo.md#entry)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [Entry](../../memo#entry)
 
 ### layerDependencies
 
-Re-exports [layerDependencies](../../memo#layerdependencies)
+Re-exports [layerDependencies](../../memo.md#layerdependencies)
 
 ***
 
@@ -52,7 +52,7 @@ Re-exports [layerDependencies](../../memo#layerdependencies)
 
 ### layerMemory
 
-Re-exports [layerMemory](../../memo#layermemory)
+Re-exports [layerMemory](../../memo.md#layermemory)
 
 ***
 
@@ -60,15 +60,15 @@ Re-exports [layerMemory](../../memo#layermemory)
 
 ### LayerOptions
 
-Re-exports [LayerOptions](../../memo#layeroptions)
+Re-exports [LayerOptions](../../memo.md#layeroptions)
 
 ***
 
-<a id="layersql"></a>
+<a id="memoerror"></a>
 
-### layerSql
+### MemoError
 
-Re-exports [layerSql](../../memo#layersql)
+Re-exports [MemoError](../../memo.md#memoerror)
 
 ***
 
@@ -76,7 +76,7 @@ Re-exports [layerSql](../../memo#layersql)
 
 ### models
 
-Re-exports [models](../../memo#models-2)
+Re-exports [models](../../memo.md#models-2)
 
 ***
 
@@ -84,7 +84,7 @@ Re-exports [models](../../memo#models-2)
 
 ### Models
 
-Re-exports [Models](../../memo#models-1)
+Re-exports [Models](../../memo.md#models-1)
 
 ***
 
@@ -92,7 +92,7 @@ Re-exports [Models](../../memo#models-1)
 
 ### ModelsOptions
 
-Re-exports [ModelsOptions](../../memo#modelsoptions)
+Re-exports [ModelsOptions](../../memo.md#modelsoptions)
 
 ***
 
@@ -100,7 +100,7 @@ Re-exports [ModelsOptions](../../memo#modelsoptions)
 
 ### Provenance
 
-Re-exports [Provenance](../../memo#provenance)
+Re-exports [Provenance](../../memo.md#provenance)
 
 ***
 
@@ -108,7 +108,7 @@ Re-exports [Provenance](../../memo#provenance)
 
 ### pure
 
-Re-exports [pure](../../memo#pure)
+Re-exports [pure](../../memo.md#pure)
 
 ***
 
@@ -116,7 +116,7 @@ Re-exports [pure](../../memo#pure)
 
 ### PureOptions
 
-Re-exports [PureOptions](../../memo#pureoptions)
+Re-exports [PureOptions](../../memo.md#pureoptions)
 
 ***
 
@@ -124,7 +124,7 @@ Re-exports [PureOptions](../../memo#pureoptions)
 
 ### Store
 
-Re-exports [Store](../../memo#store)
+Re-exports [Store](../../memo.md#store)
 
 ***
 
@@ -132,4 +132,4 @@ Re-exports [Store](../../memo#store)
 
 ### StoreService
 
-Re-exports [StoreService](../../memo#storeservice)
+Re-exports [StoreService](../../memo.md#storeservice)

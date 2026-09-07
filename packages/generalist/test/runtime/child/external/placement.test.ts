@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "../../../../src/index.js"
-import { executableDigest } from "../../../../src/runtime/child/external/placement.js"
+import { identifyRequest } from "../../../../src/runtime/child/external/placement.js"
 import { ExternalChildStore } from "../../../../src/runtime/child/external/store.js"
 import { Address, Message, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import type { ExecutionClaim } from "../../../../src/runtime/run/store.js"
@@ -11,46 +11,56 @@ import {
   completedResult,
   objectLayer,
   registrationsFor,
+  resolverLayer,
   textPrompt,
 } from "../../execution/fixtures.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
-const externalRoot = (id: string) => ({
-  placementId: `placement:${id}`,
-  parent: { partition: "openwork:parent", runId: `parent:${id}` },
-  ref: { partition: "openwork:child", runId: `child:${id}` },
-  requestDigest: `request:${id}`,
-  executableDigest: executableDigest(assistantRef),
-  root: {
-    message: Message.make({
-      id: `message:${id}`,
-      to: Address.make(`external-root:${id}`),
-      sessionId: `thread:${id}`,
-      prompt: textPrompt(`delegated ${id}`),
-      idempotencyKey: `root:${id}`,
-      correlationId: `parent:${id}`,
-      metadata: {},
-    }),
-    executableRef: assistantRef.ref,
-    executableManifest: assistantRef.manifest,
-    registrations: registrationsFor(assistantRef),
-    treePolicy: { maxDepth: 2, maxSubagents: 2 },
-  },
-})
+const externalRoot = (id: string) =>
+  Effect.gen(function* () {
+    const request = {
+      parent: { partition: "openwork:parent", runId: `parent:${id}` },
+      ref: { partition: "conformance", runId: `child:${id}` },
+      root: {
+        message: Message.make({
+          id: `message:${id}`,
+          to: Address.make(`external-root:${id}`),
+          sessionId: `thread:${id}`,
+          prompt: textPrompt(`delegated ${id}`),
+          idempotencyKey: `root:${id}`,
+          correlationId: `parent:${id}`,
+          metadata: {},
+        }),
+        executableRef: assistantRef.ref,
+        executableManifest: assistantRef.manifest,
+        registrations: registrationsFor(assistantRef),
+        treePolicy: { maxDepth: 2, maxSubagents: 2 },
+      },
+    }
+    return { placementId: `placement:${id}`, ...request, ...(yield* identifyRequest(request)) }
+  })
 
 const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExternalChildStore, E>) => {
   let sequence = 0
   const provide = <A, Failure>(
     effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore.RunStore | ExternalChildStore>,
   ) => provideScoped(layer, effect)
-  const placement = (claim: ExecutionClaim, placementId: string) => ({
-    ...claim,
-    placementId,
-    ref: { partition: "openwork:west", runId: `remote:${placementId}` },
-    invocationId: `invoke:${placementId}`,
-    requestDigest: `request:${placementId}`,
-    executableDigest: "executable:v1",
-  })
+  const placement = (claim: ExecutionClaim, placementId: string) =>
+    Effect.gen(function* () {
+      const admission = yield* externalRoot(placementId)
+      const request = {
+        parent: { partition: "conformance", runId: claim.runId },
+        ref: { partition: "openwork:west", runId: `remote:${placementId}` },
+        root: admission.root,
+      }
+      return {
+        ...claim,
+        placementId,
+        request,
+        invocationId: `invoke:${placementId}`,
+        ...(yield* identifyRequest(request)),
+      }
+    })
   const root = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const id = `${name}:external:${sequence++}`
@@ -68,7 +78,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
           const external = yield* ExternalChildStore
-          const input = externalRoot(`${name}:gate`)
+          const input = yield* externalRoot(`${name}:gate`)
           expect(yield* external.admitRoot(input)).toMatchObject({
             placementId: input.placementId,
             parent: input.parent,
@@ -82,17 +92,21 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
             depth: 0,
           })
           expect(
-            (yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-1", runId: input.ref.runId, ownerId: objectWorkerId }).pipe(Effect.flip))._tag,
+            (yield* store
+              .claimExecution({
+                commandId: "runtime-child-external-placement-test-ts-claim-1",
+                runId: input.ref.runId,
+                ownerId: objectWorkerId,
+              })
+              .pipe(Effect.flip))._tag,
           ).toBe("generalist/runtime/RuntimeUnavailable")
           expect(yield* external.admitRoot(input)).toMatchObject({ activated: false })
           expect(
-            (yield* external.admitRoot({ ...input, requestDigest: `${input.requestDigest}:changed` }).pipe(Effect.flip))
-              ._tag,
-          ).toBe("generalist/runtime/ExternalRootConflict")
+            yield* external.admitRoot({ ...input, requestDigest: `${input.requestDigest}:changed` }).pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ExternalRootConflict", placementId: input.placementId })
           expect(
             (yield* external
-              .admitRoot({ ...externalRoot(`${name}:digest-mismatch`), executableDigest: "wrong" })
+              .admitRoot({ ...(yield* externalRoot(`${name}:digest-mismatch`)), executableDigest: "wrong" })
               .pipe(Effect.flip))._tag,
           ).toBe("generalist/runtime/ExternalRootExecutableMismatch")
           expect(yield* external.activateRoot(input.placementId)).toMatchObject({ activated: true })
@@ -100,9 +114,15 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const history = yield* store.history({ runId: input.ref.runId, cursor: -1, limit: 20 })
           expect(history.filter((event) => event._tag === "RunAttemptStarted")).toHaveLength(1)
           const claim = yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-2", runId: input.ref.runId, ownerId: objectWorkerId })
+            commandId: "runtime-child-external-placement-test-ts-claim-2",
+            runId: input.ref.runId,
+            ownerId: objectWorkerId,
+          })
           yield* store.complete({
-          commandId: "runtime-child-external-placement-test-ts-complete-1", ...claim, result: completedResult("delegated result") })
+            commandId: "runtime-child-external-placement-test-ts-complete-1",
+            ...claim,
+            result: completedResult("delegated result"),
+          })
           expect(yield* external.rootSettlement(input.placementId)).toMatchObject({
             value: {
               placementId: input.placementId,
@@ -119,7 +139,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
       provide(
         Effect.gen(function* () {
           const external = yield* ExternalChildStore
-          const input = externalRoot(`${name}:cancel-before-activation`)
+          const input = yield* externalRoot(`${name}:cancel-before-activation`)
           yield* external.admitRoot(input)
           expect(yield* external.cancelRoot(input.placementId, "parent requested cancellation")).toMatchObject({
             activated: false,
@@ -136,10 +156,10 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           })
           expect(yield* external.rootSettlement(input.placementId)).toEqual(first)
           expect(
-            (yield* external
+            yield* external
               .acknowledgeRootSettlement({ placementId: input.placementId, settlementId: "wrong" })
-              .pipe(Effect.flip))._tag,
-          ).toBe("generalist/runtime/ExternalChildSettlementConflict")
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ExternalChildSettlementConflict" })
           expect(
             yield* external.acknowledgeRootSettlement({
               placementId: input.placementId,
@@ -160,32 +180,41 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-3", runId: parent.runId, ownerId: objectWorkerId })
-          const input = placement(claim, "placement:1")
+            commandId: "runtime-child-external-placement-test-ts-claim-3",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
+          const input = yield* placement(claim, "placement:1")
           expect(yield* external.reserve(input)).toMatchObject({
             placementId: input.placementId,
             parentRunId: input.runId,
-            ref: input.ref,
+            request: input.request,
             invocationId: input.invocationId,
             requestDigest: input.requestDigest,
             executableDigest: input.executableDigest,
             settled: false,
           })
           expect(yield* external.reserve(input)).toMatchObject({ placementId: input.placementId })
-          expect((yield* external.reserve({ ...input, requestDigest: "different" }).pipe(Effect.flip))._tag).toBe(
-            "generalist/runtime/ExternalChildPlacementConflict",
-          )
+          expect(yield* external.reserve({ ...input, requestDigest: "different" }).pipe(Effect.flip)).toMatchObject({
+            _tag: "generalist/runtime/ExternalChildPlacementConflict",
+            placementId: input.placementId,
+          })
+          const conflicting = yield* placement(claim, "placement:ref-conflict")
+          const request = { ...conflicting.request, ref: input.request.ref }
           expect(
             (yield* external
-              .reserve({ ...placement(claim, "placement:ref-conflict"), ref: input.ref })
+              .reserve({ ...conflicting, request, ...(yield* identifyRequest(request)) })
               .pipe(Effect.flip))._tag,
           ).toBe("generalist/runtime/ExternalChildPlacementConflict")
           expect(
             (yield* external
-              .reserve({ ...placement(claim, "placement:invocation-conflict"), invocationId: input.invocationId })
+              .reserve({
+                ...(yield* placement(claim, "placement:invocation-conflict")),
+                invocationId: input.invocationId,
+              })
               .pipe(Effect.flip))._tag,
           ).toBe("generalist/runtime/ExternalChildPlacementConflict")
-          expect((yield* external.reserve(placement(claim, "placement:2")).pipe(Effect.flip))._tag).toBe(
+          expect((yield* external.reserve(yield* placement(claim, "placement:2")).pipe(Effect.flip))._tag).toBe(
             "generalist/runtime/ExternalChildCapacityUnavailable",
           )
           expect((yield* external.acknowledge("placement:2").pipe(Effect.flip))._tag).toBe(
@@ -202,8 +231,11 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-4", runId: parent.runId, ownerId: objectWorkerId })
-          yield* external.reserve(placement(claim, "placement:race"))
+            commandId: "runtime-child-external-placement-test-ts-claim-4",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
+          yield* external.reserve(yield* placement(claim, "placement:race"))
           const outcome = {
             _tag: "Succeeded" as const,
             result: completedResult("done"),
@@ -233,17 +265,17 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
             }),
           ).toMatchObject({ settled: true })
           expect(
-            (yield* external
+            yield* external
               .settle({
                 placementId: "placement:race",
                 settlementId: "settlement:1",
                 outcome: { ...outcome, eventId: "remote:event:divergent" },
               })
-              .pipe(Effect.flip))._tag,
-          ).toBe("generalist/runtime/ExternalChildSettlementConflict")
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ExternalChildSettlementConflict", placementId: "placement:race" })
           expect(yield* external.cancel("placement:race")).toMatchObject({ cancelRequested: false })
 
-          yield* external.reserve(placement(claim, "placement:cancel"))
+          yield* external.reserve(yield* placement(claim, "placement:cancel"))
           expect(yield* external.cancel("placement:cancel")).toMatchObject({ cancelRequested: true })
           expect(
             yield* external.settle({
@@ -263,9 +295,12 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-5", runId: parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-child-external-placement-test-ts-claim-5",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
           const input = {
-            ...placement(claim, "placement:wait"),
+            ...(yield* placement(claim, "placement:wait")),
             parentSuspension: {
               wait: {
                 waitId: "external-wait",
@@ -310,10 +345,16 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-6", runId: parent.runId, ownerId: objectWorkerId })
-          yield* external.reserve(placement(claim, "placement:parent-cancel"))
+            commandId: "runtime-child-external-placement-test-ts-claim-6",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
+          yield* external.reserve(yield* placement(claim, "placement:parent-cancel"))
           yield* store.cancel({
-          commandId: "runtime-child-external-placement-test-ts-cancel-2", runId: parent.runId, reason: "caller cancelled" })
+            commandId: "runtime-child-external-placement-test-ts-cancel-2",
+            runId: parent.runId,
+            reason: "caller cancelled",
+          })
           expect(yield* external.cancel("placement:parent-cancel")).toMatchObject({
             cancelRequested: true,
             settled: false,
@@ -342,13 +383,20 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const external = yield* ExternalChildStore
           const parent = yield* root
           const first = yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-7", runId: parent.runId, ownerId: objectWorkerId })
-          const reserved = placement(first, "placement:existing")
+            commandId: "runtime-child-external-placement-test-ts-claim-7",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
+          const reserved = yield* placement(first, "placement:existing")
           yield* external.reserve(reserved)
+          yield* store.releaseExecution(first)
           yield* store.claimExecution({
-          commandId: "runtime-child-external-placement-test-ts-claim-8", runId: parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-child-external-placement-test-ts-claim-8",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
           expect(yield* external.reserve(reserved)).toMatchObject({ placementId: reserved.placementId })
-          expect((yield* external.reserve(placement(first, "placement:stale")).pipe(Effect.flip))._tag).toBe(
+          expect((yield* external.reserve(yield* placement(first, "placement:stale")).pipe(Effect.flip))._tag).toBe(
             "generalist/runtime/StaleClaim",
           )
           expect((yield* external.acknowledge("placement:stale").pipe(Effect.flip))._tag).toBe(
@@ -367,10 +415,10 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
   const options = {
     addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
   }
-  const input = externalRoot("object:reopen")
   return Effect.gen(function* () {
+    const input = yield* externalRoot("object:reopen")
     const settlementId = yield* provideScoped(
-      objectRuntimeLayer(options, storage),
+      objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const external = yield* ExternalChildStore
         yield* external.admitRoot(input)
@@ -381,7 +429,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
       }),
     )
     yield* provideScoped(
-      objectRuntimeLayer(options, storage),
+      objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
         const external = yield* ExternalChildStore
         expect(yield* external.inspectRoot(input.placementId)).toMatchObject({
@@ -398,4 +446,3 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
     )
   })
 })
-

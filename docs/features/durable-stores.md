@@ -5,17 +5,30 @@ description: "Configure the shared object-storage engine, understand commit unce
 
 Use `generalist/durability` when accepted work must survive the process that accepted it. S3 and native R2 are transports for the same canonical engine and object format, not different Runtime backends. Ordinary `Agent.run` calls remain process-local and need no durable storage.
 
-All public exports remain `@experimental`. The object contract is the intended long-term storage boundary, not a compatibility promise, provider certification, or verified performance claim. This guide does not report real-provider conformance or deployed recovery measurements.
+All public exports remain `@experimental`. Clean v1 has no SQL Generalist backends, alternate production memory/filesystem Runtime, compatibility aliases, legacy readers, or migration path. Use fresh namespaces. Implementation is not full acceptance, release readiness, provider certification, or a verified performance claim.
+
+## Local qualification without cloud credentials
+
+The repository's local acceptance uses the production S3 client against Docker-backed MinIO and native R2 against persistent Miniflare/workerd:
+
+```bash
+bun install --frozen-lockfile
+bun --bun vitest run packages/generalist/test/durability/object-store.test.ts --no-file-parallelism
+```
+
+Use Bun 1.4.0 and a running Docker daemon. The suite provisions disposable local credentials and tests conditional creation, lost acknowledgements, service restart, and shared-bucket native/S3 contention through Miniflare's gateway. It does not require cloud accounts or model keys. Missing Docker or skipped service tests leave the local gate unmet.
+
+The local pins are MinIO `RELEASE.2025-04-22T22-12-26Z`, Miniflare `5.20260811.1-alpha`, and workerd `1.20260819.1`. The committed Miniflare patch corrects exact-EOF range handling (`offset >= size`). This is patched-emulator and gateway evidence, not AWS S3, deployed R2, or arbitrary S3-compatible-provider certification. Do not run remote qualification or request cloud credentials for local acceptance.
 
 ## Prerequisites
 
-- Bun 1.4+ for the example below, the matching Effect platform package, and an existing general-purpose S3 bucket. Object requests incur provider charges.
+- Bun 1.4+ for the example below, the matching Effect platform package, and a configured object service. A local MinIO bucket needs only disposable local credentials; optional live buckets incur provider charges and are not certified by the local suite.
 - Credentials allowed to read, conditionally create, and list objects in the selected namespace. Normal Runtime credentials do not need deletion or bucket-administration permission.
 - Explicit environment, tenant, and partition identities. Keep these stable across restarts; changing them opens different state.
 - A compatible executable build and its pinned resolver registrations. The bucket cannot reconstruct arbitrary application code or replace credentials for external services.
 
 ```bash
-bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112
+bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
 export GENERALIST_BUCKET="your-generalist-bucket"
 export AWS_REGION="us-east-1"
 export AWS_ACCESS_KEY_ID="your-access-key"
@@ -29,7 +42,7 @@ Use a fresh, dedicated development namespace, not an existing deployment's parti
 
 ## Run through S3
 
-Save this as `index.ts` and run `bun index.ts`. The model is scripted: no model API key is needed, but storage is real.
+Save this as `index.ts` and run `bun index.ts`. The model is scripted: no model API key is needed. The base fragment below addresses the configured S3 bucket; for local MinIO, compose the custom-endpoint transport shown next with its region, disposable credentials, and `forcePathStyle: true`.
 
 ```ts
 import { BunCrypto } from "@effect/platform-bun"
@@ -41,25 +54,31 @@ import { ExecutableResolver, Runtime } from "generalist/runtime"
 import * as TestModel from "generalist/testing/model"
 
 const assistant = Agent.make({ name: "durability-demo" })
-const services = Layer.unwrap(Effect.gen(function* () {
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const storage = Layer.merge(S3.layer({ bucket, region, credentials: { accessKeyId, secretAccessKey } }), BunCrypto.layer)
-  return Layer.merge(
-    Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
-      Layer.provide(storage),
-      Layer.provide(ExecutableResolver.layerStatic([])),
-    ),
-    TestModel.layer([TestModel.text("An acknowledged Run can be recovered from its object namespace.")]),
-  )
-}))
+const services = Layer.unwrap(
+  Effect.gen(function* () {
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const storage = Layer.merge(
+      S3.layer({ bucket, region, credentials: { accessKeyId, secretAccessKey } }),
+      BunCrypto.layer,
+    )
+    return Layer.merge(
+      Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+        Layer.provide(storage),
+        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      ),
+      TestModel.layer([TestModel.text("An acknowledged Run can be recovered from its object namespace.")]),
+    )
+  }),
+)
 
 await Effect.gen(function* () {
+  yield* Durability.activate
   const runtime = yield* Runtime.Runtime
   yield* runtime.register(assistant)
   const run = yield* runtime.start(assistant, "Explain durability", {
@@ -67,7 +86,7 @@ await Effect.gen(function* () {
     idempotencyKey: "answer-1",
   })
   yield* Console.log(run.runId, yield* run.await)
-}).pipe(Effect.provide(services), Effect.runPromise)
+}).pipe(Effect.scoped, Effect.provide(services), Effect.runPromise)
 ```
 
 The command prints a Run ID and the scripted answer. A second invocation uses the same Session and idempotency key to retrieve the accepted Run, rather than admitting another one. A new input under that identity is a conflict, not a request to overwrite the old Run. The owned Layer scope closes when the effect exits. For an explicit close/reopen comparison, use [five-minutes](/start/examples#local-and-object-recovery-in-five-minutes).
@@ -118,7 +137,7 @@ Provide this Layer to the same durability engine with a Worker-compatible Crypto
 
 A usable provider must preserve complete bytes, atomically create an absent key, expose acknowledged writes through strong direct reads, and list correctly across every page. Generalist uses its own SHA-256 digests; ETags are opaque provider tokens, not content hashes. The normal ObjectStore surface has `read`, `create`, and `list`, with no unconditional overwrite or delete.
 
-AWS S3 and Cloudflare R2 are the first-class transport targets. An S3-shaped API alone is insufficient. Before operating a provider, run the current conformance scenarios against independent real clients: simultaneous creates, lost acknowledgements, pagination, authentication failure, and fresh-client recovery. Simulator results do not certify a provider; a skipped or credential-free check is not a remote pass. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
+S3 and native R2 are the transport targets. An S3-shaped API alone is insufficient. Current qualification is local-only MinIO and Miniflare/workerd; AWS and deployed R2 are not certified. Simulator or emulator results do not certify a live provider. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
 
 The S3 transport uses ordinary general-purpose buckets and single-object writes. Bucket versioning, Object Lock, multipart conditional completion, native sidecars, and bucket administration are not normal Runtime requirements. Custom endpoints and injected clients must satisfy the declared guarantees. Unsupported semantics fail initialization instead of weakening conditional writes.
 
@@ -128,7 +147,7 @@ Object storage owns the recoverable state: admission receipts, operations, Sessi
 
 A partition is the serialization and atomicity boundary. Colocate Runs, their children, and affected Sessions when they change together. The application supplies deterministic routing; do not independently hash a child Session into another partition. Cross-partition atomic transactions and live partition reassignment are not provided.
 
-The engine writes immutable numbered commit slots. A conditional-create conflict causes it to read the winning record and re-evaluate deterministic state changes; it must not repeat a model or tool call to resolve contention. An exact command retry returns its retained receipt. Reuse of an identity with different input fails with an input conflict.
+The engine writes immutable numbered commit slots. A conditional-create conflict causes it to read the winning record and re-evaluate deterministic state changes; it must not repeat a model or tool call to resolve contention. An exact command retry returns its original immutable receipt, including `duplicate: false` if that was originally recorded. Reuse of an identity with different input fails with an input conflict. Preserve explicit command IDs for wake, steering, operator actions, and Program settlement; a wake's `event.dedupeKey` is a separate delivery identity.
 
 A timeout is not proof a write failed. The engine reads the attempted slot to reconcile its command identity and digest. If it cannot establish the outcome, `DurabilityFailure` reports `reason: "indeterminate"`; preserve the original identity and reconcile before executing external work. Authentication, rate limits, timeouts, unavailable storage, corrupt bytes, unsupported formats, and configured limits are typed failures, not empty state.
 
@@ -154,7 +173,7 @@ The canonical schedule or wait is authoritative; a successful alarm or schedule 
 
 Snapshots bound replay work; they do not make older commit slots safe to delete. This implementation retains committed slots and command receipts. Do not configure lifecycle expiration on canonical commits, snapshots, or referenced blobs. Deleting a numbered slot can let a paused writer recreate it and invalidate the committed prefix.
 
-Automatic live-history reclamation and safe concurrent blob collection are not provided. Age or an apparently unreferenced upload is not sufficient evidence for deletion: delayed writers, forks, readers, and backups can still need it. Maintenance deletion is a separate capability and credential boundary, not permission to collect a live namespace. Purge only a retired namespace after all writers are stopped and cannot reacquire authority.
+Automatic live-history reclamation and safe concurrent blob collection are not provided. Age or an apparently unreferenced upload is not sufficient evidence for deletion: delayed writers, forks, readers, and backups can still need it. Never delete production objects to repair recovery or reclaim capacity. Retained append-only history, receipts, external outcomes, and incurred costs survive rewind; changing the active branch does not erase accepted work.
 
 ## Backup and restore
 
@@ -171,3 +190,5 @@ There is no public one-call snapshot restore API or automatic legacy-store impor
 Rehearse this procedure with your real provider and failure scenarios before relying on it. A likely startup failure is missing credentials or a custom endpoint without qualified conditional semantics: correct the configuration and provider qualification, not the stored history.
 
 Next: use [typed recovery actions](/features/recovery) for unresolved work and the [Runtime reference](/reference/runtime) for service contracts.
+
+Local integration scenarios: [`durability/object-store.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/durability/object-store.test.ts). Test availability describes the verification boundary, not a claim that every acceptance gate has passed.

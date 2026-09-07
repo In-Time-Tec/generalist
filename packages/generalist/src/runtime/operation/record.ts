@@ -4,6 +4,7 @@ import { OperationResolution } from "./resolution.js"
 import { ExecutionCheckpoint } from "../execution/state.js"
 
 export const OperationKind = Schema.Literals([
+  "hook",
   "model",
   "tool",
   "memory",
@@ -49,6 +50,5 @@ export interface OperationRecord {
   readonly checkpoint?: ExecutionCheckpoint
   readonly completedSequence?: number
 }
-
 
 export const canBlindRetry = (policy: ReplayPolicy): boolean => policy === "pure" || policy === "provider-idempotent"

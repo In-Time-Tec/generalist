@@ -49,16 +49,18 @@ export const memoizeModel = (run: string) => (model: LanguageModel.Service) =>
           return invoke().pipe(
             Stream.tap((part) => Effect.sync(() => observed.push(part))),
             Stream.concat(
-              Stream.fromEffect(Effect.suspend(() =>
-                !observed.some(Schema.is(FinishPart))
-                  ? Effect.void
-                  : store.value.put(key, {
-                      value: observed,
-                      fromRun: run,
-                      fromOperation: `model:${key}`,
-                      expiresAtMillis: Number.MAX_SAFE_INTEGER,
-                    }),
-              )).pipe(Stream.drain),
+              Stream.fromEffect(
+                Effect.suspend(() =>
+                  !observed.some(Schema.is(FinishPart))
+                    ? Effect.void
+                    : store.value.put(key, {
+                        value: observed,
+                        fromRun: run,
+                        fromOperation: `model:${key}`,
+                        expiresAtMillis: Number.MAX_SAFE_INTEGER,
+                      }),
+                ),
+              ).pipe(Stream.drain),
             ),
           )
         }),

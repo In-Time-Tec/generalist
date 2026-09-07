@@ -1,3 +1,4 @@
+/* oxlint-disable effecttsgo/async-function, effecttsgo/new-promise -- This native R2 transport suite exercises the Promise-only Bucket and Web Streams APIs, including intentionally stalled provider operations. */
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import type { ObjectStoreFailure } from "../../src/durability/object-store.js"
@@ -16,16 +17,20 @@ class NativeBucket implements Bucket, MaintenanceBucket {
   readonly objects = new Map<string, { readonly metadata: Metadata; readonly bytes: Uint8Array }>()
   private version = 0
 
-  async get(key: string, options?: { readonly range: { readonly offset: number; readonly length: number } }): Promise<Body | null> {
+  async get(
+    key: string,
+    options?: { readonly range: { readonly offset: number; readonly length: number } },
+  ): Promise<Body | null> {
     const object = this.objects.get(key)
     if (object === undefined) return null
     const requested = options?.range
     if (requested !== undefined && requested.offset >= object.bytes.byteLength) {
       throw new Error("get: Requested byte range is not satisfiable. (10039)")
     }
-    const bytes = requested === undefined
-      ? object.bytes
-      : object.bytes.subarray(requested.offset, requested.offset + requested.length)
+    const bytes =
+      requested === undefined
+        ? object.bytes
+        : object.bytes.subarray(requested.offset, requested.offset + requested.length)
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(bytes.slice(0, 2))
@@ -33,11 +38,13 @@ class NativeBucket implements Bucket, MaintenanceBucket {
         controller.close()
       },
     })
-    return {
+    const response = {
       ...object.metadata,
       body,
-      ...(requested === undefined ? {} : { range: { offset: requested.offset, length: bytes.byteLength } }),
     }
+    return requested === undefined
+      ? response
+      : { ...response, range: { offset: requested.offset, length: bytes.byteLength } }
   }
 
   async put(
@@ -58,7 +65,7 @@ class NativeBucket implements Bucket, MaintenanceBucket {
     return {
       objects: [...this.objects.keys()]
         .filter((key) => key.startsWith(options.prefix))
-        .sort()
+        .toSorted()
         .map((key) => ({ key })),
       truncated: false,
     }
@@ -70,6 +77,7 @@ class NativeBucket implements Bucket, MaintenanceBucket {
 }
 
 // Deliberately corrupt a native response at the protocol boundary, not production data types.
+// oxlint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/require-safety-comment-for-type-assertion, typescript/no-unsafe-type-assertion -- SAFETY: Parameterized malformed values are passed directly to adapter validation and never into production state.
 const malformed = <A>(value: unknown): A => value as A
 
 const metadata = { key: "journal/0", size: 3, etag: "opaque-token" }
@@ -110,6 +118,26 @@ describe("native R2 object transport", () => {
     }),
   )
 
+  it.effect("reads a native object whose body is exposed through a prototype getter", () =>
+    Effect.gen(function* () {
+      const bytes = new Uint8Array([1, 2, 3])
+      const stream = new Response(bytes).body!
+      class NativeBody implements Body {
+        readonly key = metadata.key
+        readonly size = metadata.size
+        readonly etag = metadata.etag
+        get body() {
+          return stream
+        }
+      }
+      const object = new NativeBody()
+      expect(Object.hasOwn(object, "body")).toBe(false)
+      const bucket = new NativeBucket()
+      bucket.get = async () => object
+      expect(yield* make(bucket).read("journal/0", { maxBytes: 3 })).toEqual({ bytes, etag: metadata.etag })
+    }),
+  )
+
   it.effect("continues through empty and short truncated pages until the cursor is absent", () =>
     Effect.gen(function* () {
       const bucket = new NativeBucket()
@@ -146,13 +174,26 @@ describe("native R2 object transport", () => {
     }),
   )
 
+  for (const keys of [[], ["journal/0"]]) {
+    it.effect(`accepts a native terminal page with ${keys.length} objects and an explicitly undefined cursor`, () =>
+      Effect.gen(function* () {
+        const bucket = new NativeBucket()
+        bucket.list = async () => ({ objects: keys.map((key) => ({ key })), truncated: false, cursor: undefined })
+        expect(yield* make(bucket).list("journal/", "previous-page")).toEqual({ keys })
+      }),
+    )
+  }
+
   for (const [name, page, cursor] of [
     ["missing truncated flag", { objects: [] }, undefined],
     ["missing continuation", { objects: [], truncated: true }, undefined],
+    ["undefined continuation", { objects: [], truncated: true, cursor: undefined }, undefined],
     ["empty continuation", { objects: [], truncated: true, cursor: "" }, undefined],
     ["non-string continuation", { objects: [], truncated: true, cursor: 2 }, undefined],
     ["non-advancing continuation", { objects: [], truncated: true, cursor: "same" }, "same"],
     ["continuation on a terminal page", { objects: [], truncated: false, cursor: "extra" }, undefined],
+    ["empty cursor on a terminal page", { objects: [], truncated: false, cursor: "" }, undefined],
+    ["null cursor on a terminal page", { objects: [], truncated: false, cursor: null }, undefined],
     ["missing objects", { truncated: false }, undefined],
     ["missing object key", { objects: [{}], truncated: false }, undefined],
     ["foreign namespace", { objects: [{ key: "other/0" }], truncated: false }, undefined],
@@ -174,7 +215,18 @@ describe("native R2 object transport", () => {
     ["foreign object", { ...metadata, key: "other", body: new Response(new Uint8Array(3)).body }],
     ["incomplete body", { ...metadata, body: new Response(new Uint8Array(2)).body }],
     ["oversized body", { ...metadata, body: new Response(new Uint8Array(4)).body }],
-    ["invalid byte container", { ...metadata, body: new ReadableStream({ start(controller) { controller.enqueue("not bytes"); controller.close() } }) }],
+    [
+      "invalid byte container",
+      {
+        ...metadata,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue("not bytes")
+            controller.close()
+          },
+        }),
+      },
+    ],
     ["invalid size", { ...metadata, size: Number.NaN, body: new Response(new Uint8Array(3)).body }],
     ["missing size", { key: metadata.key, etag: metadata.etag, body: new Response(new Uint8Array(3)).body }],
   ] as const) {
@@ -274,10 +326,18 @@ describe("native R2 object transport", () => {
     const bucket = new NativeBucket()
     bucket.get = async () => ({
       ...metadata,
-      body: new ReadableStream<Uint8Array>({
-        pull(controller) { pulls += 1; controller.enqueue(new Uint8Array(3)) },
-        cancel() { canceled = true },
-      }, { highWaterMark: 0 }),
+      body: new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulls += 1
+            controller.enqueue(new Uint8Array(3))
+          },
+          cancel() {
+            canceled = true
+          },
+        },
+        { highWaterMark: 0 },
+      ),
     })
     expect((await Effect.runPromise(failureOf(make(bucket).read("journal/0", { maxBytes: 2 })))).reason).toBe("limit")
     expect(pulls).toBe(0)
@@ -291,10 +351,18 @@ describe("native R2 object transport", () => {
     bucket.get = async () => ({
       ...metadata,
       size: 1,
-      body: new ReadableStream<Uint8Array>({
-        pull(controller) { pulls += 1; controller.enqueue(new Uint8Array([1, 2, 3])) },
-        cancel() { canceled = true },
-      }, { highWaterMark: 0 }),
+      body: new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulls += 1
+            controller.enqueue(new Uint8Array([1, 2, 3]))
+          },
+          cancel() {
+            canceled = true
+          },
+        },
+        { highWaterMark: 0 },
+      ),
     })
     expect((await Effect.runPromise(failureOf(make(bucket).read("journal/0", { maxBytes: 2 })))).reason).toBe("limit")
     expect(pulls).toBe(1)
@@ -305,17 +373,39 @@ describe("native R2 object transport", () => {
     Effect.gen(function* () {
       for (const bytes of [new Uint8Array([1, 2, 3]), new Uint8Array()]) {
         const bucket = new NativeBucket()
-        bucket.get = () => Promise.resolve({
-          ...metadata,
-          size: bytes.length,
-          range: { offset: 0, length: bytes.length },
-          body: new Response(bytes).body!,
-        })
+        bucket.get = () =>
+          Promise.resolve({
+            ...metadata,
+            size: bytes.length,
+            range: { offset: 0, length: bytes.length },
+            body: new Response(bytes).body!,
+          })
         expect(yield* make(bucket).read("journal/0", { maxBytes: 3 })).toEqual({
           bytes,
           etag: metadata.etag,
         })
       }
+    }),
+  )
+
+  it.effect("accepts the native undefined suffix on full and bounded reads", () =>
+    Effect.gen(function* () {
+      const bucket = new NativeBucket()
+      bucket.get = async (_key, options) => {
+        const bytes = new Uint8Array([1, 2, 3])
+        const offset = options?.range.offset ?? 0
+        const body = bytes.subarray(offset, offset + (options?.range.length ?? bytes.length))
+        return {
+          ...metadata,
+          range: { offset, length: body.length, suffix: undefined },
+          body: new Response(body).body!,
+        }
+      }
+      const store = make(bucket)
+      expect((yield* store.read("journal/0", { maxBytes: 3 }))?.bytes).toEqual(new Uint8Array([1, 2, 3]))
+      expect((yield* store.read("journal/0", { maxBytes: 2, range: { offset: 1, length: 2 } }))?.bytes).toEqual(
+        new Uint8Array([2, 3]),
+      )
     }),
   )
 
@@ -328,11 +418,12 @@ describe("native R2 object transport", () => {
     it.effect(`rejects ${name} metadata on a full read`, () =>
       Effect.gen(function* () {
         const bucket = new NativeBucket()
-        bucket.get = () => Promise.resolve({
-          ...metadata,
-          range,
-          body: new Response(new Uint8Array([1, 2, 3])).body!,
-        })
+        bucket.get = () =>
+          Promise.resolve({
+            ...metadata,
+            range,
+            body: new Response(new Uint8Array([1, 2, 3])).body!,
+          })
         expect((yield* failureOf(make(bucket).read("journal/0", { maxBytes: 3 }))).reason).toBe("invalid-response")
       }),
     )
@@ -346,7 +437,9 @@ describe("native R2 object transport", () => {
       const ending = yield* store.read("journal/0", { maxBytes: 4, range: { offset: 4, length: 4 } })
       expect(interior?.bytes).toEqual(new Uint8Array([2, 3]))
       expect(ending).toEqual({ bytes: new Uint8Array([4, 5]), etag: interior?.etag })
-      expect((yield* failureOf(store.read("journal/0", { maxBytes: 1, range: { offset: 6, length: 1 } }))).reason).toBe("invalid-response")
+      expect((yield* failureOf(store.read("journal/0", { maxBytes: 1, range: { offset: 6, length: 1 } }))).reason).toBe(
+        "invalid-response",
+      )
     }),
   )
 
@@ -359,12 +452,18 @@ describe("native R2 object transport", () => {
     it.effect(`rejects ${name} rather than returning bytes from a different range`, () =>
       Effect.gen(function* () {
         const bucket = new NativeBucket()
-        bucket.get = async () => ({
-          ...metadata, size: 6, ...(range === undefined ? {} : { range }), body: new Response(new Uint8Array([2, 3])).body!,
-        })
-        expect((yield* failureOf(make(bucket).read("journal/0", {
-          maxBytes: 2, range: { offset: 2, length: 2 },
-        }))).reason).toBe("invalid-response")
+        bucket.get = async () => {
+          const response = { ...metadata, size: 6, body: new Response(new Uint8Array([2, 3])).body! }
+          return range === undefined ? response : { ...response, range }
+        }
+        expect(
+          (yield* failureOf(
+            make(bucket).read("journal/0", {
+              maxBytes: 2,
+              range: { offset: 2, length: 2 },
+            }),
+          )).reason,
+        ).toBe("invalid-response")
       }),
     )
   }
@@ -374,11 +473,15 @@ describe("native R2 object transport", () => {
     bucket.get = () => new Promise(() => {})
     bucket.list = () => new Promise(() => {})
     const store = make(bucket, { requestTimeoutMs: 15 })
-    const errors = await Effect.runPromise(Effect.all([
-      failureOf(store.read("journal/0", { maxBytes: 3 })),
-      failureOf(store.list("journal/")),
-    ], { concurrency: "unbounded" }))
-    expect(errors.map((error) => [error.operation, error.reason])).toEqual([["read", "timeout"], ["list", "timeout"]])
+    const errors = await Effect.runPromise(
+      Effect.all([failureOf(store.read("journal/0", { maxBytes: 3 })), failureOf(store.list("journal/"))], {
+        concurrency: "unbounded",
+      }),
+    )
+    expect(errors.map((error) => [error.operation, error.reason])).toEqual([
+      ["read", "timeout"],
+      ["list", "timeout"],
+    ])
   })
 
   it("cancels a body that stalls after metadata without waiting for cancellation acknowledgement", async () => {
@@ -386,10 +489,16 @@ describe("native R2 object transport", () => {
     const bucket = new NativeBucket()
     bucket.get = async () => ({
       ...metadata,
-      body: new ReadableStream<Uint8Array>({
-        pull: () => new Promise<void>(() => {}),
-        cancel() { canceled = true; return new Promise<void>(() => {}) },
-      }, { highWaterMark: 0 }),
+      body: new ReadableStream<Uint8Array>(
+        {
+          pull: () => new Promise<void>(() => {}),
+          cancel() {
+            canceled = true
+            return new Promise<void>(() => {})
+          },
+        },
+        { highWaterMark: 0 },
+      ),
     })
     const store = make(bucket, { requestTimeoutMs: 15 })
     expect((await Effect.runPromise(failureOf(store.read("journal/0", { maxBytes: 3 })))).reason).toBe("timeout")
@@ -399,9 +508,14 @@ describe("native R2 object transport", () => {
   it("cancels a read body that arrives after its request deadline", async () => {
     let resolveGet!: (body: Body) => void
     let resolveCanceled!: () => void
-    const canceled = new Promise<void>((resolve) => { resolveCanceled = resolve })
+    const canceled = new Promise<void>((resolve) => {
+      resolveCanceled = resolve
+    })
     const bucket = new NativeBucket()
-    bucket.get = () => new Promise((resolve) => { resolveGet = resolve })
+    bucket.get = () =>
+      new Promise((resolve) => {
+        resolveGet = resolve
+      })
     const store = make(bucket, { requestTimeoutMs: 15 })
     expect((await Effect.runPromise(failureOf(store.read("journal/0", { maxBytes: 3 })))).reason).toBe("timeout")
     resolveGet({

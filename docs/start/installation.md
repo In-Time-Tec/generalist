@@ -26,31 +26,30 @@ Generalist 0.62.0 targets `effect@4.0.0-rc.112`. Effect AI APIs can change betwe
 
 ## One package
 
-Adapters ship in the `generalist` package. For example, install `generalist` and import `generalist/pg`; do not try to install `generalist/pg` as a separate package.
+Adapters ship in the `generalist` package. For example, install `generalist` and import `generalist/durability/s3`; do not install that subpath as a separate package. S3 and native R2 share one durability engine; compute hosts do not select a different storage backend.
 
-| Package      | Version | Runtime and role                                                                                                                     |
-| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `generalist` | 0.62.0  | Node 22+ and Bun 1.4+: agent loop, generic Runtime, exact feature import subpaths, and the pg, mysql, cloudflare, and rivet adapters |
+| Package      | Version | Runtime and role                                                                                                       |
+| ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `generalist` | 0.62.0  | Node 22+ and Bun 1.4+: agent loop, object-backed Runtime, exact feature imports, and Cloudflare/Rivet compute adapters |
 
 ## Import subpaths and peers
 
 `generalist/runtime`, `generalist/server`, `generalist/memory`, `generalist/instructions/skills`, and `generalist/providers/deterministic` are imports from generalist, never package-manager arguments. Core, generic Runtime, and the deterministic leaf need no optional peer.
 
-| Import profile                                             | Additional dependency                                                                     | Runtime                                                      |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `generalist/pg`                                            | `@effect/sql-pg@4.0.0-rc.112` and `pg@8.23.0`                                             | Node and Bun                                                 |
-| `generalist/mysql`                                         | `@effect/sql-mysql2@4.0.0-rc.112`                                                         | Node and Bun                                                 |
-| `generalist/unstable/cloudflare/workers`                   | None beyond effect                                                                        | Cloudflare Workers                                           |
-| `generalist/unstable/cloudflare/durable-objects`           | `@effect/sql-sqlite-do@4.0.0-rc.112`                                                      | Cloudflare Workers                                           |
-| `generalist/unstable/cloudflare/dynamic-workers`           | `es-module-lexer@2.3.2`                                                                   | Cloudflare Workers                                           |
-| `generalist/unstable/rivet`                                | `rivetkit@2.3.10` and `@standard-schema/spec@1.1.0`                                       | Node and Bun                                                 |
-| `generalist/runtime/sqlite-bun`                            | `@effect/sql-sqlite-bun@4.0.0-rc.112`                                                     | Bun only                                                     |
-| `generalist/unstable/mcp/*`                                | `@modelcontextprotocol/sdk@1.29.0`                                                        | Node, Bun; HTTP is Worker-safe                               |
-| `generalist/unstable/foldkit`                              | `foldkit@0.148.2`                                                                         | Node and Bun                                                 |
-| `generalist/unstable/a2a`                                  | `@a2a-js/sdk@1.0.1`                                                                       | Node and Bun                                                 |
-| `generalist/unstable/ag-ui`                                | `@ag-ui/core@0.0.57`                                                                      | Node and Bun                                                 |
-| `generalist/providers/<provider>`                          | The exact @effect/ai peer named by that provider; Bedrock uses its three AWS/Smithy peers | Node and Bun, except Bedrock's Node credential-chain profile |
-| `generalist/testing` / `generalist/testing/runtime-driver` | `@effect/vitest@4.0.0-rc.112` and `vitest@4.1.11`                                         | Test host                                                    |
+| Import profile                                             | Additional dependency                                                                       | Runtime                                                      |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `generalist/durability/s3`                                 | `@aws-sdk/client-s3@3.1124.0` and `@smithy/fetch-http-handler@5.7.2`                        | Node and Bun; explicit credentials                           |
+| `generalist/durability/r2`                                 | None beyond effect                                                                          | Cloudflare native R2 binding                                 |
+| `generalist/unstable/cloudflare/workers`                   | None beyond effect                                                                          | Cloudflare Workers                                           |
+| `generalist/unstable/cloudflare/durable-objects`           | None beyond effect; application supplies R2 and Crypto                                      | Cloudflare Workers                                           |
+| `generalist/unstable/cloudflare/dynamic-workers`           | `es-module-lexer@2.3.2`                                                                     | Cloudflare Workers                                           |
+| `generalist/unstable/rivet`                                | `rivetkit@2.3.15` and `@standard-schema/spec@1.1.0`, plus the chosen object transport peers | Node and Bun                                                 |
+| `generalist/unstable/mcp/*`                                | `@modelcontextprotocol/sdk@1.29.0`                                                          | Node, Bun; HTTP is Worker-safe                               |
+| `generalist/unstable/foldkit`                              | `foldkit@0.148.2`                                                                           | Node and Bun                                                 |
+| `generalist/unstable/a2a`                                  | `@a2a-js/sdk@1.0.1`                                                                         | Node and Bun                                                 |
+| `generalist/unstable/ag-ui`                                | `@ag-ui/core@0.0.57`                                                                        | Node and Bun                                                 |
+| `generalist/providers/<provider>`                          | The exact @effect/ai peer named by that provider; Bedrock uses its three AWS/Smithy peers   | Node and Bun, except Bedrock's Node credential-chain profile |
+| `generalist/testing` / `generalist/testing/runtime-driver` | `@effect/vitest@4.0.0-rc.112` and `vitest@4.1.11`                                           | Test host                                                    |
 
 ## Effect compatibility
 

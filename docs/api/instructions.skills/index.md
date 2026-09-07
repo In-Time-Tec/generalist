@@ -1,14 +1,14 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / instructions.skills
+[generalist](../index.md) / instructions.skills
 
 # instructions.skills
 
 ## Namespaces
 
-- [FileSystemCatalog](./namespaces/FileSystemCatalog)
-- [GitHubCatalog](./namespaces/GitHubCatalog)
-- [HttpCatalog](./namespaces/HttpCatalog)
-- [S3Catalog](./namespaces/S3Catalog)
+- [FileSystemCatalog](./namespaces/FileSystemCatalog.md)
+- [GitHubCatalog](./namespaces/GitHubCatalog.md)
+- [HttpCatalog](./namespaces/HttpCatalog.md)
+- [S3Catalog](./namespaces/S3Catalog.md)

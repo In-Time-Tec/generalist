@@ -10,6 +10,7 @@ import { ts } from "foldkit/schema"
 import { lift, type Subscriptions } from "foldkit/subscription"
 
 import { badge } from "@/components/ui/badge"
+import { button } from "@/components/ui/button"
 import {
   conversation,
   conversationContent,
@@ -30,7 +31,7 @@ import { response, responseText } from "@/components/ui/response"
 import { source, sources, sourcesContent, sourcesTrigger } from "@/components/ui/sources"
 import { tool, toolContent, toolHeader, toolInput, toolOutput } from "@/components/ui/tool"
 
-const SERVER_HTTP_URL = "http://localhost:4000"
+const SERVER_HTTP_URL = new URL("/api", globalThis.location.origin).toString()
 
 // MODEL
 
@@ -87,14 +88,19 @@ export const init: ApplicationInit<Model, Message, void, Connection.Connection> 
 export const OpenSession = define("OpenSession", {
   messages: [OpenedSession, FailedOpenSession],
   execute: Effect.gen(function* () {
+    const url = new URL(globalThis.location.href)
+    const existing = url.searchParams.get("session")
+    if (existing !== null && existing.length > 0) return OpenedSession({ sessionId: existing })
     const httpClient = yield* Layer.build(FetchHttpClient.layer)
     const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
       body: HttpBody.jsonUnsafe({}),
     }).pipe(Effect.provideContext(httpClient))
     const body = yield* httpResponse.json.pipe(
-      Effect.flatMap(Schema.decodeUnknownEffect(Schema.Struct({ sessionId: Schema.String }))),
+      Effect.flatMap(Schema.decodeUnknownEffect(Schema.Struct({ id: Schema.String }))),
     )
-    return OpenedSession({ sessionId: body.sessionId })
+    url.searchParams.set("session", body.id)
+    yield* Effect.sync(() => globalThis.history.replaceState(null, "", url))
+    return OpenedSession({ sessionId: body.id })
   }).pipe(
     Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
@@ -400,8 +406,38 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
           ),
         ]
       : []
+  const approval =
+    model.chat.run._tag === "AwaitingApproval"
+      ? [
+          h.keyed("div")(
+            "approval-row",
+            [h.Role("alert"), h.Class("rounded-lg border p-4 space-y-3")],
+            [
+              h.p([h.Class("font-medium")], [`Approval required: ${model.chat.run.toolName}`]),
+              h.pre([h.Class("overflow-auto text-xs")], [JSON.stringify(model.chat.run.params, null, 2)]),
+              h.div(
+                [h.Class("flex gap-2")],
+                [
+                  button({ type: "button", onClick: GotChatAction({ action: Chat.ClickedApprove() }) }, [
+                    "Approve once",
+                  ]),
+                  button(
+                    {
+                      type: "button",
+                      variant: "outline",
+                      onClick: GotChatAction({ action: Chat.ClickedDeny({ reason: null }) }),
+                    },
+                    ["Deny"],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ]
+      : []
   if (model.chat.entries.length === 0) {
     if (failure.length > 0) return failure
+    if (approval.length > 0) return approval
     return [
       h.keyed("div")(
         "empty-state",
@@ -426,7 +462,7 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
           ),
         ]
       : []
-  return [...entries, ...waiting, ...failure]
+  return [...entries, ...waiting, ...approval, ...failure]
 }
 
 const sessionBannerView = (session: SessionState): Html => {

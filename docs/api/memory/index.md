@@ -1,17 +1,17 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / memory
+[generalist](../index.md) / memory
 
 # memory
 
 ## Namespaces
 
-- [SemanticRecall](./namespaces/SemanticRecall)
-- [Supermemory](./namespaces/Supermemory)
-- [VectorStore](./namespaces/VectorStore)
-- [WorkingMemory](./namespaces/WorkingMemory)
+- [SemanticRecall](./namespaces/SemanticRecall.md)
+- [Supermemory](./namespaces/Supermemory.md)
+- [VectorStore](./namespaces/VectorStore.md)
+- [WorkingMemory](./namespaces/WorkingMemory.md)
 
 ## Interfaces
 
@@ -25,35 +25,13 @@
 
 ##### semantic?
 
-> `readonly` `optional` **semantic?**: [`Options`](./namespaces/SemanticRecall#options)
+> `readonly` `optional` **semantic?**: [`Options`](./namespaces/SemanticRecall.md#options)
 
 <a id="working"></a>
 
 ##### working?
 
-> `readonly` `optional` **working?**: [`Options`](./namespaces/WorkingMemory#options)
-
-***
-
-<a id="pgvectoroptions"></a>
-
-### PgVectorOptions
-
-PostgreSQL pgvector storage configuration.
-
-#### Properties
-
-<a id="dimensions"></a>
-
-##### dimensions
-
-> `readonly` **dimensions**: `number`
-
-<a id="table"></a>
-
-##### table
-
-> `readonly` **table**: `string`
+> `readonly` `optional` **working?**: [`Options`](./namespaces/WorkingMemory.md#options)
 
 ## Type Aliases
 
@@ -61,7 +39,7 @@ PostgreSQL pgvector storage configuration.
 
 ### WorkingRequirement
 
-> **WorkingRequirement**\<`O`\> = `O` *extends* `object` ? \[`Extract`\<`W`, [`Options`](./namespaces/WorkingMemory#options)\>\] *extends* \[`never`\] ? `never` : [`SummaryRequirement`](./namespaces/WorkingMemory#summaryrequirement)\<`Extract`\<`W`, [`Options`](./namespaces/WorkingMemory#options)\>\> : `never`
+> **WorkingRequirement**\<`O`\> = `O` *extends* `object` ? \[`Extract`\<`W`, [`Options`](./namespaces/WorkingMemory.md#options)\>\] *extends* \[`never`\] ? `never` : [`SummaryRequirement`](./namespaces/WorkingMemory.md#summaryrequirement)\<`Extract`\<`W`, [`Options`](./namespaces/WorkingMemory.md#options)\>\> : `never`
 
 **`Internal`**
 
@@ -73,26 +51,6 @@ The ambient LanguageModel is required only when working memory summarizes withou
 
 `O`
 
-## Variables
-
-<a id="layerpgvector"></a>
-
-### layerPgVector
-
-> `const` **layerPgVector**: (`options`) => `Layer.Layer`\<[`VectorStore`](./namespaces/VectorStore#vectorstore), [`VectorStoreError`](./namespaces/VectorStore#vectorstoreerror), `SqlClient.SqlClient`\>
-
-Persistent PostgreSQL vector store. Requires the `vector` extension.
-
-#### Parameters
-
-##### options
-
-[`PgVectorOptions`](#pgvectoroptions)
-
-#### Returns
-
-`Layer.Layer`\<[`VectorStore`](./namespaces/VectorStore#vectorstore), [`VectorStoreError`](./namespaces/VectorStore#vectorstoreerror), `SqlClient.SqlClient`\>
-
 ## Functions
 
 <a id="layer"></a>
@@ -101,15 +59,15 @@ Persistent PostgreSQL vector store. Requires the `vector` extension.
 
 #### Call Signature
 
-> **layer**(): `Layer`\<[`Memory`](../generalist/namespaces/Memory#memory), `never`, [`VectorStore`](./namespaces/VectorStore#vectorstore) \| `EmbeddingModel`\>
+> **layer**(): `Layer`\<[`Memory`](../generalist/namespaces/Memory.md#memory), `never`, [`VectorStore`](./namespaces/VectorStore.md#vectorstore) \| `EmbeddingModel`\>
 
 ##### Returns
 
-`Layer`\<[`Memory`](../generalist/namespaces/Memory#memory), `never`, [`VectorStore`](./namespaces/VectorStore#vectorstore) \| `EmbeddingModel`\>
+`Layer`\<[`Memory`](../generalist/namespaces/Memory.md#memory), `never`, [`VectorStore`](./namespaces/VectorStore.md#vectorstore) \| `EmbeddingModel`\>
 
 #### Call Signature
 
-> **layer**\<`O`\>(`options`): `Layer`\<[`Memory`](../generalist/namespaces/Memory#memory), `never`, [`VectorStore`](./namespaces/VectorStore#vectorstore) \| `EmbeddingModel` \| [`WorkingRequirement`](#workingrequirement)\<`O`\>\>
+> **layer**\<`O`\>(`options`): `Layer`\<[`Memory`](../generalist/namespaces/Memory.md#memory), `never`, [`VectorStore`](./namespaces/VectorStore.md#vectorstore) \| `EmbeddingModel` \| [`WorkingRequirement`](#workingrequirement)\<`O`\>\>
 
 ##### Type Parameters
 
@@ -125,7 +83,7 @@ Persistent PostgreSQL vector store. Requires the `vector` extension.
 
 ##### Returns
 
-`Layer`\<[`Memory`](../generalist/namespaces/Memory#memory), `never`, [`VectorStore`](./namespaces/VectorStore#vectorstore) \| `EmbeddingModel` \| [`WorkingRequirement`](#workingrequirement)\<`O`\>\>
+`Layer`\<[`Memory`](../generalist/namespaces/Memory.md#memory), `never`, [`VectorStore`](./namespaces/VectorStore.md#vectorstore) \| `EmbeddingModel` \| [`WorkingRequirement`](#workingrequirement)\<`O`\>\>
 
 ## References
 
@@ -133,7 +91,7 @@ Persistent PostgreSQL vector store. Requires the `vector` extension.
 
 ### layerSupermemory
 
-Renames and re-exports [layer](./namespaces/Supermemory#layer)
+Renames and re-exports [layer](./namespaces/Supermemory.md#layer)
 
 ***
 
@@ -141,7 +99,7 @@ Renames and re-exports [layer](./namespaces/Supermemory#layer)
 
 ### SupermemoryError
 
-Re-exports [SupermemoryError](./namespaces/Supermemory#supermemoryerror)
+Re-exports [SupermemoryError](./namespaces/Supermemory.md#supermemoryerror)
 
 ***
 
@@ -149,4 +107,4 @@ Re-exports [SupermemoryError](./namespaces/Supermemory#supermemoryerror)
 
 ### SupermemoryOptions
 
-Renames and re-exports [Options](./namespaces/Supermemory#options)
+Renames and re-exports [Options](./namespaces/Supermemory.md#options)

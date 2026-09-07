@@ -2,7 +2,7 @@ import { Effect, Ref, Schema, Semaphore } from "effect"
 import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import type { Checkpoint as CapabilityCheckpoint } from "../../capability/state.js"
 import type { DriverCheckpoint } from "./contract.js"
-import { LoopDriverState } from "../loop-driver-state.js"
+import { LoopDriverState, encode as encodeLoopState } from "../loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../service.js"
 
 export interface CapabilityCheckpointService {
@@ -37,9 +37,9 @@ export const capabilityCheckpointMethods = (input: {
             Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
           )
           const updated = update(decoded.capabilities)
-          const next = { ...current, state: { ...decoded, capabilities: updated.checkpoint } }
-          yield* Ref.set(input.checkpointRef, next)
+          const next = { ...current, state: yield* encodeLoopState({ ...decoded, capabilities: updated.checkpoint }) }
           yield* input.onCheckpoint(next)
+          yield* Ref.set(input.checkpointRef, next)
           return updated.value
         }),
       ),

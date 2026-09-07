@@ -12,17 +12,18 @@ import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/obje
 
 const storage = makeObjectStorage()
 const services = () => {
-  const blobStore = Layer.unwrap(Effect.gen(function* () {
-    const client = yield* storage.connect
-    return BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
-      Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, client.store))),
-    )
-  }))
+  const blobStore = Layer.unwrap(
+    Effect.gen(function* () {
+      const client = yield* storage.connect
+      return BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+        Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, client.store))),
+      )
+    }),
+  )
   return Layer.mergeAll(
-    objectRuntimeLayer(
-      { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
-      storage,
-    ).pipe(Layer.provide(ExecutableResolver.layerStatic([]))),
+    objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([])),
+    ),
     blobStore,
     artifactLayer,
     TestModel.layer([]),
@@ -30,7 +31,6 @@ const services = () => {
     Approvals.layerAutoApprove,
   )
 }
-
 
 const withServices = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.scoped(Layer.build(services()).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))))

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ModelTelemetry
+[generalist](../../index.md) / [generalist](../index.md) / ModelTelemetry
 
 # ModelTelemetry
 

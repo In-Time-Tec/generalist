@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / RunStore
+[generalist](../../index.md) / [runtime](../index.md) / RunStore
 
 # RunStore
 
@@ -12,7 +12,7 @@
 
 ### RunStore
 
-RunStore public contract and process-local memory layer.
+RunStore public contract and canonical object-backed layer.
 
 #### Extends
 
@@ -82,7 +82,7 @@ RunStore public contract and process-local memory layer.
 
 ##### executableManifest
 
-> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="executableref"></a>
 
@@ -220,7 +220,7 @@ RunStore public contract and process-local memory layer.
 
 ##### executableManifest
 
-> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 ###### Inherited from
 
@@ -248,7 +248,7 @@ RunStore public contract and process-local memory layer.
 
 ##### initialChildren
 
-> `readonly` **initialChildren**: readonly `Omit`\<[`InitialChildInput`](./Runtime#initialchildinput), `"prompt"`\> & `object`[]
+> `readonly` **initialChildren**: readonly `Omit`\<[`InitialChildInput`](./Runtime.md#initialchildinput), `"prompt"`\> & `object`[]
 
 <a id="initialfanouts"></a>
 
@@ -474,7 +474,7 @@ RunStore public contract and process-local memory layer.
 
 ##### checkpoint?
 
-> `readonly` `optional` **checkpoint?**: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \} \| \{ `version`: `"1"`; \}
+> `readonly` `optional` **checkpoint?**: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \} \| \{ `branch?`: \{ `namespace`: `string`; `replay`: \{\[`key`: `string`\]: `string`; \}; \}; `version`: `"1"`; \}
 
 <a id="continuation"></a>
 
@@ -498,7 +498,7 @@ RunStore public contract and process-local memory layer.
 
 ##### kind
 
-> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"operator"` \| `"memory"` \| `"log"` \| `"handoff"` \| `"nested"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"operator"` \| `"memory"` \| `"log"` \| `"handoff"` \| `"nested"`
 
 <a id="operationkey"></a>
 
@@ -566,7 +566,7 @@ RunStore public contract and process-local memory layer.
 
 ##### acknowledge
 
-> `readonly` **acknowledge**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`AckInvalid`](./Errors#ackinvalid) \| [`AckBeyondCommitted`](./Errors#ackbeyondcommitted)\>
+> `readonly` **acknowledge**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`AckInvalid`](./Errors.md#ackinvalid) \| [`AckBeyondCommitted`](./Errors.md#ackbeyondcommitted)\>
 
 Durably advance the host processed-through point to an exact committed model cycle.
 
@@ -584,13 +584,13 @@ Durably advance the host processed-through point to an exact committed model cyc
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`AckInvalid`](./Errors#ackinvalid) \| [`AckBeyondCommitted`](./Errors#ackbeyondcommitted)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`AckInvalid`](./Errors.md#ackinvalid) \| [`AckBeyondCommitted`](./Errors.md#ackbeyondcommitted)\>
 
 <a id="acknowledged"></a>
 
 ##### acknowledged
 
-> `readonly` **acknowledged**: (`runId`) => `Effect`\<\{ `acknowledgedAt?`: `string`; `runId`: `string`; `sequence`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **acknowledged**: (`runId`) => `Effect`\<\{ `acknowledgedAt?`: `string`; `runId`: `string`; `sequence`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 Read the durable host processed-through point; -1 means no cycle is acknowledged.
 
@@ -602,7 +602,7 @@ Read the durable host processed-through point; -1 means no cycle is acknowledged
 
 ###### Returns
 
-`Effect`\<\{ `acknowledgedAt?`: `string`; `runId`: `string`; `sequence`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<\{ `acknowledgedAt?`: `string`; `runId`: `string`; `sequence`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="acknowledgeoperationcancellation"></a>
 
@@ -626,25 +626,23 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### activate
 
-> `readonly` **activate**: (`input`) => `Effect`\<[`RunInspection`](./Run#runinspection), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **activate**: (`input`) => `Effect`\<[`RunInspection`](./Run.md#runinspection), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
 ###### input
 
-###### runId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<[`RunInspection`](./Run#runinspection), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<[`RunInspection`](./Run.md#runinspection), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="admitfanout"></a>
 
 ##### admitFanOut
 
-> `readonly` **admitFanOut**: (`input`) => `Effect`\<\{ `childRunIds`: readonly `string`[]; `duplicate`: `boolean`; `fanOutId`: `string`; `parentRunId`: `string`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal)\>
+> `readonly` **admitFanOut**: (`input`) => `Effect`\<\{ `childRunIds`: readonly `string`[]; `duplicate`: `boolean`; `fanOutId`: `string`; `parentRunId`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 ###### Parameters
 
@@ -654,13 +652,13 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<\{ `childRunIds`: readonly `string`[]; `duplicate`: `boolean`; `fanOutId`: `string`; `parentRunId`: `string`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal)\>
+`Effect`\<\{ `childRunIds`: readonly `string`[]; `duplicate`: `boolean`; `fanOutId`: `string`; `parentRunId`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 <a id="admitprogramagents"></a>
 
 ##### admitProgramAgents
 
-> `readonly` **admitProgramAgents**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **admitProgramAgents**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -670,13 +668,13 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="admitprogramchild"></a>
 
 ##### admitProgramChild
 
-> `readonly` **admitProgramChild**: (`input`) => `Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal) \| [`StaleClaim`](./Errors#staleclaim) \| `StaleSessionClaim`\>
+> `readonly` **admitProgramChild**: (`input`) => `Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`StaleClaim`](./Errors.md#staleclaim) \| `StaleSessionClaim`\>
 
 ###### Parameters
 
@@ -686,13 +684,13 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal) \| [`StaleClaim`](./Errors#staleclaim) \| `StaleSessionClaim`\>
+`Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`StaleClaim`](./Errors.md#staleclaim) \| `StaleSessionClaim`\>
 
 <a id="admitprogramchildandsuspend"></a>
 
 ##### admitProgramChildAndSuspend
 
-> `readonly` **admitProgramChildAndSuspend**: (`input`) => `Effect`\<readonly [`RunReceipt`](./Run#runreceipt)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal) \| [`StaleClaim`](./Errors#staleclaim) \| `StaleSessionClaim`\>
+> `readonly` **admitProgramChildAndSuspend**: (`input`) => `Effect`\<readonly [`RunReceipt`](./Run.md#runreceipt)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`StaleClaim`](./Errors.md#staleclaim) \| `StaleSessionClaim`\>
 
 ###### Parameters
 
@@ -702,13 +700,13 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<readonly [`RunReceipt`](./Run#runreceipt)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal) \| [`StaleClaim`](./Errors#staleclaim) \| `StaleSessionClaim`\>
+`Effect`\<readonly [`RunReceipt`](./Run.md#runreceipt)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`StaleClaim`](./Errors.md#staleclaim) \| `StaleSessionClaim`\>
 
 <a id="admitrollback"></a>
 
 ##### admitRollback
 
-> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`RunTerminal`](./Errors#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering#inboxfull) \| [`RunBusy`](./Errors#runbusy) \| [`SteeringConflict`](./Errors#steeringconflict)\>
+> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 ###### Parameters
 
@@ -718,13 +716,13 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<`SteeringAdmission`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`RunTerminal`](./Errors#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering#inboxfull) \| [`RunBusy`](./Errors#runbusy) \| [`SteeringConflict`](./Errors#steeringconflict)\>
+`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 <a id="admitsend"></a>
 
 ##### admitSend
 
-> `readonly` **admitSend**: (`input`) => `Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors#executableregistrationconflict) \| [`TreePolicyInvalid`](./Errors#treepolicyinvalid) \| [`AddressNotFound`](./Errors#addressnotfound)\>
+> `readonly` **admitSend**: (`input`) => `Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`AddressNotFound`](./Errors.md#addressnotfound)\>
 
 ###### Parameters
 
@@ -734,29 +732,29 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors#executableregistrationconflict) \| [`TreePolicyInvalid`](./Errors#treepolicyinvalid) \| [`AddressNotFound`](./Errors#addressnotfound)\>
+`Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`AddressNotFound`](./Errors.md#addressnotfound)\>
 
 <a id="admitspawn"></a>
 
 ##### admitSpawn
 
-> `readonly` **admitSpawn**: (`input`) => `Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal)\>
+> `readonly` **admitSpawn**: (`input`) => `Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 ###### Parameters
 
 ###### input
 
-[`SpawnInput`](./Runtime#spawninput) & `object`
+`Omit`\<[`SpawnInput`](./Runtime.md#spawninput), `"prompt"`\> & `object`
 
 ###### Returns
 
-`Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`RunTerminal`](./Errors#runterminal)\>
+`Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 <a id="admitstart"></a>
 
 ##### admitStart
 
-> `readonly` **admitStart**: (`input`, `options?`) => `Effect`\<[`StartReceipt`](./Runtime#startreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors#executableregistrationconflict) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`StartInvalid`](./Errors#startinvalid) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted)\>
+> `readonly` **admitStart**: (`input`, `options?`) => `Effect`\<[`StartReceipt`](./Runtime.md#startreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted)\>
 
 ###### Parameters
 
@@ -772,13 +770,13 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<[`StartReceipt`](./Runtime#startreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors#executableregistrationconflict) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`StartInvalid`](./Errors#startinvalid) \| [`FanOutConflict`](./Errors#fanoutconflict) \| [`FanOutInvalid`](./Errors#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted)\>
+`Effect`\<[`StartReceipt`](./Runtime.md#startreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted)\>
 
 <a id="admitsteering"></a>
 
 ##### admitSteering
 
-> `readonly` **admitSteering**: (`input`) => `Effect`\<`SteeringAdmission`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering#inboxfull) \| [`RunBusy`](./Errors#runbusy) \| [`SteeringConflict`](./Errors#steeringconflict)\>
+> `readonly` **admitSteering**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 ###### Parameters
 
@@ -788,47 +786,29 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<`SteeringAdmission`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering#inboxfull) \| [`RunBusy`](./Errors#runbusy) \| [`SteeringConflict`](./Errors#steeringconflict)\>
+`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 <a id="advanceschedule"></a>
 
 ##### advanceSchedule
 
-> `readonly` **advanceSchedule**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **advanceSchedule**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
 ###### input
 
-###### nextAt
-
-`string`
-
-###### now
-
-`number`
-
-###### occurrence
-
-`number`
-
-###### ownerId
-
-`string`
-
-###### scheduleId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="appendartifact"></a>
 
 ##### appendArtifact
 
-> `readonly` **appendArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+> `readonly` **appendArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact.md#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact.md#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 Append one CRDT operation if the expected branch head still matches.
 
@@ -840,13 +820,41 @@ Append one CRDT operation if the expected branch head still matches.
 
 ###### Returns
 
-`Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+`Effect`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact.md#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact.md#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
+
+<a id="artifactappendreceipt"></a>
+
+##### artifactAppendReceipt
+
+> `readonly` **artifactAppendReceipt**: (`input`) => `Effect`\<\{ `commandId`: `string`; `crdt`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
+
+Look up one persisted append receipt without mutating artifact state.
+
+###### Parameters
+
+###### input
+
+###### artifact
+
+`string`
+
+###### branch?
+
+`string`
+
+###### commandId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `commandId`: `string`; `crdt`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="artifacthead"></a>
 
 ##### artifactHead
 
-> `readonly` **artifactHead**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound)\>
+> `readonly` **artifactHead**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound)\>
 
 Load the current head of one artifact branch.
 
@@ -864,13 +872,13 @@ Load the current head of one artifact branch.
 
 ###### Returns
 
-`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound)\>
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound)\>
 
 <a id="artifactrunisfork"></a>
 
 ##### artifactRunIsFork
 
-> `readonly` **artifactRunIsFork**: (`runId`) => `Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **artifactRunIsFork**: (`runId`) => `Effect`\<`boolean`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 Whether this Run was created by Runtime fork or rewind branch retention.
 
@@ -882,13 +890,13 @@ Whether this Run was created by Runtime fork or rewind branch retention.
 
 ###### Returns
 
-`Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<`boolean`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="artifactsnapshot"></a>
 
 ##### artifactSnapshot
 
-> `readonly` **artifactSnapshot**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+> `readonly` **artifactSnapshot**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 Load one exact historical snapshot from the artifact operation log.
 
@@ -910,13 +918,13 @@ Load one exact historical snapshot from the artifact operation log.
 
 ###### Returns
 
-`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 <a id="artifactupdates"></a>
 
 ##### artifactUpdates
 
-> `readonly` **artifactUpdates**: (`input`) => `Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+> `readonly` **artifactUpdates**: (`input`) => `Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact.md#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 Replay then follow committed artifact operations after an exclusive version.
 
@@ -938,51 +946,45 @@ Replay then follow committed artifact operations after an exclusive version.
 
 ###### Returns
 
-`Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+`Stream`\<\{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `operation`: \{ `at`: `number`; `text`: `string`; \} \| \{ `from`: `number`; `to`: `number`; \} \| \{ `from`: `number`; `text`: `string`; `to`: `number`; \}; `result`: `number`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `update`: `Uint8Array`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactSubscriberLagged`](../../unstable.artifact.md#artifactsubscriberlagged) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 <a id="cancel"></a>
 
 ##### cancel
 
-> `readonly` **cancel**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **cancel**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
 ###### input
 
-[`CancelInput`](./Runtime#cancelinput)
+`CommandIdentity` & [`CancelInput`](./Runtime.md#cancelinput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="cancelsession"></a>
 
 ##### cancelSession
 
-> `readonly` **cancelSession**: (`input`) => `Effect`\<readonly `string`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **cancelSession**: (`input`) => `Effect`\<readonly `string`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
 ###### input
 
-###### reason?
-
-`string`
-
-###### sessionId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<readonly `string`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<readonly `string`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="claimedsessionstore"></a>
 
 ##### claimedSessionStore
 
-> `readonly` **claimedSessionStore**: (`claim`) => `Effect`\<`Option`\<[`SessionStore`](../../generalist/namespaces/Session#sessionstore)\>\>
+> `readonly` **claimedSessionStore**: (`claim`) => `Effect`\<`Option`\<[`SessionStore`](../../generalist/namespaces/Session.md#sessionstore)\>, [`DurabilityFailure`](../../durability.md#durabilityfailure)\>
 
 Session writer bound to one storage-issued execution claim.
 
@@ -994,59 +996,39 @@ Session writer bound to one storage-issued execution claim.
 
 ###### Returns
 
-`Effect`\<`Option`\<[`SessionStore`](../../generalist/namespaces/Session#sessionstore)\>\>
+`Effect`\<`Option`\<[`SessionStore`](../../generalist/namespaces/Session.md#sessionstore)\>, [`DurabilityFailure`](../../durability.md#durabilityfailure)\>
 
 <a id="claimexecution"></a>
 
 ##### claimExecution
 
-> `readonly` **claimExecution**: (`input`) => `Effect`\<`ExecutionRecord` & `ExecutionClaim`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`StaleClaim`](./Errors#staleclaim)\>
+> `readonly` **claimExecution**: (`input`) => `Effect`\<`ExecutionRecord` & `ExecutionClaim`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`StaleClaim`](./Errors.md#staleclaim)\>
 
 ###### Parameters
 
 ###### input
 
-###### ownerId
-
-`string`
-
-###### runId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<`ExecutionRecord` & `ExecutionClaim`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`StaleClaim`](./Errors#staleclaim)\>
+`Effect`\<`ExecutionRecord` & `ExecutionClaim`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`StaleClaim`](./Errors.md#staleclaim)\>
 
 <a id="claimschedules"></a>
 
 ##### claimSchedules
 
-> `readonly` **claimSchedules**: (`input`) => `Effect`\<readonly `ClaimedSchedule`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **claimSchedules**: (`input`) => `Effect`\<readonly `ClaimedSchedule`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
 ###### input
 
-###### leaseMillis
-
-`number`
-
-###### limit
-
-`number`
-
-###### now
-
-`number`
-
-###### ownerId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<readonly `ClaimedSchedule`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<readonly `ClaimedSchedule`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="commitinterruptedmodelresponse"></a>
 
@@ -1084,7 +1066,7 @@ Session writer bound to one storage-issued execution claim.
 
 ##### commitProgramLog
 
-> `readonly` **commitProgramLog**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **commitProgramLog**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -1094,7 +1076,7 @@ Session writer bound to one storage-issued execution claim.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="complete"></a>
 
@@ -1106,7 +1088,7 @@ Session writer bound to one storage-issued execution claim.
 
 ###### input
 
-`ExecutionClaim` & `object`
+`CommandIdentity` & `ExecutionClaim` & `object`
 
 ###### Returns
 
@@ -1132,7 +1114,7 @@ Session writer bound to one storage-issued execution claim.
 
 ##### completeProgram
 
-> `readonly` **completeProgram**: (`input`) => `Effect`\<[`CompletionOutcome`](#completionoutcome), [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities#programbudgetexhausted) \| `WorkerMutationError`\>
+> `readonly` **completeProgram**: (`input`) => `Effect`\<[`CompletionOutcome`](#completionoutcome), [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities.md#programbudgetexhausted) \| `WorkerMutationError`\>
 
 ###### Parameters
 
@@ -1142,13 +1124,13 @@ Session writer bound to one storage-issued execution claim.
 
 ###### Returns
 
-`Effect`\<[`CompletionOutcome`](#completionoutcome), [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities#programbudgetexhausted) \| `WorkerMutationError`\>
+`Effect`\<[`CompletionOutcome`](#completionoutcome), [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities.md#programbudgetexhausted) \| `WorkerMutationError`\>
 
 <a id="createhostsession"></a>
 
 ##### createHostSession
 
-> `readonly` **createHostSession**: (`input`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionConflict`](../../host#sessionconflict) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **createHostSession**: (`input`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionConflict`](../../host.md#sessionconflict)\>
 
 Persist one product-facing Session identity and metadata.
 
@@ -1166,13 +1148,13 @@ Persist one product-facing Session identity and metadata.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionConflict`](../../host#sessionconflict) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionConflict`](../../host.md#sessionconflict)\>
 
 <a id="directory"></a>
 
 ##### directory
 
-> `readonly` **directory**: (`runId`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), `DirectoryLookupError`\>
+> `readonly` **directory**: (`runId`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| `DirectoryLookupError`\>
 
 The authoritative directory record for one Run.
 
@@ -1187,13 +1169,13 @@ derived by parsing an Address or a Run id.
 
 ###### Returns
 
-`Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), `DirectoryLookupError`\>
+`Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| `DirectoryLookupError`\>
 
 <a id="dueawaitevents"></a>
 
 ##### dueAwaitEvents
 
-> `readonly` **dueAwaitEvents**: (`input`) => `Effect`\<readonly `DueAwaitEvent`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **dueAwaitEvents**: (`input`) => `Effect`\<readonly `DueAwaitEvent`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
@@ -1209,7 +1191,7 @@ derived by parsing an Address or a Run id.
 
 ###### Returns
 
-`Effect`\<readonly `DueAwaitEvent`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<readonly `DueAwaitEvent`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="emitagentevent"></a>
 
@@ -1221,7 +1203,7 @@ derived by parsing an Address or a Run id.
 
 ###### input
 
-`ExecutionClaim` & `object`
+`CommandIdentity` & `ExecutionClaim` & `object`
 
 ###### Returns
 
@@ -1231,7 +1213,7 @@ derived by parsing an Address or a Run id.
 
 ##### ensureArtifact
 
-> `readonly` **ensureArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch)\>
+> `readonly` **ensureArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact.md#artifactcrdtmismatch)\>
 
 Create or load the main head for one shared artifact.
 
@@ -1269,13 +1251,13 @@ Create or load the main head for one shared artifact.
 
 ###### Returns
 
-`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch)\>
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact.md#artifactcrdtmismatch)\>
 
 <a id="events"></a>
 
 ##### events
 
-> `readonly` **events**: (`input`) => `Stream`\<[`RunEvent`](./RunEvent#runevent), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`CursorExpired`](./Errors#cursorexpired) \| [`SubscriberLagged`](./Errors#subscriberlagged)\>
+> `readonly` **events**: (`input`) => `Stream`\<[`RunEvent`](./RunEvent.md#runevent), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`CursorExpired`](./Errors.md#cursorexpired) \| [`SubscriberLagged`](./Errors.md#subscriberlagged)\>
 
 ###### Parameters
 
@@ -1291,107 +1273,55 @@ Create or load the main head for one shared artifact.
 
 ###### Returns
 
-`Stream`\<[`RunEvent`](./RunEvent#runevent), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`CursorExpired`](./Errors#cursorexpired) \| [`SubscriberLagged`](./Errors#subscriberlagged)\>
+`Stream`\<[`RunEvent`](./RunEvent.md#runevent), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`CursorExpired`](./Errors.md#cursorexpired) \| [`SubscriberLagged`](./Errors.md#subscriberlagged)\>
 
 <a id="expirerunningoperation"></a>
 
 ##### expireRunningOperation
 
-> `readonly` **expireRunningOperation**: (`input`) => `Effect`\<\{ `outcome`: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
+> `readonly` **expireRunningOperation**: (`input`) => `Effect`\<\{ `outcome`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
 
 ###### Parameters
 
 ###### input
 
-`ExecutionClaim` & `object`
+`CommandIdentity` & `ExecutionClaim` & `object`
 
 ###### Returns
 
-`Effect`\<\{ `outcome`: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
+`Effect`\<\{ `outcome`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"running"` \| `"cancelling"` \| `"requested"` \| `"retried"`; `record`: `OperationRecord`; \}, `WorkerMutationError`\>
 
 <a id="extendbudget"></a>
 
 ##### extendBudget
 
-> `readonly` **extendBudget**: (`runId`, `delta`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
-
-###### Parameters
-
-###### runId
-
-`string`
-
-###### delta
-
-###### children?
-
-`number`
-
-###### duration?
-
-`number`
-
-###### tokens?
-
-`number`
-
-###### toolCalls?
-
-`number`
-
-###### usd?
-
-`number`
-
-###### Returns
-
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
-
-<a id="extendbudgetrecovery"></a>
-
-##### extendBudgetRecovery
-
-> `readonly` **extendBudgetRecovery**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+> `readonly` **extendBudget**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
 ###### input
 
-###### delta
-
-\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
-
-###### delta.children?
-
-`number`
-
-###### delta.duration?
-
-`number`
-
-###### delta.tokens?
-
-`number`
-
-###### delta.toolCalls?
-
-`number`
-
-###### delta.usd?
-
-`number`
-
-###### operator
-
-`string`
-
-###### runId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
+
+<a id="extendbudgetrecovery"></a>
+
+##### extendBudgetRecovery
+
+> `readonly` **extendBudgetRecovery**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
+
+###### Parameters
+
+###### input
+
+`CommandIdentity` & `object`
+
+###### Returns
+
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 <a id="fail"></a>
 
@@ -1413,7 +1343,7 @@ Create or load the main head for one shared artifact.
 
 ##### fork
 
-> `readonly` **fork**: (`input`) => `Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`SubstitutionInvalid`](./Errors#substitutioninvalid)\>
+> `readonly` **fork**: (`input`) => `Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`SubstitutionInvalid`](./Errors.md#substitutioninvalid) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 ###### Parameters
 
@@ -1423,13 +1353,13 @@ Create or load the main head for one shared artifact.
 
 ###### Returns
 
-`Effect`\<[`RunReceipt`](./Run#runreceipt), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot) \| [`SubstitutionInvalid`](./Errors#substitutioninvalid)\>
+`Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`SubstitutionInvalid`](./Errors.md#substitutioninvalid) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 <a id="forkartifact"></a>
 
 ##### forkArtifact
 
-> `readonly` **forkArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+> `readonly` **forkArtifact**: (`input`) => `Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact.md#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact.md#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
@@ -1441,13 +1371,13 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact#artifactversionnotfound)\>
+`Effect`\<\{ `artifact`: `string`; `branch?`: `string`; `crdt`: `string`; `snapshot`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; `version`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ArtifactCrdtMismatch`](../../unstable.artifact.md#artifactcrdtmismatch) \| [`ArtifactNotFound`](../../unstable.artifact.md#artifactnotfound) \| [`ArtifactVersionConflict`](../../unstable.artifact.md#artifactversionconflict) \| [`ArtifactVersionNotFound`](../../unstable.artifact.md#artifactversionnotfound)\>
 
 <a id="getoperation"></a>
 
 ##### getOperation
 
-> `readonly` **getOperation**: (`input`) => `Effect`\<`OperationRecord`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **getOperation**: (`input`) => `Effect`\<`OperationRecord`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -1463,13 +1393,13 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<`OperationRecord`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<`OperationRecord`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="getoperationbykey"></a>
 
 ##### getOperationByKey
 
-> `readonly` **getOperationByKey**: (`input`) => `Effect`\<`OperationRecord` \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **getOperationByKey**: (`input`) => `Effect`\<`OperationRecord` \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -1485,13 +1415,13 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<`OperationRecord` \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<`OperationRecord` \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="getprogramoperation"></a>
 
 ##### getProgramOperation
 
-> `readonly` **getProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **getProgramOperation**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -1507,13 +1437,13 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="hasadmission"></a>
 
 ##### hasAdmission
 
-> `readonly` **hasAdmission**: (`input`) => `Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **hasAdmission**: (`input`) => `Effect`\<`boolean`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
@@ -1533,13 +1463,13 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<`boolean`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="history"></a>
 
 ##### history
 
-> `readonly` **history**: (`input`) => `Effect`\<readonly [`RunEvent`](./RunEvent#runevent)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`CursorExpired`](./Errors#cursorexpired)\>
+> `readonly` **history**: (`input`) => `Effect`\<readonly [`RunEvent`](./RunEvent.md#runevent)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`CursorExpired`](./Errors.md#cursorexpired)\>
 
 ###### Parameters
 
@@ -1559,13 +1489,13 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ###### Returns
 
-`Effect`\<readonly [`RunEvent`](./RunEvent#runevent)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`CursorExpired`](./Errors#cursorexpired)\>
+`Effect`\<readonly [`RunEvent`](./RunEvent.md#runevent)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`CursorExpired`](./Errors.md#cursorexpired)\>
 
 <a id="hostsession"></a>
 
 ##### hostSession
 
-> `readonly` **hostSession**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`SessionNotFound`](../../host#sessionnotfound)\>
+> `readonly` **hostSession**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
 
 Read one product-facing Session by identity.
 
@@ -1577,13 +1507,13 @@ Read one product-facing Session by identity.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`SessionNotFound`](../../host#sessionnotfound)\>
+`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
 
 <a id="hostsessionevents"></a>
 
 ##### hostSessionEvents
 
-> `readonly` **hostSessionEvents**: (`input`) => `Stream`\<[`HostSessionEvent`](./HostSession#hostsessionevent), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`SessionNotFound`](../../host#sessionnotfound) \| [`SessionCursorExpired`](../../host#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host#sessionsubscriberlagged)\>
+> `readonly` **hostSessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
 
 Replay then follow one product-facing Session's authoritative event cursor.
 
@@ -1601,13 +1531,13 @@ Replay then follow one product-facing Session's authoritative event cursor.
 
 ###### Returns
 
-`Stream`\<[`HostSessionEvent`](./HostSession#hostsessionevent), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`SessionNotFound`](../../host#sessionnotfound) \| [`SessionCursorExpired`](../../host#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host#sessionsubscriberlagged)\>
+`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
 
 <a id="hostsessionruns"></a>
 
 ##### hostSessionRuns
 
-> `readonly` **hostSessionRuns**: (`sessionId`) => `Effect`\<readonly [`RunInspection`](./Run#runinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`SessionNotFound`](../../host#sessionnotfound)\>
+> `readonly` **hostSessionRuns**: (`sessionId`) => `Effect`\<readonly [`RunInspection`](./Run.md#runinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
 
 List root Runs admitted through one product-facing Session.
 
@@ -1619,19 +1549,35 @@ List root Runs admitted through one product-facing Session.
 
 ###### Returns
 
-`Effect`\<readonly [`RunInspection`](./Run#runinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`SessionNotFound`](../../host#sessionnotfound)\>
+`Effect`\<readonly [`RunInspection`](./Run.md#runinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+<a id="hostsessionsnapshot"></a>
+
+##### hostSessionSnapshot
+
+> `readonly` **hostSessionSnapshot**: (`sessionId`) => `Effect`\<[`HostSessionSnapshot`](./HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`HostSessionSnapshot`](./HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
 
 <a id="info"></a>
 
 ##### info
 
-> `readonly` **info**: `Effect`\<[`StoreInfo`](#storeinfo)\>
+> `readonly` **info**: `Effect`\<[`StoreInfo`](#storeinfo), [`DurabilityFailure`](../../durability.md#durabilityfailure)\>
 
 <a id="inspect"></a>
 
 ##### inspect
 
-> `readonly` **inspect**: (`runId`) => `Effect`\<[`RunInspection`](./Run#runinspection), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **inspect**: (`runId`) => `Effect`\<[`RunInspection`](./Run.md#runinspection), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -1641,13 +1587,13 @@ List root Runs admitted through one product-facing Session.
 
 ###### Returns
 
-`Effect`\<[`RunInspection`](./Run#runinspection), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<[`RunInspection`](./Run.md#runinspection), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="inspectfanout"></a>
 
 ##### inspectFanOut
 
-> `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
+> `readonly` **inspectFanOut**: (`fanOutId`) => `Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"running"`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`FanOutNotFound`](./Errors.md#fanoutnotfound)\>
 
 ###### Parameters
 
@@ -1657,13 +1603,13 @@ List root Runs admitted through one product-facing Session.
 
 ###### Returns
 
-`Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`FanOutNotFound`](./Errors#fanoutnotfound)\>
+`Effect`\<\{ `concurrency`: `number`; `fanOutId`: `string`; `idempotencyKey`: `string`; `join`: \{ \} \| \{ \} \| \{ \} \| \{ \} \| \{ `required`: `number`; \}; `members`: readonly `object`[]; `parentRunId`: `string`; `remainder`: `"await"` \| `"request-cancel"` \| `"terminate"` \| `"abandon"`; `status`: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"running"`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`FanOutNotFound`](./Errors.md#fanoutnotfound)\>
 
 <a id="list"></a>
 
 ##### list
 
-> `readonly` **list**: (`input`) => `Effect`\<readonly [`RunInspection`](./Run#runinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **list**: (`input`) => `Effect`\<readonly [`RunInspection`](./Run.md#runinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
@@ -1687,17 +1633,17 @@ Order of the returned Runs. Defaults to "newest".
 
 ###### status?
 
-`"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+`"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 ###### Returns
 
-`Effect`\<readonly [`RunInspection`](./Run#runinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<readonly [`RunInspection`](./Run.md#runinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="listhostsessions"></a>
 
 ##### listHostSessions
 
-> `readonly` **listHostSessions**: `Effect`\<readonly `object`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **listHostSessions**: `Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 List product-facing Sessions in creation order.
 
@@ -1705,7 +1651,7 @@ List product-facing Sessions in creation order.
 
 ##### listRelated
 
-> `readonly` **listRelated**: (`runId`) => `Effect`\<readonly [`DirectoryEntry`](./AgentDirectory#directoryentry)[], `DirectoryLookupError`\>
+> `readonly` **listRelated**: (`runId`) => `Effect`\<readonly [`DirectoryEntry`](./AgentDirectory.md#directoryentry)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| `DirectoryLookupError`\>
 
 Parent, direct children, and siblings under one parent, from durable links only.
 
@@ -1717,13 +1663,13 @@ Parent, direct children, and siblings under one parent, from durable links only.
 
 ###### Returns
 
-`Effect`\<readonly [`DirectoryEntry`](./AgentDirectory#directoryentry)[], `DirectoryLookupError`\>
+`Effect`\<readonly [`DirectoryEntry`](./AgentDirectory.md#directoryentry)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| `DirectoryLookupError`\>
 
 <a id="loadexecution"></a>
 
 ##### loadExecution
 
-> `readonly` **loadExecution**: (`runId`) => `Effect`\<`ExecutionRecord`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **loadExecution**: (`runId`) => `Effect`\<`ExecutionRecord`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -1733,13 +1679,13 @@ Parent, direct children, and siblings under one parent, from durable links only.
 
 ###### Returns
 
-`Effect`\<`ExecutionRecord`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<`ExecutionRecord`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="loadprogramstate"></a>
 
 ##### loadProgramState
 
-> `readonly` **loadProgramState**: (`runId`) => `Effect`\<\{ `activeSlots`: `number`; `agentRuns`: `number`; `budget`: \{ `agentRuns`: `number`; `concurrency`: `number`; `logBytes`: `number`; `outputBytes`: `number`; `tokens`: `number`; `toolCalls`: `number`; `wallClockMillis`: `number`; \}; `deadlineMillis`: `number`; `logBytes`: `number`; `programPin`: `string`; `runId`: `string`; `tokens`: `number`; `toolCalls`: `number`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **loadProgramState**: (`runId`) => `Effect`\<\{ `activeSlots`: `number`; `agentRuns`: `number`; `budget`: \{ `agentRuns`: `number`; `concurrency`: `number`; `logBytes`: `number`; `outputBytes`: `number`; `tokens`: `number`; `toolCalls`: `number`; `wallClockMillis`: `number`; \}; `concurrencyRoot?`: `string`; `deadlineMillis`: `number`; `logBytes`: `number`; `programPin`: `string`; `runId`: `string`; `tokens`: `number`; `toolCalls`: `number`; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -1749,7 +1695,7 @@ Parent, direct children, and siblings under one parent, from durable links only.
 
 ###### Returns
 
-`Effect`\<\{ `activeSlots`: `number`; `agentRuns`: `number`; `budget`: \{ `agentRuns`: `number`; `concurrency`: `number`; `logBytes`: `number`; `outputBytes`: `number`; `tokens`: `number`; `toolCalls`: `number`; `wallClockMillis`: `number`; \}; `deadlineMillis`: `number`; `logBytes`: `number`; `programPin`: `string`; `runId`: `string`; `tokens`: `number`; `toolCalls`: `number`; \} \| `undefined`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<\{ `activeSlots`: `number`; `agentRuns`: `number`; `budget`: \{ `agentRuns`: `number`; `concurrency`: `number`; `logBytes`: `number`; `outputBytes`: `number`; `tokens`: `number`; `toolCalls`: `number`; `wallClockMillis`: `number`; \}; `concurrencyRoot?`: `string`; `deadlineMillis`: `number`; `logBytes`: `number`; `programPin`: `string`; `runId`: `string`; `tokens`: `number`; `toolCalls`: `number`; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="operationcancellations"></a>
 
@@ -1763,7 +1709,7 @@ Cancellable tool operations awaiting a definitive concrete-executor acknowledgem
 
 ###### input
 
-`ExecutionClaim`
+`CommandIdentity` & `ExecutionClaim`
 
 ###### Returns
 
@@ -1773,7 +1719,7 @@ Cancellable tool operations awaiting a definitive concrete-executor acknowledgem
 
 ##### pendingSteering
 
-> `readonly` **pendingSteering**: (`input`) => `Effect`\<readonly `object`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **pendingSteering**: (`input`) => `Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 Read pending inbox entries without claiming execution ownership.
 
@@ -1791,7 +1737,7 @@ Read pending inbox entries without claiming execution ownership.
 
 ###### Returns
 
-`Effect`\<readonly `object`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="readsteering"></a>
 
@@ -1829,17 +1775,17 @@ Read pending inbox entries without claiming execution ownership.
 
 ##### recordReward
 
-> `readonly` **recordReward**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **recordReward**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
 ###### input
 
-[`RewardInput`](./RunEvent#rewardinput)
+`CommandIdentity` & [`RewardInput`](./RunEvent.md#rewardinput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="recoverrunningoperations"></a>
 
@@ -1853,7 +1799,7 @@ Reconcile operations left running by the prior owner before execution resumes.
 
 ###### input
 
-`ExecutionClaim`
+`CommandIdentity` & `ExecutionClaim`
 
 ###### Returns
 
@@ -1863,7 +1809,7 @@ Reconcile operations left running by the prior owner before execution resumes.
 
 ##### recoveryJournal
 
-> `readonly` **recoveryJournal**: (`runId`) => `Effect`\<[`Journal`](./Recovery#journal), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **recoveryJournal**: (`runId`) => `Effect`\<[`Journal`](./Recovery.md#journal), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 Read the normalized durable facts from which operator recovery is derived.
 
@@ -1875,13 +1821,13 @@ Read the normalized durable facts from which operator recovery is derived.
 
 ###### Returns
 
-`Effect`\<[`Journal`](./Recovery#journal), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<[`Journal`](./Recovery.md#journal), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="registeragentname"></a>
 
 ##### registerAgentName
 
-> `readonly` **registerAgentName**: (`input`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`AgentNameConflict`](./Errors#agentnameconflict)\>
+> `readonly` **registerAgentName**: (`input`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`AgentNameConflict`](./Errors.md#agentnameconflict)\>
 
 Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
@@ -1899,13 +1845,13 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`AgentNameConflict`](./Errors#agentnameconflict)\>
+`Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`AgentNameConflict`](./Errors.md#agentnameconflict)\>
 
 <a id="registerschedule"></a>
 
 ##### registerSchedule
 
-> `readonly` **registerSchedule**: (`record`) => `Effect`\<\{ `nextAt`: `string`; `scheduleId`: `string`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **registerSchedule**: (`record`) => `Effect`\<\{ `nextAt`: `string`; `scheduleId`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
@@ -1915,13 +1861,13 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<\{ `nextAt`: `string`; `scheduleId`: `string`; \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<\{ `nextAt`: `string`; `scheduleId`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="releaseexecution"></a>
 
 ##### releaseExecution
 
-> `readonly` **releaseExecution**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **releaseExecution**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
@@ -1931,13 +1877,13 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="reserveprogramoperation"></a>
 
 ##### reserveProgramOperation
 
-> `readonly` **reserveProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **reserveProgramOperation**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -1947,13 +1893,13 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="resolveaddress"></a>
 
 ##### resolveAddress
 
-> `readonly` **resolveAddress**: (`address`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), `ResolveAddressError`\>
+> `readonly` **resolveAddress**: (`address`) => `Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| `ResolveAddressError`\>
 
 ###### Parameters
 
@@ -1963,13 +1909,13 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<[`DirectoryEntry`](./AgentDirectory#directoryentry), `ResolveAddressError`\>
+`Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| `ResolveAddressError`\>
 
 <a id="resolveoperation"></a>
 
 ##### resolveOperation
 
-> `readonly` **resolveOperation**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`OperationResolutionConflict`](./Errors#operationresolutionconflict)\>
+> `readonly` **resolveOperation**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`OperationResolutionConflict`](./Errors.md#operationresolutionconflict)\>
 
 ###### Parameters
 
@@ -1993,45 +1939,45 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`OperationResolutionConflict`](./Errors#operationresolutionconflict)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`OperationResolutionConflict`](./Errors.md#operationresolutionconflict)\>
 
 <a id="resolveunknown"></a>
 
 ##### resolveUnknown
 
-> `readonly` **resolveUnknown**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+> `readonly` **resolveUnknown**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 ###### Parameters
 
 ###### input
 
-[`ResolveUnknownInput`](./Recovery#resolveunknowninput)
+`CommandIdentity` & [`ResolveUnknownInput`](./Recovery.md#resolveunknowninput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 <a id="respond"></a>
 
 ##### respond
 
-> `readonly` **respond**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`WaitNotOpen`](./Errors#waitnotopen) \| [`ResponseConflict`](./Errors#responseconflict)\>
+> `readonly` **respond**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`WaitNotOpen`](./Errors.md#waitnotopen) \| [`ResponseConflict`](./Errors.md#responseconflict)\>
 
 ###### Parameters
 
 ###### input
 
-[`RespondInput`](./Runtime#respondinput)
+[`RespondInput`](./Runtime.md#respondinput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`WaitNotOpen`](./Errors#waitnotopen) \| [`ResponseConflict`](./Errors#responseconflict)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`WaitNotOpen`](./Errors.md#waitnotopen) \| [`ResponseConflict`](./Errors.md#responseconflict)\>
 
 <a id="respondapproval"></a>
 
 ##### respondApproval
 
-> `readonly` **respondApproval**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ApprovalStale`](./Errors#approvalstale) \| [`ApprovalMismatch`](./Errors#approvalmismatch)\>
+> `readonly` **respondApproval**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ApprovalStale`](./Errors.md#approvalstale) \| [`ApprovalMismatch`](./Errors.md#approvalmismatch)\>
 
 ###### Parameters
 
@@ -2055,33 +2001,23 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ApprovalStale`](./Errors#approvalstale) \| [`ApprovalMismatch`](./Errors#approvalmismatch)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ApprovalStale`](./Errors.md#approvalstale) \| [`ApprovalMismatch`](./Errors.md#approvalmismatch)\>
 
 <a id="resume"></a>
 
 ##### resume
 
-> `readonly` **resume**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`WaitNotOpen`](./Errors#waitnotopen) \| [`ResponseConflict`](./Errors#responseconflict)\>
+> `readonly` **resume**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`WaitNotOpen`](./Errors.md#waitnotopen) \| [`ResponseConflict`](./Errors.md#responseconflict)\>
 
 ###### Parameters
 
 ###### input
 
-###### resolution
-
-\{ \} \| \{ `reason?`: `string`; \} \| \{ `encodedResult`: `unknown`; `result`: `unknown`; \} \| \{ `name`: `string`; `payload?`: `unknown`; \}
-
-###### runId
-
-`string`
-
-###### waitId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`WaitNotOpen`](./Errors#waitnotopen) \| [`ResponseConflict`](./Errors#responseconflict)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`WaitNotOpen`](./Errors.md#waitnotopen) \| [`ResponseConflict`](./Errors.md#responseconflict)\>
 
 <a id="retryexecution"></a>
 
@@ -2093,7 +2029,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### input
 
-`ExecutionClaim`
+`CommandIdentity` & `ExecutionClaim`
 
 ###### Returns
 
@@ -2103,23 +2039,23 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ##### retryRecovery
 
-> `readonly` **retryRecovery**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+> `readonly` **retryRecovery**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 ###### Parameters
 
 ###### input
 
-[`RetryInput`](./Recovery#retryinput)
+`CommandIdentity` & [`OperatorActionInput`](./Recovery.md#operatoractioninput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 <a id="rewind"></a>
 
 ##### rewind
 
-> `readonly` **rewind**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot)\>
+> `readonly` **rewind**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 ###### Parameters
 
@@ -2129,29 +2065,29 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`ForkSequenceInvalid`](./Errors#forksequenceinvalid) \| [`NoSnapshot`](./Errors#nosnapshot)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 <a id="saveexecution"></a>
 
 ##### saveExecution
 
-> `readonly` **saveExecution**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`StaleClaim`](./Errors#staleclaim) \| `StaleSessionClaim`\>
+> `readonly` **saveExecution**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`StaleClaim`](./Errors.md#staleclaim) \| `StaleSessionClaim`\>
 
 ###### Parameters
 
 ###### input
 
-`ExecutionClaim` & `object`
+`CommandIdentity` & `ExecutionClaim` & `object`
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`StaleClaim`](./Errors#staleclaim) \| `StaleSessionClaim`\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`StaleClaim`](./Errors.md#staleclaim) \| `StaleSessionClaim`\>
 
 <a id="sessionreader"></a>
 
 ##### sessionReader
 
-> `readonly` **sessionReader**: (`sessionId`) => `Effect`\<`Option`\<`SessionReader`\>\>
+> `readonly` **sessionReader**: (`sessionId`) => `Effect`\<`Option`\<`SessionReader`\>, [`DurabilityFailure`](../../durability.md#durabilityfailure)\>
 
 Read-only durable conversation history for one Session identity.
 
@@ -2163,13 +2099,13 @@ Read-only durable conversation history for one Session identity.
 
 ###### Returns
 
-`Effect`\<`Option`\<`SessionReader`\>\>
+`Effect`\<`Option`\<`SessionReader`\>, [`DurabilityFailure`](../../durability.md#durabilityfailure)\>
 
 <a id="sessionroots"></a>
 
 ##### sessionRoots
 
-> `readonly` **sessionRoots**: (`sessionId`) => `Effect`\<readonly `string`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+> `readonly` **sessionRoots**: (`sessionId`) => `Effect`\<readonly `string`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Parameters
 
@@ -2179,13 +2115,13 @@ Read-only durable conversation history for one Session identity.
 
 ###### Returns
 
-`Effect`\<readonly `string`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable)\>
+`Effect`\<readonly `string`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 <a id="settlementnotifications"></a>
 
 ##### settlementNotifications
 
-> `readonly` **settlementNotifications**: (`input`) => `Effect`\<readonly `object`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **settlementNotifications**: (`input`) => `Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 Ordered durable child settlements addressed to one exact parent Run.
 
@@ -2207,13 +2143,13 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<readonly `object`[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="settleprogramoperation"></a>
 
 ##### settleProgramOperation
 
-> `readonly` **settleProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **settleProgramOperation**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -2223,29 +2159,29 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="signal"></a>
 
 ##### signal
 
-> `readonly` **signal**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal)\>
+> `readonly` **signal**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 ###### Parameters
 
 ###### input
 
-[`SignalInput`](./Runtime#signalinput)
+`CommandIdentity` & [`SignalInput`](./Runtime.md#signalinput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 <a id="snapshot"></a>
 
 ##### snapshot
 
-> `readonly` **snapshot**: (`runId`) => `Effect`\<[`RunSnapshot`](./Run#runsnapshot), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **snapshot**: (`runId`) => `Effect`\<[`RunSnapshot`](./Run.md#runsnapshot), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -2255,7 +2191,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<[`RunSnapshot`](./Run#runsnapshot), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<[`RunSnapshot`](./Run.md#runsnapshot), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="startoperation"></a>
 
@@ -2267,7 +2203,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### input
 
-`ExecutionClaim` & `object`
+`CommandIdentity` & `ExecutionClaim` & `object`
 
 ###### Returns
 
@@ -2277,7 +2213,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### startProgramOperation
 
-> `readonly` **startProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
+> `readonly` **startProgramOperation**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
 ###### Parameters
 
@@ -2287,7 +2223,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
 <a id="suspend"></a>
 
@@ -2309,7 +2245,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### suspendProgramOperation
 
-> `readonly` **suspendProgramOperation**: (`input`) => `Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+> `readonly` **suspendProgramOperation**: (`input`) => `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 ###### Parameters
 
@@ -2319,43 +2255,29 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `capability`: `string`; `childRunIds`: readonly `string`[]; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"failed"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
+`Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError` \| `ProgramStoreFailure`\>
 
 <a id="timeoutawaitevent"></a>
 
 ##### timeoutAwaitEvent
 
-> `readonly` **timeoutAwaitEvent**: (`input`) => `Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal)\>
+> `readonly` **timeoutAwaitEvent**: (`input`) => `Effect`\<`boolean`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 ###### Parameters
 
 ###### input
 
-###### deadline
-
-`string`
-
-###### now
-
-`number`
-
-###### runId
-
-`string`
-
-###### waitId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<`boolean`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal)\>
+`Effect`\<`boolean`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 <a id="treechanges"></a>
 
 ##### treeChanges
 
-> `readonly` **treeChanges**: (`rootRunId`) => `Stream`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **treeChanges**: (`rootRunId`) => `Stream`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -2365,13 +2287,13 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Stream`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Stream`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="treecheckpoint"></a>
 
 ##### treeCheckpoint
 
-> `readonly` **treeCheckpoint**: (`rootRunId`) => `Effect`\<[`Checkpoint`](./RunTree#checkpoint), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **treeCheckpoint**: (`rootRunId`) => `Effect`\<[`Checkpoint`](./RunTree.md#checkpoint), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -2381,13 +2303,13 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<[`Checkpoint`](./RunTree#checkpoint), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<[`Checkpoint`](./RunTree.md#checkpoint), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 <a id="treereplay"></a>
 
 ##### treeReplay
 
-> `readonly` **treeReplay**: (`input`) => `Effect`\<[`ReplayPage`](./RunTree#replaypage), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`TreeCursorExpired`](./Errors#treecursorexpired) \| [`TreeCursorFuture`](./Errors#treecursorfuture) \| [`TreeReplayLimitInvalid`](./Errors#treereplaylimitinvalid)\>
+> `readonly` **treeReplay**: (`input`) => `Effect`\<[`ReplayPage`](./RunTree.md#replaypage), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`TreeCursorExpired`](./Errors.md#treecursorexpired) \| [`TreeCursorFuture`](./Errors.md#treecursorfuture) \| [`TreeReplayLimitInvalid`](./Errors.md#treereplaylimitinvalid)\>
 
 ###### Parameters
 
@@ -2407,49 +2329,39 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### Returns
 
-`Effect`\<[`ReplayPage`](./RunTree#replaypage), [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`TreeCursorExpired`](./Errors#treecursorexpired) \| [`TreeCursorFuture`](./Errors#treecursorfuture) \| [`TreeReplayLimitInvalid`](./Errors#treereplaylimitinvalid)\>
+`Effect`\<[`ReplayPage`](./RunTree.md#replaypage), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`TreeCursorExpired`](./Errors.md#treecursorexpired) \| [`TreeCursorFuture`](./Errors.md#treecursorfuture) \| [`TreeReplayLimitInvalid`](./Errors.md#treereplaylimitinvalid)\>
 
 <a id="wake"></a>
 
 ##### wake
 
-> `readonly` **wake**: (`input`) => `Effect`\<\{ `waitId`: `string`; \} \| \{ \} \| \{ \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal)\>
+> `readonly` **wake**: (`input`) => `Effect`\<\{ `waitId`: `string`; \} \| \{ \} \| \{ \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 ###### Parameters
 
 ###### input
 
-###### event
-
-\{ `dedupeKey`: `string`; `payload`: `Json`; `scheduledAt`: `string`; `scheduleId`: `string`; \} \| \{ `dedupeKey`: `string`; `headers`: \{\[`key`: `string`\]: `string`; \}; `payload`: `Json`; `source`: `string`; \} \| \{ `childRunId`: `string`; `dedupeKey`: `string`; `terminalEventId`: `string`; \} \| \{ `dedupeKey`: `string`; `kind`: `"update"` \| `"create"` \| `"remove"`; `path`: `string`; \} \| \{ `approvalId`: `string`; `decision`: \{ \} \| \{ `reason?`: `string`; \}; `dedupeKey`: `string`; \}
-
-###### now
-
-`number`
-
-###### runId
-
-`string`
+`CommandIdentity` & `object`
 
 ###### Returns
 
-`Effect`\<\{ `waitId`: `string`; \} \| \{ \} \| \{ \}, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal)\>
+`Effect`\<\{ `waitId`: `string`; \} \| \{ \} \| \{ \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal)\>
 
 <a id="wakerecovery"></a>
 
 ##### wakeRecovery
 
-> `readonly` **wakeRecovery**: (`input`) => `Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+> `readonly` **wakeRecovery**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 ###### Parameters
 
 ###### input
 
-[`OperatorActionInput`](./Recovery#operatoractioninput)
+`CommandIdentity` & [`OperatorActionInput`](./Recovery.md#operatoractioninput)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound) \| [`IllegalOperatorAction`](./Errors#illegaloperatoraction)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`IllegalOperatorAction`](./Errors.md#illegaloperatoraction)\>
 
 ***
 
@@ -2463,19 +2375,19 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ##### backend
 
-> `readonly` **backend**: [`StoreBackend`](#storebackend)
+> `readonly` **backend**: `"object"`
 
 <a id="durability"></a>
 
 ##### durability
 
-> `readonly` **durability**: [`Durability`](#durability-1)
+> `readonly` **durability**: `"durable"`
 
 <a id="multiworker"></a>
 
 ##### multiWorker
 
-> `readonly` **multiWorker**: `boolean`
+> `readonly` **multiWorker**: `true`
 
 ## Type Aliases
 
@@ -2483,7 +2395,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ### CompletionOutcome
 
-> **CompletionOutcome** = \{ `_tag`: `"Completed"`; \} \| \{ `_tag`: `"SteeringPending"`; `continuation`: [`ExecutionContinuation`](./Steering#executioncontinuation); \}
+> **CompletionOutcome** = \{ `_tag`: `"Completed"`; \} \| \{ `_tag`: `"SteeringPending"`; `continuation`: [`ExecutionContinuation`](./Steering.md#executioncontinuation); \}
 
 ***
 
@@ -2491,33 +2403,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ### Durability
 
-> **Durability** = `"ephemeral"` \| `"durable"`
-
-***
-
-<a id="storebackend"></a>
-
-### StoreBackend
-
-> **StoreBackend** = `"memory"` \| `"sqlite"` \| `"postgres"` \| `"mysql"`
-
-## Variables
-
-<a id="layermemory"></a>
-
-### layerMemory
-
-> `const` **layerMemory**: (`options`) => `Layer.Layer`\<[`RunStore`](#runstore) \| [`ExternalChildStore`](../../unstable.runtime.external-child-store#externalchildstore)\>
-
-#### Parameters
-
-##### options
-
-[`LayerOptions`](./Runtime#layeroptions)
-
-#### Returns
-
-`Layer.Layer`\<[`RunStore`](#runstore) \| [`ExternalChildStore`](../../unstable.runtime.external-child-store#externalchildstore)\>
+> **Durability** = `"durable"`
 
 ## References
 
@@ -2525,7 +2411,15 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ### ExecutionContinuation
 
-Re-exports [ExecutionContinuation](./Steering#executioncontinuation-1)
+Re-exports [ExecutionContinuation](./Steering.md#executioncontinuation-1)
+
+***
+
+<a id="layerrunstore"></a>
+
+### layerRunStore
+
+Re-exports [layerRunStore](../../durability.md#layerrunstore)
 
 ***
 
@@ -2533,7 +2427,7 @@ Re-exports [ExecutionContinuation](./Steering#executioncontinuation-1)
 
 ### SteeringEntry
 
-Re-exports [SteeringEntry](./Steering#steeringentry-1)
+Re-exports [SteeringEntry](./Steering.md#steeringentry-1)
 
 ***
 
@@ -2541,4 +2435,4 @@ Re-exports [SteeringEntry](./Steering#steeringentry-1)
 
 ### SteeringReceipt
 
-Re-exports [SteeringReceipt](./Steering#steeringreceipt-1)
+Re-exports [SteeringReceipt](./Steering.md#steeringreceipt-1)

@@ -1,10 +1,11 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import {
   ObjectMaintenance,
   ObjectStore,
   ObjectStoreFailure,
   cancelReadBody,
   readObjectBytes,
+  request,
   validateReadOptions,
   type Service,
 } from "./object-store.js"
@@ -19,19 +20,22 @@ export interface ObjectMetadata {
 /** Native R2 body is consumed incrementally rather than with arrayBuffer(). @experimental */
 export interface ObjectBody extends ObjectMetadata {
   readonly body: ReadableStream<Uint8Array>
-  readonly range?: { readonly offset?: number; readonly length?: number; readonly suffix?: number }
+  readonly range?: { readonly offset?: number; readonly length?: number; readonly suffix?: number | undefined }
 }
 
 /** Native listing fields consumed by the canonical transport. @experimental */
 export interface ObjectList {
   readonly objects: ReadonlyArray<{ readonly key: string }>
   readonly truncated: boolean
-  readonly cursor?: string
+  readonly cursor?: string | undefined
 }
 
 /** Minimal native R2Bucket binding; no Workers globals or deletion permission required. @experimental */
 export interface Bucket {
-  get(key: string, options?: { readonly range: { readonly offset: number; readonly length: number } }): Promise<ObjectBody | null>
+  get(
+    key: string,
+    options?: { readonly range: { readonly offset: number; readonly length: number } },
+  ): Promise<ObjectBody | null>
   put(
     key: string,
     value: Uint8Array,
@@ -51,14 +55,32 @@ export interface Options {
   readonly requestTimeoutMs?: number
 }
 
+const nonEmptyString = Schema.String.check(Schema.isNonEmpty())
+const metadata = Schema.Struct({ key: Schema.String, size: Schema.Int, etag: nonEmptyString })
+const rangeMetadata = Schema.Struct({
+  offset: Schema.optionalKey(Schema.Int),
+  length: Schema.optionalKey(Schema.Int),
+  suffix: Schema.optional(Schema.Int),
+})
+const bodyMetadata = Schema.Struct({
+  ...metadata.fields,
+  range: Schema.optionalKey(rangeMetadata),
+})
+const readableStream = Schema.instanceOf(ReadableStream)
+const objectList = Schema.Struct({
+  objects: Schema.Array(Schema.Struct({ key: nonEmptyString })),
+  truncated: Schema.Boolean,
+  cursor: Schema.optional(Schema.String),
+})
+
 const invalidResponse = (operation: string, key: string, message: string) =>
   ObjectStoreFailure.make({ operation, key, reason: "invalid-response", message })
 
+const error = Schema.instanceOf(Error)
+
 const failure = (operation: string, key: string, cause: unknown): ObjectStoreFailure => {
-  if (cause instanceof ObjectStoreFailure) return cause
-  const message = cause instanceof Error ? cause.message : String(cause)
-  // The native binding exposes the R2 code in the message, not an HTTP status or a code property.
-  // https://developers.cloudflare.com/r2/api/error-codes/
+  if (Schema.is(ObjectStoreFailure)(cause)) return cause
+  const message = Schema.is(error)(cause) ? cause.message : String(cause)
   const code = /\((\d+)\)$/.exec(message)?.[1]
   let reason: ObjectStoreFailure["reason"] = "unavailable"
   switch (code) {
@@ -77,156 +99,180 @@ const failure = (operation: string, key: string, cause: unknown): ObjectStoreFai
       reason = "invalid-response"
       break
     default:
-      if (cause instanceof Error && (cause.name === "TimeoutError" || /\b(?:timed out|timeout)\b/i.test(message))) {
+      if (Schema.is(error)(cause) && (cause.name === "TimeoutError" || /\b(?:timed out|timeout)\b/i.test(message))) {
         reason = "timeout"
       }
   }
   return ObjectStoreFailure.make({ operation, key, reason, message })
 }
 
-const validMetadata = (object: ObjectMetadata, key: string): boolean =>
-  object !== null &&
-  typeof object === "object" &&
-  object.key === key &&
-  typeof object.etag === "string" &&
-  object.etag.length > 0 &&
-  Number.isSafeInteger(object.size) &&
-  object.size >= 0
+const native = <A>(operation: string, key: string, execute: () => Promise<A>): Effect.Effect<A, ObjectStoreFailure> =>
+  Effect.tryPromise({ try: execute, catch: (cause) => failure(operation, key, cause) })
 
-const request = <A>(
-  options: Options,
-  operation: string,
+const rangeLength = (
   key: string,
-  execute: (signal: AbortSignal) => Promise<A>,
-): Effect.Effect<A, ObjectStoreFailure> =>
-  Effect.tryPromise({
-    try: async (interruption) => {
-      interruption.throwIfAborted()
-      const timeoutMs = options.requestTimeoutMs ?? 30_000
-      if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
-        throw invalidResponse(operation, key, "R2 requestTimeoutMs must be a positive integer within the timer range.")
-      }
-      const controller = new AbortController()
-      const interrupt = () => controller.abort(interruption.reason)
-      interruption.addEventListener("abort", interrupt, { once: true })
-      const timeout = setTimeout(
-        () => controller.abort(new DOMException("R2 request deadline exceeded", "TimeoutError")),
-        timeoutMs,
-      )
-      let rejectAbort!: (reason: unknown) => void
-      const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject })
-      const onAbort = () => rejectAbort(controller.signal.reason)
-      controller.signal.addEventListener("abort", onAbort, { once: true })
-      try {
-        // Native bindings have no AbortSignal option. Stop waiting, cancel available read
-        // bodies, and leave a pending write uncertain rather than inventing a conflict.
-        return await Promise.race([execute(controller.signal), aborted])
-      } finally {
-        clearTimeout(timeout)
-        interruption.removeEventListener("abort", interrupt)
-        controller.signal.removeEventListener("abort", onAbort)
-        controller.abort()
-      }
-    },
-    catch: (cause) => failure(operation, key, cause),
-  })
-
-/** Native reads bypass public-domain caches; writes are always atomic create-only PUTs. @experimental */
-export const make = (bucket: Bucket, options: Options = {}): Service => ({
-  capabilities: { conditionalCreate: true, strongReadAfterWrite: true, consistentListing: true },
-  read: (key, readOptions) => Effect.flatMap(
-    validateReadOptions(key, readOptions),
-    () => request(options, "read", key, async (signal) => {
-      const range = readOptions.range
-      const object = await bucket.get(key, range === undefined ? undefined : { range })
-      if (object === null) {
-        signal.throwIfAborted()
-        return undefined
-      }
-      try {
-        signal.throwIfAborted()
-        if (!validMetadata(object, key) || object.body === undefined || typeof object.body.getReader !== "function") {
-          throw invalidResponse("read", key, "R2 returned an incomplete object response")
-        }
-        let expectedLength = object.size
-        if (range === undefined) {
-          if (
-            object.range !== undefined &&
-            (object.range.offset !== 0 || object.range.length !== object.size || object.range.suffix !== undefined)
-          ) {
-            throw invalidResponse("read", key, "R2 returned a partial body for a complete read")
-          }
-        } else {
-          expectedLength = Math.min(range.length, object.size - range.offset)
-          if (
-            range.offset >= object.size ||
-            object.range?.offset !== range.offset ||
-            object.range.length !== expectedLength ||
-            object.range.suffix !== undefined
-          ) {
-            throw invalidResponse("read", key, "R2 did not return the requested byte range")
-          }
-        }
-        const bytes = await readObjectBytes(key, object.body, range?.length ?? readOptions.maxBytes, signal, expectedLength)
-        return { bytes, etag: object.etag }
-      } catch (cause) {
-        cancelReadBody(object?.body, cause)
-        throw cause
-      }
-    }),
-  ),
-  create: (key, bytes) => request(options, "create", key, async () => {
-    // R2's unquoted wildcard is If-None-Match: *. A failed condition returns null.
-    // https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#conditional-operations
-    const object = await bucket.put(key, bytes, { onlyIf: { etagDoesNotMatch: "*" } })
-    if (object === null) return "conflict" as const
-    if (!validMetadata(object, key) || object.size !== bytes.byteLength) {
-      throw invalidResponse("create", key, "R2 returned an incomplete create acknowledgement")
+  object: typeof bodyMetadata.Type,
+  range: { readonly offset: number; readonly length: number } | undefined,
+): number => {
+  if (range === undefined) {
+    if (
+      object.range !== undefined &&
+      (object.range.offset !== 0 || object.range.length !== object.size || object.range.suffix !== undefined)
+    ) {
+      throw invalidResponse("read", key, "R2 returned a partial body for a complete read")
     }
-    return "created" as const
-  }),
-  list: (prefix, cursor) => request(options, "list", prefix, async () => {
-        const page = await bucket.list(cursor === undefined ? { prefix } : { prefix, cursor })
-        if (
-          page === null ||
-          typeof page !== "object" ||
-          !Array.isArray(page.objects) ||
-          typeof page.truncated !== "boolean" ||
-          (page.truncated
-            ? typeof page.cursor !== "string" || page.cursor.length === 0 || page.cursor === cursor
-            : page.cursor !== undefined)
-        ) {
-          throw invalidResponse("list", prefix, "R2 returned invalid pagination metadata")
-        }
-        const keys: Array<string> = []
-        for (const object of page.objects) {
-          if (
-            object === null ||
-            typeof object !== "object" ||
-            typeof object.key !== "string" ||
-            object.key.length === 0 ||
-            !object.key.startsWith(prefix)
-          ) {
-            throw invalidResponse("list", prefix, "R2 returned an invalid object key in a listing")
-          }
-          keys.push(object.key)
-        }
-        // Empty and short pages can be truncated; only the provider's cursor ends pagination.
-        return page.cursor === undefined ? { keys } : { keys, cursor: page.cursor }
-  }),
+    return object.size
+  }
+  const expectedLength = Math.min(range.length, object.size - range.offset)
+  if (
+    range.offset >= object.size ||
+    object.range?.offset !== range.offset ||
+    object.range.length !== expectedLength ||
+    object.range.suffix !== undefined
+  ) {
+    throw invalidResponse("read", key, "R2 did not return the requested byte range")
+  }
+  return expectedLength
+}
+
+const readResponse = (
+  key: string,
+  object: ObjectBody,
+  readOptions: { readonly maxBytes: number; readonly range?: { readonly offset: number; readonly length: number } },
+  signal: AbortSignal,
+): Effect.Effect<{ readonly bytes: Uint8Array; readonly etag: string }, ObjectStoreFailure> => {
+  if (
+    !Schema.is(bodyMetadata)(object) ||
+    !Schema.is(readableStream)(object.body) ||
+    !Number.isSafeInteger(object.size) ||
+    object.size < 0
+  ) {
+    return Effect.fail(invalidResponse("read", key, "R2 returned an incomplete object response"))
+  }
+  if (object.key !== key) return Effect.fail(invalidResponse("read", key, "R2 returned an object for a different key"))
+  return Effect.try({
+    try: () => rangeLength(key, object, readOptions.range),
+    catch: (cause) => failure("read", key, cause),
+  }).pipe(
+    Effect.flatMap((expectedLength) =>
+      readObjectBytes({
+        key,
+        body: object.body,
+        maxBytes: readOptions.range?.length ?? readOptions.maxBytes,
+        signal,
+        expectedLength,
+      }),
+    ),
+    Effect.map((bytes) => ({ bytes, etag: object.etag })),
+  )
+}
+
+const listResponse = (
+  prefix: string,
+  cursor: string | undefined,
+  page: ObjectList,
+): Effect.Effect<{ readonly keys: ReadonlyArray<string>; readonly cursor?: string }, ObjectStoreFailure> => {
+  if (!Schema.is(objectList)(page))
+    return Effect.fail(invalidResponse("list", prefix, "R2 returned invalid pagination metadata"))
+  if (page.truncated && (page.cursor === undefined || page.cursor.length === 0 || page.cursor === cursor)) {
+    return Effect.fail(invalidResponse("list", prefix, "R2 returned invalid pagination metadata"))
+  }
+  if (!page.truncated && page.cursor !== undefined)
+    return Effect.fail(invalidResponse("list", prefix, "R2 returned invalid pagination metadata"))
+  if (page.objects.some((object) => !object.key.startsWith(prefix))) {
+    return Effect.fail(invalidResponse("list", prefix, "R2 returned an invalid object key in a listing"))
+  }
+  const keys = page.objects.map((object) => object.key)
+  return page.cursor === undefined ? Effect.succeed({ keys }) : Effect.succeed({ keys, cursor: page.cursor })
+}
+
+const makeService = (bucket: Bucket, options: Options): Service => ({
+  capabilities: { conditionalCreate: true, strongReadAfterWrite: true, consistentListing: true },
+  read: (key, readOptions) =>
+    validateReadOptions({ key, options: readOptions }).pipe(
+      Effect.andThen(
+        request({
+          timeoutMs: options.requestTimeoutMs ?? 30_000,
+          operation: "read",
+          key,
+          execute: (signal) =>
+            native("read", key, () =>
+              bucket
+                .get(key, readOptions.range === undefined ? undefined : { range: readOptions.range })
+                .then((object) => {
+                  if (signal.aborted && object !== null) cancelReadBody({ body: object.body })
+                  return object
+                }),
+            ).pipe(
+              Effect.flatMap((object) => {
+                if (object === null) return Effect.void.pipe(Effect.as(undefined))
+                return readResponse(key, object, readOptions, signal).pipe(
+                  Effect.onError(() => Effect.sync(() => cancelReadBody({ body: object.body }))),
+                )
+              }),
+            ),
+        }),
+      ),
+    ),
+  create: (key, bytes) =>
+    request({
+      timeoutMs: options.requestTimeoutMs ?? 30_000,
+      operation: "create",
+      key,
+      execute: () =>
+        native("create", key, () => bucket.put(key, bytes, { onlyIf: { etagDoesNotMatch: "*" } })).pipe(
+          Effect.flatMap((object) => {
+            if (object === null) return Effect.succeed("conflict" as const)
+            if (
+              !Schema.is(metadata)(object) ||
+              !Number.isSafeInteger(object.size) ||
+              object.size < 0 ||
+              object.key !== key ||
+              object.size !== bytes.byteLength
+            ) {
+              return Effect.fail(invalidResponse("create", key, "R2 returned an incomplete create acknowledgement"))
+            }
+            return Effect.succeed("created" as const)
+          }),
+        ),
+    }),
+  list: (prefix, cursor) =>
+    request({
+      timeoutMs: options.requestTimeoutMs ?? 30_000,
+      operation: "list",
+      key: prefix,
+      execute: () =>
+        native("list", prefix, () => bucket.list(cursor === undefined ? { prefix } : { prefix, cursor })).pipe(
+          Effect.flatMap((page) => listResponse(prefix, cursor, page)),
+        ),
+    }),
 })
 
+/** Native reads bypass public-domain caches; writes are always atomic create-only PUTs. @experimental */
+export function make(bucket: Bucket, options?: Options): Service
+export function make(options?: Options): (bucket: Bucket) => Service
+export function make(
+  bucketOrOptions: Bucket | Options = {},
+  options: Options = {},
+): Service | ((bucket: Bucket) => Service) {
+  if ("get" in bucketOrOptions) return makeService(bucketOrOptions, options)
+  return (bucket) => makeService(bucket, bucketOrOptions)
+}
+
 /** Provide canonical object transport from a native R2Bucket binding. @experimental */
-export const layer = (bucket: Bucket, options: Options = {}): Layer.Layer<ObjectStore> =>
-  Layer.succeed(ObjectStore, make(bucket, options))
+export function layer(bucket: Bucket, options?: Options): Layer.Layer<ObjectStore>
+export function layer(options?: Options): (bucket: Bucket) => Layer.Layer<ObjectStore>
+export function layer(
+  bucketOrOptions: Bucket | Options = {},
+  options: Options = {},
+): Layer.Layer<ObjectStore> | ((bucket: Bucket) => Layer.Layer<ObjectStore>) {
+  if ("get" in bucketOrOptions) return Layer.succeed(ObjectStore, makeService(bucketOrOptions, options))
+  return (bucket) => Layer.succeed(ObjectStore, makeService(bucket, bucketOrOptions))
+}
 
 /** Construct deletion capability independently of canonical runtime access. @experimental */
 export const makeMaintenance = (bucket: MaintenanceBucket) => ({
-  remove: (key: string): Effect.Effect<void, ObjectStoreFailure> =>
-    Effect.tryPromise({
-      try: () => bucket.delete(key),
-      catch: (cause) => failure("remove", key, cause),
-    }),
+  remove: (key: string): Effect.Effect<void, ObjectStoreFailure> => native("remove", key, () => bucket.delete(key)),
 })
 
 /** Provide explicitly authorized, offline maintenance deletion. @experimental */

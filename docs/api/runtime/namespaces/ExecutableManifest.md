@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ExecutableManifest
+[generalist](../../index.md) / [runtime](../index.md) / ExecutableManifest
 
 # ExecutableManifest
 
@@ -12,7 +12,7 @@
 
 ### ExecutableManifest
 
-> **ExecutableManifest** = [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> **ExecutableManifest** = [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 Complete closed executable profile registry and entry closure.
 
@@ -22,7 +22,7 @@ Complete closed executable profile registry and entry closure.
 
 ### ExecutableRef
 
-> **ExecutableRef** = [`ExecutableRef`](../../generalist/namespaces/ExecutableManifest#executableref)
+> **ExecutableRef** = [`ExecutableRef`](../../generalist/namespaces/ExecutableManifest.md#executableref)
 
 Durable reference to one exact executable closure and active Agent.
 
@@ -32,7 +32,7 @@ Durable reference to one exact executable closure and active Agent.
 
 ### PinnedExecutable
 
-> **PinnedExecutable** = [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+> **PinnedExecutable** = [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 Executable closure paired with its constructor-owned reference.
 
@@ -42,7 +42,7 @@ Executable closure paired with its constructor-owned reference.
 
 ### ProfileBinding
 
-> **ProfileBinding** = [`ProfileBinding`](../../generalist/namespaces/ExecutableManifest#profilebinding)
+> **ProfileBinding** = [`ProfileBinding`](../../generalist/namespaces/ExecutableManifest.md#profilebinding)
 
 One globally pinned child profile available by selection name.
 
@@ -52,7 +52,7 @@ One globally pinned child profile available by selection name.
 
 ### decode
 
-> `const` **decode**: *typeof* [`decode`](../../generalist/namespaces/ExecutableManifest#decode)
+> `const` **decode**: *typeof* [`decode`](../../generalist/namespaces/ExecutableManifest.md#decode)
 
 ***
 
@@ -60,7 +60,7 @@ One globally pinned child profile available by selection name.
 
 ### encode
 
-> `const` **encode**: *typeof* [`encode`](../../generalist/namespaces/ExecutableManifest#encode)
+> `const` **encode**: *typeof* [`encode`](../../generalist/namespaces/ExecutableManifest.md#encode)
 
 ***
 
@@ -68,7 +68,7 @@ One globally pinned child profile available by selection name.
 
 ### ExecutableManifest
 
-> **ExecutableManifest**: `Codec`\<[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest), [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest#executablemanifestencoded), `never`, `never`\>
+> **ExecutableManifest**: `Codec`\<[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest), [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest.md#executablemanifestencoded), `never`, `never`\>
 
 Complete closed executable Agent graph.
 
@@ -78,7 +78,7 @@ Complete closed executable Agent graph.
 
 ### ExecutableRef
 
-> `const` **ExecutableRef**: *typeof* [`ExecutableRef`](../../generalist/namespaces/ExecutableManifest#executableref-1)
+> `const` **ExecutableRef**: *typeof* [`ExecutableRef`](../../generalist/namespaces/ExecutableManifest.md#executableref-1)
 
 Durable reference to one exact executable closure and active Agent.
 
@@ -88,7 +88,7 @@ Durable reference to one exact executable closure and active Agent.
 
 ### make
 
-> `const` **make**: *typeof* [`make`](../../generalist/namespaces/ExecutableManifest#make)
+> `const` **make**: *typeof* [`make`](../../generalist/namespaces/ExecutableManifest.md#make)
 
 Construct, validate, canonicalize, and pin a complete executable closure.
 
@@ -98,13 +98,13 @@ Construct, validate, canonicalize, and pin a complete executable closure.
 
 ### makeTest
 
-> `const` **makeTest**: \{(`revision?`): (`name`) => [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable); (`name`, `revision?`): [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable); \}
+> `const` **makeTest**: \{(`revision?`): (`name`) => [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable); (`name`, `revision?`): [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable); \}
 
 Construct an exact static executable fixture.
 
 #### Call Signature
 
-> (`revision?`): (`name`) => [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+> (`revision?`): (`name`) => [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 ##### Parameters
 
@@ -114,11 +114,11 @@ Construct an exact static executable fixture.
 
 ##### Returns
 
-(`name`) => [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+(`name`) => [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 #### Call Signature
 
-> (`name`, `revision?`): [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+> (`name`, `revision?`): [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 ##### Parameters
 
@@ -132,7 +132,7 @@ Construct an exact static executable fixture.
 
 ##### Returns
 
-[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 ***
 
@@ -140,6 +140,6 @@ Construct an exact static executable fixture.
 
 ### PinnedExecutable
 
-> **PinnedExecutable**: `Codec`\<[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable), `PinnedExecutableEncoded`, `never`, `never`\>
+> **PinnedExecutable**: `Codec`\<[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable), `PinnedExecutableEncoded`, `never`, `never`\>
 
 Paired executable authority boundary.

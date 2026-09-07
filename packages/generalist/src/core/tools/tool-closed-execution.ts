@@ -10,8 +10,10 @@ import {
   type SchemaTool,
   type ToolSchemaServices,
 } from "./tool-result-codec.js"
-import { HookFailed } from "../../hooks/index.js"
+import { HookFailed, type EvaluationFailure } from "../../hooks/index.js"
 import { DriverError, DriverStateInvalid } from "../durable/service.js"
+import { DriverUnknownReplay } from "../durable/driver/interpreter.js"
+import { Exhausted } from "../durable/run-budget.js"
 import { suspendedFromCause, suspendedOutcome } from "../agent/tools/wake-event.js"
 
 type AgentToolSchemaServices<Parameters extends Schema.Top, Success extends Schema.Top> =
@@ -81,7 +83,7 @@ export const executeWithClosedToolkit: {
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
   ) => Effect.Effect<
     Outcome,
-    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    FrameworkFailure | EvaluationFailure,
     R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
   >
   <
@@ -94,7 +96,7 @@ export const executeWithClosedToolkit: {
     request: Request,
   ): Effect.Effect<
     Outcome,
-    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    FrameworkFailure | EvaluationFailure,
     R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
   >
 } = Function.dual(
@@ -109,7 +111,7 @@ export const executeWithClosedToolkit: {
     request: Request,
   ): Effect.Effect<
     Outcome,
-    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    FrameworkFailure | EvaluationFailure,
     R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
   > => {
     if (request.call.name !== toolkit.name) {
@@ -125,8 +127,12 @@ export const executeWithClosedToolkit: {
       if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
       return toolResultCodec.encodeDomainCandidate(toolkit.tool, error)
     }
-    const isHookFailure = (error: typeof Schema.Unknown.Type): error is HookFailed | DriverError | DriverStateInvalid =>
-      Schema.is(HookFailed)(error) || Schema.is(DriverError)(error) || Schema.is(DriverStateInvalid)(error)
+    const isHookFailure = (error: typeof Schema.Unknown.Type): error is EvaluationFailure =>
+      Schema.is(HookFailed)(error) ||
+      Schema.is(DriverError)(error) ||
+      Schema.is(DriverStateInvalid)(error) ||
+      Schema.is(DriverUnknownReplay)(error) ||
+      Schema.is(Exhausted)(error)
     return toolResultCodec.decodeInput(toolkit.tool, request.call.params).pipe(
       Effect.flatMap(toolkit.invoke),
       Effect.flatMap((result) => toolResultCodec.decodeSuccess(toolkit.tool, result)),

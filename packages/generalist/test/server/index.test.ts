@@ -64,8 +64,12 @@ layer(services)("Server", (it) => {
         const host = yield* Generalist.create({ agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
             host,
-            auth: Server.authBearer(Config.succeed(Redacted.make("secret"))),
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
           }).pipe(Layer.provide(HttpServer.layerServices)),
           { disableLogger: true },
         )
@@ -116,8 +120,12 @@ layer(services)("Server", (it) => {
         const host = yield* Generalist.create({ agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
             host,
-            auth: Server.authBearer(Config.succeed(Redacted.make("secret"))),
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
           }).pipe(Layer.provide(HttpServer.layerServices)),
           { disableLogger: true },
         )
@@ -174,12 +182,15 @@ layer(services)("Server", (it) => {
           agent: agent.name,
           input: { question: "cancel" },
         })
+        const missingCommandBody = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+          reason: "user stopped",
+        })
         const missingCommand = yield* Effect.promise(() =>
           app.handler(
             new Request(`http://generalist.test/runs/${cancelled.id}/cancel`, {
               method: "POST",
               headers: { authorization: "Bearer secret", "content-type": "application/json" },
-              body: JSON.stringify({ reason: "user stopped" }),
+              body: missingCommandBody,
             }),
           ),
         )
@@ -230,9 +241,14 @@ layer(services)("Server", (it) => {
           Effect.provideService(LanguageModel.LanguageModel, controlledModel),
         )
         const app = HttpRouter.toWebHandler(
-          Server.layer({ host, auth: Server.authBearer(Config.succeed(Redacted.make("secret"))) }).pipe(
-            Layer.provide(HttpServer.layerServices),
-          ),
+          Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
           { disableLogger: true },
         )
         yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
@@ -280,9 +296,15 @@ layer(services)("Server", (it) => {
         const agent = Agent.make({ name: "server-unknown" })
         const host = yield* Generalist.create({ agents: [agent] })
         const app = HttpRouter.toWebHandler(
-          Server.layer({ host, auth: Server.authBearer(Config.succeed(Redacted.make("secret"))), operator: true }).pipe(
-            Layer.provide(HttpServer.layerServices),
-          ),
+          Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+            operator: true,
+          }).pipe(Layer.provide(HttpServer.layerServices)),
           { disableLogger: true },
         )
         yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
@@ -352,21 +374,21 @@ layer(services)("Server", (it) => {
                 Permissions.layerAllowAll,
                 Approvals.layerAutoApprove,
                 blobStoreLayer({ environment: "test", tenant }).pipe(
-                  Layer.provide(
-                    Layer.merge(
-                      BunCrypto.layer,
-                      Layer.succeed(ObjectStore, makeObjectStorage().store),
-                    ),
-                  ),
+                  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, makeObjectStorage().store))),
                 ),
               ),
             )
             const agent = Agent.make({ name: "tenant-assistant" })
             const host = yield* Generalist.create({ agents: [agent] }).pipe(Effect.provideContext(context))
             const app = HttpRouter.toWebHandler(
-              Server.layer({ host, auth: Server.authBearer(Config.succeed(Redacted.make(tenant))) }).pipe(
-                Layer.provide(HttpServer.layerServices),
-              ),
+              Server.layer({
+                authorization: { tenantId: tenant, authorize: () => Effect.succeed(true) },
+                host,
+                auth: Server.authBearer({
+                  token: Config.succeed(Redacted.make(tenant)),
+                  principal: { id: "test-controller", tenantId: tenant, role: "controller" },
+                }),
+              }).pipe(Layer.provide(HttpServer.layerServices)),
               { disableLogger: true },
             )
             yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
@@ -468,8 +490,12 @@ layer(approvalServices)("Server approvals", (it) => {
         const host = yield* Generalist.create({ agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
             host,
-            auth: Server.authBearer(Config.succeed(Redacted.make("secret"))),
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
           }).pipe(Layer.provide(HttpServer.layerServices)),
           { disableLogger: true },
         )

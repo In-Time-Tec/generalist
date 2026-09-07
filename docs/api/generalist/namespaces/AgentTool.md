@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / AgentTool
+[generalist](../../index.md) / [generalist](../index.md) / AgentTool
 
 # AgentTool
 
@@ -110,7 +110,7 @@
 
 ##### invoke
 
-> `readonly` **invoke**: (`params`) => `Effect`\<`Success`\[`"Type"`\], `string` \| [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror), `R`\>
+> `readonly` **invoke**: (`params`) => `Effect`\<`Success`\[`"Type"`\], `string` \| [`EvaluationFailure`](../../hooks.md#evaluationfailure), `R`\>
 
 ###### Parameters
 
@@ -120,7 +120,7 @@
 
 ###### Returns
 
-`Effect`\<`Success`\[`"Type"`\], `string` \| [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror), `R`\>
+`Effect`\<`Success`\[`"Type"`\], `string` \| [`EvaluationFailure`](../../hooks.md#evaluationfailure), `R`\>
 
 <a id="name"></a>
 
@@ -348,7 +348,7 @@ A Runtime-owned fan-out declaration; callers do not provide a separate handler.
 
 #### Extends
 
-- `Tool`\<`Name`, \{ `failure`: *typeof* [`RunError`](./Agent#runerror-1); `failureMode`: `"error"`; `parameters`: `ParametersSchema`\<`Entries`\>; `success`: `SuccessSchema`\<`Entries`\>; \}, `Requirements`\<`Entries`\>\>
+- `Tool`\<`Name`, \{ `failure`: *typeof* [`RunError`](./Agent.md#runerror-1); `failureMode`: `"error"`; `parameters`: `ParametersSchema`\<`Entries`\>; `success`: `SuccessSchema`\<`Entries`\>; \}, `Requirements`\<`Entries`\>\>
 
 #### Type Parameters
 
@@ -390,11 +390,11 @@ One model-authored child request. Array order is the result order.
 
 ### asTool
 
-> `const` **asTool**: \{\<`Name`, `Parameters`, `Success`, `ModelR`\>(`options?`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `Name`, `Parameters`, `Success`, `ModelR`\>(`agent`, `options?`): [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>; \}
+> `const` **asTool**: \{\<`Name`, `Parameters`, `Success`, `ModelR`\>(`options?`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent.md#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `Name`, `Parameters`, `Success`, `ModelR`\>(`agent`, `options?`): [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent.md#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>; \}
 
 #### Call Signature
 
-> \<`Name`, `Parameters`, `Success`, `ModelR`\>(`options?`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
+> \<`Name`, `Parameters`, `Success`, `ModelR`\>(`options?`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent.md#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
 
 ##### Type Parameters
 
@@ -422,11 +422,11 @@ One model-authored child request. Array order is the result order.
 
 ##### Returns
 
-\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
+\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent.md#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `Name`, `Parameters`, `Success`, `ModelR`\>(`agent`, `options?`): [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
+> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `Name`, `Parameters`, `Success`, `ModelR`\>(`agent`, `options?`): [`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent.md#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
 
 ##### Type Parameters
 
@@ -466,7 +466,7 @@ One model-authored child request. Array order is the result order.
 
 ###### agent
 
-`TextAgent`\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\> \| [`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>
+`TextAgent`\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`\> \| [`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>
 
 ###### options?
 
@@ -474,7 +474,7 @@ One model-authored child request. Array order is the result order.
 
 ##### Returns
 
-[`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
+[`AgentToolToolkit`](#agenttooltoolkit)\<`Name`, `Parameters`, `Success`, `ModelR` \| [`RunRequirements`](./Agent.md#runrequirements)\<`Tools`, `R`, `AgentToolRunOptions`\> \| `Parameters`\[`"DecodingServices"`\]\>
 
 ***
 
@@ -492,11 +492,11 @@ Declare a model-callable fan-out over an exact set of child Agents.
 
 ### register
 
-> `const` **register**: \{\<`R`, `E`\>(`layer`): \<`Tools`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `E`\>(`agent`, `layer`): [`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>; \}
+> `const` **register**: \{\<`R`, `E`\>(`layer`): \<`Tools`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `E`\>(`agent`, `layer`): [`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>; \}
 
 #### Call Signature
 
-> \<`R`, `E`\>(`layer`): \<`Tools`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>
+> \<`R`, `E`\>(`layer`): \<`Tools`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>
 
 ##### Type Parameters
 
@@ -516,11 +516,11 @@ Declare a model-callable fan-out over an exact set of child Agents.
 
 ##### Returns
 
-\<`Tools`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>
+\<`Tools`, `PolicyServices`, `AuthorizationServices`\>(`agent`) => [`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `E`\>(`agent`, `layer`): [`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>
+> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `E`\>(`agent`, `layer`): [`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>
 
 ##### Type Parameters
 
@@ -556,4 +556,4 @@ Declare a model-callable fan-out over an exact set of child Agents.
 
 ##### Returns
 
-[`Registration`](./Handoff#registration-1)\<`Tools`, `R`\>
+[`Registration`](./Handoff.md#registration-1)\<`Tools`, `R`\>

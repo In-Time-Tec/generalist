@@ -44,9 +44,7 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest => 
   return value
 }
 
-const runtime = objectRuntimeLayer({ addresses: [] }).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([])),
-)
+const runtime = objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
 const model = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -68,10 +66,14 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const events = yield* host.events.subscribe(session.id)
         const fiber = yield* handle<readonly [typeof agent]>({
           host,
+          authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
           sessionId: session.id,
           request: request(fake.socket),
           events,
-        }).pipe(Effect.forkChild)
+        }).pipe(
+          Effect.provideService(Server.CurrentPrincipal, { id: "controller", tenantId: "test", role: "controller" }),
+          Effect.forkChild,
+        )
 
         const output = yield* Queue.take(fake.outbound)
         if (Socket.isCloseEvent(output) || output instanceof Uint8Array) return yield* Effect.die("expected HostEvent")

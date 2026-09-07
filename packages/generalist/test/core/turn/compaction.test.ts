@@ -605,8 +605,12 @@ describe("Compaction", () => {
       Effect.gen(function* () {
         const path = yield* Effect.scoped(
           Session.acquire("session").pipe(
-            Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") }, { commandId: "fixture-608" })),
-            Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") }, { commandId: "fixture-609" })),
+            Effect.tap((store) =>
+              store.append({ _tag: "Message", message: user("old goal") }, { commandId: "fixture-608" }),
+            ),
+            Effect.tap((store) =>
+              store.append({ _tag: "Message", message: user("recent tail") }, { commandId: "fixture-609" }),
+            ),
             Effect.flatMap((store) => store.path()),
           ),
         )
@@ -836,13 +840,20 @@ describe("Compaction", () => {
           const path = yield* Effect.scoped(
             Session.acquire("session").pipe(
               Effect.tap((store) =>
-                store.append({
-                                  _tag: "Message",
-                                  message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
-                                }, { commandId: "fixture-839" }),
+                store.append(
+                  {
+                    _tag: "Message",
+                    message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
+                  },
+                  { commandId: "fixture-839" },
+                ),
               ),
-              Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") }, { commandId: "fixture-608" })),
-              Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") }, { commandId: "fixture-609" })),
+              Effect.tap((store) =>
+                store.append({ _tag: "Message", message: user("old goal") }, { commandId: "fixture-608" }),
+              ),
+              Effect.tap((store) =>
+                store.append({ _tag: "Message", message: user("recent tail") }, { commandId: "fixture-609" }),
+              ),
               Effect.flatMap((store) => store.path()),
             ),
           )

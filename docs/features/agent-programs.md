@@ -93,8 +93,8 @@ These are Program tools, not an automatic adapter for arbitrary Toolkit handlers
 - Runtime resolves and attests tagged definitions in fresh scopes per host attempt, persists executable-neutral results/checkpoints, and commits child terminal state only after resolver/service finalization.
 - Durable Agent runs/maps/fan-outs atomically reserve identity and budget, admit ordered child Runs, replay by joining persisted child IDs without redispatch, and enforce map concurrency.
 - The terminal transaction settles fan-out membership, promotes queued members, closes the wait, releases the parent claim, and makes the parent schedulable; cancellation settles owned children, waits, operations, and slots before terminal state.
-- Memory and SQL stores share fenced idempotent admission; Memory, SQLite, PostgreSQL, and MySQL preserve Program budgets, results, operations, fan-outs, and child ownership across reopen.
-- SQLite reconstructs a reopened child only from its manifest and persisted registrations; the application resolver supplies matching codecs, executor, and handlers.
+- The object engine journals Program budgets, results, operations, fan-outs, and child ownership. Settlement uses an explicit stable `commandId`; exact retries retain the original receipt rather than charging or settling again.
+- A fresh host reconstructs a reopened child only from its manifest and persisted registrations; the application resolver supplies matching codecs, executor, and handlers.
 - Runtime records stable source-owned operation names before dispatch, replays matching results, rejects changed input as divergence, and leaves unknown non-idempotent outcomes `needs-resolution` unless cancelled; cancellation may settle the Run while preserving `unknown`.
 - Structured logs are canonical Run events committed atomically with their operation result.
 - Durable recording, replay, waits, recovery, cancellation, and durable budget state belong to Runtime, not Core; missing registrations and authority/source/capability/budget/admission violations remain typed failures.

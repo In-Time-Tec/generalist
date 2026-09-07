@@ -1,11 +1,10 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAt as preparedOccurredAt } from "../../observation.js"
+import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../../observation.js"
 import { Effect } from "effect"
 import { resultFromInspection, waitIdForGroup } from "../../../child/group.js"
 import { isTerminal } from "../../../run.js"
 import { appendLifecycle, resumedEvent } from "../../append.js"
 import type { RuntimeUnavailable } from "../../../errors.js"
-import { waitMapKey, type RuntimeState, type StoredFanOut, type StoredRun } from "../../state.js"
+import { waitMapKey, type RuntimeState, type StoredFanOut, type StoredRun } from "../../projection.js"
 import type { RemainderAction } from "./remainder.js"
 import { closeWait } from "../control/wait.js"
 
@@ -21,7 +20,10 @@ export interface CompletionInput {
   readonly fanOut: StoredFanOut
   readonly joined: "succeeded" | "failed"
   readonly remainder: ReadonlyArray<RemainderAction>
-  readonly settlePending: (state: RuntimeState, parent: StoredRun) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+  readonly settlePending: (
+    state: RuntimeState,
+    parent: StoredRun,
+  ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
 }
 
 const memberCounts = (fanOut: StoredFanOut): MemberCounts => ({
@@ -47,7 +49,9 @@ const emitJoined = (input: CompletionInput): Effect.Effect<RuntimeState, Runtime
     return emitted
   })
 
-const settlePendingParent = (input: CompletionInput): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> => {
+const settlePendingParent = (
+  input: CompletionInput,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> => {
   const parent = input.state.runs.get(input.fanOut.parentRunId)
   const hasRunningFanOut = [...input.state.fanOuts.values()].some(
     (fanOut) => fanOut.parentRunId === input.fanOut.parentRunId && fanOut.status === "running",
@@ -57,7 +61,9 @@ const settlePendingParent = (input: CompletionInput): Effect.Effect<RuntimeState
     : Effect.succeed(input.state)
 }
 
-const resumeGroupWait = (input: CompletionInput): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+const resumeGroupWait = (
+  input: CompletionInput,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const parent = input.state.runs.get(input.fanOut.parentRunId)
     const waitId = parent === undefined ? undefined : waitIdForGroup(parent.suspension, input.fanOut.fanOutId)
@@ -96,7 +102,9 @@ const resumeGroupWait = (input: CompletionInput): Effect.Effect<RuntimeState, Ru
     return resumed
   })
 
-const resumeProgramOperation = (input: CompletionInput): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+const resumeProgramOperation = (
+  input: CompletionInput,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const parent = input.state.runs.get(input.fanOut.parentRunId)
     const operationEntry = [...input.state.programOperations.entries()].find(
@@ -137,7 +145,9 @@ const resumeProgramOperation = (input: CompletionInput): Effect.Effect<RuntimeSt
     return resumed
   })
 
-export const completeJoin = (input: CompletionInput): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+export const completeJoin = (
+  input: CompletionInput,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const emitted = yield* emitJoined(input)
     const settled = yield* settlePendingParent({ ...input, state: emitted })

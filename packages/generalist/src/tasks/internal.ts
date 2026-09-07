@@ -4,8 +4,11 @@ import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../core/agent/lifecycle/definition.js"
 import { DriverInterpreter } from "../core/durable/driver/interpreter.js"
 import { LoopDriverState } from "../core/durable/loop-driver-state.js"
-import { DriverStateInvalid } from "../core/durable/service.js"
+import { DriverError, DriverStateInvalid } from "../core/durable/service.js"
 import { Items, readToolName, writeToolName, type Items as TaskItems } from "./item.js"
+import { CommandTool, bounded, layer as componentLayer, namespace } from "../core/durable/component.js"
+import { ToolContext } from "../core/tools/tool-context.js"
+import { declaration } from "./component.js"
 
 const readTool = Tool.make(readToolName, {
   description: "Read the current journaled task list.",
@@ -19,9 +22,10 @@ const writeTool = Tool.make(writeToolName, {
   description: "Replace the complete journaled task list. Preserve every task that should remain on the list.",
   parameters: Schema.Struct({ items: Items }),
   success: Items,
-  failure: DriverStateInvalid,
+  failure: Schema.Union([DriverStateInvalid, DriverError]),
   failureMode: "return",
-})
+  dependencies: [DriverInterpreter, ToolContext],
+}).annotate(CommandTool, declaration.registration)
 const toolkit = Toolkit.make(readTool, writeTool)
 
 export interface Service {
@@ -37,7 +41,15 @@ export const currentOption: Effect.Effect<Option.Option<TaskItems>, DriverStateI
     const driver = yield* DriverInterpreter
     return yield* driver.checkpoint.pipe(
       Effect.flatMap((checkpoint) => Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state)),
-      Effect.map((state) => Option.fromUndefinedOr(state.tasks)),
+      Effect.flatMap((state): Effect.Effect<Option.Option<TaskItems>, DriverStateInvalid | Schema.SchemaError> => {
+        const component = state.components?.find(
+          (entry) => namespace(entry.descriptor) === namespace(declaration.registration.descriptor),
+        )
+        if (component === undefined) return Effect.succeed(Option.none<TaskItems>())
+        if (component.pin !== declaration.registration.pin)
+          return DriverStateInvalid.make({ message: "Tasks component version is unavailable" })
+        return Schema.decodeUnknownEffect(Items)(component.state).pipe(Effect.map(Option.some))
+      }),
       Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid task checkpoint: ${error.message}` })),
     )
   },
@@ -49,12 +61,31 @@ export const current: Effect.Effect<TaskItems, DriverStateInvalid, DriverInterpr
 
 const handlers = toolkit.toLayer({
   tasks_read: () => current,
-  tasks_write: ({ items }) => Effect.succeed(items),
+  tasks_write: ({ items }) =>
+    Effect.gen(function* () {
+      const driver = yield* DriverInterpreter
+      const context = yield* ToolContext
+      if (context.operationKey === undefined)
+        return yield* DriverStateInvalid.make({ message: "Tasks command requires a tool operation identity" })
+      const command = yield* Schema.encodeEffect(declaration.command)({ items }).pipe(
+        Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid Tasks component command" })),
+        Effect.flatMap((value) => bounded({ value, limit: declaration.registration.descriptor.maxCommandBytes })),
+      )
+      const result = yield* driver.componentCommand({
+        capability: declaration.registration.capability,
+        id: context.operationKey,
+        command,
+      })
+      return yield* Schema.decodeUnknownEffect(Items)(result).pipe(
+        Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid Tasks component state" })),
+      )
+    }),
 })
 
-export const layer = Layer.merge(
+export const layer = Layer.mergeAll(
   Layer.succeed(Configuration, Configuration.of({ tools: [readTool, writeTool] })),
   handlers,
+  componentLayer([declaration.registration]).pipe(Layer.orDie),
 )
 
 export const eventFields = (input: {

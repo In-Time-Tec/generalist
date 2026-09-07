@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ExecutableManifest
+[generalist](../../index.md) / [generalist](../index.md) / ExecutableManifest
 
 # ExecutableManifest
 
@@ -26,7 +26,7 @@ One complete pinned Agent entry in an executable closure.
 
 ##### manifest
 
-> `readonly` **manifest**: [`AgentManifest`](./AgentManifest#agentmanifest)
+> `readonly` **manifest**: [`AgentManifest`](./AgentManifest.md#agentmanifest)
 
 <a id="pin"></a>
 
@@ -66,7 +66,7 @@ Complete closed executable profile registry and entry closure.
 
 ##### version
 
-> `readonly` **version**: `"2"`
+> `readonly` **version**: `"1"`
 
 ***
 
@@ -104,7 +104,7 @@ Encoded executable manifest.
 
 ##### version
 
-> `readonly` **version**: `"2"`
+> `readonly` **version**: `"1"`
 
 ###### Inherited from
 
@@ -226,11 +226,11 @@ One complete pinned Agent Program entry in an executable closure.
 
 ###### capabilities.steps
 
-> `readonly` **steps**: readonly [`NamedCapability`](./AgentManifest#namedcapability)[]
+> `readonly` **steps**: readonly [`NamedCapability`](./AgentManifest.md#namedcapability)[]
 
 ###### capabilities.tools
 
-> `readonly` **tools**: readonly [`NamedCapability`](./AgentManifest#namedcapability)[]
+> `readonly` **tools**: readonly [`NamedCapability`](./AgentManifest.md#namedcapability)[]
 
 ###### input
 
@@ -434,7 +434,7 @@ Construct, validate, canonicalize, and pin a complete executable closure.
 
 ###### entries
 
-`ReadonlyArray`\<`object` & [`PinnedAgent`](./AgentManifest#pinnedagent) \| `object` & [`PinnedProgram`](./ProgramManifest#pinnedprogram)\>
+`ReadonlyArray`\<`object` & [`PinnedAgent`](./AgentManifest.md#pinnedagent) \| `object` & [`PinnedProgram`](./ProgramManifest.md#pinnedprogram)\>
 
 ###### profiles?
 

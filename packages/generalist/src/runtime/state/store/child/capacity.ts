@@ -6,7 +6,7 @@ import type { FanOutMemberResult } from "../../../child/fan-out.js"
 import { isTerminal } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"
 import { appendLifecycle, childReadinessChangedEvent } from "../../append.js"
-import type { RuntimeState, StoredRun } from "../../state.js"
+import type { RuntimeState, StoredRun } from "../../projection.js"
 
 type MutableFanOutMemberResult = { -readonly [Key in keyof FanOutMemberResult]: FanOutMemberResult[Key] }
 

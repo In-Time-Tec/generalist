@@ -1,7 +1,7 @@
 import type { PreparedObservation } from "../observation.js"
 import { Effect, Function } from "effect"
 import { isTerminal } from "../../run.js"
-import type { RuntimeState } from "../state.js"
+import type { RuntimeState } from "../projection.js"
 import { cancel } from "./control.js"
 
 interface SessionCancelInput {

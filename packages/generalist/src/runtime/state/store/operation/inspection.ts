@@ -1,7 +1,7 @@
 import { Effect, Function } from "effect"
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { OperationRecord } from "../../../operation/record.js"
-import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../state.js"
+import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../projection.js"
 
 const getRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))

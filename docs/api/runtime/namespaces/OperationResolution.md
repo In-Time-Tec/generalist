@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / OperationResolution
+[generalist](../../index.md) / [runtime](../index.md) / OperationResolution
 
 # OperationResolution
 

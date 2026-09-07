@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / media
+[generalist](./index.md) / media
 
 # media
 
@@ -180,7 +180,7 @@ Optional media metadata overrides for `Media.fromPath`.
 
 ### FromPathError
 
-> **FromPathError** = [`MediaTypeUnsupported`](#mediatypeunsupported) \| [`MediaReadError`](#mediareaderror) \| [`BlobStoreError`](./blob-store#blobstoreerror) \| [`BlobTooLarge`](./blob-store#blobtoolarge)
+> **FromPathError** = [`MediaTypeUnsupported`](#mediatypeunsupported) \| [`MediaReadError`](#mediareaderror) \| [`BlobStoreError`](./blob-store.md#blobstoreerror) \| [`BlobTooLarge`](./blob-store.md#blobtoolarge)
 
 **`Experimental`**
 
@@ -234,7 +234,7 @@ Schema for a typed Agent field containing media of one declared media type.
 
 ### fromPath
 
-> `const` **fromPath**: (`pathValue`, `options?`) => `Effect.Effect`\<\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}, [`BlobStoreError`](./blob-store#blobstoreerror) \| [`BlobTooLarge`](./blob-store#blobtoolarge) \| [`MediaReadError`](#mediareaderror) \| [`MediaTypeUnsupported`](#mediatypeunsupported), [`BlobStore`](./blob-store#blobstore) \| `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **fromPath**: (`pathValue`, `options?`) => `Effect.Effect`\<\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}, [`BlobStoreError`](./blob-store.md#blobstoreerror) \| [`BlobTooLarge`](./blob-store.md#blobtoolarge) \| [`MediaReadError`](#mediareaderror) \| [`MediaTypeUnsupported`](#mediatypeunsupported), [`BlobStore`](./blob-store.md#blobstore) \| `FileSystem.FileSystem` \| `Path.Path`\>
 
 **`Experimental`**
 
@@ -252,7 +252,7 @@ Reads one platform file into BlobStore and returns its durable content reference
 
 #### Returns
 
-`Effect.Effect`\<\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}, [`BlobStoreError`](./blob-store#blobstoreerror) \| [`BlobTooLarge`](./blob-store#blobtoolarge) \| [`MediaReadError`](#mediareaderror) \| [`MediaTypeUnsupported`](#mediatypeunsupported), [`BlobStore`](./blob-store#blobstore) \| `FileSystem.FileSystem` \| `Path.Path`\>
+`Effect.Effect`\<\{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}, [`BlobStoreError`](./blob-store.md#blobstoreerror) \| [`BlobTooLarge`](./blob-store.md#blobtoolarge) \| [`MediaReadError`](#mediareaderror) \| [`MediaTypeUnsupported`](#mediatypeunsupported), [`BlobStore`](./blob-store.md#blobstore) \| `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
 
@@ -284,7 +284,7 @@ Content-addressed reference persisted in prompts, journals, and API payloads.
 
 ### resolve
 
-> `const` **resolve**: (`ref`, `preference?`) => `Effect.Effect`\<`FilePart`, [`BlobNotFound`](./blob-store#blobnotfound) \| [`BlobStoreError`](./blob-store#blobstoreerror), [`BlobStore`](./blob-store#blobstore)\>
+> `const` **resolve**: (`ref`, `preference?`) => `Effect.Effect`\<`FilePart`, [`BlobNotFound`](./blob-store.md#blobnotfound) \| [`BlobStoreError`](./blob-store.md#blobstoreerror), [`BlobStore`](./blob-store.md#blobstore)\>
 
 **`Experimental`**
 
@@ -316,7 +316,7 @@ Resolve a Media.Ref to provider-ready bytes or a URL from BlobStore.
 
 #### Returns
 
-`Effect.Effect`\<`FilePart`, [`BlobNotFound`](./blob-store#blobnotfound) \| [`BlobStoreError`](./blob-store#blobstoreerror), [`BlobStore`](./blob-store#blobstore)\>
+`Effect.Effect`\<`FilePart`, [`BlobNotFound`](./blob-store.md#blobnotfound) \| [`BlobStoreError`](./blob-store.md#blobstoreerror), [`BlobStore`](./blob-store.md#blobstore)\>
 
 ## References
 

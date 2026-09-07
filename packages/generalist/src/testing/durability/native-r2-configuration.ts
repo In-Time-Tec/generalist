@@ -1,4 +1,4 @@
-import type * as S3 from "../../durability/s3.js"
+import type { ConnectionOptions } from "../../durability/s3.js"
 import { maxCommandCount, nativeR2Provider, type NativeR2Provider } from "./native-r2-worker.js"
 import { configuration as s3Configuration, type Configuration as S3Configuration } from "./remote.js"
 
@@ -6,7 +6,7 @@ const endpointPattern = /^https:\/\//
 /** Native qualification host configuration. S3 credentials are reused for the exact same bucket. */
 export interface NativeR2Configuration {
   readonly provider: NativeR2Provider
-  readonly connection: S3.ConnectionOptions
+  readonly connection: ConnectionOptions
   readonly endpoint: string
   readonly token: string
   readonly environment: string

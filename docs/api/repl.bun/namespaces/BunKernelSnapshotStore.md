@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl.bun](../index) / BunKernelSnapshotStore
+[generalist](../../index.md) / [repl.bun](../index.md) / BunKernelSnapshotStore
 
 # BunKernelSnapshotStore
 
@@ -28,7 +28,7 @@ Where one Session's best-effort namespace snapshot is written.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 One durable filesystem-backed kernel snapshot store.
 
@@ -40,7 +40,7 @@ One durable filesystem-backed kernel snapshot store.
 
 #### Returns
 
-`Layer.Layer`\<[`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore#kernelsnapshotstore), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+`Layer.Layer`\<[`KernelSnapshotStore`](../../repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
 
@@ -48,7 +48,7 @@ One durable filesystem-backed kernel snapshot store.
 
 ### make
 
-> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](../../repl/namespaces/KernelSnapshotStore#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](../../repl/namespaces/KernelSnapshotStore.md#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 Best-effort namespace persistence on the Effect filesystem. Snapshots are
 owner-only, written through a same-directory temporary file plus rename so a reader never
@@ -62,4 +62,4 @@ observes a partial capture, and a corrupt manifest fails typed instead of being 
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](../../repl/namespaces/KernelSnapshotStore#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+`Effect.Effect`\<[`Service`](../../repl/namespaces/KernelSnapshotStore.md#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>

@@ -1,17 +1,18 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAtMillis } from "../../observation.js"
+import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
 import { Effect, Function, Schema } from "effect"
 import { BudgetExhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import { appendLifecycle, attemptStartedEvent } from "../../append.js"
-import type { RuntimeState } from "../../state.js"
+import type { RuntimeState } from "../../projection.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 
 export const extendBudget: {
   (
     runId: string,
     delta: BudgetLimits,
-  ): (state: RuntimeState) => Effect.Effect<readonly [void, RuntimeState], RunNotFound | RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<readonly [void, RuntimeState], RunNotFound | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
@@ -23,7 +24,10 @@ export const extendBudget: {
     if (run === undefined) return yield* RunNotFound.make({ runId })
     const [, extended] = yield* appendLifecycle(state, runId, { _tag: "BudgetExtended", delta })
     if (run.status !== "waiting" || !Schema.is(BudgetExhausted)(run.suspension)) return [undefined, extended] as const
-    const remaining = yield* budgetForEvents(extended.runs.get(runId)!.events, yield* occurredAtMillis)
+    const remaining = yield* budgetForEvents({
+      events: extended.runs.get(runId)!.events,
+      observedMillis: yield* occurredAtMillis,
+    })
     if (remaining[run.suspension.budget] === 0 || remaining[run.suspension.budget] === "unknown") {
       return [undefined, extended] as const
     }

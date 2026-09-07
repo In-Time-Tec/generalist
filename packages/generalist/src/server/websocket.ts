@@ -6,6 +6,7 @@ import type { HostEvent } from "../host/event.js"
 import type { Host } from "../host/index.js"
 import type { SessionEventsError } from "../runtime/session/host.js"
 import { decodeCommand, eventCodec } from "./wire.js"
+import { authorize, type Authorization } from "./auth.js"
 
 const closeForStreamError = (
   writer: (chunk: string | Uint8Array | Socket.CloseEvent) => Effect.Effect<void, Socket.SocketError>,
@@ -38,6 +39,7 @@ const runBelongsTo = <Agents extends ReadonlyArray<AnyAgent>>(
 /** Upgrade one authenticated Session route and stream its HostEvents. */
 export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
   readonly host: Host<Agents>
+  readonly authorization: Authorization
   readonly sessionId: string
   readonly request: HttpServerRequest.HttpServerRequest
   readonly events: Stream.Stream<HostEvent, SessionEventsError>
@@ -66,7 +68,19 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
     const dispatch = (text: string) =>
       decodeCommand(text).pipe(
         Effect.flatMap((command) =>
-          runBelongsTo(options.host, options.sessionId, command.runId).pipe(
+          authorize({
+            policy: options.authorization,
+            resource: { type: "session", id: options.sessionId },
+            action: "mutate",
+          }).pipe(
+            Effect.andThen(
+              authorize({
+                policy: options.authorization,
+                resource: { type: "run", id: command.runId },
+                action: "mutate",
+              }),
+            ),
+            Effect.andThen(Effect.suspend(() => runBelongsTo(options.host, options.sessionId, command.runId))),
             Effect.flatMap((allowed) => {
               if (!allowed) return close(1008, "run-not-in-session")
               return options.host.runs.cancel(command.runId, command.commandId, command.reason).pipe(
@@ -82,7 +96,11 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
             }),
           ),
         ),
-        Effect.catchTag("generalist/server/WireCodecFailed", () => close(1003, "malformed-command")),
+        Effect.catchTags({
+          "generalist/server/WireCodecFailed": () => close(1003, "malformed-command"),
+          "generalist/server/Forbidden": () => close(1008, "forbidden"),
+          "generalist/server/Unauthorized": () => close(1008, "unauthorized"),
+        }),
       )
 
     yield* socket

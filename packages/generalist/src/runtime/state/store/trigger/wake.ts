@@ -1,5 +1,4 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAt, occurredAtMillis } from "../../observation.js"
+import { type PreparedObservation, occurredAt, occurredAtMillis } from "../../observation.js"
 import { DateTime, Effect, Function } from "effect"
 import { matches, type AwaitEventResult, type WakeEvent } from "../../../../core/agent/tools/wake-event.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../../errors.js"
@@ -7,7 +6,7 @@ import { isTerminal } from "../../../run.js"
 import type { RunWait, WaitResolution } from "../../../run/wait.js"
 import type { DueAwaitEvent, WakeDisposition } from "../../../execution/trigger/wake.js"
 import { appendLifecycle, resumedEvent } from "../../append.js"
-import { openRunWaits, waitMapKey, type RuntimeState } from "../../state.js"
+import { openRunWaits, waitMapKey, type RuntimeState } from "../../projection.js"
 import { closeWait } from "../control/wait.js"
 
 const receiptKey = (runId: string, dedupeKey: string): string => `${runId}\0${dedupeKey}`
@@ -43,11 +42,19 @@ export const wake: {
     input: WakeInput,
   ): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [WakeDisposition, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [WakeDisposition, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: WakeInput,
-  ): Effect.Effect<readonly [WakeDisposition, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [WakeDisposition, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: WakeInput) =>
   Effect.gen(function* () {
     yield* requireRun(state, input.runId)
@@ -98,8 +105,14 @@ export const dueAwaitEvents: {
     if (separator < 0) continue
     due.push({ runId: key.slice(0, separator), waitId: wait.waitId, deadline: wait.reason.deadline })
   }
-  return due.toSorted((left, right) => left.deadline.localeCompare(right.deadline) ||
-    left.runId.localeCompare(right.runId) || left.waitId.localeCompare(right.waitId)).slice(0, input.limit)
+  return due
+    .toSorted(
+      (left, right) =>
+        left.deadline.localeCompare(right.deadline) ||
+        left.runId.localeCompare(right.runId) ||
+        left.waitId.localeCompare(right.waitId),
+    )
+    .slice(0, input.limit)
 })
 
 type TimeoutAwaitEventInput = DueAwaitEvent
@@ -109,11 +122,19 @@ export const timeoutAwaitEvent: {
     input: TimeoutAwaitEventInput,
   ): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [boolean, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [boolean, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: TimeoutAwaitEventInput,
-  ): Effect.Effect<readonly [boolean, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [boolean, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: TimeoutAwaitEventInput) =>
   Effect.gen(function* () {
     yield* requireRun(state, input.runId)

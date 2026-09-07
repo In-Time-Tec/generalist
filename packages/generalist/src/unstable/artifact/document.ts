@@ -179,13 +179,15 @@ const receiptResult = (receipt: ArtifactAppendReceipt): EditResult => {
 
 const matchesLogicalEdit = (input: CommitInput, receipt: ArtifactAppendReceipt): boolean => {
   const update = receipt.update
-  return receipt.commandId === input.commandId &&
+  return (
+    receipt.commandId === input.commandId &&
     receipt.crdt === input.crdt.id &&
     update.artifact === input.artifact &&
     update.branch === input.position.branch &&
     update.base === input.position.version &&
     sameOperation(update.operation, input.operation) &&
     sameAttribution(update.attribution, input.attribution)
+  )
 }
 
 const reconcileReceipt = (input: CommitInput, receipt: ArtifactAppendReceipt) =>
@@ -205,67 +207,64 @@ const receiptLookupInput = (input: CommitInput) => ({
   ...(input.position.branch === undefined ? undefined : { branch: input.position.branch }),
 })
 
-const commit = (
-  input: CommitInput,
-  conflicts = 0,
-): Effect.Effect<EditResult, ArtifactError, RunStore | BlobStore> =>
+const commit = (input: CommitInput, conflicts = 0): Effect.Effect<EditResult, ArtifactError, RunStore | BlobStore> =>
   Effect.gen(function* () {
     const store = yield* RunStore
     return yield* Effect.suspend(() =>
       Effect.gen(function* () {
-      const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
-      if (prior !== undefined) return yield* reconcileReceipt(input, prior)
-      const baseHead = yield* ensurePosition(input.artifact, input.crdt, input.position)
-      const current = yield* store.artifactHead({
-        artifact: input.artifact,
-        ...(baseHead.branch === undefined ? undefined : { branch: baseHead.branch }),
-      })
-      const [baseBytes, currentBytes] = yield* Effect.all([
-        loadBytes(input.artifact, "load edit base", baseHead),
-        loadBytes(input.artifact, "load current snapshot", current),
-      ])
-      const edited = yield* input.crdt.edit({
-        artifact: input.artifact,
-        base: baseBytes,
-        current: currentBytes,
-        operation: input.operation,
-      })
-      const snapshot = yield* putBytes(input.artifact, edited.snapshot)
-      const update = yield* store.appendArtifact({
-        artifact: input.artifact,
-        commandId: input.commandId,
-        crdt: input.crdt.id,
-        expected: current.version,
-        base: input.position.version,
-        operation: input.operation,
-        attribution: input.attribution,
-        update: edited.update,
-        snapshot,
-        ...(current.branch === undefined ? undefined : { branch: current.branch }),
-      })
-      return {
-        artifact: input.artifact,
-        base: input.position.version,
-        result: update.result,
-        attribution: input.attribution,
-        ...(update.branch === undefined ? undefined : { branch: update.branch }),
-      }
-    }).pipe(
-      Effect.catchTag("generalist/artifact/ArtifactVersionConflict", (error) =>
-        conflicts >= maxCommitConflicts ? error : commit(input, conflicts + 1),
+        const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
+        if (prior !== undefined) return yield* reconcileReceipt(input, prior)
+        const baseHead = yield* ensurePosition(input.artifact, input.crdt, input.position)
+        const current = yield* store.artifactHead({
+          artifact: input.artifact,
+          ...(baseHead.branch === undefined ? undefined : { branch: baseHead.branch }),
+        })
+        const [baseBytes, currentBytes] = yield* Effect.all([
+          loadBytes(input.artifact, "load edit base", baseHead),
+          loadBytes(input.artifact, "load current snapshot", current),
+        ])
+        const edited = yield* input.crdt.edit({
+          artifact: input.artifact,
+          base: baseBytes,
+          current: currentBytes,
+          operation: input.operation,
+        })
+        const snapshot = yield* putBytes(input.artifact, edited.snapshot)
+        const update = yield* store.appendArtifact({
+          artifact: input.artifact,
+          commandId: input.commandId,
+          crdt: input.crdt.id,
+          expected: current.version,
+          base: input.position.version,
+          operation: input.operation,
+          attribution: input.attribution,
+          update: edited.update,
+          snapshot,
+          ...(current.branch === undefined ? undefined : { branch: current.branch }),
+        })
+        return {
+          artifact: input.artifact,
+          base: input.position.version,
+          result: update.result,
+          attribution: input.attribution,
+          ...(update.branch === undefined ? undefined : { branch: update.branch }),
+        }
+      }).pipe(
+        Effect.catchTag("generalist/artifact/ArtifactVersionConflict", (error) =>
+          conflicts >= maxCommitConflicts ? error : commit(input, conflicts + 1),
+        ),
+        Effect.catchIf(Schema.is(DurabilityFailure), (error) =>
+          error.reason === "input-conflict"
+            ? Effect.gen(function* () {
+                const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
+                if (prior === undefined) return yield* error
+                return yield* reconcileReceipt(input, prior)
+              })
+            : Effect.fail(error),
+        ),
+        mapStorageError(input.artifact, "edit artifact"),
       ),
-      Effect.catchIf(Schema.is(DurabilityFailure), (error) =>
-        error.reason === "input-conflict"
-          ? Effect.gen(function* () {
-              const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
-              if (prior === undefined) return yield* Effect.fail(error)
-              return yield* reconcileReceipt(input, prior)
-            })
-          : Effect.fail(error),
-      ),
-      mapStorageError(input.artifact, "edit artifact"),
-    ),
-  )
+    )
   })
 
 const editForAgent = (artifact: string, crdt: CrdtService, input: { base: Version; operation: RangeOperation }) =>

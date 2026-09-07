@@ -27,9 +27,9 @@ import { ExecutionClaim, Operation, OperationError } from "./runtime-state/schem
 export const ExecutionRecord = Schema.Struct({
   runId: Schema.String,
   rootRunId: Schema.String,
-  depth: Schema.Number,
+  depth: Schema.Finite,
   treePolicy: TreePolicy,
-  activeChildCount: Schema.Number,
+  activeChildCount: Schema.Finite,
   parentRunId: Schema.optionalKey(Schema.String),
   invocationId: Schema.optionalKey(Schema.String),
   operationNamespace: Schema.optionalKey(Schema.String),
@@ -38,7 +38,7 @@ export const ExecutionRecord = Schema.Struct({
   message: Message,
   executableRef: ExecutableRef,
   executableManifest: ExecutableManifest,
-  attempt: Schema.Number,
+  attempt: Schema.Finite,
   attemptFence: ExecutionClaim.fields.attemptFence,
   cancellationRequested: Schema.Boolean,
   checkpoint: Schema.optionalKey(ExecutionCheckpoint),
@@ -46,7 +46,10 @@ export const ExecutionRecord = Schema.Struct({
   resolutions: Schema.Array(WaitResponse),
   continuation: Schema.optionalKey(ExecutionContinuation),
   registrations: Schema.Array(ExecutableRegistration),
-} satisfies { readonly [K in keyof ExecutionRecordType]-?: Schema.Constraint }) satisfies Schema.Codec<ExecutionRecordType, unknown>
+} satisfies { readonly [K in keyof ExecutionRecordType]-?: Schema.Constraint }) satisfies Schema.Codec<
+  ExecutionRecordType,
+  unknown
+>
 
 const CommandId = Schema.String.check(Schema.isNonEmpty())
 const IdentifiedClaim = Schema.Struct({ ...ExecutionClaim.fields, commandId: CommandId })
@@ -67,38 +70,40 @@ const CompletionCheckpoint = {
 }
 
 // The shared event codec owns the complete union; this domain metadata field has a narrower authored shape.
-const ToolProgressMetadata = Schema.Struct({ dropped: Schema.Number })
+const ToolProgressMetadata = Schema.Struct({ dropped: Schema.Finite })
 type DurableAgentEventType = DurableAgentLoopEvent & typeof AgentLoopEventSchema.Type
 type EmittableAgentEventType = EmittableAgentLoopEvent & DurableAgentEventType
 const DurableAgentEvent = AgentLoopEventSchema.pipe(
-  Schema.refine((event): event is DurableAgentEventType =>
-    event._tag !== "ToolExecutionCompleted" ||
-    event.metadata?.toolProgress === undefined ||
-    Schema.is(ToolProgressMetadata)(event.metadata.toolProgress),
+  Schema.refine(
+    (event): event is DurableAgentEventType =>
+      event._tag !== "ToolExecutionCompleted" ||
+      event.metadata?.toolProgress === undefined ||
+      Schema.is(ToolProgressMetadata)(event.metadata.toolProgress),
   ),
 )
 const EmittableAgentEvent = DurableAgentEvent.pipe(
-  Schema.refine((event): event is EmittableAgentEventType =>
-    event._tag !== "ModelResponseCommitted" && event._tag !== "ModelResponseInterrupted",
+  Schema.refine(
+    (event): event is EmittableAgentEventType =>
+      event._tag !== "ModelResponseCommitted" && event._tag !== "ModelResponseInterrupted",
   ),
 )
 const ModelResponseCommitted = Schema.TaggedStruct("ModelResponseCommitted", {
-  turn: Schema.Number,
+  turn: Schema.Finite,
   operationKey: Schema.String,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
-  attempt: Schema.Number,
+  attempt: Schema.Finite,
   response: CompletedModelResponse,
-  budgetCharge: Schema.Number,
+  budgetCharge: Schema.Finite,
   digest: Schema.String,
   metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
 })
 const PendingModelResponseInterrupted = Schema.TaggedStruct("ModelResponseInterrupted", {
-  turn: Schema.Number,
+  turn: Schema.Finite,
   operationKey: Schema.String,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
-  attempt: Schema.Number,
+  attempt: Schema.Finite,
   sessionParentId: Schema.NullOr(Schema.String),
   response: CompletedModelResponse,
   reason: Schema.Literals(["cancel", "failure"]),
@@ -111,10 +116,10 @@ const CancellationOutcome = Schema.Union([
 ])
 const OperatorAction = Schema.Struct({ runId: Schema.String, operator: Schema.String, commandId: CommandId })
 const ProgramReservation = Schema.Struct({
-  toolCalls: Schema.optionalKey(Schema.Number),
-  agentRuns: Schema.optionalKey(Schema.Number),
-  logBytes: Schema.optionalKey(Schema.Number),
-  activeSlots: Schema.optionalKey(Schema.Number),
+  toolCalls: Schema.optionalKey(Schema.Finite),
+  agentRuns: Schema.optionalKey(Schema.Finite),
+  logBytes: Schema.optionalKey(Schema.Finite),
+  activeSlots: Schema.optionalKey(Schema.Finite),
 })
 const ReserveProgramOperationInput = Schema.Struct({
   ...ExecutionClaim.fields,
@@ -130,7 +135,7 @@ const ReserveProgramOperationInput = Schema.Struct({
   reservation: ProgramReservation,
 })
 const ProgramOperationOutcome = Schema.Union([
-  Schema.TaggedStruct("Succeeded", { value: Schema.Unknown, tokens: Schema.optionalKey(Schema.Number) }),
+  Schema.TaggedStruct("Succeeded", { value: Schema.Unknown, tokens: Schema.optionalKey(Schema.Finite) }),
   OperationFailed,
   OperationUnknown,
 ])
@@ -192,24 +197,28 @@ export const commands: Commands = {
   },
   suspend: {
     tag: "suspend" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ExecutionClaim.fields,
-      waits: Schema.Array(RunWait),
-      suspension: ExecutionSuspension,
-      checkpoint: Schema.optionalKey(ExecutionCheckpoint),
-      continuation: Schema.optionalKey(Schema.NullOr(ExecutionContinuation)),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ExecutionClaim.fields,
+        waits: Schema.Array(RunWait),
+        suspension: ExecutionSuspension,
+        checkpoint: Schema.optionalKey(ExecutionCheckpoint),
+        continuation: Schema.optionalKey(Schema.NullOr(ExecutionContinuation)),
+      }),
+    ]),
     receipt: Schema.Void,
     identity: ([input]) => digest(["suspend", input.runId, input.attemptFence, input.waits.map((wait) => wait.waitId)]),
   },
   resume: {
     tag: "resume" as const,
-    input: Schema.Tuple([Schema.Struct({
-      runId: Schema.String,
-      waitId: Schema.String,
-      resolution: WaitResolution,
-      commandId: CommandId,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        runId: Schema.String,
+        waitId: Schema.String,
+        resolution: WaitResolution,
+        commandId: CommandId,
+      }),
+    ]),
     receipt: Schema.Void,
     identity: ([input]) => input.commandId,
   },
@@ -221,19 +230,22 @@ export const commands: Commands = {
   },
   recordOperation: {
     tag: "recordOperation" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ExecutionClaim.fields,
-      operationKey: Schema.String,
-      kind: OperationKind,
-      inputDigest: Schema.String,
-      input: Schema.Unknown,
-      replayPolicy: ReplayPolicy,
-      attempt: Schema.Number,
-      ...CompletionCheckpoint,
-      steeringEvents: Schema.optionalKey(Schema.Array(DurableAgentEvent)),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ExecutionClaim.fields,
+        operationKey: Schema.String,
+        kind: OperationKind,
+        inputDigest: Schema.String,
+        input: Schema.Unknown,
+        replayPolicy: ReplayPolicy,
+        attempt: Schema.Finite,
+        ...CompletionCheckpoint,
+        steeringEvents: Schema.optionalKey(Schema.Array(DurableAgentEvent)),
+      }),
+    ]),
     receipt: Operation,
-    identity: ([input]) => digest(["recordOperation", input.runId, input.attemptFence, input.attempt, input.operationKey]),
+    identity: ([input]) =>
+      digest(["recordOperation", input.runId, input.attemptFence, input.attempt, input.operationKey]),
   },
   startOperation: {
     tag: "startOperation" as const,
@@ -243,35 +255,42 @@ export const commands: Commands = {
   },
   completeOperation: {
     tag: "completeOperation" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ClaimedOperation.fields,
-      outcome: OperationCompletionOutcome,
-      ...CompletionCheckpoint,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ClaimedOperation.fields,
+        outcome: OperationCompletionOutcome,
+        ...CompletionCheckpoint,
+      }),
+    ]),
     receipt: Operation,
     identity: ([input]) => digest(["completeOperation", input.runId, input.attemptFence, input.operationId]),
   },
   commitModelResponse: {
     tag: "commitModelResponse" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ClaimedOperation.fields,
-      outcome: OperationSucceeded,
-      ...CompletionCheckpoint,
-      transitionDigest: Schema.optionalKey(Schema.String),
-      event: ModelResponseCommitted,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ClaimedOperation.fields,
+        outcome: OperationSucceeded,
+        ...CompletionCheckpoint,
+        transitionDigest: Schema.optionalKey(Schema.String),
+        event: ModelResponseCommitted,
+      }),
+    ]),
     receipt: Operation,
     identity: ([input]) => digest(["commitModelResponse", input.runId, input.attemptFence, input.operationId]),
   },
   commitInterruptedModelResponse: {
     tag: "commitInterruptedModelResponse" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ClaimedOperation.fields,
-      outcome: Schema.TaggedStruct("Failed", { error: RunFailure }),
-      event: PendingModelResponseInterrupted,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ClaimedOperation.fields,
+        outcome: Schema.TaggedStruct("Failed", { error: RunFailure }),
+        event: PendingModelResponseInterrupted,
+      }),
+    ]),
     receipt: Operation,
-    identity: ([input]) => digest(["commitInterruptedModelResponse", input.runId, input.attemptFence, input.operationId]),
+    identity: ([input]) =>
+      digest(["commitInterruptedModelResponse", input.runId, input.attemptFence, input.operationId]),
   },
   expireRunningOperation: {
     tag: "expireRunningOperation" as const,
@@ -295,7 +314,8 @@ export const commands: Commands = {
     tag: "acknowledgeOperationCancellation" as const,
     input: Schema.Tuple([Schema.Struct({ ...ClaimedOperation.fields, outcome: CancellationOutcome })]),
     receipt: Operation,
-    identity: ([input]) => digest(["acknowledgeOperationCancellation", input.runId, input.attemptFence, input.operationId]),
+    identity: ([input]) =>
+      digest(["acknowledgeOperationCancellation", input.runId, input.attemptFence, input.operationId]),
   },
   resolveOperation: {
     tag: "resolveOperation" as const,
@@ -323,11 +343,13 @@ export const commands: Commands = {
   },
   resolveUnknown: {
     tag: "resolveUnknown" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...OperatorAction.fields,
-      operationId: Schema.String,
-      resolution: OperationResolution,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...OperatorAction.fields,
+        operationId: Schema.String,
+        resolution: OperationResolution,
+      }),
+    ]),
     receipt: Schema.Void,
     identity: ([input]) => input.commandId,
   },
@@ -345,11 +367,13 @@ export const commands: Commands = {
   },
   saveExecution: {
     tag: "saveExecution" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...IdentifiedClaim.fields,
-      checkpoint: Schema.optionalKey(ExecutionCheckpoint),
-      suspension: Schema.optionalKey(ExecutionSuspension),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...IdentifiedClaim.fields,
+        checkpoint: Schema.optionalKey(ExecutionCheckpoint),
+        suspension: Schema.optionalKey(ExecutionSuspension),
+      }),
+    ]),
     receipt: Schema.Void,
     identity: ([input]) => input.commandId,
   },
@@ -367,36 +391,42 @@ export const commands: Commands = {
   },
   suspendProgramOperation: {
     tag: "suspendProgramOperation" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ReserveProgramOperationInput.fields,
-      suspension: ExecutionSuspension,
-      wait: RunWait,
-      checkpoint: Schema.optionalKey(ExecutionCheckpoint),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ReserveProgramOperationInput.fields,
+        suspension: ExecutionSuspension,
+        wait: RunWait,
+        checkpoint: Schema.optionalKey(ExecutionCheckpoint),
+      }),
+    ]),
     receipt: ProgramOperationRecord,
     identity: ([input]) => digest(["suspendProgramOperation", input.runId, input.attemptFence, input.operation]),
   },
   admitProgramAgents: {
     tag: "admitProgramAgents" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ReserveProgramOperationInput.fields,
-      fanOut: AdmitFanOutInput,
-      suspension: ExecutionSuspension,
-      wait: RunWait,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ReserveProgramOperationInput.fields,
+        fanOut: AdmitFanOutInput,
+        suspension: ExecutionSuspension,
+        wait: RunWait,
+      }),
+    ]),
     receipt: ProgramOperationRecord,
     identity: ([input]) => digest(["admitProgramAgents", input.runId, input.attemptFence, input.operation]),
   },
   settleProgramOperation: {
     tag: "settleProgramOperation" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ExecutionClaim.fields,
-      operation: ProgramOperationName,
-      outcome: ProgramOperationOutcome,
-      releaseSlots: Schema.Number,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...IdentifiedClaim.fields,
+        operation: ProgramOperationName,
+        outcome: ProgramOperationOutcome,
+        releaseSlots: Schema.Finite,
+      }),
+    ]),
     receipt: ProgramOperationRecord,
-    identity: ([input]) => digest(["settleProgramOperation", input.runId, input.attemptFence, input.operation]),
+    identity: ([input]) => input.commandId,
   },
   startProgramOperation: {
     tag: "startProgramOperation" as const,
@@ -406,23 +436,27 @@ export const commands: Commands = {
   },
   completeProgram: {
     tag: "completeProgram" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ExecutionClaim.fields,
-      output: Schema.Unknown,
-      outputBytes: Schema.Number,
-      outputLimit: Schema.Number,
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ExecutionClaim.fields,
+        output: Schema.Unknown,
+        outputBytes: Schema.Finite,
+        outputLimit: Schema.Finite,
+      }),
+    ]),
     receipt: CompletionOutcome,
     identity: ([input]) => digest(["completeProgram", input.runId, input.attemptFence]),
   },
   commitProgramLog: {
     tag: "commitProgramLog" as const,
-    input: Schema.Tuple([Schema.Struct({
-      ...ReserveProgramOperationInput.fields,
-      level: Schema.Literals(["debug", "info", "warn", "error"]),
-      message: Schema.String,
-      data: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
-    })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        ...ReserveProgramOperationInput.fields,
+        level: Schema.Literals(["debug", "info", "warn", "error"]),
+        message: Schema.String,
+        data: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+      }),
+    ]),
     receipt: ProgramOperationRecord,
     identity: ([input]) => digest(["commitProgramLog", input.runId, input.attemptFence, input.operation]),
   },

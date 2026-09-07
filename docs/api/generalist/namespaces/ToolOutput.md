@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ToolOutput
+[generalist](../../index.md) / [generalist](../index.md) / ToolOutput
 
 # ToolOutput
 
@@ -102,7 +102,7 @@ A successful tool result after applying the output bound.
 
 #### Extends
 
-- [`Success`](./ToolExecutor#success)
+- [`Success`](./ToolExecutor.md#success)
 
 #### Properties
 
@@ -114,7 +114,7 @@ A successful tool result after applying the output bound.
 
 ###### Inherited from
 
-[`Success`](./ToolExecutor#success).[`_tag`](./ToolExecutor#_tag-1)
+[`Success`](./ToolExecutor.md#success).[`_tag`](./ToolExecutor.md#_tag-1)
 
 <a id="encodedresult"></a>
 
@@ -124,7 +124,7 @@ A successful tool result after applying the output bound.
 
 ###### Inherited from
 
-[`Success`](./ToolExecutor#success).[`encodedResult`](./ToolExecutor#encodedresult)
+[`Success`](./ToolExecutor.md#success).[`encodedResult`](./ToolExecutor.md#encodedresult)
 
 <a id="memoized"></a>
 
@@ -142,7 +142,7 @@ A successful tool result after applying the output bound.
 
 ###### Inherited from
 
-[`Success`](./ToolExecutor#success).[`memoized`](./ToolExecutor#memoized)
+[`Success`](./ToolExecutor.md#success).[`memoized`](./ToolExecutor.md#memoized)
 
 <a id="outputpaths"></a>
 
@@ -158,7 +158,7 @@ A successful tool result after applying the output bound.
 
 ###### Inherited from
 
-[`Success`](./ToolExecutor#success).[`result`](./ToolExecutor#result)
+[`Success`](./ToolExecutor.md#success).[`result`](./ToolExecutor.md#result)
 
 <a id="taint"></a>
 
@@ -168,7 +168,7 @@ A successful tool result after applying the output bound.
 
 ###### Inherited from
 
-[`Success`](./ToolExecutor#success).[`taint`](./ToolExecutor#taint-1)
+[`Success`](./ToolExecutor.md#success).[`taint`](./ToolExecutor.md#taint-1)
 
 ***
 
@@ -228,7 +228,7 @@ A bounded tool result: inline content plus optional spilled overflow references.
 
 ###### result
 
-[`Success`](./ToolExecutor#success)
+[`Success`](./ToolExecutor.md#success)
 
 ###### options
 

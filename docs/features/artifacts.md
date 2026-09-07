@@ -90,6 +90,7 @@ The Server exposes the same open documents:
 The exported `Server.ArtifactClientCommand` and `Server.ArtifactServerEvent` Schemas own this JSON boundary. Authentication is inherited from the enclosing Server Layer.
 
 ## Persistence, replay, and fork
+
 The runtime driver's artifact head and operation log are authoritative for ordering. Each compare-and-append stores the base-relative range, result version, attribution, CRDT update, and snapshot reference. `BlobStore` stores complete binary CRDT snapshots as `Media.Ref`; Run events never contain binary CRDT state.
 
 An edit that loses the compare-and-append race reloads the head and retries the same base-relative CRDT merge with its original `commandId` up to eight times. Continued contention returns the typed `ArtifactVersionConflict` instead of retrying without a bound.
@@ -102,7 +103,7 @@ A successful Agent edit also projects as the `ArtifactUpdated` Host event at the
 
 ## Current boundary
 
-Artifact registration is process-scoped even when storage is durable, so each serving process opens the names it hosts. SQL subscriptions durably replay updates on connection and receive live writes made through that process. PostgreSQL/MySQL artifact writes from another process are visible after reconnect, but do not currently wake an already-open artifact stream in this unstable release.
+Artifact registration is process-scoped even when storage is durable, so each serving process opens the names it hosts. The object journal retains updates and append receipts; process-local publication is not an acknowledgement authority. Reconnect and replay from the committed cursor rather than treating a live notification as proof of a write.
 
 ## Related
 

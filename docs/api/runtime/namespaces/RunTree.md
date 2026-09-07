@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / RunTree
+[generalist](../../index.md) / [runtime](../index.md) / RunTree
 
 # RunTree
 
@@ -126,7 +126,7 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ##### event
 
-> `readonly` **event**: [`RunEvent`](./RunEvent#runevent)
+> `readonly` **event**: [`RunEvent`](./RunEvent.md#runevent)
 
 <a id="invocationid"></a>
 
@@ -188,7 +188,7 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ##### outcome?
 
-> `readonly` `optional` **outcome?**: [`RunOutcome`](./Run#runoutcome)
+> `readonly` `optional` **outcome?**: [`RunOutcome`](./Run.md#runoutcome)
 
 <a id="parentrunid-1"></a>
 
@@ -200,7 +200,7 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ##### run
 
-> `readonly` **run**: [`RunInspection`](./Run#runinspection)
+> `readonly` **run**: [`RunInspection`](./Run.md#runinspection)
 
 ***
 
@@ -262,7 +262,7 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ### awaitTerminal
 
-> `const` **awaitTerminal**: (`rootRunId`) => `Effect.Effect`\<`Extract`\<[`Inspection`](#inspection-1), \{ `_tag`: `"Terminal"`; \}\>, [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
+> `const` **awaitTerminal**: (`rootRunId`) => `Effect.Effect`\<`Extract`\<[`Inspection`](#inspection-1), \{ `_tag`: `"Terminal"`; \}\>, [`TreeEventsError`](./Runtime.md#treeeventserror), [`Runtime`](./Runtime.md#runtime)\>
 
 #### Parameters
 
@@ -272,7 +272,7 @@ One bounded, ordered page read strictly after the requested cursor.
 
 #### Returns
 
-`Effect.Effect`\<`Extract`\<[`Inspection`](#inspection-1), \{ `_tag`: `"Terminal"`; \}\>, [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
+`Effect.Effect`\<`Extract`\<[`Inspection`](#inspection-1), \{ `_tag`: `"Terminal"`; \}\>, [`TreeEventsError`](./Runtime.md#treeeventserror), [`Runtime`](./Runtime.md#runtime)\>
 
 ***
 
@@ -280,7 +280,7 @@ One bounded, ordered page read strictly after the requested cursor.
 
 ### checkpoint
 
-> `const` **checkpoint**: (`rootRunId`) => `Effect.Effect`\<[`Checkpoint`](#checkpoint), [`InspectError`](./Runtime#inspecterror), [`Runtime`](./Runtime#runtime)\>
+> `const` **checkpoint**: (`rootRunId`) => `Effect.Effect`\<[`Checkpoint`](#checkpoint), [`InspectError`](./Runtime.md#inspecterror), [`Runtime`](./Runtime.md#runtime)\>
 
 Atomically inspect one root Run tree and bind the inspection to its replay cursor.
 
@@ -292,7 +292,7 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 #### Returns
 
-`Effect.Effect`\<[`Checkpoint`](#checkpoint), [`InspectError`](./Runtime#inspecterror), [`Runtime`](./Runtime#runtime)\>
+`Effect.Effect`\<[`Checkpoint`](#checkpoint), [`InspectError`](./Runtime.md#inspecterror), [`Runtime`](./Runtime.md#runtime)\>
 
 ***
 
@@ -468,7 +468,7 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ### events
 
-> `const` **events**: (`input`) => `Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
+> `const` **events**: (`input`) => `Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime.md#treeeventserror), [`Runtime`](./Runtime.md#runtime)\>
 
 #### Parameters
 
@@ -478,7 +478,7 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 #### Returns
 
-`Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
+`Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime.md#treeeventserror), [`Runtime`](./Runtime.md#runtime)\>
 
 ***
 
@@ -494,7 +494,7 @@ Atomically inspect one root Run tree and bind the inspection to its replay curso
 
 ### replay
 
-> `const` **replay**: (`input`) => `Effect.Effect`\<[`ReplayPage`](#replaypage), [`TreeReplayError`](./Runtime#treereplayerror), [`Runtime`](./Runtime#runtime)\>
+> `const` **replay**: (`input`) => `Effect.Effect`\<[`ReplayPage`](#replaypage), [`TreeReplayError`](./Runtime.md#treereplayerror), [`Runtime`](./Runtime.md#runtime)\>
 
 Read one bounded, ordered page strictly after the supplied cursor.
 
@@ -506,7 +506,7 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 #### Returns
 
-`Effect.Effect`\<[`ReplayPage`](#replaypage), [`TreeReplayError`](./Runtime#treereplayerror), [`Runtime`](./Runtime#runtime)\>
+`Effect.Effect`\<[`ReplayPage`](#replaypage), [`TreeReplayError`](./Runtime.md#treereplayerror), [`Runtime`](./Runtime.md#runtime)\>
 
 ***
 
@@ -546,7 +546,7 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 ### watch
 
-> `const` **watch**: (`input`) => `Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
+> `const` **watch**: (`input`) => `Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime.md#treeeventserror), [`Runtime`](./Runtime.md#runtime)\>
 
 #### Parameters
 
@@ -556,7 +556,7 @@ Read one bounded, ordered page strictly after the supplied cursor.
 
 #### Returns
 
-`Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime#treeeventserror), [`Runtime`](./Runtime#runtime)\>
+`Stream.Stream`\<[`TreeEvent`](#treeevent), [`TreeEventsError`](./Runtime.md#treeeventserror), [`Runtime`](./Runtime.md#runtime)\>
 
 ## Functions
 

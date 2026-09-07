@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / CodeMode
+[generalist](../../index.md) / [runtime](../index.md) / CodeMode
 
 # CodeMode
 
@@ -320,7 +320,7 @@ Exact model-authored Program request admitted only through an authorized Agent R
 
 ###### checkpoint?
 
-\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \} \| \{ `version`: `"1"`; \}
+\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \} \| \{ `branch?`: \{ `namespace`: `string`; `replay`: \{\[`key`: `string`\]: `string`; \}; \}; `version`: `"1"`; \}
 
 ###### continuation?
 
@@ -332,7 +332,7 @@ Exact model-authored Program request admitted only through an authorized Agent R
 
 ###### suspension
 
-[`AgentSuspended`](../../generalist/namespaces/AgentEvent#agentsuspended)
+[`AgentSuspended`](../../generalist/namespaces/AgentEvent.md#agentsuspended)
 
 ###### waits
 
@@ -354,11 +354,11 @@ readonly `object`[]
 
 ###### cancel
 
-> **cancel**: `Tool`\<`"cancel_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; `reason`: `optionalKey`\<`String`\>; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; `outcome`: `optionalKey`\<`Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: ...; `session`: ...; `text`: ...; `turns`: ...; \} \| \{ `_tag`: ...; `value`: ...; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+> **cancel**: `Tool`\<`"cancel_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; `reason`: `optionalKey`\<`String`\>; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; `outcome`: `optionalKey`\<`Codec`\<[`RunOutcome`](./Run.md#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output`: ...; `session`: ...; `text`: ...; `turns`: ...; \} \| \{ `_tag`: ...; `value`: ...; \}; \} \| \{ `_tag`: `"Failed"`; `error`: \{ `_tag`: ...; `capability`: ...; `hint`: ...; \} \| \{ `_tag`: ...; `capability`: ...; `hint`: ...; `operation`: ...; `reason`: ...; \} \| \{ `_tag`: ...; `capability`: ...; `cause`: ...; `hint`: ...; `operation`: ...; \} \| \{ `_tag`: ...; `boundary`: ...; `capability?`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `cause`: ...; `hint`: ...; `operation`: ...; `tool`: ...; \} \| \{ `_tag`: ...; `cause`: ...; `hint`: ...; `operation`: ...; `step`: ...; \} \| \{ `_tag`: ...; `cause`: ...; `hint`: ...; `operation`: ...; `selection`: ...; \} \| \{ `_tag`: ...; `dimension`: ...; `hint`: ...; `limit`: ...; \} \| \{ `_tag`: ...; `actual`: ...; `expected`: ...; `hint`: ...; `operation`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `operation`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `operation`: ...; `reason`: ...; `token?`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `reason`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `limit`: ...; `resource`: ...; \} \| \{ `_tag`: ...; `guarantee`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `kind`: ...; `name`: ...; `reason`: ...; \} \| \{ `_tag`: ...; `actual`: ...; `expected`: ...; `hint`: ...; \} \| \{ `_tag`: ...; `cause?`: ...; `failure?`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `ref`: ...; `runId`: ...; \} \| \{ `_tag`: ...; `actualRef`: ...; `expectedRef`: ...; `hint`: ...; `runId`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `pin`: ...; \}; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
 
 ###### inspect
 
-> **inspect**: `Tool`\<`"inspect_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; `outcome`: `optionalKey`\<`Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: ...; `session`: ...; `text`: ...; `turns`: ...; \} \| \{ `_tag`: ...; `value`: ...; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+> **inspect**: `Tool`\<`"inspect_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Struct`\<\{ `childRunId`: `String`; \}\>; `success`: `Struct`\<\{ `childRunId`: `String`; `outcome`: `optionalKey`\<`Codec`\<[`RunOutcome`](./Run.md#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output`: ...; `session`: ...; `text`: ...; `turns`: ...; \} \| \{ `_tag`: ...; `value`: ...; \}; \} \| \{ `_tag`: `"Failed"`; `error`: \{ `_tag`: ...; `capability`: ...; `hint`: ...; \} \| \{ `_tag`: ...; `capability`: ...; `hint`: ...; `operation`: ...; `reason`: ...; \} \| \{ `_tag`: ...; `capability`: ...; `cause`: ...; `hint`: ...; `operation`: ...; \} \| \{ `_tag`: ...; `boundary`: ...; `capability?`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `cause`: ...; `hint`: ...; `operation`: ...; `tool`: ...; \} \| \{ `_tag`: ...; `cause`: ...; `hint`: ...; `operation`: ...; `step`: ...; \} \| \{ `_tag`: ...; `cause`: ...; `hint`: ...; `operation`: ...; `selection`: ...; \} \| \{ `_tag`: ...; `dimension`: ...; `hint`: ...; `limit`: ...; \} \| \{ `_tag`: ...; `actual`: ...; `expected`: ...; `hint`: ...; `operation`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `operation`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `operation`: ...; `reason`: ...; `token?`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `reason`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `limit`: ...; `resource`: ...; \} \| \{ `_tag`: ...; `guarantee`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `kind`: ...; `name`: ...; `reason`: ...; \} \| \{ `_tag`: ...; `actual`: ...; `expected`: ...; `hint`: ...; \} \| \{ `_tag`: ...; `cause?`: ...; `failure?`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `ref`: ...; `runId`: ...; \} \| \{ `_tag`: ...; `actualRef`: ...; `expectedRef`: ...; `hint`: ...; `runId`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `message`: ...; \} \| \{ `_tag`: ...; `hint`: ...; `pin`: ...; \}; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
 
 ###### start
 
@@ -368,7 +368,7 @@ readonly `object`[]
 
 ##### invoke
 
-> `readonly` **invoke**: (`request`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
+> `readonly` **invoke**: (`request`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome)\>
 
 ###### Parameters
 
@@ -378,23 +378,23 @@ readonly `object`[]
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome)\>
 
 <a id="invokebackground"></a>
 
 ##### invokeBackground
 
-> `readonly` **invokeBackground**: (`request`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
+> `readonly` **invokeBackground**: (`request`) => `Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome)\>
 
 ###### Parameters
 
 ###### request
 
-[`Request`](../../generalist/namespaces/ToolExecutor#request)
+[`Request`](../../generalist/namespaces/ToolExecutor.md#request)
 
 ###### Returns
 
-`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor#outcome)\>
+`Effect`\<[`Outcome`](../../generalist/namespaces/ToolExecutor.md#outcome)\>
 
 <a id="parameters-1"></a>
 
@@ -442,7 +442,7 @@ Construct the Run-attempt scoped implementation; applications still own sandbox 
 
 ###### authority
 
-[`ProgramAuthority`](../../generalist/namespaces/AgentManifest#programauthority-1)
+[`ProgramAuthority`](../../generalist/namespaces/AgentManifest.md#programauthority-1)
 
 ###### claim
 
@@ -454,7 +454,7 @@ Construct the Run-attempt scoped implementation; applications still own sandbox 
 
 ###### store
 
-[`Service`](./RunStore#service)
+[`Service`](./RunStore.md#service)
 
 #### Returns
 
@@ -474,7 +474,7 @@ Nonblocking Program admission and explicit observation/cancellation tools.
 
 ##### authority
 
-[`ProgramAuthority`](../../generalist/namespaces/AgentManifest#programauthority-1)
+[`ProgramAuthority`](../../generalist/namespaces/AgentManifest.md#programauthority-1)
 
 #### Returns
 
@@ -486,11 +486,11 @@ Nonblocking Program admission and explicit observation/cancellation tools.
 
 ##### cancel
 
-> **cancel**: `Tool.Tool`\<`"cancel_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: ... \| ...; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+> **cancel**: `Tool.Tool`\<`"cancel_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run.md#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: ... \| ...; \} \| \{ `_tag`: `"Failed"`; `error`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
 
 ##### inspect
 
-> **inspect**: `Tool.Tool`\<`"inspect_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: ... \| ...; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
+> **inspect**: `Tool.Tool`\<`"inspect_program"`, \{ `failure`: *typeof* [`ProgramAdmissionFailed`](#programadmissionfailed); `failureMode`: `"error"`; `parameters`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run.md#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: ... \| ...; \} \| \{ `_tag`: `"Failed"`; `error`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>; \}, `never`\>
 
 ##### start
 
@@ -510,7 +510,7 @@ Construct the exact canonical selection catalog for one ProgramAuthority.
 
 ##### authority
 
-[`ProgramAuthority`](../../generalist/namespaces/AgentManifest#programauthority-1)
+[`ProgramAuthority`](../../generalist/namespaces/AgentManifest.md#programauthority-1)
 
 #### Returns
 
@@ -530,7 +530,7 @@ Construct the model-visible request schema for one exact ProgramAuthority.
 
 ##### authority
 
-[`ProgramAuthority`](../../generalist/namespaces/AgentManifest#programauthority-1)
+[`ProgramAuthority`](../../generalist/namespaces/AgentManifest.md#programauthority-1)
 
 #### Returns
 
@@ -550,7 +550,7 @@ Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority.
 
 ##### authority
 
-[`ProgramAuthority`](../../generalist/namespaces/AgentManifest#programauthority-1)
+[`ProgramAuthority`](../../generalist/namespaces/AgentManifest.md#programauthority-1)
 
 #### Returns
 
@@ -572,7 +572,7 @@ A background Program handle identifies an admitted Run, not a completed tool res
 
 ### ProgramInspection
 
-> `const` **ProgramInspection**: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output?`: `unknown`; `session`: \{ `leafId`: `string` \| `null`; `sessionId`: `string`; \}; `text`: `string`; `turns`: `number`; \} \| \{ `_tag`: `"Program"`; `value`: `unknown`; \}; \} \| \{ `_tag`: `"Failed"`; `error`: `unknown`; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>
+> `const` **ProgramInspection**: `Schema.Struct`\<\{ `childRunId`: `Schema.String`; `outcome`: `Schema.optionalKey`\<`Schema.Codec`\<[`RunOutcome`](./Run.md#runoutcome), \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: \{ `output`: `unknown`; `session`: \{ `leafId`: `string` \| `null`; `sessionId`: `string`; \}; `text`: `string`; `turns`: `number`; \} \| \{ `_tag`: `"Program"`; `value`: `unknown`; \}; \} \| \{ `_tag`: `"Failed"`; `error`: \{ `_tag`: `"generalist/core/ProgramCapabilityMissing"`; `capability`: `string`; `hint`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramCapabilityDenied"`; `capability`: `string`; `hint`: `string`; `operation`: `string`; `reason`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramAuthorizationFailure"`; `capability`: `string`; `cause`: `unknown`; `hint`: `string`; `operation`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramSchemaFailure"`; `boundary`: `"agent-input"` \| `"agent-output"` \| `"program-input"` \| `"program-output"` \| `"step-input"` \| `"step-output"` \| `"tool-input"` \| `"tool-output"`; `capability?`: `string`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramToolFailure"`; `cause`: `unknown`; `hint`: `string`; `operation`: `string`; `tool`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramStepFailure"`; `cause`: `unknown`; `hint`: `string`; `operation`: `string`; `step`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramAgentFailure"`; `cause`: `unknown`; `hint`: `string`; `operation`: `string`; `selection`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramBudgetExhausted"`; `dimension`: `"agentRuns"` \| `"concurrency"` \| `"logBytes"` \| `"outputBytes"` \| `"tokens"` \| `"toolCalls"` \| `"wallClockMillis"`; `hint`: `string`; `limit`: `number`; \} \| \{ `_tag`: `"generalist/core/ProgramReplayDivergence"`; `actual`: `string`; `expected`: `string`; `hint`: `string`; `operation`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramOperationUnknown"`; `hint`: `string`; `operation`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramSuspended"`; `hint`: `string`; `operation`: `string`; `reason`: `"agent"` \| `"approval"` \| `"step"` \| `"tool-wait"`; `token?`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramCancelled"`; `hint`: `string`; `reason`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxUnavailable"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxSourceInvalid"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxInputInvalid"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxOutputInvalid"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxExecutionFailure"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxProtocolViolation"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxDeadlineExceeded"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxCancelled"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/SandboxResourceExceeded"`; `hint`: `string`; `limit`: `number`; `resource`: `"cpu"` \| `"output"` \| `"subrequests"`; \} \| \{ `_tag`: `"generalist/core/SandboxGuaranteeUnavailable"`; `guarantee`: `"cpuMillis"` \| `"deadlineMillis"` \| `"filesystem"` \| `"network"` \| `"outputBytes"` \| `"persistence"` \| `"physicalIsolation"` \| `"processes"` \| `"subrequests"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramHandlerMismatch"`; `hint`: `string`; `kind`: `"agent"` \| `"step"` \| `"tool"`; `name`: `string`; `reason`: `string`; \} \| \{ `_tag`: `"generalist/core/ProgramIdentityMismatch"`; `actual`: `string`; `expected`: `string`; `hint`: `string`; \} \| \{ `_tag`: `"generalist/runtime/AgentExecutionFailure"`; `cause?`: `Schema.Json`; `failure?`: \{ `_tag`: `"generalist/core/GateFailed"`; `gate`: \{ `evidence`: ...; `name`: ...; `verdict`: ...; \}; `hint`: `string`; \} \| \{ `_tag`: `"generalist/core/RunBudgetExhausted"`; `budget`: ... \| ... \| ... \| ... \| ...; `hint`: `string`; `remaining?`: `number`; `requested`: `number`; \} \| \{ `_tag`: `"generalist/core/ResumeMismatch"`; `expected?`: ... \| ...; `hint`: `string`; `reason`: ... \| ...; `received`: \{ `_tag`: ...; `checkpoint`: ...; `hint`: ...; `waits`: ...; \}; \} \| \{ `_tag`: `"generalist/core/PermissionDenied"`; `hint`: `string`; `message`: `string`; \}; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/runtime/ExecutablePinMissing"`; `hint`: `string`; `ref`: \{ `active`: `string`; `executable`: `string`; \}; `runId`: `string`; \} \| \{ `_tag`: `"generalist/runtime/ExecutableIdentityMismatch"`; `actualRef`: \{ `active`: `string`; `executable`: `string`; \}; `expectedRef`: \{ `active`: `string`; `executable`: `string`; \}; `hint`: `string`; `runId`: `string`; \} \| \{ `_tag`: `"generalist/runtime/ExecutableRegistrationInvalid"`; `hint`: `string`; `message`: `string`; \} \| \{ `_tag`: `"generalist/runtime/ExecutableRegistrationMissing"`; `hint`: `string`; `pin`: `string`; \}; `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}, `never`, `never`\>\>; `readiness`: `Schema.Literals`\<readonly \[`"queued"`, `"ready"`, `"settled"`\]\>; `status`: `Schema.Literals`\<readonly \[`"queued"`, `"running"`, `"waiting"`, `"needs-resolution"`, `"cancelling"`, `"succeeded"`, `"failed"`, `"cancelled"`\]\>; \}\>
 
 Current durable state and, only after settlement, the Program outcome.
 
@@ -582,13 +582,13 @@ Current durable state and, only after settlement, the Program outcome.
 
 ### withTool
 
-> `const` **withTool**: \{(`implementation`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => [`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`, `implementation`): [`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>; \}
+> `const` **withTool**: \{(`implementation`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => [`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`, `implementation`): [`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>; \}
 
 Add the Runtime-owned parallel-safe declaration without changing the resolved Agent identity.
 
 #### Call Signature
 
-> (`implementation`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => [`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
+> (`implementation`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => [`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
 
 ##### Parameters
 
@@ -598,11 +598,11 @@ Add the Runtime-owned parallel-safe declaration without changing the resolved Ag
 
 ##### Returns
 
-\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => [`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
+\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => [`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`, `implementation`): [`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
+> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`, `implementation`): [`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
 
 ##### Type Parameters
 
@@ -634,7 +634,7 @@ Add the Runtime-owned parallel-safe declaration without changing the resolved Ag
 
 ###### agent
 
-[`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
+[`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
 
 ###### implementation
 
@@ -642,4 +642,4 @@ Add the Runtime-owned parallel-safe declaration without changing the resolved Ag
 
 ##### Returns
 
-[`Agent`](../../generalist/namespaces/Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>
+[`Agent`](../../generalist/namespaces/Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>

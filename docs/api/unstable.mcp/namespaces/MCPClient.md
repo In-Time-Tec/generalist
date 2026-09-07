@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.mcp](../index) / MCPClient
+[generalist](../../index.md) / [unstable.mcp](../index.md) / MCPClient
 
 # MCPClient
 
@@ -12,7 +12,7 @@
 
 ### CallOptions
 
-Re-exports [CallOptions](../../unstable.mcp.client#calloptions)
+Re-exports [CallOptions](../../unstable.mcp.client.md#calloptions)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [CallOptions](../../unstable.mcp.client#calloptions)
 
 ### DiscoveredTool
 
-Re-exports [DiscoveredTool](../../unstable.mcp.client#discoveredtool)
+Re-exports [DiscoveredTool](../../unstable.mcp.client.md#discoveredtool)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [DiscoveredTool](../../unstable.mcp.client#discoveredtool)
 
 ### fromTransport
 
-Re-exports [fromTransport](../../unstable.mcp.client#fromtransport)
+Re-exports [fromTransport](../../unstable.mcp.client.md#fromtransport)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [fromTransport](../../unstable.mcp.client#fromtransport)
 
 ### JsonValue
 
-Re-exports [JsonValue](../../unstable.mcp.client#jsonvalue)
+Re-exports [JsonValue](../../unstable.mcp.client.md#jsonvalue)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [JsonValue](../../unstable.mcp.client#jsonvalue)
 
 ### layer
 
-Re-exports [layer](../../unstable.mcp.client#layer)
+Re-exports [layer](../../unstable.mcp.client.md#layer)
 
 ***
 
@@ -52,7 +52,7 @@ Re-exports [layer](../../unstable.mcp.client#layer)
 
 ### layerTagged
 
-Re-exports [layerTagged](../../unstable.mcp.client#layertagged)
+Re-exports [layerTagged](../../unstable.mcp.client.md#layertagged)
 
 ***
 
@@ -60,7 +60,7 @@ Re-exports [layerTagged](../../unstable.mcp.client#layertagged)
 
 ### MCPClient
 
-Re-exports [MCPClient](../../unstable.mcp.client#mcpclient)
+Re-exports [MCPClient](../../unstable.mcp.client.md#mcpclient)
 
 ***
 
@@ -68,7 +68,7 @@ Re-exports [MCPClient](../../unstable.mcp.client#mcpclient)
 
 ### MCPConnectionFailed
 
-Re-exports [MCPConnectionFailed](../../unstable.mcp.client#mcpconnectionfailed)
+Re-exports [MCPConnectionFailed](../../unstable.mcp.client.md#mcpconnectionfailed)
 
 ***
 
@@ -76,7 +76,7 @@ Re-exports [MCPConnectionFailed](../../unstable.mcp.client#mcpconnectionfailed)
 
 ### MCPTool
 
-Re-exports [MCPTool](../../unstable.mcp.client#mcptool)
+Re-exports [MCPTool](../../unstable.mcp.client.md#mcptool)
 
 ***
 
@@ -84,7 +84,7 @@ Re-exports [MCPTool](../../unstable.mcp.client#mcptool)
 
 ### MCPToolCallFailed
 
-Re-exports [MCPToolCallFailed](../../unstable.mcp.client#mcptoolcallfailed)
+Re-exports [MCPToolCallFailed](../../unstable.mcp.client.md#mcptoolcallfailed)
 
 ***
 
@@ -92,7 +92,7 @@ Re-exports [MCPToolCallFailed](../../unstable.mcp.client#mcptoolcallfailed)
 
 ### MCPToolFailure
 
-Re-exports [MCPToolFailure](../../unstable.mcp.client#mcptoolfailure-1)
+Re-exports [MCPToolFailure](../../unstable.mcp.client.md#mcptoolfailure-1)
 
 ***
 
@@ -100,7 +100,7 @@ Re-exports [MCPToolFailure](../../unstable.mcp.client#mcptoolfailure-1)
 
 ### Options
 
-Re-exports [Options](../../unstable.mcp.client#options)
+Re-exports [Options](../../unstable.mcp.client.md#options)
 
 ***
 
@@ -108,4 +108,4 @@ Re-exports [Options](../../unstable.mcp.client#options)
 
 ### Service
 
-Re-exports [Service](../../unstable.mcp.client#service)
+Re-exports [Service](../../unstable.mcp.client.md#service)

@@ -1,5 +1,4 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAtMillis } from "../../observation.js"
+import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
 import { Effect, Function } from "effect"
 import { make as makeAddress } from "../../../address.js"
 import {
@@ -21,7 +20,7 @@ import {
 } from "../../../child/fan-out-internal.js"
 import { make as makeMessage } from "../../../messaging/message.js"
 import { isTerminal } from "../../../run.js"
-import type { RuntimeState, StoredFanOut, StoredRun } from "../../state.js"
+import type { RuntimeState, StoredFanOut, StoredRun } from "../../projection.js"
 
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { resolveChild } from "../../../executable/manifest-internal.js"
@@ -239,7 +238,8 @@ export const admitFanOut: {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | Exhausted, PreparedObservation
+    | Exhausted,
+    PreparedObservation
   >
   (
     state: RuntimeState,
@@ -254,7 +254,8 @@ export const admitFanOut: {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | Exhausted, PreparedObservation
+    | Exhausted,
+    PreparedObservation
   >
 } = Function.dual(2, (state: RuntimeState, input: AdmitFanOutInput) =>
   Effect.gen(function* () {
@@ -288,7 +289,7 @@ export const admitFanOut: {
       ]
     }
     const { concurrency, depth, readyCount } = yield* validateParent(state, parent, members, input.concurrency)
-    const available = yield* budgetForEvents(parent.events, yield* occurredAtMillis)
+    const available = yield* budgetForEvents({ events: parent.events, observedMillis: yield* occurredAtMillis })
     if (available.children !== undefined && available.children < members.length) {
       return yield* Exhausted.make({ budget: "children", requested: members.length, remaining: available.children })
     }

@@ -1,3 +1,4 @@
+import "../suites/subscriber-high-water-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option, Stream } from "effect"
 import { Cursor, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"

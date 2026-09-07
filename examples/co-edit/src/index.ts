@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- This example assembles and owns its complete application Layer. */
 import { BunCrypto } from "@effect/platform-bun"
 import { layer as bunHttpServer } from "@effect/platform-bun/BunHttpServer"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Queue, Schema } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Queue, Redacted, Schema } from "effect"
 import {
   FetchHttpClient,
   HttpClient,
@@ -13,16 +13,18 @@ import {
 } from "effect/unstable/http"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
 
+import { make as makeBrowserAuth } from "./browser-auth.js"
+
 const artifactName = "plan.md"
-const editorPage = `<!doctype html>
+export const editorPage = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -38,11 +40,18 @@ const editorPage = `<!doctype html>
   </head>
   <body>
     <h1>Shared plan</h1>
-    <p id="status" data-testid="status">Connecting…</p>
+    <form id="login">
+      <label for="token">Server token</label>
+      <input id="token" type="password" autocomplete="off" required>
+      <button type="submit">Connect</button>
+    </form>
+    <p id="status" data-testid="status">Enter the configured server token to connect.</p>
     <textarea data-testid="editor" aria-label="Shared plan" disabled></textarea>
     <h2>Attributed updates</h2>
     <ol id="updates" data-testid="updates"></ol>
     <script type="module">
+      const login = document.querySelector("#login")
+      const tokenInput = document.querySelector("#token")
       const status = document.querySelector("#status")
       const editor = document.querySelector("textarea")
       const updates = document.querySelector("#updates")
@@ -50,13 +59,16 @@ const editorPage = `<!doctype html>
       let content = ""
       let commandSequence = 0
       let pending = false
+      let socket
+      const connect = () => {
       const protocol = location.protocol === "https:" ? "wss:" : "ws:"
-      const socket = new WebSocket(protocol + "//" + location.host + "/artifacts/plan.md/ws?version=0")
+      socket = new WebSocket(protocol + "//" + location.host + "/artifacts/plan.md/ws?version=0")
 
       socket.addEventListener("open", () => { status.textContent = "Connected" })
       socket.addEventListener("close", () => {
         status.textContent = "Disconnected"
         editor.disabled = true
+        login.hidden = false
       })
       socket.addEventListener("message", (message) => {
         const event = JSON.parse(message.data)
@@ -72,7 +84,22 @@ const editorPage = `<!doctype html>
           updates.append(item)
         }
       })
+      }
+      login.addEventListener("submit", (event) => {
+        event.preventDefault()
+        const token = tokenInput.value
+        tokenInput.value = ""
+        status.textContent = "Authenticating…"
+        fetch("/auth/session", { method: "POST", credentials: "same-origin", headers: { authorization: "Bearer " + token } })
+          .then((response) => {
+            if (response.status !== 204) { status.textContent = "Authentication failed. Check the server token."; return }
+            login.hidden = true
+            connect()
+          })
+          .catch(() => { status.textContent = "Could not reach the server." })
+      })
       editor.addEventListener("input", () => {
+        if (socket?.readyState !== WebSocket.OPEN) return
         if (pending) return
         pending = true
         editor.disabled = true
@@ -99,21 +126,26 @@ const services = Layer.unwrap(
     const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
     const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
     const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-    const capabilities =
-      endpoint === undefined
-        ? undefined
-        : {
-            conditionalCreate: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-            strongReadAfterWrite: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-            consistentListing: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-          }
-    const objectStore = S3.layer({
+    const credentials = { accessKeyId, secretAccessKey }
+    if (sessionToken !== undefined) Object.assign(credentials, { sessionToken })
+    const connection: ConnectionOptions = {
       bucket,
       region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : { endpoint, forcePathStyle: true, capabilities }),
-    })
-    const reconstructed = Durability.layer({
+      credentials,
+    }
+    if (endpoint !== undefined) {
+      Object.assign(connection, {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: {
+          conditionalCreate: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          strongReadAfterWrite: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          consistentListing: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+        },
+      })
+    }
+    const objectStore = layerS3(connection)
+    const reconstructed = layerDurability({
       environment,
       tenant,
       partition,
@@ -129,7 +161,7 @@ const services = Layer.unwrap(
       Layer.provide(BunCrypto.layer),
     )
     return Layer.mergeAll(
-      Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed)),
+      Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed)),
       blobs,
       artifactLayer,
       TestModel.layer([
@@ -147,28 +179,41 @@ const services = Layer.unwrap(
   }),
 )
 
-
 const pageRoute = HttpRouter.add("GET", "/", () =>
   Effect.succeed(HttpServerResponse.text(editorPage, { contentType: "text/html; charset=utf-8" })),
 )
-const noAuthentication = Layer.succeed(
-  Server.Authentication,
-  Server.Authentication.of({ bearer: (httpEffect) => httpEffect }),
-)
 const routes = Layer.unwrap(
   Effect.gen(function* () {
+    const browserAuth = yield* makeBrowserAuth
     const document = yield* Artifact.open(artifactName, { crdt: Yjs.layer(), initial: "Draft plan" })
     const writer = Agent.make({
       name: "co-edit-writer",
       toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
     })
     const host = yield* Generalist.create({ agents: [writer] })
-    return Layer.merge(Server.layer({ host, auth: noAuthentication }), pageRoute)
+    return Layer.mergeAll(
+      Server.layer({
+        authorization: { tenantId: browserAuth.tenantId, authorize: () => Effect.succeed(true) },
+        host,
+        auth: browserAuth.auth,
+      }),
+      pageRoute,
+      browserAuth.login,
+    )
   }).pipe(Effect.orDie),
 ).pipe(Layer.provide(services))
+const authenticatedHttp = Layer.effect(
+  HttpClient.HttpClient,
+  Effect.gen(function* () {
+    const token = yield* Config.redacted("GENERALIST_SERVER_TOKEN")
+    return (yield* HttpClient.HttpClient).pipe(HttpClient.mapRequest(HttpClientRequest.bearerToken(token)))
+  }),
+).pipe(Layer.provide(FetchHttpClient.layer))
 const application = Layer.merge(
-  HttpRouter.serve(routes, { disableLogger: true }).pipe(Layer.provideMerge(bunHttpServer({ port: 0 }))),
-  FetchHttpClient.layer,
+  HttpRouter.serve(routes, { disableLogger: true }).pipe(
+    Layer.provideMerge(bunHttpServer({ hostname: "127.0.0.1", port: 0 })),
+  ),
+  authenticatedHttp,
 )
 
 interface BrowserPeer {
@@ -176,11 +221,14 @@ interface BrowserPeer {
   readonly messages: Queue.Dequeue<string>
 }
 
-const connectPeer = (url: string): Effect.Effect<BrowserPeer> =>
+const connectPeer = (url: string): Effect.Effect<BrowserPeer, Schema.SchemaError> =>
   Effect.gen(function* () {
+    const token = yield* Config.redacted("GENERALIST_SERVER_TOKEN").pipe(Effect.orDie)
     const messages = yield* Queue.unbounded<string>()
+    const client = yield* Schema.decodeUnknownEffect(Schema.instanceOf(WebSocket))(
+      Reflect.construct(WebSocket, [url, { headers: { authorization: `Bearer ${Redacted.value(token)}` } }]),
+    )
     const socket = yield* Effect.callback<WebSocket>((resume) => {
-      const client = new WebSocket(url)
       client.addEventListener("message", (event) => {
         const message = Schema.decodeUnknownOption(Schema.String)(event.data)
         if (Option.isSome(message)) Queue.offerUnsafe(messages, message.value)
@@ -283,12 +331,18 @@ const program = Effect.scoped(
     yield* Console.log(`Browser page: GET / -> ${page.status}`)
     yield* Console.log(`Artifact updates: Human ${human.update.result} -> Agent ${agent.update.result}`)
     yield* Console.log(`Document: ${final.content}; run: ${status}`)
+    if (yield* Config.boolean("GENERALIST_COEDIT_SERVE").pipe(Config.withDefault(false))) {
+      yield* Console.log(`Open ${baseUrl} and enter GENERALIST_SERVER_TOKEN in the login form.`)
+      return yield* Effect.never
+    }
   }),
 )
 
-const managed = ManagedRuntime.make(application)
-try {
-  await managed.runPromise(program)
-} finally {
-  await managed.dispose()
+if (import.meta.main) {
+  const managed = ManagedRuntime.make(application)
+  try {
+    await managed.runPromise(program)
+  } finally {
+    await managed.dispose()
+  }
 }

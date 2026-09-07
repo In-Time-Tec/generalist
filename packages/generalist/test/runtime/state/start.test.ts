@@ -119,9 +119,9 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         prompt: filePrompt(new Uint8Array([0, 1, 2, 255])),
       }
       const first = yield* runtime.startExecution(input)
-      expect(
-        yield* runtime.startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 2, 255])) }),
-      ).toEqual(first)
+      expect(yield* runtime.startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 2, 255])) })).toEqual(
+        first,
+      )
       const changed = yield* runtime
         .startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) })
         .pipe(Effect.flip)
@@ -438,10 +438,21 @@ standalone.effect("reopens an atomic object root and initial child admission", (
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         expect(
-          yield* runtime.startExecution({
-            ...input,
-            initialChildren: [...input.initialChildren, { invocationId: "missing", idempotencyKey: "missing", selection: "missing", sessionId: "object-missing", prompt: "missing" }],
-          }).pipe(Effect.flip),
+          yield* runtime
+            .startExecution({
+              ...input,
+              initialChildren: [
+                ...input.initialChildren,
+                {
+                  invocationId: "missing",
+                  idempotencyKey: "missing",
+                  selection: "missing",
+                  sessionId: "object-missing",
+                  prompt: "missing",
+                },
+              ],
+            })
+            .pipe(Effect.flip),
         ).toBeInstanceOf(Errors.ChildSelectionMissing)
         expect(yield* runtime.list({ limit: 10 })).toEqual([])
         const receipt = yield* runtime.startExecution(input)
@@ -468,8 +479,13 @@ standalone.effect("reopens an atomic object root and initial child admission", (
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.startExecution(input)
         expect((yield* runtime.treeCheckpoint(receipt.runId)).inspection.runs).toHaveLength(2)
-        expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).find((event) => event._tag === "ChildLinked")).toMatchObject({
-          childRunId: receipt.childRunIds[0], invocationId: "research", selection: "researcher", prompt: textPrompt("child"),
+        expect(
+          (yield* runtime.history({ runId: receipt.runId, limit: 100 })).find((event) => event._tag === "ChildLinked"),
+        ).toMatchObject({
+          childRunId: receipt.childRunIds[0],
+          invocationId: "research",
+          selection: "researcher",
+          prompt: textPrompt("child"),
         })
         return receipt
       }),
@@ -487,12 +503,20 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
       const content = prompt.content[0]?.content
       expect(Array.isArray(content)).toBe(true)
       if (!Array.isArray(content)) throw new Error("expected multipart user content")
-      const file = Schema.decodeUnknownSync(Schema.Struct({ type: Schema.Literal("file"), data: Schema.Unknown }))(content[1])
+      const file = Schema.decodeUnknownSync(Schema.Struct({ type: Schema.Literal("file"), data: Schema.Unknown }))(
+        content[1],
+      )
       expect(file?.type).toBe("file")
       if (file?.type !== "file") throw new Error("expected file content")
-      expect(Schema.decodeUnknownSync(Schema.toCodecJson(Schema.Uint8Array))(file.data)).toEqual(bytes)
+      expect(Schema.decodeUnknownSync(Schema.Uint8Array)(file.data)).toEqual(bytes)
     }
-    const input = { executable: assistantRef, registrations: registrationsFor(assistantRef), sessionId: "object-root-file-bytes", idempotencyKey: "object-root-file-bytes", prompt: filePrompt(bytes) }
+    const input = {
+      executable: assistantRef,
+      registrations: registrationsFor(assistantRef),
+      sessionId: "object-root-file-bytes",
+      idempotencyKey: "object-root-file-bytes",
+      prompt: filePrompt(bytes),
+    }
     const runId = yield* provideScoped(
       objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
@@ -515,41 +539,111 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
 standalone.effect("reloads object registrations without address binding and closes resolver resources", () =>
   Effect.gen(function* () {
     const storage = makeObjectStorage()
-    const registrations = registrationsFor(assistantRef).map(({ pin, codec, version }) => ({ pin, codec, version, payload: { credentialRef: "credential:test" } }))
-    const firstLayer = objectRuntimeLayer({ addresses: [] }, storage).pipe(
-      Layer.provide(ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(Layer.orDie)),
-    )
-    const receipt = yield* provideScoped(firstLayer, Effect.gen(function* () {
-      return yield* (yield* Runtime.Runtime).startExecution({ executable: assistantRef, registrations, sessionId: "object-exact", idempotencyKey: "start", prompt: "recover" })
+    const registrations = registrationsFor(assistantRef).map(({ pin, codec, version }) => ({
+      pin,
+      codec,
+      version,
+      payload: { credentialRef: "credential:test" },
     }))
+    const firstLayer = objectRuntimeLayer({ addresses: [] }, storage).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
+          Layer.orDie,
+        ),
+      ),
+    )
+    const receipt = yield* provideScoped(
+      firstLayer,
+      Effect.gen(function* () {
+        return yield* (yield* Runtime.Runtime).startExecution({
+          executable: assistantRef,
+          registrations,
+          sessionId: "object-exact",
+          idempotencyKey: "start",
+          prompt: "recover",
+        })
+      }),
+    )
     const finalizers = yield* Ref.make(0)
     const resolver = ExecutableResolver.ExecutableResolver.of({
-      resolve: (input) => Effect.acquireRelease(Effect.sync(() => {
-        expect(input.registrations).toEqual([...registrations].toSorted((left, right) => left.pin.localeCompare(right.pin)))
-        return { _tag: "Agent" as const, agent: closedTestAgent(assistant), attestation: { ref: assistantRef.ref, manifest: assistantRef.manifest } }
-      }), () => Ref.update(finalizers, (count) => count + 1)),
+      resolve: (input) =>
+        Effect.acquireRelease(
+          Effect.sync(() => {
+            expect(input.registrations).toEqual(
+              [...registrations].toSorted((left, right) => left.pin.localeCompare(right.pin)),
+            )
+            return {
+              _tag: "Agent" as const,
+              agent: closedTestAgent(assistant),
+              attestation: { ref: assistantRef.ref, manifest: assistantRef.manifest },
+            }
+          }),
+          () => Ref.update(finalizers, (count) => count + 1),
+        ),
     })
-    yield* provideScoped(objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver))), Effect.gen(function* () {
-      const execution = yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
-      yield* Effect.scoped(resolver.resolve({ runId: execution.runId, ref: execution.executableRef, manifest: execution.executableManifest, registrations: execution.registrations }))
-    }))
+    yield* provideScoped(
+      objectRuntimeLayer({ addresses: [] }, storage).pipe(
+        Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
+      ),
+      Effect.gen(function* () {
+        const execution = yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+        yield* Effect.scoped(
+          resolver.resolve({
+            runId: execution.runId,
+            ref: execution.executableRef,
+            manifest: execution.executableManifest,
+            registrations: execution.registrations,
+          }),
+        )
+      }),
+    )
     expect(yield* Ref.get(finalizers)).toBe(1)
-    const persisted = yield* provideScoped(objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer)), Effect.gen(function* () { return yield* (yield* RunStore.RunStore).loadExecution(receipt.runId) }))
-    expect(JSON.stringify(persisted.registrations)).toContain("credential:test")
-    expect(JSON.stringify(persisted.registrations)).not.toContain("resolved-secret-value")
+    const persisted = yield* provideScoped(
+      objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer)),
+      Effect.gen(function* () {
+        return yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+      }),
+    )
+    const encodedRegistrations = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
+      persisted.registrations,
+    ).pipe(Effect.orDie)
+    expect(encodedRegistrations).toContain("credential:test")
+    expect(encodedRegistrations).not.toContain("resolved-secret-value")
   }),
 )
 
 standalone.effect("recovers an addressed Run from persisted send registrations without a live address binding", () =>
   Effect.gen(function* () {
     const storage = makeObjectStorage()
-    const registrations = registrationsFor(assistantRef).map(({ pin, codec, version }) => ({ pin, codec, version, payload: { credentialRef: "credential:addressed" } }))
-    const address = Address.make("agent:addressed")
-    const receipt = yield* provideScoped(objectRuntimeLayer({ addresses: [{ address, executable: assistantRef, registrations }] }, storage).pipe(Layer.provide(resolverLayer)), Effect.gen(function* () {
-      return yield* (yield* Runtime.Runtime).send({ to: address, sessionId: "addressed-session", idempotencyKey: "addressed", prompt: "recover" })
+    const registrations = registrationsFor(assistantRef).map(({ pin, codec, version }) => ({
+      pin,
+      codec,
+      version,
+      payload: { credentialRef: "credential:addressed" },
     }))
-    const execution = yield* provideScoped(objectRuntimeLayer({ addresses: [], }, storage).pipe(Layer.provide(resolverLayer)), Effect.gen(function* () { return yield* (yield* RunStore.RunStore).loadExecution(receipt.runId) }))
-    expect(execution.registrations).toEqual([...registrations].toSorted((left, right) => left.pin.localeCompare(right.pin)))
+    const address = Address.make("agent:addressed")
+    const receipt = yield* provideScoped(
+      objectRuntimeLayer({ addresses: [{ address, executable: assistantRef, registrations }] }, storage).pipe(
+        Layer.provide(resolverLayer),
+      ),
+      Effect.gen(function* () {
+        return yield* (yield* Runtime.Runtime).send({
+          to: address,
+          sessionId: "addressed-session",
+          idempotencyKey: "addressed",
+          prompt: "recover",
+        })
+      }),
+    )
+    const execution = yield* provideScoped(
+      objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer)),
+      Effect.gen(function* () {
+        return yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+      }),
+    )
+    expect(execution.registrations).toEqual(
+      [...registrations].toSorted((left, right) => left.pin.localeCompare(right.pin)),
+    )
   }),
 )
 

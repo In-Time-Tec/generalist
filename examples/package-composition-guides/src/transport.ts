@@ -1,8 +1,8 @@
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Stream, type Types } from "effect"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
@@ -37,9 +37,9 @@ const agentServices = Layer.mergeAll(
   Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
 )
-const resolver = ExecutableResolver.layerStatic([
-  { executable, agent: Agent.close(agent, agentServices) },
-]).pipe(Layer.orDie)
+const resolver = ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(
+  Layer.orDie,
+)
 
 const runtimeLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -53,34 +53,28 @@ const runtimeLayer = Layer.unwrap(
     const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
     const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
     const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-    const reconstructed = Durability.layer({
+    const connection: Types.Mutable<ConnectionOptions> = {
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    }
+    if (sessionToken !== undefined) connection.credentials = { accessKeyId, secretAccessKey, sessionToken }
+    if (endpoint !== undefined) {
+      connection.endpoint = endpoint
+      connection.forcePathStyle = true
+      connection.capabilities = {
+        conditionalCreate: confirmed,
+        strongReadAfterWrite: confirmed,
+        consistentListing: confirmed,
+      }
+    }
+    const reconstructed = layerDurability({
       environment,
       tenant,
       partition,
       addresses: [{ address, executable, registrations }],
-    }).pipe(
-      Layer.provide(resolver),
-      Layer.provide(
-        S3.layer({
-          bucket,
-          region,
-          credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-          ...(endpoint === undefined
-            ? {}
-            : {
-                endpoint,
-                forcePathStyle: true,
-                capabilities: {
-                  conditionalCreate: confirmed,
-                  strongReadAfterWrite: confirmed,
-                  consistentListing: confirmed,
-                },
-              }),
-        }),
-      ),
-      Layer.provide(BunCrypto.layer),
-    )
-    return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
+    }).pipe(Layer.provide(resolver), Layer.provide(layerS3(connection)), Layer.provide(BunCrypto.layer))
+    return Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed))
   }),
 )
 

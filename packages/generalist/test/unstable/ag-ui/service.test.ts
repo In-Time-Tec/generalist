@@ -123,6 +123,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     createSession: () => unused(),
     session: () => unused(),
     listSessions: unused(),
+    sessionSnapshot: () => Effect.die("unexpected Session snapshot"),
     sessionRuns: () => unused(),
     sessionEvents: () => Stream.empty,
     acknowledge: () => unused(),

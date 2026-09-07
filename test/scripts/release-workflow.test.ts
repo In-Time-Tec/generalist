@@ -39,7 +39,7 @@ layer(bunLayer)("release workflows", (it) => {
   it.effect("executes the exact-commit CI gate against successful and contradictory evidence", () =>
     Effect.gen(function* () {
       const source = yield* readWorkflow("publish.yml")
-      const section = source.split("      - name: Require successful database CI for the exact release commit\n")[1]
+      const section = source.split("      - name: Require successful durability CI for the exact release commit\n")[1]
       const block = section.split("        run: |\n")[1].split("      - uses:")[0]
       const script = block
         .split("\n")

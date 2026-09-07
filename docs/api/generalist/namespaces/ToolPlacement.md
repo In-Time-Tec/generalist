@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ToolPlacement
+[generalist](../../index.md) / [generalist](../index.md) / ToolPlacement
 
 # ToolPlacement
 
@@ -14,7 +14,7 @@
 
 #### Extends
 
-- [`Request`](./ToolExecutor#request)
+- [`Request`](./ToolExecutor.md#request)
 
 #### Extended by
 
@@ -30,7 +30,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`agentName`](./ToolExecutor#agentname)
+[`Request`](./ToolExecutor.md#request).[`agentName`](./ToolExecutor.md#agentname)
 
 <a id="call"></a>
 
@@ -40,7 +40,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`call`](./ToolExecutor#call)
+[`Request`](./ToolExecutor.md#request).[`call`](./ToolExecutor.md#call)
 
 <a id="placement"></a>
 
@@ -56,7 +56,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`sessionId`](./ToolExecutor#sessionid-1)
+[`Request`](./ToolExecutor.md#request).[`sessionId`](./ToolExecutor.md#sessionid-1)
 
 <a id="tasks"></a>
 
@@ -66,7 +66,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`tasks`](./ToolExecutor#tasks)
+[`Request`](./ToolExecutor.md#request).[`tasks`](./ToolExecutor.md#tasks)
 
 <a id="tool"></a>
 
@@ -86,7 +86,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`toolCallBatch`](./ToolExecutor#toolcallbatch)
+[`Request`](./ToolExecutor.md#request).[`toolCallBatch`](./ToolExecutor.md#toolcallbatch)
 
 <a id="toolcallindex"></a>
 
@@ -96,7 +96,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`toolCallIndex`](./ToolExecutor#toolcallindex)
+[`Request`](./ToolExecutor.md#request).[`toolCallIndex`](./ToolExecutor.md#toolcallindex)
 
 <a id="turn"></a>
 
@@ -106,7 +106,7 @@
 
 ###### Inherited from
 
-[`Request`](./ToolExecutor#request).[`turn`](./ToolExecutor#turn)
+[`Request`](./ToolExecutor.md#request).[`turn`](./ToolExecutor.md#turn)
 
 ***
 
@@ -126,7 +126,7 @@
 
 ##### E
 
-`E` = [`FrameworkFailure`](./ToolExecutor#frameworkfailure)
+`E` = [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure)
 
 #### Properties
 
@@ -134,7 +134,7 @@
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ###### Parameters
 
@@ -144,7 +144,7 @@
 
 ###### Returns
 
-`Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+`Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 <a id="toolkit"></a>
 
@@ -296,7 +296,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ###### Parameters
 
@@ -306,7 +306,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ###### Returns
 
-`Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+`Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 <a id="idempotent"></a>
 
@@ -372,7 +372,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### E
 
-`E` = [`FrameworkFailure`](./ToolExecutor#frameworkfailure)
+`E` = [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure)
 
 #### Properties
 
@@ -380,7 +380,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ###### Parameters
 
@@ -390,7 +390,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ###### Returns
 
-`Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
+`Effect`\<[`PlacementResponse`](#placementresponse), `E`, [`ToolContext`](./ToolContext.md#toolcontext) \| `PlacementSchemaServices`\<`Tools`\>\>
 
 ###### Inherited from
 
@@ -438,7 +438,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### R
 
-`R` = [`ToolContext`](./ToolContext#toolcontext)
+`R` = [`ToolContext`](./ToolContext.md#toolcontext)
 
 #### Properties
 
@@ -446,33 +446,33 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### cancel?
 
-> `readonly` `optional` **cancel?**: (`request`) => `Effect`\<[`CancellationOutcome`](./ToolExecutor#cancellationoutcome), [`CancellationFailure`](./ToolExecutor#cancellationfailure), `R`\>
+> `readonly` `optional` **cancel?**: (`request`) => `Effect`\<[`CancellationOutcome`](./ToolExecutor.md#cancellationoutcome), [`CancellationFailure`](./ToolExecutor.md#cancellationfailure), `R`\>
 
 ###### Parameters
 
 ###### request
 
-[`CancellationRequest`](./ToolExecutor#cancellationrequest)
+[`CancellationRequest`](./ToolExecutor.md#cancellationrequest)
 
 ###### Returns
 
-`Effect`\<[`CancellationOutcome`](./ToolExecutor#cancellationoutcome), [`CancellationFailure`](./ToolExecutor#cancellationfailure), `R`\>
+`Effect`\<[`CancellationOutcome`](./ToolExecutor.md#cancellationoutcome), [`CancellationFailure`](./ToolExecutor.md#cancellationfailure), `R`\>
 
 <a id="execute-3"></a>
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](./ToolExecutor.md#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor.md#remoteretrymisconfigured), `R`\>
 
 ###### Parameters
 
 ###### request
 
-[`Request`](./ToolExecutor#request)
+[`Request`](./ToolExecutor.md#request)
 
 ###### Returns
 
-`Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
+`Effect`\<[`Outcome`](./ToolExecutor.md#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor.md#remoteretrymisconfigured), `R`\>
 
 <a id="matches"></a>
 
@@ -484,7 +484,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ###### request
 
-[`Request`](./ToolExecutor#request)
+[`Request`](./ToolExecutor.md#request)
 
 ###### Returns
 
@@ -494,17 +494,17 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### replayPolicy?
 
-> `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
+> `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](./ToolExecutor.md#replaypolicy-1)
 
 ###### Parameters
 
 ###### request
 
-[`Request`](./ToolExecutor#request)
+[`Request`](./ToolExecutor.md#request)
 
 ###### Returns
 
-[`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
+[`ReplayPolicy`](./ToolExecutor.md#replaypolicy-1)
 
 <a id="tools-6"></a>
 
@@ -522,7 +522,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### R
 
-`R` = [`ToolContext`](./ToolContext#toolcontext)
+`R` = [`ToolContext`](./ToolContext.md#toolcontext)
 
 #### Properties
 
@@ -530,33 +530,33 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### cancel?
 
-> `readonly` `optional` **cancel?**: (`request`) => `Effect`\<[`CancellationOutcome`](./ToolExecutor#cancellationoutcome), [`CancellationFailure`](./ToolExecutor#cancellationfailure), `R`\>
+> `readonly` `optional` **cancel?**: (`request`) => `Effect`\<[`CancellationOutcome`](./ToolExecutor.md#cancellationoutcome), [`CancellationFailure`](./ToolExecutor.md#cancellationfailure), `R`\>
 
 ###### Parameters
 
 ###### request
 
-[`CancellationRequest`](./ToolExecutor#cancellationrequest)
+[`CancellationRequest`](./ToolExecutor.md#cancellationrequest)
 
 ###### Returns
 
-`Effect`\<[`CancellationOutcome`](./ToolExecutor#cancellationoutcome), [`CancellationFailure`](./ToolExecutor#cancellationfailure), `R`\>
+`Effect`\<[`CancellationOutcome`](./ToolExecutor.md#cancellationoutcome), [`CancellationFailure`](./ToolExecutor.md#cancellationfailure), `R`\>
 
 <a id="execute-4"></a>
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`Outcome`](./ToolExecutor.md#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor.md#remoteretrymisconfigured), `R`\>
 
 ###### Parameters
 
 ###### request
 
-[`Request`](./ToolExecutor#request)
+[`Request`](./ToolExecutor.md#request)
 
 ###### Returns
 
-`Effect`\<[`Outcome`](./ToolExecutor#outcome), [`HookFailed`](../../hooks#hookfailed) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`DriverError`](./DurableDriver#drivererror) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor#remoteretrymisconfigured), `R`\>
+`Effect`\<[`Outcome`](./ToolExecutor.md#outcome), [`EvaluationFailure`](../../hooks.md#evaluationfailure) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| [`RemoteRetryMisconfigured`](./ToolExecutor.md#remoteretrymisconfigured), `R`\>
 
 <a id="matches-1"></a>
 
@@ -568,7 +568,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ###### request
 
-[`Request`](./ToolExecutor#request)
+[`Request`](./ToolExecutor.md#request)
 
 ###### Returns
 
@@ -578,17 +578,17 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### replayPolicy?
 
-> `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
+> `readonly` `optional` **replayPolicy?**: (`request`) => [`ReplayPolicy`](./ToolExecutor.md#replaypolicy-1)
 
 ###### Parameters
 
 ###### request
 
-[`Request`](./ToolExecutor#request)
+[`Request`](./ToolExecutor.md#request)
 
 ###### Returns
 
-[`ReplayPolicy`](./ToolExecutor#replaypolicy-1)
+[`ReplayPolicy`](./ToolExecutor.md#replaypolicy-1)
 
 <a id="tools-7"></a>
 
@@ -628,7 +628,7 @@ Idempotent remote route whose endpoint deduplicates the stable operation key.
 
 ##### E
 
-`E` = [`FrameworkFailure`](./ToolExecutor#frameworkfailure)
+`E` = [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure)
 
 ***
 

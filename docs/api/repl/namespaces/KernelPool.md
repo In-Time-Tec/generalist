@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl](../index) / KernelPool
+[generalist](../../index.md) / [repl](../index.md) / KernelPool
 
 # KernelPool
 
@@ -108,13 +108,13 @@ A cell's streamed lifecycle plus its terminal outcome.
 
 ##### events
 
-> `readonly` **events**: `Stream`\<\{ `cellId`: `string`; `epoch`: `number`; `sequence`: `number`; `sessionId`: `string`; \} \| \{ `cellId`: `string`; `epoch`: `number`; `profileDigest`: `string`; `sequence`: `number`; `sessionId`: `string`; \} \| \{ `cellId`: `string`; `sequence`: `number`; `text`: `string`; \} \| \{ `cellId`: `string`; `sequence`: `number`; `text`: `string`; \} \| \{ `cellId`: `string`; `durationMillis?`: `number`; `inputSummary`: `string`; `message?`: `string`; `module`: `string`; `operation`: `string`; `requestId`: `string`; `sequence`: `number`; `status`: `"failed"` \| `"started"` \| `"returned"`; \} \| \{ `cellId`: `string`; `durationMillis`: `number`; `sequence`: `number`; `value`: `string`; \} \| \{ `cellId`: `string`; `data`: `string`; `mediaType`: `string`; `name?`: `string`; `sequence`: `number`; \} \| \{ `cellId`: `string`; `epoch`: `number`; `names`: readonly `string`[]; `restoredBySource`: readonly `string`[]; `sequence`: `number`; \} \| \{ `cellId`: `string`; `droppedNames`: readonly `string`[]; `epoch`: `number`; `reason`: `"function"` \| `"module"` \| `"class"` \| `"live-handle"` \| `"oversized"` \| `"unserializable"`; `sequence`: `number`; \} \| \{ `cellId`: `string`; `epoch`: `number`; `reason`: `"requested"` \| `"killed"` \| `"crashed"` \| `"profile-changed"`; `sequence`: `number`; `sessionId`: `string`; \}, [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+> `readonly` **events**: `Stream`\<\{ `cellId`: `string`; `epoch`: `number`; `sequence`: `number`; `sessionId`: `string`; \} \| \{ `cellId`: `string`; `epoch`: `number`; `profileDigest`: `string`; `sequence`: `number`; `sessionId`: `string`; \} \| \{ `cellId`: `string`; `sequence`: `number`; `text`: `string`; \} \| \{ `cellId`: `string`; `sequence`: `number`; `text`: `string`; \} \| \{ `cellId`: `string`; `durationMillis?`: `number`; `inputSummary`: `string`; `message?`: `string`; `module`: `string`; `operation`: `string`; `requestId`: `string`; `sequence`: `number`; `status`: `"failed"` \| `"started"` \| `"returned"`; \} \| \{ `cellId`: `string`; `durationMillis`: `number`; `sequence`: `number`; `value`: `string`; \} \| \{ `cellId`: `string`; `data`: `string`; `mediaType`: `string`; `name?`: `string`; `sequence`: `number`; \} \| \{ `cellId`: `string`; `epoch`: `number`; `names`: readonly `string`[]; `restoredBySource`: readonly `string`[]; `sequence`: `number`; \} \| \{ `cellId`: `string`; `droppedNames`: readonly `string`[]; `epoch`: `number`; `reason`: `"function"` \| `"module"` \| `"class"` \| `"live-handle"` \| `"oversized"` \| `"unserializable"`; `sequence`: `number`; \} \| \{ `cellId`: `string`; `epoch`: `number`; `reason`: `"requested"` \| `"killed"` \| `"crashed"` \| `"profile-changed"`; `sequence`: `number`; `sessionId`: `string`; \}, [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 <a id="result"></a>
 
 ##### result
 
-> `readonly` **result**: `Effect`\<\{ `cellId`: `string`; `durationMillis`: `number`; `epoch`: `number`; `sequence`: `number`; `stderr`: `string`; `stdout`: `string`; `value`: `string`; \}, [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+> `readonly` **result**: `Effect`\<\{ `cellId`: `string`; `durationMillis`: `number`; `epoch`: `number`; `sequence`: `number`; `stderr`: `string`; `stdout`: `string`; `value`: `string`; \}, [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 ***
 
@@ -166,7 +166,7 @@ Current kernel namespace and epoch.
 
 ###### contractVersion
 
-> `readonly` **contractVersion**: `2`
+> `readonly` **contractVersion**: `1`
 
 ###### image
 
@@ -363,7 +363,7 @@ Session and authored-order; the pool owns process lifetime, generation, and leas
 
 ##### close
 
-> `readonly` **close**: (`sessionId`) => `Effect`\<`void`, [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+> `readonly` **close**: (`sessionId`) => `Effect`\<`void`, [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 ###### Parameters
 
@@ -373,13 +373,13 @@ Session and authored-order; the pool owns process lifetime, generation, and leas
 
 ###### Returns
 
-`Effect`\<`void`, [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+`Effect`\<`void`, [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 <a id="execute"></a>
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<[`Execution`](#execution), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown), `Scope`\>
+> `readonly` **execute**: (`request`) => `Effect`\<[`Execution`](#execution), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown), `Scope`\>
 
 ###### Parameters
 
@@ -389,13 +389,13 @@ Session and authored-order; the pool owns process lifetime, generation, and leas
 
 ###### Returns
 
-`Effect`\<[`Execution`](#execution), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown), `Scope`\>
+`Effect`\<[`Execution`](#execution), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown), `Scope`\>
 
 <a id="inspect"></a>
 
 ##### inspect
 
-> `readonly` **inspect**: (`request`) => `Effect`\<[`Inspection`](#inspection), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+> `readonly` **inspect**: (`request`) => `Effect`\<[`Inspection`](#inspection), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 ###### Parameters
 
@@ -405,13 +405,13 @@ Session and authored-order; the pool owns process lifetime, generation, and leas
 
 ###### Returns
 
-`Effect`\<[`Inspection`](#inspection), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+`Effect`\<[`Inspection`](#inspection), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 <a id="interrupt"></a>
 
 ##### interrupt
 
-> `readonly` **interrupt**: (`sessionId`, `cellId`) => `Effect`\<[`Interruption`](#interruption), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+> `readonly` **interrupt**: (`sessionId`, `cellId`) => `Effect`\<[`Interruption`](#interruption), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 ###### Parameters
 
@@ -425,13 +425,13 @@ Session and authored-order; the pool owns process lifetime, generation, and leas
 
 ###### Returns
 
-`Effect`\<[`Interruption`](#interruption), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+`Effect`\<[`Interruption`](#interruption), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 <a id="restart-1"></a>
 
 ##### restart
 
-> `readonly` **restart**: (`sessionId`, `reason`) => `Effect`\<[`Restart`](#restart), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+> `readonly` **restart**: (`sessionId`, `reason`) => `Effect`\<[`Restart`](#restart), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>
 
 ###### Parameters
 
@@ -445,4 +445,4 @@ Session and authored-order; the pool owns process lifetime, generation, and leas
 
 ###### Returns
 
-`Effect`\<[`Restart`](#restart), [`CellExecutionFailed`](./Cell#cellexecutionfailed) \| [`KernelUnavailable`](./Cell#kernelunavailable) \| [`KernelProtocolViolation`](./Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\>
+`Effect`\<[`Restart`](#restart), [`CellExecutionFailed`](./Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](./Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\>

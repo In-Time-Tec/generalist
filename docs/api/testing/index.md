@@ -1,15 +1,15 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / testing
+[generalist](../index.md) / testing
 
 # testing
 
 ## Namespaces
 
-- [KernelProviderConformance](./namespaces/KernelProviderConformance)
-- [TestModel](./namespaces/TestModel)
+- [KernelProviderConformance](./namespaces/KernelProviderConformance.md)
+- [TestModel](./namespaces/TestModel.md)
 
 ## Interfaces
 
@@ -33,7 +33,7 @@ Inspect provider-owned resources after every Exit. The assertion must observe ze
 
 ##### layer
 
-> `readonly` **layer**: `Layer`\<[`CodeExecutor`](../generalist/namespaces/CodeExecutor#codeexecutor)\>
+> `readonly` **layer**: `Layer`\<[`CodeExecutor`](../generalist/namespaces/CodeExecutor.md#codeexecutor)\>
 
 <a id="name"></a>
 
@@ -114,7 +114,7 @@ Public conformance suites and certification reporting.
 
 ##### runtimeDriver
 
-> `readonly` **runtimeDriver**: *typeof* [`runtimeDriver`](../testing.runtime-driver#runtimedriver)
+> `readonly` **runtimeDriver**: *typeof* [`runtimeDriver`](../testing.runtime-driver.md#runtimedriver)
 
 <a id="sandbox"></a>
 

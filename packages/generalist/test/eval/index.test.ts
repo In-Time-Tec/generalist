@@ -13,7 +13,7 @@ import {
   toolCalledAtMost,
   usageUnder,
 } from "../../src/eval/index.js"
-import { ExecutableResolver, Runtime } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
 import type { Trajectory } from "../../src/trajectory/index.js"
 import { TestModel } from "../../src/testing/index.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
@@ -132,7 +132,7 @@ it.live("runs a bounded suite through Runtime and prints its schema result", () 
   Effect.gen(function* () {
     const fixture = yield* TestModel.make([TestModel.text("high")])
     const agent = Agent.make({ name: "eval-suite" })
-    const runtime = objectRuntimeLayer({ addresses: [] }).pipe(
+    const runtime = objectRuntimeLayer({ addresses: [], schedulerMode: "poll" }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     )
     const suite = yield* runSuite(agent, ["classify"], [outputMatches(Schema.String)], {

@@ -76,7 +76,7 @@ const duplicateResponseAfterCancellation = (waitId: string) =>
         resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
       }),
       store.resume({
-        commandId: `${runId}:control:resume:changed`,
+        commandId: `${runId}:control:resume`,
         runId,
         waitId,
         resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
@@ -100,7 +100,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         prompt: textPrompt("hello"),
       })
       const claim = yield* driver.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-control-test-ts-claim-3",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const tracing = testTracer()
       yield* runtime
         .cancel({ commandId: `${receipt.runId}:control:cancel`, runId: receipt.runId, reason: "stop" })
@@ -108,8 +111,13 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
       const cancellation = tracing.spans.find((span) => span.name === "Generalist.Runtime.cancel")
       expect(cancellation?.attributes.get("generalist.runtime.run_id")).toBe(receipt.runId)
       expect(cancellation?.events.map(([name]) => name)).toEqual(["generalist.runtime.cancel.requested"])
-      expect(yield* driver.complete({
-          commandId: "runtime-memory-store-control-test-ts-complete-2", ...claim, result: completedResult("too-late") })).toEqual({ _tag: "Completed" })
+      expect(
+        yield* driver.complete({
+          commandId: "runtime-memory-store-control-test-ts-complete-2",
+          ...claim,
+          result: completedResult("too-late"),
+        }),
+      ).toEqual({ _tag: "Completed" })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
       const inspection = yield* runtime.inspect(receipt.runId)
       const tags = yield* runtime.events({ runId: receipt.runId }).pipe(
@@ -136,7 +144,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
       })
       yield* driver.suspend({
         ...(yield* driver.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-4", runId: receipt.runId, ownerId: objectWorkerId })),
+          commandId: "runtime-state-store-control-test-ts-claim-4",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: receipt.runId,
         waits: [openWait({ waitId: "wait:1" })],
         suspension: suspension({ waitId: "wait:1" }),
@@ -174,7 +185,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         prompt: textPrompt("approve the operation"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-5", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-control-test-ts-claim-5",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const call = Response.toolCallPart({
         id: "operation:delete-draft",
         name: "delete_draft",
@@ -188,7 +202,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         input: call.params,
       }
       yield* store.emitAgentEvent({
-          commandId: "runtime-memory-store-control-test-ts-emitAgentEvent-3",
+        commandId: "runtime-memory-store-control-test-ts-emitAgentEvent-3",
         ...claim,
         event: { _tag: "ApprovalRequested", turn: 0, call, request: approvalRequest },
       })
@@ -251,7 +265,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
     Effect.gen(function* () {
       const { runtime, store, runId } = yield* admitWaitWithClaimedChild("wait:cancelled")
       yield* runtime.cancel({
-          commandId: "runtime-memory-store-control-test-ts-cancel-4", runId, reason: "stop" })
+        commandId: "runtime-memory-store-control-test-ts-cancel-4",
+        runId,
+        reason: "stop",
+      })
       expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
 
       const response = yield* runtime
@@ -263,7 +280,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         .pipe(Effect.flip)
       expect(response).toBeInstanceOf(Errors.WaitNotOpen)
       yield* runtime.signal({
-          commandId: "runtime-memory-store-control-test-ts-signal-5", runId, name: "wait:cancelled" })
+        commandId: "runtime-memory-store-control-test-ts-signal-5",
+        runId,
+        name: "wait:cancelled",
+      })
       const resume = yield* store
         .resume({
           commandId: `${runId}:control:resume:cancelled`,
@@ -293,8 +313,13 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
               resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
             })
             .pipe(Effect.exit),
-          runtime.cancel({
-          commandId: "runtime-memory-store-control-test-ts-cancel-6", runId, reason: "stop" }).pipe(Effect.exit),
+          runtime
+            .cancel({
+              commandId: "runtime-memory-store-control-test-ts-cancel-6",
+              runId,
+              reason: "stop",
+            })
+            .pipe(Effect.exit),
         ],
         { concurrency: "unbounded" },
       )
@@ -313,7 +338,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         prompt: textPrompt("hello"),
       })
       const claim = yield* driver.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-control-test-ts-claim-6",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const operation = yield* driver.recordOperation({
         ...claim,
         operationKey: "tool:unknown",
@@ -324,7 +352,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         attempt: claim.attempt,
       })
       yield* driver.startOperation({
-          commandId: "runtime-memory-store-control-test-ts-startOperation-7", ...claim, operationId: operation.operationId })
+        commandId: "runtime-memory-store-control-test-ts-startOperation-7",
+        ...claim,
+        operationId: operation.operationId,
+      })
       yield* driver.completeOperation({
         ...claim,
         operationId: operation.operationId,
@@ -373,7 +404,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         prompt: textPrompt("hello"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-7", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-control-test-ts-claim-7",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const operation = yield* store.recordOperation({
         ...claim,
         operationKey: "tool:non-replayable",
@@ -384,14 +418,25 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         attempt: claim.attempt,
       })
       yield* store.startOperation({
-          commandId: "runtime-memory-store-control-test-ts-startOperation-8", ...claim, operationId: operation.operationId })
+        commandId: "runtime-memory-store-control-test-ts-startOperation-8",
+        ...claim,
+        operationId: operation.operationId,
+      })
       yield* store.expireRunningOperation({
-          commandId: "runtime-memory-store-control-test-ts-expireRunningOperation-9", ...claim, operationId: operation.operationId })
+        commandId: "runtime-memory-store-control-test-ts-expireRunningOperation-9",
+        ...claim,
+        operationId: operation.operationId,
+      })
       yield* store.releaseExecution(claim)
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
       expect(
-        (yield* store.claimExecution({
-          commandId: "runtime-memory-store-control-test-ts-claim-8", runId: receipt.runId, ownerId: "worker:two" }).pipe(Effect.flip))._tag,
+        (yield* store
+          .claimExecution({
+            commandId: "runtime-memory-store-control-test-ts-claim-8",
+            runId: receipt.runId,
+            ownerId: "worker:two",
+          })
+          .pipe(Effect.flip))._tag,
       ).toBe("generalist/runtime/RuntimeUnavailable")
 
       const resolution = { _tag: "Succeeded" as const, value: { answer: 42, source: { kind: "manual", rank: 1 } } }
@@ -425,7 +470,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
       expect(conflict).toMatchObject({ reason: "input-conflict" })
 
       const resumed = yield* store.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-9", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-control-test-ts-claim-9",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const replayed = yield* store.recordOperation({
         ...resumed,
         operationKey: "tool:non-replayable",
@@ -451,7 +499,10 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         prompt: textPrompt("hello"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-state-store-control-test-ts-claim-10", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-state-store-control-test-ts-claim-10",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const operation = yield* store.recordOperation({
         ...claim,
         operationKey: "tool:non-replayable",
@@ -462,13 +513,22 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         attempt: claim.attempt,
       })
       yield* store.startOperation({
-          commandId: "runtime-memory-store-control-test-ts-startOperation-10", ...claim, operationId: operation.operationId })
+        commandId: "runtime-memory-store-control-test-ts-startOperation-10",
+        ...claim,
+        operationId: operation.operationId,
+      })
       yield* store.expireRunningOperation({
-          commandId: "runtime-memory-store-control-test-ts-expireRunningOperation-11", ...claim, operationId: operation.operationId })
+        commandId: "runtime-memory-store-control-test-ts-expireRunningOperation-11",
+        ...claim,
+        operationId: operation.operationId,
+      })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
 
       yield* runtime.cancel({
-          commandId: "runtime-memory-store-control-test-ts-cancel-12", runId: receipt.runId, reason: "stop" })
+        commandId: "runtime-memory-store-control-test-ts-cancel-12",
+        runId: receipt.runId,
+        reason: "stop",
+      })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
       expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
         "unknown",

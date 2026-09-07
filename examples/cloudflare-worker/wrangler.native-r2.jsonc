@@ -7,12 +7,12 @@
   "vars": {
     "NATIVE_R2_QUALIFICATION_ENABLED": "0",
     "NATIVE_R2_QUALIFICATION_ENVIRONMENT": "replace-with-fixed-environment",
-    "NATIVE_R2_QUALIFICATION_TENANT": "replace-with-fixed-tenant"
+    "NATIVE_R2_QUALIFICATION_TENANT": "replace-with-fixed-tenant",
   },
   "r2_buckets": [
     {
       "binding": "NATIVE_R2_QUALIFICATION_BUCKET",
-      "bucket_name": "replace-with-test-bucket"
-    }
-  ]
+      "bucket_name": "replace-with-test-bucket",
+    },
+  ],
 }

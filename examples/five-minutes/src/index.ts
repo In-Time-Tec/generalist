@@ -1,9 +1,9 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- this example provides the Bun platform at its entry point. */
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, Option, Schema } from "effect"
+import { Config, Console, Effect, Layer, Option, Schema, type Types } from "effect"
 import { Agent } from "generalist"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
 import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
 import { layer as testModel, object, text } from "generalist/testing/model"
 
@@ -39,19 +39,25 @@ const program = Effect.gen(function* () {
   const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
   const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
   const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  const storage = S3.layer({
+  const connection: Types.Mutable<ConnectionOptions> = {
     bucket,
     region,
-    credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-    ...(endpoint === undefined ? {} : {
-      endpoint,
-      forcePathStyle: true,
-      capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-    }),
-  })
+    credentials: { accessKeyId, secretAccessKey },
+  }
+  if (sessionToken !== undefined) connection.credentials = { accessKeyId, secretAccessKey, sessionToken }
+  if (endpoint !== undefined) {
+    connection.endpoint = endpoint
+    connection.forcePathStyle = true
+    connection.capabilities = {
+      conditionalCreate: confirmed,
+      strongReadAfterWrite: confirmed,
+      consistentListing: confirmed,
+    }
+  }
+  const storage = layerS3(connection)
   // Both scopes use the same remote namespace. Only the reopened scope executes the accepted work.
   const runtimeLayer = () => {
-    const reconstructed = Durability.layer({
+    const reconstructed = layerDurability({
       environment,
       tenant,
       partition,
@@ -86,8 +92,9 @@ const program = Effect.gen(function* () {
       Effect.flatMap((context) =>
         Effect.gen(function* () {
           const handle = yield* start
-          yield* Durability.activate
+          yield* activate
           const scheduler = yield* LocalScheduler.LocalScheduler
+          yield* scheduler.drain()
           return { runId: handle.runId, output: yield* handle.await }
         }).pipe(Effect.provide(context)),
       ),

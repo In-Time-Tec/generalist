@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.worker-loader
+[generalist](./index.md) / unstable.sandbox.worker-loader
 
 # unstable.sandbox.worker-loader
 
@@ -18,7 +18,7 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 #### Extends
 
-- [`Options`](./unstable.cloudflare.dynamic-workers#options)
+- [`Options`](./unstable.cloudflare.dynamic-workers.md#options)
 
 #### Properties
 
@@ -34,7 +34,7 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 ###### rpc
 
-[`CapabilityRpc`](./unstable.cloudflare.dynamic-workers#capabilityrpc)
+[`CapabilityRpc`](./unstable.cloudflare.dynamic-workers.md#capabilityrpc)
 
 ###### Returns
 
@@ -42,7 +42,7 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.dynamic-workers#options).[`capabilityBinding`](./unstable.cloudflare.dynamic-workers#capabilitybinding)
+[`Options`](./unstable.cloudflare.dynamic-workers.md#options).[`capabilityBinding`](./unstable.cloudflare.dynamic-workers.md#capabilitybinding)
 
 <a id="compatibilitydate"></a>
 
@@ -54,7 +54,7 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.dynamic-workers#options).[`compatibilityDate`](./unstable.cloudflare.dynamic-workers#compatibilitydate-1)
+[`Options`](./unstable.cloudflare.dynamic-workers.md#options).[`compatibilityDate`](./unstable.cloudflare.dynamic-workers.md#compatibilitydate-1)
 
 <a id="image"></a>
 
@@ -88,13 +88,13 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 ##### loader
 
-> `readonly` **loader**: [`WorkerLoader`](./unstable.cloudflare.dynamic-workers#workerloader)
+> `readonly` **loader**: [`WorkerLoader`](./unstable.cloudflare.dynamic-workers.md#workerloader)
 
 **`Experimental`**
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.dynamic-workers#options).[`loader`](./unstable.cloudflare.dynamic-workers#loader)
+[`Options`](./unstable.cloudflare.dynamic-workers.md#options).[`loader`](./unstable.cloudflare.dynamic-workers.md#loader)
 
 ## Variables
 
@@ -102,7 +102,7 @@ Worker Loader sandbox configuration and optional provider-wide maximums.
 
 ### layerWorkerLoader
 
-> `const` **layerWorkerLoader**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
+> `const` **layerWorkerLoader**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider)\>
 
 **`Experimental`**
 
@@ -116,7 +116,7 @@ Provide the v8-isolate Worker Loader Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider)\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider)\>
 
 ***
 
@@ -124,7 +124,7 @@ Provide the v8-isolate Worker Loader Sandbox leaf.
 
 ### makeWorkerLoaderProvider
 
-> `const` **makeWorkerLoaderProvider**: (`options`) => [`SandboxProviderService`](./sandbox#sandboxproviderservice)
+> `const` **makeWorkerLoaderProvider**: (`options`) => [`SandboxProviderService`](./sandbox.md#sandboxproviderservice)
 
 **`Experimental`**
 
@@ -138,4 +138,4 @@ Construct the v8-isolate Worker Loader Sandbox provider.
 
 #### Returns
 
-[`SandboxProviderService`](./sandbox#sandboxproviderservice)
+[`SandboxProviderService`](./sandbox.md#sandboxproviderservice)

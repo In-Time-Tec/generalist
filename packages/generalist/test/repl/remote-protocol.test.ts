@@ -81,6 +81,7 @@ describe("RemoteKernelProtocol", () => {
           epoch: 4,
           reason: "transport-lost",
           message: "uncertain",
+          hint: "Reconnect to determine the cell outcome before retrying.",
         },
       }),
     ).toThrow()

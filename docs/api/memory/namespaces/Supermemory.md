@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [memory](../index) / Supermemory
+[generalist](../../index.md) / [memory](../index.md) / Supermemory
 
 # Supermemory
 
@@ -104,7 +104,7 @@ Hosted Supermemory configuration.
 
 ###### key
 
-[`Key`](../../generalist/namespaces/Memory#key-1)
+[`Key`](../../generalist/namespaces/Memory.md#key-1)
 
 ###### Returns
 
@@ -134,7 +134,7 @@ Hosted Supermemory configuration.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 Hosted semantic Memory that uses Supermemory's embeddings and vector storage.
 
@@ -146,4 +146,4 @@ Hosted semantic Memory that uses Supermemory's embeddings and vector storage.
 
 #### Returns
 
-`Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory), `Config.ConfigError`, `HttpClient.HttpClient`\>

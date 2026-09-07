@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.rlm
+[generalist](./index.md) / unstable.rlm
 
 # unstable.rlm
 
@@ -94,7 +94,7 @@ Options for retaining recent context while moving older turns into the RLM Sandb
 
 ### layer
 
-> `const` **layer**: \<`RootError`, `RootRequirements`, `LeafError`, `LeafRequirements`\>(`options`) => `Layer.Layer`\<`LanguageModel.LanguageModel`, `RootError` \| `LeafError`, [`SandboxProvider`](./sandbox#sandboxprovider) \| `RootRequirements` \| `LeafRequirements`\>
+> `const` **layer**: \<`RootError`, `RootRequirements`, `LeafError`, `LeafRequirements`\>(`options`) => `Layer.Layer`\<`LanguageModel.LanguageModel`, `RootError` \| `LeafError`, [`SandboxProvider`](./sandbox.md#sandboxprovider) \| `RootRequirements` \| `LeafRequirements`\>
 
 **`Experimental`**
 
@@ -126,7 +126,7 @@ Provide a Recursive Language Model as an Effect AI LanguageModel.
 
 #### Returns
 
-`Layer.Layer`\<`LanguageModel.LanguageModel`, `RootError` \| `LeafError`, [`SandboxProvider`](./sandbox#sandboxprovider) \| `RootRequirements` \| `LeafRequirements`\>
+`Layer.Layer`\<`LanguageModel.LanguageModel`, `RootError` \| `LeafError`, [`SandboxProvider`](./sandbox.md#sandboxprovider) \| `RootRequirements` \| `LeafRequirements`\>
 
 ***
 
@@ -134,7 +134,7 @@ Provide a Recursive Language Model as an Effect AI LanguageModel.
 
 ### rlmOffload
 
-> `const` **rlmOffload**: (`options`) => [`StrategyPart`](./compaction#strategypart)
+> `const` **rlmOffload**: (`options`) => [`StrategyPart`](./compaction.md#strategypart)
 
 **`Experimental`**
 
@@ -148,4 +148,4 @@ Move compacted turns into the RLM Sandbox instead of summarizing them.
 
 #### Returns
 
-[`StrategyPart`](./compaction#strategypart)
+[`StrategyPart`](./compaction.md#strategypart)

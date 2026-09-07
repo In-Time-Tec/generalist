@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl](../index) / KernelResourceAuthority
+[generalist](../../index.md) / [repl](../index.md) / KernelResourceAuthority
 
 # KernelResourceAuthority
 
@@ -481,7 +481,7 @@ ID after deletion is proven. Failed deletion stays visible through `pendingDelet
 
 #### Extended by
 
-- [`MemoryResourceAuthority`](./TestKernel#memoryresourceauthority)
+- [`MemoryResourceAuthority`](./TestKernel.md#memoryresourceauthority)
 
 #### Properties
 

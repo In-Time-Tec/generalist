@@ -12,10 +12,7 @@ const objectMemoLayer = layerMemo({
   environment: "test",
   tenant: "memo",
   partition: "conformance",
-}).pipe(
-  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, memoStorage.store))),
-)
+}).pipe(Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, memoStorage.store))))
 
 Testing.memo({ layer: layerMemory(), adjustClock: adjustTestClock("1 hour") })
 Testing.memo({ layer: objectMemoLayer, adjustClock: adjustTestClock("1 hour") })
-

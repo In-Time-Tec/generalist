@@ -73,7 +73,12 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
         }),
     })
     const hooks = Hooks.layer([
-      Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:hooked admission`))),
+      Hooks.onSteer({
+        key: "test.runtime.steering.onSteer.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:hooked admission`)),
+      }),
     ])
     const handlers = toolkit.toLayer({ controlled_tool: () => Effect.die("ToolExecutor owns controlled_tool") })
     const runtimeLayer = objectRuntimeLayer({
@@ -102,8 +107,13 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
           prompt: "start",
         })
         const execution = yield* host
-          .execute(yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-1", runId: run.runId, ownerId: objectWorkerId }))
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-steering-test-ts-claim-1",
+              runId: run.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           .pipe(Effect.forkChild({ startImmediately: true }))
         const start = yield* Effect.raceFirst(
           Deferred.await(started).pipe(Effect.as("started" as const)),
@@ -187,8 +197,13 @@ it.effect("interrupt journals first, stops an in-flight tool, and creates an Unk
           prompt: "write",
         })
         const execution = yield* host
-          .execute(yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-2", runId: run.runId, ownerId: objectWorkerId }))
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-steering-test-ts-claim-2",
+              runId: run.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -257,8 +272,13 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
           prompt: "start",
         })
         const execution = yield* host
-          .execute(yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-3", runId: run.runId, ownerId: objectWorkerId }))
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-steering-test-ts-claim-3",
+              runId: run.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -287,7 +307,10 @@ const completionLaneSelection = Effect.gen(function* () {
     prompt: "start",
   })
   const claim = yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-4", runId: run.runId, ownerId: objectWorkerId })
+    commandId: "runtime-steering-test-ts-claim-4",
+    runId: run.runId,
+    ownerId: objectWorkerId,
+  })
   const steering = yield* runtime.send(run.runId, "steer later", {
     policy: "steer",
     idempotencyKey: "steer",
@@ -298,7 +321,10 @@ const completionLaneSelection = Effect.gen(function* () {
   })
 
   const first = yield* store.complete({
-          commandId: "runtime-steering-test-ts-complete-1", ...claim, result: completedResult("first") })
+    commandId: "runtime-steering-test-ts-complete-1",
+    ...claim,
+    result: completedResult("first"),
+  })
   expect(first).toMatchObject({
     _tag: "SteeringPending",
     continuation: { steeringEntryIds: [enqueue.entryId] },
@@ -314,7 +340,10 @@ const completionLaneSelection = Effect.gen(function* () {
     steeringEntryIds: [enqueue.entryId],
   })
   const second = yield* store.complete({
-          commandId: "runtime-steering-test-ts-complete-2", ...claim, result: completedResult("second") })
+    commandId: "runtime-steering-test-ts-complete-2",
+    ...claim,
+    result: completedResult("second"),
+  })
   expect(second).toMatchObject({
     _tag: "SteeringPending",
     continuation: { steeringEntryIds: [steering.entryId] },
@@ -324,8 +353,6 @@ const completionLaneSelection = Effect.gen(function* () {
 layer(objectLayer)("object completion admission lanes", (test) => {
   test.effect("continues one admission lane at a time with enqueue first", () => completionLaneSelection)
 })
-
-
 
 it.effect("completion continuations retain their lane and pass through onSteer", () =>
   Effect.gen(function* () {
@@ -347,7 +374,12 @@ it.effect("completion continuations retain their lane and pass through onSteer",
       }),
     )
     const hooks = Hooks.layer([
-      Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:completion hook`))),
+      Hooks.onSteer({
+        key: "test.runtime.steering.onSteer.2",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:completion hook`)),
+      }),
     ])
     const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
@@ -372,13 +404,19 @@ it.effect("completion continuations retain their lane and pass through onSteer",
           prompt: "start",
         })
         const claim = yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-5", runId: run.runId, ownerId: objectWorkerId })
+          commandId: "runtime-steering-test-ts-claim-5",
+          runId: run.runId,
+          ownerId: objectWorkerId,
+        })
         const receipt = yield* runtime.send(run.runId, "queued continuation", {
           policy: "enqueue",
           idempotencyKey: "queued",
         })
         const outcome = yield* store.complete({
-          commandId: "runtime-steering-test-ts-complete-3", ...claim, result: completedResult("first") })
+          commandId: "runtime-steering-test-ts-complete-3",
+          ...claim,
+          result: completedResult("first"),
+        })
         expect(outcome).toMatchObject({
           _tag: "SteeringPending",
           continuation: { queue: "followUp", steeringEntryIds: [receipt.entryId] },
@@ -405,13 +443,25 @@ layer(objectLayer)("rollback admission", (test) => {
         prompt: "start",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-6", runId: run.runId, ownerId: objectWorkerId })
+        commandId: "runtime-steering-test-ts-claim-6",
+        runId: run.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-steering-test-ts-emitAgentEvent-4", ...claim, event: { _tag: "TurnStarted", turn: 0 } })
+        commandId: "runtime-steering-test-ts-emitAgentEvent-4",
+        ...claim,
+        event: { _tag: "TurnStarted", turn: 0 },
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-steering-test-ts-emitAgentEvent-5", ...claim, event: { _tag: "TurnCompleted", turn: 0 } })
+        commandId: "runtime-steering-test-ts-emitAgentEvent-5",
+        ...claim,
+        event: { _tag: "TurnCompleted", turn: 0 },
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-steering-test-ts-emitAgentEvent-6", ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+        commandId: "runtime-steering-test-ts-emitAgentEvent-6",
+        ...claim,
+        event: { _tag: "TurnStarted", turn: 1 },
+      })
       yield* store.releaseExecution(claim)
 
       const [receipt, retry] = yield* Effect.all(
@@ -432,7 +482,14 @@ layer(objectLayer)("rollback admission", (test) => {
       expect((yield* runtime.inspect(run.runId)).branches).toHaveLength(1)
       const history = yield* runtime.history({ runId: run.runId, limit: 100 })
       expect(history.filter((event) => event._tag === "TurnCompleted")).toHaveLength(1)
-      expect(history.filter((event) => event._tag === "TurnStarted" && event.turn === 1)).toEqual([])
+      expect(history.filter((event) => event._tag === "TurnStarted" && event.turn === 1)).toHaveLength(1)
+      expect(history.findLast((event) => event._tag === "RunRewound")).toMatchObject({
+        toSequence: history.findLast((event) => event._tag === "TurnCompleted")?.sequence,
+      })
+      expect((yield* store.loadExecution(run.runId)).continuation).toMatchObject({
+        nextTurn: 1,
+        steeringEntryIds: [receipt.entryId],
+      })
       expect(history.filter((event) => event._tag === "Inbox")).toEqual([
         expect.objectContaining({ entryId: receipt.entryId, policy: "rollback" }),
       ])
@@ -444,6 +501,7 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
     const requests: Array<string> = []
+    let dispatches = 0
     const tool = Tool.make("rollback_write", { parameters: Schema.Struct({}), success: Schema.String })
     const toolkit = Toolkit.make(tool)
     const agent = Agent.make({ name: "rollback-active", toolkit })
@@ -472,10 +530,19 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
       }),
     )
     const executor = ToolExecutor.layerTest({
-      execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+      replayPolicy: () => "provider-idempotent",
+      execute: () =>
+        Effect.sync(() => {
+          dispatches += 1
+        }).pipe(Effect.andThen(Deferred.succeed(started, undefined)), Effect.andThen(Effect.never)),
     })
     const hooks = Hooks.layer([
-      Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:rollback hook`))),
+      Hooks.onSteer({
+        key: "test.runtime.steering.onSteer.3",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:rollback hook`)),
+      }),
     ])
     const handlers = toolkit.toLayer({ rollback_write: () => Effect.die("ToolExecutor owns rollback_write") })
     const runtimeLayer = objectRuntimeLayer({
@@ -504,8 +571,13 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
           prompt: "write",
         })
         const first = yield* host
-          .execute(yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-7", runId: run.runId, ownerId: objectWorkerId }))
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-steering-test-ts-claim-7",
+              runId: run.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -515,10 +587,16 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
         })
         yield* Fiber.join(first)
 
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-steering-test-ts-claim-8", runId: run.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-steering-test-ts-claim-8",
+            runId: run.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
 
         expect(requests).toHaveLength(2)
+        expect(dispatches).toBe(1)
         expect(requests[1]).toContain("replace the active turn")
         expect(requests[1]).toContain("steering:1:rollback hook")
         expect((yield* runtime.inspect(run.runId)).status).toBe("succeeded")
@@ -527,6 +605,118 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
           expect.objectContaining({ entryId: receipt.entryId, policy: "rollback" }),
         ])
         expect(history.filter((event) => event._tag === "OperationUnknown")).toEqual([])
+        expect((yield* runtime.inspect(run.runId)).branches).toHaveLength(1)
+      }),
+    )
+  }),
+)
+
+it.effect("rollback retains an unsafe running tool without redispatching replacement work", () =>
+  Effect.gen(function* () {
+    const started = yield* Deferred.make<void>()
+    const requests: Array<string> = []
+    let dispatches = 0
+    const tool = Tool.make("rollback_write", { parameters: Schema.Struct({}), success: Schema.String })
+    const toolkit = Toolkit.make(tool)
+    const agent = Agent.make({ name: "rollback-active", toolkit })
+    const executable = testExecutable(agent, "1")
+    const address = Address.make("agent:rollback-active")
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: (request) => {
+          requests.push(JSON.stringify(request.prompt))
+          return Stream.fromIterable<Response.StreamPartEncoded>(
+            requests.length === 1
+              ? [
+                  Response.makePart("tool-call", {
+                    id: "rollback-write-1",
+                    name: "rollback_write",
+                    params: {},
+                    providerExecuted: false,
+                  }),
+                  finish,
+                ]
+              : [Response.makePart("text-delta", { id: "replacement", delta: "replaced" }), finish],
+          )
+        },
+      }),
+    )
+    const executor = ToolExecutor.layerTest({
+      execute: () =>
+        Effect.sync(() => {
+          dispatches += 1
+        }).pipe(Effect.andThen(Deferred.succeed(started, undefined)), Effect.andThen(Effect.never)),
+    })
+    const hooks = Hooks.layer([
+      Hooks.onSteer({
+        key: "test.runtime.steering.onSteer.4",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:rollback hook`)),
+      }),
+    ])
+    const handlers = toolkit.toLayer({ rollback_write: () => Effect.die("ToolExecutor owns rollback_write") })
+    const runtimeLayer = objectRuntimeLayer({
+      addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+    }).pipe(
+      Layer.provide(
+        ExecutableResolver.layerStatic([
+          {
+            executable,
+            agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers, hooks)),
+          },
+        ]).pipe(Layer.orDie),
+      ),
+    )
+
+    yield* provideScoped(
+      runtimeLayer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor.RunExecutor
+        const run = yield* runtime.send({
+          to: address,
+          sessionId: "session:rollback-active",
+          idempotencyKey: "run",
+          prompt: "write",
+        })
+        const first = yield* host
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-steering-test-ts-claim-7",
+              runId: run.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
+          .pipe(Effect.forkChild({ startImmediately: true }))
+        yield* Deferred.await(started)
+
+        const receipt = yield* runtime.send(run.runId, "replace the active turn", {
+          policy: "rollback",
+          idempotencyKey: "rollback-active",
+        })
+        yield* Fiber.join(first)
+
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-steering-test-ts-claim-8",
+            runId: run.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
+
+        expect(requests).toHaveLength(1)
+        expect(dispatches).toBe(1)
+        expect((yield* runtime.inspect(run.runId)).status).toBe("needs-resolution")
+        const history = yield* runtime.history({ runId: run.runId, limit: 100 })
+        expect(history.filter((event) => event._tag === "Inbox")).toEqual([
+          expect.objectContaining({ entryId: receipt.entryId, policy: "rollback" }),
+        ])
+        expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(1)
+        expect(history.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
         expect((yield* runtime.inspect(run.runId)).branches).toHaveLength(1)
       }),
     )
@@ -553,16 +743,20 @@ layer(objectLayer)("admission retry side effects", (test) => {
         prompt: "start",
       })
 
-      const firstInterrupt = yield* admit(run.runId, "interrupt once", {
-        policy: "interrupt",
-        idempotencyKey: "interrupt-once",
-      })
-      const retryInterrupt = yield* admit(run.runId, "interrupt once", {
-        policy: "interrupt",
-        idempotencyKey: "interrupt-once",
-      })
-      expect(firstInterrupt.duplicate).toBe(false)
-      expect(retryInterrupt).toEqual({ ...firstInterrupt, duplicate: true })
+      const [firstInterrupt, retryInterrupt] = yield* Effect.all(
+        [
+          admit(run.runId, "interrupt once", {
+            policy: "interrupt",
+            idempotencyKey: "interrupt-once",
+          }),
+          admit(run.runId, "interrupt once", {
+            policy: "interrupt",
+            idempotencyKey: "interrupt-once",
+          }),
+        ],
+        { concurrency: "unbounded" },
+      )
+      expect(retryInterrupt).toEqual(firstInterrupt)
       expect(yield* Ref.get(interrupts)).toBe(1)
 
       const firstRollback = yield* admit(run.runId, "rollback once", {
@@ -573,8 +767,7 @@ layer(objectLayer)("admission retry side effects", (test) => {
         policy: "rollback",
         idempotencyKey: "rollback-once",
       })
-      expect(firstRollback.duplicate).toBe(false)
-      expect(retryRollback).toEqual({ ...firstRollback, duplicate: true })
+      expect(retryRollback).toEqual(firstRollback)
       expect(yield* Ref.get(interrupts)).toBe(2)
       expect((yield* runtime.inspect(run.runId)).branches).toHaveLength(1)
     }),

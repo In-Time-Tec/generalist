@@ -1,23 +1,23 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / instructions
+[generalist](../index.md) / instructions
 
 # instructions
 
 ## Namespaces
 
-- [Authorship](./namespaces/Authorship)
-- [Entry](./namespaces/Entry)
-- [FileSystemStore](./namespaces/FileSystemStore)
-- [Overview](./namespaces/Overview)
-- [PackageCatalog](./namespaces/PackageCatalog)
-- [Refinement](./namespaces/Refinement)
-- [Registration](./namespaces/Registration)
-- [Snapshot](./namespaces/Snapshot)
-- [State](./namespaces/State)
-- [Store](./namespaces/Store)
+- [Authorship](./namespaces/Authorship.md)
+- [Entry](./namespaces/Entry.md)
+- [FileSystemStore](./namespaces/FileSystemStore.md)
+- [Overview](./namespaces/Overview.md)
+- [PackageCatalog](./namespaces/PackageCatalog.md)
+- [Refinement](./namespaces/Refinement.md)
+- [Registration](./namespaces/Registration.md)
+- [Snapshot](./namespaces/Snapshot.md)
+- [State](./namespaces/State.md)
+- [Store](./namespaces/Store.md)
 
 ## Classes
 
@@ -127,7 +127,7 @@ Ordered provider of model instructions or contextual updates.
 
 ##### render
 
-> `readonly` **render**: (`context`) => `Effect`\<`Option`\<`string`\>, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror), `R`\>
+> `readonly` **render**: (`context`) => `Effect`\<`Option`\<`string`\>, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror), `R`\>
 
 ###### Parameters
 
@@ -137,7 +137,7 @@ Ordered provider of model instructions or contextual updates.
 
 ###### Returns
 
-`Effect`\<`Option`\<`string`\>, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror), `R`\>
+`Effect`\<`Option`\<`string`\>, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror), `R`\>
 
 ***
 
@@ -289,13 +289,13 @@ Load AGENTS.md / CLAUDE.md instruction files from global and ancestor paths.
 
 ### render
 
-> `const` **render**: \{(`context`): (`instructions`) => `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror)\>; (`instructions`, `context`): `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror)\>; \}
+> `const` **render**: \{(`context`): (`instructions`) => `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror)\>; (`instructions`, `context`): `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror)\>; \}
 
 Render every provider once for a run's instruction baseline.
 
 #### Call Signature
 
-> (`context`): (`instructions`) => `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror)\>
+> (`context`): (`instructions`) => `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror)\>
 
 ##### Parameters
 
@@ -305,11 +305,11 @@ Render every provider once for a run's instruction baseline.
 
 ##### Returns
 
-(`instructions`) => `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror)\>
+(`instructions`) => `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror)\>
 
 #### Call Signature
 
-> (`instructions`, `context`): `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror)\>
+> (`instructions`, `context`): `Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror)\>
 
 ##### Parameters
 
@@ -323,4 +323,4 @@ Render every provider once for a run's instruction baseline.
 
 ##### Returns
 
-`Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent#agenterror)\>
+`Effect`\<`string`, [`AgentError`](../generalist/namespaces/AgentEvent.md#agenterror)\>

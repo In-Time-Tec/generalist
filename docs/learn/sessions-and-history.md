@@ -16,7 +16,7 @@ The prompt the model sees is never stored separately. `Session.buildContext(path
 **projection.ts**
 
 ```typescript
-import { Console, Effect, ManagedRuntime } from "effect"
+import { Console, Effect } from "effect"
 import { Session } from "generalist"
 import { Prompt } from "effect/unstable/ai"
 
@@ -31,11 +31,15 @@ const assistant = (text: string): Prompt.Message =>
 const program = Effect.scoped(
   Effect.gen(function* () {
     const store = yield* Session.acquire("travel-planner")
-    yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })))
-    yield* store.append(message(user("Plan a trip to Boise.")))
-    yield* store.append(message(assistant("Three days in Boise, starting downtown.")))
-    const kept = yield* store.append(message(user("Add a rafting day.")))
-    const checkpointId = yield* store.reserveEntryId
+    yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })), {
+      commandId: "travel-planner:system:1",
+    })
+    yield* store.append(message(user("Plan a trip to Boise.")), { commandId: "travel-planner:question:1" })
+    yield* store.append(message(assistant("Three days in Boise, starting downtown.")), {
+      commandId: "travel-planner:answer:1",
+    })
+    const kept = yield* store.append(message(user("Add a rafting day.")), { commandId: "travel-planner:question:2" })
+    const checkpointId = yield* store.reserveEntryId("travel-planner:compact:1")
 
     const before = Session.buildContext(yield* store.path())
     yield* Console.log(`before: ${before.content.map((entry) => entry.role).join(" ")}`)
@@ -55,8 +59,7 @@ const program = Effect.scoped(
   }),
 )
 
-const runtime = ManagedRuntime.make(Session.layerMemory)
-await runtime.runPromise(program)
+await Effect.runPromise(program.pipe(Effect.provide(Session.layerMemory)))
 ```
 
 **Output**
@@ -66,6 +69,8 @@ before: system user assistant user
 after: user
 log entries: 5
 ```
+
+Reuse each `commandId` when retrying the same append or entry reservation; use a new identity for a new mutation. The scoped Effect owns the in-memory directory and releases it on success or failure.
 
 After the compaction entry the projected context shrinks to a checkpoint plus the kept tail, while the log still holds all five entries. Rewinding is moving the leaf; auditing is reading the log; shrinking context is appending an entry. [How to stay inside the context window](/guides/compaction) covers the strategy that decides when Generalist appends one for you.
 

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Errors
+[generalist](../../index.md) / [runtime](../index.md) / Errors
 
 # Errors
 
@@ -1816,70 +1816,6 @@ A Run history request falls outside the fixed page-size contract.
 
 ***
 
-<a id="multiworkerunsupported"></a>
-
-### MultiWorkerUnsupported
-
-#### Extends
-
-- `MultiWorkerUnsupported_base`
-
-#### Constructors
-
-<a id="constructor-25"></a>
-
-##### Constructor
-
-> **new MultiWorkerUnsupported**(...`args`): [`MultiWorkerUnsupported`](#multiworkerunsupported)
-
-###### Parameters
-
-###### args
-
-...\[`object`, `MakeOptions`\]
-
-###### Returns
-
-[`MultiWorkerUnsupported`](#multiworkerunsupported)
-
-###### Inherited from
-
-`MultiWorkerUnsupported_base.constructor`
-
-#### Properties
-
-<a id="backend"></a>
-
-##### backend
-
-> `readonly` **backend**: `"sqlite"` \| `"mysql"`
-
-###### Inherited from
-
-`MultiWorkerUnsupported_base.backend`
-
-<a id="hint-25"></a>
-
-##### hint
-
-> `readonly` **hint**: `string`
-
-###### Inherited from
-
-`MultiWorkerUnsupported_base.hint`
-
-<a id="message-4"></a>
-
-##### message
-
-> `readonly` **message**: `string`
-
-###### Inherited from
-
-`MultiWorkerUnsupported_base.message`
-
-***
-
 <a id="nosnapshot"></a>
 
 ### NoSnapshot
@@ -1892,7 +1828,7 @@ A fork point includes sandbox state that has no committed image to restore.
 
 #### Constructors
 
-<a id="constructor-26"></a>
+<a id="constructor-25"></a>
 
 ##### Constructor
 
@@ -1924,7 +1860,7 @@ A fork point includes sandbox state that has no committed image to restore.
 
 `NoSnapshot_base.atSequence`
 
-<a id="hint-26"></a>
+<a id="hint-25"></a>
 
 ##### hint
 
@@ -1958,7 +1894,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Constructors
 
-<a id="constructor-27"></a>
+<a id="constructor-26"></a>
 
 ##### Constructor
 
@@ -1990,7 +1926,7 @@ One Run attempted to message a target outside its durable Run family.
 
 `NotInFamily_base.fromRunId`
 
-<a id="hint-27"></a>
+<a id="hint-26"></a>
 
 ##### hint
 
@@ -2022,7 +1958,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Constructors
 
-<a id="constructor-28"></a>
+<a id="constructor-27"></a>
 
 ##### Constructor
 
@@ -2044,7 +1980,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
-<a id="hint-28"></a>
+<a id="hint-27"></a>
 
 ##### hint
 
@@ -2096,7 +2032,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Constructors
 
-<a id="constructor-29"></a>
+<a id="constructor-28"></a>
 
 ##### Constructor
 
@@ -2118,7 +2054,7 @@ One Run attempted to message a target outside its durable Run family.
 
 #### Properties
 
-<a id="hint-29"></a>
+<a id="hint-28"></a>
 
 ##### hint
 
@@ -2162,7 +2098,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-30"></a>
+<a id="constructor-29"></a>
 
 ##### Constructor
 
@@ -2184,7 +2120,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-30"></a>
+<a id="hint-29"></a>
 
 ##### hint
 
@@ -2216,7 +2152,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-31"></a>
+<a id="constructor-30"></a>
 
 ##### Constructor
 
@@ -2248,7 +2184,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `RunIdConflict_base.existingRunId`
 
-<a id="hint-31"></a>
+<a id="hint-30"></a>
 
 ##### hint
 
@@ -2280,7 +2216,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-32"></a>
+<a id="constructor-31"></a>
 
 ##### Constructor
 
@@ -2302,7 +2238,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-32"></a>
+<a id="hint-31"></a>
 
 ##### hint
 
@@ -2334,7 +2270,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-33"></a>
+<a id="constructor-32"></a>
 
 ##### Constructor
 
@@ -2356,7 +2292,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-33"></a>
+<a id="hint-32"></a>
 
 ##### hint
 
@@ -2380,7 +2316,7 @@ A reject-policy message arrived while its target Run was executing.
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"succeeded"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"`
 
 ###### Inherited from
 
@@ -2398,7 +2334,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-34"></a>
+<a id="constructor-33"></a>
 
 ##### Constructor
 
@@ -2420,7 +2356,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-34"></a>
+<a id="hint-33"></a>
 
 ##### hint
 
@@ -2430,7 +2366,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `RuntimeUnavailable_base.hint`
 
-<a id="message-5"></a>
+<a id="message-4"></a>
 
 ##### message
 
@@ -2452,7 +2388,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-35"></a>
+<a id="constructor-34"></a>
 
 ##### Constructor
 
@@ -2484,7 +2420,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryCorrupt_base.entryId`
 
-<a id="hint-35"></a>
+<a id="hint-34"></a>
 
 ##### hint
 
@@ -2494,7 +2430,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryCorrupt_base.hint`
 
-<a id="message-6"></a>
+<a id="message-5"></a>
 
 ##### message
 
@@ -2526,7 +2462,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-36"></a>
+<a id="constructor-35"></a>
 
 ##### Constructor
 
@@ -2558,7 +2494,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryNotFound_base.entryId`
 
-<a id="hint-36"></a>
+<a id="hint-35"></a>
 
 ##### hint
 
@@ -2590,7 +2526,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-37"></a>
+<a id="constructor-36"></a>
 
 ##### Constructor
 
@@ -2622,7 +2558,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `StaleClaim_base.attemptFence`
 
-<a id="hint-37"></a>
+<a id="hint-36"></a>
 
 ##### hint
 
@@ -2664,7 +2600,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-38"></a>
+<a id="constructor-37"></a>
 
 ##### Constructor
 
@@ -2686,7 +2622,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-38"></a>
+<a id="hint-37"></a>
 
 ##### hint
 
@@ -2696,7 +2632,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `StartInvalid_base.hint`
 
-<a id="message-7"></a>
+<a id="message-6"></a>
 
 ##### message
 
@@ -2718,7 +2654,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-39"></a>
+<a id="constructor-38"></a>
 
 ##### Constructor
 
@@ -2740,7 +2676,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-39"></a>
+<a id="hint-38"></a>
 
 ##### hint
 
@@ -2782,7 +2718,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-40"></a>
+<a id="constructor-39"></a>
 
 ##### Constructor
 
@@ -2804,7 +2740,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-40"></a>
+<a id="hint-39"></a>
 
 ##### hint
 
@@ -2848,7 +2784,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Constructors
 
-<a id="constructor-41"></a>
+<a id="constructor-40"></a>
 
 ##### Constructor
 
@@ -2870,7 +2806,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Properties
 
-<a id="hint-41"></a>
+<a id="hint-40"></a>
 
 ##### hint
 
@@ -2912,7 +2848,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Constructors
 
-<a id="constructor-42"></a>
+<a id="constructor-41"></a>
 
 ##### Constructor
 
@@ -2954,7 +2890,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 `TreeCursorExpired_base.earliestCursor`
 
-<a id="hint-42"></a>
+<a id="hint-41"></a>
 
 ##### hint
 
@@ -2988,7 +2924,7 @@ The cursor names a position that has not committed.
 
 #### Constructors
 
-<a id="constructor-43"></a>
+<a id="constructor-42"></a>
 
 ##### Constructor
 
@@ -3020,7 +2956,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorFuture_base.cursor`
 
-<a id="hint-43"></a>
+<a id="hint-42"></a>
 
 ##### hint
 
@@ -3062,7 +2998,7 @@ The cursor names a position that has not committed.
 
 #### Constructors
 
-<a id="constructor-44"></a>
+<a id="constructor-43"></a>
 
 ##### Constructor
 
@@ -3094,7 +3030,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorInvalid_base.cursor`
 
-<a id="hint-44"></a>
+<a id="hint-43"></a>
 
 ##### hint
 
@@ -3104,7 +3040,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorInvalid_base.hint`
 
-<a id="message-8"></a>
+<a id="message-7"></a>
 
 ##### message
 
@@ -3138,7 +3074,7 @@ The cursor belongs to a different root Run.
 
 #### Constructors
 
-<a id="constructor-45"></a>
+<a id="constructor-44"></a>
 
 ##### Constructor
 
@@ -3180,7 +3116,7 @@ The cursor belongs to a different root Run.
 
 `TreeCursorRootMismatch_base.cursorRootRunId`
 
-<a id="hint-45"></a>
+<a id="hint-44"></a>
 
 ##### hint
 
@@ -3212,7 +3148,7 @@ The cursor belongs to a different root Run.
 
 #### Constructors
 
-<a id="constructor-46"></a>
+<a id="constructor-45"></a>
 
 ##### Constructor
 
@@ -3234,7 +3170,7 @@ The cursor belongs to a different root Run.
 
 #### Properties
 
-<a id="hint-46"></a>
+<a id="hint-45"></a>
 
 ##### hint
 
@@ -3244,7 +3180,7 @@ The cursor belongs to a different root Run.
 
 `TreePolicyInvalid_base.hint`
 
-<a id="message-9"></a>
+<a id="message-8"></a>
 
 ##### message
 
@@ -3268,7 +3204,7 @@ A replay request falls outside the fixed page-size contract.
 
 #### Constructors
 
-<a id="constructor-47"></a>
+<a id="constructor-46"></a>
 
 ##### Constructor
 
@@ -3290,7 +3226,7 @@ A replay request falls outside the fixed page-size contract.
 
 #### Properties
 
-<a id="hint-47"></a>
+<a id="hint-46"></a>
 
 ##### hint
 
@@ -3344,7 +3280,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Constructors
 
-<a id="constructor-48"></a>
+<a id="constructor-47"></a>
 
 ##### Constructor
 
@@ -3366,7 +3302,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
-<a id="hint-48"></a>
+<a id="hint-47"></a>
 
 ##### hint
 
@@ -3408,7 +3344,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Constructors
 
-<a id="constructor-49"></a>
+<a id="constructor-48"></a>
 
 ##### Constructor
 
@@ -3430,7 +3366,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
-<a id="hint-49"></a>
+<a id="hint-48"></a>
 
 ##### hint
 
@@ -3466,7 +3402,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 ### StructuredAgentFailure
 
-> **StructuredAgentFailure** = [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted) \| [`GateFailed`](../../generalist/namespaces/Gate#gatefailed) \| [`PermissionDenied`](../../generalist/namespaces/ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](../../generalist/namespaces/AgentEvent#resumemismatch)
+> **StructuredAgentFailure** = [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`GateFailed`](../../generalist/namespaces/Gate.md#gatefailed) \| [`PermissionDenied`](../../generalist/namespaces/ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](../../generalist/namespaces/AgentEvent.md#resumemismatch)
 
 The structured Agent failures a durable terminal event preserves verbatim.
 
@@ -3476,44 +3412,4 @@ The structured Agent failures a durable terminal event preserves verbatim.
 
 ### StructuredAgentFailure
 
-> **StructuredAgentFailure**: `Codec`\<[`StructuredAgentFailure`](#structuredagentfailure), \{ `expected?`: \{ `checkpoint`: \{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `argumentTaint?`: readonly `object`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}; `hint?`: `string`; `waits`: readonly `object`[]; \}; `hint?`: `string`; `reason`: `"checkpoint-not-found"` \| `"identity-mismatch"`; `received`: \{ `checkpoint`: \{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `argumentTaint?`: readonly `object`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}; `hint?`: `string`; `waits`: readonly `object`[]; \}; \} \| \{ `gate`: \{ `evidence`: `Json`; `name`: `string`; `verdict`: `"pass"` \| `"fail"`; \}; `hint?`: `string`; \} \| \{ `hint?`: `string`; `message`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; `hint?`: `string`; `remaining?`: `number`; `requested`: `number`; \}, `never`, `never`\>
-
-## References
-
-<a id="schemachecksummismatch"></a>
-
-### SchemaChecksumMismatch
-
-Re-exports [SchemaChecksumMismatch](../../runtime.sql-driver/index#schemachecksummismatch)
-
-***
-
-<a id="schemadirty"></a>
-
-### SchemaDirty
-
-Re-exports [SchemaDirty](../../runtime.sql-driver/index#schemadirty)
-
-***
-
-<a id="schemamigrationfailed"></a>
-
-### SchemaMigrationFailed
-
-Re-exports [SchemaMigrationFailed](../../runtime.sql-driver/index#schemamigrationfailed)
-
-***
-
-<a id="schemaupgraderequired"></a>
-
-### SchemaUpgradeRequired
-
-Re-exports [SchemaUpgradeRequired](../../runtime.sql-driver/index#schemaupgraderequired)
-
-***
-
-<a id="schemaversionunsupported"></a>
-
-### SchemaVersionUnsupported
-
-Re-exports [SchemaVersionUnsupported](../../runtime.sql-driver/index#schemaversionunsupported)
+> **StructuredAgentFailure**: `Codec`\<[`StructuredAgentFailure`](#structuredagentfailure), \{ `expected?`: \{ `checkpoint`: \{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `argumentTaint?`: readonly `object`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}; `hint`: `string`; `waits`: readonly `object`[]; \}; `hint`: `string`; `reason`: `"checkpoint-not-found"` \| `"identity-mismatch"`; `received`: \{ `checkpoint`: \{ `activatedSkills`: readonly `string`[]; `activeTools`: readonly `string`[]; `argumentTaint?`: readonly `object`[]; `authorizationContextDigest`: `string`; `calls`: readonly `object`[]; `invocationPath`: readonly `string`[]; `turn`: `number`; \}; `hint`: `string`; `waits`: readonly `object`[]; \}; \} \| \{ `gate`: \{ `evidence`: `Json`; `name`: `string`; `verdict`: `"pass"` \| `"fail"`; \}; `hint`: `string`; \} \| \{ `hint`: `string`; `message`: `string`; \} \| \{ `budget`: `"toolCalls"` \| `"tokens"` \| `"usd"` \| `"duration"` \| `"children"`; `hint`: `string`; `remaining?`: `number`; `requested`: `number`; \}, `never`, `never`\>

@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.learning
+[generalist](./index.md) / unstable.learning
 
 # unstable.learning
 
@@ -276,7 +276,7 @@ Scheduled semantic-memory consolidation configuration.
 
 ##### budget?
 
-> `readonly` `optional` **budget?**: [`Input`](./generalist/namespaces/RunBudget#input)
+> `readonly` `optional` **budget?**: [`Input`](./generalist/namespaces/RunBudget.md#input)
 
 **`Experimental`**
 
@@ -292,7 +292,7 @@ Scheduled semantic-memory consolidation configuration.
 
 ##### model
 
-> `readonly` **model**: `string` \| [`ModelSelection`](./generalist/namespaces/ModelRegistry#modelselection)
+> `readonly` **model**: `string` \| [`ModelSelection`](./generalist/namespaces/ModelRegistry.md#modelselection)
 
 **`Experimental`**
 
@@ -854,7 +854,7 @@ Build the scheduled journal-backed consolidation proposer used by `Learning.laye
 
 ### declaration
 
-> `const` **declaration**: \<`ProposeR`, `ProposeE`, `ApplyR`, `ApplyE`\>(`options`) => `Effect.Effect`\<[`Declaration`](./hooks#declaration), `never`, [`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`Approvals`](./approvals#approvals) \| `ProposeR` \| `ApplyR`\>
+> `const` **declaration**: \<`ProposeR`, `ProposeE`, `ApplyR`, `ApplyE`\>(`options`) => `Effect.Effect`\<[`Declaration`](./hooks.md#declaration), `never`, [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Approvals`](./approvals.md#approvals) \| `ProposeR` \| `ApplyR`\>
 
 **`Experimental`**
 
@@ -887,7 +887,7 @@ journal. Compose it with other declarations through `Hooks.layer([...])` or a Ho
 
 #### Returns
 
-`Effect.Effect`\<[`Declaration`](./hooks#declaration), `never`, [`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`Approvals`](./approvals#approvals) \| `ProposeR` \| `ApplyR`\>
+`Effect.Effect`\<[`Declaration`](./hooks.md#declaration), `never`, [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Approvals`](./approvals.md#approvals) \| `ProposeR` \| `ApplyR`\>
 
 ***
 
@@ -1021,7 +1021,7 @@ One exact run turn supporting a proposed change.
 
 #### Call Signature
 
-> **layer**\<`ApplyR`, `ApplyE`\>(`options`): `Layer`\<[`Hooks`](./hooks#hooks), [`DuplicateAgent`](./runtime/namespaces/Errors#duplicateagent) \| [`ConsolidationInvalid`](#consolidationinvalid) \| [`ScheduleError`](./runtime/namespaces/Runtime#scheduleerror), [`Approvals`](./approvals#approvals) \| [`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`Memory`](./generalist/namespaces/Memory#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry) \| `ApplyR`\>
+> **layer**\<`ApplyR`, `ApplyE`\>(`options`): `Layer`\<[`Hooks`](./hooks.md#hooks), [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`ConsolidationInvalid`](#consolidationinvalid) \| [`ScheduleError`](./runtime/namespaces/Runtime.md#scheduleerror), [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Memory`](./generalist/namespaces/Memory.md#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry) \| `ApplyR`\>
 
 **`Experimental`**
 
@@ -1046,11 +1046,11 @@ already has other hook declarations.
 
 ##### Returns
 
-`Layer`\<[`Hooks`](./hooks#hooks), [`DuplicateAgent`](./runtime/namespaces/Errors#duplicateagent) \| [`ConsolidationInvalid`](#consolidationinvalid) \| [`ScheduleError`](./runtime/namespaces/Runtime#scheduleerror), [`Approvals`](./approvals#approvals) \| [`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`Memory`](./generalist/namespaces/Memory#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry) \| `ApplyR`\>
+`Layer`\<[`Hooks`](./hooks.md#hooks), [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`ConsolidationInvalid`](#consolidationinvalid) \| [`ScheduleError`](./runtime/namespaces/Runtime.md#scheduleerror), [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Memory`](./generalist/namespaces/Memory.md#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry) \| `ApplyR`\>
 
 #### Call Signature
 
-> **layer**\<`ProposeR`, `ProposeE`, `ApplyR`, `ApplyE`\>(`options`): `Layer`\<[`Hooks`](./hooks#hooks), `never`, [`Approvals`](./approvals#approvals) \| [`Runtime`](./runtime/namespaces/Runtime#runtime) \| `ProposeR` \| `ApplyR`\>
+> **layer**\<`ProposeR`, `ProposeE`, `ApplyR`, `ApplyE`\>(`options`): `Layer`\<[`Hooks`](./hooks.md#hooks), `never`, [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| `ProposeR` \| `ApplyR`\>
 
 **`Experimental`**
 
@@ -1083,7 +1083,7 @@ already has other hook declarations.
 
 ##### Returns
 
-`Layer`\<[`Hooks`](./hooks#hooks), `never`, [`Approvals`](./approvals#approvals) \| [`Runtime`](./runtime/namespaces/Runtime#runtime) \| `ProposeR` \| `ApplyR`\>
+`Layer`\<[`Hooks`](./hooks.md#hooks), `never`, [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| `ProposeR` \| `ApplyR`\>
 
 ## References
 

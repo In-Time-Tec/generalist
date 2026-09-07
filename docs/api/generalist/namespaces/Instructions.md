@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Instructions
+[generalist](../../index.md) / [generalist](../index.md) / Instructions
 
 # Instructions
 
@@ -12,7 +12,7 @@
 
 ### Authorship
 
-Re-exports [Authorship](../../instructions/namespaces/Authorship)
+Re-exports [Authorship](../../instructions/namespaces/Authorship.md)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [Authorship](../../instructions/namespaces/Authorship)
 
 ### Entry
 
-Re-exports [Entry](../../instructions/namespaces/Entry)
+Re-exports [Entry](../../instructions/namespaces/Entry.md)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [Entry](../../instructions/namespaces/Entry)
 
 ### FileSystemStore
 
-Re-exports [FileSystemStore](../../instructions/namespaces/FileSystemStore)
+Re-exports [FileSystemStore](../../instructions/namespaces/FileSystemStore.md)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [FileSystemStore](../../instructions/namespaces/FileSystemStore)
 
 ### fromText
 
-Re-exports [fromText](../../instructions/index#fromtext)
+Re-exports [fromText](../../instructions/index.md#fromtext)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [fromText](../../instructions/index#fromtext)
 
 ### InstructionFile
 
-Re-exports [InstructionFile](../../instructions/index#instructionfile)
+Re-exports [InstructionFile](../../instructions/index.md#instructionfile)
 
 ***
 
@@ -52,7 +52,7 @@ Re-exports [InstructionFile](../../instructions/index#instructionfile)
 
 ### Instructions
 
-Re-exports [Instructions](../../instructions/index#instructions)
+Re-exports [Instructions](../../instructions/index.md#instructions)
 
 ***
 
@@ -60,7 +60,7 @@ Re-exports [Instructions](../../instructions/index#instructions)
 
 ### layer
 
-Re-exports [layer](../../instructions/index#layer)
+Re-exports [layer](../../instructions/index.md#layer)
 
 ***
 
@@ -68,7 +68,7 @@ Re-exports [layer](../../instructions/index#layer)
 
 ### layerTest
 
-Re-exports [layerTest](../../instructions/index#layertest)
+Re-exports [layerTest](../../instructions/index.md#layertest)
 
 ***
 
@@ -76,7 +76,7 @@ Re-exports [layerTest](../../instructions/index#layertest)
 
 ### load
 
-Re-exports [load](../../instructions/index#load)
+Re-exports [load](../../instructions/index.md#load)
 
 ***
 
@@ -84,7 +84,7 @@ Re-exports [load](../../instructions/index#load)
 
 ### Options
 
-Re-exports [Options](../../instructions/index#options)
+Re-exports [Options](../../instructions/index.md#options)
 
 ***
 
@@ -92,7 +92,7 @@ Re-exports [Options](../../instructions/index#options)
 
 ### Overview
 
-Re-exports [Overview](../../instructions/namespaces/Overview)
+Re-exports [Overview](../../instructions/namespaces/Overview.md)
 
 ***
 
@@ -100,7 +100,7 @@ Re-exports [Overview](../../instructions/namespaces/Overview)
 
 ### PackageCatalog
 
-Re-exports [PackageCatalog](../../instructions/namespaces/PackageCatalog)
+Re-exports [PackageCatalog](../../instructions/namespaces/PackageCatalog.md)
 
 ***
 
@@ -108,7 +108,7 @@ Re-exports [PackageCatalog](../../instructions/namespaces/PackageCatalog)
 
 ### Provider
 
-Re-exports [Provider](../../instructions/index#provider)
+Re-exports [Provider](../../instructions/index.md#provider)
 
 ***
 
@@ -116,7 +116,7 @@ Re-exports [Provider](../../instructions/index#provider)
 
 ### Refinement
 
-Re-exports [Refinement](../../instructions/namespaces/Refinement)
+Re-exports [Refinement](../../instructions/namespaces/Refinement.md)
 
 ***
 
@@ -124,7 +124,7 @@ Re-exports [Refinement](../../instructions/namespaces/Refinement)
 
 ### Registration
 
-Re-exports [Registration](../../instructions/namespaces/Registration)
+Re-exports [Registration](../../instructions/namespaces/Registration.md)
 
 ***
 
@@ -132,7 +132,7 @@ Re-exports [Registration](../../instructions/namespaces/Registration)
 
 ### render
 
-Re-exports [render](../../instructions/index#render-1)
+Re-exports [render](../../instructions/index.md#render-1)
 
 ***
 
@@ -140,7 +140,7 @@ Re-exports [render](../../instructions/index#render-1)
 
 ### RenderContext
 
-Re-exports [RenderContext](../../instructions/index#rendercontext)
+Re-exports [RenderContext](../../instructions/index.md#rendercontext)
 
 ***
 
@@ -148,7 +148,7 @@ Re-exports [RenderContext](../../instructions/index#rendercontext)
 
 ### Service
 
-Re-exports [Service](../../instructions/index#service)
+Re-exports [Service](../../instructions/index.md#service)
 
 ***
 
@@ -156,7 +156,7 @@ Re-exports [Service](../../instructions/index#service)
 
 ### Snapshot
 
-Re-exports [Snapshot](../../instructions/namespaces/Snapshot)
+Re-exports [Snapshot](../../instructions/namespaces/Snapshot.md)
 
 ***
 
@@ -164,7 +164,7 @@ Re-exports [Snapshot](../../instructions/namespaces/Snapshot)
 
 ### State
 
-Re-exports [State](../../instructions/namespaces/State)
+Re-exports [State](../../instructions/namespaces/State.md)
 
 ***
 
@@ -172,4 +172,4 @@ Re-exports [State](../../instructions/namespaces/State)
 
 ### Store
 
-Re-exports [Store](../../instructions/namespaces/Store)
+Re-exports [Store](../../instructions/namespaces/Store.md)

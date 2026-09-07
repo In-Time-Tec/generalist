@@ -136,9 +136,11 @@ const makeRuntimeWith = (
           sessionId: input.sessionId,
           idempotencyKey: input.idempotencyKey,
         })
-        .pipe(Effect.flatMap((admitted) =>
-          admitted ? validateRegistrations(input.executable, input.registrations) : attest(input),
-        ))
+        .pipe(
+          Effect.flatMap((admitted) =>
+            admitted ? validateRegistrations(input.executable, input.registrations) : attest(input),
+          ),
+        )
     const awaitFanOut = (fanOutId: string): ReturnType<RuntimeService["awaitFanOut"]> =>
       Effect.gen(function* () {
         const current = yield* store.inspectFanOut(fanOutId)
@@ -333,7 +335,8 @@ const makeRuntimeWith = (
       verify: (runId) => store.recoveryJournal(runId).pipe(Effect.map(verifyRecovery)),
       retry: (runId, operatorIdentity, commandId) =>
         store.retryRecovery({ commandId, runId, operator: operatorIdentity }),
-      wake: (runId, operatorIdentity, commandId) => store.wakeRecovery({ runId, operator: operatorIdentity, commandId }),
+      wake: (runId, operatorIdentity, commandId) =>
+        store.wakeRecovery({ runId, operator: operatorIdentity, commandId }),
       scanObligations: () =>
         operatorRuns.pipe(
           Stream.mapEffect((run) =>
@@ -479,6 +482,7 @@ const makeRuntimeWith = (
           : store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
       createSession: store.createHostSession,
       session: store.hostSession,
+      sessionSnapshot: store.hostSessionSnapshot,
       listSessions: store.listHostSessions,
       sessionRuns: store.hostSessionRuns,
       sessionEvents: (input) =>
@@ -499,10 +503,10 @@ const makeRuntimeWith = (
       respond: store.respond,
       respondApproval: store.respondApproval,
       signal: store.signal,
-      wake: (runId, event) =>
-        Schema.decodeEffect(WakeEvent, { onExcessProperty: "error" })(event).pipe(
+      wake: (input) =>
+        Schema.decodeEffect(WakeEvent, { onExcessProperty: "error" })(input.event).pipe(
           Effect.mapError((error) => WakeEventInvalid.make({ message: String(error) })),
-          Effect.flatMap((validated) => store.wake({ runId, event: validated })),
+          Effect.flatMap((validated) => store.wake({ ...input, event: validated })),
         ),
       cancel: (input) =>
         Effect.gen(function* () {

@@ -11,9 +11,10 @@ import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/
 import { ObjectStore } from "../../src/durability/object-store.js"
 
 const storage = makeObjectStorage()
-const runtime = objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([])),
-)
+const runtime = objectRuntimeLayer(
+  { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
+  storage,
+).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
 const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
   Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
 )
@@ -50,7 +51,9 @@ layer(services)("Artifact Runtime fork", (it) => {
       const source = yield* host.runs.start(session.id, writer, "read the plan")
       const store = yield* RunStore.RunStore
       const executor = yield* RunExecutor.RunExecutor
-      yield* executor.execute(yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId, commandId: "artifact-source-claim" }))
+      yield* executor.execute(
+        yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId, commandId: "artifact-source-claim" }),
+      )
       expect(yield* source.await).toBe("source done")
 
       const runtimeService = yield* Runtime.Runtime
@@ -68,7 +71,9 @@ layer(services)("Artifact Runtime fork", (it) => {
         attribution: { _tag: "Human", actor: "alice" },
       })
       const branch = yield* host.sessions.fork(source.id, { commandId: "artifact-fork", atSequence: read.sequence })
-      yield* executor.execute(yield* store.claimExecution({ runId: branch.id, ownerId: objectWorkerId, commandId: "artifact-branch-claim" }))
+      yield* executor.execute(
+        yield* store.claimExecution({ runId: branch.id, ownerId: objectWorkerId, commandId: "artifact-branch-claim" }),
+      )
       expect(yield* branch.await).toBe("branch done")
       expect(yield* Artifact.read(document)).toMatchObject({ version: 1, content: "main" })
 

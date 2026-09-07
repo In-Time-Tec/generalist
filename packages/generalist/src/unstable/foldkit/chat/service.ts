@@ -4,6 +4,7 @@ import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { AgentCommandError, CommandOperation, Connection, Incoming, SendFailed } from "./connection.js"
 import type { ClientApproval } from "./connection-command.js"
+import { Conversation } from "../../../runtime/session/conversation.js"
 
 type EmptyFields = Record<never, never>
 
@@ -92,8 +93,10 @@ export interface Model {
   readonly sessionId: string | null
   readonly connection: typeof ModelConnection.Type
   readonly lastSeq: number
+  readonly connectionEpoch: number
   readonly run: RunState
   readonly entries: ReadonlyArray<ChatEntry>
+  readonly conversation: Conversation
   readonly draft: string
 }
 
@@ -102,8 +105,10 @@ export const Model: Schema.Schema<Model> = Schema.Struct({
   sessionId: Schema.NullOr(Schema.String),
   connection: ModelConnection,
   lastSeq: Schema.Finite,
+  connectionEpoch: Schema.Int,
   run: RunState,
   entries: Schema.Array(ChatEntry),
+  conversation: Conversation,
   draft: Schema.String,
 })
 
@@ -317,8 +322,10 @@ export const initialModel = (sessionId: string | null = null): Model => ({
   sessionId,
   connection: "disconnected",
   lastSeq: -1,
+  connectionEpoch: -1,
   run: Idle(),
   entries: [],
+  conversation: { leafId: null, entries: [] },
   draft: "",
 })
 
@@ -386,7 +393,10 @@ export const CancelRun = define("CancelRun", {
   messages: [CancelledRun, FailedAgentCommand],
   execute: ({ sessionId, commandId }) =>
     Connection.use((connection) =>
-      catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId, commandId }).pipe(Effect.as(CancelledRun()))),
+      catchCommandFailure(
+        "cancel",
+        connection.send({ _tag: "Cancel", sessionId, commandId }).pipe(Effect.as(CancelledRun())),
+      ),
     ),
 })
 

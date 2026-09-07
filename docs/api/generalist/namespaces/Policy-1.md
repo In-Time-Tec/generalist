@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Policy
+[generalist](../../index.md) / [generalist](../index.md) / Policy
 
 # Policy
 

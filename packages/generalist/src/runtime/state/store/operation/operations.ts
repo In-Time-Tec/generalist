@@ -4,7 +4,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../../errors.js
 import type { OperationCompletionOutcome, RecordOperationInput } from "../../../run/store.js"
 import type { OperationRecord, OperationStatus } from "../../../operation/record.js"
 import { appendAgentEvent, appendLifecycle, rejectIfTerminal } from "../../append.js"
-import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../state.js"
+import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../projection.js"
 import { checkpointRef } from "../../../executable/manifest-internal.js"
 import {
   sameModelResponseEvent,
@@ -112,11 +112,19 @@ export const recordOperation: {
     input: RecordOperationInput,
   ): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: RecordOperationInput,
-  ): Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: RecordOperationInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
@@ -205,11 +213,19 @@ export const startOperation: {
     readonly operationId: string
   }): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: { readonly runId: string; readonly operationId: string },
-  ): Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
@@ -241,7 +257,11 @@ export const completeOperation: {
     readonly steeringEntryIds?: ReadonlyArray<string>
   }): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: {
@@ -254,7 +274,11 @@ export const completeOperation: {
       readonly continuation?: import("../../../run/steering.js").ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>
     },
-  ): Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(
   2,
   (
@@ -337,11 +361,19 @@ export const commitModelResponse: {
     input: CommitModelResponseInput,
   ): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: CommitModelResponseInput,
-  ): Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: CommitModelResponseInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
@@ -395,11 +427,19 @@ export const commitInterruptedModelResponse: {
     input: CommitInterruptedModelResponseInput,
   ): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: CommitInterruptedModelResponseInput,
-  ): Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [OperationRecord, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: CommitInterruptedModelResponseInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / TreePolicy
+[generalist](../../index.md) / [runtime](../index.md) / TreePolicy
 
 # TreePolicy
 
@@ -36,7 +36,7 @@ would not survive serialization or keep idempotency stable.
 
 ### normalize
 
-> `const` **normalize**: (`policy?`) => `Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors#treepolicyinvalid)\>
+> `const` **normalize**: (`policy?`) => `Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
 
 Decode and detach one root policy before its authoritative admission.
 
@@ -48,7 +48,7 @@ Decode and detach one root policy before its authoritative admission.
 
 #### Returns
 
-`Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors#treepolicyinvalid)\>
+`Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
 
 ***
 

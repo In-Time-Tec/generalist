@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / blob-store
+[generalist](./index.md) / blob-store
 
 # blob-store
 
@@ -116,7 +116,7 @@ Content-addressed BlobStore service.
 
 **`Experimental`**
 
-A BlobStore backend operation failed.
+Object access, encoding, or content integrity failed.
 
 #### Extends
 
@@ -262,25 +262,21 @@ Content exceeds the configured byte limit.
 
 ## Interfaces
 
-<a id="filesystemoptions"></a>
+<a id="layeroptions"></a>
 
-### FileSystemOptions
+### LayerOptions
 
 **`Experimental`**
 
-Content-addressed filesystem Layer options.
-
-#### Extends
-
-- [`LayerOptions`](#layeroptions)
+Explicit journal-compatible tenant namespace and maximum payload size for uploads and reads.
 
 #### Properties
 
-<a id="dir"></a>
+<a id="environment"></a>
 
-##### dir
+##### environment
 
-> `readonly` **dir**: `string`
+> `readonly` **environment**: `string`
 
 **`Experimental`**
 
@@ -292,32 +288,11 @@ Content-addressed filesystem Layer options.
 
 **`Experimental`**
 
-###### Inherited from
+<a id="tenant"></a>
 
-[`LayerOptions`](#layeroptions).[`maxBytes`](#maxbytes-2)
+##### tenant
 
-***
-
-<a id="layeroptions"></a>
-
-### LayerOptions
-
-**`Experimental`**
-
-Shared BlobStore Layer options.
-
-#### Extended by
-
-- [`FileSystemOptions`](#filesystemoptions)
-- [`S3Options`](#s3options)
-
-#### Properties
-
-<a id="maxbytes-2"></a>
-
-##### maxBytes?
-
-> `readonly` `optional` **maxBytes?**: `number`
+> `readonly` **tenant**: `string`
 
 **`Experimental`**
 
@@ -387,188 +362,6 @@ Provider transport preference for resolving a reference.
 
 ***
 
-<a id="s3client"></a>
-
-### S3Client
-
-**`Experimental`**
-
-Minimal S3-compatible client needed by BlobStore.
-
-#### Type Parameters
-
-##### E
-
-`E` = `unknown`
-
-#### Properties
-
-<a id="get"></a>
-
-##### get
-
-> `readonly` **get**: (`bucket`, `key`) => `Effect`\<`Option`\<[`S3Object`](#s3object)\>, `E`\>
-
-**`Experimental`**
-
-###### Parameters
-
-###### bucket
-
-`string`
-
-###### key
-
-`string`
-
-###### Returns
-
-`Effect`\<`Option`\<[`S3Object`](#s3object)\>, `E`\>
-
-<a id="head"></a>
-
-##### head
-
-> `readonly` **head**: (`bucket`, `key`) => `Effect`\<`boolean`, `E`\>
-
-**`Experimental`**
-
-###### Parameters
-
-###### bucket
-
-`string`
-
-###### key
-
-`string`
-
-###### Returns
-
-`Effect`\<`boolean`, `E`\>
-
-<a id="put"></a>
-
-##### put
-
-> `readonly` **put**: (`bucket`, `key`, `object`) => `Effect`\<`void`, `E`\>
-
-**`Experimental`**
-
-###### Parameters
-
-###### bucket
-
-`string`
-
-###### key
-
-`string`
-
-###### object
-
-[`S3Object`](#s3object)
-
-###### Returns
-
-`Effect`\<`void`, `E`\>
-
-***
-
-<a id="s3object"></a>
-
-### S3Object
-
-**`Experimental`**
-
-One object exchanged with an injected S3-compatible client.
-
-#### Properties
-
-<a id="data-1"></a>
-
-##### data
-
-> `readonly` **data**: `Uint8Array`
-
-**`Experimental`**
-
-<a id="filename"></a>
-
-##### filename?
-
-> `readonly` `optional` **filename?**: `string`
-
-**`Experimental`**
-
-<a id="mediatype"></a>
-
-##### mediaType
-
-> `readonly` **mediaType**: `string`
-
-**`Experimental`**
-
-<a id="url"></a>
-
-##### url?
-
-> `readonly` `optional` **url?**: `URL`
-
-**`Experimental`**
-
-***
-
-<a id="s3options"></a>
-
-### S3Options
-
-**`Experimental`**
-
-S3-compatible BlobStore Layer options.
-
-#### Extends
-
-- [`LayerOptions`](#layeroptions)
-
-#### Type Parameters
-
-##### E
-
-`E` = `unknown`
-
-#### Properties
-
-<a id="bucket"></a>
-
-##### bucket
-
-> `readonly` **bucket**: `string`
-
-**`Experimental`**
-
-<a id="client"></a>
-
-##### client
-
-> `readonly` **client**: [`S3Client`](#s3client)\<`E`\>
-
-**`Experimental`**
-
-<a id="maxbytes-3"></a>
-
-##### maxBytes?
-
-> `readonly` `optional` **maxBytes?**: `number`
-
-**`Experimental`**
-
-###### Inherited from
-
-[`LayerOptions`](#layeroptions).[`maxBytes`](#maxbytes-2)
-
-***
-
 <a id="service"></a>
 
 ### Service
@@ -579,7 +372,7 @@ Content-addressed storage operations.
 
 #### Properties
 
-<a id="get-1"></a>
+<a id="get"></a>
 
 ##### get
 
@@ -597,7 +390,7 @@ Content-addressed storage operations.
 
 `Effect`\<\{ `data`: `Uint8Array`; `ref`: \{ `bytes`: `number`; `filename?`: `string`; `mediaType`: `string`; `sha256`: `string`; \}; \}, [`BlobNotFound`](#blobnotfound) \| [`BlobStoreError`](#blobstoreerror)\>
 
-<a id="put-1"></a>
+<a id="put"></a>
 
 ##### put
 
@@ -675,7 +468,7 @@ Stored content and its canonical reference.
 
 ***
 
-<a id="put-2"></a>
+<a id="put-1"></a>
 
 ### Put
 
@@ -699,101 +492,29 @@ Stored content and its canonical reference.
 
 ***
 
-<a id="layerfilesystem"></a>
+<a id="layer"></a>
 
-### layerFileSystem
+### layer
 
-> `const` **layerFileSystem**: (`options`) => `Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `ObjectStore`\>
 
 **`Experimental`**
 
-Content-addressed files with a schema-encoded metadata sidecar.
+Immutable object-backed content storage; requires no maintenance credentials.
 
 #### Parameters
 
 ##### options
 
-[`FileSystemOptions`](#filesystemoptions)
-
-#### Returns
-
-`Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `FileSystem.FileSystem` \| `Path.Path`\>
-
-***
-
-<a id="layermemory"></a>
-
-### layerMemory
-
-> `const` **layerMemory**: (`options?`) => `Layer.Layer`\<[`BlobStore`](#blobstore), `never`, `Crypto.Crypto`\>
-
-**`Experimental`**
-
-Process-local content-addressed storage.
-
-#### Parameters
-
-##### options?
-
 [`LayerOptions`](#layeroptions)
 
 #### Returns
 
-`Layer.Layer`\<[`BlobStore`](#blobstore), `never`, `Crypto.Crypto`\>
+`Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `ObjectStore`\>
 
 ***
 
-<a id="layers3"></a>
-
-### layerS3
-
-> `const` **layerS3**: \<`E`\>(`options`) => `Layer.Layer`\<[`BlobStore`](#blobstore), `never`, `Crypto.Crypto`\>
-
-**`Experimental`**
-
-S3-compatible storage through an injected client; no AWS SDK is required.
-
-#### Type Parameters
-
-##### E
-
-`E`
-
-#### Parameters
-
-##### options
-
-[`S3Options`](#s3options)\<`E`\>
-
-#### Returns
-
-`Layer.Layer`\<[`BlobStore`](#blobstore), `never`, `Crypto.Crypto`\>
-
-***
-
-<a id="layersql"></a>
-
-### layerSql
-
-> `const` **layerSql**: (`options?`) => `Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `SqlClient.SqlClient`\>
-
-**`Experimental`**
-
-Portable SQL storage over the runtime SqlClient seam.
-
-#### Parameters
-
-##### options?
-
-[`LayerOptions`](#layeroptions)
-
-#### Returns
-
-`Layer.Layer`\<[`BlobStore`](#blobstore), [`BlobStoreError`](#blobstoreerror), `Crypto.Crypto` \| `SqlClient.SqlClient`\>
-
-***
-
-<a id="put-3"></a>
+<a id="put-2"></a>
 
 ### Put
 

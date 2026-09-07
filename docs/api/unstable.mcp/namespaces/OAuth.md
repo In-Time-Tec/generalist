@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.mcp](../index) / OAuth
+[generalist](../../index.md) / [unstable.mcp](../index.md) / OAuth
 
 # OAuth
 
@@ -12,7 +12,7 @@
 
 ### Authorization
 
-Re-exports [Authorization](../../unstable.mcp.oauth#authorization)
+Re-exports [Authorization](../../unstable.mcp.oauth.md#authorization)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [Authorization](../../unstable.mcp.oauth#authorization)
 
 ### Configuration
 
-Re-exports [Configuration](../../unstable.mcp.oauth#configuration)
+Re-exports [Configuration](../../unstable.mcp.oauth.md#configuration)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [Configuration](../../unstable.mcp.oauth#configuration)
 
 ### layer
 
-Re-exports [layer](../../unstable.mcp.oauth#layer)
+Re-exports [layer](../../unstable.mcp.oauth.md#layer)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [layer](../../unstable.mcp.oauth#layer)
 
 ### layerTest
 
-Re-exports [layerTest](../../unstable.mcp.oauth#layertest)
+Re-exports [layerTest](../../unstable.mcp.oauth.md#layertest)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [layerTest](../../unstable.mcp.oauth#layertest)
 
 ### layerTokenStoreMemory
 
-Re-exports [layerTokenStoreMemory](../../unstable.mcp.oauth#layertokenstorememory)
+Re-exports [layerTokenStoreMemory](../../unstable.mcp.oauth.md#layertokenstorememory)
 
 ***
 
@@ -52,7 +52,7 @@ Re-exports [layerTokenStoreMemory](../../unstable.mcp.oauth#layertokenstorememor
 
 ### layerTokenStoreTest
 
-Re-exports [layerTokenStoreTest](../../unstable.mcp.oauth#layertokenstoretest)
+Re-exports [layerTokenStoreTest](../../unstable.mcp.oauth.md#layertokenstoretest)
 
 ***
 
@@ -60,7 +60,7 @@ Re-exports [layerTokenStoreTest](../../unstable.mcp.oauth#layertokenstoretest)
 
 ### OAuth
 
-Re-exports [OAuth](../../unstable.mcp.oauth#oauth)
+Re-exports [OAuth](../../unstable.mcp.oauth.md#oauth)
 
 ***
 
@@ -68,7 +68,7 @@ Re-exports [OAuth](../../unstable.mcp.oauth#oauth)
 
 ### OAuthDenied
 
-Re-exports [OAuthDenied](../../unstable.mcp.oauth#oauthdenied)
+Re-exports [OAuthDenied](../../unstable.mcp.oauth.md#oauthdenied)
 
 ***
 
@@ -76,7 +76,7 @@ Re-exports [OAuthDenied](../../unstable.mcp.oauth#oauthdenied)
 
 ### OAuthExpired
 
-Re-exports [OAuthExpired](../../unstable.mcp.oauth#oauthexpired)
+Re-exports [OAuthExpired](../../unstable.mcp.oauth.md#oauthexpired)
 
 ***
 
@@ -84,7 +84,7 @@ Re-exports [OAuthExpired](../../unstable.mcp.oauth#oauthexpired)
 
 ### OAuthPending
 
-Re-exports [OAuthPending](../../unstable.mcp.oauth#oauthpending)
+Re-exports [OAuthPending](../../unstable.mcp.oauth.md#oauthpending)
 
 ***
 
@@ -92,7 +92,7 @@ Re-exports [OAuthPending](../../unstable.mcp.oauth#oauthpending)
 
 ### OAuthProviderError
 
-Re-exports [OAuthProviderError](../../unstable.mcp.oauth#oauthprovidererror)
+Re-exports [OAuthProviderError](../../unstable.mcp.oauth.md#oauthprovidererror)
 
 ***
 
@@ -100,7 +100,7 @@ Re-exports [OAuthProviderError](../../unstable.mcp.oauth#oauthprovidererror)
 
 ### Service
 
-Re-exports [Service](../../unstable.mcp.oauth#service)
+Re-exports [Service](../../unstable.mcp.oauth.md#service)
 
 ***
 
@@ -108,4 +108,4 @@ Re-exports [Service](../../unstable.mcp.oauth#service)
 
 ### TokenStore
 
-Re-exports [TokenStore](../../unstable.mcp.oauth#tokenstore)
+Re-exports [TokenStore](../../unstable.mcp.oauth.md#tokenstore)

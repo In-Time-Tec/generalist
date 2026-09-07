@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.amazon-bedrock
+[generalist](./index.md) / providers.amazon-bedrock
 
 # providers.amazon-bedrock
 
@@ -310,7 +310,7 @@
 
 ##### requestHandler?
 
-> `readonly` `optional` **requestHandler?**: (Record\<string, unknown\> \| NodeHttpHandlerOptions \| FetchHttpHandlerOptions \| RequestHandler\<any, any, HttpHandlerOptions\>) & HttpHandlerUserInput
+> `readonly` `optional` **requestHandler?**: (NodeHttpHandlerOptions \| FetchHttpHandlerOptions \| Record\<string, unknown\> \| RequestHandler\<any, any, HttpHandlerOptions\>) & HttpHandlerUserInput
 
 ***
 
@@ -416,7 +416,7 @@ Amazon Bedrock embedding model configuration.
 
 #### Extends
 
-- [`RegistrationOptions`](./providers.openai#registrationoptions)
+- [`RegistrationOptions`](./providers.openai.md#registrationoptions)
 
 #### Properties
 
@@ -506,7 +506,7 @@ Amazon Bedrock embedding model configuration.
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`metadata`](./providers.openai.md#metadata-3)
 
 <a id="model-1"></a>
 
@@ -522,7 +522,7 @@ Amazon Bedrock embedding model configuration.
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`registrationKey`](./providers.openai.md#registrationkey-3)
 
 ***
 
@@ -618,7 +618,7 @@ Amazon Bedrock embedding model configuration.
 
 ### classifyFailure
 
-> `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 ***
 
@@ -684,7 +684,7 @@ identity, ECS and EC2 instance metadata. Values are resolved for every call.
 
 ### layer
 
-> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `never`, `never`\>
+> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `never`, `never`\>
 
 #### Parameters
 
@@ -694,7 +694,7 @@ identity, ECS and EC2 instance metadata. Values are resolved for every call.
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `never`, `never`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `never`, `never`\>
 
 ***
 
@@ -816,4 +816,4 @@ Effect AI EmbeddingModel backed by Bedrock InvokeModel.
 
 ### toolJsonSchemaCompiler
 
-> `const` **toolJsonSchemaCompiler**: [`ToolJsonSchemaCompiler`](./generalist/namespaces/ModelRegistry#tooljsonschemacompiler-1)
+> `const` **toolJsonSchemaCompiler**: [`ToolJsonSchemaCompiler`](./generalist/namespaces/ModelRegistry.md#tooljsonschemacompiler-1)

@@ -1,5 +1,4 @@
-import type { PreparedObservation } from "./observation.js"
-import { occurredAt as preparedOccurredAt } from "./observation.js"
+import { type PreparedObservation, occurredAt as preparedOccurredAt } from "./observation.js"
 import { Effect, Function, Option, Types } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
@@ -10,9 +9,10 @@ import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionResult } from "../execution/state.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run/event.js"
-import type { RuntimePublication, RuntimeState, StoredRun, SubscriberQueue } from "./state.js"
+import type { RuntimePublication, RuntimeState, StoredRun, SubscriberQueue } from "./projection.js"
 import { projectTreeEvent } from "../tree/event.js"
 import { appendTerminalToolResults } from "./session-store.js"
+import type { HostSessionEvent } from "../session/host.js"
 
 const occurredAt = preparedOccurredAt
 type MutableStoredRun = { -readonly [Key in keyof StoredRun]: StoredRun[Key] }
@@ -189,7 +189,7 @@ export const appendEvent: {
       const hostSession = rootRun === undefined ? undefined : hostSessions.get(rootRun.message.sessionId)
       if (hostSession !== undefined) {
         const cursor = hostSession.lastCursor + 1
-        const entry = { cursor, event }
+        const entry: HostSessionEvent = { _tag: "Run", cursor, event }
         hostSessions.set(hostSession.session.id, {
           ...hostSession,
           lastCursor: cursor,

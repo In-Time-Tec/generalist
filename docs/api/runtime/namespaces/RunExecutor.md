@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / RunExecutor
+[generalist](../../index.md) / [runtime](../index.md) / RunExecutor
 
 # RunExecutor
 
@@ -84,7 +84,7 @@
 
 ### layer
 
-> `const` **layer**: `Layer.Layer`\<[`RunExecutor`](#runexecutor), `never`, `ActiveExecutions` \| [`ExecutableResolver`](./ExecutableResolver#executableresolver) \| [`RunStore`](./RunStore#runstore)\>
+> `const` **layer**: `Layer.Layer`\<[`RunExecutor`](#runexecutor), `never`, `ActiveExecutions` \| [`ExecutableResolver`](./ExecutableResolver.md#executableresolver) \| [`RunStore`](./RunStore.md#runstore)\>
 
 ***
 
@@ -92,7 +92,7 @@
 
 ### layerRegisteredAgents
 
-> `const` **layerRegisteredAgents**: (`agents`) => `Layer.Layer`\<[`RunExecutor`](#runexecutor), `never`, `ActiveExecutions` \| [`ExecutableResolver`](./ExecutableResolver#executableresolver) \| [`RunStore`](./RunStore#runstore)\>
+> `const` **layerRegisteredAgents**: (`agents`) => `Layer.Layer`\<[`RunExecutor`](#runexecutor), `never`, `ActiveExecutions` \| [`ExecutableResolver`](./ExecutableResolver.md#executableresolver) \| [`RunStore`](./RunStore.md#runstore)\>
 
 #### Parameters
 
@@ -102,4 +102,4 @@
 
 #### Returns
 
-`Layer.Layer`\<[`RunExecutor`](#runexecutor), `never`, `ActiveExecutions` \| [`ExecutableResolver`](./ExecutableResolver#executableresolver) \| [`RunStore`](./RunStore#runstore)\>
+`Layer.Layer`\<[`RunExecutor`](#runexecutor), `never`, `ActiveExecutions` \| [`ExecutableResolver`](./ExecutableResolver.md#executableresolver) \| [`RunStore`](./RunStore.md#runstore)\>

@@ -1,12 +1,11 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAt as preparedOccurredAt, occurredAtMillis } from "../../observation.js"
+import { type PreparedObservation, occurredAt as preparedOccurredAt, occurredAtMillis } from "../../observation.js"
 import { Effect, Function } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
 import { ownsChildSuspension, resultFromChildEvent } from "../../../child/group.js"
 import { isTerminal } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"
 import { appendLifecycle, childReadinessChangedEvent, childSettledEvent, resumedEvent } from "../../append.js"
-import { openRunWaits, type RuntimeState, type StoredRun } from "../../state.js"
+import { openRunWaits, type RuntimeState, type StoredRun } from "../../projection.js"
 import { admitChildSettlement } from "../directory.js"
 import { closeWait } from "../control/wait.js"
 import { spendForEvents } from "../../../execution/inspection.js"
@@ -92,8 +91,15 @@ export const reconcileChildWait: {
 )
 
 export const settleParentChild: {
-  (child: StoredRun, terminalEventId: string): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
-  (state: RuntimeState, child: StoredRun, terminalEventId: string): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+  (
+    child: StoredRun,
+    terminalEventId: string,
+  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+  (
+    state: RuntimeState,
+    child: StoredRun,
+    terminalEventId: string,
+  ): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
 } = Function.dual(3, (state: RuntimeState, child: StoredRun, terminalEventId: string) =>
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return state
@@ -118,7 +124,11 @@ export const settleParentChild: {
     const [, linked] = yield* appendLifecycle(
       readinessChanged,
       parent.runId,
-      childSettledEvent({ childRunId: child.runId, terminalEventId, spend: yield* spendForEvents(child.events, yield* occurredAtMillis) }),
+      childSettledEvent({
+        childRunId: child.runId,
+        terminalEventId,
+        spend: yield* spendForEvents({ events: child.events, observedMillis: yield* occurredAtMillis }),
+      }),
     )
     const currentParent = linked.runs.get(parent.runId)
     const reconciled =

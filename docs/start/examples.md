@@ -3,7 +3,7 @@ title: "Examples"
 description: "Choose a runnable example to build on."
 ---
 
-These examples cover common starting points. They use scripted models by default; the research agent can also connect to live providers.
+These examples cover common starting points. They use scripted models by default; the research agent can also connect to live providers, which require credentials and incur costs. Durable examples additionally need an object service. Local acceptance provisions MinIO and Miniflare/workerd without external service credentials; it does not certify AWS or deployed R2.
 
 **Terminal**
 
@@ -14,15 +14,17 @@ bun install --frozen-lockfile
 bun run build
 ```
 
-## Local and SQLite in five minutes
+## Local and object recovery in five minutes
 
-Start with [examples/five-minutes](https://github.com/In-Time-Tec/generalist/tree/main/examples/five-minutes). After the setup above:
+Start with [examples/five-minutes](https://github.com/In-Time-Tec/generalist/tree/main/examples/five-minutes). Configure a fresh object namespace using its README before running:
 
 ```bash
 bun run --cwd examples/five-minutes start
 ```
 
-It prints `Local: A durable agent can continue an accepted run after its host restarts.` and then `Recovered <runId>:` with the same summary. It closes the first SQLite Runtime scope, opens a fresh Layer on the same file, and starts with the same Session and idempotency key. The example asserts that the Run ID and output match. The temporary database is removed when the example exits; this is a reopen demonstration, not a database deployment recipe.
+It prints `Local: A durable agent can continue an accepted run after its host restarts.` and then `Recovered <runId>:` with the same summary. It closes the first object-backed Runtime scope, opens a fresh Layer on the same namespace, and starts with the same Session and idempotency key. The example asserts that the Run ID and output match. It does not delete the namespace. Missing object configuration is a startup error, not a fallback to an in-memory Runtime.
+
+For self-provisioned local transport acceptance, run `bun --bun vitest run packages/generalist/test/durability/object-store.test.ts --no-file-parallelism` with Docker available. This is a local service test, not a live model or cloud deployment test. See [object durability](/features/durable-stores) for the transport contract and emulator limitations.
 
 ## More examples
 
@@ -31,7 +33,7 @@ It prints `Local: A durable agent can continue an accepted run after its host re
 | `tool-calling-chatbot`     | An offline agent that emits a tool call, executes it through a ToolExecutor, and returns a final answer                                            | `bun --cwd examples/tool-calling-chatbot start`     |
 | `eval-in-ci`               | A deterministic no-credential smoke eval over `Agent.run` using the ModelRegistry.withModel pattern                                                | `bun --cwd examples/eval-in-ci start`               |
 | `structured-extraction`    | An offline `Agent.run` call that validates terminal model output with Effect Schema                                                                | `bun --cwd examples/structured-extraction start`    |
-| `hitl-over-sse`            | An approval suspension captured as canonical RunEvents from Runtime.layerMemory and encoded for SSE                                                | `bun --cwd examples/hitl-over-sse start`            |
+| `hitl-over-sse`            | An approval suspension captured as canonical object-backed RunEvents and encoded for SSE; requires object configuration                            | `bun --cwd examples/hitl-over-sse start`            |
 | `multi-agent`              | Typed `Agent.fanOut` with two child agents and the deterministic provider                                                                          | `bun --cwd examples/multi-agent start`              |
 | `memory-chat`              | Two local turns with the same memory key; the second turn receives working-memory recall                                                           | `bun --cwd examples/memory-chat start`              |
 | `mcp-agent`                | An agent over a fake in-memory MCP client using the `generalist/unstable/mcp/tools` adapter shape of a real connection                             | `bun --cwd examples/mcp-agent start`                |

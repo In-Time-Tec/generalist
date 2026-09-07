@@ -1,19 +1,24 @@
-# Runtime
+---
+title: "Runtime"
+description: "Admit addressable Runs and activate scoped execution over canonical object state."
+---
 
-The Runtime registers typed Agents by unique name and turns an Agent value plus typed input into an addressable `Run`. The store's journal, cursor, and claim remain the authority for execution and recovery. Memory and SQLite host their own scheduler; SQL adapters expose the same state machine to fenced workers.
+The Runtime registers typed Agents by unique name and turns an Agent value plus typed input into an addressable `Run`. The store's journal, cursor, and claim remain the authority for execution and recovery. One object-native engine supplies that authority through S3 or native R2, independently of the compute host.
 
 ## Usage
 
 ```ts
 import { Effect, Layer } from "effect"
 import { Agent } from "generalist"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as Durability from "generalist/durability"
+import { Runtime } from "generalist/runtime"
 
 const agent = Agent.make({ name: "build-explainer" })
 declare const agentServices: Layer.Layer<Agent.Requirements<typeof agent>>
-declare const resolverLayer: Layer.Layer<ExecutableResolver.ExecutableResolver>
+declare const runtimeLayer: Layer.Layer<Durability.RuntimeServices>
 
 const program = Effect.gen(function* () {
+  yield* Durability.activate
   const runtime = yield* Runtime.Runtime
   yield* runtime.register(agent)
   const handle = yield* runtime.start(agent, "Explain the failed build", {
@@ -23,11 +28,13 @@ const program = Effect.gen(function* () {
   return yield* handle.await
 })
 
-const memory = Layer.merge(Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(resolverLayer)), agentServices)
-Effect.runPromise(program.pipe(Effect.provide(memory)))
+const services = Layer.merge(runtimeLayer, agentServices)
+Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(services)))
 ```
 
-`register` captures the Agent's exact service environment once per process. `start` is immediate admission: the scoped memory scheduler can claim the returned Run without an application claim loop. `handle.await` returns the Agent's schema-decoded output, `handle.events` replays then follows the Run, and `inspect` reports authoritative lifecycle state.
+This is a composition fragment: `runtimeLayer` must provide the object transport, explicit namespace, Crypto, and executable resolver described in [object durability](./durable-stores.md). Layer construction is read-only; activation owns execution in the scope.
+
+`register` captures the Agent's exact service environment once per process. `start` is immediate admission: the activated scoped scheduler can claim the returned Run without an application claim loop. `handle.await` returns the Agent's schema-decoded output, `handle.events` replays then follows the Run, and `inspect` reports authoritative lifecycle state.
 
 ## What runs
 
@@ -86,7 +93,7 @@ worker/process loss
 
 ### Admission and identity
 
-- `generalist/runtime` is Worker-safe and supplies the contract plus memory implementation; Bun SQLite, SQL claims, and hosted SQL worker loops are opt-in subpaths. A blocking ask is not a Runtime primitive.
+- `generalist/runtime` is the Worker-safe execution contract. Compose `generalist/durability` with S3 or native R2; Core remains process-local without either. A blocking ask is not a Runtime primitive.
 - `Address` is an opaque routing key bound by a Layer to a pinned executable. `Message` carries Effect AI `Prompt`, idempotency, Session/lane, and correlation fields; Runtime adds no content vocabulary.
 - `register` rejects duplicate Agent names in one Runtime process. `start(agent, input, options)` requires that registration, Schema-encodes the input, and atomically persists the generated executable identity, secret-free reconstruction registrations, and Run. An exact `{ sessionId, idempotencyKey }` retry returns a handle for the same Run ID without admitting a second run.
 - Recovery resolves typed starts by the persisted Agent name against the new process's registered set. A missing name suspends the Run with `UnknownAgent { name, runId }` instead of failing it or dispatching work.
@@ -116,13 +123,13 @@ worker/process loss
 - Pure/provider-idempotent stale operations return to `requested`; `never` operations become `unknown`. `resolveOperation` atomically records schema-backed `Succeeded`, `Failed`, or `Retry` without changing the checkpoint; exact replay is idempotent, changed resolution conflicts, and all unknowns must resolve before replay continues without redispatch.
 - `RunExecutor` attests the persisted executable closure, reconstructs the Agent and checkpoint, uses a fenced journal, and settles an active failure before the Run terminal event. Retryable post-turn model-stream failure gets at most two more attempts on the same Run/fence; completed operations replay, and attempt 3 terminalizes with the original failure.
 - Compaction emits `CompactionStarted`, then `CompactionSkipped`, `CompactionApplied`, or `CompactionFailed`; applied state and deterministic checkpoint commit together. Compacting manifests require compaction-service and summary-model registrations; payload policy is secret-free and the manifest alone owns context limits.
-- Memory and SQLite layers own one scoped scheduler. Exit finalizes resolver/execution scope, releases only the exact `(runId, ownerId, attemptFence)`, then removes the active marker; stale release cannot clear a replacement claim, and interruption makes only that host's nonterminal work reclaimable.
+- The activated host scope owns execution and scheduler fibers. Exit finalizes resolver/execution scopes; stale authority cannot release or mutate a replacement claim.
 - Child settlement reconciliation pages waiting parents, not terminal Runs; each keyed wait is reread before conditional close. Idle cost is three bounded list calls, and cost scales with waiting parents/children rather than terminal backlog.
-- Memory preserves admission, FIFO, controls, waits, cancellation, children, operations, and replay but loses all state when its Layer is released. SQLite is durable single-process (`multiWorker: false`), uses WAL, foreign keys, and `BEGIN IMMEDIATE`, and automatically creates/verifies the single version-7 baseline; dirty, checksum, old/future version, migration, and multi-worker errors are typed.
+- There is no production memory, filesystem, or SQL Runtime. Test-only object simulators exercise the same engine but are not restart-safe production storage.
 - Runtime drivers also own product-facing Host Session metadata, root Run membership, and one strict Session event cursor. Descendant events inherit the root Run's Host Session, while Session run lists contain roots only. `sessionEvents` replays committed events strictly after its exclusive cursor, then follows live events.
-- PostgreSQL and MySQL are durable multi-worker adapters with verify-only startup and explicit `RuntimeSchema` predeploy work. Both use database-time leases, monotonic Run fences and Session writer epochs, lane-head claims, stale-owner rejection, and bounded fallback sweeps; PostgreSQL uses `LISTEN`/`NOTIFY` hints, while MySQL followers poll committed history.
-- SQL wakeups are lossy hints only; replay after the authoritative cursor and bounded probes close missed notifications. Per-Run sequence allocation has no `MAX` race, and new events receive a transactional root-relative tree position.
-- SQL telemetry records bounded backend/transition/outcome attributes; Run/Operation IDs are trace-only. Session/model content, checkpoints, tool payloads, SQL parameters, and durable payloads are never telemetry attributes.
+- Object journal commits order ownership generations, Run-attempt fences, Session writer authority, and protected transitions. Missing executable or component pins fail closed on reconstruction.
+- Wakeups are lossy hints only; replay after the authoritative cursor and independent reconciliation recover missed delivery.
+- Telemetry must not expose credentials, Session/model content, checkpoints, tool payloads, or canonical bytes.
 - Opaque canonical JSON is schema-coded; correctness queries do not inspect payload JSON.
 
 ## Related

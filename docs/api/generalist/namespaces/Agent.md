@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Agent
+[generalist](../../index.md) / [generalist](../index.md) / Agent
 
 # Agent
 
@@ -222,7 +222,7 @@ An Agent definition carrying its tools, requirements, input, and output contract
 
 ##### authorization?
 
-> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
+> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization.md#authorizer)\<`AuthorizationServices`\>
 
 <a id="budget"></a>
 
@@ -264,7 +264,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### gates
 
-> `readonly` **gates**: readonly [`Any`](./Gate#any)[]
+> `readonly` **gates**: readonly [`Any`](./Gate.md#any)[]
 
 <a id="generalistcoreagent"></a>
 
@@ -318,7 +318,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### memory?
 
-> `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+> `readonly` `optional` **memory?**: [`Key`](./Memory.md#key-1)
 
 <a id="metadata"></a>
 
@@ -330,7 +330,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### model?
 
-> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry.md#modelselection)
 
 <a id="name"></a>
 
@@ -342,7 +342,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### onGateFailure
 
-> `readonly` **onGateFailure**: [`FailureMode`](./Gate#failuremode)
+> `readonly` **onGateFailure**: [`FailureMode`](./Gate.md#failuremode)
 
 <a id="output"></a>
 
@@ -354,13 +354,13 @@ Capability descriptors attached only by child inheritance.
 
 ##### policy
 
-> `readonly` **policy**: [`Policy`](./Policy-1#policy)\<`PolicyServices`\>
+> `readonly` **policy**: [`Policy`](./Policy-1.md#policy)\<`PolicyServices`\>
 
 <a id="sandbox"></a>
 
 ##### sandbox?
 
-> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
+> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox.md#sandboxservice)
 
 <a id="supplemental"></a>
 
@@ -404,7 +404,7 @@ One Agent observed where its tool and requirement types are hidden.
 
 ##### authorization?
 
-> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`unknown`\>
+> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization.md#authorizer)\<`unknown`\>
 
 <a id="budget-1"></a>
 
@@ -446,7 +446,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### gates
 
-> `readonly` **gates**: readonly [`Any`](./Gate#any)[]
+> `readonly` **gates**: readonly [`Any`](./Gate.md#any)[]
 
 <a id="generalistcoreagent-1"></a>
 
@@ -470,7 +470,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### memory?
 
-> `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+> `readonly` `optional` **memory?**: [`Key`](./Memory.md#key-1)
 
 <a id="metadata-1"></a>
 
@@ -482,7 +482,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### model?
 
-> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry.md#modelselection)
 
 <a id="name-1"></a>
 
@@ -494,7 +494,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### onGateFailure
 
-> `readonly` **onGateFailure**: [`FailureMode`](./Gate#failuremode)
+> `readonly` **onGateFailure**: [`FailureMode`](./Gate.md#failuremode)
 
 <a id="output-1"></a>
 
@@ -506,13 +506,13 @@ Capability descriptors attached only by child inheritance.
 
 ##### policy
 
-> `readonly` **policy**: [`Policy`](./Policy-1#policy)\<`unknown`\>
+> `readonly` **policy**: [`Policy`](./Policy-1.md#policy)\<`unknown`\>
 
 <a id="sandbox-1"></a>
 
 ##### sandbox?
 
-> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
+> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox.md#sandboxservice)
 
 <a id="tooldeclarations-1"></a>
 
@@ -564,7 +564,7 @@ An Agent closed over its exact environment.
 
 ##### authorization?
 
-> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`unknown`\>
+> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization.md#authorizer)\<`unknown`\>
 
 ###### Inherited from
 
@@ -618,7 +618,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### gates
 
-> `readonly` **gates**: readonly [`Any`](./Gate#any)[]
+> `readonly` **gates**: readonly [`Any`](./Gate.md#any)[]
 
 ###### Inherited from
 
@@ -658,7 +658,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### memory?
 
-> `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+> `readonly` `optional` **memory?**: [`Key`](./Memory.md#key-1)
 
 ###### Inherited from
 
@@ -678,7 +678,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### model?
 
-> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry.md#modelselection)
 
 ###### Inherited from
 
@@ -698,7 +698,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### onGateFailure
 
-> `readonly` **onGateFailure**: [`FailureMode`](./Gate#failuremode)
+> `readonly` **onGateFailure**: [`FailureMode`](./Gate.md#failuremode)
 
 ###### Inherited from
 
@@ -740,7 +740,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### policy
 
-> `readonly` **policy**: [`Policy`](./Policy-1#policy)\<`unknown`\>
+> `readonly` **policy**: [`Policy`](./Policy-1.md#policy)\<`unknown`\>
 
 ###### Inherited from
 
@@ -750,7 +750,7 @@ Capability descriptors attached only by child inheritance.
 
 ##### sandbox?
 
-> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
+> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox.md#sandboxservice)
 
 ###### Inherited from
 
@@ -938,7 +938,7 @@ Caller-authored child inheritance options. Omitted fields use safe defaults.
 
 ##### tools?
 
-> `readonly` `optional` **tools?**: `"attenuate"` \| `"same"` \| readonly [`Handle`](../../unstable.capability#handle)\<`Any`\>[]
+> `readonly` `optional` **tools?**: `"attenuate"` \| `"same"` \| readonly [`Handle`](../../unstable.capability.md#handle)\<`Any`\>[]
 
 ***
 
@@ -966,7 +966,7 @@ Point-in-time process-local state for one Agent Run.
 
 ##### lastEvent?
 
-> `readonly` `optional` **lastEvent?**: [`Event`](./AgentEvent#event)
+> `readonly` `optional` **lastEvent?**: [`Event`](./AgentEvent.md#event)
 
 <a id="runid-1"></a>
 
@@ -1034,7 +1034,7 @@ Process-local Agent Run inspection seam.
 
 ###### event
 
-[`Event`](./AgentEvent#event)
+[`Event`](./AgentEvent.md#event)
 
 ###### Returns
 
@@ -1108,7 +1108,7 @@ Process-local Agent Run inspection seam.
 
 ##### authorization?
 
-> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
+> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization.md#authorizer)\<`AuthorizationServices`\>
 
 <a id="budget-4"></a>
 
@@ -1140,7 +1140,7 @@ Process-local Agent Run inspection seam.
 
 ##### gates?
 
-> `readonly` `optional` **gates?**: readonly [`Gate`](./Gate#gate-1)\<`OutputSchema`\[`"Type"`\], `unknown`\>[]
+> `readonly` `optional` **gates?**: readonly [`Gate`](./Gate.md#gate-1)\<`OutputSchema`\[`"Type"`\], `unknown`\>[]
 
 <a id="input-3"></a>
 
@@ -1158,7 +1158,7 @@ Process-local Agent Run inspection seam.
 
 ##### memory?
 
-> `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+> `readonly` `optional` **memory?**: [`Key`](./Memory.md#key-1)
 
 <a id="metadata-3"></a>
 
@@ -1170,7 +1170,7 @@ Process-local Agent Run inspection seam.
 
 ##### model?
 
-> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry.md#modelselection)
 
 <a id="name-4"></a>
 
@@ -1182,7 +1182,7 @@ Process-local Agent Run inspection seam.
 
 ##### onGateFailure?
 
-> `readonly` `optional` **onGateFailure?**: [`FailureMode`](./Gate#failuremode)
+> `readonly` `optional` **onGateFailure?**: [`FailureMode`](./Gate.md#failuremode)
 
 <a id="output-3"></a>
 
@@ -1194,13 +1194,13 @@ Process-local Agent Run inspection seam.
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: [`Policy`](./Policy-1#policy)\<`PolicyServices`\>
+> `readonly` `optional` **policy?**: [`Policy`](./Policy-1.md#policy)\<`PolicyServices`\>
 
 <a id="sandbox-4"></a>
 
 ##### sandbox?
 
-> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
+> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox.md#sandboxservice)
 
 <a id="supplemental-1"></a>
 
@@ -1266,7 +1266,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### authorization?
 
-> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization#authorizer)\<`AuthorizationServices`\>
+> `readonly` `optional` **authorization?**: [`Authorizer`](./ToolAuthorization.md#authorizer)\<`AuthorizationServices`\>
 
 ###### Inherited from
 
@@ -1306,7 +1306,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### gates?
 
-> `readonly` `optional` **gates?**: readonly [`Gate`](./Gate#gate-1)\<`OutputSchema`\[`"Type"`\], `unknown`\>[]
+> `readonly` `optional` **gates?**: readonly [`Gate`](./Gate.md#gate-1)\<`OutputSchema`\[`"Type"`\], `unknown`\>[]
 
 ###### Inherited from
 
@@ -1336,7 +1336,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### memory?
 
-> `readonly` `optional` **memory?**: [`Key`](./Memory#key-1)
+> `readonly` `optional` **memory?**: [`Key`](./Memory.md#key-1)
 
 ###### Inherited from
 
@@ -1356,7 +1356,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### model?
 
-> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry#modelselection)
+> `readonly` `optional` **model?**: [`ModelSelection`](./ModelRegistry.md#modelselection)
 
 ###### Inherited from
 
@@ -1376,7 +1376,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### onGateFailure?
 
-> `readonly` `optional` **onGateFailure?**: [`FailureMode`](./Gate#failuremode)
+> `readonly` `optional` **onGateFailure?**: [`FailureMode`](./Gate.md#failuremode)
 
 ###### Inherited from
 
@@ -1396,7 +1396,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: [`Policy`](./Policy-1#policy)\<`PolicyServices`\>
+> `readonly` `optional` **policy?**: [`Policy`](./Policy-1.md#policy)\<`PolicyServices`\>
 
 ###### Inherited from
 
@@ -1406,7 +1406,7 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 
 ##### sandbox?
 
-> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox#sandboxservice)
+> `readonly` `optional` **sandbox?**: [`SandboxService`](../../sandbox.md#sandboxservice)
 
 ###### Inherited from
 
@@ -1512,7 +1512,7 @@ Consumer of a hidden Agent identity and its environment.
 
 ##### suspension
 
-> `readonly` **suspension**: [`AgentSuspended`](./AgentEvent#agentsuspended)
+> `readonly` **suspension**: [`AgentSuspended`](./AgentEvent.md#agentsuspended)
 
 ***
 
@@ -1526,7 +1526,7 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 ##### EventValue
 
-`EventValue` = [`Event`](./AgentEvent#event)
+`EventValue` = [`Event`](./AgentEvent.md#event)
 
 ##### EventError
 
@@ -1538,11 +1538,11 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 ##### ControlReceipt
 
-`ControlReceipt` = [`Receipt`](./Steering#receipt)
+`ControlReceipt` = [`Receipt`](./Steering.md#receipt)
 
 ##### ControlError
 
-`ControlError` = [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)
+`ControlError` = [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)
 
 #### Properties
 
@@ -1562,17 +1562,17 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 ###### reject
 
-> `readonly` **reject**: (`input`) => `Effect`\<`ControlReceipt`, [`RunBusy`](./Steering#runbusy) \| `ControlError`\>
+> `readonly` **reject**: (`input`) => `Effect`\<`ControlReceipt`, [`RunBusy`](./Steering.md#runbusy) \| `ControlError`\>
 
 ###### Parameters
 
 ###### input
 
-[`Input`](./Steering#input)
+[`Input`](./Steering.md#input)
 
 ###### Returns
 
-`Effect`\<`ControlReceipt`, [`RunBusy`](./Steering#runbusy) \| `ControlError`\>
+`Effect`\<`ControlReceipt`, [`RunBusy`](./Steering.md#runbusy) \| `ControlError`\>
 
 <a id="events"></a>
 
@@ -1590,7 +1590,7 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 ###### input
 
-[`Input`](./Steering#input)
+[`Input`](./Steering.md#input)
 
 ###### Returns
 
@@ -1612,7 +1612,7 @@ Producer capability and event stream owned by one scoped Agent Run.
 
 ###### input
 
-[`Input`](./Steering#input)
+[`Input`](./Steering.md#input)
 
 ###### Returns
 
@@ -1760,7 +1760,7 @@ Runtime-owned checkpoint used to reconstruct the same durable driver.
 
 ##### executableManifest?
 
-> `readonly` `optional` **executableManifest?**: [`ExecutableManifest`](./ExecutableManifest#executablemanifest)
+> `readonly` `optional` **executableManifest?**: [`ExecutableManifest`](./ExecutableManifest.md#executablemanifest)
 
 Complete pinned closure used to resolve same-run handoffs exactly.
 
@@ -1914,7 +1914,7 @@ Consult the Memory service for this run.
 
 ###### key
 
-> `readonly` **key**: [`Key`](./Memory#key-1)
+> `readonly` **key**: [`Key`](./Memory.md#key-1)
 
 <a id="modelcallordinalstart"></a>
 
@@ -1950,7 +1950,7 @@ Opaque host-assigned identity for this run/session.
 
 ##### steering?
 
-> `readonly` `optional` **steering?**: [`Options`](./Steering#options)
+> `readonly` `optional` **steering?**: [`Options`](./Steering.md#options)
 
 Finite process-local input policy for this Run.
 
@@ -2393,7 +2393,7 @@ Agent options known to contain a model selection.
 
 ##### model
 
-> `readonly` **model**: [`ModelSelection`](./ModelRegistry#modelselection)
+> `readonly` **model**: [`ModelSelection`](./ModelRegistry.md#modelselection)
 
 ## Type Aliases
 
@@ -2619,7 +2619,7 @@ Services required by one run option set.
 
 ### SendError
 
-> **SendError** = [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed) \| [`RollbackRequiresRuntime`](./Steering#rollbackrequiresruntime) \| [`RunBusy`](./Steering#runbusy)
+> **SendError** = [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed) \| [`RollbackRequiresRuntime`](./Steering.md#rollbackrequiresruntime) \| [`RunBusy`](./Steering.md#runbusy)
 
 ***
 
@@ -2627,7 +2627,7 @@ Services required by one run option set.
 
 ### StartEvent
 
-> **StartEvent**\<`Output`\> = `Exclude`\<[`RunEvent`](../../runtime/namespaces/RunEvent#runevent), [`RunCompleted`](../../runtime/namespaces/RunEvent#runcompleted)\> \| `Omit`\<[`RunCompleted`](../../runtime/namespaces/RunEvent#runcompleted), `"result"`\> & `object`
+> **StartEvent**\<`Output`\> = `Exclude`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), [`RunCompleted`](../../runtime/namespaces/RunEvent.md#runcompleted)\> \| `Omit`\<[`RunCompleted`](../../runtime/namespaces/RunEvent.md#runcompleted), `"result"`\> & `object`
 
 Durable Runtime event with Agent completion decoded through its output Schema.
 
@@ -2711,7 +2711,7 @@ Serializable selector persisted with an `Agent.awaitEvent` obligation.
 
 ### allocateRun
 
-> `const` **allocateRun**: \{\<`O`\>(`options`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent#event)\<`OutputSchema`\[`"Type"`\]\>, `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)\>, [`PolicyInvalid`](./Steering#policyinvalid), `Scope`\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`, `O`\>(`agent`, `options`): `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent#event)\<`OutputSchema`\[`"Type"`\]\>, `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)\>, [`PolicyInvalid`](./Steering#policyinvalid), `Scope`\>; \}
+> `const` **allocateRun**: \{\<`O`\>(`options`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent.md#event)\<`OutputSchema`\[`"Type"`\]\>, [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)\>, [`PolicyInvalid`](./Steering.md#policyinvalid), `Scope`\>; \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`, `O`\>(`agent`, `options`): `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent.md#event)\<`OutputSchema`\[`"Type"`\]\>, [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)\>, [`PolicyInvalid`](./Steering.md#policyinvalid), `Scope`\>; \}
 
 **`Internal`**
 
@@ -2719,7 +2719,7 @@ Allocate one scoped Run and its producer handle before consuming its event strea
 
 #### Call Signature
 
-> \<`O`\>(`options`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent#event)\<`OutputSchema`\[`"Type"`\]\>, `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)\>, [`PolicyInvalid`](./Steering#policyinvalid), `Scope`\>
+> \<`O`\>(`options`): \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent.md#event)\<`OutputSchema`\[`"Type"`\]\>, [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)\>, [`PolicyInvalid`](./Steering.md#policyinvalid), `Scope`\>
 
 ##### Type Parameters
 
@@ -2735,11 +2735,11 @@ Allocate one scoped Run and its producer handle before consuming its event strea
 
 ##### Returns
 
-\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent#event)\<`OutputSchema`\[`"Type"`\]\>, `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)\>, [`PolicyInvalid`](./Steering#policyinvalid), `Scope`\>
+\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`\>(`agent`) => `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent.md#event)\<`OutputSchema`\[`"Type"`\]\>, [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)\>, [`PolicyInvalid`](./Steering.md#policyinvalid), `Scope`\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`, `O`\>(`agent`, `options`): `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent#event)\<`OutputSchema`\[`"Type"`\]\>, `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)\>, [`PolicyInvalid`](./Steering#policyinvalid), `Scope`\>
+> \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputSchema`, `OutputSchema`, `O`\>(`agent`, `options`): `Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent.md#event)\<`OutputSchema`\[`"Type"`\]\>, [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)\>, [`PolicyInvalid`](./Steering.md#policyinvalid), `Scope`\>
 
 ##### Type Parameters
 
@@ -2783,7 +2783,7 @@ Allocate one scoped Run and its producer handle before consuming its event strea
 
 ##### Returns
 
-`Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent#event)\<`OutputSchema`\[`"Type"`\]\>, `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering#inboxfull) \| [`RunClosed`](./Steering#runclosed)\>, [`PolicyInvalid`](./Steering#policyinvalid), `Scope`\>
+`Effect`\<[`RunHandle`](#runhandle)\<[`Event`](./AgentEvent.md#event)\<`OutputSchema`\[`"Type"`\]\>, [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`RunRequirements`](#runrequirements)\<`Tools`, `R`, `O`, `String`, `OutputSchema`, `PolicyServices`, `AuthorizationServices`\>, \{ `bytes`: `Schema.Int`; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; \}, [`InboxFull`](./Steering.md#inboxfull) \| [`RunClosed`](./Steering.md#runclosed)\>, [`PolicyInvalid`](./Steering.md#policyinvalid), `Scope`\>
 
 ***
 
@@ -2791,7 +2791,7 @@ Allocate one scoped Run and its producer handle before consuming its event strea
 
 ### awaitEvent
 
-> `const` **awaitEvent**: \{(`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>; (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>; \}
+> `const` **awaitEvent**: \{(`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>; (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>; \}
 
 Suspend the current durable tool call until a matching environmental event or timeout.
 
@@ -2800,7 +2800,7 @@ call's result rather than re-running JavaScript after this Effect.
 
 #### Call Signature
 
-> (`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>
+> (`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Parameters
 
@@ -2810,11 +2810,11 @@ call's result rather than re-running JavaScript after this Effect.
 
 ##### Returns
 
-(`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>
+(`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 #### Call Signature
 
-> (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>
+> (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Parameters
 
@@ -2828,7 +2828,7 @@ call's result rather than re-running JavaScript after this Effect.
 
 ##### Returns
 
-`Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext#toolcontext)\>
+`Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ***
 
@@ -3080,7 +3080,7 @@ Run an Agent to its schema-decoded output.
 
 ### RunError
 
-> `const` **RunError**: `Schema.Union`\<readonly \[*typeof* [`SinkFailed`](./ModelTelemetry#sinkfailed), *typeof* [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed), *typeof* [`HookFailed`](../../hooks#hookfailed), *typeof* [`GateFailed`](./Gate#gatefailed), *typeof* [`AgentError`](./AgentEvent#agenterror), *typeof* [`ChildExceedsParent`](./AgentEvent#childexceedsparent), *typeof* [`InvalidOutput`](./AgentEvent#invalidoutput), *typeof* [`AgentSuspended`](./AgentEvent#agentsuspended), *typeof* [`ResumeMismatch`](./AgentEvent#resumemismatch), *typeof* [`PolicyError`](./Policy-1#policyerror), *typeof* [`PolicyStopped`](./AgentEvent#policystopped), *typeof* [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded), *typeof* [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput), *typeof* [`MiddlewareViolation`](./AgentEvent#middlewareviolation), *typeof* [`Misconfigured`](./ModelResilience#misconfigured), *typeof* [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters), *typeof* [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing), *typeof* [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid), *typeof* [`ProgressOverflow`](./AgentEvent#progressoverflow), *typeof* [`ToolNameCollision`](./AgentEvent#toolnamecollision), *typeof* `AiError.AiError`, *typeof* [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered), *typeof* [`PermissionDenied`](./ToolAuthorization#permissiondenied), *typeof* [`FrameworkFailure`](./ToolExecutor#frameworkfailure), *typeof* [`DriverError`](./DurableDriver#drivererror), *typeof* [`DriverStateInvalid`](./DurableDriver#driverstateinvalid), *typeof* [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay), *typeof* [`Suspended`](./NestedOperation#suspended), *typeof* [`Exhausted`](./RunBudget#exhausted), *typeof* `TargetMissing`, *typeof* `HandoffLimitExceeded`, *typeof* `HandoffRequirementsMissing`, *typeof* [`ProjectionInvalid`](./Handoff#projectioninvalid), *typeof* [`Rejected`](./Handoff#rejected), *typeof* [`PolicyInvalid`](./Steering#policyinvalid)\]\>
+> `const` **RunError**: `Schema.Union`\<readonly \[*typeof* [`SinkFailed`](./ModelTelemetry.md#sinkfailed), *typeof* [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed), *typeof* [`HookFailed`](../../hooks.md#hookfailed), *typeof* [`GateFailed`](./Gate.md#gatefailed), *typeof* [`AgentError`](./AgentEvent.md#agenterror), *typeof* [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent), *typeof* [`InvalidOutput`](./AgentEvent.md#invalidoutput), *typeof* [`AgentSuspended`](./AgentEvent.md#agentsuspended), *typeof* [`ResumeMismatch`](./AgentEvent.md#resumemismatch), *typeof* [`PolicyError`](./Policy-1.md#policyerror), *typeof* [`PolicyStopped`](./AgentEvent.md#policystopped), *typeof* [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded), *typeof* [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput), *typeof* [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation), *typeof* [`Misconfigured`](./ModelResilience.md#misconfigured), *typeof* [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters), *typeof* [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing), *typeof* [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid), *typeof* [`ProgressOverflow`](./AgentEvent.md#progressoverflow), *typeof* [`ToolNameCollision`](./AgentEvent.md#toolnamecollision), *typeof* `AiError.AiError`, *typeof* [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered), *typeof* [`PermissionDenied`](./ToolAuthorization.md#permissiondenied), *typeof* [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure), *typeof* [`DriverError`](./DurableDriver.md#drivererror), *typeof* [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid), *typeof* [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay), *typeof* [`Suspended`](./NestedOperation.md#suspended), *typeof* [`Exhausted`](./RunBudget.md#exhausted), *typeof* `TargetMissing`, *typeof* `HandoffLimitExceeded`, *typeof* `HandoffRequirementsMissing`, *typeof* [`ProjectionInvalid`](./Handoff.md#projectioninvalid), *typeof* [`Rejected`](./Handoff.md#rejected), *typeof* [`PolicyInvalid`](./Steering.md#policyinvalid)\]\>
 
 The error channel and durable codec of `Agent.run` and `Agent.stream`.
 
@@ -3174,13 +3174,13 @@ Stream an Agent run as Events ending in `Completed { output }`.
 
 ### streamToolCalls
 
-> `const` **streamToolCalls**: \{(`options`): \<`Tools`, `R`, `P`, `A`\>(`agent`) => `Stream`\<[`Event`](./AgentEvent#event), `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>; \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`): `Stream`\<[`Event`](./AgentEvent#event), `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>; \}
+> `const` **streamToolCalls**: \{(`options`): \<`Tools`, `R`, `P`, `A`\>(`agent`) => `Stream`\<[`Event`](./AgentEvent.md#event), [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>; \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`): `Stream`\<[`Event`](./AgentEvent.md#event), [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>; \}
 
 Execute one externally completed tool-call batch without invoking a LanguageModel.
 
 #### Call Signature
 
-> (`options`): \<`Tools`, `R`, `P`, `A`\>(`agent`) => `Stream`\<[`Event`](./AgentEvent#event), `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
+> (`options`): \<`Tools`, `R`, `P`, `A`\>(`agent`) => `Stream`\<[`Event`](./AgentEvent.md#event), [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
 
 ##### Parameters
 
@@ -3190,11 +3190,11 @@ Execute one externally completed tool-call batch without invoking a LanguageMode
 
 ##### Returns
 
-\<`Tools`, `R`, `P`, `A`\>(`agent`) => `Stream`\<[`Event`](./AgentEvent#event), `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
+\<`Tools`, `R`, `P`, `A`\>(`agent`) => `Stream`\<[`Event`](./AgentEvent.md#event), [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`): `Stream`\<[`Event`](./AgentEvent#event), `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
+> \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`): `Stream`\<[`Event`](./AgentEvent.md#event), [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
 
 ##### Type Parameters
 
@@ -3226,7 +3226,7 @@ Execute one externally completed tool-call batch without invoking a LanguageMode
 
 ##### Returns
 
-`Stream`\<[`Event`](./AgentEvent#event), `AiError` \| [`HookFailed`](../../hooks#hookfailed) \| [`Exhausted`](./RunBudget#exhausted) \| [`AgentError`](./AgentEvent#agenterror) \| [`GateFailed`](./Gate#gatefailed) \| [`PermissionDenied`](./ToolAuthorization#permissiondenied) \| [`ResumeMismatch`](./AgentEvent#resumemismatch) \| [`DriverStateInvalid`](./DurableDriver#driverstateinvalid) \| [`AgentSuspended`](./AgentEvent#agentsuspended) \| [`Suspended`](./NestedOperation#suspended) \| [`ChildExceedsParent`](./AgentEvent#childexceedsparent) \| [`InvalidOutput`](./AgentEvent#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent#progressoverflow) \| [`ToolNameCollision`](./AgentEvent#toolnamecollision) \| [`DriverError`](./DurableDriver#drivererror) \| [`SinkFailed`](./ModelTelemetry#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1#policyerror) \| [`Misconfigured`](./ModelResilience#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor#frameworkfailure) \| [`DriverUnknownReplay`](./DurableDriver#driverunknownreplay) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff#projectioninvalid) \| [`Rejected`](./Handoff#rejected) \| [`PolicyInvalid`](./Steering#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
+`Stream`\<[`Event`](./AgentEvent.md#event), [`Exhausted`](./RunBudget.md#exhausted) \| `AiError` \| [`HookFailed`](../../hooks.md#hookfailed) \| [`DriverError`](./DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./DurableDriver.md#driverstateinvalid) \| [`DriverUnknownReplay`](./DurableDriver.md#driverunknownreplay) \| [`AgentError`](./AgentEvent.md#agenterror) \| [`GateFailed`](./Gate.md#gatefailed) \| [`PermissionDenied`](./ToolAuthorization.md#permissiondenied) \| [`ResumeMismatch`](./AgentEvent.md#resumemismatch) \| [`AgentSuspended`](./AgentEvent.md#agentsuspended) \| [`Suspended`](./NestedOperation.md#suspended) \| [`ChildExceedsParent`](./AgentEvent.md#childexceedsparent) \| [`InvalidOutput`](./AgentEvent.md#invalidoutput) \| [`TurnLimitExceeded`](./AgentEvent.md#turnlimitexceeded) \| [`PolicyStopped`](./AgentEvent.md#policystopped) \| [`RunEndedWithoutOutput`](./AgentEvent.md#runendedwithoutoutput) \| [`MiddlewareViolation`](./AgentEvent.md#middlewareviolation) \| [`DuplicateToolCallId`](./AgentEvent.md#duplicatetoolcallid) \| [`ProgressOverflow`](./AgentEvent.md#progressoverflow) \| [`ToolNameCollision`](./AgentEvent.md#toolnamecollision) \| [`SinkFailed`](./ModelTelemetry.md#sinkfailed) \| [`InvocationLifecycleFailed`](./ModelTelemetry.md#invocationlifecyclefailed) \| [`PolicyError`](./Policy-1.md#policyerror) \| [`Misconfigured`](./ModelResilience.md#misconfigured) \| [`InvalidToolCallParameters`](./ModelToolCallValidation.md#invalidtoolcallparameters) \| [`ToolJsonSchemaCompilerMissing`](./ModelToolCallValidation.md#tooljsonschemacompilermissing) \| [`LanguageModelNotRegistered`](./ModelRegistry.md#languagemodelnotregistered) \| [`FrameworkFailure`](./ToolExecutor.md#frameworkfailure) \| `TargetMissing` \| `HandoffLimitExceeded` \| `HandoffRequirementsMissing` \| [`ProjectionInvalid`](./Handoff.md#projectioninvalid) \| [`Rejected`](./Handoff.md#rejected) \| [`PolicyInvalid`](./Steering.md#policyinvalid), [`ToolCallBatchRequirements`](#toolcallbatchrequirements)\<`Tools`, `A`\>\>
 
 ***
 

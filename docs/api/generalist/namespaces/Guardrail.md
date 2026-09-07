@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Guardrail
+[generalist](../../index.md) / [generalist](../index.md) / Guardrail
 
 # Guardrail
 
@@ -12,7 +12,7 @@
 
 ### filterOutput
 
-> `const` **filterOutput**: (`keep`) => [`Middleware`](./ModelMiddleware#middleware)
+> `const` **filterOutput**: (`keep`) => [`Middleware`](./ModelMiddleware.md#middleware)
 
 Drop streamed non-tool-call parts when `keep` returns false.
 
@@ -24,7 +24,7 @@ Drop streamed non-tool-call parts when `keep` returns false.
 
 #### Returns
 
-[`Middleware`](./ModelMiddleware#middleware)
+[`Middleware`](./ModelMiddleware.md#middleware)
 
 ***
 
@@ -32,7 +32,7 @@ Drop streamed non-tool-call parts when `keep` returns false.
 
 ### redactInput
 
-> `const` **redactInput**: (`options`) => [`Middleware`](./ModelMiddleware#middleware)
+> `const` **redactInput**: (`options`) => [`Middleware`](./ModelMiddleware.md#middleware)
 
 Redact matches in text-bearing prompt fields before the model sees them.
 
@@ -44,7 +44,7 @@ Redact matches in text-bearing prompt fields before the model sees them.
 
 #### Returns
 
-[`Middleware`](./ModelMiddleware#middleware)
+[`Middleware`](./ModelMiddleware.md#middleware)
 
 ***
 
@@ -52,7 +52,7 @@ Redact matches in text-bearing prompt fields before the model sees them.
 
 ### redactOutput
 
-> `const` **redactOutput**: (`options`) => [`Middleware`](./ModelMiddleware#middleware)
+> `const` **redactOutput**: (`options`) => [`Middleware`](./ModelMiddleware.md#middleware)
 
 Redact matches in streamed text deltas before Generalist folds or emits them.
 
@@ -64,7 +64,7 @@ Redact matches in streamed text deltas before Generalist folds or emits them.
 
 #### Returns
 
-[`Middleware`](./ModelMiddleware#middleware)
+[`Middleware`](./ModelMiddleware.md#middleware)
 
 ***
 
@@ -72,7 +72,7 @@ Redact matches in streamed text deltas before Generalist folds or emits them.
 
 ### validateInput
 
-> `const` **validateInput**: (`check`) => [`Middleware`](./ModelMiddleware#middleware)
+> `const` **validateInput**: (`check`) => [`Middleware`](./ModelMiddleware.md#middleware)
 
 Fail the run when `check` rejects the input prompt.
 
@@ -84,4 +84,4 @@ Fail the run when `check` rejects the input prompt.
 
 #### Returns
 
-[`Middleware`](./ModelMiddleware#middleware)
+[`Middleware`](./ModelMiddleware.md#middleware)

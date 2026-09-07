@@ -1,3 +1,5 @@
+import { makeObjectStorage } from "../runtime/execution/object.js"
+import { register as registerRuntimeHooks } from "./runtime-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -18,6 +20,8 @@ import { Json } from "../core/json.js"
 import { ItLayer } from "../core/it-layer.js"
 import { unusedToolHandlerLayer } from "../core/tool-handler-layer.js"
 import { withProviderFinish } from "../core/provider-finish.js"
+
+registerRuntimeHooks({ makeObjectStorage })
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -56,31 +60,47 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
       },
     ])
     const hooks = Hooks.layer([
-      Hooks.onRunStart(() =>
-        Effect.sync(() => {
-          order.push("run-start")
-          return Hooks.AddContext("run-context")
-        }),
-      ),
-      Hooks.onTurnStart(() =>
-        Effect.sync(() => {
-          order.push("turn-start")
-          return Hooks.AddContext("turn-context")
-        }),
-      ),
-      Hooks.onModelCall(({ prompt }) =>
-        Effect.sync(() => {
-          order.push("model-call")
-          expect(Json.stringify(prompt.content)).toContain("middleware-context")
-          return Hooks.AddContext("model-context")
-        }),
-      ),
-      Hooks.onRunEnd(({ output }) =>
-        Effect.sync(() => {
-          order.push(`run-end:${String(output)}`)
-          return Hooks.Replace("hooked output")
-        }),
-      ),
+      Hooks.onRunStart({
+        key: "test.hooks.index.onRunStart.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            order.push("run-start")
+            return Hooks.AddContext("run-context")
+          }),
+      }),
+      Hooks.onTurnStart({
+        key: "test.hooks.index.onTurnStart.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            order.push("turn-start")
+            return Hooks.AddContext("turn-context")
+          }),
+      }),
+      Hooks.onModelCall({
+        key: "test.hooks.index.onModelCall.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ prompt }) =>
+          Effect.sync(() => {
+            order.push("model-call")
+            expect(Json.stringify(prompt.content)).toContain("middleware-context")
+            return Hooks.AddContext("model-context")
+          }),
+      }),
+      Hooks.onRunEnd({
+        key: "test.hooks.index.onRunEnd.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ output }) =>
+          Effect.sync(() => {
+            order.push(`run-end:${String(output)}`)
+            return Hooks.Replace("hooked output")
+          }),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -111,19 +131,32 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     let resultHookCalls = 0
     let followUpPrompt = ""
     const hooks = Hooks.layer([
-      Hooks.onToolCall(() => Effect.succeed(Hooks.Block({ reason: "destructive" }))),
-      Hooks.onToolCall(() =>
-        Effect.sync(() => {
-          skippedHookCalls += 1
-          return Hooks.Continue()
-        }),
-      ),
-      Hooks.onToolResult(() =>
-        Effect.sync(() => {
-          resultHookCalls += 1
-          return Hooks.Continue()
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () => Effect.succeed(Hooks.Block({ reason: "destructive" })),
+      }),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.2",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            skippedHookCalls += 1
+            return Hooks.Continue()
+          }),
+      }),
+      Hooks.onToolResult({
+        key: "test.hooks.index.onToolResult.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            resultHookCalls += 1
+            return Hooks.Continue()
+          }),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -163,24 +196,36 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     let followUpPrompt = ""
     let modelCalls = 0
     const hooks = Hooks.layer([
-      Hooks.onToolCall(() =>
-        Effect.sync(() => {
-          order.push("replace-args")
-          return Hooks.Replace({ text: "hooked args" })
-        }),
-      ),
-      Hooks.onToolCall(({ args }) =>
-        Effect.sync(() => {
-          order.push(`observe:${Json.stringify(args)}`)
-          return Hooks.Continue()
-        }),
-      ),
-      Hooks.onToolResult(() =>
-        Effect.sync(() => {
-          order.push("replace-result")
-          return Hooks.Replace({ value: "hooked result" })
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.3",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            order.push("replace-args")
+            return Hooks.Replace({ text: "hooked args" })
+          }),
+      }),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.4",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ args }) =>
+          Effect.sync(() => {
+            order.push(`observe:${Json.stringify(args)}`)
+            return Hooks.Continue()
+          }),
+      }),
+      Hooks.onToolResult({
+        key: "test.hooks.index.onToolResult.2",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            order.push("replace-result")
+            return Hooks.Replace({ value: "hooked result" })
+          }),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -218,12 +263,16 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
       success: Schema.Unknown,
     })
     const hooks = Hooks.layer([
-      Hooks.onToolCall(({ call }) =>
-        Effect.sync(() => {
-          Reflect.set(call, "name", other.name)
-          return Hooks.Replace({ text: "substituted" })
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.5",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ call }) =>
+          Effect.sync(() => {
+            Reflect.set(call, "name", other.name)
+            return Hooks.Replace({ text: "substituted" })
+          }),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -251,24 +300,36 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     const order: Array<string> = []
     let pendingArgs: unknown
     const hooks = Hooks.layer([
-      Hooks.onToolCall(() =>
-        Effect.sync(() => {
-          order.push("replace")
-          return Hooks.Replace({ text: "approval args" })
-        }),
-      ),
-      Hooks.onToolCall(({ args }) =>
-        Effect.sync(() => {
-          order.push(`ask:${Json.stringify(args)}`)
-          return Hooks.Ask()
-        }),
-      ),
-      Hooks.onApprovalRequest(({ request }) =>
-        Effect.sync(() => {
-          order.push(`approval:${request.approvalId}`)
-          return Hooks.Continue()
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.6",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            order.push("replace")
+            return Hooks.Replace({ text: "approval args" })
+          }),
+      }),
+      Hooks.onToolCall({
+        key: "test.hooks.index.onToolCall.7",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ args }) =>
+          Effect.sync(() => {
+            order.push(`ask:${Json.stringify(args)}`)
+            return Hooks.Ask()
+          }),
+      }),
+      Hooks.onApprovalRequest({
+        key: "test.hooks.index.onApprovalRequest.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ request }) =>
+          Effect.sync(() => {
+            order.push(`approval:${request.approvalId}`)
+            return Hooks.Continue()
+          }),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -300,10 +361,18 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     let secondModelPrompt = ""
     let modelCalls = 0
     const hooks = Hooks.layer([
-      Hooks.onCompaction(() => Effect.succeed(Hooks.AddContext("pinned compaction context"))),
-      Hooks.onSteer(({ queue, count }) =>
-        Effect.succeed(Hooks.AddContext(`${queue}:${count}:hooked steering context`)),
-      ),
+      Hooks.onCompaction({
+        key: "test.hooks.index.onCompaction.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () => Effect.succeed(Hooks.AddContext("pinned compaction context")),
+      }),
+      Hooks.onSteer({
+        key: "test.hooks.index.onSteer.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:hooked steering context`)),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -360,18 +429,26 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     const child = Agent.make({ name: "child" })
     const childToolkit = AgentTool.asTool(child, { name: "ask_child" })
     const hooks = Hooks.layer([
-      Hooks.onChildStart(({ child: started }) =>
-        Effect.sync(() => {
-          childEvents.push(`start:${started.selection}`)
-          return Hooks.Continue()
-        }),
-      ),
-      Hooks.onChildEnd(({ child: ended, result }) =>
-        Effect.sync(() => {
-          childEvents.push(`end:${ended.selection}:${String(result)}`)
-          return Hooks.Replace("hooked child answer")
-        }),
-      ),
+      Hooks.onChildStart({
+        key: "test.hooks.index.onChildStart.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ child: started }) =>
+          Effect.sync(() => {
+            childEvents.push(`start:${started.selection}`)
+            return Hooks.Continue()
+          }),
+      }),
+      Hooks.onChildEnd({
+        key: "test.hooks.index.onChildEnd.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ child: ended, result }) =>
+          Effect.sync(() => {
+            childEvents.push(`end:${ended.selection}:${String(result)}`)
+            return Hooks.Replace("hooked child answer")
+          }),
+      }),
     ])
     return [
       Layer.mergeAll(
@@ -399,7 +476,14 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("unused"))),
           ModelMiddleware.layerIdentity,
-          Hooks.layer([Hooks.onRunStart(() => Effect.fail("hook boom"))]),
+          Hooks.layer([
+            Hooks.onRunStart({
+              key: "test.hooks.index.onRunStart.2",
+              version: "1",
+              replayPolicy: "never",
+              hook: () => Effect.fail("hook boom"),
+            }),
+          ]),
         ),
         Effect.gen(function* () {
           const failure = yield* Agent.run(Agent.make({ name: "failed-hook" }), "input").pipe(Effect.flip)
@@ -421,12 +505,16 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
       const first = yield* DurableDriver.makeInline({ driver, initial })
       let hookCalls = 0
       const declarations = [
-        Hooks.onToolCall(() =>
-          Effect.sync(() => {
-            hookCalls += 1
-            return Hooks.Block({ reason: "recorded veto" })
-          }),
-        ),
+        Hooks.onToolCall({
+          key: "test.hooks.index.onToolCall.8",
+          version: "1",
+          replayPolicy: "never",
+          hook: () =>
+            Effect.sync(() => {
+              hookCalls += 1
+              return Hooks.Block({ reason: "recorded veto" })
+            }),
+        }),
       ]
       const input = {
         runId: logicalOperationId,
@@ -444,7 +532,7 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
           applyDecision: (current) => current,
         }).pipe(
           Effect.provideService(DurableDriver.DriverInterpreter, interpreter),
-          Effect.provideService(Hooks.Hooks, Hooks.Hooks.of({ declarations })),
+          Effect.provideService(Hooks.Hooks, Hooks.make({ declarations })),
         )
 
       expect((yield* run(first)).blocked).toBe("recorded veto")

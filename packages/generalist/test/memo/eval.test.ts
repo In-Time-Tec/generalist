@@ -8,6 +8,7 @@ import { TestModel } from "../../src/testing/index.js"
 import { fromJournal } from "../../src/trajectory/index.js"
 import { allowAllAuthorization } from "../authorization.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
+import { objectRuntimeLayer } from "../runtime/execution/object.js"
 
 const MemoizedCompletion = Schema.TaggedStruct("ToolExecutionCompleted", {
   result: Schema.Struct({
@@ -31,7 +32,7 @@ it.live("runs an eval suite twice without a second tool dispatch", () =>
       TestModel.text("done"),
       TestModel.text("done"),
     ])
-    const runtime = Runtime.layerMemory({ addresses: [] }).pipe(
+    const runtime = objectRuntimeLayer({ addresses: [], schedulerMode: "poll" }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     )
     const services = Layer.mergeAll(

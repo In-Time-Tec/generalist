@@ -1,11 +1,11 @@
 import { Cause, Clock, Crypto, DateTime, Deferred, Effect, Fiber, Result, Schema } from "effect"
 import { DurabilityFailure } from "../../durability/errors.js"
-import * as Journal from "../../durability/internal/journal.js"
+import { make as makeJournal, type Head } from "../../durability/internal/journal.js"
 import { ObjectStore, ObjectStoreFailure, type Service } from "../../durability/object-store.js"
-import * as S3 from "../../durability/s3.js"
+import { make as makeS3 } from "../../durability/s3.js"
 import { HttpClient } from "effect/unstable/http"
 import { nativeRequest } from "./native-r2-request.js"
-import { ObjectStoreConformanceFailure } from "./index.js"
+import { ObjectStoreConformanceFailure } from "./conformance.js"
 import {
   decodeReceipt,
   equal,
@@ -17,13 +17,13 @@ import {
   NativeR2Failure,
   safeFailureReason,
   summary,
-  transition,
   type NativeR2Request,
   type NativeR2Response,
   type NativeR2Provider,
   type QualificationReceipt,
 } from "./native-r2-worker.js"
 import type { CaseEvidence } from "./remote.js"
+import { transition } from "./native-r2-transition.js"
 import type { NativeR2Configuration } from "./native-r2-configuration.js"
 
 export type NativeR2WriterState = "stopped" | "uncertain"
@@ -59,7 +59,7 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
       const namespace = nativeR2Namespace(configuration.environment, configuration.tenant, host.runId)
       const identity = { environment: configuration.environment, tenant: `${configuration.tenant}~${host.runId}` }
       const requests = { worker: 0, read: 0, create: 0, list: 0, conflicts: 0, continuationPages: 0 }
-      const raw = yield* S3.make(configuration.connection)
+      const raw = yield* makeS3(configuration.connection)
       const store: Service = {
         capabilities: raw.capabilities,
         read: (key, options) =>
@@ -121,7 +121,7 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
         "The fixed qualification namespace is not empty",
       )
       const open = (partition: string) =>
-        Journal.make({
+        makeJournal({
           environment: identity.environment,
           tenant: identity.tenant,
           partition,
@@ -191,7 +191,7 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
           const journal = yield* open(partition)
           const receipts: Array<{ readonly id: string; readonly receipt: QualificationReceipt }> = []
           for (const command of commands) {
-            const receipt = yield* journal.commit(command, (state) => transition(command.id, state))
+            const receipt = yield* journal.commit(command, (state) => transition({ id: command.id, state }))
             receipts.push({ id: command.id, receipt: decodeReceipt(receipt) })
           }
           return { journal, commands, receipts, head: yield* journal.read }
@@ -253,7 +253,7 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
         partition: "s3" | "s3-contention",
         expected: {
           readonly receipts: ReadonlyArray<{ readonly id: string; readonly receipt: { readonly count: number } }>
-          readonly head: Journal.Head
+          readonly head: Head
         },
         seed: number,
       ) =>
@@ -324,7 +324,9 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
           const journals = yield* Effect.forEach(commands, () => open("s3-contention"))
           const fibers = yield* Effect.forEach(journals, (journal, index) =>
             Deferred.await(start).pipe(
-              Effect.andThen(journal.commit(commands[index]!, (state) => transition(commands[index]!.id, state))),
+              Effect.andThen(
+                journal.commit(commands[index]!, (state) => transition({ id: commands[index]!.id, state })),
+              ),
               Effect.map((receipt) => ({ id: commands[index]!.id, receipt: decodeReceipt(receipt) })),
               Effect.forkChild({ startImmediately: true }),
             ),

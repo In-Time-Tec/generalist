@@ -9,7 +9,7 @@ import {
   Permissions,
   SkillCatalog,
 } from "generalist"
-import { Tool, Toolkit } from "effect/unstable/ai"
+import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { Chat, Connection } from "generalist/unstable/foldkit"
 import { WorkingMemory } from "generalist/memory"
 import { layer as deterministicLayer } from "generalist/providers/deterministic"
@@ -63,16 +63,44 @@ const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunE
   })
 
 const hostEvent = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
-  Schema.decodeUnknownSync(HostEvent)({
-    _tag: tag,
-    sessionId: "capstone-session",
-    cursor,
-    runId: "capstone-run",
-    event,
+  Connection.HostDelivery({
+    epoch: 0,
+    event: Schema.decodeUnknownSync(HostEvent)({
+      _tag: tag,
+      sessionId: "capstone-session",
+      cursor,
+      runId: "capstone-run",
+      event,
+    }),
   })
 
 const chatFrames: ReadonlyArray<Connection.Incoming> = [
+  Connection.ConnectionOpened({ sessionId: "capstone-session", epoch: 0 }),
   hostEvent(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
+  Connection.HostDelivery({
+    epoch: 0,
+    event: {
+      _tag: "Conversation",
+      sessionId: "capstone-session",
+      cursor: 1,
+      update: {
+        previousLeafId: null,
+        leafId: "entry-response-0",
+        afterEntryId: null,
+        entries: [
+          {
+            id: "entry-response-0",
+            parentId: null,
+            messages: [
+              Prompt.makeMessage("assistant", {
+                content: [Prompt.makePart("text", { text: "deterministic response" })],
+              }),
+            ],
+          },
+        ],
+      },
+    },
+  }),
   hostEvent(2, "Turn", runEvent(2, { _tag: "TurnCompleted", turn: 0 })),
   hostEvent(
     3,
@@ -81,6 +109,7 @@ const chatFrames: ReadonlyArray<Connection.Incoming> = [
       _tag: "RunCompleted",
       result: {
         text: "deterministic response",
+        output: "deterministic response",
         turns: 1,
         session: { sessionId: "capstone-session", leafId: "entry-response-0" },
       },
@@ -90,7 +119,18 @@ const chatFrames: ReadonlyArray<Connection.Incoming> = [
 
 const [chatModel] = Chat.update(
   Chat.initialModel("capstone-session"),
-  Chat.ReceivedConnection({ event: Connection.ConnectionOpened() }),
+  Chat.ReceivedConnection({
+    event: Connection.SessionSnapshot({
+      epoch: 0,
+      snapshot: {
+        version: 1,
+        session: { id: "capstone-session", createdAt: "2026-09-02T00:00:00.000Z" },
+        cursor: -1,
+        runs: [],
+        conversation: { leafId: null, entries: [] },
+      },
+    }),
+  }),
 )
 const renderedChat = chatFrames.reduce(
   (model, frame) => Chat.update(model, Chat.ReceivedConnection({ event: frame }))[0],

@@ -27,7 +27,7 @@ const memo = Layer.merge(
 )
 ```
 
-Use `Memo.layerSql()` instead of `layerMemory()` when entries must survive process restarts. The SQL layer uses `generalist_memo_entries` from Runtime SQL schema version 7, so apply the Runtime schema before constructing the layer.
+`Memo.layerMemory()` is a process-local reuse cache, not durable Runtime storage. The public Memo entrypoint does not expose a SQL layer. Replay always uses authoritative Runtime outcomes rather than relying on cache survival.
 
 ## Identity and replay
 
@@ -39,13 +39,13 @@ Only successful outcomes are stored. Domain failures, suspensions, framework fai
 
 ## Model calls
 
-`Memo.models({ enabled: true })` is passed to `layerMemory({ models })` or `layerSql({ models })` to opt a temperature-0 model into prompt-keyed reuse. Hosts must configure the provider at temperature 0; Effect AI's provider-neutral `LanguageModel` interface does not expose provider sampling settings for Generalist to inspect.
+`Memo.models({ enabled: true })` is passed to `layerMemory({ models })` to opt a temperature-0 model into prompt-keyed reuse. Hosts must configure the provider at temperature 0; Effect AI's provider-neutral `LanguageModel` interface does not expose provider sampling settings for Generalist to inspect.
 
 ## Purity rule and limits
 
 `no-unsafe-memo-pure` rejects direct `Memo.pure` use in a source module that also directly uses `Sandbox`, `SqlClient`, or common non-GET `HttpClient` methods. It is intentionally best effort: aliases, wrapper services, dynamic SQL, and transitive side effects cannot be proven statically. Reviewers and tool authors still own the purity claim. Prefer putting a pure tool and handler in a small module so the rule has a clear boundary.
 
-`Memo.layerRedis` is not included. Generalist adds no Redis dependency; hosts can implement durable reuse with the SQL layer.
+`Memo.layerRedis` is not included. Generalist adds no Redis dependency; the public `Memo.Store` seam lets a host supply its own cache without replacing Runtime authority.
 
 ## Invariants
 

@@ -5,7 +5,7 @@ import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput } from "../../../chil
 import { fanOutMemberSessionId } from "../../../child/session.js"
 import { inheritance } from "../../../../core/agent/lifecycle/fan-out.js"
 import type { AdmitStartInput } from "../../../run/store.js"
-import type { RuntimeState } from "../../state.js"
+import type { RuntimeState } from "../../projection.js"
 
 const newRunId = (state: RuntimeState): readonly [string, RuntimeState] => {
   const runId = `run_${state.nextRunCounter}`

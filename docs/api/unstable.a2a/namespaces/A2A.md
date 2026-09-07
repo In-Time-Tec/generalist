@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.a2a](../index) / A2A
+[generalist](../../index.md) / [unstable.a2a](../index.md) / A2A
 
 # A2A
 
@@ -106,7 +106,7 @@ A configured A2A v1 request handler.
 
 ### layer
 
-> `const` **layer**: (`deployment`) => `Layer.Layer`\<[`A2A`](#a2a), `never`, [`Runtime`](../../runtime/namespaces/Runtime#runtime)\>
+> `const` **layer**: (`deployment`) => `Layer.Layer`\<[`A2A`](#a2a), `never`, [`Runtime`](../../runtime/namespaces/Runtime.md#runtime)\>
 
 **`Experimental`**
 
@@ -120,7 +120,7 @@ Provide one explicit A2A deployment over the caller's Runtime.
 
 #### Returns
 
-`Layer.Layer`\<[`A2A`](#a2a), `never`, [`Runtime`](../../runtime/namespaces/Runtime#runtime)\>
+`Layer.Layer`\<[`A2A`](#a2a), `never`, [`Runtime`](../../runtime/namespaces/Runtime.md#runtime)\>
 
 ***
 
@@ -142,7 +142,7 @@ Construct the SDK handler while keeping Runtime as task authority.
 
 ###### runtime
 
-[`Service`](../../runtime/namespaces/Runtime#service)
+[`Service`](../../runtime/namespaces/Runtime.md#service)
 
 ###### deployment
 

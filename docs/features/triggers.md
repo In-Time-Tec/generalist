@@ -23,16 +23,20 @@ const handler = () => Agent.awaitEvent({ _tag: "Webhook", source: "deploy" }, { 
 `awaitEvent` journals an `Awaiting { filter, deadline }` obligation and suspends without another model call. It is terminal handler control flow: code after `yield* Agent.awaitEvent(...)` is not resumed. The durable Runtime injects `Event` or `TimedOut` as that tool call's result, then reconstructs the Agent from its checkpoint. Strict replay does not dispatch the handler again.
 
 ```ts
-const wake = runtime.wake(runId, {
-  _tag: "Webhook",
-  dedupeKey: "delivery-01",
-  source: "deploy",
-  payload: { status: "ready" },
-  headers: {},
+const wake = runtime.wake({
+  runId,
+  commandId: "wake-command:delivery-01",
+  event: {
+    _tag: "Webhook",
+    dedupeKey: "delivery-01",
+    source: "deploy",
+    payload: { status: "ready" },
+    headers: {},
+  },
 })
 ```
 
-`runtime.wake` Schema-validates the event, journals `WakeReceived`, and atomically closes one matching wait. It returns `Resumed`, `Ignored`, or `Duplicate`. A dedupe key is unique within one Run; a duplicate journals `Duplicate` but cannot resume or dispatch work. The Runtime-scoped scheduler closes elapsed waits with `TimedOut` and resumes them through the same checkpoint path.
+`runtime.wake` Schema-validates the event, journals `WakeReceived`, and atomically closes one matching wait. It returns `Resumed`, `Ignored`, or `Duplicate`. `commandId` identifies the caller's command; `event.dedupeKey` separately deduplicates environmental delivery within one Run. Retrying the exact command returns its original disposition without adding another transition. A new command for an already admitted event cannot resume or dispatch it again. The Runtime-scoped scheduler closes elapsed waits with `TimedOut` and resumes them through the same checkpoint path.
 
 ## Recurring fresh Runs
 
@@ -45,7 +49,7 @@ The supported recurrence subset is intentionally small and UTC-only:
 - `FREQ=DAILY` may set one UTC hour with `BYHOUR=0..23`, for example `FREQ=DAILY;BYHOUR=3`
 - no other calendar selectors, time zones, end dates, or exceptions
 
-Memory, SQLite, PostgreSQL, and MySQL persist schedules in their Runtime store. The scheduler fiber belongs to the Runtime Layer scope. SQL schedule claims use leased transactional row claims so competing Runtime instances admit one occurrence. Timer input is Schema-validated through the scheduled Agent's input Schema before persistence.
+The shared object engine persists schedules and orders competing claims in the canonical partition journal. The scheduler fiber belongs to the activated Runtime scope; external hosts can drain it with bounded fuel. Alarms and notifications are wake hints, so an independent reconciler must recover missed delivery. Timer input is Schema-validated through the scheduled Agent's input Schema before persistence.
 
 ## Webhooks
 

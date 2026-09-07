@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [memory](../index) / WorkingMemory
+[generalist](../../index.md) / [memory](../index.md) / WorkingMemory
 
 # WorkingMemory
 
@@ -74,15 +74,15 @@ The ambient LanguageModel is required only when summarizing without an explicit 
 
 #### Call Signature
 
-> **layer**(): `Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory)\>
+> **layer**(): `Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory)\>
 
 ##### Returns
 
-`Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory)\>
+`Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory)\>
 
 #### Call Signature
 
-> **layer**\<`O`\>(`options`): `Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
+> **layer**\<`O`\>(`options`): `Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
 
 ##### Type Parameters
 
@@ -98,7 +98,7 @@ The ambient LanguageModel is required only when summarizing without an explicit 
 
 ##### Returns
 
-`Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
+`Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
 
 ***
 
@@ -108,15 +108,15 @@ The ambient LanguageModel is required only when summarizing without an explicit 
 
 #### Call Signature
 
-> **make**(): `Effect`\<[`Service`](../../generalist/namespaces/Memory#service)\>
+> **make**(): `Effect`\<[`Service`](../../generalist/namespaces/Memory.md#service)\>
 
 ##### Returns
 
-`Effect`\<[`Service`](../../generalist/namespaces/Memory#service)\>
+`Effect`\<[`Service`](../../generalist/namespaces/Memory.md#service)\>
 
 #### Call Signature
 
-> **make**\<`O`\>(`options`): `Effect`\<[`Service`](../../generalist/namespaces/Memory#service), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
+> **make**\<`O`\>(`options`): `Effect`\<[`Service`](../../generalist/namespaces/Memory.md#service), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
 
 ##### Type Parameters
 
@@ -132,4 +132,4 @@ The ambient LanguageModel is required only when summarizing without an explicit 
 
 ##### Returns
 
-`Effect`\<[`Service`](../../generalist/namespaces/Memory#service), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>
+`Effect`\<[`Service`](../../generalist/namespaces/Memory.md#service), `never`, [`SummaryRequirement`](#summaryrequirement)\<`O`\>\>

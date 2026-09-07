@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ExecutableRegistration
+[generalist](../../index.md) / [runtime](../index.md) / ExecutableRegistration
 
 # ExecutableRegistration
 
@@ -80,13 +80,13 @@ Secret-free application data used to reconstruct one opaque model or capability 
 
 ### narrow
 
-> `const` **narrow**: \{(`registrations`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>; (`executable`, `registrations`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>; \}
+> `const` **narrow**: \{(`registrations`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>; (`executable`, `registrations`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>; \}
 
 Select and validate the exact registrations required by a narrowed executable.
 
 #### Call Signature
 
-> (`registrations`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+> (`registrations`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 ##### Parameters
 
@@ -96,17 +96,17 @@ readonly `object`[]
 
 ##### Returns
 
-(`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+(`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 #### Call Signature
 
-> (`executable`, `registrations`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+> (`executable`, `registrations`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 ##### Parameters
 
 ###### executable
 
-[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 ###### registrations
 
@@ -114,7 +114,7 @@ readonly `object`[]
 
 ##### Returns
 
-`Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+`Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 ***
 
@@ -128,7 +128,7 @@ readonly `object`[]
 
 ##### executable
 
-[`PinnedExecutable`](./ExecutableManifest#pinnedexecutable)
+[`PinnedExecutable`](./ExecutableManifest.md#pinnedexecutable)
 
 #### Returns
 
@@ -148,7 +148,7 @@ Exact pins one active executable requires, independent of the rest of its closur
 
 ##### executable
 
-[`PinnedExecutable`](./ExecutableManifest#pinnedexecutable)
+[`PinnedExecutable`](./ExecutableManifest.md#pinnedexecutable)
 
 #### Returns
 
@@ -160,13 +160,13 @@ Exact pins one active executable requires, independent of the rest of its closur
 
 ### validate
 
-> `const` **validate**: \{(`registrations`, `required?`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>; (`executable`, `registrations`, `required?`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>; \}
+> `const` **validate**: \{(`registrations`, `required?`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>; (`executable`, `registrations`, `required?`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>; \}
 
 Validate and canonicalize the complete registration set for one exact executable.
 
 #### Call Signature
 
-> (`registrations`, `required?`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+> (`registrations`, `required?`): (`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 ##### Parameters
 
@@ -180,17 +180,17 @@ readonly `object`[]
 
 ##### Returns
 
-(`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+(`executable`) => `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 #### Call Signature
 
-> (`executable`, `registrations`, `required?`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+> (`executable`, `registrations`, `required?`): `Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>
 
 ##### Parameters
 
 ###### executable
 
-[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest#pinnedexecutable)
+[`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
 
 ###### registrations
 
@@ -202,4 +202,4 @@ readonly `object`[]
 
 ##### Returns
 
-`Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing)\>
+`Effect`\<readonly `object`[], [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing)\>

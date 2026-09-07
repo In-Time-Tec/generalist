@@ -1,19 +1,19 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / repl
+[generalist](../index.md) / repl
 
 # repl
 
 ## Namespaces
 
-- [Cell](./namespaces/Cell)
-- [CellTool](./namespaces/CellTool)
-- [HostBindings](./namespaces/HostBindings)
-- [KernelPool](./namespaces/KernelPool)
-- [KernelProfile](./namespaces/KernelProfile)
-- [KernelResourceAuthority](./namespaces/KernelResourceAuthority)
-- [KernelSnapshotStore](./namespaces/KernelSnapshotStore)
-- [RemoteKernelProtocol](./namespaces/RemoteKernelProtocol)
-- [TestKernel](./namespaces/TestKernel)
+- [Cell](./namespaces/Cell.md)
+- [CellTool](./namespaces/CellTool.md)
+- [HostBindings](./namespaces/HostBindings.md)
+- [KernelPool](./namespaces/KernelPool.md)
+- [KernelProfile](./namespaces/KernelProfile.md)
+- [KernelResourceAuthority](./namespaces/KernelResourceAuthority.md)
+- [KernelSnapshotStore](./namespaces/KernelSnapshotStore.md)
+- [RemoteKernelProtocol](./namespaces/RemoteKernelProtocol.md)
+- [TestKernel](./namespaces/TestKernel.md)

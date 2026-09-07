@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Triggers
+[generalist](../../index.md) / [generalist](../index.md) / Triggers
 
 # Triggers
 

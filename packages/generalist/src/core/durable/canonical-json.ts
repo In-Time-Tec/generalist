@@ -6,7 +6,7 @@ const fraction = (value: number): number => ((value % 1) * 0x100000000) >>> 0
 const constants = new Uint32Array(primes.map((prime) => fraction(prime ** (1 / 3))))
 const initial = new Uint32Array(primes.slice(0, 8).map((prime) => fraction(Math.sqrt(prime))))
 
-import { Function, Schema } from "effect"
+import { Array as Arr, Function, Predicate, Schema } from "effect"
 
 const encoder = new TextEncoder()
 const schedule = new Uint32Array(64)
@@ -139,13 +139,19 @@ export const sha256Text = (text: string): string => {
 }
 
 export const canonicalize = (value: Schema.Json): Schema.Json => {
-  if (Array.isArray(value)) return value.map(canonicalize)
-  if (value === null || !Schema.is(Schema.JsonObject)(value)) return Object.is(value, -0) ? 0 : value
-  return Object.fromEntries(
-    Object.keys(value)
-      .toSorted()
-      .map((key) => [key, canonicalize(value[key]!)]),
-  )
+  if (Arr.isArray<Schema.Json>(value)) return value.map(canonicalize)
+  if (value === null || Predicate.isNumber(value) || Predicate.isString(value) || Predicate.isBoolean(value))
+    return Object.is(value, -0) ? 0 : value
+  const result: Record<string, Schema.Json> = {}
+  for (const key of Object.keys(value).toSorted()) {
+    Object.defineProperty(result, key, {
+      value: canonicalize(value[key]!),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    })
+  }
+  return result
 }
 
 /** Canonical SHA-256 identity for closed JSON values. */

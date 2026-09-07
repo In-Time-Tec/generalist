@@ -2,7 +2,12 @@
 import { Effect, Filter, Option, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
-import { Hooks, type Declaration as HookDeclaration, type Service as HooksService } from "../hooks/index.js"
+import {
+  Hooks,
+  make as makeHooks,
+  type Declaration as HookDeclaration,
+  type Service as HooksService,
+} from "../hooks/index.js"
 import {
   withTools,
   type Agent,
@@ -49,6 +54,7 @@ import {
 } from "../runtime/service.js"
 import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
 import { resolveApproval } from "./approval.js"
+import { make as preparePlugins, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
@@ -74,14 +80,7 @@ export {
   SessionCursorExpired,
   SessionSubscriberLagged,
 } from "../runtime/session/host.js"
-/** One deterministic collection of host-owned Agent contributions. */
-export interface Plugin<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
-  readonly name: string
-  readonly tools?: Tools
-  readonly instructions?: ReadonlyArray<InstructionProvider>
-  readonly skills?: ReadonlyArray<Skill>
-  readonly hooks?: ReadonlyArray<HookDeclaration>
-}
+export type { Plugin } from "./plugins.js"
 export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {
   readonly name: string
   readonly tools?: Tools
@@ -111,7 +110,16 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly sessions: {
     readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
     readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
-    readonly list: () => Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | import("../durability/errors.js").DurabilityFailure>
+    readonly snapshot: (
+      sessionId: string,
+    ) => Effect.Effect<
+      import("../runtime/session/host.js").HostSessionSnapshot,
+      import("../runtime/session/host.js").SessionSnapshotError
+    >
+    readonly list: () => Effect.Effect<
+      ReadonlyArray<HostSession>,
+      RuntimeUnavailable | import("../durability/errors.js").DurabilityFailure
+    >
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
@@ -265,75 +273,6 @@ const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService =
   })
 }
 
-const toolName = (tool: Tool.Any): string => tool.name
-
-interface PluginContributions {
-  readonly tools: ReadonlyArray<Tool.Any>
-  readonly instructions: ReadonlyArray<InstructionProvider>
-  readonly skills: ReadonlyArray<Skill>
-  readonly hooks: ReadonlyArray<HookDeclaration>
-}
-
-const preparePlugins = (
-  plugins: ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>>,
-  agents: ReadonlyArray<AnyAgent>,
-): Effect.Effect<PluginContributions, PluginNameConflict | PluginToolConflict> =>
-  Effect.gen(function* () {
-    const pluginNames = new Set<string>()
-    const pluginTools = new Map<string, { readonly plugin: string; readonly tool: Tool.Any }>()
-    const instructions: Array<InstructionProvider> = []
-    const skills: Array<Skill> = []
-    const hooks: Array<HookDeclaration> = []
-    for (const current of plugins) {
-      if (pluginNames.has(current.name)) {
-        return yield* PluginNameConflict.make({
-          name: current.name,
-          hint: "Give each host plugin a unique name.",
-        })
-      }
-      pluginNames.add(current.name)
-      for (const tool of current.tools ?? []) {
-        const name = toolName(tool)
-        const existing = pluginTools.get(name)
-        if (existing !== undefined) {
-          return yield* PluginToolConflict.make({
-            name,
-            sources: [existing.plugin, current.name],
-            hint: "Rename or remove one of the colliding plugin tools.",
-          })
-        }
-        pluginTools.set(name, { plugin: current.name, tool })
-      }
-      instructions.push(...(current.instructions ?? []))
-      skills.push(...(current.skills ?? []))
-      hooks.push(...(current.hooks ?? []))
-    }
-
-    const tools = [...pluginTools.values()].map(({ tool }) => tool)
-    for (const agent of agents) {
-      for (const tool of tools) {
-        const name = toolName(tool)
-        if (!Object.hasOwn(agent.toolkit.tools, name)) continue
-        return yield* PluginToolConflict.make({
-          name,
-          sources: [`agent:${agent.name}`, `plugin:${pluginTools.get(name)!.plugin}`],
-          hint: "Rename or remove the plugin tool that collides with the Agent's static toolkit.",
-        })
-      }
-    }
-
-    for (const [index, current] of plugins.entries()) {
-      yield* Effect.logInfo("Loaded Generalist host plugin").pipe(
-        Effect.annotateLogs({
-          "generalist.host.plugin.name": current.name,
-          "generalist.host.plugin.index": index,
-          "generalist.host.plugin.count": plugins.length,
-        }),
-      )
-    }
-    return { tools, instructions, skills, hooks }
-  })
-
 const mergedInstructions = (
   current: Option.Option<InstructionsService>,
   contributed: ReadonlyArray<InstructionProvider>,
@@ -360,7 +299,7 @@ const mergedHooks = (
 ): HooksService | undefined => {
   const existing = Option.getOrUndefined(current)
   if (contributed.length === 0) return existing
-  return Hooks.of({ declarations: [...(existing?.declarations ?? []), ...contributed] })
+  return makeHooks({ declarations: [...(existing?.declarations ?? []), ...contributed] })
 }
 
 const create = <
@@ -382,7 +321,7 @@ const create = <
     const currentHooks = yield* Effect.serviceOption(Hooks)
     const attachments = makeAttachments(yield* Effect.serviceOption(BlobStore))
     const artifacts = makeArtifacts(yield* Effect.serviceOption(ArtifactRegistry))
-    const contributions = yield* preparePlugins(plugins, options.agents)
+    const contributions = yield* preparePlugins({ plugins, agents: options.agents })
     const instructions = mergedInstructions(currentInstructions, contributions.instructions)
     const skills = mergedSkills(currentSkills, contributions.skills)
     const hooks = mergedHooks(currentHooks, contributions.hooks)
@@ -415,6 +354,7 @@ const create = <
             return yield* runtime.createSession(request)
           }),
         get: runtime.session,
+        snapshot: runtime.sessionSnapshot,
         list: () => runtime.listSessions,
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
@@ -464,10 +404,11 @@ const create = <
         inspect: runtime.inspect,
         send: (runId, prompt, sendOptions) => runtime.send(runId, prompt, sendOptions),
         cancel: (runId, commandId, reason) => {
-          const input: Types.Mutable<{ readonly runId: string; readonly commandId: string; readonly reason?: string }> = {
-            runId,
-            commandId,
-          }
+          const input: Types.Mutable<{ readonly runId: string; readonly commandId: string; readonly reason?: string }> =
+            {
+              runId,
+              commandId,
+            }
           if (reason !== undefined) input.reason = reason
           return runtime.cancel(input)
         },

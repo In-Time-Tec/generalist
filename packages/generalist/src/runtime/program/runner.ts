@@ -1,8 +1,8 @@
+import { make as makeAgentMembers } from "./agent-members.js"
 import { Clock, DateTime, Effect, Schema, SchemaRepresentation } from "effect"
 import { type Service as CodeExecutorService, makeRequest } from "../../core/program/code-executor.js"
 import {
   type CapabilityFailure,
-  ProgramAgentFailure,
   ProgramBudgetExhausted,
   ProgramCancelled,
   ProgramCapabilities,
@@ -24,13 +24,9 @@ import {
 } from "../../core/program/runner.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 import type { CommitProgramLogInput, ProgramOperationKind, ProgramReservation } from "./store.js"
-import { childRunIdFor, fanOutIdFor } from "../child/fan-out-internal.js"
-import { defaultInheritance } from "../../core/agent/lifecycle/fan-out.js"
-import { fanOutMemberSessionId } from "../child/session.js"
 import {
   AgentFanOut,
   AgentMap,
-  AgentMemberResults,
   AgentRun,
   Log,
   StepCall,
@@ -43,7 +39,6 @@ import {
   storeFailure,
   strictDecode,
 } from "./boundary.js"
-import { Prompt } from "effect/unstable/ai"
 import { programWait } from "./approval.js"
 import { OperationOutcome } from "./operation-outcome.js"
 import { Authorization } from "./authorization.js"
@@ -57,21 +52,24 @@ export const make = (input: {
 }): ProgramRunnerService => {
   const tools = new Map(input.handlers.tools.map((handler) => [handler.name, handler] as const))
   const steps = new Map(input.handlers.steps.map((handler) => [handler.name, handler] as const))
-  const agents = new Map(input.handlers.agents.map((handler) => [handler.selection, handler] as const))
-  const branch = input.claimed.checkpoint !== undefined && "_tag" in input.claimed.checkpoint
-    ? input.claimed.checkpoint.branch
-    : undefined
+  const branch =
+    input.claimed.checkpoint !== undefined && "_tag" in input.claimed.checkpoint
+      ? input.claimed.checkpoint.branch
+      : undefined
   const operationIdentity = (authoredOperation: string): string =>
     branch === undefined
       ? authoredOperation
-      : branch.replay[authoredOperation] ?? `b${identityDigest({ namespace: branch.namespace, authoredOperation }).slice(0, 63)}`
+      : (branch.replay[authoredOperation] ??
+        `b${identityDigest({ namespace: branch.namespace, authoredOperation }).slice(0, 63)}`)
   // Immutable command receipts are not the current dispatch state.
   const acceptedOperation = (operation: string) =>
     input.store.getProgramOperation({ runId: input.claim.runId, operation }).pipe(
       Effect.mapError(storeFailure),
-      Effect.flatMap((record) => record === undefined
-        ? ProgramCancelled.make({ reason: `Accepted Program operation ${operation} is missing` })
-        : Effect.succeed(record)),
+      Effect.flatMap((record) =>
+        record === undefined
+          ? ProgramCancelled.make({ reason: `Accepted Program operation ${operation} is missing` })
+          : Effect.succeed(record),
+      ),
     )
   const settleOperation = (
     operation: string,
@@ -79,7 +77,13 @@ export const make = (input: {
     releaseSlots: number,
   ) =>
     input.store
-      .settleProgramOperation({ ...input.claim, operation, outcome, releaseSlots })
+      .settleProgramOperation({
+        ...input.claim,
+        commandId: JSON.stringify(["program-settle", input.claim.runId, input.claim.attemptFence, operation]),
+        operation,
+        outcome,
+        releaseSlots,
+      })
       .pipe(Effect.mapError(storeFailure))
   const executeOperation = <A>(
     program: PinnedProgram,
@@ -137,12 +141,14 @@ export const make = (input: {
               reason: failure.reason,
             }
             const wait = programWait(failure.token === undefined ? waitInput : { ...waitInput, token: failure.token })
+            const checkpoint = { _tag: "Program" as const, version: "1" as const }
+            if (branch !== undefined) Object.assign(checkpoint, { branch })
             yield* input.store
               .suspendProgramOperation({
                 ...reservation,
                 suspension: failure,
                 wait: { ...wait, status: "open", openedAt },
-                checkpoint: { _tag: "Program", version: "1", ...(branch === undefined ? {} : { branch }) },
+                checkpoint,
               })
               .pipe(Effect.mapError(storeFailure))
             return yield* failure
@@ -170,7 +176,8 @@ export const make = (input: {
         if (execution.ownerId !== input.claim.ownerId || execution.attemptFence !== input.claim.attemptFence) {
           return yield* ProgramCancelled.make({ reason: "Program execution ownership changed before dispatch" })
         }
-        if (execution.cancellationRequested) return yield* ProgramCancelled.make({ reason: "Program execution was cancelled" })
+        if (execution.cancellationRequested)
+          return yield* ProgramCancelled.make({ reason: "Program execution was cancelled" })
         const exit = yield* Effect.exit(options.dispatch)
         if (exit._tag === "Success") {
           const value = yield* options.validateResult(exit.value)
@@ -191,179 +198,15 @@ export const make = (input: {
       })
       return yield* dispatch
     })
-  const resultFor = (selection: string, operation: string, runId: string) =>
-    input.store.snapshot(runId).pipe(
-      Effect.flatMap((snapshot) => {
-        const outcome = snapshot.outcome
-        if (outcome?._tag !== "Succeeded" || "_tag" in outcome.result) {
-          return Effect.fail(
-            ProgramAgentFailure.make({
-              selection,
-              operation,
-              cause: outcome ?? `child Run ${runId} is not terminal`,
-            }),
-          )
-        }
-        let inputTokens = 0
-        let outputTokens = 0
-        for (const fact of snapshot.usageFacts) {
-          if (fact._tag !== "Completed") continue
-          inputTokens += fact.usage.inputTokens.total ?? fact.usage.inputTokens.uncached ?? 0
-          outputTokens += fact.usage.outputTokens.total ?? 0
-        }
-        return Effect.succeed({
-          text: outcome.result.text,
-          turns: outcome.result.turns,
-          tokenUsage: { input: inputTokens, output: outputTokens },
-        })
-      }),
-      Effect.mapError((cause) =>
-        Schema.is(ProgramAgentFailure)(cause) ? cause : ProgramAgentFailure.make({ selection, operation, cause }),
-      ),
-    )
-  const runAgentMembers = (
-    program: PinnedProgram,
-    authoredRequest: {
-      readonly operation: string
-      readonly kind: "agent" | "agent-map" | "agent-fan-out"
-      readonly members: ReadonlyArray<{ readonly member: string; readonly selection: string; readonly input: unknown }>
-    },
-  ) =>
-    Effect.gen(function* () {
-      const authoredOperation = authoredRequest.operation
-      const request = { ...authoredRequest, operation: operationIdentity(authoredOperation) }
-      if (request.members.length === 0) return []
-      if (new Set(request.members.map((member) => member.member)).size !== request.members.length) {
-        return yield* ProgramAgentFailure.make({
-          selection: request.kind,
-          operation: request.operation,
-          cause: "Agent member keys must be unique",
-        })
-      }
-      const prior = yield* input.store.getProgramOperation({
-        runId: input.claim.runId, operation: request.operation,
-      }).pipe(Effect.mapError(storeFailure))
-      if (prior?.status === "succeeded" || prior?.status === "failed" || prior?.status === "unknown") {
-        yield* input.store.reserveProgramOperation({
-          ...input.claim,
-          programPin: program.pin,
-          budget: program.manifest.budget,
-          operation: request.operation,
-          authoredOperation,
-          kind: request.kind,
-          capability: request.kind === "agent-fan-out" ? "fan-out" : request.members[0]!.selection,
-          inputDigest: yield* digest({ kind: request.kind, members: request.members }, "agent-input", request.kind),
-          input: request.members,
-          replay: "recorded",
-          reservation: {},
-        }).pipe(Effect.mapError(storeFailure))
-        const retained = yield* acceptedOperation(request.operation)
-        if (retained.status === "failed") return yield* storeFailure(retained.error)
-        if (retained.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: request.operation })
-        return yield* strictDecode(AgentMemberResults, "agent-output", request.kind)(retained.result)
-      }
-      const decoded: Array<{
-        readonly member: string
-        readonly selection: string
-        readonly prompt: Prompt.Prompt
-      }> = []
-      for (const member of request.members) {
-        const binding = agents.get(member.selection)
-        if (binding === undefined) {
-          return yield* ProgramCapabilityMissing.make({ capability: member.selection })
-        }
-        const invocation = yield* binding
-          .decode(member.input)
-          .pipe(Effect.mapError(schemaFailure("agent-input", member.selection)))
-        yield* Authorization.authorize(input.claimed, invocation, request.operation, member.selection)
-        decoded.push({
-          member: member.member,
-          selection: member.selection,
-          prompt: Prompt.make(invocation.prompt),
-        })
-      }
-      const fanOutId = fanOutIdFor(input.claim.runId, `program:${request.operation}`)
-      const concurrency = Math.min(program.manifest.budget.concurrency, decoded.length)
-      const nowMillis = yield* Clock.currentTimeMillis
-      const suspension = ProgramSuspended.make({
-        operation: request.operation,
-        reason: "agent",
-        token: `program-children:${request.operation}`,
-      })
-      yield* input.store
-        .admitProgramAgents({
-          ...input.claim,
-          programPin: program.pin,
-          budget: program.manifest.budget,
-          operation: request.operation,
-          authoredOperation,
-          kind: request.kind,
-          capability: request.kind === "agent-fan-out" ? "fan-out" : decoded[0]!.selection,
-          inputDigest: yield* digest({ kind: request.kind, members: request.members }, "agent-input", request.kind),
-          input: request.members,
-          replay: "recorded",
-          reservation: { agentRuns: decoded.length, activeSlots: concurrency },
-          fanOut: {
-            fanOutId,
-            parentRunId: input.claim.runId,
-            idempotencyKey: `program:${request.operation}`,
-            members: decoded.map((member, ordinal) => ({
-              ordinal,
-              key: member.member,
-              childRunId: childRunIdFor(fanOutId, ordinal),
-              selection: member.selection,
-              prompt: member.prompt,
-              sessionId: fanOutMemberSessionId({ fanOutId, key: member.member }),
-              metadata: { programOperation: request.operation, programMember: member.member },
-              origin: { operationKey: request.operation },
-              inherit: defaultInheritance,
-            })),
-            concurrency,
-            join: { _tag: "AllSuccess" },
-            remainder: "await",
-          },
-          suspension,
-          wait: {
-            waitId: suspension.token!,
-            reason: { _tag: "External", capability: "agent" },
-            status: "open",
-            openedAt: DateTime.formatIso(DateTime.makeUnsafe(nowMillis)),
-          },
-        })
-        .pipe(Effect.mapError(storeFailure))
-      const record = yield* acceptedOperation(request.operation)
-      if (record.status === "succeeded")
-        return yield* strictDecode(AgentMemberResults, "agent-output", request.kind)(record.result)
-      if (record.status === "failed") return yield* storeFailure(record.error)
-      if (record.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: request.operation })
-      if (record.status === "waiting") return yield* suspension
-      const aggregate = yield* input.store.inspectFanOut(record.fanOutId!).pipe(Effect.mapError(storeFailure))
-      if (aggregate.status === "running") return yield* suspension
-      const resultExit = yield* Effect.exit(
-        Effect.forEach(decoded, (member, ordinal) =>
-          resultFor(member.selection, request.operation, record.childRunIds[ordinal]!).pipe(
-            Effect.map((result) => ({ member: member.member, result })),
-          ),
-        ),
-      )
-      if (resultExit._tag === "Failure") {
-        const failure = failureFromExit(resultExit.cause)
-        yield* settleOperation(request.operation, { _tag: "Failed", error: failure }, concurrency)
-        return yield* failure
-      }
-      const results = yield* strictDecode(AgentMemberResults, "agent-output", request.kind)(resultExit.value)
-      const tokens = results.reduce(
-        (total, member) => total + member.result.tokenUsage.input + member.result.tokenUsage.output,
-        0,
-      )
-      const settled = yield* settleOperation(
-        request.operation,
-        { _tag: "Succeeded", value: results, tokens },
-        concurrency,
-      )
-      if (settled.status === "failed") return yield* storeFailure(settled.error)
-      return results
-    })
+  const runAgentMembers = makeAgentMembers({
+    claim: input.claim,
+    claimed: input.claimed,
+    store: input.store,
+    handlers: input.handlers.agents,
+    operationIdentity,
+    acceptedOperation,
+    settleOperation,
+  })
   const callBinding = (program: PinnedProgram, raw: SerializedValue, kind: "tool" | "step") =>
     Effect.gen(function* () {
       const boundary = kind === "tool" ? "tool-input" : "step-input"

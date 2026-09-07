@@ -1,7 +1,9 @@
-import { objectRuntimeLayer, objectWorkerId } from "./object.js"
+import "../state/suites/worker-wakeup-suite.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
 import "./suites/fifo-suite.js"
-import { expect, layer } from "@effect/vitest"
-import { Deferred, Effect, Layer, Stream } from "effect"
+import { describe, expect, it as standalone, layer } from "@effect/vitest"
+import { provideScoped } from "./scoped-provide.js"
+import { Deferred, Effect, Exit, Layer, Ref, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import {
   ChildRuns,
@@ -39,7 +41,57 @@ const finish = Response.makePart("finish", {
 const childSuspension = (childRunId: string, waitId: string) =>
   suspension({ waitId, token: childRunId, toolName: ChildRuns.toolName })
 
-const backend = "object" as const
+standalone.effect("releases blocked provider resources after a scheduler fixture failure", () =>
+  Effect.gen(function* () {
+    const release = yield* Deferred.make<void>()
+    const started = yield* Deferred.make<void>()
+    const finalized = yield* Ref.make(false)
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(
+            Stream.drain,
+            Stream.concat(Stream.fromEffect(Deferred.await(release)).pipe(Stream.drain)),
+            Stream.concat(Stream.make(Response.makePart("text-delta", { id: "answer", delta: "done" }), finish)),
+            Stream.ensuring(Ref.set(finalized, true)),
+          ),
+      }),
+    )
+    const resolver = ExecutableResolver.layerStatic([
+      {
+        executable: assistantRef,
+        agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model)),
+      },
+    ]).pipe(Layer.orDie)
+    const result = yield* provideScoped(
+      objectRuntimeLayer({
+        addresses: [
+          { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+        ],
+        scheduler: { pollInterval: "1 day" },
+      }).pipe(Layer.provide(resolver)),
+      Effect.gen(function* () {
+        yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
+        const runtime = yield* Runtime.Runtime
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "fixture-cleanup",
+          idempotencyKey: "fixture-cleanup",
+          prompt: "run",
+        })
+        yield* scheduler.tick
+        yield* Deferred.await(started)
+        return yield* Effect.die("simulated scheduler fixture assertion")
+      }),
+    ).pipe(Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+    expect(yield* Ref.get(finalized)).toBe(true)
+  }),
+)
+
 {
   {
     const model = Layer.effect(
@@ -89,7 +141,10 @@ const backend = "object" as const
             prompt: "parent",
           })
           yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-1", runId: parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-1",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
           const child = yield* runtime.spawn({
             parentRunId: parent.runId,
             invocationId: "research",
@@ -106,13 +161,18 @@ const backend = "object" as const
             selection: "researcher",
             prompt: "recovered child",
           })
-          yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-2", runId: recovered.runId, ownerId: objectWorkerId })
+          const recoveredClaim = yield* store.claimExecution({
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-2",
+            runId: recovered.runId,
+            ownerId: objectWorkerId,
+          })
           expect((yield* runtime.inspect(recovered.runId)).status).toBe("running")
+          yield* store.releaseExecution(recoveredClaim)
           yield* scheduler.tick
           yield* scheduler.idle
           expect((yield* runtime.inspect(child.runId)).status).toBe("succeeded")
           expect((yield* runtime.inspect(recovered.runId)).status).toBe("succeeded")
+          expect((yield* store.loadExecution(recovered.runId)).attemptFence).toBe(recoveredClaim.attemptFence + 1)
           for (const runId of [child.runId, recovered.runId]) {
             const tags = (yield* runtime.history({ runId, cursor: -1, limit: 100 })).map((event) => event._tag)
             expect(tags.filter((tag) => tag === "RunAttemptStarted")).toHaveLength(1)
@@ -158,7 +218,10 @@ const backend = "object" as const
             prompt: "run",
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-3",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
 
           yield* scheduler.tick
 
@@ -169,7 +232,10 @@ const backend = "object" as const
           yield* store.releaseExecution(claim)
           expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
           const replacement = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-4", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-4",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           yield* store.releaseExecution(claim)
           expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
             ownerId: replacement.ownerId,
@@ -183,6 +249,11 @@ const backend = "object" as const
             attemptFence: replacement.attemptFence + 1,
           })
           expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
+          expect(
+            (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
+              (event) => event._tag === "RunAttemptStarted",
+            ),
+          ).toHaveLength(1)
         }),
       )
     })
@@ -214,7 +285,10 @@ const backend = "object" as const
             prompt: "parent",
           })
           const parentClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-5", runId: parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-5",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
           const childOutcome = yield* ChildRuns.make(store).invoke({
             parentRunId: parent.runId,
             toolCallId: "child-tool",
@@ -230,7 +304,10 @@ const backend = "object" as const
           yield* store.complete({
             commandId: "runtime-execution-local-scheduler-test-ts-complete-1",
             ...(yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-6", runId: childOutcome.token, ownerId: objectWorkerId })),
+              commandId: "runtime-execution-local-scheduler-test-ts-claim-6",
+              runId: childOutcome.token,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult("done"),
           })
           const blocker = yield* runtime.spawn({
@@ -239,12 +316,19 @@ const backend = "object" as const
             selection: "researcher",
             prompt: "block",
           })
-          yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-7", runId: blocker.runId, ownerId: objectWorkerId })
+          const blockerClaim = yield* store.claimExecution({
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-7",
+            runId: blocker.runId,
+            ownerId: objectWorkerId,
+          })
 
           yield* runtime.cancel({
-          commandId: "runtime-execution-local-scheduler-test-ts-cancel-2", runId: parent.runId, reason: "stop" })
+            commandId: "runtime-execution-local-scheduler-test-ts-cancel-2",
+            runId: parent.runId,
+            reason: "stop",
+          })
           expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
+          yield* store.releaseExecution(blockerClaim)
           yield* scheduler.tick
           yield* scheduler.tick
 
@@ -266,20 +350,31 @@ const backend = "object" as const
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-8", runId: activeParent.runId, ownerId: objectWorkerId })
+          const activeParentClaim = yield* store.claimExecution({
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-8",
+            runId: activeParent.runId,
+            ownerId: objectWorkerId,
+          })
           const activeChild = yield* runtime.spawn({
             parentRunId: activeParent.runId,
             invocationId: "child",
             selection: "researcher",
             prompt: "child",
           })
-          yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-9", runId: activeChild.runId, ownerId: objectWorkerId })
+          const activeChildClaim = yield* store.claimExecution({
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-9",
+            runId: activeChild.runId,
+            ownerId: objectWorkerId,
+          })
           yield* runtime.cancel({
-          commandId: "runtime-execution-local-scheduler-test-ts-cancel-3", runId: activeParent.runId, reason: "stop" })
+            commandId: "runtime-execution-local-scheduler-test-ts-cancel-3",
+            runId: activeParent.runId,
+            reason: "stop",
+          })
           expect((yield* runtime.inspect(activeParent.runId)).status).toBe("cancelling")
 
+          yield* store.releaseExecution(activeChildClaim)
+          yield* store.releaseExecution(activeParentClaim)
           yield* scheduler.tick
           expect((yield* runtime.inspect(activeChild.runId)).status).toBe("cancelled")
           expect((yield* runtime.inspect(activeParent.runId)).status).toBe("cancelled")
@@ -360,53 +455,97 @@ const backend = "object" as const
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
+    describe(`object the cancelling sweep fences an owner absent from this process incarnation`, () => {
+      standalone.effect("settles an owner absent from this process incarnation", () =>
+        Effect.gen(function* () {
+          const storage = makeObjectStorage()
+          const runtimeLayer = () => objectRuntimeLayer(options, storage).pipe(Layer.provide(options.resolverLayer))
+          const persisted = yield* provideScoped(
+            runtimeLayer(),
+            Effect.gen(function* () {
+              const runtime = yield* Runtime.Runtime
+              const store = yield* RunStore.RunStore
+              const workerId = objectWorkerId
 
-    layer(runtimeLayer)(
-      `object the cancelling sweep fences an owner absent from this process incarnation`,
-      (it) => {
-        it.effect("settles an owner absent from this process incarnation", () =>
-          Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            const store = yield* RunStore.RunStore
-            const workerId = objectWorkerId
+              const owned = yield* runtime.send({
+                to: assistantAddress,
+                sessionId: `scheduler-claim-window:object`,
+                idempotencyKey: "owned",
+                prompt: "owned",
+              })
+              const ownedClaim = yield* store.claimExecution({
+                commandId: "runtime-execution-local-scheduler-test-ts-claim-10",
+                runId: owned.runId,
+                ownerId: workerId,
+              })
+              yield* runtime.cancel({
+                commandId: "runtime-execution-local-scheduler-test-ts-cancel-4",
+                runId: owned.runId,
+                reason: "stop",
+              })
+              expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelling")
 
-            const owned = yield* runtime.send({
-              to: assistantAddress,
-              sessionId: `scheduler-claim-window:object`,
-              idempotencyKey: "owned",
-              prompt: "owned",
-            })
-            yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-10", runId: owned.runId, ownerId: workerId })
-            yield* runtime.cancel({
-          commandId: "runtime-execution-local-scheduler-test-ts-cancel-4", runId: owned.runId, reason: "stop" })
-            expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelling")
+              const orphaned = yield* runtime.send({
+                to: assistantAddress,
+                sessionId: `scheduler-claim-window-ghost:object`,
+                idempotencyKey: "ghost",
+                prompt: "ghost",
+              })
+              const orphanedClaim = yield* store.claimExecution({
+                commandId: "runtime-execution-local-scheduler-test-ts-claim-11",
+                runId: orphaned.runId,
+                ownerId: objectWorkerId,
+              })
+              yield* runtime.cancel({
+                commandId: "runtime-execution-local-scheduler-test-ts-cancel-5",
+                runId: orphaned.runId,
+                reason: "stop",
+              })
+              const scheduler = yield* LocalScheduler.LocalScheduler
+              yield* scheduler.tick
+              for (const claim of [ownedClaim, orphanedClaim]) {
+                expect((yield* runtime.inspect(claim.runId)).status).toBe("cancelling")
+                expect(yield* store.loadExecution(claim.runId)).toMatchObject({
+                  ownerId: claim.ownerId,
+                  attemptFence: claim.attemptFence,
+                })
+              }
+              return { owned, orphaned, ownedClaim, orphanedClaim }
+            }),
+          )
+          yield* provideScoped(
+            runtimeLayer(),
+            Effect.gen(function* () {
+              const { owned, orphaned, ownedClaim, orphanedClaim } = persisted
+              const runtime = yield* Runtime.Runtime
+              const scheduler = yield* LocalScheduler.LocalScheduler
+              const store = yield* RunStore.RunStore
+              for (const claim of [ownedClaim, orphanedClaim]) {
+                const execution = yield* store.loadExecution(claim.runId)
+                expect(execution.ownerId).toBeUndefined()
+                expect(execution.attemptFence).toBe(claim.attemptFence + 1)
+              }
+              yield* scheduler.tick
 
-            const orphaned = yield* runtime.send({
-              to: assistantAddress,
-              sessionId: `scheduler-claim-window-ghost:object`,
-              idempotencyKey: "ghost",
-              prompt: "ghost",
-            })
-            yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-11", runId: orphaned.runId, ownerId: objectWorkerId })
-            yield* runtime.cancel({
-          commandId: "runtime-execution-local-scheduler-test-ts-cancel-5", runId: orphaned.runId, reason: "stop" })
-
-            yield* scheduler.tick
-
-            expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelled")
-            const ownedTags = (yield* runtime.history({ runId: owned.runId, cursor: -1, limit: 100 })).map(
-              (event) => event._tag,
-            )
-            expect(ownedTags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
-            expect((yield* runtime.inspect(orphaned.runId)).status).toBe("cancelled")
-          }),
-        )
-      },
-    )
+              expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelled")
+              const ownedTags = (yield* runtime.history({ runId: owned.runId, cursor: -1, limit: 100 })).map(
+                (event) => event._tag,
+              )
+              expect(ownedTags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
+              expect((yield* runtime.inspect(orphaned.runId)).status).toBe("cancelled")
+              for (const claim of [ownedClaim, orphanedClaim]) {
+                expect((yield* store.loadExecution(claim.runId)).attemptFence).toBe(claim.attemptFence + 2)
+                expect(
+                  (yield* runtime.history({ runId: claim.runId, cursor: -1, limit: 100 })).filter(
+                    (event) => event._tag === "RunAttemptStarted",
+                  ),
+                ).toHaveLength(1)
+              }
+            }),
+          )
+        }),
+      )
+    })
   }
 
   {
@@ -428,8 +567,13 @@ const backend = "object" as const
           const store = yield* RunStore.RunStore
           const host = RunExecutor.RunExecutor.of({
             execute: (claim) =>
-              store.complete({
-          commandId: `runtime-execution-local-scheduler-test-ts-complete-6:${claim.runId}`, ...claim, result: completedResult("done") }).pipe(Effect.asVoid, Effect.orDie),
+              store
+                .complete({
+                  commandId: `runtime-execution-local-scheduler-test-ts-complete-6:${claim.runId}`,
+                  ...claim,
+                  result: completedResult("done"),
+                })
+                .pipe(Effect.asVoid, Effect.orDie),
             interrupt: () => Effect.void,
           })
           const scheduler = yield* makeLocalScheduler({ workerId: objectWorkerId, concurrency: 4 }).pipe(
@@ -457,14 +601,10 @@ const backend = "object" as const
               { concurrency: "unbounded" },
             )
             const expected = Math.min(4 * (tickIndex + 1), 17)
-            if (true) {
-              expect(completed).toEqual([
-                ...Array<boolean>(expected).fill(true),
-                ...Array<boolean>(17 - expected).fill(false),
-              ])
-            } else {
-              expect(completed.filter(Boolean)).toHaveLength(expected)
-            }
+            expect(completed).toEqual([
+              ...Array<boolean>(expected).fill(true),
+              ...Array<boolean>(17 - expected).fill(false),
+            ])
           }
           expect((yield* runtime.inspect(receipts[0]!.runId)).status).toBe("succeeded")
           expect((yield* runtime.inspect(receipts[16]!.runId)).status).toBe("succeeded")
@@ -492,9 +632,11 @@ const backend = "object" as const
         () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
+            const scheduler = yield* makeLocalScheduler({ workerId: objectWorkerId }).pipe(
+              Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
+            )
             const store = yield* RunStore.RunStore
-            const runCount = true ? 1000 : 400
+            const runCount = 1000
             const receipts: Array<{ readonly runId: string }> = []
             for (let index = 0; index < runCount; index += 1) {
               const receipt = yield* runtime.send({
@@ -507,9 +649,15 @@ const backend = "object" as const
             }
             for (const receipt of receipts) {
               const claim = yield* store.claimExecution({
-          commandId: `runtime-execution-local-scheduler-test-ts-claim-12:${receipt.runId}`, runId: receipt.runId, ownerId: objectWorkerId })
+                commandId: `runtime-execution-local-scheduler-test-ts-claim-12:${receipt.runId}`,
+                runId: receipt.runId,
+                ownerId: objectWorkerId,
+              })
               yield* store.complete({
-          commandId: `runtime-execution-local-scheduler-test-ts-complete-7:${claim.runId}`, ...claim, result: completedResult("done") })
+                commandId: `runtime-execution-local-scheduler-test-ts-complete-7:${claim.runId}`,
+                ...claim,
+                result: completedResult("done"),
+              })
             }
             const calls: Array<{
               readonly method: string
@@ -569,7 +717,10 @@ const backend = "object" as const
               prompt: "parent",
             })
             const parentClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-13", runId: parent.runId, ownerId: objectWorkerId })
+              commandId: "runtime-execution-local-scheduler-test-ts-claim-13",
+              runId: parent.runId,
+              ownerId: objectWorkerId,
+            })
             const childOutcome = yield* ChildRuns.make(store).invoke({
               parentRunId: parent.runId,
               toolCallId: "order-child",
@@ -582,6 +733,11 @@ const backend = "object" as const
               waits: [openWait({ waitId: "order-child" })],
               suspension: childSuspension(childOutcome.token, "order-child"),
             })
+            const childClaim = yield* store.claimExecution({
+              commandId: "runtime-execution-local-scheduler-test-ts-claim-15",
+              runId: childOutcome.token,
+              ownerId: objectWorkerId,
+            })
             const later = yield* runtime.send({
               to: assistantAddress,
               sessionId: `scheduler-order-later:object`,
@@ -591,14 +747,16 @@ const backend = "object" as const
             yield* store.complete({
               commandId: "runtime-execution-local-scheduler-test-ts-complete-2",
               ...(yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-14", runId: later.runId, ownerId: objectWorkerId })),
+                commandId: "runtime-execution-local-scheduler-test-ts-claim-14",
+                runId: later.runId,
+                ownerId: objectWorkerId,
+              })),
               result: completedResult("later"),
             })
             yield* scheduler.tick
             yield* store.complete({
               commandId: "runtime-execution-local-scheduler-test-ts-complete-3",
-              ...(yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-15", runId: childOutcome.token, ownerId: objectWorkerId })),
+              ...childClaim,
               result: completedResult("child"),
             })
             yield* scheduler.tick
@@ -627,7 +785,10 @@ const backend = "object" as const
               yield* store.complete({
                 commandId: `runtime-execution-local-scheduler-test-ts-complete-4:${receipt.runId}`,
                 ...(yield* store.claimExecution({
-          commandId: `runtime-execution-local-scheduler-test-ts-claim-16:${receipt.runId}`, runId: receipt.runId, ownerId: objectWorkerId })),
+                  commandId: `runtime-execution-local-scheduler-test-ts-claim-16:${receipt.runId}`,
+                  runId: receipt.runId,
+                  ownerId: objectWorkerId,
+                })),
                 result: completedResult("done"),
               })
             })
@@ -639,7 +800,10 @@ const backend = "object" as const
               prompt: "parent",
             })
             const parentClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-17", runId: parent.runId, ownerId: objectWorkerId })
+              commandId: "runtime-execution-local-scheduler-test-ts-claim-17",
+              runId: parent.runId,
+              ownerId: objectWorkerId,
+            })
             const childOutcome = yield* ChildRuns.make(store).invoke({
               parentRunId: parent.runId,
               toolCallId: "backlog-child",
@@ -655,7 +819,10 @@ const backend = "object" as const
             yield* store.complete({
               commandId: "runtime-execution-local-scheduler-test-ts-complete-5",
               ...(yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-18", runId: childOutcome.token, ownerId: objectWorkerId })),
+                commandId: "runtime-execution-local-scheduler-test-ts-claim-18",
+                runId: childOutcome.token,
+                ownerId: objectWorkerId,
+              })),
               result: completedResult("done"),
             })
             for (let index = 0; index < 100; index += 1) yield* filler(`after-${index}`)
@@ -690,7 +857,7 @@ const backend = "object" as const
                 prompt: "blocked",
               })
               const blockedClaim = yield* store.claimExecution({
-          commandId: `runtime-execution-local-scheduler-test-ts-claim-19:${blocked.runId}`,
+                commandId: `runtime-execution-local-scheduler-test-ts-claim-19:${blocked.runId}`,
                 runId: blocked.runId,
                 ownerId: objectWorkerId,
               })
@@ -707,7 +874,10 @@ const backend = "object" as const
               prompt: "parent",
             })
             const parentClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-20", runId: parent.runId, ownerId: objectWorkerId })
+              commandId: "runtime-execution-local-scheduler-test-ts-claim-20",
+              runId: parent.runId,
+              ownerId: objectWorkerId,
+            })
             const childOutcome = yield* ChildRuns.make(store).invoke({
               parentRunId: parent.runId,
               toolCallId: "starve-child",
@@ -723,7 +893,10 @@ const backend = "object" as const
             yield* store.complete({
               commandId: "runtime-execution-local-scheduler-test-ts-complete-8",
               ...(yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-21", runId: childOutcome.token, ownerId: objectWorkerId })),
+                commandId: "runtime-execution-local-scheduler-test-ts-claim-21",
+                runId: childOutcome.token,
+                ownerId: objectWorkerId,
+              })),
               result: completedResult("done"),
             })
             const tickBudget = 40
@@ -752,9 +925,15 @@ const backend = "object" as const
             prompt: "run-idle",
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-22", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-22",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           yield* store.complete({
-          commandId: "runtime-execution-local-scheduler-test-ts-complete-13", ...claim, result: completedResult("done") })
+            commandId: "runtime-execution-local-scheduler-test-ts-complete-13",
+            ...claim,
+            result: completedResult("done"),
+          })
           const calls: Array<{ readonly method: string; readonly status?: string }> = []
           const spy = RunStore.RunStore.of({
             ...store,
@@ -828,7 +1007,10 @@ const backend = "object" as const
             prompt: "parent",
           })
           const parentClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-23", runId: parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-23",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
           const outcome = yield* ChildRuns.make(store).invoke({
             parentRunId: parent.runId,
             toolCallId: "child-tool",
@@ -907,7 +1089,10 @@ const backend = "object" as const
             prompt: "parent",
           })
           const parentClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-24", runId: parent.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-local-scheduler-test-ts-claim-24",
+            runId: parent.runId,
+            ownerId: objectWorkerId,
+          })
           const outcome = yield* ChildRuns.make(store).invoke({
             parentRunId: parent.runId,
             toolCallId: "child-tool",
@@ -923,7 +1108,10 @@ const backend = "object" as const
           yield* store.complete({
             commandId: "runtime-execution-local-scheduler-test-ts-complete-9",
             ...(yield* store.claimExecution({
-          commandId: "runtime-execution-local-scheduler-test-ts-claim-25", runId: outcome.token, ownerId: objectWorkerId })),
+              commandId: "runtime-execution-local-scheduler-test-ts-claim-25",
+              runId: outcome.token,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult("done"),
           })
           yield* scheduler.tick
@@ -983,7 +1171,10 @@ const backend = "object" as const
             // store.cancel only records the request; delivering the interrupt to the owning
             // worker is the scheduler sweep's job, so the run must not settle without a tick.
             yield* store.cancel({
-          commandId: "runtime-execution-local-scheduler-test-ts-cancel-15", runId: receipt.runId, reason: "stop" })
+              commandId: "runtime-execution-local-scheduler-test-ts-cancel-15",
+              runId: receipt.runId,
+              reason: "stop",
+            })
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
 
             yield* scheduler.tick
@@ -1034,6 +1225,7 @@ const backend = "object" as const
       (it) => {
         it.effect("bounds simultaneously executing Runs across ticks", () =>
           Effect.gen(function* () {
+            yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
             const runtime = yield* Runtime.Runtime
             const scheduler = yield* LocalScheduler.LocalScheduler
             for (let index = 0; index < 6; index += 1) {
@@ -1094,6 +1286,7 @@ const backend = "object" as const
       (it) => {
         it.effect("starts more than the former default bound", () =>
           Effect.gen(function* () {
+            yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
             const runtime = yield* Runtime.Runtime
             const scheduler = yield* LocalScheduler.LocalScheduler
             for (let index = 0; index < 6; index += 1) {

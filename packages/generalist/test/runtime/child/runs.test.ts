@@ -1,3 +1,4 @@
+import { objectWorkerId } from "../execution/object.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { ChildRuns, Cursor, Errors, Runtime, RunStore, RunTree } from "../../../src/runtime/index.js"
@@ -82,17 +83,26 @@ layer(objectLayer)("Runtime children", (it) => {
         selection: "researcher",
         prompt: textPrompt("research"),
       })
-      expect(duplicate.runId).toBe(child.runId)
-      expect(duplicate.duplicate).toBe(true)
+      expect(duplicate).toEqual(child)
+      const childClaim = yield* driver.claimExecution({
+        commandId: "runtime-child-runs-test-ts-claim-1",
+        runId: child.runId,
+        ownerId: objectWorkerId,
+      })
       yield* driver.emitAgentEvent({
-        ...(yield* driver.claimExecution({
-          commandId: "runtime-child-runs-test-ts-claim-1", runId: child.runId, ownerId: "test" })),
+        commandId: "runs.test-87",
+        ...childClaim,
         runId: child.runId,
         event: { _tag: "TurnStarted", turn: 0 },
       })
+      yield* driver.releaseExecution(childClaim)
       yield* driver.complete({
+        commandId: "runs.test-93",
         ...(yield* driver.claimExecution({
-          commandId: "runtime-child-runs-test-ts-claim-2", runId: child.runId, ownerId: "test" })),
+          commandId: "runtime-child-runs-test-ts-claim-2",
+          runId: child.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: child.runId,
         result: completedResult("notes"),
       })
@@ -149,8 +159,12 @@ layer(objectLayer)("Runtime children", (it) => {
         prompt: textPrompt("research"),
       })
       yield* driver.complete({
+        commandId: "runs.test-151",
         ...(yield* driver.claimExecution({
-          commandId: "runtime-child-runs-test-ts-claim-3", runId: child.runId, ownerId: "test" })),
+          commandId: "runtime-child-runs-test-ts-claim-3",
+          runId: child.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: child.runId,
         result: completedResult("notes"),
       })
@@ -188,7 +202,10 @@ layer(objectLayer)("Runtime children", (it) => {
       })
 
       yield* runtime.cancel({
-          commandId: "runtime-child-runs-test-ts-cancel-4", runId: parent.runId, reason: "stop" })
+        commandId: "runtime-child-runs-test-ts-cancel-4",
+        runId: parent.runId,
+        reason: "stop",
+      })
 
       expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
       expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
@@ -220,9 +237,15 @@ layer(objectLayer)("Runtime children", (it) => {
         prompt: textPrompt("parent"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-child-runs-test-ts-claim-4", runId: parent.runId, ownerId: "test" })
+        commandId: "runtime-child-runs-test-ts-claim-4",
+        runId: parent.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.complete({
-          commandId: "runtime-child-runs-test-ts-complete-5", ...claim, result: completedResult("done") })
+        commandId: "runtime-child-runs-test-ts-complete-5",
+        ...claim,
+        result: completedResult("done"),
+      })
       const before = yield* RunTree.checkpoint(parent.runId)
       const failure = yield* runtime
         .spawn({
@@ -250,7 +273,10 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
         prompt: "parent",
       })
       yield* store.claimExecution({
-          commandId: "runtime-child-runs-test-ts-claim-5", runId: parent.runId, ownerId: "test-parent" })
+        commandId: "runtime-child-runs-test-ts-claim-5",
+        runId: parent.runId,
+        ownerId: objectWorkerId,
+      })
       const children = ChildRuns.make(store)
       const input = {
         parentRunId: parent.runId,
@@ -266,8 +292,12 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
       if (first._tag !== "Suspend") return
       const large = "終🚀".repeat(7_000)
       yield* store.complete({
+        commandId: "runs.test-268",
         ...(yield* store.claimExecution({
-          commandId: "runtime-child-runs-test-ts-claim-6", runId: first.token, ownerId: "test" })),
+          commandId: "runtime-child-runs-test-ts-claim-6",
+          runId: first.token,
+          ownerId: objectWorkerId,
+        })),
         result: completedResult(large),
       })
       expect(yield* children.invoke(input)).toMatchObject({

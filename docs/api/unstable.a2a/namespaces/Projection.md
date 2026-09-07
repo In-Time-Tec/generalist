@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.a2a](../index) / Projection
+[generalist](../../index.md) / [unstable.a2a](../index.md) / Projection
 
 # Projection
 
@@ -22,7 +22,7 @@ Build the completion artifact update for a Runtime completion.
 
 ##### event
 
-[`RunCompleted`](../../runtime/namespaces/RunEvent#runcompleted)
+[`RunCompleted`](../../runtime/namespaces/RunEvent.md#runcompleted)
 
 #### Returns
 
@@ -34,7 +34,7 @@ Build the completion artifact update for a Runtime completion.
 
 ### fromRuntime
 
-> `const` **fromRuntime**: \{(`runtime`, `taskId`): `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors#taskprojectionfailed)\>; (`taskId`): (`runtime`) => `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors#taskprojectionfailed)\>; \}
+> `const` **fromRuntime**: \{(`runtime`, `taskId`): `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors.md#taskprojectionfailed)\>; (`taskId`): (`runtime`) => `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors.md#taskprojectionfailed)\>; \}
 
 **`Experimental`**
 
@@ -42,13 +42,13 @@ Project one Runtime snapshot and its canonical history to an A2A Task.
 
 #### Call Signature
 
-> (`runtime`, `taskId`): `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors#taskprojectionfailed)\>
+> (`runtime`, `taskId`): `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors.md#taskprojectionfailed)\>
 
 ##### Parameters
 
 ###### runtime
 
-[`Service`](../../runtime/namespaces/Runtime#service)
+[`Service`](../../runtime/namespaces/Runtime.md#service)
 
 ###### taskId
 
@@ -56,11 +56,11 @@ Project one Runtime snapshot and its canonical history to an A2A Task.
 
 ##### Returns
 
-`Effect`\<`Task`, [`TaskProjectionFailed`](./Errors#taskprojectionfailed)\>
+`Effect`\<`Task`, [`TaskProjectionFailed`](./Errors.md#taskprojectionfailed)\>
 
 #### Call Signature
 
-> (`taskId`): (`runtime`) => `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors#taskprojectionfailed)\>
+> (`taskId`): (`runtime`) => `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors.md#taskprojectionfailed)\>
 
 ##### Parameters
 
@@ -70,7 +70,7 @@ Project one Runtime snapshot and its canonical history to an A2A Task.
 
 ##### Returns
 
-(`runtime`) => `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors#taskprojectionfailed)\>
+(`runtime`) => `Effect`\<`Task`, [`TaskProjectionFailed`](./Errors.md#taskprojectionfailed)\>
 
 ***
 
@@ -88,7 +88,7 @@ Map authoritative Runtime status to A2A task state.
 
 ##### run
 
-[`RunInspection`](../../runtime/namespaces/Run#runinspection)
+[`RunInspection`](../../runtime/namespaces/Run.md#runinspection)
 
 #### Returns
 
@@ -118,7 +118,7 @@ Build a status update for one canonical Runtime event.
 
 ###### event
 
-[`RunEvent`](../../runtime/namespaces/RunEvent#runevent)
+[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent)
 
 ##### Returns
 
@@ -132,7 +132,7 @@ Build a status update for one canonical Runtime event.
 
 ###### event
 
-[`RunEvent`](../../runtime/namespaces/RunEvent#runevent)
+[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent)
 
 ##### Returns
 

@@ -10,7 +10,7 @@ import { ts } from "foldkit/schema"
 import { type Subscriptions, lift } from "foldkit/subscription"
 import { evo } from "foldkit/struct"
 import { html } from "../../html"
-const SERVER_HTTP_URL = "http://localhost:4000"
+const SERVER_HTTP_URL = "/api"
 
 const SessionOpening = ts("SessionOpening")
 const SessionReady = ts("SessionReady")
@@ -206,7 +206,7 @@ const view = (model: Model): Document => {
   }
 }
 
-const resources = Connection.layerWebSocket({ baseUrl: "http://localhost:4000" }).pipe(
+const resources = Connection.layerWebSocket({ baseUrl: new URL("/api", location.origin).toString() }).pipe(
   Layer.provide(Socket.layerWebSocketConstructorGlobal),
   Layer.provide(FetchHttpClient.layer),
 )
@@ -221,4 +221,44 @@ const application = makeApplication({
   container: document.getElementById("root"),
 })
 
-run(application)
+const form = document.getElementById("server-login")
+const tokenInput = document.getElementById("server-token")
+const loginStatus = document.getElementById("login-status")
+const root = document.getElementById("root")
+if (
+  form instanceof HTMLFormElement &&
+  tokenInput instanceof HTMLInputElement &&
+  loginStatus !== null &&
+  root !== null
+) {
+  let pending = false
+  form.addEventListener("submit", (event) => {
+    event.preventDefault()
+    if (pending) return
+    pending = true
+    const token = tokenInput.value
+    tokenInput.value = ""
+    loginStatus.textContent = "Authenticating…"
+    // oxlint-disable-next-line effecttsgo/global-fetch -- Login handler runs outside Effect; FetchHttpClient is not available in the DOM event listener scope.
+    void fetch("/api/auth/session", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { authorization: "Bearer " + token },
+    })
+      .then((response) => {
+        if (response.status !== 204) {
+          pending = false
+          loginStatus.textContent = "Authentication failed. Check the server token."
+          return undefined
+        }
+        form.hidden = true
+        root.hidden = false
+        run(application)
+        return undefined
+      })
+      .catch(() => {
+        pending = false
+        loginStatus.textContent = "Could not reach the server."
+      })
+  })
+}

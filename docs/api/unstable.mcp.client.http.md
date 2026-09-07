@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.mcp.client.http
+[generalist](./index.md) / unstable.mcp.client.http
 
 # unstable.mcp.client.http
 
@@ -56,7 +56,7 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 ##### oauth?
 
-> `readonly` `optional` **oauth?**: [`Service`](./unstable.mcp.oauth#service)
+> `readonly` `optional` **oauth?**: [`Service`](./unstable.mcp.oauth.md#service)
 
 **`Experimental`**
 
@@ -82,7 +82,7 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](./unstable.mcp.client#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](./unstable.mcp.client.md#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 **`Experimental`**
 
@@ -94,7 +94,7 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 #### Returns
 
-`Layer.Layer`\<[`MCPClient`](./unstable.mcp.client#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+`Layer.Layer`\<[`MCPClient`](./unstable.mcp.client.md#mcpclient), [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ***
 
@@ -102,13 +102,13 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 ### layerTagged
 
-> `const` **layerTagged**: \{(`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>; \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>; \}
+> `const` **layerTagged**: \{(`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending)\>; \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending)\>; \}
 
 **`Experimental`**
 
 #### Call Signature
 
-> (`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>
+> (`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending)\>
 
 ##### Parameters
 
@@ -118,11 +118,11 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 ##### Returns
 
-\<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>
+\<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending)\>
 
 #### Call Signature
 
-> \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>
+> \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending)\>
 
 ##### Type Parameters
 
@@ -134,7 +134,7 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 ###### tag
 
-`Key`\<`Identifier`, [`Service`](./unstable.mcp.client#service)\>
+`Key`\<`Identifier`, [`Service`](./unstable.mcp.client.md#service)\>
 
 ###### options
 
@@ -142,7 +142,7 @@ Process-local HTTP transport options. Construct request headers at this boundary
 
 ##### Returns
 
-`Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth#oauthpending)\>
+`Layer`\<`Identifier`, [`MCPConnectionFailed`](./unstable.mcp.client.md#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror) \| [`OAuthPending`](./unstable.mcp.oauth.md#oauthpending)\>
 
 ***
 

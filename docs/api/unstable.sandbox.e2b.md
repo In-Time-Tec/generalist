@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.e2b
+[generalist](./index.md) / unstable.sandbox.e2b
 
 # unstable.sandbox.e2b
 
@@ -48,7 +48,7 @@ E2B hosted microVM configuration.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 **`Experimental`**
 
@@ -62,7 +62,7 @@ Provide the hosted E2B microVM Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -70,7 +70,7 @@ Provide the hosted E2B microVM Sandbox leaf.
 
 ### makeProvider
 
-> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
+> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
 
 **`Experimental`**
 
@@ -84,4 +84,4 @@ Construct the E2B provider over Effect HttpClient.
 
 #### Returns
 
-`Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
+`Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>

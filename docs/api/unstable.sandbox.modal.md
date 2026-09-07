@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.modal
+[generalist](./index.md) / unstable.sandbox.modal
 
 # unstable.sandbox.modal
 
@@ -320,7 +320,7 @@ Resolved Modal configuration used by recorded fixtures.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`\>
 
 **`Experimental`**
 
@@ -334,7 +334,7 @@ Provide the hosted Modal container Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`\>
 
 ***
 
@@ -342,7 +342,7 @@ Provide the hosted Modal container Sandbox leaf.
 
 ### makeProvider
 
-> `const` **makeProvider**: (`options`) => [`SandboxProviderService`](./sandbox#sandboxproviderservice)
+> `const` **makeProvider**: (`options`) => [`SandboxProviderService`](./sandbox.md#sandboxproviderservice)
 
 **`Experimental`**
 
@@ -356,4 +356,4 @@ Construct the Modal provider over an injected SDK client.
 
 #### Returns
 
-[`SandboxProviderService`](./sandbox#sandboxproviderservice)
+[`SandboxProviderService`](./sandbox.md#sandboxproviderservice)

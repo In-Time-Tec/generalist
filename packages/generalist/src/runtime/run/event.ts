@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the closed durable Run event union remains one codec authority */
-import { Effect, Schema, SchemaParser } from "effect"
+import { Effect, Option, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "../executable/manifest.js"
 import type { AgentLoopEvent, DurableAgentLoopEvent } from "../execution/agent/event.js"
@@ -29,7 +29,7 @@ import { FanOutMemberOrigin, type FanOutMemberOrigin as FanOutOrigin } from "../
 import { ChildReadiness } from "../child/readiness.js"
 import { BudgetLimits, Dimension, Spend } from "../../core/durable/run-budget.js"
 import { Inheritance } from "../../core/agent/lifecycle/fan-out.js"
-import { TriggerEventSchema, TriggerTags, type TriggerEvent } from "./trigger-event.js"
+import { TriggerEventSchema, TriggerTags, type TriggerEvent } from "../execution/trigger/event.js"
 import { Sequence, SpecVersion } from "./event-identity.js"
 import { AwaitEvent } from "../../core/agent/tools/wake-event.js"
 import { AdmissionPolicy, MessageSource } from "./steering.js"
@@ -40,7 +40,7 @@ import { ArtifactReadJournal, EditResult as ArtifactEditResult } from "../../cor
 import { ProgramBudget } from "../../core/durable/manifest/program-manifest.js"
 
 export type { AgentLoopEvent, ExecutionResult }
-export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
+export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "../execution/trigger/event.js"
 export { eventIdFor } from "./event-identity.js"
 export { Sequence, SpecVersion }
 
@@ -324,22 +324,9 @@ const ToolResult = Schema.Struct({
   taint: Schema.optionalKey(Schema.Array(CapabilitySource)),
 })
 const CompletedToolResult = Schema.Struct({ ...ToolResult.fields, taint: Schema.Array(CapabilitySource) })
-const Usage = Schema.Struct({
-  inputTokens: Schema.Struct({
-    uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-    cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-    cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-  }),
-  outputTokens: Schema.Struct({
-    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-    text: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-    reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
-  }),
-})
 const FinishPart = Schema.Struct({
   ...Response.FinishPart.fields,
-  usage: Usage,
+  usage: Response.Usage,
   response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
 })
 const Part = Schema.Union([
@@ -359,14 +346,11 @@ const ModelTelemetryEventSchema = Schema.Union([
   CallStarted,
   AttemptStarted,
   AttemptFirstOutput,
-  Schema.Struct({ ...AttemptCompleted.fields, usage: Usage }),
+  AttemptCompleted,
   AttemptFailed,
   RetryScheduled,
   FallbackScheduled,
-  Schema.Struct({
-    ...CallCompleted.fields,
-    usage: Schema.optionalKey(Usage),
-  }),
+  CallCompleted,
   CallFailed,
   CompactionStarted,
   CompactionSkipped,
@@ -375,7 +359,7 @@ const ModelTelemetryEventSchema = Schema.Union([
 ])
 export const CompletedModelResponse = Schema.Struct({
   content: Schema.Array(Part),
-  usage: Schema.optionalKey(Usage),
+  usage: Schema.optionalKey(Response.Usage),
   finishReason: Schema.optionalKey(Response.FinishReason),
 })
 export type CompletedModelResponse = typeof CompletedModelResponse.Type
@@ -398,7 +382,7 @@ export const AgentLoopEventSchema = Schema.Union([
       Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
     ),
     digest: Schema.String,
-    usage: Schema.optionalKey(Usage),
+    usage: Schema.optionalKey(Response.Usage),
     finishReason: Schema.optionalKey(Response.FinishReason),
     ...optionalMetadata,
   }),
@@ -415,7 +399,7 @@ export const AgentLoopEventSchema = Schema.Union([
     sessionEntryId: Schema.String,
     reason: Schema.Literals(["cancel", "failure"]),
     digest: Schema.String,
-    usage: Schema.optionalKey(Usage),
+    usage: Schema.optionalKey(Response.Usage),
     finishReason: Schema.optionalKey(Response.FinishReason),
   }),
   Schema.TaggedStruct("ToolExecutionStarted", { turn: Schema.Finite, call: ToolCall, ...optionalMetadata }),
@@ -478,7 +462,7 @@ export const AgentLoopEventSchema = Schema.Union([
   }),
   Schema.TaggedStruct("TurnCompleted", {
     turn: Schema.Finite,
-    usage: Schema.optionalKey(Usage),
+    usage: Schema.optionalKey(Response.Usage),
     finishReason: Schema.optionalKey(Response.FinishReason),
     ...optionalMetadata,
   }),
@@ -602,6 +586,8 @@ const LifecycleEventSchema = Schema.Union([
   }),
 ])
 const EventPayload = Schema.Union([AgentLoopEventSchema, LifecycleEventSchema])
+const EventFields = Schema.Record(Schema.String, Schema.Unknown)
+const decodeEventFields = Schema.decodeUnknownOption(EventFields)
 type RunEventEncoded = typeof RunEventBase.Encoded & typeof EventPayload.Encoded
 export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareConstructor<RunEvent, RunEventEncoded>()(
   [RunEventBase, EventPayload],
@@ -609,22 +595,23 @@ export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareC
     (input, _ast, options) => {
       // Each codec owns disjoint fields. Preserve unknown payload fields so strict
       // decoding still rejects them rather than treating the other half as excess.
-      let baseInput: unknown = input
-      let payloadInput: unknown = input
-      if (typeof input === "object" && input !== null && !Array.isArray(input)) {
-        const base: Record<string, unknown> = {}
-        const payload: Record<string, unknown> = {}
-        for (const [key, value] of Object.entries(input)) {
-          Object.defineProperty(Object.hasOwn(RunEventBase.fields, key) ? base : payload, key, {
-            value,
-            enumerable: true,
-            configurable: true,
-            writable: true,
-          })
-        }
-        baseInput = base
-        payloadInput = payload
-      }
+      const fields = decodeEventFields(input)
+      const [baseInput, payloadInput] = Option.match(fields, {
+        onNone: () => [input, input],
+        onSome: (value) => {
+          const base: typeof EventFields.Type = {}
+          const payload: typeof EventFields.Type = {}
+          for (const [key, field] of Object.entries(value)) {
+            Object.defineProperty(Object.hasOwn(RunEventBase.fields, key) ? base : payload, key, {
+              value: field,
+              enumerable: true,
+              configurable: true,
+              writable: true,
+            })
+          }
+          return [base, payload]
+        },
+      })
       return Effect.zipWith(
         SchemaParser.decodeUnknownEffect(baseCodec)(baseInput, options),
         SchemaParser.decodeUnknownEffect(payloadCodec)(payloadInput, options),

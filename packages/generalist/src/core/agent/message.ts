@@ -6,7 +6,7 @@ import { activateSkillToolName } from "./skill-tool.js"
 import { isMessageFromRecall, recalledMessageIdentity, replaceRecalledMessage } from "../context/memory.js"
 import type { Middleware, TurnContext } from "../model/middleware.js"
 import type { Entry } from "../context/session.js"
-import type { HookFailed } from "../../hooks/index.js"
+import type { EvaluationFailure } from "../../hooks/index.js"
 
 export const providerOutputState = () => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
 export const errorMessage = <E>(error: E) =>
@@ -106,19 +106,21 @@ export const applyPromptChain: {
   (
     prompt: Prompt.Prompt,
     context: TurnContext,
-  ): (chain: ReadonlyArray<Middleware>) => Effect.Effect<Prompt.Prompt, AgentError | HookFailed | MiddlewareViolation>
+  ): (
+    chain: ReadonlyArray<Middleware>,
+  ) => Effect.Effect<Prompt.Prompt, AgentError | EvaluationFailure | MiddlewareViolation>
   (
     chain: ReadonlyArray<Middleware>,
     prompt: Prompt.Prompt,
     context: TurnContext,
-  ): Effect.Effect<Prompt.Prompt, AgentError | HookFailed | MiddlewareViolation>
+  ): Effect.Effect<Prompt.Prompt, AgentError | EvaluationFailure | MiddlewareViolation>
 } = Function.dual(
   3,
   (
     chain: ReadonlyArray<Middleware>,
     prompt: Prompt.Prompt,
     context: TurnContext,
-  ): Effect.Effect<Prompt.Prompt, AgentError | HookFailed | MiddlewareViolation> =>
+  ): Effect.Effect<Prompt.Prompt, AgentError | EvaluationFailure | MiddlewareViolation> =>
     Effect.gen(function* () {
       let current = prompt
       for (const middleware of chain) {
@@ -145,19 +147,19 @@ export const applyPartChain: {
     context: TurnContext,
   ): (
     chain: ReadonlyArray<Middleware>,
-  ) => Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | HookFailed>
+  ) => Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | EvaluationFailure>
   (
     chain: ReadonlyArray<Middleware>,
     part: Response.StreamPart<Record<string, Tool.Any>>,
     context: TurnContext,
-  ): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | HookFailed>
+  ): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | EvaluationFailure>
 } = Function.dual(
   3,
   (
     chain: ReadonlyArray<Middleware>,
     part: Response.StreamPart<Record<string, Tool.Any>>,
     context: TurnContext,
-  ): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | HookFailed> =>
+  ): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError | EvaluationFailure> =>
     Effect.gen(function* () {
       let current: Option.Option<Response.StreamPart<Record<string, Tool.Any>>> = Option.some(part)
       for (const middleware of chain) {

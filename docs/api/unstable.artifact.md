@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.artifact
+[generalist](./index.md) / unstable.artifact
 
 # unstable.artifact
 
@@ -954,7 +954,7 @@ Journaled result of one attributed artifact edit.
 
 ### EditTool
 
-> **EditTool** = `Tool.Tool`\<`` `artifact_edit_${string}` ``, \{ `failure`: *typeof* [`ArtifactError`](#artifacterror-1); `failureMode`: `"return"`; `parameters`: *typeof* `EditParameters`; `success`: *typeof* [`EditResult`](#editresult-2); \}, [`DriverInterpreter`](./generalist/namespaces/DurableDriver#driverinterpreter) \| [`ToolContext`](./generalist/namespaces/ToolContext#toolcontext)\> & `ManagedArtifactTool`
+> **EditTool** = `Tool.Tool`\<`` `artifact_edit_${string}` ``, \{ `failure`: *typeof* [`ArtifactError`](#artifacterror-1); `failureMode`: `"return"`; `parameters`: *typeof* `EditParameters`; `success`: *typeof* [`EditResult`](#editresult-2); \}, [`DriverInterpreter`](./generalist/namespaces/DurableDriver.md#driverinterpreter) \| [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\> & `ManagedArtifactTool`
 
 **`Experimental`**
 
@@ -1002,7 +1002,7 @@ Model-visible artifact contents and the exact version read.
 
 ### ReadTool
 
-> **ReadTool** = `Tool.Tool`\<`` `artifact_read_${string}` ``, \{ `failure`: *typeof* [`ArtifactError`](#artifacterror-1); `failureMode`: `"return"`; `parameters`: *typeof* `ReadParameters`; `success`: *typeof* [`ReadResult`](#readresult-2); \}, [`DriverInterpreter`](./generalist/namespaces/DurableDriver#driverinterpreter) \| [`ToolContext`](./generalist/namespaces/ToolContext#toolcontext)\> & `ManagedArtifactTool`
+> **ReadTool** = `Tool.Tool`\<`` `artifact_read_${string}` ``, \{ `failure`: *typeof* [`ArtifactError`](#artifacterror-1); `failureMode`: `"return"`; `parameters`: *typeof* `ReadParameters`; `success`: *typeof* [`ReadResult`](#readresult-2); \}, [`DriverInterpreter`](./generalist/namespaces/DurableDriver.md#driverinterpreter) \| [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\> & `ManagedArtifactTool`
 
 **`Experimental`**
 

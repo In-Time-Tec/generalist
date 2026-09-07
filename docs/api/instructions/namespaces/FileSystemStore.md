@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / FileSystemStore
+[generalist](../../index.md) / [instructions](../index.md) / FileSystemStore
 
 # FileSystemStore
 
@@ -38,7 +38,7 @@ Where one scope's state is stored. The host owns every location decision.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`Store`](./Store#store), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`Store`](./Store.md#store), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 One durable filesystem-backed guidance store.
 
@@ -50,7 +50,7 @@ One durable filesystem-backed guidance store.
 
 #### Returns
 
-`Layer.Layer`\<[`Store`](./Store#store), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+`Layer.Layer`\<[`Store`](./Store.md#store), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
 
@@ -58,7 +58,7 @@ One durable filesystem-backed guidance store.
 
 ### make
 
-> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](./Store#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **make**: (`options`) => `Effect.Effect`\<[`Service`](./Store.md#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
 
 Build one durable store over the Effect filesystem. Writes are owner-only and land through a
 same-directory temporary file plus rename, so a reader never observes a partial state. A corrupt file fails typed
@@ -72,4 +72,4 @@ instead of resetting the scope, and concurrent saves of one scope are serialized
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](./Store#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>
+`Effect.Effect`\<[`Service`](./Store.md#service), `never`, `FileSystem.FileSystem` \| `Path.Path`\>

@@ -31,8 +31,7 @@ import {
 export { FrameworkFailure, FrameworkStage, Outcome, RemoteRetryMisconfigured }
 export type { ClosedToolSet, DomainFailure, ReplayPolicy, Request, Success, Suspend, ToolkitInput }
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
-import type { HookFailed } from "../../hooks/index.js"
-import type { DriverError, DriverStateInvalid } from "../durable/service.js"
+import type { EvaluationFailure } from "../../hooks/index.js"
 import { suspendedFromCause, suspendedOutcome } from "../agent/tools/wake-event.js"
 
 export type SettledOutcome = Success | DomainFailure
@@ -47,20 +46,12 @@ export interface Service<R = ToolContext> {
   readonly cancellable?: ((request: Request) => boolean) | undefined
   readonly execute: (
     request: Request,
-  ) => Effect.Effect<
-    Outcome,
-    FrameworkFailure | RemoteRetryMisconfigured | HookFailed | DriverError | DriverStateInvalid,
-    R
-  >
+  ) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured | EvaluationFailure, R>
   readonly transformResolved?:
     | ((
         request: Request,
         outcome: SettledOutcome,
-      ) => Effect.Effect<
-        SettledOutcome,
-        FrameworkFailure | RemoteRetryMisconfigured | HookFailed | DriverError | DriverStateInvalid,
-        R
-      >)
+      ) => Effect.Effect<SettledOutcome, FrameworkFailure | RemoteRetryMisconfigured | EvaluationFailure, R>)
     | undefined
   readonly cancel?:
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
@@ -179,7 +170,7 @@ function executeToolkitUncurried<
   request: Request,
 ): Effect.Effect<
   Outcome,
-  FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+  FrameworkFailure | EvaluationFailure,
   R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
 >
 function executeToolkitUncurried<Tools extends Record<string, Tool.Any>>(
@@ -218,7 +209,7 @@ export const executeToolkit: typeof executeToolkitUncurried & {
     toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
   ) => Effect.Effect<
     Outcome,
-    FrameworkFailure | HookFailed | DriverError | DriverStateInvalid,
+    FrameworkFailure | EvaluationFailure,
     R | ToolContext | AgentToolSchemaServices<Parameters, SuccessSchema>
   >
   <Tools extends Record<string, Tool.Any>>(

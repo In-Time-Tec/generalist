@@ -18,6 +18,10 @@ import { ToolContext } from "../../core/tools/tool-context.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStoreService } from "../run/store.js"
 import { approvalReason, type WaitReason } from "../run/wait.js"
 
+const CommandId = Schema.fromJsonString(
+  Schema.Tuple([Schema.String, Schema.String, Schema.Finite, Schema.String, Schema.Finite]),
+)
+
 /** The persisted operation kind every nested host operation uses. */
 export const nestedOperationKind = "nested" as const
 
@@ -69,6 +73,12 @@ export const make = (input: {
   Effect.gen(function* () {
     const ordinals = yield* Ref.make(new Map<string, number>())
     const pending = yield* Ref.make(new Map<string, PendingApproval>())
+    const currentCheckpoint = input.store.loadExecution(input.claim.runId).pipe(
+      Effect.map((execution) =>
+        execution.checkpoint === undefined ? undefined : { checkpoint: execution.checkpoint },
+      ),
+      Effect.orDie,
+    )
 
     const nextOrdinal = (operationKey: string) =>
       Ref.modify(ordinals, (current) => {
@@ -87,6 +97,7 @@ export const make = (input: {
     ): Effect.Effect<A, E | Failure, R | ToolContext> {
       return Effect.gen(function* () {
         const context = yield* ToolContext
+        const attempt = context.attempt ?? input.claimed.attempt
         const operationKey = context.operationKey ?? context.toolCallId ?? input.claim.runId
         const ordinal = yield* nextOrdinal(operationKey)
         const nestedKey = nestedOperationKey({ operationKey, ordinal })
@@ -100,25 +111,32 @@ export const make = (input: {
                 Effect.flatMap((data) => context.emit({ toolCallId, message: `${request.kind} ${status}`, data })),
               )
 
-        const prior = yield* input.store.getOperationByKey({
-          runId: input.claim.runId,
-          operationKey: nestedKey,
-        }).pipe(Effect.orDie)
-        const receipt = prior ?? (yield* input.store
-          .recordOperation({
-            ...input.claim,
+        const existing = yield* input.store
+          .getOperationByKey({
+            runId: input.claim.runId,
             operationKey: nestedKey,
-            kind: nestedOperationKind,
-            inputDigest: payloadDigest,
-            input: { kind: request.kind, ordinal, payload: request.payload } satisfies NestedInput,
-            replayPolicy: request.replayPolicy,
-            attempt: input.claimed.attempt,
           })
-          .pipe(Effect.orDie))
-        const record = yield* input.store.getOperation({
-          runId: input.claim.runId,
-          operationId: receipt.operationId,
-        }).pipe(Effect.orDie)
+          .pipe(Effect.orDie)
+        const receipt =
+          existing ??
+          (yield* input.store
+            .recordOperation({
+              ...input.claim,
+              ...(yield* currentCheckpoint),
+              operationKey: nestedKey,
+              kind: nestedOperationKind,
+              inputDigest: payloadDigest,
+              input: { kind: request.kind, ordinal, payload: request.payload } satisfies NestedInput,
+              replayPolicy: request.replayPolicy,
+              attempt: input.claimed.attempt,
+            })
+            .pipe(Effect.orDie))
+        const record = yield* input.store
+          .getOperation({
+            runId: input.claim.runId,
+            operationId: receipt.operationId,
+          })
+          .pipe(Effect.orDie)
         const unknown = () => Unknown.make({ operationKey, ordinal, operationId: record.operationId })
         const replayFailure = (recorded: { readonly error?: unknown }) => {
           if (Schema.is(Denied)(recorded.error)) return Effect.fail(recorded.error)
@@ -128,11 +146,12 @@ export const make = (input: {
           )
         }
         const persisted = Option.getOrUndefined(recordedInput(record.input))
-        if (record.inputDigest !== payloadDigest || persisted?.kind !== request.kind) {
+        const recordedKind = persisted?.kind
+        if (record.inputDigest !== payloadDigest || recordedKind !== request.kind) {
           return yield* Divergence.make({
             operationKey,
             ordinal,
-            recordedKind: persisted?.kind ?? record.kind,
+            recordedKind: recordedKind ?? record.kind,
             recordedDigest: record.inputDigest,
             requestedKind: request.kind,
             requestedDigest: payloadDigest,
@@ -163,7 +182,13 @@ export const make = (input: {
             .expireRunningOperation({
               ...input.claim,
               operationId: record.operationId,
-              commandId: JSON.stringify(["expire-operation", input.claim.runId, input.claim.attemptFence, record.operationId, context.attempt ?? input.claimed.attempt]),
+              commandId: yield* Schema.encodeEffect(CommandId)([
+                "expire-operation",
+                input.claim.runId,
+                input.claim.attemptFence,
+                record.operationId,
+                attempt,
+              ]).pipe(Effect.orDie),
             })
             .pipe(Effect.orDie)
           if (expired.outcome === "unknown") return yield* unknown()
@@ -193,9 +218,14 @@ export const make = (input: {
             | { readonly _tag: "Failed"; readonly error: unknown }
             | { readonly _tag: "Unknown" },
         ) =>
-          input.store
-            .completeOperation({ ...input.claim, operationId: record.operationId, outcome })
-            .pipe(Effect.orDie, Effect.andThen(progressFor(outcome)))
+          Effect.gen(function* () {
+            yield* input.store.completeOperation({
+              ...input.claim,
+              ...(yield* currentCheckpoint),
+              operationId: record.operationId,
+              outcome,
+            })
+          }).pipe(Effect.orDie, Effect.andThen(progressFor(outcome)))
 
         if (request.approval !== undefined) {
           const approval = request.approval
@@ -260,11 +290,19 @@ export const make = (input: {
           yield* authorize
         }
 
-        yield* input.store.startOperation({
-          ...input.claim,
-          operationId: record.operationId,
-          commandId: JSON.stringify(["start-operation", input.claim.runId, input.claim.attemptFence, record.operationId, context.attempt ?? input.claimed.attempt]),
-        }).pipe(Effect.orDie)
+        yield* input.store
+          .startOperation({
+            ...input.claim,
+            operationId: record.operationId,
+            commandId: yield* Schema.encodeEffect(CommandId)([
+              "start-operation",
+              input.claim.runId,
+              input.claim.attemptFence,
+              record.operationId,
+              attempt,
+            ]).pipe(Effect.orDie),
+          })
+          .pipe(Effect.orDie)
         yield* emit("running")
         const exit = yield* Effect.exit(effect)
         if (exit._tag === "Success") {
@@ -275,6 +313,7 @@ export const make = (input: {
           yield* input.store
             .completeOperation({
               ...input.claim,
+              ...(yield* currentCheckpoint),
               operationId: record.operationId,
               outcome: { _tag: "Succeeded", value },
             })

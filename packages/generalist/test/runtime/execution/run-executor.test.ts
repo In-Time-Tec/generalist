@@ -1,4 +1,5 @@
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
+import { DurabilityFailure } from "../../../src/durability/errors.js"
 import "./suites/host-preview-suite.js"
 import "./suites/boundaries.js"
 import "./suites/operation-boundaries.js"
@@ -119,20 +120,23 @@ const acknowledgementLayer = (storage: ReturnType<typeof makeObjectStorage>) => 
     { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)) },
   ]).pipe(Layer.orDie)
   return () =>
-    objectRuntimeLayer({
-      addresses: [
-        {
-          address: acknowledgementAddress,
-          executable,
-          registrations: registrationsFor(executable),
-        },
-      ],
-    }, storage).pipe(Layer.provide(resolverLayer))
+    objectRuntimeLayer(
+      {
+        addresses: [
+          {
+            address: acknowledgementAddress,
+            executable,
+            registrations: registrationsFor(executable),
+          },
+        ],
+      },
+      storage,
+    ).pipe(Layer.provide(resolverLayer))
 }
 
 const scopedWith =
-  <A, E>(layerValue: Layer.Layer<A, E, never>) =>
-  <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
+  <A, E, R>(layerValue: Layer.Layer<A, E, R>) =>
+  <B, E2, R2 extends A | Scope.Scope | R>(effect: Effect.Effect<B, E2, R2>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
 describe("RunExecutor", () => {
@@ -155,8 +159,13 @@ describe("RunExecutor", () => {
           prompt: "complete two model cycles",
         })
         runId = receipt.runId
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-1", runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-run-executor-test-ts-claim-1",
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         full = yield* runtime.history({ runId, limit: 100 })
         const boundaries = full.filter((event) => event._tag === "TurnCompleted")
         expect(boundaries).toHaveLength(2)
@@ -211,8 +220,13 @@ describe("RunExecutor", () => {
           prompt: "complete two model cycles",
         })
         runId = receipt.runId
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-2", runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-run-executor-test-ts-claim-2",
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         full = yield* runtime.history({ runId, limit: 100 })
         expect((yield* runtime.acknowledged(runId)).sequence).toBe(Cursor.origin)
       }),
@@ -332,8 +346,13 @@ describe("RunExecutor", () => {
             idempotencyKey: "pinned-compaction",
             prompt: "run",
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-3",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
         }),
       )
 
@@ -352,9 +371,9 @@ describe("RunExecutor", () => {
       const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
         Layer.orDie,
       )
-      const layerObject = () =>
-        objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer))
+      const layerObject = () => objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
+      let writerCommand = 0
 
       const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
@@ -371,15 +390,26 @@ describe("RunExecutor", () => {
               })).runId
             }
             const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-4", runId, ownerId: objectWorkerId })
+              commandId: `runtime-execution-run-executor-test-ts-claim-4:${++writerCommand}`,
+              runId,
+              ownerId: objectWorkerId,
+            })
             const session = yield* store.claimedSessionStore(claim)
             if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
-            return yield* body(session.value)
+            return yield* body(session.value).pipe(Effect.ensuring(store.releaseExecution(claim).pipe(Effect.orDie)))
           }).pipe((effect) => provideScoped(layerObject(), effect), Effect.scoped),
         )
 
-      yield* withWriter((session) => session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie))
-      yield* withWriter((session) => session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie))
+      yield* withWriter((session) =>
+        session
+          .append({ _tag: "Message", message: user("m1") }, { commandId: "session-independence:m1" })
+          .pipe(Effect.orDie),
+      )
+      yield* withWriter((session) =>
+        session
+          .append({ _tag: "Message", message: user("m2") }, { commandId: "session-independence:m2" })
+          .pipe(Effect.orDie),
+      )
 
       // Conversation and execution are separate logs. Dropping the execution journal must leave the
       // conversation whole; if this fails, orchestration state leaked into conversation state.
@@ -403,9 +433,9 @@ describe("RunExecutor", () => {
       const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
         Layer.orDie,
       )
-      const layerObject = () =>
-        objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer))
+      const layerObject = () => objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
+      let writerCommand = 0
 
       const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
@@ -422,10 +452,13 @@ describe("RunExecutor", () => {
               })).runId
             }
             const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-5", runId, ownerId: objectWorkerId })
+              commandId: `runtime-execution-run-executor-test-ts-claim-5:${++writerCommand}`,
+              runId,
+              ownerId: objectWorkerId,
+            })
             const session = yield* store.claimedSessionStore(claim)
             if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
-            return yield* body(session.value)
+            return yield* body(session.value).pipe(Effect.ensuring(store.releaseExecution(claim).pipe(Effect.orDie)))
           }).pipe((effect) => provideScoped(layerObject(), effect), Effect.scoped),
         )
 
@@ -451,7 +484,7 @@ describe("RunExecutor", () => {
         },
       ]
 
-      const id = yield* withWriter((session) => session.reserveEntryId.pipe(Effect.orDie))
+      const id = yield* withWriter((session) => session.reserveEntryId("session-telemetry:reserve").pipe(Effect.orDie))
       yield* withWriter((session) =>
         session
           .appendCheckpoint({ id, parentId: null, projectedHistory: Prompt.fromMessages([user("kept")]), telemetry })
@@ -482,9 +515,9 @@ describe("RunExecutor", () => {
       const resolverLayer = ExecutableResolver.layerStatic([{ executable, agent: closedTestAgent(agent) }]).pipe(
         Layer.orDie,
       )
-      const layerObject = () =>
-        objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer))
+      const layerObject = () => objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer))
       let runId: string | undefined
+      let writerCommand = 0
 
       const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
@@ -501,18 +534,21 @@ describe("RunExecutor", () => {
               })).runId
             }
             const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-6", runId, ownerId: objectWorkerId })
+              commandId: `runtime-execution-run-executor-test-ts-claim-6:${++writerCommand}`,
+              runId,
+              ownerId: objectWorkerId,
+            })
             const session = yield* store.claimedSessionStore(claim)
             if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
-            return yield* body(session.value)
+            return yield* body(session.value).pipe(Effect.ensuring(store.releaseExecution(claim).pipe(Effect.orDie)))
           }).pipe((effect) => provideScoped(layerObject(), effect), Effect.scoped),
         )
 
       const first = yield* withWriter((session) =>
-        session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie),
+        session.append({ _tag: "Message", message: user("m1") }, { commandId: "session-direct:m1" }).pipe(Effect.orDie),
       )
       const second = yield* withWriter((session) =>
-        session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie),
+        session.append({ _tag: "Message", message: user("m2") }, { commandId: "session-direct:m2" }).pipe(Effect.orDie),
       )
       const path = yield* Effect.gen(function* () {
         const store = yield* RunStore.RunStore
@@ -587,8 +623,13 @@ describe("RunExecutor", () => {
             })
             const host = yield* RunExecutor.RunExecutor
             const store = yield* RunStore.RunStore
-            yield* host.execute(yield* store.claimExecution({
-          commandId: `runtime-execution-run-executor-test-ts-claim-7-${idempotencyKey}`, runId: receipt.runId, ownerId: objectWorkerId }))
+            yield* host.execute(
+              yield* store.claimExecution({
+                commandId: `runtime-execution-run-executor-test-ts-claim-7-${idempotencyKey}`,
+                runId: receipt.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
           }).pipe((effect) => provideScoped(layerObject(), effect), Effect.scoped),
         )
 
@@ -760,8 +801,13 @@ describe("RunExecutor", () => {
         Effect.gen(function* () {
           const host = yield* RunExecutor.RunExecutor
           const store = yield* RunStore.RunStore
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-8", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-8",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
         }),
       )
       const snapshot = yield* scopedWith(layerObject())(
@@ -839,8 +885,13 @@ describe("RunExecutor", () => {
           expect(persisted.executableRef).toEqual(executable.ref)
           expect(persisted.executableManifest).toEqual(executable.manifest)
 
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-9", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-9",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           expect(yield* Ref.get(admissions)).toBe(1)
           expect(yield* Ref.get(resolved)).toBe(1)
           expect(yield* Ref.get(lifecycle)).toEqual([
@@ -922,7 +973,10 @@ describe("RunExecutor", () => {
             prompt: "resolve after recovery",
           })
           const abandoned = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-10", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-10",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           const execution = yield* host.execute(abandoned).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(resolving)
           yield* Effect.sync(() => execution.interruptUnsafe())
@@ -940,7 +994,10 @@ describe("RunExecutor", () => {
           expect(yield* Ref.get(modelCalls)).toBe(0)
 
           const replacement = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-11", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-11",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           yield* store.releaseExecution(abandoned)
           expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
             ownerId: replacement.ownerId,
@@ -1012,8 +1069,13 @@ describe("RunExecutor", () => {
             prompt: "fail",
           })
           expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-12", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-12",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
 
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
           expect(lifecycle).toEqual([
@@ -1053,8 +1115,13 @@ describe("RunExecutor", () => {
         })
         expect(yield* Ref.get(admissionFinalized)).toBe(true)
         expect(yield* Ref.get(finalized)).toBe(false)
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-13", runId: receipt.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-run-executor-test-ts-claim-13",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         const failed = (yield* runtime.history({ runId: receipt.runId, limit: 20 })).find(
           (event) => event._tag === "RunFailed",
         )
@@ -1207,7 +1274,10 @@ describe("RunExecutor", () => {
         expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
 
         const firstClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-14", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-execution-run-executor-test-ts-claim-14",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         yield* host.execute(firstClaim)
         const waiting = yield* runtime.inspect(receipt.runId)
         if (waiting.status === "failed") {
@@ -1256,7 +1326,10 @@ describe("RunExecutor", () => {
           })
           expect((yield* store.loadExecution(receipt.runId)).suspension).toBeDefined()
           const resumeClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-15", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-15",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           yield* host.execute(resumeClaim)
 
           const completed = yield* runtime.inspect(receipt.runId)
@@ -1331,11 +1404,19 @@ describe("RunExecutor", () => {
             idempotencyKey: "message:cancel",
             prompt: "Wait until cancelled.",
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-16", runId: cancelled.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-16",
+              runId: cancelled.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           expect((yield* runtime.inspect(cancelled.runId)).status).toBe("waiting")
           yield* runtime.cancel({
-          commandId: "runtime-execution-run-executor-test-ts-cancel-1", runId: cancelled.runId, reason: "stop while suspended" })
+            commandId: "runtime-execution-run-executor-test-ts-cancel-1",
+            runId: cancelled.runId,
+            reason: "stop while suspended",
+          })
           expect((yield* runtime.inspect(cancelled.runId)).status).toBe("cancelled")
         })
         yield* cancelExecution
@@ -1388,27 +1469,38 @@ describe("RunExecutor", () => {
       }),
     )
     const hooks = Hooks.layer([
-      Hooks.onChildStart(({ child }) =>
-        Effect.sync(() => {
-          childLifecycle.push(`start:${child.operation}`)
-          return Hooks.Continue()
-        }),
-      ),
-      Hooks.onChildEnd(({ child }) =>
-        Effect.sync(() => {
-          childLifecycle.push(`end:${child.operation}`)
-          return Hooks.Continue()
-        }),
-      ),
+      Hooks.onChildStart({
+        key: "test.runtime.execution.run.executor.onChildStart.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ child }) =>
+          Effect.sync(() => {
+            childLifecycle.push(`start:${child.operation}`)
+            return Hooks.Continue()
+          }),
+      }),
+      Hooks.onChildEnd({
+        key: "test.runtime.execution.run.executor.onChildEnd.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ child }) =>
+          Effect.sync(() => {
+            childLifecycle.push(`end:${child.operation}`)
+            return Hooks.Continue()
+          }),
+      }),
     ])
     const resolverLayer = ExecutableResolver.layerStatic([
       { executable: assistantRef, agent: Agent.close(assistant, Layer.mergeAll(allowAllAuthorization, model, hooks)) },
     ]).pipe(Layer.orDie)
     const layerObject = () =>
-      objectRuntimeLayer({
-        addresses: [{ address, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-        scheduler: { pollInterval: "1 day" },
-      }, storage).pipe(Layer.provide(resolverLayer))
+      objectRuntimeLayer(
+        {
+          addresses: [{ address, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+          scheduler: { pollInterval: "1 day" },
+        },
+        storage,
+      ).pipe(Layer.provide(resolverLayer))
 
     return Effect.gen(function* () {
       const admitted = yield* Effect.scoped(
@@ -1423,8 +1515,13 @@ describe("RunExecutor", () => {
             prompt: "delegate",
             treePolicy: { maxDepth: 1, maxSubagents: 2 },
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-17", runId: parent.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-17",
+              runId: parent.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           expect(yield* runtime.inspect(parent.runId)).toMatchObject({
             status: "waiting",
             waits: [
@@ -1453,23 +1550,36 @@ describe("RunExecutor", () => {
           ])
           yield* store.fail({
             ...(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-18", runId: group.members[1]!.childRunId, ownerId: objectWorkerId })),
+              commandId: "runtime-execution-run-executor-test-ts-claim-18",
+              runId: group.members[1]!.childRunId,
+              ownerId: objectWorkerId,
+            })),
             error: Errors.AgentExecutionFailure.make({ message: "second child failed" }),
           })
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
           yield* store.complete({
+            commandId: "child-group:first-complete",
             ...(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-19", runId: group.members[0]!.childRunId, ownerId: objectWorkerId })),
+              commandId: "runtime-execution-run-executor-test-ts-claim-19",
+              runId: group.members[0]!.childRunId,
+              ownerId: objectWorkerId,
+            })),
             result: {
               text: "first child complete",
+              output: "first child complete",
               turns: 1,
               session: { sessionId: "first-child", leafId: null },
             },
           })
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("running")
           expect((yield* store.loadExecution(admitted.parentRunId)).suspension).toBeDefined()
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-20", runId: admitted.parentRunId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-20",
+              runId: admitted.parentRunId,
+              ownerId: objectWorkerId,
+            }),
+          )
           expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("succeeded")
           expect((yield* store.loadExecution(admitted.parentRunId)).suspension).toBeUndefined()
           expect((yield* store.snapshot(admitted.parentRunId)).outcome).toMatchObject({
@@ -1548,8 +1658,13 @@ describe("RunExecutor", () => {
         prompt: "start work",
         treePolicy: { maxDepth: 1, maxSubagents: 1 },
       })
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-21", runId: parent.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-run-executor-test-ts-claim-21",
+          runId: parent.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect(yield* runtime.inspect(parent.runId)).toMatchObject({ status: "waiting" })
       expect(calls).toBe(2)
       const history = yield* runtime.history({ runId: parent.runId, limit: 100 })
@@ -1560,8 +1675,13 @@ describe("RunExecutor", () => {
       const tree = (yield* runtime.treeCheckpoint(parent.runId)).inspection
       const child = tree.runs.find((run) => run.parentRunId === parent.runId)!
       expect(child.run.status).toBe("queued")
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-22", runId: child.run.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-run-executor-test-ts-claim-22",
+          runId: child.run.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       expect((yield* runtime.inspect(child.run.runId)).status).toBe("succeeded")
       expect((yield* runtime.inspect(parent.runId)).status).toBe("succeeded")
       expect(advertised[0]).toEqual(
@@ -1635,6 +1755,7 @@ describe("RunExecutor", () => {
       const store = yield* RunStore.RunStore
       const host = yield* RunExecutor.RunExecutor
       let sequence = 0
+      let claimSequence = 0
       const root = (treePolicy: { readonly maxDepth: number; readonly maxSubagents: number }) =>
         runtime.startExecution({
           executable,
@@ -1645,8 +1766,14 @@ describe("RunExecutor", () => {
           treePolicy,
         })
       const execute = (runId: string) =>
-        Effect.flatMap(store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-23", runId, ownerId: objectWorkerId }), host.execute)
+        Effect.flatMap(
+          store.claimExecution({
+            commandId: `runtime-execution-run-executor-test-ts-claim-23:${runId}:${claimSequence++}`,
+            runId,
+            ownerId: objectWorkerId,
+          }),
+          host.execute,
+        )
 
       const allowed = yield* root({ maxDepth: 2, maxSubagents: 2 })
       const child = yield* runtime.spawn({
@@ -1689,7 +1816,10 @@ describe("RunExecutor", () => {
       yield* execute(exhausted.runId)
       expect((yield* runtime.inspect(exhausted.runId)).status).toBe("waiting")
       yield* runtime.cancel({
-          commandId: "runtime-execution-run-executor-test-ts-cancel-3", runId: group.children[0]!.childRunId, reason: "settle admitted group" })
+        commandId: "runtime-execution-run-executor-test-ts-cancel-3",
+        runId: group.children[0]!.childRunId,
+        reason: "settle admitted group",
+      })
       yield* execute(exhausted.runId)
       expect(yield* runtime.inspect(exhausted.runId)).toMatchObject({ status: "succeeded" })
 
@@ -1787,11 +1917,13 @@ describe("RunExecutor", () => {
       })
       let claimAttempt = 0
       const execute = () =>
-        store.claimExecution({
-          commandId: `runtime-execution-run-executor-test-ts-claim-24-${++claimAttempt}`,
-          runId: receipt.runId,
-          ownerId: objectWorkerId,
-        }).pipe(Effect.flatMap((claim) => host.execute(claim)))
+        store
+          .claimExecution({
+            commandId: `runtime-execution-run-executor-test-ts-claim-24-${++claimAttempt}`,
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
+          .pipe(Effect.flatMap((claim) => host.execute(claim)))
 
       yield* execute()
       const firstWaitId = `${receipt.runId}:tool:1:wait-call-2:wait_for_human`
@@ -1847,8 +1979,13 @@ describe("RunExecutor", () => {
         prompt: "run",
         budget: RunBudget.make({ tokens: 0 }),
       })
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-25", runId: receipt.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-run-executor-test-ts-claim-25",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
       expect(history.some((event) => event._tag === "RunFailed")).toBe(false)
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
@@ -1925,8 +2062,13 @@ describe("RunExecutor", () => {
         prompt: "run",
         budget: RunBudget.make({ tokens: 5, toolCalls: 1 }),
       })
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-26", runId: receipt.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-run-executor-test-ts-claim-26",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
 
       const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
       const committed = history.filter((event) => event._tag === "ModelResponseCommitted")
@@ -2031,11 +2173,17 @@ describe("RunExecutor", () => {
           })
           expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
           const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-27", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-27",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(started)
           yield* runtime.cancel({
-          commandId: "runtime-execution-run-executor-test-ts-cancel-4", runId: receipt.runId, reason: "stop" })
+            commandId: "runtime-execution-run-executor-test-ts-cancel-4",
+            runId: receipt.runId,
+            reason: "stop",
+          })
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
           expect(lifecycle).toEqual([
             "admission resolver acquired",
@@ -2081,10 +2229,13 @@ describe("RunExecutor", () => {
         }),
       )
       const runId = yield* scopedWith(
-        objectRuntimeLayer({
-          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-          scheduler: { pollInterval: "1 hour" },
-        }, storage).pipe(
+        objectRuntimeLayer(
+          {
+            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+            scheduler: { pollInterval: "1 hour" },
+          },
+          storage,
+        ).pipe(
           Layer.provide(
             ExecutableResolver.layerStatic([
               { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, blockingModel)) },
@@ -2103,7 +2254,10 @@ describe("RunExecutor", () => {
             prompt: "wait for host shutdown",
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-28", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-28",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           yield* host.execute(claim).pipe(Effect.forkScoped)
           yield* Deferred.await(started)
           return receipt.runId
@@ -2122,10 +2276,13 @@ describe("RunExecutor", () => {
         }),
       )
       yield* scopedWith(
-        objectRuntimeLayer({
-          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-          scheduler: { pollInterval: "1 hour" },
-        }, storage).pipe(
+        objectRuntimeLayer(
+          {
+            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+            scheduler: { pollInterval: "1 hour" },
+          },
+          storage,
+        ).pipe(
           Layer.provide(
             ExecutableResolver.layerStatic([
               { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, recoveredModel)) },
@@ -2203,7 +2360,10 @@ describe("RunExecutor", () => {
             prompt: "block",
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-29", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-29",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(started)
           expect(invocation).toMatchObject({
@@ -2217,7 +2377,10 @@ describe("RunExecutor", () => {
             sessionId: "session:cancel-tool",
           })
           yield* runtime.cancel({
-          commandId: "runtime-execution-run-executor-test-ts-cancel-5", runId: receipt.runId, reason: "stop" })
+            commandId: "runtime-execution-run-executor-test-ts-cancel-5",
+            runId: receipt.runId,
+            reason: "stop",
+          })
           const exit = yield* Fiber.await(fiber)
           expect(exit._tag).toBe("Success")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
@@ -2300,12 +2463,18 @@ describe("RunExecutor", () => {
             prompt: "block finitely",
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-30", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-execution-run-executor-test-ts-claim-30",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           const running = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(started)
 
           yield* runtime.cancel({
-          commandId: "runtime-execution-run-executor-test-ts-cancel-6", runId: receipt.runId, reason: "stop" })
+            commandId: "runtime-execution-run-executor-test-ts-cancel-6",
+            runId: receipt.runId,
+            reason: "stop",
+          })
 
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
           expect((yield* active.active).has(receipt.runId)).toBe(true)
@@ -2406,7 +2575,7 @@ describe("RunExecutor", () => {
             storage,
           ).pipe(Layer.provide(layerResolver(resolver)))
 
-        const first = yield* scopedWith(layer())(
+        yield* scopedWith(layer())(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const host = yield* RunExecutor.RunExecutor
@@ -2419,12 +2588,20 @@ describe("RunExecutor", () => {
             })
             expect(lifecycle).toEqual(["admission resolver finalized"])
             const fiber = yield* host
-              .execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-31", runId: receipt.runId, ownerId: objectWorkerId }))
+              .execute(
+                yield* store.claimExecution({
+                  commandId: "runtime-execution-run-executor-test-ts-claim-31",
+                  runId: receipt.runId,
+                  ownerId: objectWorkerId,
+                }),
+              )
               .pipe(Effect.forkChild({ startImmediately: true }))
             yield* Deferred.await(started)
             yield* runtime.cancel({
-          commandId: "runtime-execution-run-executor-test-ts-cancel-7", runId: receipt.runId, reason: "stop after commit" })
+              commandId: "runtime-execution-run-executor-test-ts-cancel-7",
+              runId: receipt.runId,
+              reason: "stop after commit",
+            })
             expect((yield* Fiber.await(fiber))._tag).toBe("Success")
             yield* Deferred.await(toolFinalized)
             expect(externalCounter).toBe(1)
@@ -2450,7 +2627,6 @@ describe("RunExecutor", () => {
             return { runId: receipt.runId, operationId: operation.operationId }
           }),
         )
-
       }),
     )
   }
@@ -2466,12 +2642,18 @@ describe("RunExecutor", () => {
         prompt: "fence",
       })
       const first = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-32", runId: receipt.runId, ownerId: objectWorkerId })
-      const firstSession = Option.getOrThrow(yield* store.claimedSessionStore(first))
-      const firstEntry = yield* firstSession.append({
-        _tag: "Message",
-        message: Prompt.make("fenced Session").content[0]!,
+        commandId: "runtime-execution-run-executor-test-ts-claim-32",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
       })
+      const firstSession = Option.getOrThrow(yield* store.claimedSessionStore(first))
+      const firstEntry = yield* firstSession.append(
+        {
+          _tag: "Message",
+          message: Prompt.make("fenced Session").content[0]!,
+        },
+        { commandId: "fenced:first-entry" },
+      )
       const operation = yield* store.recordOperation({
         ...first,
         operationKey: "tool:fenced",
@@ -2482,9 +2664,16 @@ describe("RunExecutor", () => {
         attempt: 1,
       })
       yield* store.startOperation({
-          commandId: "runtime-execution-run-executor-test-ts-startOperation-8", ...first, operationId: operation.operationId })
+        commandId: "runtime-execution-run-executor-test-ts-startOperation-8",
+        ...first,
+        operationId: operation.operationId,
+      })
+      yield* store.releaseExecution(first)
       const replacement = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-33", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-run-executor-test-ts-claim-33",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const replacementSession = Option.getOrThrow(yield* store.claimedSessionStore(replacement))
       const checkpoint = {
         id: "fenced-checkpoint",
@@ -2496,25 +2685,27 @@ describe("RunExecutor", () => {
       expect(yield* Effect.flip(firstSession.appendCheckpoint(checkpoint))).toMatchObject({
         message: "Session write claim is stale",
       })
-      expect(yield* Effect.flip(firstSession.reserveEntryId)).toMatchObject({
+      expect(yield* Effect.flip(firstSession.reserveEntryId("fenced:stale-reserve"))).toMatchObject({
         message: "Session write claim is stale",
       })
-      expect(yield* replacementSession.reserveEntryId).toMatch(/^\d+$/)
-      expect(yield* Effect.flip(firstSession.setLeaf(firstEntry.id))).toMatchObject({
+      expect(yield* replacementSession.reserveEntryId("fenced:replacement-reserve")).toMatch(/^\d+$/)
+      expect(yield* Effect.flip(firstSession.setLeaf(firstEntry.id, "fenced:stale-leaf"))).toMatchObject({
         message: "Session write claim is stale",
       })
-      yield* replacementSession.setLeaf(firstEntry.id)
+      yield* replacementSession.setLeaf(firstEntry.id, "fenced:replacement-leaf")
       expect(
         (yield* (yield* store.sessionReader("session:fence")).pipe(Option.getOrThrow).path()).map((entry) => entry.id),
       ).toEqual([firstEntry.id])
       const stale = yield* store
         .saveExecution({
+          commandId: "fenced:stale-save",
           ...first,
         })
         .pipe(Effect.flip)
       expect(stale._tag).toBe("generalist/runtime/StaleClaim")
       const staleRecovery = yield* store
         .expireRunningOperation({
+          commandId: "fenced:stale-expire",
           ...first,
           operationId: operation.operationId,
         })
@@ -2557,7 +2748,10 @@ describe("RunExecutor", () => {
         prompt: "handoff",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-34", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-run-executor-test-ts-claim-34",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const operation = yield* store.recordOperation({
         ...claim,
         operationKey: "handoff:atomic",
@@ -2568,7 +2762,10 @@ describe("RunExecutor", () => {
         attempt: claim.attempt,
       })
       yield* store.startOperation({
-          commandId: "runtime-execution-run-executor-test-ts-startOperation-9", ...claim, operationId: operation.operationId })
+        commandId: "runtime-execution-run-executor-test-ts-startOperation-9",
+        ...claim,
+        operationId: operation.operationId,
+      })
 
       expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
         "running",
@@ -2621,7 +2818,10 @@ describe("RunExecutor", () => {
         prompt: "supervisor sentinel",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-35", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-run-executor-test-ts-claim-35",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const operationKey = "handoff:memory-projection"
       const operation = yield* store.recordOperation({
         ...claim,
@@ -2633,7 +2833,10 @@ describe("RunExecutor", () => {
         attempt: claim.attempt,
       })
       yield* store.startOperation({
-          commandId: "runtime-execution-run-executor-test-ts-startOperation-10", ...claim, operationId: operation.operationId })
+        commandId: "runtime-execution-run-executor-test-ts-startOperation-10",
+        ...claim,
+        operationId: operation.operationId,
+      })
       const projectedHistory = Prompt.make("projected-for-specialist")
       const commit: Handoff.Commit = {
         _tag: "Commit",
@@ -2684,13 +2887,19 @@ describe("RunExecutor", () => {
       yield* store.completeOperation(completion)
       const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected memory Session")
-      yield* session.value.append({ _tag: "Message", message: Prompt.make("descendant").content[0]! })
+      yield* session.value.append(
+        { _tag: "Message", message: Prompt.make("descendant").content[0]! },
+        { commandId: "atomic-operation:descendant" },
+      )
       yield* store.completeOperation(completion)
       const beforeDivergence = yield* session.value.path()
       const divergentCheckpoint = yield* store
         .completeOperation({ ...completion, checkpoint: { ...checkpoint, state: { divergent: true } } })
         .pipe(Effect.flip)
-      expect(divergentCheckpoint).toBeInstanceOf(Errors.RuntimeUnavailable)
+      expect(divergentCheckpoint).toBeInstanceOf(DurabilityFailure)
+      if (!Schema.is(DurabilityFailure)(divergentCheckpoint)) return yield* Effect.die("expected receipt conflict")
+      expect(divergentCheckpoint.reason).toBe("input-conflict")
+      expect(divergentCheckpoint.commandId).toMatch(/^completeOperation:/)
       const divergent = yield* store
         .completeOperation({
           ...completion,
@@ -2700,7 +2909,10 @@ describe("RunExecutor", () => {
           },
         })
         .pipe(Effect.flip)
-      expect(divergent).toBeInstanceOf(Errors.RuntimeUnavailable)
+      expect(divergent).toBeInstanceOf(DurabilityFailure)
+      if (!Schema.is(DurabilityFailure)(divergent)) return yield* Effect.die("expected receipt conflict")
+      expect(divergent.reason).toBe("input-conflict")
+      expect(divergent.commandId).toBe(divergentCheckpoint.commandId)
       expect(yield* session.value.path()).toEqual(beforeDivergence)
       expect(Session.buildContext(beforeDivergence)).toEqual(Prompt.concat(projectedHistory, Prompt.make("descendant")))
       expect((yield* store.loadExecution(receipt.runId)).executableRef).toEqual(researcherRef.ref)
@@ -2738,7 +2950,10 @@ describe("RunExecutor", () => {
           prompt: outcome._tag,
         })
         const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-36", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: `runtime-execution-run-executor-test-ts-claim-36:${receipt.runId}`,
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         const operation = yield* store.recordOperation({
           ...claim,
           operationKey: `tool:${outcome._tag}`,
@@ -2749,7 +2964,10 @@ describe("RunExecutor", () => {
           attempt: claim.attempt,
         })
         yield* store.startOperation({
-          commandId: "runtime-execution-run-executor-test-ts-startOperation-11", ...claim, operationId: operation.operationId })
+          commandId: `runtime-execution-run-executor-test-ts-startOperation-11:${receipt.runId}:${operation.operationId}`,
+          ...claim,
+          operationId: operation.operationId,
+        })
         expect((yield* store.loadExecution(receipt.runId)).checkpoint).toBeUndefined()
         yield* store.completeOperation({ ...claim, operationId: operation.operationId, outcome, checkpoint })
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
@@ -2768,7 +2986,10 @@ describe("RunExecutor", () => {
         prompt: "suspend",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-37", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-run-executor-test-ts-claim-37",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const suspensionValue = suspension({
         waitId: "approval",
         reason: "approval",
@@ -3007,8 +3228,13 @@ describe("RunExecutor", () => {
             idempotencyKey: `early-failure-map:${earlyFailure.name}`,
             prompt: "run the worker map",
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-38", runId: parent.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-38",
+              runId: parent.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
 
           const operation = yield* store.getProgramOperation({ runId: parent.runId, operation: "workers" })
           expect(operation).toMatchObject({
@@ -3028,8 +3254,13 @@ describe("RunExecutor", () => {
           expect((yield* runtime.inspect(childRunId)).status).toBe("queued")
           expect(operation.childRunIds).toContain(childRunId)
 
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-39", runId: childRunId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-39",
+              runId: childRunId,
+              ownerId: objectWorkerId,
+            }),
+          )
 
           expect(finalizerObservations.map((observation) => observation.name)).toEqual(
             earlyFailure.opensService ? ["service", "resolver"] : ["resolver"],
@@ -3062,10 +3293,10 @@ describe("RunExecutor", () => {
     })
   }
 
-  const backend = "object" as const
+  const programBackend = "object" as const
   {
     const storage = makeObjectStorage()
-    it.effect(`${backend} finalizes a real Program map child before its RunFailed commit`, () => {
+    it.effect(`${programBackend} finalizes a real Program map child before its RunFailed commit`, () => {
       let modelCalls = 0
       let childDispatches = 0
       let bindingDispatches = 0
@@ -3246,12 +3477,17 @@ describe("RunExecutor", () => {
           store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: address,
-            sessionId: `session:failed-agent-map:${backend}`,
+            sessionId: `session:failed-agent-map:${programBackend}`,
             idempotencyKey: "failed-agent-map",
             prompt: "run the worker map",
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-40", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-40",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
 
           const admitted = yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("waiting")
@@ -3270,8 +3506,13 @@ describe("RunExecutor", () => {
             members: [{ key: "only", childRunId, status: "running" }],
           })
 
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-41", runId: childRunId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-41",
+              runId: childRunId,
+              ownerId: objectWorkerId,
+            }),
+          )
 
           expect(finalizerObservations.map((observation) => observation.name)).toEqual(["service", "resolver"])
           for (const observation of finalizerObservations) {
@@ -3358,8 +3599,13 @@ describe("RunExecutor", () => {
             childRunIds: [childRunId],
           })
 
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-42", runId: receipt.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-run-executor-test-ts-claim-42",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
 
           expect(sandboxCalls).toBe(2)
           expect(bindingDispatches).toBe(0)
@@ -3418,9 +3664,12 @@ describe("RunExecutor", () => {
         prompt: "handoff",
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-run-executor-test-ts-claim-43", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-execution-run-executor-test-ts-claim-43",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.saveExecution({
-          commandId: "runtime-execution-run-executor-test-ts-saveExecution-12",
+        commandId: "runtime-execution-run-executor-test-ts-saveExecution-12",
         ...claim,
         checkpoint: {
           driverVersion: "1",

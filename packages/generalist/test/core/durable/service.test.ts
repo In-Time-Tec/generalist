@@ -22,7 +22,7 @@ import { unusedToolHandlerLayer } from "../tool-handler-layer.js"
 import { sha256Text } from "../../../src/core/durable/canonical-json.js"
 import { edgeCount, incrementEdge } from "../../../src/core/agent/handoff/state.js"
 import { applyCommit } from "../../../src/core/durable/loop-driver.js"
-import { makeAgent, makeExecutable } from "../../../src/core/durable/pin-internal.js"
+import { makeAgent, makeExecutable } from "../../../src/core/durable/manifest/pin-internal.js"
 import { withDerivedSystem } from "../../../src/core/agent/session/history.js"
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
 import { make as makeToolBatch, updateCall } from "../../../src/core/agent/tools/checkpoint.js"
@@ -85,7 +85,9 @@ describe("executable identity", () => {
         roundTrip(commit),
       )
       expect(checkpoint.executable?.active).toBe(child)
-      expect(checkpoint.state).toMatchObject({ handoff: commit.state })
+      expect(yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state)).toMatchObject({
+        handoff: commit.state,
+      })
       expect(checkpoint.budget.remaining.tokens).toBe(1)
     })
   })
@@ -1100,12 +1102,15 @@ describe("DurableDriver Agent.stream integration", () => {
           Effect.gen(function* () {
             const store = yield* Session.acquire("bounded-session-sync")
             for (let index = 0; index < 256; index += 1) {
-              yield* store.append({
-                              _tag: "Message",
-                              message: Prompt.makeMessage("user", {
-                                content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
-                              }),
-                            }, { commandId: `fixture-1103-${index}` })
+              yield* store.append(
+                {
+                  _tag: "Message",
+                  message: Prompt.makeMessage("user", {
+                    content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
+                  }),
+                },
+                { commandId: `fixture-1103-${index}` },
+              )
             }
             return yield* store.path()
           }),
@@ -1130,7 +1135,6 @@ describe("DurableDriver Agent.stream integration", () => {
       }),
     )
   })
-
 
   it.effect("replays the exact Session path from its cursor without re-appending", () => {
     const recorded = new Map<string, DurableDriver.OperationOutcome>()
@@ -1231,12 +1235,15 @@ describe("DurableDriver Agent.stream integration", () => {
         const advancedPath = yield* Effect.scoped(
           Effect.gen(function* () {
             const store = yield* Session.acquire("session-sync-replay")
-            yield* store.append({
-                          _tag: "Message",
-                          message: Prompt.makeMessage("user", {
-                            content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
-                          }),
-                        }, { commandId: "fixture-1292" })
+            yield* store.append(
+              {
+                _tag: "Message",
+                message: Prompt.makeMessage("user", {
+                  content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
+                }),
+              },
+              { commandId: "fixture-1292" },
+            )
             return yield* store.path()
           }),
         )

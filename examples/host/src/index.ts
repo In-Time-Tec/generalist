@@ -1,9 +1,9 @@
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream, type Types } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Instructions, Permissions } from "generalist"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 
@@ -90,33 +90,41 @@ const program = Effect.gen(function* () {
   yield* Console.log(`Answer: ${answer}`)
 })
 
-const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
-  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([])),
-    Layer.provide(S3.layer({
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    const connection: Types.Mutable<ConnectionOptions> = {
       bucket,
       region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : {
-        endpoint,
-        forcePathStyle: true,
-        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-      }),
-    })),
-    Layer.provide(BunCrypto.layer),
-  )
-  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
-}))
+      credentials: { accessKeyId, secretAccessKey },
+    }
+    if (sessionToken !== undefined) connection.credentials = { accessKeyId, secretAccessKey, sessionToken }
+    if (endpoint !== undefined) {
+      connection.endpoint = endpoint
+      connection.forcePathStyle = true
+      connection.capabilities = {
+        conditionalCreate: confirmed,
+        strongReadAfterWrite: confirmed,
+        consistentListing: confirmed,
+      }
+    }
+    const reconstructed = layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([])),
+      Layer.provide(layerS3(connection)),
+      Layer.provide(BunCrypto.layer),
+    )
+    return Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed))
+  }),
+)
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(runtimeLayer, scriptedModel, Permissions.layerAllowAll, Approvals.layerAutoApprove, echoHandler),
 )

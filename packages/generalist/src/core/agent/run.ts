@@ -56,9 +56,10 @@ const streamInternalImpl = <
   inbox: RunInbox,
 ): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices> => {
   const logicalId = suppliedOptions.logicalOperationId ?? inbox.runId
-  const options = suppliedOptions.logicalOperationId === undefined
-    ? { ...suppliedOptions, logicalOperationId: logicalId }
-    : suppliedOptions
+  const options =
+    suppliedOptions.logicalOperationId === undefined
+      ? { ...suppliedOptions, logicalOperationId: logicalId }
+      : suppliedOptions
   return Stream.unwrap(
     Effect.gen(function* () {
       const setup = yield* setupRun(agent, options)
@@ -333,14 +334,18 @@ const streamInternalImpl = <
         options.resume === undefined && recoveredToolCheckpoint === undefined && options.turnStart === undefined
           ? recoveredGateRetry({ agent, checkpoint: options.driverCheckpoint })
           : undefined
-      const pendingMemory = yield* pendingRemember(options.driverCheckpoint)
+      const pendingMemory = yield* pendingRemember({
+        checkpoint: options.driverCheckpoint,
+        turnStart: options.turnStart,
+      })
       const recoveringMemory = pendingMemory !== undefined
       const loadInitialPrompt = () => {
         if (recoveringMemory) {
+          if (pendingMemory.completed === true) return Effect.succeed(Prompt.empty)
           // Session sync is also a memory operation. Reconstruct the exact pending remember
           // before either sync or startup recall can ask the strict scheduler for another identity.
           return Effect.gen(function* () {
-            const input = pendingMemory
+            const input = pendingMemory.input
             const transcript = yield* Ref.get(chat.history)
             const path = Option.isNone(activeSession)
               ? []

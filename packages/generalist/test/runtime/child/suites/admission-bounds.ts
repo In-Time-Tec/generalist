@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer } from "effect"
 import { Address, ChildAdmission, Errors, Message, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
@@ -139,9 +140,15 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           expect(yield* context.runtime.inspect(first.childRunId)).toMatchObject({ childReadiness: "ready" })
           expect(yield* context.runtime.inspect(second.childRunId)).toMatchObject({ childReadiness: "queued" })
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-admission-bounds-ts-claim-1", runId: first.childRunId, ownerId: "bounds" })
+            commandId: "runtime-child-suites-admission-bounds-ts-claim-1",
+            runId: first.childRunId,
+            ownerId: objectWorkerId,
+          })
           yield* context.store.complete({
-          commandId: "runtime-child-suites-admission-bounds-ts-store-1", ...claim, result: completedResult("done") })
+            commandId: "runtime-child-suites-admission-bounds-ts-store-1",
+            ...claim,
+            result: completedResult("done"),
+          })
           expect(yield* context.runtime.inspect(second.childRunId)).toMatchObject({ childReadiness: "ready" })
           yield* context.children.cancel({ parentRunId: context.runId, childRunId: second.childRunId })
           const third = yield* admit(context.children, context.runId, "after-cancel")
@@ -165,7 +172,8 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           const context = yield* root({ maxDepth: 1, maxSubagents: 2 })
           const first = yield* admit(context.children, context.runId, "stable", "same")
           const replay = yield* admit(context.children, context.runId, "stable", "same")
-          expect(replay).toMatchObject({ childRunId: first.childRunId, duplicate: true })
+          expect(first.duplicate).toBe(false)
+          expect(replay).toEqual(first)
           expect(yield* admit(context.children, context.runId, "stable", "different").pipe(Effect.flip)).toBeInstanceOf(
             Errors.IdempotencyConflict,
           )
@@ -197,7 +205,8 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
               message,
             })
           const admitted = yield* spawn(first.runId)
-          expect(yield* spawn(first.runId)).toMatchObject({ runId: admitted.runId, duplicate: true })
+          expect(admitted.duplicate).toBe(false)
+          expect(yield* spawn(first.runId)).toEqual(admitted)
           expect(yield* spawn(second.runId).pipe(Effect.flip)).toBeInstanceOf(Errors.IdempotencyConflict)
           expect(yield* first.children.listDirect(first.runId)).toHaveLength(1)
           expect(yield* second.children.listDirect(second.runId)).toHaveLength(0)
@@ -223,21 +232,30 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           expect(
             yield* context.store
               .claimExecution({
-          commandId: "runtime-child-suites-admission-bounds-ts-claim-2", runId: inspection.members[4]!.childRunId, ownerId: "too-early" })
+                commandId: "runtime-child-suites-admission-bounds-ts-claim-2",
+                runId: inspection.members[4]!.childRunId,
+                ownerId: objectWorkerId,
+              })
               .pipe(Effect.flip),
           ).toBeInstanceOf(Errors.RuntimeUnavailable)
           const first = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-admission-bounds-ts-claim-3",
+            commandId: "runtime-child-suites-admission-bounds-ts-claim-3",
             runId: inspection.members[0]!.childRunId,
-            ownerId: "first",
+            ownerId: objectWorkerId,
           })
           yield* context.store.complete({
-          commandId: "runtime-child-suites-admission-bounds-ts-store-2", ...first, result: completedResult("first") })
+            commandId: "runtime-child-suites-admission-bounds-ts-store-2",
+            ...first,
+            result: completedResult("first"),
+          })
           const promoted = yield* context.runtime.inspectFanOut(receipt.fanOutId)
           expect(promoted.members[4]).toMatchObject({ readiness: "ready", status: "running" })
           expect(
             yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-admission-bounds-ts-claim-4", runId: promoted.members[4]!.childRunId, ownerId: "promoted" }),
+              commandId: "runtime-child-suites-admission-bounds-ts-claim-4",
+              runId: promoted.members[4]!.childRunId,
+              ownerId: objectWorkerId,
+            }),
           ).toMatchObject({ runId: promoted.members[4]!.childRunId })
         }),
       ),
@@ -348,7 +366,10 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           const context = yield* root({ maxDepth: 0, maxSubagents: 4 })
           yield* activate(context.runId)
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-admission-bounds-ts-claim-5", runId: context.runId, ownerId: "program-bound" })
+            commandId: "runtime-child-suites-admission-bounds-ts-claim-5",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const programInput = {
             ...claim,
             childRunId: `${context.runId}:program-child`,
@@ -407,9 +428,9 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
           const context = yield* root({ maxDepth: 1, maxSubagents: 1 })
           yield* activate(context.runId)
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-admission-bounds-ts-claim-6",
+            commandId: "runtime-child-suites-admission-bounds-ts-claim-6",
             runId: context.runId,
-            ownerId: "program-batch-bound",
+            ownerId: objectWorkerId,
           })
           const programInput = (suffix: string) => ({
             childRunId: `${context.runId}:program-child:${suffix}`,

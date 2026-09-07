@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.capability
+[generalist](./index.md) / unstable.capability
 
 # unstable.capability
 
@@ -434,7 +434,7 @@ Check one live handle outside an Agent loop. Agent-owned checks additionally jou
 
 ### grant
 
-> `const` **grant**: \<`T`\>(`tool`, `options`) => `Effect.Effect`\<[`Handle`](#handle)\<`T`\>, [`DriverError`](./generalist/namespaces/DurableDriver#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
+> `const` **grant**: \<`T`\>(`tool`, `options`) => `Effect.Effect`\<[`Handle`](#handle)\<`T`\>, [`DriverError`](./generalist/namespaces/DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver.md#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
 
 Grant a time-scoped capability for one exact Tool value.
 
@@ -462,7 +462,7 @@ Grant a time-scoped capability for one exact Tool value.
 
 #### Returns
 
-`Effect.Effect`\<[`Handle`](#handle)\<`T`\>, [`DriverError`](./generalist/namespaces/DurableDriver#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
+`Effect.Effect`\<[`Handle`](#handle)\<`T`\>, [`DriverError`](./generalist/namespaces/DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver.md#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
 
 ***
 
@@ -490,7 +490,7 @@ Require the named model-authored arguments to have no tainted tool-result proven
 
 ### revoke
 
-> `const` **revoke**: (`handle`) => `Effect.Effect`\<`undefined`, [`DriverError`](./generalist/namespaces/DurableDriver#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
+> `const` **revoke**: (`handle`) => `Effect.Effect`\<`undefined`, [`DriverError`](./generalist/namespaces/DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver.md#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
 
 Revoke a handle and every handle transitively attenuated from it.
 
@@ -502,7 +502,7 @@ Revoke a handle and every handle transitively attenuated from it.
 
 #### Returns
 
-`Effect.Effect`\<`undefined`, [`DriverError`](./generalist/namespaces/DurableDriver#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
+`Effect.Effect`\<`undefined`, [`DriverError`](./generalist/namespaces/DurableDriver.md#drivererror) \| [`DriverStateInvalid`](./generalist/namespaces/DurableDriver.md#driverstateinvalid) \| [`Invalid`](#invalid), `never`\>
 
 ***
 

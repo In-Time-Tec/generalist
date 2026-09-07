@@ -15,13 +15,14 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3"
 import { FetchHttpHandler } from "@smithy/fetch-http-handler"
-import { Effect, Layer } from "effect"
+import { Data, Effect, Layer, Schema } from "effect"
 import {
   ObjectMaintenance,
   ObjectStore,
   ObjectStoreFailure,
   cancelReadBody,
   readObjectBytes,
+  request,
   validateReadOptions,
   type Capabilities,
   type ObjectPage,
@@ -35,7 +36,6 @@ export interface ClientGuarantees {
   readonly singleAttempt: boolean
   readonly noRedirects: boolean
 }
-
 /** Injectable signed client; conditional writes have no unconditional counterpart. @experimental */
 export interface Client {
   readonly guarantees: ClientGuarantees
@@ -46,129 +46,145 @@ export interface Client {
   ) => Promise<PutObjectCommandOutput>
   readonly listObjects: (input: ListObjectsV2CommandInput, signal: AbortSignal) => Promise<ListObjectsV2CommandOutput>
 }
-
 /** Deletion is supplied only to a separately constructed maintenance service. @experimental */
 export interface MaintenanceClient {
   readonly guarantees: ClientGuarantees
   readonly deleteObject: (input: DeleteObjectCommandInput, signal: AbortSignal) => Promise<DeleteObjectCommandOutput>
 }
-
 /** S3 general-purpose bucket connection; custom providers must attest the durability contract. @experimental */
 export interface ConnectionOptions {
   readonly bucket: string
   readonly region: string
-  /** A direct object API endpoint, never a public cached domain. Use HTTPS outside local development. */
   readonly endpoint?: string
   readonly forcePathStyle?: boolean
-  /** Static credentials (including sessionToken) or a refreshing AWS SDK credential provider. */
   readonly credentials?: S3ClientConfig["credentials"]
-  /** Required for custom endpoints and injected clients; an assertion, not a conformance probe. */
   readonly capabilities?: { readonly [K in keyof Capabilities]: boolean }
-  /** Deadline for signing, request, and complete response consumption. Defaults to 30 seconds. */
   readonly requestTimeoutMs?: number
 }
-
 /** Default SDK signing or an explicitly qualified advanced client. @experimental */
 export interface Options extends ConnectionOptions {
   readonly client?: Client
 }
-
 /** Maintenance credentials can be different from ordinary runtime credentials. @experimental */
 export interface MaintenanceOptions extends ConnectionOptions {
   readonly client?: MaintenanceClient
 }
 
-const capabilities: Capabilities = {
-  conditionalCreate: true,
-  strongReadAfterWrite: true,
-  consistentListing: true,
-}
+const capabilities: Capabilities = { conditionalCreate: true, strongReadAfterWrite: true, consistentListing: true }
+const nonEmptyString = Schema.String.check(Schema.isNonEmpty())
+const awsError = Schema.Struct({
+  name: Schema.optionalKey(Schema.String),
+  code: Schema.optionalKey(Schema.String),
+  $metadata: Schema.optionalKey(Schema.Struct({ httpStatusCode: Schema.optionalKey(Schema.Int) })),
+})
 
 const failure = (operation: string, key: string, reason: ObjectStoreFailure["reason"], message: string) =>
-  new ObjectStoreFailure({ operation, key, reason, message })
+  ObjectStoreFailure.make({ operation, key, reason, message })
 
-const errorDetails = (error: unknown) => {
-  if (typeof error !== "object" || error === null) return { name: undefined, status: undefined }
-  const value = error as { name?: string; code?: string; $metadata?: { httpStatusCode?: number } }
-  return { name: value.name === undefined || value.name === "Error" ? value.code : value.name, status: value.$metadata?.httpStatusCode }
+class S3NativeFailure extends Data.TaggedError("generalist/durability/S3NativeFailure")<{
+  readonly name?: string | undefined
+  readonly status?: number | undefined
+}> {}
+
+const errorDetails = (cause: unknown) => {
+  if (!Schema.is(awsError)(cause)) return { name: undefined, status: undefined }
+  return {
+    name: cause.name === undefined || cause.name === "Error" ? cause.code : cause.name,
+    status: cause.$metadata?.httpStatusCode,
+  }
 }
 
-const classify = (operation: string, key: string, error: unknown): ObjectStoreFailure => {
-  if (error instanceof ObjectStoreFailure) return error
-  const { name, status } = errorDetails(error)
-  const reason =
-    status === 401 ||
-    status === 403 ||
-    name === "CredentialsProviderError" ||
-    name === "TokenProviderError" ||
-    name === "ExpiredToken" ||
-    name === "InvalidAccessKeyId" ||
-    name === "SignatureDoesNotMatch"
-      ? "authentication"
-      : status === 429 || name === "SlowDown" || name === "Throttling" || name === "ThrottlingException"
-        ? "rate-limit"
-        : status === 408 ||
-            status === 504 ||
-            name === "TimeoutError" ||
-            name === "RequestTimeout" ||
-            name === "AbortError" ||
-            name === "ETIMEDOUT"
-          ? "timeout"
-          : status !== undefined && status >= 300 && status < 500 && status !== 409
-            ? "invalid-response"
-            : "unavailable"
-  // Do not expose SDK messages: providers can echo signed URLs or credential material.
+const authentication = (status: number | undefined, name: string | undefined): boolean =>
+  status === 401 ||
+  status === 403 ||
+  [
+    "CredentialsProviderError",
+    "TokenProviderError",
+    "ExpiredToken",
+    "InvalidAccessKeyId",
+    "SignatureDoesNotMatch",
+  ].includes(name ?? "")
+const rateLimited = (status: number | undefined, name: string | undefined): boolean =>
+  status === 429 || ["SlowDown", "Throttling", "ThrottlingException"].includes(name ?? "")
+const timedOut = (status: number | undefined, name: string | undefined): boolean =>
+  status === 408 || status === 504 || ["TimeoutError", "RequestTimeout", "AbortError", "ETIMEDOUT"].includes(name ?? "")
+
+const classify = (operation: string, key: string, cause: unknown): ObjectStoreFailure => {
+  if (Schema.is(ObjectStoreFailure)(cause)) return cause
+  const { name, status } = errorDetails(cause)
+  return classifyDetails(operation, key, name, status)
+}
+
+const classifyDetails = (
+  operation: string,
+  key: string,
+  name: string | undefined,
+  status: number | undefined,
+): ObjectStoreFailure => {
+  let reason: ObjectStoreFailure["reason"] = "unavailable"
+  if (authentication(status, name)) reason = "authentication"
+  else if (rateLimited(status, name)) reason = "rate-limit"
+  else if (timedOut(status, name)) reason = "timeout"
+  else if (status !== undefined && status >= 300 && status < 500 && status !== 409) reason = "invalid-response"
   return failure(operation, key, reason, `S3 ${operation} failed (${reason}); writes may require reconciliation.`)
 }
 
-const validate = (options: ConnectionOptions, client: { readonly guarantees: ClientGuarantees } | undefined) => {
-  const reject = (message: string): never => {
-    throw failure("initialize", options.bucket, "invalid-response", message)
+const native = <A>(execute: () => Promise<A>): Effect.Effect<A, S3NativeFailure> =>
+  Effect.tryPromise({ try: execute, catch: (cause) => new S3NativeFailure(errorDetails(cause)) })
+
+const mapNativeFailure = (operation: string, key: string) =>
+  Effect.mapError((cause: S3NativeFailure) => classifyDetails(operation, key, cause.name, cause.status))
+
+const invalid = (options: ConnectionOptions, message: string): never => {
+  throw failure("initialize", options.bucket, "invalid-response", message)
+}
+const validBucket = (bucket: string): boolean =>
+  /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) &&
+  !bucket.includes("..") &&
+  !/^\d+\.\d+\.\d+\.\d+$/.test(bucket) &&
+  !["--x-s3", "-s3alias", "--ol-s3", "--table-s3"].some((suffix) => bucket.endsWith(suffix))
+const validateEndpoint = (options: ConnectionOptions): void => {
+  if (options.endpoint === undefined) return
+  let endpoint: URL
+  try {
+    endpoint = new URL(options.endpoint)
+  } catch {
+    return invalid(options, "S3 endpoints must be absolute HTTP(S) URLs.")
   }
-  // Restrict this transport to ordinary buckets, avoiding ARN/access-point/directory-bucket endpoint rewriting.
   if (
-    !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(options.bucket) ||
-    options.bucket.includes("..") ||
-    /^\d+\.\d+\.\d+\.\d+$/.test(options.bucket) ||
-    options.bucket.endsWith("--x-s3") ||
-    options.bucket.endsWith("-s3alias") ||
-    options.bucket.endsWith("--ol-s3") ||
-    options.bucket.endsWith("--table-s3")
-  ) reject("S3 durability requires a general-purpose bucket name, not an ARN or an endpoint alias.")
-  if (options.region.trim().length === 0) reject("An explicit S3 region is required.")
+    (endpoint.protocol !== "https:" && endpoint.protocol !== "http:") ||
+    endpoint.username !== "" ||
+    endpoint.password !== "" ||
+    endpoint.search !== "" ||
+    endpoint.hash !== ""
+  )
+    invalid(options, "S3 endpoints must be HTTP(S) URLs without embedded credentials, query strings, or fragments.")
+}
+const requiresCapabilityAttestation = (
+  options: ConnectionOptions,
+  client: { readonly guarantees: ClientGuarantees } | undefined,
+): boolean => options.endpoint !== undefined || client !== undefined || options.capabilities !== undefined
+const validCapabilities = (asserted: ConnectionOptions["capabilities"]): boolean =>
+  asserted?.conditionalCreate === true && asserted.strongReadAfterWrite === true && asserted.consistentListing === true
+const validate = (options: ConnectionOptions, client: { readonly guarantees: ClientGuarantees } | undefined): void => {
+  if (!validBucket(options.bucket))
+    invalid(options, "S3 durability requires a general-purpose bucket name, not an ARN or an endpoint alias.")
+  if (options.region.trim().length === 0) invalid(options, "An explicit S3 region is required.")
   const timeout = options.requestTimeoutMs ?? 30_000
-  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2_147_483_647) {
-    reject("S3 requestTimeoutMs must be a positive integer within the timer range.")
-  }
-  if (options.endpoint !== undefined) {
-    let endpoint: URL
-    try {
-      endpoint = new URL(options.endpoint)
-    } catch {
-      return reject("S3 endpoints must be absolute HTTP(S) URLs.")
-    }
-    if (
-      (endpoint.protocol !== "https:" && endpoint.protocol !== "http:") ||
-      endpoint.username !== "" || endpoint.password !== "" || endpoint.search !== "" || endpoint.hash !== ""
-    ) reject("S3 endpoints must be HTTP(S) URLs without embedded credentials, query strings, or fragments.")
-  }
-  const asserted = options.capabilities
-  if (
-    (options.endpoint !== undefined || client !== undefined || asserted !== undefined) &&
-    (asserted?.conditionalCreate !== true || asserted.strongReadAfterWrite !== true || asserted.consistentListing !== true)
-  ) reject("The provider must guarantee atomic conditional create, strong reads, and consistent listing.")
+  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2_147_483_647)
+    invalid(options, "S3 requestTimeoutMs must be a positive integer within the timer range.")
+  validateEndpoint(options)
+  if (requiresCapabilityAttestation(options, client) && !validCapabilities(options.capabilities))
+    invalid(options, "The provider must guarantee atomic conditional create, strong reads, and consistent listing.")
   if (client !== undefined && (client.guarantees.singleAttempt !== true || client.guarantees.noRedirects !== true)) {
-    reject("Injected S3 clients must disable automatic retries and all redirects.")
+    invalid(options, "Injected S3 clients must disable automatic retries and all redirects.")
   }
 }
 
 const sdkClient = (options: ConnectionOptions): Client & MaintenanceClient => {
-  const sdk = new S3Client({
+  const config: S3ClientConfig = {
     region: options.region,
     ignoreConfiguredEndpointUrls: true,
-    ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
-    ...(options.forcePathStyle === undefined ? {} : { forcePathStyle: options.forcePathStyle }),
-    ...(options.credentials === undefined ? {} : { credentials: options.credentials }),
     maxAttempts: 1,
     followRegionRedirects: false,
     useArnRegion: false,
@@ -180,7 +196,11 @@ const sdkClient = (options: ConnectionOptions): Client & MaintenanceClient => {
       credentials: "omit",
       requestInit: () => ({ redirect: "error" }),
     }),
-  })
+  }
+  if (options.endpoint !== undefined) config.endpoint = options.endpoint
+  if (options.forcePathStyle !== undefined) config.forcePathStyle = options.forcePathStyle
+  if (options.credentials !== undefined) config.credentials = options.credentials
+  const sdk = new S3Client(config)
   return {
     guarantees: { singleAttempt: true, noRedirects: true },
     getObject: (input, signal) => sdk.send(new GetObjectCommand(input), { abortSignal: signal }),
@@ -190,176 +210,220 @@ const sdkClient = (options: ConnectionOptions): Client & MaintenanceClient => {
   }
 }
 
-const request = <A>(
-  options: ConnectionOptions,
-  operation: string,
-  key: string,
-  execute: (signal: AbortSignal) => Promise<A>,
-): Effect.Effect<A, ObjectStoreFailure> =>
-  Effect.tryPromise({
-    try: async (interruption) => {
-      interruption.throwIfAborted()
-      const controller = new AbortController()
-      const interrupt = () => controller.abort(interruption.reason)
-      interruption.addEventListener("abort", interrupt, { once: true })
-      const timeout = setTimeout(
-        () => controller.abort(new DOMException("S3 request deadline exceeded", "TimeoutError")),
-        options.requestTimeoutMs ?? 30_000,
-      )
-      let rejectAbort!: (reason: unknown) => void
-      const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject })
-      const onAbort = () => rejectAbort(controller.signal.reason)
-      controller.signal.addEventListener("abort", onAbort, { once: true })
-      try {
-        return await Promise.race([execute(controller.signal), aborted])
-      } finally {
-        clearTimeout(timeout)
-        interruption.removeEventListener("abort", interrupt)
-        controller.signal.removeEventListener("abort", onAbort)
-        controller.abort()
-      }
-    },
-    catch: (error) => classify(operation, key, error),
-  })
-
-const checkKey = (operation: string, key: string) => {
-  // Fetch's URL parser normalizes dot-only segments even when percent-encoded. Never address a different object.
+const checkKey = (operation: string, key: string): void => {
   if (key.length === 0 || /(?:^|\/)\.{1,2}(?:\/|$)/.test(key)) {
-    throw failure(operation, key, "invalid-response", "Object keys must be nonempty and contain no dot-only path segments.")
+    throw failure(
+      operation,
+      key,
+      "invalid-response",
+      "Object keys must be nonempty and contain no dot-only path segments.",
+    )
   }
 }
+const getInput = (bucket: string, key: string, range: ReadOptions["range"]): GetObjectCommandInput => {
+  const input: GetObjectCommandInput = { Bucket: bucket, Key: key }
+  if (range !== undefined) input.Range = `bytes=${range.offset}-${range.offset + range.length - 1}`
+  return input
+}
+const streamFrom = (
+  key: string,
+  body: GetObjectCommandOutput["Body"],
+): Effect.Effect<ReadableStream<unknown>, ObjectStoreFailure> =>
+  Effect.try({
+    try: () => body?.transformToWebStream(),
+    catch: () => failure("read", key, "invalid-response", "S3 did not return a streaming object body."),
+  }).pipe(
+    Effect.flatMap((stream) =>
+      Schema.is(Schema.instanceOf(ReadableStream))(stream)
+        ? Effect.succeed(stream)
+        : Effect.fail(failure("read", key, "invalid-response", "S3 did not return a streaming object body.")),
+    ),
+  )
+const rangeLength = (key: string, object: GetObjectCommandOutput, range: ReadOptions["range"]): number | undefined => {
+  if (object.ContentLength !== undefined && (!Number.isSafeInteger(object.ContentLength) || object.ContentLength < 0)) {
+    throw failure("read", key, "invalid-response", "S3 returned invalid Content-Length metadata.")
+  }
+  if (range === undefined) {
+    if (object.ContentRange !== undefined || object.$metadata.httpStatusCode === 206) {
+      throw failure("read", key, "invalid-response", "S3 returned a partial body for a complete read.")
+    }
+    return object.ContentLength
+  }
+  return validateRange(key, object, range)
+}
+const validateRange = (
+  key: string,
+  object: GetObjectCommandOutput,
+  range: NonNullable<ReadOptions["range"]>,
+): number => {
+  const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(object.ContentRange ?? "")
+  const start = Number(match?.[1])
+  const end = Number(match?.[2])
+  const total = Number(match?.[3])
+  if (
+    object.$metadata.httpStatusCode !== 206 ||
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) ||
+    !Number.isSafeInteger(total) ||
+    start !== range.offset ||
+    start > end ||
+    end >= total ||
+    end !== Math.min(range.offset + range.length, total) - 1
+  )
+    throw failure("read", key, "invalid-response", "S3 did not return the requested byte range.")
+  const expectedLength = end - start + 1
+  if (object.ContentLength !== undefined && object.ContentLength !== expectedLength) {
+    throw failure("read", key, "invalid-response", "S3 range length differs from Content-Length.")
+  }
+  return expectedLength
+}
+const readResponse = (
+  key: string,
+  object: GetObjectCommandOutput,
+  options: ReadOptions,
+  signal: AbortSignal,
+): Effect.Effect<StoredObject, ObjectStoreFailure> => {
+  const etag = object.ETag
+  if (!Schema.is(nonEmptyString)(etag))
+    return Effect.fail(failure("read", key, "invalid-response", "S3 did not return an opaque ETag."))
+  const maxBytes = options.range?.length ?? options.maxBytes
+  return streamFrom(key, object.Body).pipe(
+    Effect.flatMap((body) =>
+      Effect.try({
+        try: () => rangeLength(key, object, options.range),
+        catch: (cause) => classify("read", key, cause),
+      }).pipe(
+        Effect.flatMap((expectedLength) => {
+          if (object.ContentLength !== undefined && object.ContentLength > maxBytes) {
+            return Effect.fail(failure("read", key, "limit", "S3 response exceeds the read byte budget."))
+          }
+          return readObjectBytes({ key, body, maxBytes, signal, expectedLength })
+        }),
+        Effect.map((bytes) => ({ bytes, etag })),
+        Effect.onError(() => Effect.sync(() => cancelReadBody({ body }))),
+      ),
+    ),
+  )
+}
 
-/**
- * Creates the signed transport. Every request is single-attempt: reconcile uncertain creates by reading the key.
- * Custom endpoints require documented provider guarantees and independent conformance qualification.
- * Uses single PUTs (no multipart); ETags remain opaque. Dot-only key segments are rejected, not normalized.
- * @experimental
- */
+const listResponse = (
+  prefix: string,
+  cursor: string | undefined,
+  page: ListObjectsV2CommandOutput,
+): Effect.Effect<ObjectPage, ObjectStoreFailure> => {
+  if (
+    !Schema.is(Schema.Boolean)(page.IsTruncated) ||
+    !Schema.is(Schema.UndefinedOr(Schema.Literal("url")))(page.EncodingType)
+  ) {
+    return Effect.fail(
+      failure("list", prefix, "invalid-response", "S3 listing omitted valid pagination or encoding metadata."),
+    )
+  }
+  const nextCursor = page.IsTruncated ? page.NextContinuationToken : undefined
+  if (page.IsTruncated && (nextCursor === undefined || nextCursor.length === 0 || nextCursor === cursor)) {
+    return Effect.fail(
+      failure("list", prefix, "invalid-response", "Truncated S3 listing did not advance its continuation token."),
+    )
+  }
+  return Effect.try({
+    try: () =>
+      (page.Contents ?? []).map((object) => {
+        if (object.Key === undefined)
+          throw failure("list", prefix, "invalid-response", "S3 listing contained an object without a key.")
+        let key: string
+        try {
+          key = page.EncodingType === "url" ? decodeURIComponent(object.Key) : object.Key
+        } catch {
+          throw failure("list", prefix, "invalid-response", "S3 listing contained malformed URL-encoded keys.")
+        }
+        if (!key.startsWith(prefix))
+          throw failure("list", prefix, "invalid-response", "S3 listing returned a key outside the requested prefix.")
+        return key
+      }),
+    catch: (cause) => classify("list", prefix, cause),
+  }).pipe(Effect.map((keys) => (nextCursor === undefined ? { keys } : { keys, cursor: nextCursor })))
+}
+
+const makeService = (options: Options, client: Client): Service => ({
+  capabilities,
+  read: (key, readOptions) =>
+    validateReadOptions({ key, options: readOptions }).pipe(
+      Effect.andThen(
+        request({
+          timeoutMs: options.requestTimeoutMs ?? 30_000,
+          operation: "read",
+          key,
+          execute: (signal) =>
+            Effect.try({ try: () => checkKey("read", key), catch: (cause) => classify("read", key, cause) }).pipe(
+              Effect.andThen(
+                native(() => client.getObject(getInput(options.bucket, key, readOptions.range), signal)).pipe(
+                  Effect.catchTag("generalist/durability/S3NativeFailure", (cause) =>
+                    cause.name === "NoSuchKey" || (cause.status === 404 && cause.name === "NotFound")
+                      ? Effect.void.pipe(Effect.as(undefined))
+                      : Effect.fail(classifyDetails("read", key, cause.name, cause.status)),
+                  ),
+                ),
+              ),
+              Effect.flatMap((object) =>
+                object === undefined
+                  ? Effect.void.pipe(Effect.as(undefined))
+                  : readResponse(key, object, readOptions, signal),
+              ),
+            ),
+        }),
+      ),
+    ),
+  create: (key, bytes) =>
+    request({
+      timeoutMs: options.requestTimeoutMs ?? 30_000,
+      operation: "create",
+      key,
+      execute: (signal) =>
+        Effect.try({ try: () => checkKey("create", key), catch: (cause) => classify("create", key, cause) }).pipe(
+          Effect.andThen(
+            native(() =>
+              client.createObject({ Bucket: options.bucket, Key: key, Body: bytes, IfNoneMatch: "*" }, signal),
+            ).pipe(
+              Effect.as("created" as const),
+              Effect.catchTag("generalist/durability/S3NativeFailure", (cause) =>
+                cause.status === 412 || cause.name === "PreconditionFailed"
+                  ? Effect.succeed("conflict" as const)
+                  : Effect.fail(classifyDetails("create", key, cause.name, cause.status)),
+              ),
+            ),
+          ),
+        ),
+    }),
+  list: (prefix, cursor) =>
+    request({
+      timeoutMs: options.requestTimeoutMs ?? 30_000,
+      operation: "list",
+      key: prefix,
+      execute: (signal) =>
+        native(() =>
+          client.listObjects(
+            { Bucket: options.bucket, Prefix: prefix, ContinuationToken: cursor, EncodingType: "url" },
+            signal,
+          ),
+        ).pipe(
+          mapNativeFailure("list", prefix),
+          Effect.flatMap((page) => listResponse(prefix, cursor, page)),
+        ),
+    }),
+})
+
+/** Creates the signed transport. Every request is single-attempt: reconcile uncertain creates by reading the key. @experimental */
 export const make = (options: Options): Effect.Effect<Service, ObjectStoreFailure> =>
   Effect.try({
     try: () => {
       validate(options, options.client)
-      const client = options.client ?? sdkClient(options)
-      return {
-        capabilities,
-        read: (key: string, readOptions: ReadOptions) => Effect.flatMap(
-          validateReadOptions(key, readOptions),
-          () => request(options, "read", key, async (signal): Promise<StoredObject | undefined> => {
-            checkKey("read", key)
-            const range = readOptions.range
-            let object: GetObjectCommandOutput
-            try {
-              object = await client.getObject({
-                Bucket: options.bucket,
-                Key: key,
-                ...(range === undefined ? {} : { Range: `bytes=${range.offset}-${range.offset + range.length - 1}` }),
-              }, signal)
-            } catch (error) {
-              const { name, status } = errorDetails(error)
-              if (name === "NoSuchKey" || (status === 404 && name === "NotFound")) return undefined
-              throw error
-            }
-            let body: ReadableStream<Uint8Array> | undefined
-            try {
-              if (object.Body === undefined || typeof object.Body.transformToWebStream !== "function") {
-                throw failure("read", key, "invalid-response", "S3 did not return a streaming object body.")
-              }
-              body = object.Body.transformToWebStream()
-              signal.throwIfAborted()
-              if (typeof object.ETag !== "string" || object.ETag.length === 0) {
-                throw failure("read", key, "invalid-response", "S3 did not return an opaque ETag.")
-              }
-              if (object.ContentLength !== undefined && (
-                !Number.isSafeInteger(object.ContentLength) || object.ContentLength < 0
-              )) {
-                throw failure("read", key, "invalid-response", "S3 returned invalid Content-Length metadata.")
-              }
-              const maxBytes = range?.length ?? readOptions.maxBytes
-              if (object.ContentLength !== undefined && object.ContentLength > maxBytes) {
-                throw failure("read", key, "limit", "S3 response exceeds the read byte budget.")
-              }
-              let expectedLength = object.ContentLength
-              if (range === undefined) {
-                if (object.ContentRange !== undefined || object.$metadata.httpStatusCode === 206) {
-                  throw failure("read", key, "invalid-response", "S3 returned a partial body for a complete read.")
-                }
-              } else {
-                const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(object.ContentRange ?? "")
-                const start = Number(match?.[1])
-                const end = Number(match?.[2])
-                const total = Number(match?.[3])
-                if (
-                  object.$metadata.httpStatusCode !== 206 ||
-                  !Number.isSafeInteger(start) ||
-                  !Number.isSafeInteger(end) ||
-                  !Number.isSafeInteger(total) ||
-                  start !== range.offset ||
-                  start > end ||
-                  end >= total ||
-                  end !== Math.min(range.offset + range.length, total) - 1
-                ) {
-                  throw failure("read", key, "invalid-response", "S3 did not return the requested byte range.")
-                }
-                expectedLength = end - start + 1
-                if (object.ContentLength !== undefined && object.ContentLength !== expectedLength) {
-                  throw failure("read", key, "invalid-response", "S3 range length differs from Content-Length.")
-                }
-              }
-              const bytes = await readObjectBytes(key, body, maxBytes, signal, expectedLength)
-              return { bytes, etag: object.ETag }
-            } catch (cause) {
-              cancelReadBody(body, cause)
-              throw cause
-            }
-          }),
-        ),
-        create: (key: string, bytes: Uint8Array) => request(options, "create", key, async (signal) => {
-          checkKey("create", key)
-          try {
-            await client.createObject({ Bucket: options.bucket, Key: key, Body: bytes, IfNoneMatch: "*" }, signal)
-            return "created" as const
-          } catch (error) {
-            const { name, status } = errorDetails(error)
-            if (status === 412 || name === "PreconditionFailed") return "conflict" as const
-            // A 409 can race a deletion; unlike 412, it does not prove a competing object exists.
-            throw error
-          }
-        }),
-        list: (prefix: string, cursor?: string) => request(options, "list", prefix, async (signal): Promise<ObjectPage> => {
-          const page = await client.listObjects({
-            Bucket: options.bucket,
-            Prefix: prefix,
-            ContinuationToken: cursor,
-            EncodingType: "url",
-          }, signal)
-          if (typeof page.IsTruncated !== "boolean" || (page.EncodingType !== undefined && page.EncodingType !== "url")) {
-            throw failure("list", prefix, "invalid-response", "S3 listing omitted valid pagination or encoding metadata.")
-          }
-          const nextCursor = page.IsTruncated ? page.NextContinuationToken : undefined
-          if (page.IsTruncated && (!nextCursor || nextCursor === cursor)) {
-            throw failure("list", prefix, "invalid-response", "Truncated S3 listing did not advance its continuation token.")
-          }
-          const keys = (page.Contents ?? []).map((object) => {
-            if (object.Key === undefined) throw failure("list", prefix, "invalid-response", "S3 listing contained an object without a key.")
-            let key: string
-            try {
-              key = page.EncodingType === "url" ? decodeURIComponent(object.Key) : object.Key
-            } catch {
-              throw failure("list", prefix, "invalid-response", "S3 listing contained malformed URL-encoded keys.")
-            }
-            if (!key.startsWith(prefix)) throw failure("list", prefix, "invalid-response", "S3 listing returned a key outside the requested prefix.")
-            return key
-          })
-          return nextCursor === undefined ? { keys } : { keys, cursor: nextCursor }
-        }),
-      }
+      return makeService(options, options.client ?? sdkClient(options))
     },
-    catch: (error) => classify("initialize", options.bucket, error),
+    catch: (cause) => classify("initialize", options.bucket, cause),
   })
-
 /** Signed S3 canonical transport layer. @experimental */
-export const layer = (options: Options): Layer.Layer<ObjectStore, ObjectStoreFailure> => Layer.effect(ObjectStore, make(options))
-
+export const layer = (options: Options): Layer.Layer<ObjectStore, ObjectStoreFailure> =>
+  Layer.effect(ObjectStore, make(options))
 /** Constructs separately authorized maintenance deletion; never included in the normal store. @experimental */
 export const makeMaintenance = (options: MaintenanceOptions) =>
   Effect.try({
@@ -367,15 +431,25 @@ export const makeMaintenance = (options: MaintenanceOptions) =>
       validate(options, options.client)
       const client = options.client ?? sdkClient(options)
       return {
-        remove: (key: string) => request(options, "remove", key, async (signal) => {
-          checkKey("remove", key)
-          await client.deleteObject({ Bucket: options.bucket, Key: key }, signal)
-        }),
+        remove: (key: string) =>
+          request({
+            timeoutMs: options.requestTimeoutMs ?? 30_000,
+            operation: "remove",
+            key,
+            execute: (signal) =>
+              Effect.try({ try: () => checkKey("remove", key), catch: (cause) => classify("remove", key, cause) }).pipe(
+                Effect.andThen(
+                  native(() => client.deleteObject({ Bucket: options.bucket, Key: key }, signal)).pipe(
+                    mapNativeFailure("remove", key),
+                  ),
+                ),
+                Effect.asVoid,
+              ),
+          }),
       }
     },
-    catch: (error) => classify("initialize", options.bucket, error),
+    catch: (cause) => classify("initialize", options.bucket, cause),
   })
-
 /** Separately authorized S3 deletion layer. @experimental */
 export const layerMaintenance = (options: MaintenanceOptions): Layer.Layer<ObjectMaintenance, ObjectStoreFailure> =>
   Layer.effect(ObjectMaintenance, makeMaintenance(options))

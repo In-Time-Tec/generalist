@@ -5,7 +5,23 @@
     <title>Research Agent</title>
   </head>
   <body>
-    <div id="root"></div>
+    <form
+      id="server-login"
+      style="max-width: 28rem; margin: 4rem auto; padding: 1rem; font-family: system-ui, sans-serif"
+    >
+      <h1 style="margin-top: 0">Research Agent</h1>
+      <label for="server-token">Server token</label>
+      <input
+        id="server-token"
+        type="password"
+        autocomplete="off"
+        required
+        style="display: block; width: 100%; margin: 0.75rem 0; padding: 0.4rem; box-sizing: border-box"
+      />
+      <button type="submit">Connect</button>
+      <p id="login-status" role="status" style="color: #555">Enter the configured GENERALIST_SERVER_TOKEN.</p>
+    </form>
+    <div id="root" hidden></div>
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

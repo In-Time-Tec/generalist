@@ -17,9 +17,8 @@ import { PolicyError as TurnPolicyError } from "../turn/policy.js"
 import { DriverInterpreter, DriverJournal, journalNoop } from "../durable/driver/interpreter.js"
 import { Exhausted, Invalid as BudgetInvalid, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "./tool/registration.js"
-import { DriverError, DriverStateInvalid } from "../durable/service.js"
 import { childEnd as applyChildEnd, childStart as applyChildStart } from "./lifecycle/hooks.js"
-import type { HookFailed } from "../../hooks/index.js"
+import type { EvaluationFailure } from "../../hooks/index.js"
 import { ToolContext } from "../tools/tool-context.js"
 import { make as makeFanOut } from "./tool/fan-out.js"
 
@@ -118,9 +117,7 @@ export interface AgentToolToolkit<_Name extends string, Parameters extends Schem
   readonly tools: { readonly [name: string]: AgentToolTool<Parameters, Success> }
   readonly parametersSchema: Schema.Top
   readonly successSchema: Schema.Top
-  readonly invoke: (
-    params: ToolInput,
-  ) => Effect.Effect<Success["Type"], string | HookFailed | DriverError | DriverStateInvalid, R>
+  readonly invoke: (params: ToolInput) => Effect.Effect<Success["Type"], string | EvaluationFailure, R>
   readonly requirements: (value: R) => R
 }
 
@@ -226,7 +223,7 @@ const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success
   tool: AgentToolTool<Parameters, Success>,
   name: string,
   parameters: Parameters | DefaultParameters,
-  invoke: (params: ToolInput) => Effect.Effect<ToolInput, string | HookFailed | DriverError | DriverStateInvalid, R>,
+  invoke: (params: ToolInput) => Effect.Effect<ToolInput, string | EvaluationFailure, R>,
 ): AgentToolToolkit<Name, Parameters, Success, R> => ({
   name,
   tool,
@@ -297,7 +294,7 @@ export const asTool: {
       params: ToolInput,
     ): Effect.Effect<
       ToolInput,
-      string | HookFailed | DriverError | DriverStateInvalid,
+      string | EvaluationFailure,
       RunRequirements<Tools, R, AgentToolRunOptions> | Parameters["DecodingServices"] | ModelR
     > =>
       Effect.gen(function* () {

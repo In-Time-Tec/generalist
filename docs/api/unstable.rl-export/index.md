@@ -1,14 +1,14 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / unstable.rl-export
+[generalist](../index.md) / unstable.rl-export
 
 # unstable.rl-export
 
 ## Namespaces
 
-- [Reward](./namespaces/Reward)
+- [Reward](./namespaces/Reward.md)
 
 ## Interfaces
 
@@ -74,7 +74,7 @@ Cross-driver Runtime methods required by `dag`.
 
 #### Extends
 
-- [`JournalReader`](../trajectory#journalreader)
+- [`JournalReader`](../trajectory.md#journalreader)
 
 #### Properties
 
@@ -82,7 +82,7 @@ Cross-driver Runtime methods required by `dag`.
 
 ##### history
 
-> `readonly` **history**: (`input`) => `Effect`\<readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[], [`EventsError`](../runtime/namespaces/Runtime#eventserror)\>
+> `readonly` **history**: (`input`) => `Effect`\<readonly [`RunEvent`](../runtime/namespaces/RunEvent.md#runevent)[], [`EventsError`](../runtime/namespaces/Runtime.md#eventserror)\>
 
 **`Experimental`**
 
@@ -90,15 +90,15 @@ Cross-driver Runtime methods required by `dag`.
 
 ###### input
 
-[`HistoryInput`](../runtime/namespaces/Runtime#historyinput)
+[`HistoryInput`](../runtime/namespaces/Runtime.md#historyinput)
 
 ###### Returns
 
-`Effect`\<readonly [`RunEvent`](../runtime/namespaces/RunEvent#runevent)[], [`EventsError`](../runtime/namespaces/Runtime#eventserror)\>
+`Effect`\<readonly [`RunEvent`](../runtime/namespaces/RunEvent.md#runevent)[], [`EventsError`](../runtime/namespaces/Runtime.md#eventserror)\>
 
 ###### Inherited from
 
-[`JournalReader`](../trajectory#journalreader).[`history`](../trajectory#history)
+[`JournalReader`](../trajectory.md#journalreader).[`history`](../trajectory.md#history)
 
 <a id="recordreward"></a>
 
@@ -112,7 +112,7 @@ Cross-driver Runtime methods required by `dag`.
 
 ###### input
 
-[`RewardInput`](../runtime/namespaces/RunEvent#rewardinput)
+[`RewardInput`](../runtime/namespaces/RunEvent.md#rewardinput) & `CommandIdentity`
 
 ###### Returns
 
@@ -122,7 +122,7 @@ Cross-driver Runtime methods required by `dag`.
 
 ##### resolveModelResponse
 
-> `readonly` **resolveModelResponse**: (`event`) => `Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `taint?`: readonly `object`[]; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \}, [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
+> `readonly` **resolveModelResponse**: (`event`) => `Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: `Usage`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `taint?`: readonly `object`[]; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: `Usage`; \}, [`SessionEntryError`](../runtime/namespaces/Runtime.md#sessionentryerror)\>
 
 **`Experimental`**
 
@@ -130,21 +130,21 @@ Cross-driver Runtime methods required by `dag`.
 
 ###### event
 
-[`ModelResponseEvent`](../runtime/namespaces/Runtime#modelresponseevent)
+[`ModelResponseEvent`](../runtime/namespaces/Runtime.md#modelresponseevent)
 
 ###### Returns
 
-`Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `taint?`: readonly `object`[]; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: \{ `inputTokens`: \{ `cacheRead?`: `number`; `cacheWrite?`: `number`; `total?`: `number`; `uncached?`: `number`; \}; `outputTokens`: \{ `reasoning?`: `number`; `text?`: `number`; `total?`: `number`; \}; \}; \}, [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
+`Effect`\<\{ `content`: readonly (\{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"text"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `text`: `string`; `type`: `"reasoning"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `approvalId`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `toolCallId`: `string`; `type`: `"tool-approval-request"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `data`: `Uint8Array`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `type`: `"file"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `fileName?`: `string`; `id`: `string`; `mediaType`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"document"`; `title`: `string`; `type`: `"source"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `sourceType`: `"url"`; `title`: `string`; `type`: `"source"`; `url`: `URL`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id?`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `modelId?`: `string`; `request?`: \{ \}; `timestamp?`: `Utc`; `type`: `"response-metadata"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `reason`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `response?`: \{ `headers`: \{\[`key`: `string`\]: `string` \| `Redacted`\<...\>; \}; `status`: `number`; \}; `type`: `"finish"`; `usage`: `Usage`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `id`: `string`; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `params`: `unknown`; `providerExecuted`: `boolean`; `type`: `"tool-call"`; \} \| \{ `~effect/ai/Content/Part`: `"~effect/ai/Content/Part"`; `encodedResult`: `unknown`; `id`: `string`; `isFailure`: `boolean`; `memoized?`: \{ `fromOperation`: `string`; `fromRun`: `string`; \}; `metadata`: \{\[`key`: `string`\]: `Json`; \}; `name`: `string`; `preliminary`: `boolean`; `providerExecuted`: `boolean`; `result`: `unknown`; `taint?`: readonly `object`[]; `type`: `"tool-result"`; \})[]; `finishReason?`: `"stop"` \| `"length"` \| `"content-filter"` \| `"tool-calls"` \| `"error"` \| `"pause"` \| `"other"` \| `"unknown"`; `usage?`: `Usage`; \}, [`SessionEntryError`](../runtime/namespaces/Runtime.md#sessionentryerror)\>
 
 ###### Inherited from
 
-[`JournalReader`](../trajectory#journalreader).[`resolveModelResponse`](../trajectory#resolvemodelresponse)
+[`JournalReader`](../trajectory.md#journalreader).[`resolveModelResponse`](../trajectory.md#resolvemodelresponse)
 
 <a id="sessionentry"></a>
 
 ##### sessionEntry
 
-> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../generalist/namespaces/Session#entry-1), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
+> `readonly` **sessionEntry**: (`input`) => `Effect`\<[`Entry`](../generalist/namespaces/Session.md#entry-1), [`SessionEntryError`](../runtime/namespaces/Runtime.md#sessionentryerror)\>
 
 **`Experimental`**
 
@@ -152,21 +152,21 @@ Cross-driver Runtime methods required by `dag`.
 
 ###### input
 
-[`SessionEntryInput`](../runtime/namespaces/Runtime#sessionentryinput)
+[`SessionEntryInput`](../runtime/namespaces/Runtime.md#sessionentryinput)
 
 ###### Returns
 
-`Effect`\<[`Entry`](../generalist/namespaces/Session#entry-1), [`SessionEntryError`](../runtime/namespaces/Runtime#sessionentryerror)\>
+`Effect`\<[`Entry`](../generalist/namespaces/Session.md#entry-1), [`SessionEntryError`](../runtime/namespaces/Runtime.md#sessionentryerror)\>
 
 ###### Inherited from
 
-[`JournalReader`](../trajectory#journalreader).[`sessionEntry`](../trajectory#sessionentry)
+[`JournalReader`](../trajectory.md#journalreader).[`sessionEntry`](../trajectory.md#sessionentry)
 
 <a id="snapshot"></a>
 
 ##### snapshot
 
-> `readonly` **snapshot**: (`runId`) => `Effect`\<[`RunSnapshot`](../runtime/namespaces/Run#runsnapshot), [`InspectError`](../runtime/namespaces/Runtime#inspecterror)\>
+> `readonly` **snapshot**: (`runId`) => `Effect`\<[`RunSnapshot`](../runtime/namespaces/Run.md#runsnapshot), [`InspectError`](../runtime/namespaces/Runtime.md#inspecterror)\>
 
 **`Experimental`**
 
@@ -178,11 +178,11 @@ Cross-driver Runtime methods required by `dag`.
 
 ###### Returns
 
-`Effect`\<[`RunSnapshot`](../runtime/namespaces/Run#runsnapshot), [`InspectError`](../runtime/namespaces/Runtime#inspecterror)\>
+`Effect`\<[`RunSnapshot`](../runtime/namespaces/Run.md#runsnapshot), [`InspectError`](../runtime/namespaces/Runtime.md#inspecterror)\>
 
 ###### Inherited from
 
-[`JournalReader`](../trajectory#journalreader).[`snapshot`](../trajectory#snapshot)
+[`JournalReader`](../trajectory.md#journalreader).[`snapshot`](../trajectory.md#snapshot)
 
 ***
 
@@ -226,7 +226,7 @@ Verifiers v1 JSONL export options.
 
 ##### reward
 
-> `readonly` **reward**: [`Service`](./namespaces/Reward#service)\<`R`, `E`\>
+> `readonly` **reward**: [`Service`](./namespaces/Reward.md#service)\<`R`, `E`\>
 
 **`Experimental`**
 
@@ -396,7 +396,7 @@ One applied durable compaction operation.
 
 ### dag
 
-> `const` **dag**: (`runtime`, `runId`) => `Effect.Effect`\<[`Dag`](#dag), [`FromJournalError`](../trajectory#fromjournalerror), `never`\>
+> `const` **dag**: (`runtime`, `runId`) => `Effect.Effect`\<[`Dag`](#dag), [`FromJournalError`](../trajectory.md#fromjournalerror), `never`\>
 
 **`Experimental`**
 
@@ -414,7 +414,7 @@ Project a root Run, retained forks, and linked child Runs into one operation DAG
 
 #### Returns
 
-`Effect.Effect`\<[`Dag`](#dag), [`FromJournalError`](../trajectory#fromjournalerror), `never`\>
+`Effect.Effect`\<[`Dag`](#dag), [`FromJournalError`](../trajectory.md#fromjournalerror), `never`\>
 
 ***
 
@@ -434,11 +434,11 @@ The journal fact relating two trajectory operations.
 
 ### export
 
-> `const` **export**: \{\<`R`, `E`\>(`options`): (`dagValue`) => `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward#rewardinvalid) \| `E`, `R`\>; \<`R`, `E`\>(`dagValue`, `options`): `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward#rewardinvalid) \| `E`, `R`\>; \}
+> `const` **export**: \{\<`R`, `E`\>(`options`): (`dagValue`) => `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward.md#rewardinvalid) \| `E`, `R`\>; \<`R`, `E`\>(`dagValue`, `options`): `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward.md#rewardinvalid) \| `E`, `R`\>; \}
 
 #### Call Signature
 
-> \<`R`, `E`\>(`options`): (`dagValue`) => `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward#rewardinvalid) \| `E`, `R`\>
+> \<`R`, `E`\>(`options`): (`dagValue`) => `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward.md#rewardinvalid) \| `E`, `R`\>
 
 ##### Type Parameters
 
@@ -458,11 +458,11 @@ The journal fact relating two trajectory operations.
 
 ##### Returns
 
-(`dagValue`) => `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward#rewardinvalid) \| `E`, `R`\>
+(`dagValue`) => `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward.md#rewardinvalid) \| `E`, `R`\>
 
 #### Call Signature
 
-> \<`R`, `E`\>(`dagValue`, `options`): `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward#rewardinvalid) \| `E`, `R`\>
+> \<`R`, `E`\>(`dagValue`, `options`): `Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward.md#rewardinvalid) \| `E`, `R`\>
 
 ##### Type Parameters
 
@@ -486,7 +486,7 @@ The journal fact relating two trajectory operations.
 
 ##### Returns
 
-`Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward#rewardinvalid) \| `E`, `R`\>
+`Stream`\<`Uint8Array`\<`ArrayBufferLike`\>, `SchemaError` \| `RecordRewardError` \| [`RewardInvalid`](./namespaces/Reward.md#rewardinvalid) \| `E`, `R`\>
 
 ***
 

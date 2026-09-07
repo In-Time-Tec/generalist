@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Permissions
+[generalist](../../index.md) / [generalist](../index.md) / Permissions
 
 # Permissions
 
@@ -12,7 +12,7 @@
 
 ### Allow
 
-Re-exports [Allow](../../permissions#allow)
+Re-exports [Allow](../../permissions.md#allow)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [Allow](../../permissions#allow)
 
 ### Ask
 
-Re-exports [Ask](../../permissions#ask)
+Re-exports [Ask](../../permissions.md#ask)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [Ask](../../permissions#ask)
 
 ### Decision
 
-Re-exports [Decision](../../permissions#decision)
+Re-exports [Decision](../../permissions.md#decision)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [Decision](../../permissions#decision)
 
 ### Deny
 
-Re-exports [Deny](../../permissions#deny)
+Re-exports [Deny](../../permissions.md#deny)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [Deny](../../permissions#deny)
 
 ### evaluate
 
-Re-exports [evaluate](../../permissions#evaluate-1)
+Re-exports [evaluate](../../permissions.md#evaluate-1)
 
 ***
 
@@ -52,7 +52,7 @@ Re-exports [evaluate](../../permissions#evaluate-1)
 
 ### evaluateWithRules
 
-Re-exports [evaluateWithRules](../../permissions#evaluatewithrules)
+Re-exports [evaluateWithRules](../../permissions.md#evaluatewithrules)
 
 ***
 
@@ -60,7 +60,7 @@ Re-exports [evaluateWithRules](../../permissions#evaluatewithrules)
 
 ### InvalidRuleFile
 
-Re-exports [InvalidRuleFile](../../permissions#invalidrulefile)
+Re-exports [InvalidRuleFile](../../permissions.md#invalidrulefile)
 
 ***
 
@@ -68,7 +68,7 @@ Re-exports [InvalidRuleFile](../../permissions#invalidrulefile)
 
 ### layerAllowAll
 
-Re-exports [layerAllowAll](../../permissions#layerallowall)
+Re-exports [layerAllowAll](../../permissions.md#layerallowall)
 
 ***
 
@@ -76,7 +76,7 @@ Re-exports [layerAllowAll](../../permissions#layerallowall)
 
 ### layerFailClosed
 
-Re-exports [layerFailClosed](../../permissions#layerfailclosed)
+Re-exports [layerFailClosed](../../permissions.md#layerfailclosed)
 
 ***
 
@@ -84,7 +84,7 @@ Re-exports [layerFailClosed](../../permissions#layerfailclosed)
 
 ### layerRuleset
 
-Re-exports [layerRuleset](../../permissions#layerruleset)
+Re-exports [layerRuleset](../../permissions.md#layerruleset)
 
 ***
 
@@ -92,7 +92,7 @@ Re-exports [layerRuleset](../../permissions#layerruleset)
 
 ### layerRuleStoreFile
 
-Re-exports [layerRuleStoreFile](../../permissions#layerrulestorefile)
+Re-exports [layerRuleStoreFile](../../permissions.md#layerrulestorefile)
 
 ***
 
@@ -100,15 +100,7 @@ Re-exports [layerRuleStoreFile](../../permissions#layerrulestorefile)
 
 ### layerRuleStoreMemory
 
-Re-exports [layerRuleStoreMemory](../../permissions#layerrulestorememory)
-
-***
-
-<a id="layerrulestoresql"></a>
-
-### layerRuleStoreSql
-
-Re-exports [layerRuleStoreSql](../../permissions#layerrulestoresql)
+Re-exports [layerRuleStoreMemory](../../permissions.md#layerrulestorememory)
 
 ***
 
@@ -116,7 +108,7 @@ Re-exports [layerRuleStoreSql](../../permissions#layerrulestoresql)
 
 ### layerRuleStoreTest
 
-Re-exports [layerRuleStoreTest](../../permissions#layerrulestoretest)
+Re-exports [layerRuleStoreTest](../../permissions.md#layerrulestoretest)
 
 ***
 
@@ -124,7 +116,7 @@ Re-exports [layerRuleStoreTest](../../permissions#layerrulestoretest)
 
 ### layerTest
 
-Re-exports [layerTest](../../permissions#layertest)
+Re-exports [layerTest](../../permissions.md#layertest)
 
 ***
 
@@ -132,7 +124,7 @@ Re-exports [layerTest](../../permissions#layertest)
 
 ### Level
 
-Re-exports [Level](../../permissions#level-1)
+Re-exports [Level](../../permissions.md#level-1)
 
 ***
 
@@ -140,7 +132,7 @@ Re-exports [Level](../../permissions#level-1)
 
 ### matches
 
-Re-exports [matches](../../permissions#matches)
+Re-exports [matches](../../permissions.md#matches)
 
 ***
 
@@ -148,7 +140,7 @@ Re-exports [matches](../../permissions#matches)
 
 ### matchRule
 
-Re-exports [matchRule](../../permissions#matchrule)
+Re-exports [matchRule](../../permissions.md#matchrule)
 
 ***
 
@@ -156,7 +148,7 @@ Re-exports [matchRule](../../permissions#matchrule)
 
 ### PermissionError
 
-Re-exports [PermissionError](../../permissions#permissionerror)
+Re-exports [PermissionError](../../permissions.md#permissionerror)
 
 ***
 
@@ -164,7 +156,7 @@ Re-exports [PermissionError](../../permissions#permissionerror)
 
 ### Permissions
 
-Re-exports [Permissions](../../permissions#permissions)
+Re-exports [Permissions](../../permissions.md#permissions)
 
 ***
 
@@ -172,7 +164,7 @@ Re-exports [Permissions](../../permissions#permissions)
 
 ### Rule
 
-Re-exports [Rule](../../permissions#rule)
+Re-exports [Rule](../../permissions.md#rule)
 
 ***
 
@@ -180,7 +172,7 @@ Re-exports [Rule](../../permissions#rule)
 
 ### RuleFile
 
-Re-exports [RuleFile](../../permissions#rulefile)
+Re-exports [RuleFile](../../permissions.md#rulefile)
 
 ***
 
@@ -188,7 +180,7 @@ Re-exports [RuleFile](../../permissions#rulefile)
 
 ### RuleSchema
 
-Re-exports [RuleSchema](../../permissions#ruleschema)
+Re-exports [RuleSchema](../../permissions.md#ruleschema)
 
 ***
 
@@ -196,7 +188,7 @@ Re-exports [RuleSchema](../../permissions#ruleschema)
 
 ### Ruleset
 
-Re-exports [Ruleset](../../permissions#ruleset)
+Re-exports [Ruleset](../../permissions.md#ruleset)
 
 ***
 
@@ -204,7 +196,7 @@ Re-exports [Ruleset](../../permissions#ruleset)
 
 ### RuleStore
 
-Re-exports [RuleStore](../../permissions#rulestore)
+Re-exports [RuleStore](../../permissions.md#rulestore)
 
 ***
 
@@ -212,7 +204,7 @@ Re-exports [RuleStore](../../permissions#rulestore)
 
 ### RuleStoreError
 
-Re-exports [RuleStoreError](../../permissions#rulestoreerror)
+Re-exports [RuleStoreError](../../permissions.md#rulestoreerror)
 
 ***
 
@@ -220,15 +212,7 @@ Re-exports [RuleStoreError](../../permissions#rulestoreerror)
 
 ### RuleStoreFileOptions
 
-Re-exports [RuleStoreFileOptions](../../permissions#rulestorefileoptions)
-
-***
-
-<a id="rulestoresqloptions"></a>
-
-### RuleStoreSqlOptions
-
-Re-exports [RuleStoreSqlOptions](../../permissions#rulestoresqloptions)
+Re-exports [RuleStoreFileOptions](../../permissions.md#rulestorefileoptions)
 
 ***
 
@@ -236,4 +220,4 @@ Re-exports [RuleStoreSqlOptions](../../permissions#rulestoresqloptions)
 
 ### Service
 
-Re-exports [Service](../../permissions#service)
+Re-exports [Service](../../permissions.md#service)

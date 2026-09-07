@@ -1,23 +1,14 @@
 import { Context, Effect, Layer, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import type { RunId } from "../core/durable/run-id.js"
-import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
+import { Event, HookFailed } from "./event.js"
+import { CapabilityPin, makeCapability } from "../core/durable/pin.js"
+import { ReplayPolicy } from "../core/durable/driver/contract.js"
+import type { DriverError, DriverStateInvalid } from "../core/durable/service.js"
+import type { DriverUnknownReplay } from "../core/durable/driver/interpreter.js"
+import type { Exhausted } from "../core/durable/run-budget.js"
 
-/** Typed lifecycle boundary exposed to a hook declaration. */
-export const Event = Schema.Literals([
-  "RunStart",
-  "TurnStart",
-  "ModelCall",
-  "ToolCall",
-  "ToolResult",
-  "ApprovalRequest",
-  "Compaction",
-  "ChildStart",
-  "ChildEnd",
-  "Steer",
-  "RunEnd",
-])
-export type Event = typeof Event.Type
+export { Event, HookFailed } from "./event.js"
 
 /** Continue the guarded operation unchanged. */
 export interface Continue {
@@ -185,9 +176,17 @@ type RunEndDecision<Output> = Continue | Block | Replace<Output>
 /** One Effectful typed lifecycle interceptor. `void` is shorthand for Continue. */
 export type Hook<Input, HookDecision extends Decision = Decision> = (
   input: Input,
+  context: { readonly operationKey: string },
 ) => Effect.Effect<HookDecision | void, unknown>
 
-interface HookDeclaration<Name extends Event, Input, HookDecision extends Decision> {
+export const Identity = Schema.Struct({
+  key: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
+  version: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
+  replayPolicy: ReplayPolicy,
+})
+export type Identity = typeof Identity.Type
+
+interface HookDeclaration<Name extends Event, Input, HookDecision extends Decision> extends Identity {
   readonly event: Name
   readonly hook: Hook<Input, HookDecision>
 }
@@ -205,7 +204,7 @@ export type Steer = HookDeclaration<"Steer", SteerInput, PromptDecision>
 export type RunEnd<Output = unknown> = HookDeclaration<"RunEnd", RunEndInput<Output>, RunEndDecision<Output>>
 
 /** Plugin-facing type-erased declaration shape accepted by Hooks.layer. */
-export interface Declaration {
+export interface Declaration extends Identity {
   readonly event: Event
   readonly hook: Hook<never>
 }
@@ -213,6 +212,7 @@ export interface Declaration {
 /** Ordered lifecycle hook declarations for one Agent execution context. */
 export interface Service {
   readonly declarations: ReadonlyArray<Declaration>
+  readonly pin: CapabilityPin
 }
 
 /** Optional ordered lifecycle interceptor service. */
@@ -220,38 +220,76 @@ export class Hooks extends Context.Service<Hooks, Service>()("generalist/hooks/H
 
 /** Provide an explicit ordered hook declaration list. */
 export const layer = (declarations: ReadonlyArray<Declaration>): Layer.Layer<Hooks> =>
-  Layer.succeed(Hooks, Hooks.of({ declarations }))
+  Layer.sync(Hooks, () => make({ declarations }))
 
 /** Explicit empty hook chain. Omitting Hooks has the same behavior. */
 export const layerIdentity: Layer.Layer<Hooks> = layer([])
 
-export const onRunStart = (hook: RunStart["hook"]): RunStart => ({ event: "RunStart", hook })
-export const onTurnStart = (hook: TurnStart["hook"]): TurnStart => ({ event: "TurnStart", hook })
-export const onModelCall = (hook: ModelCall["hook"]): ModelCall => ({ event: "ModelCall", hook })
-export const onToolCall = (hook: ToolCall["hook"]): ToolCall => ({ event: "ToolCall", hook })
-export const onToolResult = (hook: ToolResult["hook"]): ToolResult => ({ event: "ToolResult", hook })
-export const onApprovalRequest = (hook: ApprovalRequest["hook"]): ApprovalRequest => ({
-  event: "ApprovalRequest",
-  hook,
+export const chainPin = (declarations: ReadonlyArray<Declaration>): CapabilityPin => {
+  const identities = declarations.map((declaration) => ({
+    ...Schema.decodeSync(Identity)(declaration),
+    event: declaration.event,
+  }))
+  if (new Set(identities.map((identity) => identity.key)).size !== identities.length) {
+    throw new TypeError("Duplicate hook declaration key")
+  }
+  return makeCapability({ version: "1", declarations: identities })
+}
+
+export const make = (input: { readonly declarations: ReadonlyArray<Declaration> }): Service => {
+  const declarations = Object.freeze(input.declarations.map((declaration) => Object.freeze({ ...declaration })))
+  return { declarations, pin: chainPin(declarations) }
+}
+
+export const onRunStart = (input: Identity & { readonly hook: RunStart["hook"] }): RunStart => ({
+  event: "RunStart",
+  ...input,
 })
-export const onCompaction = (hook: Compaction["hook"]): Compaction => ({ event: "Compaction", hook })
-export const onChildStart = (hook: ChildStart["hook"]): ChildStart => ({ event: "ChildStart", hook })
-export const onChildEnd = (hook: ChildEnd["hook"]): ChildEnd => ({ event: "ChildEnd", hook })
-export const onSteer = (hook: Steer["hook"]): Steer => ({ event: "Steer", hook })
-export const onRunEnd = <Output = unknown>(hook: RunEnd<Output>["hook"]): RunEnd<Output> => ({
+export const onTurnStart = (input: Identity & { readonly hook: TurnStart["hook"] }): TurnStart => ({
+  event: "TurnStart",
+  ...input,
+})
+export const onModelCall = (input: Identity & { readonly hook: ModelCall["hook"] }): ModelCall => ({
+  event: "ModelCall",
+  ...input,
+})
+export const onToolCall = (input: Identity & { readonly hook: ToolCall["hook"] }): ToolCall => ({
+  event: "ToolCall",
+  ...input,
+})
+export const onToolResult = (input: Identity & { readonly hook: ToolResult["hook"] }): ToolResult => ({
+  event: "ToolResult",
+  ...input,
+})
+export const onApprovalRequest = (input: Identity & { readonly hook: ApprovalRequest["hook"] }): ApprovalRequest => ({
+  event: "ApprovalRequest",
+  ...input,
+})
+export const onCompaction = (input: Identity & { readonly hook: Compaction["hook"] }): Compaction => ({
+  event: "Compaction",
+  ...input,
+})
+export const onChildStart = (input: Identity & { readonly hook: ChildStart["hook"] }): ChildStart => ({
+  event: "ChildStart",
+  ...input,
+})
+export const onChildEnd = (input: Identity & { readonly hook: ChildEnd["hook"] }): ChildEnd => ({
+  event: "ChildEnd",
+  ...input,
+})
+export const onSteer = (input: Identity & { readonly hook: Steer["hook"] }): Steer => ({ event: "Steer", ...input })
+export const onRunEnd = <Output = unknown>(
+  input: Identity & { readonly hook: RunEnd<Output>["hook"] },
+): RunEnd<Output> => ({
   event: "RunEnd",
-  hook,
+  ...input,
 })
 
-/** A lifecycle hook failed instead of returning a decision. */
-export class HookFailed extends ActionableTaggedError<HookFailed>()("generalist/core/HookFailed", {
-  event: Event,
-  cause: Schema.Defect(),
-  hint: errorHint("Inspect the named lifecycle hook and its cause before retrying the run."),
-}) {}
+export type EvaluationFailure = HookFailed | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
 
 /** @internal One completed declaration chain stored in the driver checkpoint. */
 export const Checkpoint = Schema.Struct({
+  chain: CapabilityPin,
   key: Schema.String,
   event: Event,
   decisions: Schema.Array(Decision),

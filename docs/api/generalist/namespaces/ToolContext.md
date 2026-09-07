@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ToolContext
+[generalist](../../index.md) / [generalist](../index.md) / ToolContext
 
 # ToolContext
 
@@ -86,7 +86,7 @@ Ambient context available to a tool handler for the current call.
 
 ##### agent?
 
-> `readonly` `optional` **agent?**: [`Any`](./Agent#any)
+> `readonly` `optional` **agent?**: [`Any`](./Agent.md#any)
 
 **`Internal`**
 

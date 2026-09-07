@@ -67,6 +67,6 @@ An Effect describes work, including its result, possible failures, and required 
 - [Test agent behavior](/features/testing) without network calls or API keys.
 - [Add the durable Runtime](/features/runtime) when accepted work must survive a restart.
 
-Want to see the difference first? [Five minutes: local and SQLite reopen](/start/examples#local-and-sqlite-in-five-minutes) runs the same agent both ways without credentials. Before exposing a server, read [Operate an agent service](/guides/production).
+Want to see the difference first? [Five minutes: local and object recovery](/start/examples#local-and-object-recovery-in-five-minutes) runs the same scripted agent both ways. Its durable half needs a configured object service; the local acceptance suite provisions MinIO and Miniflare without cloud credentials. Before exposing a server, read [Operate an agent service](/guides/production).
 
 Generalist is pre-1.0 and uses unstable Effect AI APIs. Keep Effect and optional Effect provider packages on the documented matching versions; expect breaking changes between Generalist releases.

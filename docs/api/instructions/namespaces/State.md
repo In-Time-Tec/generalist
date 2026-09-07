@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / State
+[generalist](../../index.md) / [instructions](../index.md) / State
 
 # State
 
@@ -32,7 +32,7 @@ One complete versioned instruction state for one scope.
 
 ### allEntries
 
-> `const` **allEntries**: (`state`) => `ReadonlyArray`\<[`GuidanceEntry`](./Entry#guidanceentry)\>
+> `const` **allEntries**: (`state`) => `ReadonlyArray`\<[`GuidanceEntry`](./Entry.md#guidanceentry)\>
 
 Every entry of one state in canonical kind then id order.
 
@@ -44,7 +44,7 @@ Every entry of one state in canonical kind then id order.
 
 #### Returns
 
-`ReadonlyArray`\<[`GuidanceEntry`](./Entry#guidanceentry)\>
+`ReadonlyArray`\<[`GuidanceEntry`](./Entry.md#guidanceentry)\>
 
 ***
 
@@ -60,7 +60,7 @@ An empty state for one scope.
 
 ##### scope
 
-[`GuidanceScope`](./Entry#guidancescope)
+[`GuidanceScope`](./Entry.md#guidancescope)
 
 #### Returns
 
@@ -166,15 +166,15 @@ Build one state from unordered entries and refinements.
 
 ###### entries?
 
-`ReadonlyArray`\<[`GuidanceEntry`](./Entry#guidanceentry)\>
+`ReadonlyArray`\<[`GuidanceEntry`](./Entry.md#guidanceentry)\>
 
 ###### refinements?
 
-`ReadonlyArray`\<[`RefinementEvent`](./Entry#refinementevent)\>
+`ReadonlyArray`\<[`RefinementEvent`](./Entry.md#refinementevent)\>
 
 ###### scope
 
-[`GuidanceScope`](./Entry#guidancescope)
+[`GuidanceScope`](./Entry.md#guidancescope)
 
 #### Returns
 
@@ -287,7 +287,7 @@ kind and id; every surviving entry keeps the scope that authored it.
 
 ### snapshotId
 
-> `const` **snapshotId**: (`state`) => [`GuidanceSnapshotId`](./Entry#guidancesnapshotid)
+> `const` **snapshotId**: (`state`) => [`GuidanceSnapshotId`](./Entry.md#guidancesnapshotid)
 
 Content-addressed identity of one exact state, independent of refinement history.
 
@@ -299,7 +299,7 @@ Content-addressed identity of one exact state, independent of refinement history
 
 #### Returns
 
-[`GuidanceSnapshotId`](./Entry#guidancesnapshotid)
+[`GuidanceSnapshotId`](./Entry.md#guidancesnapshotid)
 
 ***
 

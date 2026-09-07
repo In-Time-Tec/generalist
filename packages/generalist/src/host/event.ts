@@ -4,6 +4,14 @@ import type { HostSessionEvent } from "../runtime/session/host.js"
 import { RunEvent } from "../runtime/run/event.js"
 import { Items as TaskItems } from "../tasks/item.js"
 import { EditResult as ArtifactEditResult } from "../core/artifact.js"
+import { ConversationUpdate } from "../runtime/session/conversation.js"
+
+export const Conversation = Schema.TaggedStruct("Conversation", {
+  sessionId: Schema.String,
+  cursor: Cursor,
+  update: ConversationUpdate,
+})
+export type Conversation = typeof Conversation.Type
 
 type TaggedRunEvent<Tag extends RunEvent["_tag"]> = RunEvent & { readonly _tag: Tag }
 
@@ -93,15 +101,25 @@ export const HostEvent: Schema.Union<
     typeof ApprovalRequested,
     typeof Compacted,
     typeof Completed,
+    typeof Conversation,
   ]
-> = Schema.Union([RunStarted, Turn, ToolCall, TasksUpdated, ArtifactUpdated, ApprovalRequested, Compacted, Completed])
+> = Schema.Union([
+  RunStarted,
+  Turn,
+  ToolCall,
+  TasksUpdated,
+  ArtifactUpdated,
+  ApprovalRequested,
+  Compacted,
+  Completed,
+  Conversation,
+])
 export type HostEvent = typeof HostEvent.Type
 
-/** Project one durable Runtime event into the product-facing Host stream. */
-export const project: {
-  (entry: HostSessionEvent): (sessionId: string) => Option.Option<HostEvent>
-  (sessionId: string, entry: HostSessionEvent): Option.Option<HostEvent>
-} = Function.dual(2, (sessionId: string, entry: HostSessionEvent): Option.Option<HostEvent> => {
+const projectRun = (
+  sessionId: string,
+  entry: Extract<HostSessionEvent, { readonly _tag: "Run" }>,
+): Option.Option<HostEvent> => {
   const base = { sessionId, cursor: entry.cursor, runId: entry.event.runId }
   switch (entry.event._tag) {
     case "RunAccepted":
@@ -131,4 +149,16 @@ export const project: {
     default:
       return Option.none()
   }
-})
+}
+
+/** Project one durable Runtime event into the product-facing Host stream. */
+export const project: {
+  (entry: HostSessionEvent): (sessionId: string) => Option.Option<HostEvent>
+  (sessionId: string, entry: HostSessionEvent): Option.Option<HostEvent>
+} = Function.dual(
+  2,
+  (sessionId: string, entry: HostSessionEvent): Option.Option<HostEvent> =>
+    entry._tag === "Conversation"
+      ? Option.some({ _tag: "Conversation", sessionId, cursor: entry.cursor, update: entry.update })
+      : projectRun(sessionId, entry),
+)

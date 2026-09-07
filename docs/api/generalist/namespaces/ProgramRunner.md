@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ProgramRunner
+[generalist](../../index.md) / [generalist](../index.md) / ProgramRunner
 
 # ProgramRunner
 
@@ -198,7 +198,7 @@ Encoded execution request used by direct and durable hosts.
 
 ##### program
 
-> `readonly` **program**: [`PinnedProgram`](./ProgramManifest#pinnedprogram)
+> `readonly` **program**: [`PinnedProgram`](./ProgramManifest.md#pinnedprogram)
 
 ***
 
@@ -212,7 +212,7 @@ Encoded execution request used by direct and durable hosts.
 
 ##### execute
 
-> `readonly` **execute**: (`request`) => `Effect`\<`unknown`, [`SandboxUnavailable`](./CodeExecutor#sandboxunavailable) \| [`SandboxSourceInvalid`](./CodeExecutor#sandboxsourceinvalid) \| [`SandboxInputInvalid`](./CodeExecutor#sandboxinputinvalid) \| [`SandboxOutputInvalid`](./CodeExecutor#sandboxoutputinvalid) \| [`SandboxExecutionFailure`](./CodeExecutor#sandboxexecutionfailure) \| [`SandboxProtocolViolation`](./CodeExecutor#sandboxprotocolviolation) \| [`SandboxDeadlineExceeded`](./CodeExecutor#sandboxdeadlineexceeded) \| [`SandboxCancelled`](./CodeExecutor#sandboxcancelled) \| [`SandboxResourceExceeded`](./CodeExecutor#sandboxresourceexceeded) \| [`SandboxGuaranteeUnavailable`](./CodeExecutor#sandboxguaranteeunavailable) \| [`ProgramCapabilityMissing`](./ProgramCapabilities#programcapabilitymissing) \| [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSchemaFailure`](./ProgramCapabilities#programschemafailure) \| [`ProgramToolFailure`](./ProgramCapabilities#programtoolfailure) \| [`ProgramStepFailure`](./ProgramCapabilities#programstepfailure) \| [`ProgramAgentFailure`](./ProgramCapabilities#programagentfailure) \| [`ProgramBudgetExhausted`](./ProgramCapabilities#programbudgetexhausted) \| [`ProgramReplayDivergence`](./ProgramCapabilities#programreplaydivergence) \| [`ProgramOperationUnknown`](./ProgramCapabilities#programoperationunknown) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramHandlerMismatch`](#programhandlermismatch) \| [`ProgramIdentityMismatch`](#programidentitymismatch), `Scope`\>
+> `readonly` **execute**: (`request`) => `Effect`\<`unknown`, [`SandboxUnavailable`](./CodeExecutor.md#sandboxunavailable) \| [`SandboxSourceInvalid`](./CodeExecutor.md#sandboxsourceinvalid) \| [`SandboxInputInvalid`](./CodeExecutor.md#sandboxinputinvalid) \| [`SandboxOutputInvalid`](./CodeExecutor.md#sandboxoutputinvalid) \| [`SandboxExecutionFailure`](./CodeExecutor.md#sandboxexecutionfailure) \| [`SandboxProtocolViolation`](./CodeExecutor.md#sandboxprotocolviolation) \| [`SandboxDeadlineExceeded`](./CodeExecutor.md#sandboxdeadlineexceeded) \| [`SandboxCancelled`](./CodeExecutor.md#sandboxcancelled) \| [`SandboxResourceExceeded`](./CodeExecutor.md#sandboxresourceexceeded) \| [`SandboxGuaranteeUnavailable`](./CodeExecutor.md#sandboxguaranteeunavailable) \| [`ProgramCapabilityMissing`](./ProgramCapabilities.md#programcapabilitymissing) \| [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramSchemaFailure`](./ProgramCapabilities.md#programschemafailure) \| [`ProgramToolFailure`](./ProgramCapabilities.md#programtoolfailure) \| [`ProgramStepFailure`](./ProgramCapabilities.md#programstepfailure) \| [`ProgramAgentFailure`](./ProgramCapabilities.md#programagentfailure) \| [`ProgramBudgetExhausted`](./ProgramCapabilities.md#programbudgetexhausted) \| [`ProgramReplayDivergence`](./ProgramCapabilities.md#programreplaydivergence) \| [`ProgramOperationUnknown`](./ProgramCapabilities.md#programoperationunknown) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled) \| [`ProgramHandlerMismatch`](#programhandlermismatch) \| [`ProgramIdentityMismatch`](#programidentitymismatch), `Scope`\>
 
 ###### Parameters
 
@@ -222,7 +222,7 @@ Encoded execution request used by direct and durable hosts.
 
 ###### Returns
 
-`Effect`\<`unknown`, [`SandboxUnavailable`](./CodeExecutor#sandboxunavailable) \| [`SandboxSourceInvalid`](./CodeExecutor#sandboxsourceinvalid) \| [`SandboxInputInvalid`](./CodeExecutor#sandboxinputinvalid) \| [`SandboxOutputInvalid`](./CodeExecutor#sandboxoutputinvalid) \| [`SandboxExecutionFailure`](./CodeExecutor#sandboxexecutionfailure) \| [`SandboxProtocolViolation`](./CodeExecutor#sandboxprotocolviolation) \| [`SandboxDeadlineExceeded`](./CodeExecutor#sandboxdeadlineexceeded) \| [`SandboxCancelled`](./CodeExecutor#sandboxcancelled) \| [`SandboxResourceExceeded`](./CodeExecutor#sandboxresourceexceeded) \| [`SandboxGuaranteeUnavailable`](./CodeExecutor#sandboxguaranteeunavailable) \| [`ProgramCapabilityMissing`](./ProgramCapabilities#programcapabilitymissing) \| [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure) \| [`ProgramSchemaFailure`](./ProgramCapabilities#programschemafailure) \| [`ProgramToolFailure`](./ProgramCapabilities#programtoolfailure) \| [`ProgramStepFailure`](./ProgramCapabilities#programstepfailure) \| [`ProgramAgentFailure`](./ProgramCapabilities#programagentfailure) \| [`ProgramBudgetExhausted`](./ProgramCapabilities#programbudgetexhausted) \| [`ProgramReplayDivergence`](./ProgramCapabilities#programreplaydivergence) \| [`ProgramOperationUnknown`](./ProgramCapabilities#programoperationunknown) \| [`ProgramSuspended`](./ProgramCapabilities#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities#programcancelled) \| [`ProgramHandlerMismatch`](#programhandlermismatch) \| [`ProgramIdentityMismatch`](#programidentitymismatch), `Scope`\>
+`Effect`\<`unknown`, [`SandboxUnavailable`](./CodeExecutor.md#sandboxunavailable) \| [`SandboxSourceInvalid`](./CodeExecutor.md#sandboxsourceinvalid) \| [`SandboxInputInvalid`](./CodeExecutor.md#sandboxinputinvalid) \| [`SandboxOutputInvalid`](./CodeExecutor.md#sandboxoutputinvalid) \| [`SandboxExecutionFailure`](./CodeExecutor.md#sandboxexecutionfailure) \| [`SandboxProtocolViolation`](./CodeExecutor.md#sandboxprotocolviolation) \| [`SandboxDeadlineExceeded`](./CodeExecutor.md#sandboxdeadlineexceeded) \| [`SandboxCancelled`](./CodeExecutor.md#sandboxcancelled) \| [`SandboxResourceExceeded`](./CodeExecutor.md#sandboxresourceexceeded) \| [`SandboxGuaranteeUnavailable`](./CodeExecutor.md#sandboxguaranteeunavailable) \| [`ProgramCapabilityMissing`](./ProgramCapabilities.md#programcapabilitymissing) \| [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied) \| [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure) \| [`ProgramSchemaFailure`](./ProgramCapabilities.md#programschemafailure) \| [`ProgramToolFailure`](./ProgramCapabilities.md#programtoolfailure) \| [`ProgramStepFailure`](./ProgramCapabilities.md#programstepfailure) \| [`ProgramAgentFailure`](./ProgramCapabilities.md#programagentfailure) \| [`ProgramBudgetExhausted`](./ProgramCapabilities.md#programbudgetexhausted) \| [`ProgramReplayDivergence`](./ProgramCapabilities.md#programreplaydivergence) \| [`ProgramOperationUnknown`](./ProgramCapabilities.md#programoperationunknown) \| [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended) \| [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled) \| [`ProgramHandlerMismatch`](#programhandlermismatch) \| [`ProgramIdentityMismatch`](#programidentitymismatch), `Scope`\>
 
 ## Type Aliases
 
@@ -238,7 +238,7 @@ Encoded execution request used by direct and durable hosts.
 
 ### ExecutionFailure
 
-> `const` **ExecutionFailure**: `Schema.Union`\<readonly \[`Schema.Union`\<readonly \[[`SandboxUnavailable`](./CodeExecutor#sandboxunavailable), [`SandboxSourceInvalid`](./CodeExecutor#sandboxsourceinvalid), [`SandboxInputInvalid`](./CodeExecutor#sandboxinputinvalid), [`SandboxOutputInvalid`](./CodeExecutor#sandboxoutputinvalid), [`SandboxExecutionFailure`](./CodeExecutor#sandboxexecutionfailure), [`SandboxProtocolViolation`](./CodeExecutor#sandboxprotocolviolation), [`SandboxDeadlineExceeded`](./CodeExecutor#sandboxdeadlineexceeded), [`SandboxCancelled`](./CodeExecutor#sandboxcancelled), [`SandboxResourceExceeded`](./CodeExecutor#sandboxresourceexceeded), [`SandboxGuaranteeUnavailable`](./CodeExecutor#sandboxguaranteeunavailable), `Schema.Union`\<readonly \[*typeof* [`ProgramCapabilityMissing`](./ProgramCapabilities#programcapabilitymissing), *typeof* [`ProgramCapabilityDenied`](./ProgramCapabilities#programcapabilitydenied), *typeof* [`ProgramAuthorizationFailure`](./ProgramCapabilities#programauthorizationfailure), *typeof* [`ProgramSchemaFailure`](./ProgramCapabilities#programschemafailure), *typeof* [`ProgramToolFailure`](./ProgramCapabilities#programtoolfailure), *typeof* [`ProgramStepFailure`](./ProgramCapabilities#programstepfailure), *typeof* [`ProgramAgentFailure`](./ProgramCapabilities#programagentfailure), *typeof* [`ProgramBudgetExhausted`](./ProgramCapabilities#programbudgetexhausted), *typeof* [`ProgramReplayDivergence`](./ProgramCapabilities#programreplaydivergence), [`ProgramOperationUnknown`](./ProgramCapabilities#programoperationunknown), *typeof* [`ProgramSuspended`](./ProgramCapabilities#programsuspended), *typeof* [`ProgramCancelled`](./ProgramCapabilities#programcancelled)\]\>\]\>, *typeof* [`ProgramHandlerMismatch`](#programhandlermismatch), *typeof* [`ProgramIdentityMismatch`](#programidentitymismatch)\]\>
+> `const` **ExecutionFailure**: `Schema.Union`\<readonly \[`Schema.Union`\<readonly \[[`SandboxUnavailable`](./CodeExecutor.md#sandboxunavailable), [`SandboxSourceInvalid`](./CodeExecutor.md#sandboxsourceinvalid), [`SandboxInputInvalid`](./CodeExecutor.md#sandboxinputinvalid), [`SandboxOutputInvalid`](./CodeExecutor.md#sandboxoutputinvalid), [`SandboxExecutionFailure`](./CodeExecutor.md#sandboxexecutionfailure), [`SandboxProtocolViolation`](./CodeExecutor.md#sandboxprotocolviolation), [`SandboxDeadlineExceeded`](./CodeExecutor.md#sandboxdeadlineexceeded), [`SandboxCancelled`](./CodeExecutor.md#sandboxcancelled), [`SandboxResourceExceeded`](./CodeExecutor.md#sandboxresourceexceeded), [`SandboxGuaranteeUnavailable`](./CodeExecutor.md#sandboxguaranteeunavailable), `Schema.Union`\<readonly \[*typeof* [`ProgramCapabilityMissing`](./ProgramCapabilities.md#programcapabilitymissing), *typeof* [`ProgramCapabilityDenied`](./ProgramCapabilities.md#programcapabilitydenied), *typeof* [`ProgramAuthorizationFailure`](./ProgramCapabilities.md#programauthorizationfailure), *typeof* [`ProgramSchemaFailure`](./ProgramCapabilities.md#programschemafailure), *typeof* [`ProgramToolFailure`](./ProgramCapabilities.md#programtoolfailure), *typeof* [`ProgramStepFailure`](./ProgramCapabilities.md#programstepfailure), *typeof* [`ProgramAgentFailure`](./ProgramCapabilities.md#programagentfailure), *typeof* [`ProgramBudgetExhausted`](./ProgramCapabilities.md#programbudgetexhausted), *typeof* [`ProgramReplayDivergence`](./ProgramCapabilities.md#programreplaydivergence), [`ProgramOperationUnknown`](./ProgramCapabilities.md#programoperationunknown), *typeof* [`ProgramSuspended`](./ProgramCapabilities.md#programsuspended), *typeof* [`ProgramCancelled`](./ProgramCapabilities.md#programcancelled)\]\>\]\>, *typeof* [`ProgramHandlerMismatch`](#programhandlermismatch), *typeof* [`ProgramIdentityMismatch`](#programidentitymismatch)\]\>
 
 Failures returned by Core-owned Program execution.
 
@@ -258,11 +258,11 @@ Direct process-local runner for an explicitly supplied code executor and live ha
 
 ###### executor
 
-[`Service`](./CodeExecutor#service)
+[`Service`](./CodeExecutor.md#service)
 
 ###### handlers
 
-[`Handlers`](./ProgramHandlers#handlers)
+[`Handlers`](./ProgramHandlers.md#handlers)
 
 #### Returns
 
@@ -286,7 +286,7 @@ Verify that live Program handlers exactly match persisted manifest authority.
 
 ###### handlers
 
-[`Handlers`](./ProgramHandlers#handlers)
+[`Handlers`](./ProgramHandlers.md#handlers)
 
 ##### Returns
 
@@ -300,11 +300,11 @@ Verify that live Program handlers exactly match persisted manifest authority.
 
 ###### program
 
-[`PinnedProgram`](./ProgramManifest#pinnedprogram)
+[`PinnedProgram`](./ProgramManifest.md#pinnedprogram)
 
 ###### handlers
 
-[`Handlers`](./ProgramHandlers#handlers)
+[`Handlers`](./ProgramHandlers.md#handlers)
 
 ##### Returns
 

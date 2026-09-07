@@ -3,7 +3,7 @@ import type { DurabilityFailure } from "../../durability/errors.js"
 import type { RuntimeUnavailable } from "../errors.js"
 import { type CompactionEntry, type Entry, SessionStoreError } from "../../core/context/session.js"
 import type { PathPage, PathPageInput } from "../../core/context/session-history.js"
-import { emptySession, type RuntimeSession, type RuntimeState } from "./state.js"
+import { emptySession, type RuntimeSession, type RuntimeState } from "./projection.js"
 import type { SessionReader } from "../run/store.js"
 
 const storeError = (message: string) => SessionStoreError.make({ message })
@@ -13,7 +13,7 @@ export const sessionStorageFailure = (cause: DurabilityFailure | RuntimeUnavaila
   if (cause._tag !== "generalist/durability/DurabilityFailure") {
     return SessionStoreError.make({ message: cause.message, reason: "unavailable", cause })
   }
-  const reasons: Record<DurabilityFailure["reason"], NonNullable<SessionStoreError["reason"]>> = {
+  const reasons = {
     corruption: "corrupt",
     "unsupported-version": "unsupported",
     limit: "unsupported",
@@ -24,7 +24,7 @@ export const sessionStorageFailure = (cause: DurabilityFailure | RuntimeUnavaila
     encoding: "corrupt",
     crypto: "unavailable",
     transport: "unavailable",
-  }
+  } satisfies Record<DurabilityFailure["reason"], NonNullable<SessionStoreError["reason"]>>
   return SessionStoreError.make({ message: cause.message, reason: reasons[cause.reason], cause })
 }
 
@@ -119,43 +119,38 @@ export const reader = (config: {
 }): SessionReader => {
   const readState = config.readState.pipe(Effect.mapError(sessionStorageFailure))
   return {
-  entry: (id) =>
-    readState.pipe(
-      Effect.map((state) => state.sessions.get(config.sessionId)?.entries.get(id)),
-    ),
-  pathPage: (input) =>
-    readState.pipe(
-      Effect.flatMap((state) => {
-        const result = pathPage(state.sessions.get(config.sessionId) ?? emptySession(), input)
-        return Schema.is(SessionStoreError)(result) ? Effect.fail(result) : Effect.succeed(result)
-      }),
-    ),
-  effectivePath: (leaf) =>
-    readState.pipe(
-      Effect.flatMap((state) => {
-        const session = state.sessions.get(config.sessionId) ?? emptySession()
-        const result = effectivePathTo(session, leaf ?? session.leaf)
-        return Schema.is(SessionStoreError)(result) ? Effect.fail(result) : Effect.succeed(result)
-      }),
-    ),
-  latestCompaction: (leaf) =>
-    readState.pipe(
-      Effect.flatMap((state) => {
-        const session = state.sessions.get(config.sessionId) ?? emptySession()
-        const result = latestCompaction(session, leaf ?? session.leaf)
-        return Schema.is(SessionStoreError)(result) ? Effect.fail(result) : Effect.succeed(result)
-      }),
-    ),
-  path: (leaf) =>
-    readState.pipe(
-      Effect.flatMap((state) => {
-        const session = state.sessions.get(config.sessionId) ?? emptySession()
-        const path = pathTo(session, leaf ?? session.leaf)
-        return Schema.is(SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
-      }),
-    ),
-  leaf: readState.pipe(
-    Effect.map((state) => state.sessions.get(config.sessionId)?.leaf ?? null),
-  ),
+    entry: (id) => readState.pipe(Effect.map((state) => state.sessions.get(config.sessionId)?.entries.get(id))),
+    pathPage: (input) =>
+      readState.pipe(
+        Effect.flatMap((state) => {
+          const result = pathPage(state.sessions.get(config.sessionId) ?? emptySession(), input)
+          return Schema.is(SessionStoreError)(result) ? Effect.fail(result) : Effect.succeed(result)
+        }),
+      ),
+    effectivePath: (leaf) =>
+      readState.pipe(
+        Effect.flatMap((state) => {
+          const session = state.sessions.get(config.sessionId) ?? emptySession()
+          const result = effectivePathTo(session, leaf ?? session.leaf)
+          return Schema.is(SessionStoreError)(result) ? Effect.fail(result) : Effect.succeed(result)
+        }),
+      ),
+    latestCompaction: (leaf) =>
+      readState.pipe(
+        Effect.flatMap((state) => {
+          const session = state.sessions.get(config.sessionId) ?? emptySession()
+          const result = latestCompaction(session, leaf ?? session.leaf)
+          return Schema.is(SessionStoreError)(result) ? Effect.fail(result) : Effect.succeed(result)
+        }),
+      ),
+    path: (leaf) =>
+      readState.pipe(
+        Effect.flatMap((state) => {
+          const session = state.sessions.get(config.sessionId) ?? emptySession()
+          const path = pathTo(session, leaf ?? session.leaf)
+          return Schema.is(SessionStoreError)(path) ? Effect.fail(path) : Effect.succeed(path)
+        }),
+      ),
+    leaf: readState.pipe(Effect.map((state) => state.sessions.get(config.sessionId)?.leaf ?? null)),
   }
 }

@@ -21,7 +21,8 @@ const table = (rows: ReadonlyArray<ReadonlyArray<string>>): string => {
 
 export const renderHosts = (report: HostReport): string => {
   const suite = report.suites.find((entry) => entry.name === objectNativeSuiteName)
-  const localCapabilities = suite === undefined ? "unmet: no passing object-native shared suite" : suite.capabilities.join(", ")
+  const localCapabilities =
+    suite === undefined ? "unmet: no passing object-native shared suite" : suite.capabilities.join(", ")
   const rows = [
     [
       "Node/Bun, test-only object simulator",

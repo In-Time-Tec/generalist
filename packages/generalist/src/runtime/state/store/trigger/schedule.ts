@@ -1,16 +1,17 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAtMillis } from "../../observation.js"
+import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
 import { DateTime, Effect, Equal, Function } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
 import type { ClaimedSchedule, ScheduleReceipt, ScheduleRecord } from "../../../execution/trigger/schedule.js"
-import type { RuntimeState } from "../../state.js"
+import type { RuntimeState } from "../../projection.js"
 
 const iso = (millis: number): string => DateTime.formatIso(DateTime.makeUnsafe(millis))
 
 export const registerSchedule: {
   (
     record: ScheduleRecord,
-  ): (state: RuntimeState) => Effect.Effect<readonly [ScheduleReceipt, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<readonly [ScheduleReceipt, RuntimeState], RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     record: ScheduleRecord,
@@ -40,36 +41,39 @@ interface ClaimSchedulesInput {
 export const claimSchedules: {
   (
     input: ClaimSchedulesInput,
-  ): (state: RuntimeState) => Effect.Effect<readonly [ReadonlyArray<ClaimedSchedule>, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<readonly [ReadonlyArray<ClaimedSchedule>, RuntimeState], RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     input: ClaimSchedulesInput,
   ): Effect.Effect<readonly [ReadonlyArray<ClaimedSchedule>, RuntimeState], RuntimeUnavailable, PreparedObservation>
-} = Function.dual(2, (state: RuntimeState, input: ClaimSchedulesInput) => Effect.gen(function* () {
-  if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-  const now = yield* occurredAtMillis
-  const claims = new Map(state.scheduleClaims)
-  const claimed: Array<ClaimedSchedule> = []
-  const due = [...state.schedules.values()]
-    .filter((record) => DateTime.toEpochMillis(DateTime.makeUnsafe(record.nextAt)) <= now)
-    .toSorted(
-      (left, right) => left.nextAt.localeCompare(right.nextAt) || left.scheduleId.localeCompare(right.scheduleId),
-    )
-  for (const record of due) {
-    if (claimed.length >= input.limit) break
-    const current = claims.get(record.scheduleId)
-    if (current !== undefined && DateTime.toEpochMillis(DateTime.makeUnsafe(current.leaseExpiresAt)) > now)
-      continue
-    const claim: ClaimedSchedule = {
-      ...record,
-      ownerId: input.ownerId,
-      leaseExpiresAt: iso(now + input.leaseMillis),
+} = Function.dual(2, (state: RuntimeState, input: ClaimSchedulesInput) =>
+  Effect.gen(function* () {
+    if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+    const now = yield* occurredAtMillis
+    const claims = new Map(state.scheduleClaims)
+    const claimed: Array<ClaimedSchedule> = []
+    const due = [...state.schedules.values()]
+      .filter((record) => DateTime.toEpochMillis(DateTime.makeUnsafe(record.nextAt)) <= now)
+      .toSorted(
+        (left, right) => left.nextAt.localeCompare(right.nextAt) || left.scheduleId.localeCompare(right.scheduleId),
+      )
+    for (const record of due) {
+      if (claimed.length >= input.limit) break
+      const current = claims.get(record.scheduleId)
+      if (current !== undefined && DateTime.toEpochMillis(DateTime.makeUnsafe(current.leaseExpiresAt)) > now) continue
+      const claim: ClaimedSchedule = {
+        ...record,
+        ownerId: input.ownerId,
+        leaseExpiresAt: iso(now + input.leaseMillis),
+      }
+      claims.set(record.scheduleId, claim)
+      claimed.push(claim)
     }
-    claims.set(record.scheduleId, claim)
-    claimed.push(claim)
-  }
-  return [claimed, { ...state, scheduleClaims: claims }] as const
-}))
+    return [claimed, { ...state, scheduleClaims: claims }] as const
+  }),
+)
 
 interface AdvanceScheduleInput {
   readonly scheduleId: string
@@ -79,8 +83,13 @@ interface AdvanceScheduleInput {
 }
 
 export const advanceSchedule: {
-  (input: AdvanceScheduleInput): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
-  (state: RuntimeState, input: AdvanceScheduleInput): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+  (
+    input: AdvanceScheduleInput,
+  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+  (
+    state: RuntimeState,
+    input: AdvanceScheduleInput,
+  ): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
 } = Function.dual(2, (state: RuntimeState, input: AdvanceScheduleInput) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
   const claim = state.scheduleClaims.get(input.scheduleId)

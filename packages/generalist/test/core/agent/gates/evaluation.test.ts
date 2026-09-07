@@ -1,4 +1,4 @@
-import { objectRuntimeLayer } from "../../../runtime/execution/object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
 /* oxlint-disable effecttsgo/strict-effect-provide -- tests provide scripted models and gate requirements at the process boundary. */
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
@@ -117,11 +117,15 @@ it.effect("fences structured output before onRunEnd", () =>
       ],
     })
     const hooks = Hooks.layer([
-      Hooks.onRunEnd(({ output }) =>
-        Effect.sync(() => {
-          order.push(`onRunEnd:${stringify(output)}`)
-        }),
-      ),
+      Hooks.onRunEnd({
+        key: "test.core.agent.gates.evaluation.onRunEnd.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ output }) =>
+          Effect.sync(() => {
+            order.push(`onRunEnd:${stringify(output)}`)
+          }),
+      }),
     ])
 
     expect(yield* Agent.run(agent, "finish").pipe(Effect.provide(Layer.merge(fixture.layer, hooks)))).toEqual({
@@ -306,7 +310,13 @@ it.effect("suspends on retry budget exhaustion without false completion", () =>
         const store = yield* RunStore.RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "finish", { budget: RunBudget.make({ tokens: 2 }) })
-        yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "gate-budget-test" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            commandId: "gate-budget-test:claim",
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
 
         const inspection = yield* runtime.inspect(handle.runId)
         expect((yield* runtime.snapshot(handle.runId)).outcome).toBeUndefined()
@@ -320,8 +330,18 @@ it.effect("suspends on retry budget exhaustion without false completion", () =>
         expect(history.some((event) => event._tag === "RunCompleted")).toBe(false)
         expect(yield* fixture.requests.pipe(Effect.map((requests) => requests.length))).toBe(1)
 
-        yield* runtime.extendBudget(handle.runId, { tokens: 2 })
-        yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "gate-budget-resume" }))
+        yield* runtime.extendBudget({
+          commandId: "gate-budget-resume:budget",
+          runId: handle.runId,
+          delta: { tokens: 2 },
+        })
+        yield* executor.execute(
+          yield* store.claimExecution({
+            commandId: "gate-budget-resume:claim",
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         expect(yield* handle.await).toBe("fixed")
         expect((yield* runtime.inspect(handle.runId)).gates).toMatchObject([
           { name: "quality", verdict: "fail" },

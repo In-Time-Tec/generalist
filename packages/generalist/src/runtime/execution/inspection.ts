@@ -1,13 +1,8 @@
-import { Effect, Equal, Function, Option } from "effect"
+import { factsForRuns, spendForUsage } from "./inspection-usage.js"
+import { Effect, Equal, Function } from "effect"
 import { RuntimeUnavailable } from "../errors.js"
 import type { RunEvent } from "../run/event.js"
-import {
-  isTerminal,
-  type CompactionInspection,
-  type RawUsageFact,
-  type RunInspection,
-  type RunOutcome,
-} from "../run.js"
+import { isTerminal, type CompactionInspection, type RunInspection, type RunOutcome } from "../run.js"
 import type { Checkpoint, Inspection, TreeRunInspection } from "../tree.js"
 import {
   extend as extendBudget,
@@ -16,7 +11,6 @@ import {
   type Remaining,
   type Spend,
 } from "../../core/durable/run-budget.js"
-import { cost as modelCost } from "../../ai/model-catalog.js"
 import { durationForEvents } from "../budget/state.js"
 import type { Result as GateResult } from "../../core/agent/gates/definition.js"
 
@@ -45,9 +39,9 @@ const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | void, Runtim
   const boundary = run.events.findLastIndex(
     (event) => event._tag === "RunRewound" || (event._tag === "RunForked" && event.role !== "source"),
   )
-  const terminalEvents = run.events.slice(boundary + 1).filter(
-    (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
-  )
+  const terminalEvents = run.events
+    .slice(boundary + 1)
+    .filter((event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled")
   if (!isTerminal(run.inspection.status)) {
     return terminalEvents.length === 0
       ? Effect.void
@@ -79,140 +73,8 @@ const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | void, Runtim
   return Effect.fail(corruption(`Run ${run.inspection.runId} terminal status and event disagree`))
 }
 
-type CallStarted = Extract<RunEvent, { readonly _tag: "ModelCallStarted" }>
-type ModelAttemptTerminal = Extract<RunEvent, { readonly _tag: "ModelAttemptCompleted" | "ModelAttemptFailed" }>
-
-interface FactProjection {
-  readonly facts: Array<RawUsageFact>
-  readonly attempts: Map<string, RawUsageFact>
-  readonly attemptEvents: Map<string, RunEvent>
-  readonly attemptMappings: Map<string, string>
-}
-
-interface RunFactProjection {
-  readonly calls: Map<string, CallStarted>
-  readonly callsWithAttempts: Set<string>
-}
-
-const recordModelCall = (
-  runId: string,
-  event: CallStarted,
-  projection: RunFactProjection,
-): Effect.Effect<void, RuntimeUnavailable> => {
-  const key = `${runId}\u0000${event.modelCallId}`
-  const previous = projection.calls.get(key)
-  if (previous !== undefined && !Equal.equals(previous, event)) {
-    return Effect.fail(corruption(`Conflicting model call ${event.modelCallId} in Run ${runId}`))
-  }
-  if (previous !== undefined && projection.callsWithAttempts.has(key)) {
-    return Effect.fail(corruption(`Model call ${event.modelCallId} start replayed after an attempt terminal`))
-  }
-  projection.calls.set(key, event)
-  return Effect.void
-}
-
-const usageFactFor = (runId: string, call: CallStarted, event: ModelAttemptTerminal): RawUsageFact | undefined => {
-  const common = Object.assign(
-    {
-      runId,
-      turn: event.turn,
-      purpose: call.purpose,
-      modelCallId: event.modelCallId,
-      modelAttemptId: event.modelAttemptId,
-      attempt: event.attempt,
-    },
-    call.provider === undefined ? undefined : { provider: call.provider },
-    call.model === undefined ? undefined : { model: call.model },
-  )
-  if (event._tag === "ModelAttemptCompleted") {
-    return {
-      _tag: "Completed",
-      ...common,
-      usageAt: event.usageAt,
-      usage: event.usage,
-      ...Object.assign({}, event.requestId === undefined ? undefined : { requestId: event.requestId }),
-      ...Object.assign({}, event.responseModel === undefined ? undefined : { responseModel: event.responseModel }),
-      ...Object.assign({}, event.serviceTier === undefined ? undefined : { serviceTier: event.serviceTier }),
-    }
-  }
-  return event.providerUsage === undefined
-    ? undefined
-    : {
-        _tag: "Failed",
-        ...common,
-        category: event.category,
-        usageAt: event.failedAt,
-        providerUsage: event.providerUsage,
-      }
-}
-
-const recordModelAttempt = (
-  runId: string,
-  event: ModelAttemptTerminal,
-  projection: FactProjection,
-  runProjection: RunFactProjection,
-): Effect.Effect<void, RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    const eventKey = `${runId}\u0000${event.modelAttemptId}`
-    const previousEvent = projection.attemptEvents.get(eventKey)
-    if (previousEvent !== undefined) {
-      if (!Equal.equals(previousEvent, event))
-        return yield* corruption(`Conflicting model attempt ${event.modelAttemptId}`)
-      return
-    }
-    projection.attemptEvents.set(eventKey, event)
-    const callKey = `${runId}\u0000${event.modelCallId}`
-    const call = runProjection.calls.get(callKey)
-    if (call === undefined)
-      return yield* corruption(`Model attempt ${event.modelAttemptId} has no canonical call start`)
-    if (call.turn !== event.turn)
-      return yield* corruption(`Model attempt ${event.modelAttemptId} disagrees with its call turn`)
-    runProjection.callsWithAttempts.add(callKey)
-    const mappingKey = `${callKey}\u0000${event.attempt}`
-    const mappedAttemptId = projection.attemptMappings.get(mappingKey)
-    if (mappedAttemptId !== undefined && mappedAttemptId !== event.modelAttemptId) {
-      return yield* corruption(
-        `Model call ${event.modelCallId} attempt ${event.attempt} maps to conflicting attempt IDs`,
-      )
-    }
-    projection.attemptMappings.set(mappingKey, event.modelAttemptId)
-    const fact = usageFactFor(runId, call, event)
-    if (fact === undefined) return
-    const previous = projection.attempts.get(eventKey)
-    if (previous !== undefined) {
-      if (!Equal.equals(previous, fact)) return yield* corruption(`Conflicting model attempt ${event.modelAttemptId}`)
-      return
-    }
-    projection.attempts.set(eventKey, fact)
-    projection.facts.push(fact)
-  })
-
-const factsForRuns = (
-  runs: ReadonlyArray<{ readonly runId: string; readonly events: ReadonlyArray<RunEvent> }>,
-): Effect.Effect<ReadonlyArray<RawUsageFact>, RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    const projection: FactProjection = {
-      facts: [],
-      attempts: new Map(),
-      attemptEvents: new Map(),
-      attemptMappings: new Map(),
-    }
-    for (const run of runs) {
-      const runProjection: RunFactProjection = { calls: new Map(), callsWithAttempts: new Set() }
-      for (const event of allocationEvents(run.events)) {
-        if (event._tag === "ModelCallStarted") {
-          yield* recordModelCall(run.runId, event, runProjection)
-          continue
-        }
-        if (event._tag !== "ModelAttemptCompleted" && event._tag !== "ModelAttemptFailed") continue
-        yield* recordModelAttempt(run.runId, event, projection, runProjection)
-      }
-    }
-    return projection.facts
-  })
-
 const factsFor = (runs: ReadonlyArray<InspectionRun>) =>
-  factsForRuns(runs.map((run) => ({ runId: run.inspection.runId, events: run.events })))
+  factsForRuns(runs.map((run) => ({ runId: run.inspection.runId, events: allocationEvents(run.events) })))
 
 const gatesFor = (run: InspectionRun): Effect.Effect<ReadonlyArray<GateResult>, RuntimeUnavailable> =>
   Effect.gen(function* () {
@@ -233,101 +95,91 @@ const gatesFor = (run: InspectionRun): Effect.Effect<ReadonlyArray<GateResult>, 
     return results
   })
 
-export const factTokens = (fact: RawUsageFact): number => {
-  if (fact._tag === "Failed") {
-    return (
-      fact.providerUsage.totalTokens ?? (fact.providerUsage.inputTokens ?? 0) + (fact.providerUsage.outputTokens ?? 0)
-    )
-  }
-  return (fact.usage.inputTokens.total ?? 0) + (fact.usage.outputTokens.total ?? 0)
-}
-
 /** Project spend exclusively from canonical Run events. */
-export const spendForEvents = (events: ReadonlyArray<RunEvent>, observedMillis?: number): Effect.Effect<Spend, RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    events = allocationEvents(events)
-    const accepted = events.find((event) => event._tag === "RunAccepted")
-    const usage = yield* factsForRuns([{ runId: events[0]?.runId ?? accepted?.rootRunId ?? "", events }])
-    let usd: number | "unknown" = 0
-    for (const fact of usage) {
-      if (fact._tag === "Failed" || fact.provider === undefined || fact.model === undefined) {
-        usd = "unknown"
-        continue
-      }
-      const priced = yield* modelCost({ provider: fact.provider, model: fact.model }, fact.usage)
-      if (Option.isNone(priced)) usd = "unknown"
-      else if (usd !== "unknown") usd += priced.value
-    }
-    const duration = yield* durationForEvents(events, observedMillis)
-    const linked = new Set(events.filter((event) => event._tag === "ChildLinked").map((event) => event.childRunId))
-    for (const event of events) if (event._tag === "ChildSettled") linked.delete(event.childRunId)
-    const reservations = events.filter((event) => event._tag === "ChildLinked" && linked.has(event.childRunId))
-    const reserved = (dimension: "tokens" | "usd" | "duration" | "toolCalls") =>
-      reservations.reduce(
-        (total, event) => total + (event._tag === "ChildLinked" ? (event.budget?.[dimension] ?? 0) : 0),
-        0,
-      )
-    const settled = events.filter((event) => event._tag === "ChildSettled" && event.spend !== undefined)
-    const settledAmount = (dimension: "tokens" | "usd" | "duration" | "toolCalls" | "children") =>
-      settled.reduce((total, event) => {
-        if (event._tag !== "ChildSettled") return total
-        const value = event.spend?.[dimension]
-        return total + (value === undefined || value === "unknown" ? 0 : value)
-      }, 0)
-    const settledUnknownUsd = settled.some((event) => event._tag === "ChildSettled" && event.spend?.usd === "unknown")
-    const activeChildren = reservations.reduce(
-      (total, event) => total + (event._tag === "ChildLinked" ? 1 + (event.budget?.children ?? 0) : 0),
+export const spendForEvents = Effect.fn("RuntimeInspection.spendForEvents")(function* (input: {
+  readonly events: ReadonlyArray<RunEvent>
+  readonly observedMillis?: number | undefined
+}): Effect.fn.Return<Spend, RuntimeUnavailable> {
+  const events = allocationEvents(input.events)
+  const observedMillis = input.observedMillis
+  const accepted = events.find((event) => event._tag === "RunAccepted")
+  const usage = yield* factsForRuns([{ runId: events[0]?.runId ?? accepted?.rootRunId ?? "", events }])
+  const modelSpend = yield* spendForUsage({ events, usage })
+  const duration = yield* durationForEvents({ events, observedMillis })
+  const linked = new Set(events.filter((event) => event._tag === "ChildLinked").map((event) => event.childRunId))
+  for (const event of events) if (event._tag === "ChildSettled") linked.delete(event.childRunId)
+  const reservations = events.filter((event) => event._tag === "ChildLinked" && linked.has(event.childRunId))
+  const reserved = (dimension: "tokens" | "usd" | "duration" | "toolCalls") =>
+    reservations.reduce(
+      (total, event) => total + (event._tag === "ChildLinked" ? (event.budget?.[dimension] ?? 0) : 0),
       0,
     )
-    const forks = events.filter(
-      (event): event is Extract<RunEvent, { readonly _tag: "RunForked" }> =>
-        event._tag === "RunForked" && event.role === "source",
-    )
-    const forkAllocation = (dimension: "tokens" | "usd" | "duration" | "toolCalls" | "children") =>
-      forks.reduce((total, event) => total + (event.budget[dimension] ?? 0), 0)
-    return {
-      tokens:
-        usage.reduce((total, fact) => total + factTokens(fact), 0) +
-        reserved("tokens") + settledAmount("tokens") + forkAllocation("tokens"),
-      usd: usd === "unknown" || settledUnknownUsd ? "unknown" : usd + reserved("usd") + settledAmount("usd") + forkAllocation("usd"),
-      duration: duration + reserved("duration") + settledAmount("duration") + forkAllocation("duration"),
-      toolCalls:
-        events.filter((event) => event._tag === "ToolExecutionStarted").length +
-        reserved("toolCalls") +
-        settledAmount("toolCalls") + forkAllocation("toolCalls"),
-      children: activeChildren + settled.length + settledAmount("children") + forks.length + forkAllocation("children"),
-    }
-  })
+  const settled = events.filter((event) => event._tag === "ChildSettled" && event.spend !== undefined)
+  const settledAmount = (dimension: "tokens" | "usd" | "duration" | "toolCalls" | "children") =>
+    settled.reduce((total, event) => {
+      if (event._tag !== "ChildSettled") return total
+      const value = event.spend?.[dimension]
+      return total + (value === undefined || value === "unknown" ? 0 : value)
+    }, 0)
+  const settledUnknownUsd = settled.some((event) => event._tag === "ChildSettled" && event.spend?.usd === "unknown")
+  const activeChildren = reservations.reduce(
+    (total, event) => total + (event._tag === "ChildLinked" ? 1 + (event.budget?.children ?? 0) : 0),
+    0,
+  )
+  const forks = events.filter(
+    (event): event is Extract<RunEvent, { readonly _tag: "RunForked" }> =>
+      event._tag === "RunForked" && event.role === "source",
+  )
+  const forkAllocation = (dimension: "tokens" | "usd" | "duration" | "toolCalls" | "children") =>
+    forks.reduce((total, event) => total + (event.budget[dimension] ?? 0), 0)
+  return {
+    tokens: modelSpend.tokens + reserved("tokens") + settledAmount("tokens") + forkAllocation("tokens"),
+    usd:
+      modelSpend.usd === "unknown" || settledUnknownUsd
+        ? "unknown"
+        : modelSpend.usd + reserved("usd") + settledAmount("usd") + forkAllocation("usd"),
+    duration: duration + reserved("duration") + settledAmount("duration") + forkAllocation("duration"),
+    toolCalls:
+      events.filter((event) => event._tag === "ToolExecutionStarted").length +
+      reserved("toolCalls") +
+      settledAmount("toolCalls") +
+      forkAllocation("toolCalls"),
+    children: activeChildren + settled.length + settledAmount("children") + forks.length + forkAllocation("children"),
+  }
+})
 
 /** Project remaining budget exclusively from canonical Run events. */
-export const budgetForEvents = (events: ReadonlyArray<RunEvent>, observedMillis?: number): Effect.Effect<Remaining, RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    const boundary = events.findLastIndex((event) =>
+export const budgetForEvents = Effect.fn("RuntimeInspection.budgetForEvents")(function* (input: {
+  readonly events: ReadonlyArray<RunEvent>
+  readonly observedMillis?: number | undefined
+}): Effect.fn.Return<Remaining, RuntimeUnavailable> {
+  const { events, observedMillis } = input
+  const boundary = events.findLastIndex(
+    (event) =>
       (event._tag === "RunForked" && event.role !== "source") ||
       (event._tag === "RunRewound" && event.allocation !== undefined),
-    )
-    const allocation = events[boundary]
-    const accepted = events.find((event) => event._tag === "RunAccepted")
-    let budget = makeBudget(
-      allocation?._tag === "RunForked" ? allocation.budget :
-        allocation?._tag === "RunRewound" ? allocation.allocation!.budget :
-          accepted?._tag === "RunAccepted" ? (accepted.budget ?? {}) : {},
-    )
-    for (let index = boundary + 1; index < events.length; index++) {
-      const event = events[index]!
-      if (event._tag === "BudgetExtended") budget = extendBudget(budget, event.delta)
-    }
-    const spend = yield* spendForEvents(events, observedMillis)
-    if (allocation?._tag !== "RunRewound") return inspectBudget(budget, spend)
-    const baseline = allocation.allocation!.baseline
-    return inspectBudget(budget, {
-      tokens: Math.max(0, spend.tokens - baseline.tokens),
-      usd: spend.usd === "unknown" || baseline.usd === "unknown" ? "unknown" : Math.max(0, spend.usd - baseline.usd),
-      duration: Math.max(0, spend.duration - baseline.duration),
-      toolCalls: Math.max(0, spend.toolCalls - baseline.toolCalls),
-      children: Math.max(0, spend.children - baseline.children),
-    })
+  )
+  const allocation = events[boundary]
+  const accepted = events.find((event) => event._tag === "RunAccepted")
+  let limits = accepted?._tag === "RunAccepted" ? (accepted.budget ?? {}) : {}
+  if (allocation?._tag === "RunForked") limits = allocation.budget
+  else if (allocation?._tag === "RunRewound") limits = allocation.allocation!.budget
+  let budget = makeBudget(limits)
+  for (let index = boundary + 1; index < events.length; index++) {
+    const event = events[index]!
+    if (event._tag === "BudgetExtended") budget = extendBudget(budget, event.delta)
+  }
+  const spend = yield* spendForEvents({ events, observedMillis })
+  if (allocation?._tag !== "RunRewound") return inspectBudget(budget, spend)
+  const baseline = allocation.allocation!.baseline
+  return inspectBudget(budget, {
+    tokens: Math.max(0, spend.tokens - baseline.tokens),
+    usd: spend.usd === "unknown" || baseline.usd === "unknown" ? "unknown" : Math.max(0, spend.usd - baseline.usd),
+    duration: Math.max(0, spend.duration - baseline.duration),
+    toolCalls: Math.max(0, spend.toolCalls - baseline.toolCalls),
+    children: Math.max(0, spend.children - baseline.children),
   })
+})
 
 type CompactionTerminal = Extract<
   RunEvent,
@@ -461,7 +313,7 @@ export const projectRunSnapshot = (run: InspectionRun) =>
       cursor: run.inspection.lastSequence,
       turn,
       usageFacts: yield* factsFor([run]),
-      budget: yield* budgetForEvents(run.events),
+      budget: yield* budgetForEvents({ events: run.events }),
       compactions: yield* compactionsFor([run]),
       gates: yield* gatesFor(run),
     }

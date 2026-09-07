@@ -8,7 +8,7 @@ import type { ApplicationInit } from "foldkit/runtime"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { type Subscriptions, lift } from "foldkit/subscription"
 import { evo } from "foldkit/struct"
-const SERVER_URL = "http://localhost:4000"
+const SERVER_URL = new URL("/api", location.origin).toString()
 
 export interface Model {
   readonly chat: Chat.Model

@@ -104,9 +104,7 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
             (event) => event._tag === "RunFailed",
           )
           if (failure?._tag === "RunFailed") {
-            throw new Error(
-              `approval suspension RunFailed: ${failure.error._tag}: ${failure.error.message}`,
-            )
+            throw new Error(`approval suspension RunFailed: ${failure.error._tag}: ${failure.error.message}`)
           }
         }
         expect(inspection.status).toBe("waiting")
@@ -121,10 +119,7 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
         })
         return { runId: handle.runId, token: notifications[0]!.token }
       })
-    const recover = (
-      services: Services,
-      suspended: { readonly runId: string; readonly token: string },
-    ) =>
+    const recover = (services: Services, suspended: { readonly runId: string; readonly token: string }) =>
       Effect.gen(function* () {
         if (services.executor === undefined)
           return yield* Effect.die(`${options.name} approval recovery requires RunExecutor`)

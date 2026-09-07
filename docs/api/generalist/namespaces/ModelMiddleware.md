@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ModelMiddleware
+[generalist](../../index.md) / [generalist](../index.md) / ModelMiddleware
 
 # ModelMiddleware
 
@@ -54,7 +54,7 @@ A single middleware. Both hooks are optional; omitted hooks are identity.
 
 ##### transformPart?
 
-> `readonly` `optional` **transformPart?**: (`part`, `context`) => `Effect`\<`Option`\<`StreamPart`\<`Record`\<`string`, `Any`\>, `false`\>\>, [`HookFailed`](../../hooks#hookfailed) \| [`AgentError`](./AgentEvent#agenterror)\>
+> `readonly` `optional` **transformPart?**: (`part`, `context`) => `Effect`\<`Option`\<`StreamPart`\<`Record`\<`string`, `Any`\>, `false`\>\>, [`AgentError`](./AgentEvent.md#agenterror) \| [`EvaluationFailure`](../../hooks.md#evaluationfailure)\>
 
 Transform or drop a model stream part before the loop processes it.
 Return `Option.none()` to drop the part (it is not folded, not emitted, not persisted).
@@ -73,13 +73,13 @@ is a middleware bug; the loop fails the run with MiddlewareViolation if it happe
 
 ###### Returns
 
-`Effect`\<`Option`\<`StreamPart`\<`Record`\<`string`, `Any`\>, `false`\>\>, [`HookFailed`](../../hooks#hookfailed) \| [`AgentError`](./AgentEvent#agenterror)\>
+`Effect`\<`Option`\<`StreamPart`\<`Record`\<`string`, `Any`\>, `false`\>\>, [`AgentError`](./AgentEvent.md#agenterror) \| [`EvaluationFailure`](../../hooks.md#evaluationfailure)\>
 
 <a id="transformprompt"></a>
 
 ##### transformPrompt?
 
-> `readonly` `optional` **transformPrompt?**: (`prompt`, `context`) => `Effect`\<`Prompt`, [`HookFailed`](../../hooks#hookfailed) \| [`AgentError`](./AgentEvent#agenterror)\>
+> `readonly` `optional` **transformPrompt?**: (`prompt`, `context`) => `Effect`\<`Prompt`, [`AgentError`](./AgentEvent.md#agenterror) \| [`EvaluationFailure`](../../hooks.md#evaluationfailure)\>
 
 Transform the prompt for a turn before it is sent to the model. Recalled-memory messages must preserve lineage.
 
@@ -95,7 +95,7 @@ Transform the prompt for a turn before it is sent to the model. Recalled-memory 
 
 ###### Returns
 
-`Effect`\<`Prompt`, [`HookFailed`](../../hooks#hookfailed) \| [`AgentError`](./AgentEvent#agenterror)\>
+`Effect`\<`Prompt`, [`AgentError`](./AgentEvent.md#agenterror) \| [`EvaluationFailure`](../../hooks.md#evaluationfailure)\>
 
 ***
 

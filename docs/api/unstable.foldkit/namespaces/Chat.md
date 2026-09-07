@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.foldkit](../index) / Chat
+[generalist](../../index.md) / [unstable.foldkit](../index.md) / Chat
 
 # Chat
 
@@ -23,6 +23,30 @@
 > `readonly` **connection**: `"open"` \| `"disconnected"` \| `"connecting"` \| `"reconnecting"`
 
 **`Experimental`**
+
+<a id="connectionepoch"></a>
+
+##### connectionEpoch
+
+> `readonly` **connectionEpoch**: `number`
+
+**`Experimental`**
+
+<a id="conversation"></a>
+
+##### conversation
+
+> `readonly` **conversation**: `object`
+
+**`Experimental`**
+
+###### entries
+
+> `readonly` **entries**: readonly `object`[]
+
+###### leafId
+
+> `readonly` **leafId**: `string` \| `null`
 
 <a id="draft"></a>
 
@@ -80,7 +104,7 @@
 
 ### ChatCommand
 
-> **ChatCommand** = `Command`\<[`Action`](#action), [`AgentCommandError`](./Connection#agentcommanderror), [`Connection`](./Connection#connection)\>
+> **ChatCommand** = `Command`\<[`Action`](#action), [`AgentCommandError`](./Connection.md#agentcommanderror), [`Connection`](./Connection.md#connection)\>
 
 **`Experimental`**
 
@@ -350,7 +374,7 @@
 
 ### FailedAgentCommand
 
-> `const` **FailedAgentCommand**: `CallableTaggedStruct`\<`"FailedAgentCommand"`, \{ `error`: *typeof* [`AgentCommandError`](./Connection#agentcommanderror-1); `operation`: *typeof* [`CommandOperation`](./Connection#commandoperation-1); `reason`: *typeof* `Schema.String`; \}\>
+> `const` **FailedAgentCommand**: `CallableTaggedStruct`\<`"FailedAgentCommand"`, \{ `error`: *typeof* [`AgentCommandError`](./Connection.md#agentcommanderror-1); `operation`: *typeof* [`CommandOperation`](./Connection.md#commandoperation-1); `reason`: *typeof* `Schema.String`; \}\>
 
 **`Experimental`**
 
@@ -586,7 +610,7 @@
 
 ###### dependenciesSchema
 
-> `readonly` **dependenciesSchema**: `Schema.Schema`\<\{ `afterSeq`: `number`; `sessionId`: `string` \| `null`; \}\> & `object`
+> `readonly` **dependenciesSchema**: `Schema.Schema`\<\{ `sessionId`: `string` \| `null`; \}\> & `object`
 
 ###### Type Declaration
 
@@ -596,15 +620,11 @@
 
 ###### dependenciesToStream
 
-> `readonly` **dependenciesToStream**: (`dependencies`, `readDependencies`) => `Stream.Stream`\<[`Action`](#action), `never`, [`Connection`](./Connection#connection)\>
+> `readonly` **dependenciesToStream**: (`dependencies`, `readDependencies`) => `Stream.Stream`\<[`Action`](#action), `never`, [`Connection`](./Connection.md#connection)\>
 
 ###### Parameters
 
 ###### dependencies
-
-###### afterSeq
-
-`number`
 
 ###### sessionId
 
@@ -616,11 +636,11 @@
 
 ###### Returns
 
-`Stream.Stream`\<[`Action`](#action), `never`, [`Connection`](./Connection#connection)\>
+`Stream.Stream`\<[`Action`](#action), `never`, [`Connection`](./Connection.md#connection)\>
 
 ###### keepAliveEquivalence
 
-> `readonly` **keepAliveEquivalence**: `Equivalence.Equivalence`\<\{ `afterSeq`: `number`; `sessionId`: `string` \| `null`; \}\>
+> `readonly` **keepAliveEquivalence**: `Equivalence.Equivalence`\<\{ `sessionId`: `string` \| `null`; \}\>
 
 ###### modelToDependencies
 
@@ -635,10 +655,6 @@
 ###### Returns
 
 `object`
-
-###### afterSeq
-
-> `readonly` **afterSeq**: `number`
 
 ###### sessionId
 

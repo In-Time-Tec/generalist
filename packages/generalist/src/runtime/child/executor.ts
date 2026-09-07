@@ -117,7 +117,7 @@ const domainFailure = <Error>(error: Error): DomainFailure => {
   }
   if (Schema.is(ChildExceedsParent)(error)) {
     const failure = { message: error.message, failure: error }
-    return { _tag: "DomainFailure", failure: error, encodedFailure: Schema.encodeSync(Failure)(failure) }
+    return { _tag: "DomainFailure", failure: error, encodedFailure: Schema.encodeSync(FanOutFailure)(failure) }
   }
   const decoded = Schema.decodeUnknownOption(ErrorMessage)(error)
   const failure =

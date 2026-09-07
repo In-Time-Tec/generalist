@@ -6,6 +6,7 @@ import {
   type OperationOutcome,
 } from "../../core/durable/driver.js"
 import { withPending } from "../../core/durable/loop-driver.js"
+import { RememberInput, type PendingOperation } from "../../core/durable/loop-driver-state.js"
 import { Effect, Function, Option, Ref, Schema } from "effect"
 import { digest } from "../../core/durable/canonical-json.js"
 
@@ -21,12 +22,10 @@ import {
 } from "./model-response/commit.js"
 import { hydrateCompletedOperation } from "./model-response/hydration.js"
 
-const jsonValue = (value: unknown): Schema.Json =>
-  Schema.decodeSync(Schema.fromJsonString(Schema.Json))(
-    Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value),
-  )
+const jsonValue = (value: LiveModelResponseCommitted): Schema.Json =>
+  Schema.decodeSync(Schema.fromJsonString(Schema.Json))(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value))
 
-const sameJson = (left: unknown, right: unknown): boolean => {
+const sameJson = (left: LiveModelResponseCommitted, right: LiveModelResponseCommitted): boolean => {
   try {
     return digest(jsonValue(left)) === digest(jsonValue(right))
   } catch {
@@ -72,14 +71,13 @@ export const commitDriverOperation = (input: {
   // Remember completes before the loop consumes its turn-end continuation. As with model
   // responses, keep that exact cursor durable until the next operation advances the loop.
   const { inputDigest: _inputDigest, ...pending } = operation
-  const remember =
-    operation.kind === "memory" &&
-    Schema.is(Schema.Struct({ turn: Schema.Finite, terminal: Schema.Boolean }))(operation.input)
+  const remember = operation.kind === "memory" && Schema.is(RememberInput)(operation.input)
+  const replayCursor: PendingOperation = outcome._tag === "Succeeded" ? { ...pending, completed: true } : pending
   return store.completeOperation({
     ...claim,
     operationId,
     outcome: completion,
-    checkpoint: remember ? withPending(checkpoint, pending, checkpoint.turn) : checkpoint,
+    checkpoint: remember ? withPending(checkpoint, replayCursor, checkpoint.turn) : checkpoint,
     ...prepared,
   })
 }

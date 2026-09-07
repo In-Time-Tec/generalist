@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.a2a](../index) / Content
+[generalist](../../index.md) / [unstable.a2a](../index.md) / Content
 
 # Content
 
@@ -12,7 +12,7 @@
 
 ### decode
 
-> `const` **decode**: (`message`) => `Effect.Effect`\<`Prompt.Prompt`, [`MessageRejected`](./Errors#messagerejected)\>
+> `const` **decode**: (`message`) => `Effect.Effect`\<`Prompt.Prompt`, [`MessageRejected`](./Errors.md#messagerejected)\>
 
 **`Experimental`**
 
@@ -26,4 +26,4 @@ Decode an A2A message strictly as untrusted user content.
 
 #### Returns
 
-`Effect.Effect`\<`Prompt.Prompt`, [`MessageRejected`](./Errors#messagerejected)\>
+`Effect.Effect`\<`Prompt.Prompt`, [`MessageRejected`](./Errors.md#messagerejected)\>

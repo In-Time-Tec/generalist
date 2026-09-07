@@ -1,6 +1,6 @@
 import { Effect, Queue } from "effect"
 import { SubscriberLagged } from "../../../errors.js"
-import type { RuntimePublication, RuntimeState } from "../../state.js"
+import type { RuntimePublication, RuntimeState } from "../../projection.js"
 import { publish as publishHostSession } from "../host-session.js"
 
 /** Publish committed Run and Session events without blocking their producers. */

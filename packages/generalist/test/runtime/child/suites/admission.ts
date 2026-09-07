@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer } from "effect"
 import { ChildAdmission, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
@@ -74,7 +75,8 @@ export const childAdmissionSuite = <StoreError, Extra = never>(
             key: "reviewer",
           })
           expect(again.childRunId).toBe(first.childRunId)
-          expect(again.duplicate).toBe(true)
+          expect(first.duplicate).toBe(false)
+          expect(again).toEqual(first)
           expect(yield* children.listDirect(parentRunId)).toHaveLength(1)
         }),
       ),
@@ -204,9 +206,15 @@ export const childAdmissionSuite = <StoreError, Extra = never>(
             key: "first",
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-child-suites-admission-ts-claim-1", runId: child.childRunId, ownerId: "child" })
+            commandId: "runtime-child-suites-admission-ts-claim-1",
+            runId: child.childRunId,
+            ownerId: objectWorkerId,
+          })
           yield* store.complete({
-          commandId: "runtime-child-suites-admission-ts-complete-1", ...claim, result: completedResult("done") })
+            commandId: "runtime-child-suites-admission-ts-complete-1",
+            ...claim,
+            result: completedResult("done"),
+          })
           const joined = yield* children.join({ parentRunId, childRunId: child.childRunId })
           expect(joined.childRunId).toBe(child.childRunId)
           expect(joined.status).toBe("succeeded")

@@ -1,4 +1,5 @@
-import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../object.js"
+import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { expect, it } from "@effect/vitest"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -20,8 +21,21 @@ for (const replayPolicy of ["pure", "never"] as const) {
       `${replayPolicy} stream interrupted ${persisted ? "after" : "before"} completion write reopens safely`,
       () =>
         Effect.gen(function* () {
-          const storage = makeObjectStorage()
-          const layerObject = () => objectRuntimeLayer({ addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }], scheduler: { pollInterval: "1 hour" } }, storage).pipe(Layer.provide(resolverLayer))
+          const storage = yield* makeSimulator()
+          const layerObject = () =>
+            objectRuntimeLayer(
+              {
+                addresses: [
+                  {
+                    address: assistantAddress,
+                    executable: assistantRef,
+                    registrations: registrationsFor(assistantRef),
+                  },
+                ],
+                scheduler: { pollInterval: "1 hour" },
+              },
+              storage,
+            ).pipe(Layer.provide(resolverLayer))
           const committing = yield* Deferred.make<void>()
           let invocations = 0
           const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream", sessionId: "stream" })
@@ -49,7 +63,10 @@ for (const replayPolicy of ["pure", "never"] as const) {
                 prompt: "unused",
               })
               const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId })
+                commandId: "runtime-execution-suites-operation-boundaries-ts-claim-1",
+                runId: receipt.runId,
+                ownerId: objectWorkerId,
+              })
               const active = yield* Ref.make<ReadonlySet<string>>(new Set())
               let operationId = ""
               const interpreter = yield* DurableDriver.makeInline({
@@ -70,7 +87,10 @@ for (const replayPolicy of ["pure", "never"] as const) {
                       })
                       operationId = record.operationId
                       yield* store.startOperation({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-1", ...claim, operationId })
+                        commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-1",
+                        ...claim,
+                        operationId,
+                      })
                       yield* Ref.set(active, new Set([operationId]))
                     }).pipe(Effect.orDie),
                   onCompleted: (_operation, outcome, checkpoint) =>
@@ -135,8 +155,13 @@ for (const replayPolicy of ["pure", "never"] as const) {
                 })
               }
               const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-2", runId: first.runId, ownerId: objectWorkerId })
-              expect(yield* store.recoverRunningOperations(claim)).toBe("ready")
+                commandId: "runtime-execution-suites-operation-boundaries-ts-claim-2",
+                runId: first.runId,
+                ownerId: objectWorkerId,
+              })
+              expect(
+                yield* store.recoverRunningOperations({ ...claim, commandId: "operation-boundaries:recover-ready" }),
+              ).toBe("ready")
               const reopened = yield* store.loadExecution(first.runId)
               const interpreter = yield* DurableDriver.makeInline({
                 driver,
@@ -148,7 +173,10 @@ for (const replayPolicy of ["pure", "never"] as const) {
                       if (record.status === "succeeded") return { _tag: "Succeeded" as const, value: record.result }
                       expect(record.status).toBe("requested")
                       yield* store.startOperation({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-2", ...claim, operationId: first.operationId })
+                        commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-2",
+                        ...claim,
+                        operationId: first.operationId,
+                      })
                       return undefined
                     }).pipe(Effect.orDie),
                   onCompleted: (_operation, outcome, checkpoint) =>
@@ -182,8 +210,17 @@ for (const persisted of [false, true]) {
     `settlement expiration failure ${persisted ? "after" : "before"} a write preserves recovery of every operation`,
     () =>
       Effect.gen(function* () {
-        const storage = makeObjectStorage()
-        const layerObject = () => objectRuntimeLayer({ addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }], scheduler: { pollInterval: "1 hour" } }, storage).pipe(Layer.provide(resolverLayer))
+        const storage = yield* makeSimulator()
+        const layerObject = () =>
+          objectRuntimeLayer(
+            {
+              addresses: [
+                { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+              ],
+              scheduler: { pollInterval: "1 hour" },
+            },
+            storage,
+          ).pipe(Layer.provide(resolverLayer))
         const fault = RuntimeUnavailable.make({ message: "injected expiration failure" })
         const first = yield* scopedWith(layerObject())(
           Effect.gen(function* () {
@@ -196,7 +233,10 @@ for (const persisted of [false, true]) {
               prompt: "unused",
             })
             const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
+              commandId: "runtime-execution-suites-operation-boundaries-ts-claim-3",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            })
             const ids: string[] = []
             for (const replayPolicy of ["pure", "never"] as const) {
               const operation = yield* store.recordOperation({
@@ -210,7 +250,10 @@ for (const persisted of [false, true]) {
               })
               ids.push(operation.operationId)
               yield* store.startOperation({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-3", ...claim, operationId: operation.operationId })
+                commandId: `runtime-execution-suites-operation-boundaries-ts-startOperation-3:${replayPolicy}`,
+                ...claim,
+                operationId: operation.operationId,
+              })
             }
             let writes = 0
             const activeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set(ids))
@@ -249,8 +292,13 @@ for (const persisted of [false, true]) {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
             const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-4", runId: first.runId, ownerId: objectWorkerId })
-            expect(yield* store.recoverRunningOperations(claim)).toBe("blocked")
+              commandId: "runtime-execution-suites-operation-boundaries-ts-claim-4",
+              runId: first.runId,
+              ownerId: objectWorkerId,
+            })
+            expect(
+              yield* store.recoverRunningOperations({ ...claim, commandId: "operation-boundaries:recover-blocked" }),
+            ).toBe("blocked")
             expect((yield* store.getOperation({ runId: first.runId, operationId: first.ids[0]! })).status).toBe(
               "requested",
             )

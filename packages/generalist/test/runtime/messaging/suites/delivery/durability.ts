@@ -15,7 +15,10 @@ const encodePrompt = (prompt: Prompt.Prompt): string => Schema.encodeSync(Schema
  */
 export interface MessagingDurabilitySuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
+  readonly layers: () => {
+    readonly admit: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
+    readonly reopen: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
+  }
   readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
   readonly skip?: boolean
 }
@@ -23,8 +26,6 @@ export interface MessagingDurabilitySuiteOptions<StoreError, Extra = never> {
 export const messagingDurabilitySuite = <StoreError, Extra = never>(
   options: MessagingDurabilitySuiteOptions<StoreError, Extra>,
 ) => {
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
-    provideScoped(options.storeLayer, effect)
   const describeBackend = options.skip === true ? describe.skip : describe
   const activate = options.activate ?? (() => Effect.void)
   const session = (label: string) => `thread:durable:${options.name}:${label}`
@@ -56,11 +57,13 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
 
   describeBackend(`mailbox durability across reopen (${options.name})`, () => {
     it.live("preserves pending messages across a close and reopen", () => {
+      const layers = options.layers()
       const sessionId = session("pending")
       let parentRunId = ""
       let childRunId = ""
 
-      const admit = provide(
+      const admit = provideScoped(
+        layers.admit,
         Effect.gen(function* () {
           const { runtime, parent, child } = yield* familyIn(sessionId)
           parentRunId = parent.runId
@@ -75,7 +78,8 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
         }),
       )
 
-      const reopen = provide(
+      const reopen = provideScoped(
+        layers.reopen,
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const pending = yield* runtime.messages({ runId: parentRunId, limit: 10 })
@@ -90,12 +94,21 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
     })
 
     it.live("keeps admission idempotent across a reopen", () => {
+      const layers = options.layers()
       const sessionId = session("idempotent")
       let parentRunId = ""
       let childRunId = ""
-      let entryId = ""
+      let original:
+        | {
+            readonly messageId: string
+            readonly entryId: string
+            readonly sequence: number
+            readonly duplicate: boolean
+          }
+        | undefined
 
-      const admit = provide(
+      const admit = provideScoped(
+        layers.admit,
         Effect.gen(function* () {
           const { runtime, parent, child } = yield* familyIn(sessionId)
           parentRunId = parent.runId
@@ -107,11 +120,12 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
             messageId: "msg:once",
             prompt: textPrompt("exactly once"),
           })
-          entryId = receipt.entryId
+          original = receipt
         }),
       )
 
-      const retry = provide(
+      const retry = provideScoped(
+        layers.reopen,
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           // A sender that retried across the reopen must not create a second entry.
@@ -122,8 +136,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
             messageId: "msg:once",
             prompt: textPrompt("exactly once"),
           })
-          expect(replay.duplicate).toBe(true)
-          expect(replay.entryId).toBe(entryId)
+          expect(replay).toEqual(original)
           expect(yield* runtime.messages({ runId: parentRunId, limit: 10 })).toHaveLength(1)
         }),
       )
@@ -132,11 +145,13 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
     })
 
     it.live("preserves a bound name and its address across a reopen", () => {
+      const layers = options.layers()
       const sessionId = session("name")
       let childRunId = ""
       let scope = ""
 
-      const bind = provide(
+      const bind = provideScoped(
+        layers.admit,
         Effect.gen(function* () {
           const { runtime, child } = yield* familyIn(sessionId)
           childRunId = child.runId
@@ -145,7 +160,8 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
         }),
       )
 
-      const reopen = provide(
+      const reopen = provideScoped(
+        layers.reopen,
         Effect.gen(function* () {
           const store = yield* RunStore.RunStore
           const resolved = yield* store.resolveAddress(
@@ -160,11 +176,13 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
     })
 
     it.live("rejects a divergent payload for one message identity after a reopen", () => {
+      const layers = options.layers()
       const sessionId = session("conflict")
       let parentRunId = ""
       let childRunId = ""
 
-      const admit = provide(
+      const admit = provideScoped(
+        layers.admit,
         Effect.gen(function* () {
           const { runtime, parent, child } = yield* familyIn(sessionId)
           parentRunId = parent.runId
@@ -179,7 +197,8 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
         }),
       )
 
-      const reopen = provide(
+      const reopen = provideScoped(
+        layers.reopen,
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const error = yield* runtime
@@ -200,11 +219,13 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
     })
 
     it.live("continues the target's total order after a reopen", () => {
+      const layers = options.layers()
       const sessionId = session("ordering")
       let parentRunId = ""
       let childRunId = ""
 
-      const admit = provide(
+      const admit = provideScoped(
+        layers.admit,
         Effect.gen(function* () {
           const { runtime, parent, child } = yield* familyIn(sessionId)
           parentRunId = parent.runId
@@ -218,7 +239,8 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
         }),
       )
 
-      const reopen = provide(
+      const reopen = provideScoped(
+        layers.reopen,
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           yield* runtime.sendMessage({

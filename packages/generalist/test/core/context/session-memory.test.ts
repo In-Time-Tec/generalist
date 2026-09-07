@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Option, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Session, ToolContext } from "../../../src/index.js"
 import { layerMemory } from "../../../src/core/context/session-memory.js"
@@ -24,7 +24,10 @@ const user = (text: string): Prompt.Message =>
 
 const pathText = (path: ReadonlyArray<Session.Entry>): string => Json.stringify(Session.buildContext(path).content)
 
-const provideScoped = <A, E, R>(services: Layer.Layer<R>, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E> =>
+const provideScoped = <A, E, R>(
+  services: Layer.Layer<R>,
+  effect: Effect.Effect<A, E, R | Scope.Scope>,
+): Effect.Effect<A, E> =>
   Effect.scoped(Effect.flatMap(Layer.build(services), (context) => Effect.provideContext(effect, context)))
 
 describe("memory SessionDirectory binding", () => {
@@ -250,12 +253,8 @@ describe("memory Session command receipts", () => {
         const second = yield* store.append({ _tag: "Message", message: user("B") }, { commandId: "B" })
         expect(yield* append).toEqual(first)
         expect(yield* store.path()).toEqual([first, second])
-        const changed = yield* Effect.flip(
-          store.append({ _tag: "Message", message: user("changed") }, options),
-        )
-        const changedExpectation = yield* Effect.flip(
-          store.append(input, { ...options, expectedLeafId: null }),
-        )
+        const changed = yield* Effect.flip(store.append({ _tag: "Message", message: user("changed") }, options))
+        const changedExpectation = yield* Effect.flip(store.append(input, { ...options, expectedLeafId: null }))
         expect(changed).toMatchObject({ _tag: "generalist/core/SessionConflict", reason: "entry-id-reused" })
         expect(changedExpectation).toMatchObject({
           _tag: "generalist/core/SessionConflict",
@@ -291,7 +290,10 @@ describe("memory Session command receipts", () => {
 
   it.effect("allocates distinct Session entries for new Runs with repeated branch content", () =>
     provideScoped(
-      Layer.merge(layerMemory, modelLayer(() => Stream.make(textDelta("done")))),
+      Layer.merge(
+        layerMemory,
+        modelLayer(() => Stream.make(textDelta("done"))),
+      ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "repeated-branch-agent" })
         const paths: Array<ReadonlyArray<Session.Entry>> = []
@@ -305,12 +307,18 @@ describe("memory Session command receipts", () => {
               return entries
             }),
           )
-          expect(Session.buildContext(path).content.map((message) => ({
-            role: message.role,
-            text: message.role === "system"
-              ? message.content
-              : message.content.map((part) => part.type === "text" ? part.text : "").join(""),
-          }))).toEqual([{ role: "user", text: prompt }, { role: "assistant", text: "done" }])
+          expect(
+            Session.buildContext(path).content.map((message) => ({
+              role: message.role,
+              text:
+                message.role === "system"
+                  ? message.content
+                  : message.content.map((part) => (part.type === "text" ? part.text : "")).join(""),
+            })),
+          ).toEqual([
+            { role: "user", text: prompt },
+            { role: "assistant", text: "done" },
+          ])
           paths.push(path)
         }
         const first = paths[0]![0]!

@@ -81,34 +81,32 @@ export const replayCheckpoint =
       return replay
     }
     const { postCommitFailure: _, ...resumable } = state.value
-    return { ...replay, state: resumable }
+    return { ...replay, state: Schema.encodeSync(LoopDriverState)(resumable) }
   }
 
 /** Reconstruct elapsed run time from journaled active and suspended boundaries. */
-export const durationForEvents = (events: ReadonlyArray<RunEvent>, observedMillis?: number): Effect.Effect<number> =>
-  Effect.gen(function* () {
-    const nowMillis = observedMillis ?? (yield* DateTime.now.pipe(Effect.map(DateTime.toEpochMillis)))
-    let activeSince: number | undefined
-    let duration = 0
-    for (const event of events) {
-      const occurredAt = Option.map(DateTime.make(event.occurredAt), DateTime.toEpochMillis).pipe(Option.getOrUndefined)
-      if (occurredAt === undefined) continue
-      if (event._tag === "RunAccepted" || event._tag === "RunAttemptStarted" || event._tag === "RunResumed") {
-        if (activeSince === undefined) activeSince = occurredAt
-        continue
-      }
-      if (
-        activeSince !== undefined &&
-        (event._tag === "RunWaiting" ||
-          event._tag === "BudgetSuspended" ||
-          event._tag === "RunRewound" ||
-          event._tag === "RunCompleted" ||
-          event._tag === "RunFailed" ||
-          event._tag === "RunCancelled")
-      ) {
-        duration += Math.max(0, occurredAt - activeSince)
-        activeSince = undefined
-      }
+export const durationForEvents = Effect.fn("RuntimeBudget.durationForEvents")(function* (input: {
+  readonly events: ReadonlyArray<RunEvent>
+  readonly observedMillis?: number | undefined
+}) {
+  const { events, observedMillis } = input
+  const nowMillis = observedMillis ?? (yield* DateTime.now.pipe(Effect.map(DateTime.toEpochMillis)))
+  let activeSince: number | undefined
+  let duration = 0
+  for (const event of events) {
+    const occurredAt = Option.map(DateTime.make(event.occurredAt), DateTime.toEpochMillis).pipe(Option.getOrUndefined)
+    if (occurredAt === undefined) continue
+    if (event._tag === "RunAccepted" || event._tag === "RunAttemptStarted" || event._tag === "RunResumed") {
+      if (activeSince === undefined) activeSince = occurredAt
+      continue
     }
-    return activeSince === undefined ? duration : duration + Math.max(0, nowMillis - activeSince)
-  })
+    if (
+      activeSince !== undefined &&
+      ["RunWaiting", "BudgetSuspended", "RunRewound", "RunCompleted", "RunFailed", "RunCancelled"].includes(event._tag)
+    ) {
+      duration += Math.max(0, occurredAt - activeSince)
+      activeSince = undefined
+    }
+  }
+  return activeSince === undefined ? duration : duration + Math.max(0, nowMillis - activeSince)
+})

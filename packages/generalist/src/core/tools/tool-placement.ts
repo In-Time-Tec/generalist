@@ -12,19 +12,14 @@ import {
 import type { CancellationFailure, CancellationOutcome, CancellationRequest } from "./tool-executor-cancellation.js"
 import type { ToolContext } from "./tool-context.js"
 import type { ConcreteSchemaTool, PlacementSchemaServices } from "./tool-placement-internal.js"
-import type { HookFailed } from "../../hooks/index.js"
-import type { DriverError, DriverStateInvalid } from "../durable/service.js"
+import type { EvaluationFailure } from "../../hooks/index.js"
 export interface Route<R = ToolContext> {
   readonly tools: ReadonlyArray<string>
   readonly matches: (request: Request) => boolean
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: (
     request: Request,
-  ) => Effect.Effect<
-    Outcome,
-    FrameworkFailure | RemoteRetryMisconfigured | HookFailed | DriverError | DriverStateInvalid,
-    R
-  >
+  ) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured | EvaluationFailure, R>
   readonly cancel?:
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
     | undefined
@@ -35,11 +30,7 @@ export interface RouteOptions<R = ToolContext> {
   readonly replayPolicy?: ((request: Request) => ReplayPolicy) | undefined
   readonly execute: (
     request: Request,
-  ) => Effect.Effect<
-    Outcome,
-    FrameworkFailure | RemoteRetryMisconfigured | HookFailed | DriverError | DriverStateInvalid,
-    R
-  >
+  ) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured | EvaluationFailure, R>
   readonly cancel?:
     | ((request: CancellationRequest) => Effect.Effect<CancellationOutcome, CancellationFailure, R>)
     | undefined

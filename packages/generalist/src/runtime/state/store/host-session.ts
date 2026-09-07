@@ -2,9 +2,11 @@ import type { ModifyState } from "../../../durability/internal/runtime.js"
 import type { DurabilityFailure } from "../../../durability/errors.js"
 import { commands } from "../../../durability/internal/runtime-command-admission.js"
 import { occurredAt as preparedOccurredAt } from "../observation.js"
-import { Effect, Function, Queue, Stream, SynchronizedRef } from "effect"
+import { Effect, Function, Queue, Schema, Stream, SynchronizedRef } from "effect"
 import {
   type HostSession,
+  HostSessionSnapshot,
+  SessionSnapshotTooLarge,
   SessionConflict,
   SessionCursorExpired,
   SessionNotFound,
@@ -14,8 +16,61 @@ import {
 import { RuntimeUnavailable } from "../../errors.js"
 import { validate as validatePayload } from "../../execution/payload/index.js"
 import type { Service as RunStoreService } from "../../run/store.js"
-import type { HostSessionPublication, HostSessionSubscriberQueue, RuntimeState } from "../state.js"
+import {
+  emptySession,
+  type HostSessionPublication,
+  type HostSessionSubscriberQueue,
+  type RuntimeState,
+} from "../projection.js"
 import { toInspection } from "./events.js"
+import { projectRunSnapshot } from "../../execution/inspection.js"
+import { projectConversation } from "./host-conversation.js"
+
+const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
+  Effect.gen(function* () {
+    const session = yield* getHostSession(state, sessionId)
+    const stored = state.hostSessions.get(sessionId)
+    if (stored === undefined) return yield* missing(sessionId)
+    const excess = (limit: SessionSnapshotTooLarge["limit"], maximum: number) =>
+      SessionSnapshotTooLarge.make({ sessionId, limit, maximum })
+    if (state.runs.size > 10000) return yield* excess("scanned-runs", 10000)
+    const runs = []
+    let events = 0
+    let bytes = 0
+    for (const run of state.runs.values()) {
+      if (state.runs.get(run.rootRunId)?.message.sessionId !== sessionId) continue
+      if (runs.length >= 128) return yield* excess("runs", 128)
+      events += run.events.length
+      if (events > 8192) return yield* excess("events", 8192)
+      for (const event of run.events) {
+        const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(event).pipe(
+          Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+        )
+        bytes += new TextEncoder().encode(encoded).byteLength
+        if (bytes > 1048576) return yield* excess("bytes", 1048576)
+      }
+      const projection = {
+        inspection: toInspection(state, run),
+        rootRunId: run.rootRunId,
+        events: run.events,
+        firstTreePosition: 0,
+      }
+      if (run.parentRunId !== undefined) Object.assign(projection, { parentRunId: run.parentRunId })
+      if (run.invocationId !== undefined) Object.assign(projection, { invocationId: run.invocationId })
+      if (run.terminalEventId !== undefined) Object.assign(projection, { terminalEventId: run.terminalEventId })
+      runs.push(yield* projectRunSnapshot(projection))
+    }
+    const conversation = yield* projectConversation({
+      sessionId,
+      session: state.sessions.get(sessionId) ?? emptySession(),
+    })
+    const snapshot: HostSessionSnapshot = { version: 1, session, cursor: stored.lastCursor, runs, conversation }
+    const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(HostSessionSnapshot))(snapshot).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+    )
+    if (new TextEncoder().encode(encoded).byteLength > 1048576) return yield* excess("bytes", 1048576)
+    return snapshot
+  })
 
 const missing = (sessionId: string) =>
   SessionNotFound.make({
@@ -165,7 +220,6 @@ export const publish = (input: { readonly state: RuntimeState; readonly publicat
     return state
   })
 
-
 /** Construct the canonical operations owned by product-facing Sessions. */
 export const make = (input: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<RuntimeState>
@@ -173,11 +227,18 @@ export const make = (input: {
   readonly modifyState: ModifyState
 }): Pick<
   RunStoreService,
-  "createHostSession" | "hostSession" | "listHostSessions" | "hostSessionRuns" | "hostSessionEvents"
+  | "createHostSession"
+  | "hostSession"
+  | "hostSessionSnapshot"
+  | "listHostSessions"
+  | "hostSessionRuns"
+  | "hostSessionEvents"
 > => ({
-  createHostSession: (request) => input.modifyState(commands.createHostSession, [request], (state, [prepared]) => createHostSession(state, prepared)),
-  hostSession: (sessionId) =>
-    input.readState.pipe(Effect.flatMap((state) => getHostSession(state, sessionId))),
+  createHostSession: (request) =>
+    input.modifyState(commands.createHostSession, [request], (state, [prepared]) => createHostSession(state, prepared)),
+  hostSession: (sessionId) => input.readState.pipe(Effect.flatMap((state) => getHostSession(state, sessionId))),
+  hostSessionSnapshot: (sessionId) =>
+    input.readState.pipe(Effect.flatMap((state) => hostSessionSnapshot(state, sessionId))),
   listHostSessions: input.readState.pipe(
     Effect.flatMap((state) =>
       state.closed
@@ -185,7 +246,7 @@ export const make = (input: {
         : Effect.succeed([...state.hostSessions.values()].map(({ session }) => session)),
     ),
   ),
-  hostSessionRuns: (sessionId) =>
-    input.readState.pipe(Effect.flatMap((state) => hostSessionRuns(state, sessionId))),
-  hostSessionEvents: (request) => Stream.unwrap(input.readState.pipe(Effect.as(followHostSessionEvents(input.stateRef, request)))),
+  hostSessionRuns: (sessionId) => input.readState.pipe(Effect.flatMap((state) => hostSessionRuns(state, sessionId))),
+  hostSessionEvents: (request) =>
+    Stream.unwrap(input.readState.pipe(Effect.as(followHostSessionEvents(input.stateRef, request)))),
 })

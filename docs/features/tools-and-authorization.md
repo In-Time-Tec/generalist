@@ -29,17 +29,15 @@ const policy = Layer.mergeAll(
 const runnable = agent.run({ prompt: "Find authorization docs" }).pipe(Effect.provide(Layer.merge(handlers, policy)))
 ```
 
-For rules that survive process restarts, replace the memory store with a file or SQL store:
+For process-local applications, remembered rules can use the explicit file store. This is a permission configuration seam, not a filesystem Runtime backend:
 
 ```ts
 const projectRules = Permissions.layerRuleStoreFile({ path: ".generalist/permissions.json" }).pipe(
-  Layer.provideMerge(platformLayer), // FileSystem and Path
+  Layer.provideMerge(platformLayer),
 )
-
-const sessionRules = Permissions.layerRuleStoreSql({ scope: sessionId }).pipe(Layer.provideMerge(runtimeSqlClientLayer))
 ```
 
-The file store accepts a schema-validated JSON or YAML array of `{ pattern, level, reason? }`, watches the file for external changes, and writes remembered rules through a same-directory temporary file plus rename. Missing files start empty; malformed content fails as `InvalidRuleFile { path, issues }` rather than silently dropping rules. The SQL store uses the `generalist_permission_rules` table from the Runtime SQL schema (so the schema must be migrated first), replaces rules by `(scope, pattern)`, and shares the Runtime `SqlClient`; omitting `scope` stores rules under the `"global"` scope.
+The file store accepts a schema-validated JSON or YAML array of `{ pattern, level, reason? }`, watches for external changes, and writes through a same-directory temporary file plus rename. Missing files start empty; malformed content fails as `InvalidRuleFile`. There is no public SQL RuleStore. A file or process-local rule cache must not be treated as the authority for replaying accepted durable decisions.
 
 ## What runs
 

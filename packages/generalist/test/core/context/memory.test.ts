@@ -1197,7 +1197,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         const sessionId = "session-repeated-suffix"
         yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
-            Effect.flatMap((session) => session.append({ _tag: "Message", message: repeated }, { commandId: "fixture-1200" })),
+            Effect.flatMap((session) =>
+              session.append({ _tag: "Message", message: repeated }, { commandId: "fixture-1200" }),
+            ),
           ),
         )
 

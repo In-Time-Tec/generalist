@@ -44,13 +44,12 @@ export {
   guardUnknownNeverReplay,
   layerInline,
   layerTest,
-  arrayStreamCodec,
   make as makeInline,
   type Journal,
   type OperationSpec,
   type RecordedOperation,
-  type StreamSuccessCodec,
 } from "./driver/interpreter.js"
+export { arrayStreamCodec, type StreamSuccessCodec } from "./driver/stream-success.js"
 export { layerForRun } from "./driver/layer-for-run.js"
 export { make as makeLoopDriver } from "./loop-driver.js"
 export {

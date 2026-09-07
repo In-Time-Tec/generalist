@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / Snapshot
+[generalist](../../index.md) / [instructions](../index.md) / Snapshot
 
 # Snapshot
 
@@ -235,7 +235,7 @@ Encode one snapshot payload as the closed JSON a registration carries.
 
 ##### state
 
-[`GuidanceState`](./State#guidancestate)
+[`GuidanceState`](./State.md#guidancestate)
 
 #### Returns
 
@@ -265,7 +265,7 @@ Pin one exact state as a content-addressed snapshot.
 
 ##### state
 
-[`GuidanceState`](./State#guidancestate)
+[`GuidanceState`](./State.md#guidancestate)
 
 #### Returns
 

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl](../index) / KernelProfile
+[generalist](../../index.md) / [repl](../index.md) / KernelProfile
 
 # KernelProfile
 
@@ -245,7 +245,7 @@ What actually continued when a kernel resource was recovered.
 
 ### contractVersion
 
-> `const` **contractVersion**: `2` = `2`
+> `const` **contractVersion**: `1` = `1`
 
 Version of the KernelProfile contract itself.
 
@@ -296,7 +296,7 @@ Physical process boundary supplied to a kernel. This is a fact, not a security r
 
 ### KernelProfile
 
-> `const` **KernelProfile**: `Schema.Struct`\<\{ `bindingsDigest`: `Schema.String`; `checkpoints`: `Schema.Struct`\<\{ `filesystem`: `Schema.Boolean`; `liveProcess`: `Schema.Boolean`; `namespace`: `Schema.Boolean`; \}\>; `contractVersion`: `Schema.Literal`\<`2`\>; `image`: `Schema.Struct`\<\{ `digest`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"runtime"`, `"image"`, `"template"`\]\>; `reference`: `Schema.String`; \}\>; `isolation`: `Schema.Literals`\<readonly \[`"host-process"`, `"container"`, `"microvm"`\]\>; `limits`: `Schema.Struct`\<\{ `cellDeadlineMillis`: `Schema.Int`; `sourceBytes`: `Schema.Int`; \}\>; `protocolVersion`: `Schema.Literal`\<`1`\>; `provider`: `Schema.String`; `runtime`: `Schema.Struct`\<\{ `digest`: `Schema.String`; `name`: `Schema.String`; `version`: `Schema.String`; \}\>; `workspace`: `Schema.Struct`\<\{ `dataRoot`: `Schema.String`; `root`: `Schema.String`; \}\>; \}\>
+> `const` **KernelProfile**: `Schema.Struct`\<\{ `bindingsDigest`: `Schema.String`; `checkpoints`: `Schema.Struct`\<\{ `filesystem`: `Schema.Boolean`; `liveProcess`: `Schema.Boolean`; `namespace`: `Schema.Boolean`; \}\>; `contractVersion`: `Schema.Literal`\<`1`\>; `image`: `Schema.Struct`\<\{ `digest`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"runtime"`, `"image"`, `"template"`\]\>; `reference`: `Schema.String`; \}\>; `isolation`: `Schema.Literals`\<readonly \[`"host-process"`, `"container"`, `"microvm"`\]\>; `limits`: `Schema.Struct`\<\{ `cellDeadlineMillis`: `Schema.Int`; `sourceBytes`: `Schema.Int`; \}\>; `protocolVersion`: `Schema.Literal`\<`1`\>; `provider`: `Schema.String`; `runtime`: `Schema.Struct`\<\{ `digest`: `Schema.String`; `name`: `Schema.String`; `version`: `Schema.String`; \}\>; `workspace`: `Schema.Struct`\<\{ `dataRoot`: `Schema.String`; `root`: `Schema.String`; \}\>; \}\>
 
 Everything a kernel epoch is reconstructed from. The profile declares no
 secret-bearing field: every field is an identifier, a digest, a path, or a bound, and there is no

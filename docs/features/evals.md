@@ -9,6 +9,8 @@ import { Effect, Stream } from "effect"
 import { Runtime } from "generalist/runtime"
 import * as Trajectory from "generalist/trajectory"
 
+declare const runtime: Layer.Layer<Durability.RuntimeServices>
+
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
   const trajectory = yield* Trajectory.fromJournal(runtime, "run_123")
@@ -38,20 +40,20 @@ The optional `budget` currently records a non-empty Agent budget allocation from
 
 ## Run a deterministic suite
 
+This composition fragment uses a scripted model and expects a configured object Runtime Layer. It needs no model key; provision local object storage for credential-free acceptance.
+
 ```ts
 import { Effect, Layer, Schema } from "effect"
 import { Agent } from "generalist"
 import * as Eval from "generalist/eval"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as Durability from "generalist/durability"
 import { TestModel } from "generalist/testing"
 
 const triage = Agent.make({ name: "triage" })
 
 const program = Effect.gen(function* () {
   const model = yield* TestModel.make([TestModel.text("high"), TestModel.text("low")])
-  const runtime = Runtime.layerMemory({ addresses: [] }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-  )
+  yield* Durability.activate
 
   return yield* Eval.runSuite(
     triage,
@@ -63,8 +65,8 @@ const program = Effect.gen(function* () {
       Eval.usageUnder({ tokens: 100 }),
     ],
     { concurrency: 2 },
-  ).pipe(Effect.provide(Layer.merge(runtime, model.layer)))
-})
+  ).pipe(Effect.provide(model.layer))
+}).pipe(Effect.scoped, Effect.provide(runtime))
 ```
 
 `runSuite` returns `Eval.SuiteResult`, prints a plain-text pass/fail table, and bounds concurrent Runs by the supplied positive integer. The docs app has HTML prose-table rendering but no reusable terminal table formatter, so the package owns this small plain-text rendering.

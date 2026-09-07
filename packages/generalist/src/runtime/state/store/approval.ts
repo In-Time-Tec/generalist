@@ -3,7 +3,7 @@ import { Effect, Equal, Function } from "effect"
 import type { RespondInput as RespondApprovalInput } from "../../operation/approval.js"
 import { ApprovalMismatch, ApprovalStale, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
-import { openRunWaits, waitMapKey, type RuntimeState, type StoredRun } from "../state.js"
+import { openRunWaits, waitMapKey, type RuntimeState, type StoredRun } from "../projection.js"
 import { respond } from "./control.js"
 
 const staleApproval = (state: RuntimeState, run: StoredRun, input: RespondApprovalInput) =>
@@ -27,11 +27,19 @@ export const respondApproval: {
     input: RespondApprovalInput,
   ): (
     state: RuntimeState,
-  ) => Effect.Effect<RuntimeState, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    RuntimeState,
+    RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: RespondApprovalInput,
-  ): Effect.Effect<RuntimeState, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    RuntimeState,
+    RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: RespondApprovalInput) =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })

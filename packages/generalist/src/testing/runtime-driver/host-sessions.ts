@@ -39,23 +39,35 @@ export const registerHostSessions = <LayerError, ClaimsLayerError>(input: {
 
           const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "host-sessions" })
           for (let turn = 0; turn < 140; turn += 1) {
-            yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnStarted"}:${turn}`, event: { _tag: "TurnStarted", turn } })
+            yield* services.store.emitAgentEvent({
+              ...claim,
+              commandId: `${claim.runId}:event:TurnStarted:${turn}`,
+              event: { _tag: "TurnStarted", turn },
+            })
           }
           const replayedRunEvents = yield* services.runtime.history({ runId: receipt.runId, limit: 1000 })
           const followed = yield* services.runtime.sessionEvents({ sessionId }).pipe(
-            Stream.takeUntil(({ event }) => event._tag === "TurnStarted" && event.turn === 1007),
+            Stream.takeUntil(
+              (entry) => entry._tag === "Run" && entry.event._tag === "TurnStarted" && entry.event.turn === 1007,
+            ),
             Stream.runCollect,
             Effect.forkScoped,
           )
           yield* Effect.yieldNow
-          yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnStarted"}:${1007}`, event: { _tag: "TurnStarted", turn: 1007 } })
+          yield* services.store.emitAgentEvent({
+            ...claim,
+            commandId: `${claim.runId}:event:TurnStarted:1007`,
+            event: { _tag: "TurnStarted", turn: 1007 },
+          })
           const entries = Array.from(yield* Fiber.join(followed))
 
           expect(entries.map(({ cursor }) => cursor)).toEqual(entries.map((_, cursor) => cursor))
-          expect(entries.slice(0, replayedRunEvents.length).map(({ event }) => event.eventId)).toEqual(
+          const runEntries = entries.filter((entry) => entry._tag === "Run")
+          expect(runEntries).toHaveLength(entries.length)
+          expect(runEntries.slice(0, replayedRunEvents.length).map(({ event }) => event.eventId)).toEqual(
             replayedRunEvents.map(({ eventId }) => eventId),
           )
-          expect(entries.at(-1)?.event).toMatchObject({ _tag: "TurnStarted", turn: 1007 })
+          expect(runEntries.at(-1)?.event).toMatchObject({ _tag: "TurnStarted", turn: 1007 })
         }),
       ),
     ),

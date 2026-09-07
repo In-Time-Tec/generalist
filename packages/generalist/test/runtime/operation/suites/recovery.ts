@@ -70,11 +70,13 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claim = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({
-          commandId: `runtime-operation-suites-recovery-ts-claim-${ownerId}`,
-          runId,
-          ownerId: objectWorkerId,
-        }))
+      ? Effect.flatMap(RunStore.RunStore, (store) =>
+          store.claimExecution({
+            commandId: `runtime-operation-suites-recovery-ts-claim-${ownerId}`,
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
       : options.claim(runId, ownerId)
 
   describeBackend(`running operation recovery (${options.name})`, () => {
@@ -365,14 +367,12 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
           expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(2)
           expect(
-            (
-              yield* store
-                .recoverRunningOperations({
-                  ...original,
-                  commandId: "runtime-operation-suites-recovery-ts-recoverRunningOperations-stale",
-                })
-                .pipe(Effect.flip)
-            )._tag,
+            (yield* store
+              .recoverRunningOperations({
+                ...original,
+                commandId: "runtime-operation-suites-recovery-ts-recoverRunningOperations-stale",
+              })
+              .pipe(Effect.flip))._tag,
           ).toBe("generalist/runtime/StaleClaim")
 
           yield* runtime.resolveOperation({

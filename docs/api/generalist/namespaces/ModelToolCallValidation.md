@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ModelToolCallValidation
+[generalist](../../index.md) / [generalist](../index.md) / ModelToolCallValidation
 
 # ModelToolCallValidation
 
@@ -282,7 +282,7 @@ Project a toolkit with the active provider's exact JSON Schema compiler.
 
 ###### compile
 
-[`ToolJsonSchemaCompiler`](./ModelRegistry#tooljsonschemacompiler-1)
+[`ToolJsonSchemaCompiler`](./ModelRegistry.md#tooljsonschemacompiler-1)
 
 ##### Returns
 
@@ -300,7 +300,7 @@ Project a toolkit with the active provider's exact JSON Schema compiler.
 
 ###### compile
 
-[`ToolJsonSchemaCompiler`](./ModelRegistry#tooljsonschemacompiler-1)
+[`ToolJsonSchemaCompiler`](./ModelRegistry.md#tooljsonschemacompiler-1)
 
 ##### Returns
 

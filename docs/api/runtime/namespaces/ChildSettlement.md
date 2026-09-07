@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ChildSettlement
+[generalist](../../index.md) / [runtime](../index.md) / ChildSettlement
 
 # ChildSettlement
 
@@ -40,7 +40,7 @@ Decode a typed settlement notification from a mailbox row.
 
 ##### entry
 
-[`MailboxEntry`](./Mailbox#mailboxentry)
+[`MailboxEntry`](./Mailbox.md#mailboxentry)
 
 #### Returns
 
@@ -66,7 +66,7 @@ Decode a typed settlement notification from mailbox metadata.
 
 ###### metadata
 
-[`Metadata`](./Message#metadata)
+[`Metadata`](./Message.md#metadata)
 
 ###### sequence
 
@@ -122,7 +122,7 @@ Stable identity shared by retries of one child's settlement.
 
 ### observationEntry
 
-> `const` **observationEntry**: (`input`) => [`MailboxEntry`](./Mailbox#mailboxentry)
+> `const` **observationEntry**: (`input`) => [`MailboxEntry`](./Mailbox.md#mailboxentry)
 
 Encode one settlement payload as a durable observation.
 
@@ -152,7 +152,7 @@ operations.
 
 #### Returns
 
-[`MailboxEntry`](./Mailbox#mailboxentry)
+[`MailboxEntry`](./Mailbox.md#mailboxentry)
 
 ***
 
@@ -184,7 +184,7 @@ Build the typed notification payload from the authoritative terminal event.
 
 ###### event
 
-[`RunEvent`](./RunEvent#runevent)
+[`RunEvent`](./RunEvent.md#runevent)
 
 ###### joined?
 

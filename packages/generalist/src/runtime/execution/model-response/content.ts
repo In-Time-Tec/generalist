@@ -28,6 +28,13 @@ export const decodeAuthoredModelResponseContent = (
         metadata: part.metadata,
       })
     }
+    if (part.type === "finish") {
+      return Response.makePart("finish", {
+        ...part,
+        response: part.response,
+        usage: Schema.decodeSync(Response.Usage)(part.usage),
+      })
+    }
     return part
   })
   const prompt = promptFromResponseParts(content)

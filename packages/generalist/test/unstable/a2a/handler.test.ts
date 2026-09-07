@@ -228,6 +228,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     createSession: () => Effect.die("not used"),
     session: () => Effect.die("not used"),
     listSessions: Effect.die("not used"),
+    sessionSnapshot: () => Effect.die("unexpected Session snapshot"),
     sessionRuns: () => Effect.die("not used"),
     sessionEvents: () => Stream.die("not used"),
     acknowledge: () => Effect.die("not used"),

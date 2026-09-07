@@ -67,23 +67,31 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
         }),
     })
     const hooks = Hooks.layer([
-      Hooks.onToolCall(({ tool }) =>
-        Effect.sync(() => {
-          if (tool === "first_call") {
-            hookCalls.first += 1
-            if (input.blockFirst) return Hooks.Block({ reason: "blocked for replay test" })
-          } else {
-            hookCalls.second += 1
-          }
-          return Hooks.Ask()
-        }),
-      ),
-      Hooks.onRunEnd<string>(() =>
-        Effect.sync(() => {
-          hookCalls.runEnd += 1
-          return Hooks.Replace(`hook completed:${input.label}`)
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.core.agent.tools.resume.batch.onToolCall.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ tool }) =>
+          Effect.sync(() => {
+            if (tool === "first_call") {
+              hookCalls.first += 1
+              if (input.blockFirst) return Hooks.Block({ reason: "blocked for replay test" })
+            } else {
+              hookCalls.second += 1
+            }
+            return Hooks.Ask()
+          }),
+      }),
+      Hooks.onRunEnd<string>({
+        key: "test.core.agent.tools.resume.batch.onRunEnd.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: () =>
+          Effect.sync(() => {
+            hookCalls.runEnd += 1
+            return Hooks.Replace(`hook completed:${input.label}`)
+          }),
+      }),
     ])
     const environment = Layer.mergeAll(
       Permissions.layerAllowAll,
@@ -95,10 +103,9 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
     const resolver = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
     const runtimeLayer = (workerId: string) =>
       Layer.merge(
-        objectRuntimeLayer(
-          { addresses: [], scheduler: { pollInterval: "1 hour" }, workerId },
-          storage,
-        ).pipe(Layer.provide(resolver)),
+        objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, workerId }, storage).pipe(
+          Layer.provide(resolver),
+        ),
         environment,
       )
     const startOptions = {

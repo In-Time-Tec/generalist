@@ -1,18 +1,13 @@
 import { Schema, SchemaTransformation } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Ref as MediaRef } from "../media/ref.js"
-import { BudgetLimits, Remaining as RemainingBudget } from "../core/durable/run-budget.js"
-import { Result as GateResult } from "../core/agent/gates/definition.js"
+import { BudgetLimits } from "../core/durable/run-budget.js"
 import { HostEvent } from "../host/event.js"
-import { HostSession } from "../runtime/session/host.js"
+import { HostSession, HostSessionSnapshot } from "../runtime/session/host.js"
 import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
-import { RawUsageFact, RunInspection, RunInspectionFields, RunOutcome, RunStatus } from "../runtime/run.js"
-import { AgentLoopEventSchema } from "../runtime/run/event.js"
-import type { RuntimeInspection } from "../runtime/service.js"
-import { isInspectionEvent } from "../runtime/execution/agent/event.js"
-import { ChildReadiness } from "../runtime/child/readiness.js"
-import { ExecutionSuspension } from "../runtime/execution/state.js"
+import { RunInspection } from "../runtime/run.js"
+import { RuntimeInspectionResponse } from "../runtime/inspection.js"
 import { Authentication } from "./auth.js"
 import { apiErrors, artifactApiErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
@@ -100,8 +95,15 @@ const listSessions = HttpApiEndpoint.get("list", "/sessions", {
   success: Schema.Array(HostSession),
   error: apiErrors,
 })
-const sessions: HttpApiGroup.HttpApiGroup<"sessions", typeof createSession | typeof getSession | typeof listSessions> =
-  HttpApiGroup.make("sessions").add(createSession, getSession, listSessions)
+const snapshotSession = HttpApiEndpoint.get("snapshot", "/sessions/:id/snapshot", {
+  params: { id: Schema.String },
+  success: HostSessionSnapshot,
+  error: apiErrors,
+})
+const sessions: HttpApiGroup.HttpApiGroup<
+  "sessions",
+  typeof createSession | typeof getSession | typeof listSessions | typeof snapshotSession
+> = HttpApiGroup.make("sessions").add(createSession, getSession, listSessions, snapshotSession)
 
 const startRun = HttpApiEndpoint.post("start", "/sessions/:sessionId/runs", {
   params: { sessionId: Schema.String },
@@ -113,29 +115,6 @@ const listRuns = HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
   params: { sessionId: Schema.String },
   success: Schema.Array(RunInspection),
   error: apiErrors,
-})
-const InspectionLastEvent = AgentLoopEventSchema.pipe(Schema.refine(isInspectionEvent))
-const RuntimeInspectionResponse: Schema.Codec<RuntimeInspection, unknown> = Schema.Struct({
-  ...RunInspectionFields,
-  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  usage: Schema.Struct({ inputTokens: Schema.Finite, outputTokens: Schema.Finite }),
-  usageFacts: Schema.Array(RawUsageFact),
-  activeTools: Schema.Array(Schema.String),
-  lastEvent: Schema.optionalKey(InspectionLastEvent),
-  elapsed: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
-  budget: RemainingBudget,
-  gates: Schema.Array(GateResult),
-  children: Schema.Array(
-    Schema.Struct({
-      childRunId: Schema.String,
-      status: RunStatus,
-      readiness: ChildReadiness,
-      invocationId: Schema.optionalKey(Schema.String),
-      origin: Schema.optionalKey(Schema.Struct({ operationKey: Schema.String, ordinal: Schema.Finite })),
-      outcome: Schema.optionalKey(RunOutcome),
-    }),
-  ),
-  suspension: Schema.optionalKey(ExecutionSuspension),
 })
 const inspectRun = HttpApiEndpoint.get("inspect", "/runs/:id", {
   params: { id: Schema.String },

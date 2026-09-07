@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Fork
+[generalist](../../index.md) / [runtime](../index.md) / Fork
 
 # Fork
 
@@ -22,6 +22,76 @@ Select one committed journal prefix for a new Run.
 
 > `readonly` **atSequence**: `number`
 
+<a id="budget"></a>
+
+##### budget?
+
+> `readonly` `optional` **budget?**: `object`
+
+New allocation reserved from the current budget owner; required for a bounded source.
+
+###### children?
+
+> `readonly` `optional` **children?**: `number`
+
+###### duration?
+
+> `readonly` `optional` **duration?**: `number`
+
+###### tokens?
+
+> `readonly` `optional` **tokens?**: `number`
+
+###### toolCalls?
+
+> `readonly` `optional` **toolCalls?**: `number`
+
+###### usd?
+
+> `readonly` `optional` **usd?**: `number`
+
+<a id="commandid"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+<a id="programbudget"></a>
+
+##### programBudget?
+
+> `readonly` `optional` **programBudget?**: `object`
+
+Separately reserved additive Program resources; a fork never copies its source's allowance.
+
+###### agentRuns
+
+> `readonly` **agentRuns**: `number`
+
+###### concurrency
+
+> `readonly` **concurrency**: `number`
+
+###### logBytes
+
+> `readonly` **logBytes**: `number`
+
+###### outputBytes
+
+> `readonly` **outputBytes**: `number`
+
+###### tokens
+
+> `readonly` **tokens**: `number`
+
+###### toolCalls
+
+> `readonly` **toolCalls**: `number`
+
+###### wallClockMillis
+
+> `readonly` **wallClockMillis**: `number`
+
 <a id="substitute"></a>
 
 ##### substitute?
@@ -37,6 +107,40 @@ Select one committed journal prefix for a new Run.
 Select one committed journal prefix for in-place continuation.
 
 #### Properties
+
+<a id="budget-1"></a>
+
+##### budget?
+
+> `readonly` `optional` **budget?**: `object`
+
+Required when a settled child must reserve new capacity from its current ancestor budget owner.
+
+###### children?
+
+> `readonly` `optional` **children?**: `number`
+
+###### duration?
+
+> `readonly` `optional` **duration?**: `number`
+
+###### tokens?
+
+> `readonly` `optional` **tokens?**: `number`
+
+###### toolCalls?
+
+> `readonly` `optional` **toolCalls?**: `number`
+
+###### usd?
+
+> `readonly` `optional` **usd?**: `number`
+
+<a id="commandid-1"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
 
 <a id="tosequence"></a>
 

@@ -1,9 +1,10 @@
+import { objectWorkerId } from "./object.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { expectTypeOf } from "vitest"
 import type { Agent } from "../../../src/index.js"
-import { Errors, Run, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Errors, ExecutableManifest, Run, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
 import type { RuntimeInspection } from "../../../src/runtime/service.js"
 import { alternateAssistantRef, assistantAddress, objectLayer, openWait, suspension, textPrompt } from "./fixtures.js"
 
@@ -30,7 +31,10 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
       })
       yield* store.suspend({
         ...(yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-1", runId: receipt.runId, ownerId: "test" })),
+          commandId: "runtime-execution-inspection-test-ts-claim-1",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: receipt.runId,
         waits: [openWait({ waitId: "wait:inspection" })],
         suspension: suspension({ waitId: "wait:inspection" }),
@@ -50,14 +54,21 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
           resolution: { _tag: "ToolResult", result: "accepted", encodedResult: "accepted" },
         },
       ])
-      expect(yield* Run.decodeSnapshot(yield* Run.encodeSnapshot(snapshot))).toEqual(snapshot)
+      const encodedSnapshot = yield* Run.encodeSnapshot(snapshot)
+      expect(yield* Run.decodeSnapshot(encodedSnapshot)).toEqual(snapshot)
       const mismatchedInspection = Object.assign({}, snapshot.run, {
         executableManifest: alternateAssistantRef.manifest,
       })
       expect(Schema.decodeExit(Run.RunInspection)(mismatchedInspection)._tag).toBe("Failure")
-      expect(Schema.decodeExit(Run.RunSnapshot)(Object.assign({}, snapshot, { run: mismatchedInspection }))._tag).toBe(
-        "Failure",
+      const alternateManifest = yield* Schema.encodeEffect(ExecutableManifest.ExecutableManifest)(
+        alternateAssistantRef.manifest,
       )
+      expect(
+        Schema.decodeExit(Run.RunSnapshot)({
+          ...encodedSnapshot,
+          run: { ...encodedSnapshot.run, executableManifest: alternateManifest },
+        })._tag,
+      ).toBe("Failure")
       expect(
         Schema.decodeExit(Run.Run)(
           Object.assign({}, mismatchedInspection, {
@@ -103,13 +114,16 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         prompt: textPrompt("usage"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-2", runId: receipt.runId, ownerId: "usage-worker" })
-      const usage: Response.Usage = {
+        commandId: "runtime-execution-inspection-test-ts-claim-2",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
+      const usage = Response.Usage.make({
         inputTokens: { total: 10, uncached: 10, cacheRead: undefined, cacheWrite: undefined },
         outputTokens: { total: 4, text: 4, reasoning: 0 },
-      }
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-1",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-1",
         ...claim,
         event: {
           _tag: "ModelCallStarted",
@@ -123,7 +137,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-2",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-2",
         ...claim,
         event: {
           _tag: "ModelAttemptCompleted",
@@ -140,7 +154,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-3",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-3",
         ...claim,
         event: {
           _tag: "ModelAttemptFailed",
@@ -157,7 +171,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-4",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-4",
         ...claim,
         event: {
           _tag: "ToolExecutionStarted",
@@ -166,12 +180,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-5",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-5",
         ...claim,
         event: { _tag: "TurnCompleted", turn: 2, usage },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-6",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-6",
         ...claim,
         event: {
           _tag: "GateResult",
@@ -209,9 +223,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         prompt: textPrompt("corrupt"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-3", runId: receipt.runId, ownerId: "projection-corruption" })
+        commandId: "runtime-execution-inspection-test-ts-claim-3",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-7",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-7",
         ...claim,
         event: {
           _tag: "ModelCallStarted",
@@ -224,7 +241,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-8",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-8",
         ...claim,
         event: {
           _tag: "ModelCallStarted",
@@ -245,9 +262,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         prompt: textPrompt("corrupt"),
       })
       const secondClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-4", runId: second.runId, ownerId: "missing-start" })
+        commandId: "runtime-execution-inspection-test-ts-claim-4",
+        runId: second.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-9",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-9",
         ...secondClaim,
         event: {
           _tag: "CompactionFailed",
@@ -287,11 +307,17 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
 
       const unordered = yield* makeRun("unordered-attempt")
       const unorderedClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-5", runId: unordered.runId, ownerId: "unordered" })
+        commandId: "runtime-execution-inspection-test-ts-claim-5",
+        runId: unordered.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-10", ...unorderedClaim, event: attempt })
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-10",
+        ...unorderedClaim,
+        event: attempt,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-11",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-11",
         ...unorderedClaim,
         event: {
           _tag: "ModelCallStarted",
@@ -306,9 +332,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
 
       const conflicting = yield* makeRun("conflicting-attempt-map")
       const conflictingClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-6", runId: conflicting.runId, ownerId: "conflicting" })
+        commandId: "runtime-execution-inspection-test-ts-claim-6",
+        runId: conflicting.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-12",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-12",
         ...conflictingClaim,
         event: {
           _tag: "ModelCallStarted",
@@ -320,9 +349,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-13", ...conflictingClaim, event: attempt })
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-13",
+        ...conflictingClaim,
+        event: attempt,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-14",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-14",
         ...conflictingClaim,
         event: { ...attempt, deliveryId: "attempt-2", modelAttemptId: "attempt:other" },
       })
@@ -341,9 +373,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         prompt: textPrompt("compact"),
       })
       const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-7", runId: receipt.runId, ownerId: "failed-compaction" })
+        commandId: "runtime-execution-inspection-test-ts-claim-7",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-15",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-15",
         ...claim,
         event: {
           _tag: "CompactionStarted",
@@ -355,7 +390,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-16",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-16",
         ...claim,
         event: {
           _tag: "CompactionFailed",
@@ -374,9 +409,12 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         prompt: textPrompt("compact"),
       })
       const mismatchClaim = yield* store.claimExecution({
-          commandId: "runtime-execution-inspection-test-ts-claim-8", runId: mismatch.runId, ownerId: "mismatch" })
+        commandId: "runtime-execution-inspection-test-ts-claim-8",
+        runId: mismatch.runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-17",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-17",
         ...mismatchClaim,
         event: {
           _tag: "CompactionStarted",
@@ -388,7 +426,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
-          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-18",
+        commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-18",
         ...mismatchClaim,
         event: {
           _tag: "CompactionFailed",

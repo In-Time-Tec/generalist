@@ -8,18 +8,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
     "blob-store",
     () => import("../src/blob-store/index.js"),
-    [
-      "Blob",
-      "BlobNotFound",
-      "BlobStore",
-      "BlobStoreError",
-      "BlobTooLarge",
-      "Put",
-      "layerFileSystem",
-      "layerMemory",
-      "layerS3",
-      "layerSql",
-    ],
+    ["Blob", "BlobNotFound", "BlobStore", "BlobStoreError", "BlobTooLarge", "Put", "layer"],
   ],
   [
     "media",
@@ -125,21 +114,12 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
     "memory",
     () => import("../src/memory/index.js"),
-    [
-      "SemanticRecall",
-      "Supermemory",
-      "SupermemoryError",
-      "VectorStore",
-      "WorkingMemory",
-      "layer",
-      "layerPgVector",
-      "layerSupermemory",
-    ],
+    ["SemanticRecall", "Supermemory", "SupermemoryError", "VectorStore", "WorkingMemory", "layer", "layerSupermemory"],
   ],
   [
     "memo",
     () => import("../src/memo.js"),
-    ["Dependencies", "Store", "layerDependencies", "layerMemory", "layerSql", "models", "pure"],
+    ["Dependencies", "MemoError", "Store", "layerDependencies", "layerMemory", "models", "pure"],
   ],
   ["tasks", () => import("../src/tasks/index.js"), ["Item", "Items", "Status", "Update", "layer", "update"]],
 ]

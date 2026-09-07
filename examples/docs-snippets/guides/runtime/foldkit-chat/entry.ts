@@ -6,10 +6,9 @@ import { makeApplication, run } from "foldkit/runtime"
 import { Model, init, subscriptions, update } from "./model"
 import { view } from "./view"
 
-const resources = Connection.layerWebSocket({ baseUrl: "http://localhost:4000" }).pipe(
-  Layer.provide(Socket.layerWebSocketConstructorGlobal),
-  Layer.provide(FetchHttpClient.layer),
-)
+const resources = Connection.layerWebSocket({
+  baseUrl: new URL("/api", location.origin).toString(),
+}).pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal), Layer.provide(FetchHttpClient.layer))
 
 const application = makeApplication({
   Model,

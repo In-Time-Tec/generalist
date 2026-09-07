@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / DurableDriver
+[generalist](../../index.md) / [generalist](../index.md) / DurableDriver
 
 # DurableDriver
 
@@ -422,7 +422,7 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ##### apply
 
-> `readonly` **apply**: (`checkpoint`, `outcome`) => `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> `readonly` **apply**: (`checkpoint`, `outcome`) => `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ###### Parameters
 
@@ -510,13 +510,13 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ###### Returns
 
-`Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+`Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 <a id="decide"></a>
 
 ##### decide
 
-> `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ###### Parameters
 
@@ -600,7 +600,7 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ###### Returns
 
-`Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+`Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 <a id="initial"></a>
 
@@ -638,7 +638,7 @@ Host hook surface for durable operation journaling without runtime imports.
 
 ##### onCheckpoint
 
-> `readonly` **onCheckpoint**: (`checkpoint`) => `Effect`\<`void`, [`DriverError`](#drivererror)\>
+> `readonly` **onCheckpoint**: (`checkpoint`, `commandId?`) => `Effect`\<`void`, [`DriverError`](#drivererror)\>
 
 ###### Parameters
 
@@ -720,6 +720,10 @@ Host hook surface for durable operation journaling without runtime imports.
 
 `number`
 
+###### commandId?
+
+`string`
+
 ###### Returns
 
 `Effect`\<`void`, [`DriverError`](#drivererror)\>
@@ -748,7 +752,7 @@ Host hook surface for durable operation journaling without runtime imports.
 
 ###### kind
 
-`"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
+`"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
 
 ###### replayPolicy
 
@@ -864,7 +868,7 @@ Host hook surface for durable operation journaling without runtime imports.
 
 ###### kind
 
-`"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
+`"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
 
 ###### replayPolicy
 
@@ -1192,7 +1196,7 @@ Operation scheduled at one agent-loop effect boundary.
 
 ##### kind
 
-> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
 
 ###### Inherited from
 
@@ -1332,7 +1336,7 @@ Recorded operation for tests and future runtime journaling.
 
 ###### kind
 
-> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
+> `readonly` **kind**: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`
 
 ###### replayPolicy
 
@@ -1586,13 +1590,13 @@ Wait the driver requests before the next decision.
 
 ### applyOperation
 
-> `const` **applyOperation**: \{(`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; \}
+> `const` **applyOperation**: \{(`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; \}
 
 Advance one Execute decision using a supplied outcome.
 
 #### Call Signature
 
-> (`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> (`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ##### Parameters
 
@@ -1624,11 +1628,11 @@ Advance one Execute decision using a supplied outcome.
 
 ##### Returns
 
-(`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+(`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 #### Call Signature
 
-> (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ##### Parameters
 
@@ -1664,7 +1668,7 @@ Advance one Execute decision using a supplied outcome.
 
 ##### Returns
 
-`Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+`Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ***
 
@@ -1692,17 +1696,17 @@ Collect and replay one stream as its emitted values.
 
 ### chargeUsage
 
-> `const` **chargeUsage**: (`usage`) => `Effect.Effect`\<`void`, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget#exhausted), [`DriverInterpreter`](#driverinterpreter)\>
+> `const` **chargeUsage**: (`usage`) => `Effect.Effect`\<`void`, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted), [`DriverInterpreter`](#driverinterpreter)\>
 
 #### Parameters
 
 ##### usage
 
-[`BudgetLimits`](./RunBudget#budgetlimits)
+[`BudgetLimits`](./RunBudget.md#budgetlimits)
 
 #### Returns
 
-`Effect.Effect`\<`void`, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget#exhausted), [`DriverInterpreter`](#driverinterpreter)\>
+`Effect.Effect`\<`void`, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
 
@@ -1806,17 +1810,17 @@ Current durable driver contract version.
 
 ### decodeDecision
 
-> `const` **decodeDecision**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; \}
+> `const` **decodeDecision**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; \}
 
 #### Call Signature
 
-> (`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+> (`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ##### Parameters
 
 ###### input
 
-\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}
+\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}
 
 ###### options?
 
@@ -1824,11 +1828,11 @@ Current durable driver contract version.
 
 ##### Returns
 
-`Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+`Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 #### Call Signature
 
-> (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+> (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ##### Parameters
 
@@ -1838,7 +1842,7 @@ Current durable driver contract version.
 
 ##### Returns
 
-(`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+(`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ***
 
@@ -1896,7 +1900,7 @@ Reconstructable durable checkpoint for one agent run.
 
 ### DriverDecision
 
-> `const` **DriverDecision**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}\>\]\>
+> `const` **DriverDecision**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}\>\]\>
 
 Next step chosen deterministically from one checkpoint.
 
@@ -1906,7 +1910,7 @@ Next step chosen deterministically from one checkpoint.
 
 ### DriverOperation
 
-> `const` **DriverOperation**: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>
+> `const` **DriverOperation**: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>
 
 One schedulable nondeterministic operation with deterministic identity.
 
@@ -1916,7 +1920,7 @@ One schedulable nondeterministic operation with deterministic identity.
 
 ### DriverOperationKind
 
-> `const` **DriverOperationKind**: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>
+> `const` **DriverOperationKind**: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>
 
 Bounded operation kinds the driver may schedule.
 
@@ -2004,17 +2008,17 @@ Version string for a durable driver implementation.
 
 ### encodeDecision
 
-> `const` **encodeDecision**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; \}
+> `const` **encodeDecision**: \{(`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>; \}
 
 #### Call Signature
 
-> (`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+> (`input`, `options?`): `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ##### Parameters
 
 ###### input
 
-\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}
+\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[..., ...\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}
 
 ###### options?
 
@@ -2022,11 +2026,11 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-`Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+`Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<...\>; `duration`: `Schema.optionalKey`\<...\>; `tokens`: `Schema.optionalKey`\<...\>; `toolCalls`: `Schema.optionalKey`\<...\>; `usd`: `Schema.optionalKey`\<...\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly ...\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 #### Call Signature
 
-> (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+> (`options?`): (`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ##### Parameters
 
@@ -2036,7 +2040,7 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-(`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
+(`input`) => `Effect`\<\{ `_tag`: `Schema.tag`\<`"Execute"`\>; `operation`: `Schema.Struct`\<\{ `input`: `Schema.Unknown`; `inputDigest`: `Schema.String`; `key`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>; `replayPolicy`: `Schema.Literals`\<readonly \[`"pure"`, `"provider-idempotent"`, `"never"`\]\>; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Wait"`\>; `wait`: `Schema.Struct`\<\{ `reason`: `Schema.String`; `replayToken`: `Schema.optionalKey`\<`Schema.String`\>; `waitId`: `Schema.String`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Continue"`\>; `checkpoint`: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<...\>; `executable`: `Schema.brand`\<..., ...\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}\>; \} \| \{ `_tag`: `Schema.tag`\<`"Complete"`\>; `result`: `Schema.Struct`\<\{ `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>; \}, `SchemaError`, `never`\>
 
 ***
 
@@ -2122,7 +2126,7 @@ Version string for a durable driver implementation.
 
 ###### kind
 
-`Schema.Literals`\<readonly \[`"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>
+`Schema.Literals`\<readonly \[`"hook"`, `"model"`, `"tool"`, `"memory"`, `"compaction"`, `"handoff"`, `"send"`, `"wait"`, `"structured-output"`\]\>
 
 ###### replayPolicy
 
@@ -2148,7 +2152,7 @@ Version string for a durable driver implementation.
 
 ##### input
 
-`Parameters`\<*typeof* [`digest`](./Pins#digest)\>\[`0`\]
+`Parameters`\<*typeof* [`digest`](./Pins.md#digest)\>\[`0`\]
 
 #### Returns
 
@@ -2160,11 +2164,11 @@ Version string for a durable driver implementation.
 
 ### intercept
 
-> `const` **intercept**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
+> `const` **intercept**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
 
 #### Call Signature
 
-> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 ##### Type Parameters
 
@@ -2200,11 +2204,11 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-\<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+\<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 #### Call Signature
 
-> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ##### Type Parameters
 
@@ -2248,7 +2252,7 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-`Effect`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+`Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ***
 
@@ -2256,11 +2260,11 @@ Version string for a durable driver implementation.
 
 ### interceptStream
 
-> `const` **interceptStream**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
+> `const` **interceptStream**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
 
 #### Call Signature
 
-> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 ##### Type Parameters
 
@@ -2296,11 +2300,11 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-\<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+\<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 #### Call Signature
 
-> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ##### Type Parameters
 
@@ -2344,7 +2348,7 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-`Stream`\<`A`, [`Exhausted`](./RunBudget#exhausted) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+`Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ***
 
@@ -2406,13 +2410,13 @@ Version string for a durable driver implementation.
 
 ### layerForRun
 
-> `const` **layerForRun**: \{\<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; \}
+> `const` **layerForRun**: \{\<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; \}
 
 Construct the inline driver Layer for one Agent run.
 
 #### Call Signature
 
-> \<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> \<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ##### Type Parameters
 
@@ -2436,7 +2440,7 @@ Construct the inline driver Layer for one Agent run.
 
 ###### options
 
-[`RunOptions`](./Agent#runoptions)
+[`RunOptions`](./Agent.md#runoptions)
 
 ###### prompt
 
@@ -2454,11 +2458,11 @@ Construct the inline driver Layer for one Agent run.
 
 ##### Returns
 
-(`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+(`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+> \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ##### Type Parameters
 
@@ -2482,11 +2486,11 @@ Construct the inline driver Layer for one Agent run.
 
 ###### agent
 
-[`Agent`](./Agent#agent)\<`Tools`, `R`, `P`, `A`, `Top`, `Top`\>
+[`Agent`](./Agent.md#agent)\<`Tools`, `R`, `P`, `A`, `Top`, `Top`\>
 
 ###### options
 
-[`RunOptions`](./Agent#runoptions)
+[`RunOptions`](./Agent.md#runoptions)
 
 ###### prompt
 
@@ -2504,7 +2508,7 @@ Construct the inline driver Layer for one Agent run.
 
 ##### Returns
 
-`Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
+`Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
 
 ***
 
@@ -2540,27 +2544,7 @@ Construct the inline driver Layer for one Agent run.
 
 ### layerTest
 
-> `const` **layerTest**: (`input`) => `Layer.Layer`\<[`DriverInterpreter`](#driverinterpreter)\>
-
-#### Parameters
-
-##### input
-
-###### driver
-
-[`DurableAgentDriver`](#durableagentdriver)
-
-###### initial
-
-[`DriverCheckpoint`](#drivercheckpoint)
-
-###### journal?
-
-[`Journal`](#journal)
-
-#### Returns
-
-`Layer.Layer`\<[`DriverInterpreter`](#driverinterpreter)\>
+> `const` **layerTest**: *typeof* [`layerInline`](#layerinline)
 
 ***
 
@@ -2581,6 +2565,10 @@ Construct the inline driver Layer for one Agent run.
 #### Parameters
 
 ##### input
+
+###### components?
+
+`ReadonlyArray`\<`Registration`\>
 
 ###### driver
 
@@ -2718,7 +2706,7 @@ Persisted outcome for one operation attempt.
 
 ##### child
 
-[`RunBudget`](./RunBudget#runbudget)
+[`RunBudget`](./RunBudget.md#runbudget)
 
 #### Returns
 
@@ -2780,17 +2768,17 @@ How a host may replay one persisted operation after recovery.
 
 ### reserveChildBudget
 
-> `const` **reserveChildBudget**: (`grant`) => `Effect.Effect`\<\{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget#exhausted) \| [`Invalid`](./RunBudget#invalid), [`DriverInterpreter`](#driverinterpreter)\>
+> `const` **reserveChildBudget**: (`grant`) => `Effect.Effect`\<\{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`Invalid`](./RunBudget.md#invalid), [`DriverInterpreter`](#driverinterpreter)\>
 
 #### Parameters
 
 ##### grant
 
-[`BudgetLimits`](./RunBudget#budgetlimits)
+[`BudgetLimits`](./RunBudget.md#budgetlimits)
 
 #### Returns
 
-`Effect.Effect`\<\{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget#exhausted) \| [`Invalid`](./RunBudget#invalid), [`DriverInterpreter`](#driverinterpreter)\>
+`Effect.Effect`\<\{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`Invalid`](./RunBudget.md#invalid), [`DriverInterpreter`](#driverinterpreter)\>
 
 ***
 
@@ -2804,7 +2792,7 @@ How a host may replay one persisted operation after recovery.
 
 ##### budget
 
-[`RunBudget`](./RunBudget#runbudget)
+[`RunBudget`](./RunBudget.md#runbudget)
 
 #### Returns
 

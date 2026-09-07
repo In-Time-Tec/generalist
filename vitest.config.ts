@@ -32,14 +32,6 @@ generalistSourceAliases.sort(
   (left, right) => Number(left.find.source.includes("(")) - Number(right.find.source.includes("(")),
 )
 
-/**
- * Each worker runs real Bun kernel processes, so the useful ceiling is the machine's own
- * parallelism rather than a fixed number: a two-core CI runner and an eleven-core laptop want
- * different answers. Six is where the gain flattened when measured (83s at two workers, 60s at
- * four, 52s at six, 48s at eight), so the extra contention past it buys nothing.
- */
-const workers = Math.max(2, Math.min(6, availableParallelism()))
-
 export default defineConfig({
   resolve: {
     /**
@@ -59,8 +51,9 @@ export default defineConfig({
     },
   ],
   test: {
+    env: { RIVETKIT_STORAGE_PATH: `/tmp/generalist-rivetkit-${process.pid}` },
     reporters: ["default", new RuntimeDriverReport()],
-    maxWorkers: workers,
+    maxWorkers: Math.min(4, availableParallelism()),
     testTimeout: 60_000,
     hookTimeout: 60_000,
     include: [

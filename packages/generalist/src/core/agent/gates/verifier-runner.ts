@@ -12,6 +12,7 @@ import type { VerifierRunner } from "./evaluation.js"
 const schema = Schema.Struct({ output: requiredField(VerifierOutput) })
 const structured: StructuredRunConfig<typeof schema, VerifierOutput> = {
   schema,
+  outputSchema: VerifierOutput,
   objectName: "submit",
   objectPrompt: "Return the final structured output for the task above.",
   output: (value) => value.output,

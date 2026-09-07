@@ -42,7 +42,12 @@ describe("Object-backed BlobStore", () => {
       const winner = yield* second.put({ ...input, mediaType: "application/octet-stream", filename: "winner.bin" })
       yield* pause.release
       expect(yield* Fiber.join(pending)).toEqual(winner)
-      expect(winner).toEqual({ sha256: digest, bytes: 4, mediaType: "application/octet-stream", filename: "winner.bin" })
+      expect(winner).toEqual({
+        sha256: digest,
+        bytes: 4,
+        mediaType: "application/octet-stream",
+        filename: "winner.bin",
+      })
       const reopened = yield* storeFor(yield* simulator.connect)
       expect(yield* reopened.get(digest)).toEqual({ ref: winner, data: input.data })
       expect(yield* reopened.put(input)).toEqual(winner)
@@ -94,7 +99,8 @@ describe("Object-backed BlobStore", () => {
       const ref = yield* store.put(input)
       const object = (yield* simulator.store.read(key, { maxBytes: 1024 }))!
       const corrupted = object.bytes.slice()
-      corrupted[corrupted.length - 1] = corrupted[corrupted.length - 1]! ^ 0xff
+      const finalIndex = corrupted.length - 1
+      corrupted.set([corrupted[finalIndex]! ^ 0xff], finalIndex)
       yield* simulator.faults.corrupt(key, corrupted)
       const failures = yield* Effect.all([
         Effect.flip(store.get(digest)),
@@ -167,9 +173,18 @@ describe("Object-backed BlobStore", () => {
       const reopened = yield* storeFor(yield* simulator.connect, { maxBytes: data.byteLength })
       expect((yield* reopened.get(ref.sha256)).data).toEqual(data)
       const smaller = yield* storeFor(yield* simulator.connect, { maxBytes: data.byteLength - 1 })
-      expect(yield* Effect.flip(smaller.get(ref.sha256))).toMatchObject({ _tag: "generalist/blob-store/BlobStoreError", operation: "integrity" })
-      const tooLarge = yield* Effect.flip(store.put({ data: new Uint8Array(data.byteLength + 1), mediaType: "application/octet-stream" }))
-      expect(tooLarge).toMatchObject({ _tag: "generalist/blob-store/BlobTooLarge", bytes: data.byteLength + 1, maxBytes: data.byteLength })
+      expect(yield* Effect.flip(smaller.get(ref.sha256))).toMatchObject({
+        _tag: "generalist/blob-store/BlobStoreError",
+        operation: "integrity",
+      })
+      const tooLarge = yield* Effect.flip(
+        store.put({ data: new Uint8Array(data.byteLength + 1), mediaType: "application/octet-stream" }),
+      )
+      expect(tooLarge).toMatchObject({
+        _tag: "generalist/blob-store/BlobTooLarge",
+        bytes: data.byteLength + 1,
+        maxBytes: data.byteLength,
+      })
     }),
   )
 

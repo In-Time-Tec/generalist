@@ -2,7 +2,6 @@ import { objectRuntimeLayer } from "../execution/object.js"
 import "./suites/settlement-notifications-suite.js"
 import { layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Runtime } from "../../../src/runtime/index.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { programAddress, programExecutable, programFixture } from "../program/fixture.js"
 import {

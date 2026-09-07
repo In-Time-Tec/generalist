@@ -255,8 +255,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
       const first = yield* children.admit(spawn("reviewer")).pipe(withCell(cell))
       const again = yield* children.admit(spawn("reviewer")).pipe(withCell(cell))
 
-      expect(again.childRunId).toBe(first.childRunId)
-      expect(again.duplicate).toBe(true)
+      expect(again).toEqual(first)
       expect(yield* operations.listDirect(parentRunId)).toHaveLength(1)
     }),
   )
@@ -311,10 +310,8 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
       const replayedFirst = yield* children.admit(spawn("first")).pipe(withCell(cell))
       const replayedSecond = yield* children.admit(spawn("second")).pipe(withCell(cell))
 
-      expect(replayedFirst.childRunId).toBe(first.childRunId)
-      expect(replayedSecond.childRunId).toBe(second.childRunId)
-      expect(replayedFirst.duplicate).toBe(true)
-      expect(replayedSecond.duplicate).toBe(true)
+      expect(replayedFirst).toEqual(first)
+      expect(replayedSecond).toEqual(second)
       expect(yield* operations.listDirect(parentRunId)).toHaveLength(2)
     }),
   )
@@ -333,8 +330,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
       const afterRestart = yield* restarted.admit(spawn("second")).pipe(withCell(cell))
       const third = yield* restarted.admit(spawn("third")).pipe(withCell(cell))
 
-      expect(afterRestart.childRunId).toBe(second.childRunId)
-      expect(afterRestart.duplicate).toBe(true)
+      expect(afterRestart).toEqual(second)
       const direct = yield* operations.listDirect(parentRunId)
       expect(direct).toHaveLength(3)
       expect(direct.find((entry) => entry.childRunId === third.childRunId)?.origin?.ordinal).toBe(2)

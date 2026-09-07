@@ -19,13 +19,12 @@ bun add effect@4.0.0-rc.112 generalist @aws-sdk/client-s3 @smithy/fetch-http-han
 
 ```typescript
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
+import { Console, Config, Effect, Layer, Option, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
-
 const agent = Agent.make({ name: "chat-agent" })
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
@@ -52,32 +51,40 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
-  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  return Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-    Layer.provide(S3.layer({
-      bucket,
-      region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : {
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    let credentials: Options["credentials"] = { accessKeyId, secretAccessKey }
+    if (sessionToken !== undefined) credentials = { ...credentials, sessionToken }
+    let transport: Options = { bucket, region, credentials }
+    if (endpoint !== undefined) {
+      transport = {
+        ...transport,
         endpoint,
         forcePathStyle: true,
-        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-      }),
-    })),
-    Layer.provide(BunCrypto.layer),
-  )
-}))
+        capabilities: {
+          conditionalCreate: confirmed,
+          strongReadAfterWrite: confirmed,
+          consistentListing: confirmed,
+        },
+      }
+    }
+    return layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      Layer.provide(layerS3(transport)),
+      Layer.provide(BunCrypto.layer),
+    )
+  }),
+)
 
 const collectRun = (runId: string, cursor?: number) => {
   const options = { runId }
@@ -97,7 +104,7 @@ const tags = (events: Iterable<{ readonly sequence: number; readonly _tag: strin
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    yield* Durability.activate
+    yield* activate
     const runtime = yield* Runtime.Runtime
     yield* runtime.register(agent)
     const handle = yield* runtime.start(agent, "Say hello", {
@@ -111,9 +118,7 @@ const program = Effect.scoped(
   }),
 )
 
-const runtime = ManagedRuntime.make(runtimeLayer)
-await runtime.runPromise(program)
-await runtime.dispose()
+await Effect.runPromise(program.pipe(Effect.provide(Layer.merge(runtimeLayer, agentServices))))
 ```
 
 **Output**
@@ -137,11 +142,11 @@ A durable approval emits an approval token and suspends the Run. Resolve it with
 
 ```typescript
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
+import { Config, Console, Effect, Layer, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
 
 const deployTool = Tool.make("deploy", {
@@ -204,36 +209,44 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
-  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  return Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-    Layer.provide(S3.layer({
-      bucket,
-      region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : {
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    let credentials: Options["credentials"] = { accessKeyId, secretAccessKey }
+    if (sessionToken !== undefined) credentials = { ...credentials, sessionToken }
+    let transport: Options = { bucket, region, credentials }
+    if (endpoint !== undefined) {
+      transport = {
+        ...transport,
         endpoint,
         forcePathStyle: true,
-        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-      }),
-    })),
-    Layer.provide(BunCrypto.layer),
-  )
-}))
+        capabilities: {
+          conditionalCreate: confirmed,
+          strongReadAfterWrite: confirmed,
+          consistentListing: confirmed,
+        },
+      }
+    }
+    return layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      Layer.provide(layerS3(transport)),
+      Layer.provide(BunCrypto.layer),
+    )
+  }),
+)
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    yield* Durability.activate
+    yield* activate
     const runtime = yield* Runtime.Runtime
     yield* runtime.register(agent)
     const handle = yield* runtime.start(agent, "Deploy the api service", {
@@ -262,15 +275,13 @@ const program = Effect.scoped(
   }),
 )
 
-const runtime = ManagedRuntime.make(runtimeLayer)
-await runtime.runPromise(program)
-await runtime.dispose()
+await Effect.runPromise(program.pipe(Effect.provide(Layer.merge(runtimeLayer, agentServices))))
 ```
 
 **Output**
 
 ```text
-waiting for Approval on approval:deploy-1
+waiting for Approval on runtime-approval:run_1:approval:deploy-1
 Deployed api to production.
 ```
 
@@ -284,44 +295,52 @@ WebSocket carries Host events and explicit cancellation only. Resolve approvals 
 
 ```typescript
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Effect, Layer, Option, Redacted } from "effect"
+import { Config, Effect, Layer, Option } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
+import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 
 const agent = Agent.make({ name: "research-agent" })
-const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
-  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-    Layer.provide(S3.layer({
-      bucket,
-      region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : {
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    let credentials: Options["credentials"] = { accessKeyId, secretAccessKey }
+    if (sessionToken !== undefined) credentials = { ...credentials, sessionToken }
+    let transport: Options = { bucket, region, credentials }
+    if (endpoint !== undefined) {
+      transport = {
+        ...transport,
         endpoint,
         forcePathStyle: true,
-        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-      }),
-    })),
-    Layer.provide(BunCrypto.layer),
-  )
-  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
-}))
+        capabilities: {
+          conditionalCreate: confirmed,
+          strongReadAfterWrite: confirmed,
+          consistentListing: confirmed,
+        },
+      }
+    }
+    const reconstructed = layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      Layer.provide(layerS3(transport)),
+      Layer.provide(BunCrypto.layer),
+    )
+    return Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed))
+  }),
+)
 const services = Layer.mergeAll(
   runtimeLayer,
   TestModel.layer([TestModel.text("Answer.")]),
@@ -333,18 +352,29 @@ const apiLayer = Layer.unwrap(
   Generalist.create({ agents: [agent] }).pipe(
     Effect.map((host) =>
       Server.layer({
+        authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },
         host,
-        auth: Server.authBearer(Config.succeed(Redacted.make("replace-me"))).pipe(Layer.orDie),
+        auth: Server.authBearer({
+          token: Config.redacted("GENERALIST_SERVER_TOKEN"),
+          principal: { id: "example-controller", tenantId: "example", role: "controller" },
+        }).pipe(Layer.orDie),
       }),
     ),
     Effect.orDie,
   ),
 )
 
-export const serverLayer = HttpRouter.serve(
-  Layer.merge(apiLayer, HttpRouter.cors()).pipe(Layer.provide(HttpServer.layerServices)),
-  { disableLogger: false },
-).pipe(Layer.provideMerge(services), Layer.provideMerge(FetchHttpClient.layer))
+export const serverLayer: Layer.Layer<
+  | RuntimeServices
+  | Layer.Success<ReturnType<typeof TestModel.layer>>
+  | Permissions.Permissions
+  | Approvals.Approvals
+  | Layer.Success<typeof FetchHttpClient.layer>,
+  Config.ConfigError | Effect.Error<typeof activate> | Layer.Error<ReturnType<typeof layerS3>>,
+  HttpServer.HttpServer
+> = HttpRouter.serve(Layer.merge(apiLayer, HttpRouter.cors()).pipe(Layer.provide(HttpServer.layerServices)), {
+  disableLogger: false,
+}).pipe(Layer.provideMerge(services), Layer.provideMerge(FetchHttpClient.layer))
 ```
 
 Launch the layer with your platform HTTP server, then admit and observe a run:
@@ -352,7 +382,7 @@ Launch the layer with your platform HTTP server, then admit and observe a run:
 **Terminal**
 
 ```bash
-TOKEN=replace-me
+TOKEN=local-demo-only
 SESSION_ID=$(curl -s -X POST localhost:4000/sessions \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"id":"docs-1"}' | jq -r .id)
@@ -364,6 +394,7 @@ curl -s -X POST "localhost:4000/runs/$RUN_ID/cancel" \
   -d '{"commandId":"cancel:docs-1","reason":"operator requested"}'
 curl -N "localhost:4000/sessions/$SESSION_ID/events" -H "authorization: Bearer $TOKEN"
 ```
+
 The cancel payload must include a caller-chosen `commandId`; retry the exact payload with that identity rather than generating a new cancellation command. Closing the stream does not cancel the Run.
 
 ## 4. Cursors and backpressure

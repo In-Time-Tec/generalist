@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Address
+[generalist](../../index.md) / [runtime](../index.md) / Address
 
 # Address
 

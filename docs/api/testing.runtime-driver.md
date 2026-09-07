@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / testing.runtime-driver
+[generalist](./index.md) / testing.runtime-driver
 
 # testing.runtime-driver
 
@@ -22,13 +22,53 @@ Durable approval suspension and recovery capability.
 
 > `readonly` **claim**: [`ClaimExecution`](#claimexecution)
 
-<a id="recovery"></a>
+***
 
-##### recovery
+<a id="atomiccommitcapability"></a>
 
-> `readonly` **recovery**: `"rebuild"` \| `"reclaim"`
+### AtomicCommitCapability
 
-Persistent drivers rebuild their Runtime; process-memory drivers reclaim through a fresh owner.
+Atomic journal publication conformance capability.
+
+#### Properties
+
+<a id="claim-1"></a>
+
+##### claim
+
+> `readonly` **claim**: [`ClaimExecution`](#claimexecution)
+
+<a id="failnextcommit"></a>
+
+##### failNextCommit
+
+> `readonly` **failNextCommit**: (`services`) => `Effect`\<`void`\>
+
+###### Parameters
+
+###### services
+
+[`Services`](#services)
+
+###### Returns
+
+`Effect`\<`void`\>
+
+<a id="pausenextcommit"></a>
+
+##### pauseNextCommit
+
+> `readonly` **pauseNextCommit**: (`services`) => `Effect`\<\{ `entered`: `Effect`\<`void`\>; `release`: `Effect`\<`void`\>; \}\>
+
+###### Parameters
+
+###### services
+
+[`Services`](#services)
+
+###### Returns
+
+`Effect`\<\{ `entered`: `Effect`\<`void`\>; `release`: `Effect`\<`void`\>; \}\>
 
 ***
 
@@ -40,17 +80,11 @@ Durable environmental wait conformance, including reopen where the driver persis
 
 #### Properties
 
-<a id="claim-1"></a>
+<a id="claim-2"></a>
 
 ##### claim
 
 > `readonly` **claim**: [`ClaimExecution`](#claimexecution)
-
-<a id="recovery-1"></a>
-
-##### recovery
-
-> `readonly` **recovery**: `"rebuild"` \| `"reclaim"`
 
 ***
 
@@ -85,6 +119,12 @@ Independently selectable Runtime driver conformance capabilities.
 ##### artifacts?
 
 > `readonly` `optional` **artifacts?**: `true`
+
+<a id="atomiccommits"></a>
+
+##### atomicCommits?
+
+> `readonly` `optional` **atomicCommits?**: [`AtomicCommitCapability`](#atomiccommitcapability)
 
 <a id="await-event"></a>
 
@@ -170,12 +210,6 @@ Independently selectable Runtime driver conformance capabilities.
 
 > `readonly` `optional` **schedules?**: [`SchedulesCapability`](#schedulescapability)
 
-<a id="sqltransactions"></a>
-
-##### sqlTransactions?
-
-> `readonly` `optional` **sqlTransactions?**: [`SqlTransactionCapability`](#sqltransactioncapability)
-
 <a id="start-by-agent"></a>
 
 ##### start-by-agent?
@@ -204,19 +238,11 @@ Durable Agent fan-out recovery and journal-budget conformance capability.
 
 #### Properties
 
-<a id="claim-2"></a>
+<a id="claim-3"></a>
 
 ##### claim
 
 > `readonly` **claim**: [`ClaimExecution`](#claimexecution)
-
-<a id="recovery-2"></a>
-
-##### recovery
-
-> `readonly` **recovery**: `"rebuild"` \| `"reclaim"`
-
-Persistent drivers rebuild their Runtime; process-memory drivers reclaim through a fresh owner.
 
 ***
 
@@ -228,7 +254,7 @@ Journal-prefix fork and retained rewind branch capability.
 
 #### Properties
 
-<a id="claim-3"></a>
+<a id="claim-4"></a>
 
 ##### claim
 
@@ -244,7 +270,7 @@ Product-facing Session persistence and replay capability.
 
 #### Properties
 
-<a id="claim-4"></a>
+<a id="claim-5"></a>
 
 ##### claim
 
@@ -260,7 +286,7 @@ Typed Agent idempotent-start capability exercised with one storage-issued execut
 
 #### Properties
 
-<a id="claim-5"></a>
+<a id="claim-6"></a>
 
 ##### claim
 
@@ -286,57 +312,27 @@ Typed Agent idempotent-start capability exercised with one storage-issued execut
 
 > `readonly` **address**: `string` & `Brand`\<`"Address"`\>
 
-<a id="claim-6"></a>
+<a id="claim-7"></a>
 
 ##### claim
 
-> `readonly` **claim**: (`input`) => `Effect`\<`ExecutionClaim`\>
-
-###### Parameters
-
-###### input
-
-###### claims?
-
-`Service`
-
-###### runId
-
-`string`
-
-###### store
-
-[`Service`](./runtime/namespaces/RunStore#service)
-
-###### workerId
-
-`string`
-
-###### Returns
-
-`Effect`\<`ExecutionClaim`\>
+> `readonly` **claim**: [`ClaimExecution`](#claimexecution)
 
 <a id="install"></a>
 
 ##### install
 
-> `readonly` **install**: (`input`) => `Effect`\<`void`\>
+> `readonly` **install**: (`services`, `boundary`) => `Effect`\<`void`\>
 
 ###### Parameters
 
-###### input
+###### services
+
+[`Services`](#services)
 
 ###### boundary
 
-`"after-claim-validation"` \| `"after-session-entry"` \| `"after-session-leaf"` \| `"after-operation"` \| `"after-checkpoint"` \| `"after-event"` \| `"after-tree-position"` \| `"after-tree-index"` \| `"before-commit"`
-
-###### runId
-
-`string`
-
-###### sessionId
-
-`string`
+`"before-publication"` \| `"after-publication-lost-ack"` \| `"before-publication-unreadable"` \| `"after-publication-unreadable"`
 
 ###### Returns
 
@@ -346,7 +342,7 @@ Typed Agent idempotent-start capability exercised with one storage-issued execut
 
 ##### layer
 
-> `readonly` **layer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`RunStore`](./runtime/namespaces/RunStore#runstore), `LayerError`, `never`\>
+> `readonly` **layer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore), `LayerError`, `never`\>
 
 <a id="name"></a>
 
@@ -354,21 +350,13 @@ Typed Agent idempotent-start capability exercised with one storage-issued execut
 
 > `readonly` **name**: `string`
 
-<a id="remove"></a>
+<a id="readlayer"></a>
 
-##### remove
+##### readLayer
 
-> `readonly` **remove**: (`boundary`) => `Effect`\<`void`\>
+> `readonly` **readLayer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore), `LayerError`, `never`\>
 
-###### Parameters
-
-###### boundary
-
-`"after-claim-validation"` \| `"after-session-entry"` \| `"after-session-leaf"` \| `"after-operation"` \| `"after-checkpoint"` \| `"after-event"` \| `"after-tree-position"` \| `"after-tree-index"` \| `"before-commit"`
-
-###### Returns
-
-`Effect`\<`void`\>
+A genuinely fresh, read-only host over the same objects.
 
 <a id="skip"></a>
 
@@ -392,27 +380,17 @@ Multi-worker claim and fencing conformance capability.
 
 #### Properties
 
-<a id="expire"></a>
+<a id="claim-8"></a>
 
-##### expire
+##### claim
 
-> `readonly` **expire**: (`claim`) => `Effect`\<`void`\>
-
-###### Parameters
-
-###### claim
-
-[`WorkerClaim`](#workerclaim)
-
-###### Returns
-
-`Effect`\<`void`\>
+> `readonly` **claim**: [`ClaimExecution`](#claimexecution)
 
 <a id="layer-1"></a>
 
 ##### layer
 
-> `readonly` **layer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`RunClaims`](./runtime.sql-driver/index#runclaims) \| [`RunStore`](./runtime/namespaces/RunStore#runstore), `E`, `never`\>
+> `readonly` **layer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore), `E`, `never`\>
 
 ***
 
@@ -424,7 +402,7 @@ Durable notification recovery conformance capability.
 
 #### Properties
 
-<a id="claim-7"></a>
+<a id="claim-9"></a>
 
 ##### claim
 
@@ -440,7 +418,7 @@ Unknown-outcome operator resolution conformance capability.
 
 #### Properties
 
-<a id="claim-8"></a>
+<a id="claim-10"></a>
 
 ##### claim
 
@@ -456,7 +434,7 @@ Safe-operation operator retry conformance capability.
 
 #### Properties
 
-<a id="claim-9"></a>
+<a id="claim-11"></a>
 
 ##### claim
 
@@ -472,7 +450,7 @@ Store-wide operator obligation scan conformance capability.
 
 #### Properties
 
-<a id="claim-10"></a>
+<a id="claim-12"></a>
 
 ##### claim
 
@@ -514,7 +492,7 @@ Configuration for the authoritative Runtime driver conformance suites.
 
 ##### layer
 
-> `readonly` **layer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime#runtime) \| [`RunStore`](./runtime/namespaces/RunStore#runstore), `LayerError`, `never`\>
+> `readonly` **layer**: `Layer`\<[`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore), `LayerError`, `never`\>
 
 <a id="name-1"></a>
 
@@ -544,7 +522,7 @@ Runtime control and durable-event conformance capability.
 
 #### Properties
 
-<a id="claim-11"></a>
+<a id="claim-13"></a>
 
 ##### claim
 
@@ -560,7 +538,7 @@ RunTree finite replay conformance capability.
 
 #### Properties
 
-<a id="claim-12"></a>
+<a id="claim-14"></a>
 
 ##### claim
 
@@ -582,12 +560,6 @@ Durable recurring admission and per-occurrence claim conformance.
 
 > `readonly` **definition**: `ScheduleDefinition`
 
-<a id="recovery-3"></a>
-
-##### recovery
-
-> `readonly` **recovery**: `"rebuild"` \| `"reclaim"`
-
 ***
 
 <a id="services"></a>
@@ -598,103 +570,23 @@ Runtime services passed to driver-specific conformance operations.
 
 #### Properties
 
-<a id="claims"></a>
-
-##### claims?
-
-> `readonly` `optional` **claims?**: `Service`
-
 <a id="executor"></a>
 
 ##### executor?
 
-> `readonly` `optional` **executor?**: [`Service`](./runtime/namespaces/RunExecutor#service)
+> `readonly` `optional` **executor?**: [`Service`](./runtime/namespaces/RunExecutor.md#service)
 
 <a id="runtime-1"></a>
 
 ##### runtime
 
-> `readonly` **runtime**: [`Service`](./runtime/namespaces/Runtime#service)
+> `readonly` **runtime**: [`Service`](./runtime/namespaces/Runtime.md#service)
 
 <a id="store"></a>
 
 ##### store
 
-> `readonly` **store**: [`Service`](./runtime/namespaces/RunStore#service)
-
-***
-
-<a id="sqltransactioncapability"></a>
-
-### SqlTransactionCapability
-
-SQL transaction conformance capability.
-
-#### Properties
-
-<a id="claim-13"></a>
-
-##### claim
-
-> `readonly` **claim**: [`ClaimExecution`](#claimexecution)
-
-<a id="forcerollback"></a>
-
-##### forceRollback
-
-> `readonly` **forceRollback**: \<`A`, `E`\>(`effect`) => `Effect`\<`A`, `E`\>
-
-###### Type Parameters
-
-###### A
-
-`A`
-
-###### E
-
-`E`
-
-###### Parameters
-
-###### effect
-
-`Effect`\<`A`, `E`\>
-
-###### Returns
-
-`Effect`\<`A`, `E`\>
-
-***
-
-<a id="sqltransactionfaultoptions"></a>
-
-### SqlTransactionFaultOptions
-
-#### Type Parameters
-
-##### LayerError
-
-`LayerError` = `never`
-
-#### Properties
-
-<a id="layer-3"></a>
-
-##### layer
-
-> `readonly` **layer**: `Layer`\<`SqlClient`, `LayerError`, `never`\>
-
-<a id="name-2"></a>
-
-##### name
-
-> `readonly` **name**: `string`
-
-<a id="skip-2"></a>
-
-##### skip?
-
-> `readonly` `optional` **skip?**: `boolean`
+> `readonly` **store**: [`Service`](./runtime/namespaces/RunStore.md#service)
 
 ***
 
@@ -706,7 +598,7 @@ Typed Agent start capability exercised with one storage-issued execution claim.
 
 #### Properties
 
-<a id="claim-14"></a>
+<a id="claim-15"></a>
 
 ##### claim
 
@@ -722,19 +614,11 @@ Inbox persistence and exactly-once delivery capability.
 
 #### Properties
 
-<a id="claim-15"></a>
+<a id="claim-16"></a>
 
 ##### claim
 
 > `readonly` **claim**: [`ClaimExecution`](#claimexecution)
-
-<a id="recovery-4"></a>
-
-##### recovery
-
-> `readonly` **recovery**: `"rebuild"` \| `"reclaim"`
-
-Persistent drivers rebuild their Runtime; process-memory drivers retain one open store.
 
 ***
 
@@ -746,45 +630,11 @@ Missing-registration recovery capability exercised with one storage-issued execu
 
 #### Properties
 
-<a id="claim-16"></a>
+<a id="claim-17"></a>
 
 ##### claim
 
 > `readonly` **claim**: [`ClaimExecution`](#claimexecution)
-
-***
-
-<a id="workerclaim"></a>
-
-### WorkerClaim
-
-A multi-worker claim without the driver's decoded persisted Run representation.
-
-#### Properties
-
-<a id="attemptfence"></a>
-
-##### attemptFence
-
-> `readonly` **attemptFence**: `number`
-
-<a id="runid"></a>
-
-##### runId
-
-> `readonly` **runId**: `string`
-
-<a id="session"></a>
-
-##### session
-
-> `readonly` **session**: `SessionWriteClaim`
-
-<a id="workerid"></a>
-
-##### workerId
-
-> `readonly` **workerId**: `string`
 
 ## Type Aliases
 
@@ -804,7 +654,7 @@ Shared Artifact head, operation-log, subscription, and branch capability.
 
 > **ClaimExecution** = (`services`, `input`) => `Effect.Effect`\<`ExecutionClaim`\>
 
-Driver-specific activation or worker claim needed before a fenced mutation.
+Claim through the fixture's activated host using a stable logical action identity, not a fabricated worker.
 
 #### Parameters
 
@@ -814,11 +664,11 @@ Driver-specific activation or worker claim needed before a fenced mutation.
 
 ##### input
 
-###### runId
+###### commandId
 
 `string`
 
-###### workerId
+###### runId
 
 `string`
 
@@ -850,9 +700,9 @@ Read-only recovery projection conformance capability.
 
 ### modelResponseFaultBoundaries
 
-> `const` **modelResponseFaultBoundaries**: readonly \[`"after-claim-validation"`, `"after-session-entry"`, `"after-session-leaf"`, `"after-operation"`, `"after-checkpoint"`, `"after-event"`, `"after-tree-position"`, `"after-tree-index"`, `"before-commit"`\]
+> `const` **modelResponseFaultBoundaries**: readonly \[`"before-publication"`, `"after-publication-lost-ack"`, `"before-publication-unreadable"`, `"after-publication-unreadable"`\]
 
-A failure point after each durable statement in the completed-model-response projection.
+The atomic projection has one publication boundary, not independently durable statement stages.
 
 ***
 
@@ -862,7 +712,7 @@ A failure point after each durable statement in the completed-model-response pro
 
 > `const` **modelResponseFaultConformance**: \<`LayerError`\>(`options`) => `void`
 
-Register one reusable atomic-projection fault matrix for a physical SQL driver.
+Retains Session, outcome, checkpoint, run-event and tree-index atomicity through real transport faults.
 
 #### Type Parameters
 
@@ -905,32 +755,6 @@ Registers only the conformance suites selected by the supplied driver capabiliti
 ##### options
 
 [`Options`](#options)\<`LayerError`, `ClaimsLayerError`\>
-
-#### Returns
-
-`void`
-
-***
-
-<a id="sqltransactionfaultconformance"></a>
-
-### sqlTransactionFaultConformance
-
-> `const` **sqlTransactionFaultConformance**: \<`LayerError`\>(`options`) => `void`
-
-Register interruption and lock-wait rollback tests for a server SQL transaction strategy.
-
-#### Type Parameters
-
-##### LayerError
-
-`LayerError`
-
-#### Parameters
-
-##### options
-
-[`SqlTransactionFaultOptions`](#sqltransactionfaultoptions)\<`LayerError`\>
 
 #### Returns
 

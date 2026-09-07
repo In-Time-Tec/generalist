@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Steering
+[generalist](../../index.md) / [generalist](../index.md) / Steering
 
 # Steering
 

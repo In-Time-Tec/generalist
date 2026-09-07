@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer, Schema } from "effect"
 import { ChildRuns, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
@@ -102,7 +103,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("singleton-success")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-1", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-1",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const child = yield* admittedChild(context.children, context.runId, "success")
           yield* context.store.suspend({
             ...claim,
@@ -111,8 +115,12 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           })
           const large = "終🚀".repeat(7_000)
           yield* context.store.complete({
+            commandId: "run-group-113",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-2", runId: child.childRunId, ownerId: "child" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-2",
+              runId: child.childRunId,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult(large),
           })
 
@@ -162,11 +170,17 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("singleton-failure-race")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-3", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-3",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const child = yield* admittedChild(context.children, context.runId, "failure")
           yield* context.store.fail({
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-4", runId: child.childRunId, ownerId: "child" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-4",
+              runId: child.childRunId,
+              ownerId: objectWorkerId,
+            })),
             error: Errors.AgentExecutionFailure.make({ message: "failed before wait" }),
           })
           yield* context.store.suspend({
@@ -203,7 +217,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("singleton-cancel")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-5", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-5",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const child = yield* admittedChild(context.children, context.runId, "cancel")
           yield* context.store.suspend({
             ...claim,
@@ -211,7 +228,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             suspension: childSuspension({ ...child.input, childRunId: child.childRunId }),
           })
           yield* context.runtime.cancel({
-          commandId: "runtime-child-suites-run-group-ts-cancel-2", runId: child.childRunId, reason: "cancelled by test" })
+            commandId: "runtime-child-suites-run-group-ts-cancel-2",
+            runId: child.childRunId,
+            reason: "cancelled by test",
+          })
 
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({
             status: "running",
@@ -240,7 +260,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("singleton-cancel-race")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-6", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-6",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const child = yield* admittedChild(context.children, context.runId, "race")
           yield* context.store.suspend({
             ...claim,
@@ -248,13 +271,22 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             suspension: childSuspension({ ...child.input, childRunId: child.childRunId }),
           })
           const childClaim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-7", runId: child.childRunId, ownerId: "child" })
+            commandId: "runtime-child-suites-run-group-ts-claim-7",
+            runId: child.childRunId,
+            ownerId: objectWorkerId,
+          })
           yield* Effect.all(
             [
               context.store.complete({
-          commandId: "runtime-child-suites-run-group-ts-store-3", ...childClaim, result: completedResult("raced completion") }),
+                commandId: "runtime-child-suites-run-group-ts-store-3",
+                ...childClaim,
+                result: completedResult("raced completion"),
+              }),
               context.runtime.cancel({
-          commandId: "runtime-child-suites-run-group-ts-cancel-4", runId: context.runId, reason: "raced cancellation" }),
+                commandId: "runtime-child-suites-run-group-ts-cancel-4",
+                runId: context.runId,
+                reason: "raced cancellation",
+              }),
             ],
             { concurrency: "unbounded" },
           )
@@ -279,7 +311,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("settle")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-8", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-8",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const input = {
             parentRunId: context.runId,
             toolCallId: "group-call",
@@ -347,19 +382,30 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
 
           const large = "終🚀".repeat(7_000)
           yield* context.store.complete({
+            commandId: "run-group-349",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-9", runId: inspection.members[2]!.childRunId, ownerId: "gamma" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-9",
+              runId: inspection.members[2]!.childRunId,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult(large),
           })
           yield* context.store.fail({
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-10", runId: inspection.members[1]!.childRunId, ownerId: "beta" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-10",
+              runId: inspection.members[1]!.childRunId,
+              ownerId: objectWorkerId,
+            })),
             error: Errors.AgentExecutionFailure.make({ message: "失敗 🌧️" }),
           })
           expect((yield* context.runtime.inspect(context.runId)).status).toBe("waiting")
           yield* context.store.complete({
+            commandId: "run-group-360",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-11", runId: inspection.members[0]!.childRunId, ownerId: "alpha" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-11",
+              runId: inspection.members[0]!.childRunId,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult("成功 ✅"),
           })
 
@@ -389,7 +435,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("active-capacity", { maxDepth: 1, maxSubagents: 2 })
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-12", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-12",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const input = {
             parentRunId: context.runId,
             toolCallId: "capacity-group",
@@ -405,7 +454,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           expect(
             yield* context.store
               .claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-13", runId: inspection.members[2]!.childRunId, ownerId: "queued" })
+                commandId: "runtime-child-suites-run-group-ts-claim-13",
+                runId: inspection.members[2]!.childRunId,
+                ownerId: objectWorkerId,
+              })
               .pipe(Effect.flip),
           ).toBeInstanceOf(Errors.RuntimeUnavailable)
           yield* context.store.suspend({
@@ -420,10 +472,11 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             }),
           })
           yield* context.store.complete({
+            commandId: "run-group-422",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-14",
+              commandId: "runtime-child-suites-run-group-ts-claim-14",
               runId: inspection.members[1]!.childRunId,
-              ownerId: "beta",
+              ownerId: objectWorkerId,
             })),
             result: completedResult("beta"),
           })
@@ -431,19 +484,21 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           expect(inspection.members.map((member) => member.readiness)).toEqual(["ready", "settled", "ready"])
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({ status: "waiting" })
           yield* context.store.complete({
+            commandId: "run-group-433",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-15",
+              commandId: "runtime-child-suites-run-group-ts-claim-15",
               runId: inspection.members[2]!.childRunId,
-              ownerId: "gamma",
+              ownerId: objectWorkerId,
             })),
             result: completedResult("gamma"),
           })
           expect(yield* context.runtime.inspect(context.runId)).toMatchObject({ status: "waiting" })
           yield* context.store.complete({
+            commandId: "run-group-442",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-16",
+              commandId: "runtime-child-suites-run-group-ts-claim-16",
               runId: inspection.members[0]!.childRunId,
-              ownerId: "alpha",
+              ownerId: objectWorkerId,
             })),
             result: completedResult("alpha"),
           })
@@ -476,7 +531,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             prompt: "first profile",
           })
           const firstClaim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-17", runId: first.runId, ownerId: "first-profile" })
+            commandId: "runtime-child-suites-run-group-ts-claim-17",
+            runId: first.runId,
+            ownerId: objectWorkerId,
+          })
           const outerInput = {
             parentRunId: first.runId,
             toolCallId: "outer-group",
@@ -504,7 +562,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
 
           const left = outerInspection.members[0]!
           const leftClaim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-18", runId: left.childRunId, ownerId: "left-profile" })
+            commandId: "runtime-child-suites-run-group-ts-claim-18",
+            runId: left.childRunId,
+            ownerId: objectWorkerId,
+          })
           const innerInput = {
             parentRunId: left.childRunId,
             toolCallId: "inner-group",
@@ -533,21 +594,30 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             depth: 3,
           })
           yield* context.store.complete({
+            commandId: "run-group-535",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-19", runId: nested.childRunId, ownerId: "nested-profile" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-19",
+              runId: nested.childRunId,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult("nested complete"),
           })
           expect(yield* context.runtime.inspect(left.childRunId)).toMatchObject({ status: "running" })
           yield* context.store.complete({
+            commandId: "run-group-541",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-20", runId: left.childRunId, ownerId: "left-complete" })),
+              commandId: "runtime-child-suites-run-group-ts-claim-20",
+              runId: left.childRunId,
+              ownerId: objectWorkerId,
+            })),
             result: completedResult("left complete"),
           })
           yield* context.store.complete({
+            commandId: "run-group-546",
             ...(yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-21",
+              commandId: "runtime-child-suites-run-group-ts-claim-21",
               runId: outerInspection.members[1]!.childRunId,
-              ownerId: "right-complete",
+              ownerId: objectWorkerId,
             })),
             result: completedResult("right complete"),
           })
@@ -571,7 +641,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("member-cancel")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-22", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-22",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const member = { key: "cancelled", selection: "researcher", label: "Cancelled card", prompt: "work" }
           const input = {
             parentRunId: context.runId,
@@ -595,7 +668,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             }),
           })
           yield* context.runtime.cancel({
-          commandId: "runtime-child-suites-run-group-ts-cancel-13",
+            commandId: "runtime-child-suites-run-group-ts-cancel-13",
             runId: inspection.members[0]!.childRunId,
             reason: "member cancelled independently",
           })
@@ -623,7 +696,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         Effect.gen(function* () {
           const context = yield* parent("cancel")
           const claim = yield* context.store.claimExecution({
-          commandId: "runtime-child-suites-run-group-ts-claim-23", runId: context.runId, ownerId: "parent" })
+            commandId: "runtime-child-suites-run-group-ts-claim-23",
+            runId: context.runId,
+            ownerId: objectWorkerId,
+          })
           const outcome = yield* context.children.runGroup({
             parentRunId: context.runId,
             toolCallId: "group-call",
@@ -638,7 +714,10 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             suspension: suspension(groupId),
           })
           yield* context.runtime.cancel({
-          commandId: "runtime-child-suites-run-group-ts-cancel-14", runId: context.runId, reason: "stop" })
+            commandId: "runtime-child-suites-run-group-ts-cancel-14",
+            runId: context.runId,
+            reason: "stop",
+          })
           expect((yield* context.runtime.inspectFanOut(groupId)).status).toBe("cancelled")
           const inspection = yield* context.runtime.inspectFanOut(groupId)
           expect(

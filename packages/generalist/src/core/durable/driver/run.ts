@@ -1,5 +1,6 @@
 import { Effect, Function, Schema, Stream } from "effect"
-import { arrayStreamCodec, DriverInterpreter, DriverUnknownReplay, type OperationSpec } from "./interpreter.js"
+import { DriverInterpreter, DriverUnknownReplay, type OperationSpec } from "./interpreter.js"
+import { arrayStreamCodec } from "./stream-success.js"
 import { Exhausted, type BudgetLimits, type RunBudget } from "../run-budget.js"
 import { LoopDriverState } from "../loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../service.js"

@@ -8,6 +8,7 @@ import { ExecutionResolution, type Resolver } from "../execution/resolution/reso
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore, WorkerMutationError } from "../run/store.js"
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
+const CommandId = Schema.fromJsonString(Schema.Tuple([Schema.String, Schema.String, Schema.Finite]))
 
 export const make = (options: {
   readonly store: RunStore
@@ -21,11 +22,19 @@ export const make = (options: {
         Effect.gen(function* () {
           yield* options.store.recoverRunningOperations({
             ...claim,
-            commandId: JSON.stringify(["recover-operations", claim.runId, claim.attemptFence]),
+            commandId: yield* Schema.encodeEffect(CommandId)([
+              "recover-operations",
+              claim.runId,
+              claim.attemptFence,
+            ]).pipe(Effect.orDie),
           })
           const operations = yield* options.store.operationCancellations({
             ...claim,
-            commandId: JSON.stringify(["operation-cancellations", claim.runId, claim.attemptFence]),
+            commandId: yield* Schema.encodeEffect(CommandId)([
+              "operation-cancellations",
+              claim.runId,
+              claim.attemptFence,
+            ]).pipe(Effect.orDie),
           })
           if (operations.length > 0) {
             const resolution = yield* ExecutionResolution.resolve(

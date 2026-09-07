@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.fly-sprites
+[generalist](./index.md) / unstable.sandbox.fly-sprites
 
 # unstable.sandbox.fly-sprites
 
@@ -80,7 +80,7 @@ Prefix for fresh Sprite names. Acquire keys address an exact existing Sprite nam
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 **`Experimental`**
 
@@ -94,7 +94,7 @@ Provide the hosted Fly Sprites microVM Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -102,7 +102,7 @@ Provide the hosted Fly Sprites microVM Sandbox leaf.
 
 ### makeProvider
 
-> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
+> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
 
 **`Experimental`**
 
@@ -116,4 +116,4 @@ Construct the Fly Sprites provider over Effect HttpClient.
 
 #### Returns
 
-`Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>
+`Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice), `never`, `HttpClient.HttpClient`\>

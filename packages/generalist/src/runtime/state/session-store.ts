@@ -3,8 +3,8 @@ import { Effect, Schema } from "effect"
 import type { ModifyState } from "../../durability/internal/runtime.js"
 import { DurabilityFailure } from "../../durability/errors.js"
 import type { Definition } from "../../durability/internal/runtime-command.js"
-import { commands } from "../../durability/internal/runtime-command-session.js"
-import { requireExecutionClaim } from "./store/execution.js"
+import { commands } from "../../durability/internal/runtime-state/session-command.js"
+import { requireExecutionClaim } from "./store/claim.js"
 import {
   type AppendInput,
   type AppendOptions,
@@ -24,16 +24,23 @@ import type { CompletedSessionEntry } from "../execution/model-response/commit.j
 import { handoffPayload, type HandoffSessionEntry } from "../session/handoff.js"
 import { prepareSessionAppendInput } from "../../core/model/response/persistence.js"
 import { terminalToolMessage, type RunTerminalOutcome } from "../session/tool-results.js"
-import { emptySession, type RuntimeSession, type RuntimeState } from "./state.js"
+import { emptySession, type RuntimeSession, type RuntimeState } from "./projection.js"
 import type { ExecutionClaim } from "../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../run/ownership-errors.js"
 import { reader, SessionReads, sessionStorageFailure } from "./session-reader.js"
+import { publishConversation } from "./store/host-conversation.js"
 
 const { pathTo } = SessionReads
 
 const payloadEquivalence = Schema.toEquivalence(EntryPayload)
 const storeError = (message: string) => SessionStoreError.make({ message })
 const conflict = (reason: SessionConflict["reason"], message: string) => SessionConflict.make({ reason, message })
+const updateSession = (state: RuntimeState, sessionId: string, session: RuntimeSession) =>
+  publishConversation({
+    previous: state,
+    sessionId,
+    next: { ...state, sessions: new Map(state.sessions).set(sessionId, session) },
+  })
 
 const entryFromInput = (input: AppendInput, id: string, parentId: string | null): Entry => ({
   ...input,
@@ -152,10 +159,7 @@ export const appendCompletedSessionEntry = (input: {
       if (!isAppendSuccess(result)) return yield* result
       nextSession = result[1]
     }
-    return {
-      ...input.state,
-      sessions: new Map(input.state.sessions).set(input.entry.sessionId, nextSession),
-    }
+    return yield* updateSession(input.state, input.entry.sessionId, nextSession)
   })
 
 export const verifyHandoffSessionEntry = (input: {
@@ -198,10 +202,7 @@ export const appendHandoffSessionEntry = (input: {
       if (!isAppendSuccess(result)) return yield* result
       nextSession = result[1]
     }
-    return {
-      ...input.state,
-      sessions: new Map(input.state.sessions).set(input.entry.sessionId, nextSession),
-    }
+    return yield* updateSession(input.state, input.entry.sessionId, nextSession)
   })
 
 const interruptedPayload = (input: InterruptedSessionEntry): AppendInput => ({
@@ -258,7 +259,7 @@ export const appendInterruptedSessionEntry = (input: {
       if (!isAppendSuccess(result)) return yield* result
       nextSession = result[1]
     }
-    return { ...state, sessions: new Map(state.sessions).set(interrupted.sessionId, nextSession) }
+    return yield* updateSession(state, interrupted.sessionId, nextSession)
   })
 
 const writerBelongsToRun = (
@@ -345,29 +346,39 @@ export const appendTerminalToolResults = (input: {
     if (!isAppendSuccess(result)) {
       return yield* RuntimeUnavailable.make({ message: result.message })
     }
-    return finish({ ...state, sessions: new Map(state.sessions).set(run.message.sessionId, result[1]) })
+    return yield* publishConversation({
+      previous: input.state,
+      sessionId: run.message.sessionId,
+      next: finish({ ...state, sessions: new Map(state.sessions).set(run.message.sessionId, result[1]) }),
+    }).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })))
   })
 
 const claimedUpdate = <Input extends readonly [ExecutionClaim, ...ReadonlyArray<unknown>], A, E>(
   modifyState: ModifyState,
   definition: Definition<Input, A>,
   input: Input,
-  transition: (session: RuntimeSession, input: Input) => Effect.Effect<readonly [A, RuntimeSession], E, PreparedObservation>,
-) => modifyState(definition, input, (state, prepared) => {
-  const claim = prepared[0]
-  return requireExecutionClaim(state, claim).pipe(
-    Effect.andThen(transition(state.sessions.get(claim.session.sessionId) ?? emptySession(), prepared)),
-    Effect.map(([value, session]) => [
-      value,
-      { ...state, sessions: new Map(state.sessions).set(claim.session.sessionId, session) },
-    ] as const),
+  transition: (
+    session: RuntimeSession,
+    input: Input,
+  ) => Effect.Effect<readonly [A, RuntimeSession], E, PreparedObservation>,
+) =>
+  modifyState(definition, input, (state, prepared) => {
+    const claim = prepared[0]
+    return requireExecutionClaim(state, claim).pipe(
+      Effect.andThen(transition(state.sessions.get(claim.session.sessionId) ?? emptySession(), prepared)),
+      Effect.flatMap(([value, session]) =>
+        updateSession(state, claim.session.sessionId, session).pipe(Effect.map((next) => [value, next] as const)),
+      ),
+    )
+  }).pipe(
+    Effect.mapError((error) => {
+      if (Schema.is(StaleClaim)(error) || Schema.is(StaleSessionClaim)(error))
+        return SessionStoreError.make({ message: "Session write claim is stale", reason: "conflict", cause: error })
+      if (Schema.is(DurabilityFailure)(error) || Schema.is(RuntimeUnavailable)(error))
+        return sessionStorageFailure(error)
+      return error
+    }),
   )
-}).pipe(Effect.mapError((error) =>
-  Schema.is(StaleClaim)(error) || Schema.is(StaleSessionClaim)(error)
-    ? SessionStoreError.make({ message: "Session write claim is stale", reason: "conflict", cause: error })
-    : Schema.is(DurabilityFailure)(error) || Schema.is(RuntimeUnavailable)(error)
-      ? sessionStorageFailure(error) : error,
-))
 
 export const claimedStore = (config: {
   readonly readState: Effect.Effect<RuntimeState, DurabilityFailure | RuntimeUnavailable>
@@ -378,21 +389,35 @@ export const claimedStore = (config: {
   const sessionId = claim.session.sessionId
   const reads = reader({ readState, sessionId })
   return {
-    reserveEntryId: (commandId) => claimedUpdate(modifyState, commands.reserveEntryId, [claim, commandId], (session) =>
-      Effect.succeed([String(session.counter), { ...session, counter: session.counter + 1 }] as const),
-    ),
-    append: (input, options) =>
-      claimedUpdate(modifyState, commands.append, [claim, prepareSessionAppendInput(input), options], (session, [, input, options]) =>
-        Effect.gen(function* () {
-          yield* validatePayload({ value: input, boundary: "Session entry" }).pipe(
-            Effect.mapError((error) => storeError(error.message)),
-          )
-          const result = append(session, input, options)
-          return yield* isAppendSuccess(result) ? Effect.succeed(result) : Effect.fail(result)
-        }),
+    reserveEntryId: (commandId) =>
+      claimedUpdate(modifyState, commands.reserveEntryId, [claim, commandId], (session) =>
+        Effect.succeed([String(session.counter), { ...session, counter: session.counter + 1 }] as const),
       ),
-    appendCheckpoint: (prepared) =>
-      claimedUpdate(modifyState, commands.appendCheckpoint, [claim, prepared], (session, [, prepared]) =>
+    append: (authoredInput, appendOptions) =>
+      claimedUpdate(
+        modifyState,
+        commands.append,
+        [claim, prepareSessionAppendInput(authoredInput), appendOptions],
+        (session, [, input, options]) =>
+          Effect.gen(function* () {
+            yield* validatePayload({ value: input, boundary: "Session entry" }).pipe(
+              Effect.mapError((error) => storeError(error.message)),
+            )
+            const result = append(session, input, options)
+            return yield* isAppendSuccess(result) ? Effect.succeed(result) : Effect.fail(result)
+          }),
+      ).pipe(
+        Effect.mapError((error) =>
+          "id" in appendOptions &&
+          Schema.is(SessionStoreError)(error) &&
+          Schema.is(DurabilityFailure)(error.cause) &&
+          error.cause.reason === "input-conflict"
+            ? conflict("entry-id-reused", `Session entry id ${appendOptions.id} was reused with different content`)
+            : error,
+        ),
+      ),
+    appendCheckpoint: (request) =>
+      claimedUpdate(modifyState, commands.appendCheckpoint, [claim, request], (session, [, prepared]) =>
         Effect.gen(function* () {
           yield* validatePayload({ value: prepared, boundary: "Session checkpoint" }).pipe(
             Effect.mapError((error) => storeError(error.message)),
@@ -447,14 +472,22 @@ export const claimedStore = (config: {
             next,
           ] as const
         }),
+      ).pipe(
+        Effect.mapError((error) =>
+          Schema.is(SessionStoreError)(error) &&
+          Schema.is(DurabilityFailure)(error.cause) &&
+          error.cause.reason === "input-conflict"
+            ? conflict("checkpoint-id-reused", `Session checkpoint id ${request.id} was reused with different content`)
+            : error,
+        ),
       ),
     entry: reads.entry,
     pathPage: reads.pathPage,
     effectivePath: reads.effectivePath,
     latestCompaction: reads.latestCompaction,
     path: reads.path,
-    setLeaf: (id, commandId) =>
-      claimedUpdate(modifyState, commands.setLeaf, [claim, id, commandId], (session, [, id]) =>
+    setLeaf: (leaf, commandId) =>
+      claimedUpdate(modifyState, commands.setLeaf, [claim, leaf, commandId], (session, [, id]) =>
         id !== null && !session.entries.has(id)
           ? Effect.fail(storeError(`Session entry ${id} does not exist`))
           : Effect.succeed([undefined, { ...session, leaf: id }] as const),

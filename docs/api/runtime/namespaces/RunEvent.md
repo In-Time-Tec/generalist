@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / RunEvent
+[generalist](../../index.md) / [runtime](../index.md) / RunEvent
 
 # RunEvent
 
@@ -12,7 +12,7 @@
 
 ### AgentLoopEvent
 
-> **AgentLoopEvent** = `Exclude`\<[`Event`](../../generalist/namespaces/AgentEvent#event), [`Completed`](../../generalist/namespaces/AgentEvent#completed)\>
+> **AgentLoopEvent** = `Exclude`\<[`Event`](../../generalist/namespaces/AgentEvent.md#event), [`Completed`](../../generalist/namespaces/AgentEvent.md#completed)\>
 
 ***
 
@@ -34,7 +34,7 @@
 
 ##### filter
 
-> `readonly` **filter**: [`WakeEventFilter`](../../generalist/namespaces/Agent#wakeeventfilter)
+> `readonly` **filter**: [`WakeEventFilter`](../../generalist/namespaces/Agent.md#wakeeventfilter)
 
 ##### waitId
 
@@ -56,7 +56,7 @@
 
 ##### delta
 
-> `readonly` **delta**: [`BudgetLimits`](../../generalist/namespaces/RunBudget#budgetlimits)
+> `readonly` **delta**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
 
 ***
 
@@ -74,7 +74,7 @@
 
 ##### budget
 
-> `readonly` **budget**: [`Dimension`](../../generalist/namespaces/RunBudget#dimension)
+> `readonly` **budget**: [`Dimension`](../../generalist/namespaces/RunBudget.md#dimension)
 
 ***
 
@@ -92,7 +92,7 @@
 
 ##### budget?
 
-> `readonly` `optional` **budget?**: [`BudgetLimits`](../../generalist/namespaces/RunBudget#budgetlimits)
+> `readonly` `optional` **budget?**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
 
 ##### childDepth
 
@@ -104,7 +104,7 @@
 
 ##### inherit
 
-> `readonly` **inherit**: [`Inheritance`](../../generalist/namespaces/Agent#inheritance)
+> `readonly` **inherit**: [`Inheritance`](../../generalist/namespaces/Agent.md#inheritance)
 
 ##### invocationId
 
@@ -128,7 +128,7 @@
 
 ##### readiness
 
-> `readonly` **readiness**: [`ChildReadiness`](./ChildReadiness#childreadiness)
+> `readonly` **readiness**: [`ChildReadiness`](./ChildReadiness.md#childreadiness)
 
 ##### selection
 
@@ -154,7 +154,7 @@
 
 ##### readiness
 
-> `readonly` **readiness**: [`ChildReadiness`](./ChildReadiness#childreadiness)
+> `readonly` **readiness**: [`ChildReadiness`](./ChildReadiness.md#childreadiness)
 
 ***
 
@@ -176,7 +176,7 @@
 
 ##### spend?
 
-> `readonly` `optional` **spend?**: [`Spend`](../../generalist/namespaces/RunBudget#spend)
+> `readonly` `optional` **spend?**: [`Spend`](../../generalist/namespaces/RunBudget.md#spend)
 
 ##### terminalEventId
 
@@ -232,7 +232,7 @@
 
 ##### join
 
-> `readonly` **join**: [`FanOutJoin`](./FanOut#fanoutjoin)
+> `readonly` **join**: [`FanOutJoin`](./FanOut.md#fanoutjoin)
 
 ##### memberCount
 
@@ -240,7 +240,7 @@
 
 ##### remainder
 
-> `readonly` **remainder**: [`FanOutRemainder`](./FanOut#fanoutremainder)
+> `readonly` **remainder**: [`FanOutRemainder`](./FanOut.md#fanoutremainder)
 
 ***
 
@@ -302,7 +302,7 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 
 ##### addressed?
 
-> `readonly` `optional` **addressed?**: [`Message`](./Message#message)
+> `readonly` `optional` **addressed?**: [`Message`](./Message.md#message)
 
 ##### digest
 
@@ -314,7 +314,7 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 
 ##### from
 
-> `readonly` **from**: [`MessageSource`](./Steering#messagesource)
+> `readonly` **from**: [`MessageSource`](./Steering.md#messagesource)
 
 ##### idempotencyKey
 
@@ -330,7 +330,7 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 
 ##### policy
 
-> `readonly` **policy**: [`AdmissionPolicy`](../../generalist/namespaces/Steering#admissionpolicy)
+> `readonly` **policy**: [`AdmissionPolicy`](../../generalist/namespaces/Steering.md#admissionpolicy)
 
 ***
 
@@ -338,7 +338,7 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 
 ### LifecycleEvent
 
-> **LifecycleEvent** = `TriggerEvent` \| [`RunAccepted`](#runaccepted) \| [`BudgetExtended`](#budgetextended) \| [`BudgetSuspended`](#budgetsuspended) \| [`RunAttemptStarted`](#runattemptstarted) \| [`RunWaiting`](#runwaiting) \| [`RunResumed`](#runresumed) \| [`Inbox`](#inbox) \| [`SteeringAccepted`](#steeringaccepted) \| [`SteeringConsumed`](#steeringconsumed) \| [`SteeringDiscarded`](#steeringdiscarded) \| [`OperationUnknown`](#operationunknown) \| [`Substituted`](#substituted) \| [`ChildLinked`](#childlinked) \| [`ChildReadinessChanged`](#childreadinesschanged) \| [`ChildSettled`](#childsettled) \| [`FanOutAdmitted`](#fanoutadmitted) \| [`FanOutJoined`](#fanoutjoined) \| [`RunCompleted`](#runcompleted) \| [`RunFailed`](#runfailed) \| [`RunCancellationRequested`](#runcancellationrequested) \| [`RunCancelled`](#runcancelled) \| `ProgramLog` \| [`Rewarded`](#rewarded)
+> **LifecycleEvent** = `TriggerEvent` \| [`RunAccepted`](#runaccepted) \| [`BudgetExtended`](#budgetextended) \| [`RunForked`](#runforked) \| [`RunRewound`](#runrewound) \| [`ProgramOperationSettled`](#programoperationsettled) \| [`BudgetSuspended`](#budgetsuspended) \| [`RunAttemptStarted`](#runattemptstarted) \| [`RunWaiting`](#runwaiting) \| [`RunResumed`](#runresumed) \| [`Inbox`](#inbox) \| [`SteeringAccepted`](#steeringaccepted) \| [`SteeringConsumed`](#steeringconsumed) \| [`SteeringDiscarded`](#steeringdiscarded) \| [`OperationUnknown`](#operationunknown) \| [`Substituted`](#substituted) \| [`ChildLinked`](#childlinked) \| [`ChildReadinessChanged`](#childreadinesschanged) \| [`ChildSettled`](#childsettled) \| [`FanOutAdmitted`](#fanoutadmitted) \| [`FanOutJoined`](#fanoutjoined) \| [`RunCompleted`](#runcompleted) \| [`RunFailed`](#runfailed) \| [`RunCancellationRequested`](#runcancellationrequested) \| [`RunCancelled`](#runcancelled) \| `ProgramLog` \| [`Rewarded`](#rewarded)
 
 ***
 
@@ -357,6 +357,28 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 ##### operationId
 
 > `readonly` **operationId**: `string`
+
+***
+
+<a id="programoperationsettled"></a>
+
+### ProgramOperationSettled
+
+> **ProgramOperationSettled** = [`RunEventBase`](#runeventbase) & `object`
+
+#### Type Declaration
+
+##### \_tag
+
+> `readonly` **\_tag**: `"ProgramOperationSettled"`
+
+##### operation
+
+> `readonly` **operation**: `string`
+
+##### status
+
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"unknown"`
 
 ***
 
@@ -412,11 +434,11 @@ Reward payload accepted by the Runtime journal.
 
 ##### address
 
-> `readonly` **address**: [`Address`](./Address#address)
+> `readonly` **address**: [`Address`](./Address.md#address)
 
 ##### budget?
 
-> `readonly` `optional` **budget?**: [`BudgetLimits`](../../generalist/namespaces/RunBudget#budgetlimits)
+> `readonly` `optional` **budget?**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
 
 ##### messageId
 
@@ -492,7 +514,7 @@ Reward payload accepted by the Runtime journal.
 
 ##### result
 
-> `readonly` **result**: [`ExecutionResult`](./ExecutionState#executionresult)
+> `readonly` **result**: [`ExecutionResult`](./ExecutionState.md#executionresult)
 
 ***
 
@@ -534,7 +556,51 @@ Reward payload accepted by the Runtime journal.
 
 ### RunFailure
 
-> **RunFailure** = [`RunFailure`](./Run#runfailure)
+> **RunFailure** = [`RunFailure`](./Run.md#runfailure)
+
+***
+
+<a id="runforked"></a>
+
+### RunForked
+
+> **RunForked** = [`RunEventBase`](#runeventbase) & `object`
+
+A source reservation is permanent; target history before this boundary is inherited evidence.
+
+#### Type Declaration
+
+##### \_tag
+
+> `readonly` **\_tag**: `"RunForked"`
+
+##### allocationRunId
+
+> `readonly` **allocationRunId**: `string`
+
+##### atSequence
+
+> `readonly` **atSequence**: `number`
+
+##### budget
+
+> `readonly` **budget**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
+
+##### forkRunId
+
+> `readonly` **forkRunId**: `string`
+
+##### programBudget?
+
+> `readonly` `optional` **programBudget?**: [`ProgramBudget`](../../generalist/namespaces/ProgramManifest.md#programbudget)
+
+##### role
+
+> `readonly` **role**: `"source"` \| `"target"` \| `"archive"`
+
+##### sourceRunId
+
+> `readonly` **sourceRunId**: `string`
 
 ***
 
@@ -552,11 +618,51 @@ Reward payload accepted by the Runtime journal.
 
 ##### resolution
 
-> `readonly` **resolution**: [`WaitResolution`](./RunWait#waitresolution)
+> `readonly` **resolution**: [`WaitResolution`](./RunWait.md#waitresolution)
 
 ##### waitId
 
 > `readonly` **waitId**: `string`
+
+***
+
+<a id="runrewound"></a>
+
+### RunRewound
+
+> **RunRewound** = [`RunEventBase`](#runeventbase) & `object`
+
+Changes branch-local control without removing the earlier committed history.
+
+#### Type Declaration
+
+##### \_tag
+
+> `readonly` **\_tag**: `"RunRewound"`
+
+##### allocation?
+
+> `readonly` `optional` **allocation?**: `object`
+
+###### allocation.baseline
+
+> `readonly` **baseline**: [`Spend`](../../generalist/namespaces/RunBudget.md#spend)
+
+###### allocation.budget
+
+> `readonly` **budget**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
+
+###### allocation.runId
+
+> `readonly` **runId**: `string`
+
+##### branchRunId
+
+> `readonly` **branchRunId**: `string`
+
+##### toSequence
+
+> `readonly` **toSequence**: `number`
 
 ***
 
@@ -574,7 +680,7 @@ Reward payload accepted by the Runtime journal.
 
 ##### wait
 
-> `readonly` **wait**: [`RunWait`](./RunWait#runwait)
+> `readonly` **wait**: [`RunWait`](./RunWait.md#runwait)
 
 ***
 
@@ -742,7 +848,7 @@ Terminal disposition category for accepted steering.
 
 ##### event
 
-> `readonly` **event**: [`WakeEvent`](../../generalist/namespaces/Agent#wakeevent)
+> `readonly` **event**: [`WakeEvent`](../../generalist/namespaces/Agent.md#wakeevent)
 
 ## Variables
 
@@ -750,7 +856,7 @@ Terminal disposition category for accepted steering.
 
 ### AgentLoopEventSchema
 
-> `const` **AgentLoopEventSchema**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"TurnStarted"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ModelResponseCommitted"`, \{ `attempt`: `Schema.Finite`; `budgetCharge`: `Schema.Int`; `digest`: `Schema.String`; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `operationKey`: `Schema.String`; `originOperationKey`: `Schema.String`; `originRunId`: `Schema.String`; `sessionEntryId`: `Schema.String`; `sessionId`: `Schema.String`; `sessionParentId`: `Schema.NullOr`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<...\>; `cacheWrite`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; `uncached`: `Schema.optionalKey`\<...\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<...\>; `text`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; \}\>; \}\>\>; \}\>, `Schema.TaggedStruct`\<`"ModelResponseInterrupted"`, \{ `attempt`: `Schema.Finite`; `digest`: `Schema.String`; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `operationKey`: `Schema.String`; `originOperationKey`: `Schema.String`; `originRunId`: `Schema.String`; `reason`: `Schema.Literals`\<readonly \[`"cancel"`, `"failure"`\]\>; `sessionEntryId`: `Schema.String`; `sessionId`: `Schema.String`; `sessionParentId`: `Schema.NullOr`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<...\>; `cacheWrite`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; `uncached`: `Schema.optionalKey`\<...\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<...\>; `text`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; \}\>; \}\>\>; \}\>, `Schema.TaggedStruct`\<`"ToolExecutionStarted"`, \{ `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolProgress"`, \{ `data`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `toolCallId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolExecutionCompleted"`, \{ `artifactRead`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `artifact`: `Schema.String`; `branch`: `Schema.optionalKey`\<`Schema.String`\>; `version`: `Schema.Int`; \}\>\>; `artifactUpdated`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `artifact`: `Schema.String`; `attribution`: `Schema.Union`\<readonly \[..., ...\]\>; `base`: `Schema.Int`; `branch`: `Schema.optionalKey`\<`Schema.String`\>; `result`: `Schema.Int`; \}\>\>; `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `result`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: `Schema.String`; `fromRun`: `Schema.String`; \}\>\>; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `taint`: `Schema.$Array`\<`Schema.Struct`\<\{ `capabilityId`: `Schema.brand`\<..., ...\>; `tool`: `Schema.String`; `toolCallId`: `Schema.String`; \}\>\>; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>; `tasksUpdated`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly ...\>; `title`: `Schema.String`; \}\>\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolExecutionWaiting"`, \{ `awaitEvent`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[..., ..., ..., ..., ...\]\>; \}\>\>; `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `token`: `Schema.String`; `turn`: `Schema.Finite`; `waitId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"HandoffRequested"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.String`; `target`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"HandoffCompleted"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `source`: `Schema.String`; `target`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Rejected"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `reason`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ApprovalRequested"`, \{ `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `request`: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `capability`: `Schema.String`; `input`: `Schema.Unknown`; `operation`: `Schema.String`; \}\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"SteeringDrained"`, \{ `count`: `Schema.Finite`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"TurnCompleted"`, \{ `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<...\>; `cacheWrite`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; `uncached`: `Schema.optionalKey`\<...\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<...\>; `text`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; \}\>; \}\>\>; \}\>, `Schema.TaggedStruct`\<`"GateResult"`, \{ `evidence`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `name`: `Schema.String`; `turn`: `Schema.Finite`; `verdict`: `Schema.Literals`\<readonly \[`"pass"`, `"fail"`\]\>; \}\>, `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallStarted"`\>; `compactionId`: `Schema.optionalKey`\<`Schema.String`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptStarted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFirstOutput"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptCompleted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `finishReason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerMetadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<...\>\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `requestId`: `Schema.optionalKey`\<`Schema.String`\>; `responseModel`: `Schema.optionalKey`\<`Schema.String`\>; `serviceTier`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: `Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<...\>; `outputTokens`: `Schema.Struct`\<...\>; \}\>; `usageAt`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFailed"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `classification`: `Schema.Literals`\<readonly \[..., ...\]\>; `deliveryId`: `Schema.String`; `disposition`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `failedAt`: `Schema.Finite`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelRetryScheduled"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `delayMillis`: `Schema.Finite`; `deliveryId`: `Schema.String`; `modelCallId`: `Schema.String`; `reason`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelFallbackScheduled"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `deliveryId`: `Schema.String`; `fromCandidate`: `Schema.Int`; `fromModel`: `Schema.String`; `fromProvider`: `Schema.String`; `fromRegistrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `modelCallId`: `Schema.String`; `toCandidate`: `Schema.Int`; `toModel`: `Schema.String`; `toProvider`: `Schema.String`; `toRegistrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallCompleted"`\>; `attempts`: `Schema.Int`; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[..., ..., ..., ..., ..., ..., ..., ...\]\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; \}\>\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallFailed"`\>; `attempts`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `classification`: `Schema.Literals`\<readonly \[..., ...\]\>; `deliveryId`: `Schema.String`; `failedAt`: `Schema.Finite`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionStarted"`\>; `compactionId`: `Schema.String`; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `deliveryId`: `Schema.String`; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `startedAt`: `Schema.Finite`; `trigger`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionSkipped"`\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `skippedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionApplied"`\>; `appliedAt`: `Schema.Finite`; `checkpointId`: `Schema.String`; `commit`: `Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<...\>; `contextTokensBefore`: `Schema.optionalKey`\<...\>; `entriesAfter`: `Schema.optionalKey`\<...\>; `entriesBefore`: `Schema.optionalKey`\<...\>; `summaryModelCallId`: `Schema.optionalKey`\<...\>; \}\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionFailed"`\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `failedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>\]\>\]\>
+> `const` **AgentLoopEventSchema**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"TurnStarted"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ModelResponseCommitted"`, \{ `attempt`: `Schema.Finite`; `budgetCharge`: `Schema.Int`; `digest`: `Schema.String`; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `operationKey`: `Schema.String`; `originOperationKey`: `Schema.String`; `originRunId`: `Schema.String`; `sessionEntryId`: `Schema.String`; `sessionId`: `Schema.String`; `sessionParentId`: `Schema.NullOr`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>, `Schema.TaggedStruct`\<`"ModelResponseInterrupted"`, \{ `attempt`: `Schema.Finite`; `digest`: `Schema.String`; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `operationKey`: `Schema.String`; `originOperationKey`: `Schema.String`; `originRunId`: `Schema.String`; `reason`: `Schema.Literals`\<readonly \[`"cancel"`, `"failure"`\]\>; `sessionEntryId`: `Schema.String`; `sessionId`: `Schema.String`; `sessionParentId`: `Schema.NullOr`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>, `Schema.TaggedStruct`\<`"ToolExecutionStarted"`, \{ `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolProgress"`, \{ `data`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `message`: `Schema.optionalKey`\<`Schema.String`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `toolCallId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolExecutionCompleted"`, \{ `artifactRead`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `artifact`: `Schema.String`; `branch`: `Schema.optionalKey`\<`Schema.String`\>; `version`: `Schema.Int`; \}\>\>; `artifactUpdated`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `artifact`: `Schema.String`; `attribution`: `Schema.Union`\<readonly \[..., ...\]\>; `base`: `Schema.Int`; `branch`: `Schema.optionalKey`\<`Schema.String`\>; `result`: `Schema.Int`; \}\>\>; `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `result`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: `Schema.String`; `fromRun`: `Schema.String`; \}\>\>; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `taint`: `Schema.$Array`\<`Schema.Struct`\<\{ `capabilityId`: `Schema.brand`\<..., ...\>; `tool`: `Schema.String`; `toolCallId`: `Schema.String`; \}\>\>; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>; `tasksUpdated`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly ...\>; `title`: `Schema.String`; \}\>\>\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ToolExecutionWaiting"`, \{ `awaitEvent`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[..., ..., ..., ..., ...\]\>; \}\>\>; `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `token`: `Schema.String`; `turn`: `Schema.Finite`; `waitId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"HandoffRequested"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `source`: `Schema.String`; `target`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"HandoffCompleted"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `source`: `Schema.String`; `target`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Rejected"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `reason`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"ApprovalRequested"`, \{ `call`: `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `request`: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `capability`: `Schema.String`; `input`: `Schema.Unknown`; `operation`: `Schema.String`; \}\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"SteeringDrained"`, \{ `count`: `Schema.Finite`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `queue`: `Schema.Literals`\<readonly \[`"steering"`, `"followUp"`\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"TurnCompleted"`, \{ `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>, `Schema.TaggedStruct`\<`"GateResult"`, \{ `evidence`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `name`: `Schema.String`; `turn`: `Schema.Finite`; `verdict`: `Schema.Literals`\<readonly \[`"pass"`, `"fail"`\]\>; \}\>, `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallStarted"`\>; `compactionId`: `Schema.optionalKey`\<`Schema.String`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptStarted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `deliveryId`: `Schema.String`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `startedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFirstOutput"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptCompleted"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `finishReason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerMetadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<...\>\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `requestId`: `Schema.optionalKey`\<`Schema.String`\>; `responseModel`: `Schema.optionalKey`\<`Schema.String`\>; `serviceTier`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; `usage`: *typeof* `Response.Usage`; `usageAt`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelAttemptFailed"`\>; `attempt`: `Schema.Int`; `candidate`: `Schema.optionalKey`\<`Schema.Int`\>; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `classification`: `Schema.Literals`\<readonly \[..., ...\]\>; `deliveryId`: `Schema.String`; `disposition`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `failedAt`: `Schema.Finite`; `model`: `Schema.optionalKey`\<`Schema.String`\>; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `provider`: `Schema.optionalKey`\<`Schema.String`\>; `providerUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `registrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelRetryScheduled"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `delayMillis`: `Schema.Finite`; `deliveryId`: `Schema.String`; `modelCallId`: `Schema.String`; `reason`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelFallbackScheduled"`\>; `at`: `Schema.Finite`; `attempt`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `deliveryId`: `Schema.String`; `fromCandidate`: `Schema.Int`; `fromModel`: `Schema.String`; `fromProvider`: `Schema.String`; `fromRegistrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `modelCallId`: `Schema.String`; `toCandidate`: `Schema.Int`; `toModel`: `Schema.String`; `toProvider`: `Schema.String`; `toRegistrationKey`: `Schema.optionalKey`\<`Schema.String`\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallCompleted"`\>; `attempts`: `Schema.Int`; `completedAt`: `Schema.Finite`; `deliveryId`: `Schema.String`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[..., ..., ..., ..., ..., ..., ..., ...\]\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `turn`: `Schema.Finite`; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"ModelCallFailed"`\>; `attempts`: `Schema.Int`; `category`: `Schema.Literals`\<readonly \[..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ..., ...\]\>; `classification`: `Schema.Literals`\<readonly \[..., ...\]\>; `deliveryId`: `Schema.String`; `failedAt`: `Schema.Finite`; `failedAttemptUsage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: ...; `outputTokens`: ...; `totalTokens`: ...; \}\>\>; `modelCallId`: `Schema.String`; `purpose`: `Schema.Literals`\<readonly \[..., ..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionStarted"`\>; `compactionId`: `Schema.String`; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `deliveryId`: `Schema.String`; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `startedAt`: `Schema.Finite`; `trigger`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionSkipped"`\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `skippedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionApplied"`\>; `appliedAt`: `Schema.Finite`; `checkpointId`: `Schema.String`; `commit`: `Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<...\>; `contextTokensBefore`: `Schema.optionalKey`\<...\>; `entriesAfter`: `Schema.optionalKey`\<...\>; `entriesBefore`: `Schema.optionalKey`\<...\>; `summaryModelCallId`: `Schema.optionalKey`\<...\>; \}\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `kind`: `Schema.Literals`\<readonly \[..., ...\]\>; `turn`: `Schema.Finite`; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"CompactionFailed"`\>; `compactionId`: `Schema.String`; `deliveryId`: `Schema.String`; `failedAt`: `Schema.Finite`; `turn`: `Schema.Finite`; \}\>\]\>\]\>
 
 ***
 
@@ -758,7 +864,7 @@ Terminal disposition category for accepted steering.
 
 ### CompletedModelResponse
 
-> `const` **CompletedModelResponse**: `Schema.Struct`\<\{ `content`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"text"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"reasoning"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `approvalId`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `toolCallId`: `Schema.String`; `type`: `Schema.tag`\<`"tool-approval-request"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `data`: `Schema.Uint8ArrayFromBase64`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `type`: `Schema.tag`\<`"file"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `fileName`: `Schema.optionalKey`\<`Schema.String`\>; `id`: `Schema.String`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `sourceType`: `Schema.tag`\<`"document"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `sourceType`: `Schema.tag`\<`"url"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; `url`: `Schema.URLFromString`; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.optional`\<`Schema.String`\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `modelId`: `Schema.optional`\<`Schema.String`\>; `request`: `Schema.optional`\<*typeof* `Response.HttpRequestDetails`\>; `timestamp`: `Schema.optional`\<`Schema.DateTimeUtcFromString`\>; `type`: `Schema.tag`\<`"response-metadata"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `reason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `response`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Struct`\<...\>\>\>; `type`: `Schema.tag`\<`"finish"`\>; `usage`: `Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<...\>; `outputTokens`: `Schema.Struct`\<...\>; \}\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<..., ..., ..., ...\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: ...; `fromRun`: ...; \}\>\>; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<..., ..., ..., ...\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `taint`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<...\>\>\>; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>\]\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `usage`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; `cacheWrite`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; `total`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; `uncached`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; `text`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; `total`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Finite`\>\>; \}\>; \}\>\>; \}\>
+> `const` **CompletedModelResponse**: `Schema.Struct`\<\{ `content`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"text"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"reasoning"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `approvalId`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `toolCallId`: `Schema.String`; `type`: `Schema.tag`\<`"tool-approval-request"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `data`: `Schema.Uint8ArrayFromBase64`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `type`: `Schema.tag`\<`"file"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `fileName`: `Schema.optionalKey`\<`Schema.String`\>; `id`: `Schema.String`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `sourceType`: `Schema.tag`\<`"document"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `sourceType`: `Schema.tag`\<`"url"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; `url`: `Schema.URLFromString`; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.optional`\<`Schema.String`\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `modelId`: `Schema.optional`\<`Schema.String`\>; `request`: `Schema.optional`\<*typeof* `Response.HttpRequestDetails`\>; `timestamp`: `Schema.optional`\<`Schema.DateTimeUtcFromString`\>; `type`: `Schema.tag`\<`"response-metadata"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<...\>\>\>; `reason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `response`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Struct`\<...\>\>\>; `type`: `Schema.tag`\<`"finish"`\>; `usage`: *typeof* `Response.Usage`; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<..., ..., ..., ...\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Content/Part"`\>, `never`\>; `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: ...; `fromRun`: ...; \}\>\>; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<..., ..., ..., ...\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `taint`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<...\>\>\>; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>\]\>\>; `finishReason`: `Schema.optionalKey`\<`Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>\>; `usage`: `Schema.optionalKey`\<*typeof* `Response.Usage`\>; \}\>
 
 ***
 
@@ -806,7 +912,7 @@ Terminal disposition category for accepted steering.
 
 ### LifecycleTag
 
-> `const` **LifecycleTag**: `Schema.Literals`\<readonly \[`"Awaiting"`, `"Duplicate"`, `"TimedOut"`, `"WakeReceived"`, `"RunAccepted"`, `"BudgetExtended"`, `"BudgetSuspended"`, `"RunAttemptStarted"`, `"RunWaiting"`, `"RunResumed"`, `"Inbox"`, `"SteeringAccepted"`, `"SteeringConsumed"`, `"SteeringDiscarded"`, `"OperationUnknown"`, `"Substituted"`, `"ChildLinked"`, `"ChildReadinessChanged"`, `"ChildSettled"`, `"FanOutAdmitted"`, `"FanOutJoined"`, `"RunCompleted"`, `"RunFailed"`, `"RunCancellationRequested"`, `"RunCancelled"`, `"ProgramLog"`, `"Rewarded"`\]\>
+> `const` **LifecycleTag**: `Schema.Literals`\<readonly \[`"Awaiting"`, `"Duplicate"`, `"TimedOut"`, `"WakeReceived"`, `"RunAccepted"`, `"BudgetExtended"`, `"RunForked"`, `"RunRewound"`, `"ProgramOperationSettled"`, `"BudgetSuspended"`, `"RunAttemptStarted"`, `"RunWaiting"`, `"RunResumed"`, `"Inbox"`, `"SteeringAccepted"`, `"SteeringConsumed"`, `"SteeringDiscarded"`, `"OperationUnknown"`, `"Substituted"`, `"ChildLinked"`, `"ChildReadinessChanged"`, `"ChildSettled"`, `"FanOutAdmitted"`, `"FanOutJoined"`, `"RunCompleted"`, `"RunFailed"`, `"RunCancellationRequested"`, `"RunCancelled"`, `"ProgramLog"`, `"Rewarded"`\]\>
 
 ***
 
@@ -864,7 +970,7 @@ Terminal disposition category for accepted steering.
 
 ### ExecutionResult
 
-Re-exports [ExecutionResult](./ExecutionState#executionresult-1)
+Re-exports [ExecutionResult](./ExecutionState.md#executionresult-1)
 
 ***
 
@@ -872,4 +978,4 @@ Re-exports [ExecutionResult](./ExecutionState#executionresult-1)
 
 ### ExecutionResultSchema
 
-Renames and re-exports [ExecutionResult](./Run#executionresult-1)
+Renames and re-exports [ExecutionResult](./Run.md#executionresult-1)

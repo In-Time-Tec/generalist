@@ -1,8 +1,8 @@
-[**generalist**](../../../../index)
+[**generalist**](../../../../index.md)
 
 ***
 
-[generalist](../../../../index) / [runtime](../../../index) / [Messaging](../index) / MessagingPolicy
+[generalist](../../../../index.md) / [runtime](../../../index.md) / [Messaging](../index.md) / MessagingPolicy
 
 # MessagingPolicy
 
@@ -24,7 +24,7 @@
 
 ###### input
 
-[`PolicyInput`](../index#policyinput)
+[`PolicyInput`](../index.md#policyinput)
 
 ###### Returns
 
@@ -40,7 +40,7 @@
 
 ###### sender
 
-[`DirectoryEntry`](../../AgentDirectory#directoryentry)
+[`DirectoryEntry`](../../AgentDirectory.md#directoryentry)
 
 ###### Returns
 

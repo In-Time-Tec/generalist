@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / tasks
+[generalist](./index.md) / tasks
 
 # tasks
 

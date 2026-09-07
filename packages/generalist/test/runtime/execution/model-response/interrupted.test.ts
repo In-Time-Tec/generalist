@@ -1,8 +1,8 @@
 import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Option, Ref, Schedule, Schema, Scope, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Schedule, Schema, Scope, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Compaction, ModelResilience, Pins, Session } from "../../../../src/index.js"
+import { Agent, Compaction, ModelResilience, Pins } from "../../../../src/index.js"
 import {
   Address,
   Cursor,
@@ -77,7 +77,11 @@ const directCommit = () =>
         replayPolicy: "never",
         attempt: 0,
       })
-      yield* store.startOperation({ commandId: "runtime-execution-model-response-interrupted-test-ts-startOperation-1", ...claim, operationId: operation.operationId })
+      yield* store.startOperation({
+        commandId: "runtime-execution-model-response-interrupted-test-ts-startOperation-1",
+        ...claim,
+        operationId: operation.operationId,
+      })
       const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
       const prefix = yield* session.value.append(
@@ -85,23 +89,52 @@ const directCommit = () =>
         { commandId: "runtime-execution-model-response-interrupted-test-ts-prefix-1", expectedLeafId: null },
       )
       const empty = interrupted(operationKey, prefix.id, "")
-      const rejectedEmpty = yield* Effect.exit(store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: empty }))
+      const rejectedEmpty = yield* Effect.exit(
+        store.commitInterruptedModelResponse({
+          ...claim,
+          operationId: operation.operationId,
+          outcome: failedOutcome,
+          event: empty,
+        }),
+      )
       expect(rejectedEmpty._tag).toBe("Failure")
       expect(yield* session.value.path()).toEqual([prefix])
-      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe("running")
+      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
+        "running",
+      )
       const exact = interrupted(operationKey, prefix.id)
-      yield* store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: exact })
-      yield* store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: exact })
+      yield* store.commitInterruptedModelResponse({
+        ...claim,
+        operationId: operation.operationId,
+        outcome: failedOutcome,
+        event: exact,
+      })
+      yield* store.commitInterruptedModelResponse({
+        ...claim,
+        operationId: operation.operationId,
+        outcome: failedOutcome,
+        event: exact,
+      })
       const beforeDivergence = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       const pathBefore = yield* session.value.path()
       const divergent = interrupted(operationKey, prefix.id, "different partial")
-      const rejected = yield* Effect.exit(store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: divergent }))
+      const rejected = yield* Effect.exit(
+        store.commitInterruptedModelResponse({
+          ...claim,
+          operationId: operation.operationId,
+          outcome: failedOutcome,
+          event: divergent,
+        }),
+      )
       expect(rejected._tag).toBe("Failure")
       expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toEqual(beforeDivergence)
       expect(yield* session.value.path()).toEqual(pathBefore)
       const record = yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })
       const events = beforeDivergence.filter((event) => event._tag === "ModelResponseInterrupted")
-      expect(record).toMatchObject({ status: "failed", error: { _tag: "generalist/runtime/AgentExecutionFailure", message: "model terminated" } })
+      expect(record).toMatchObject({
+        status: "failed",
+        error: { _tag: "generalist/runtime/AgentExecutionFailure", message: "model terminated" },
+      })
       expect(events).toHaveLength(1)
       expect(events[0]).toMatchObject({ digest: exact.digest, sessionParentId: prefix.id })
       expect(events[0]).not.toHaveProperty("response")
@@ -109,18 +142,29 @@ const directCommit = () =>
       if (event === undefined) return yield* Effect.die("expected interrupted event")
       expect(yield* runtime.resolveModelResponse(event)).toEqual(exact.response)
       const corrupt = yield* runtime.resolveModelResponse({ ...event, digest: "corrupt" }).pipe(Effect.flip)
-      expect(corrupt).toMatchObject({ _tag: "generalist/runtime/SessionEntryCorrupt", sessionId: event.sessionId, entryId: event.sessionEntryId })
-      const wrongParent = yield* runtime.resolveModelResponse({ ...event, sessionParentId: "wrong-parent" }).pipe(Effect.flip)
+      expect(corrupt).toMatchObject({
+        _tag: "generalist/runtime/SessionEntryCorrupt",
+        sessionId: event.sessionId,
+        entryId: event.sessionEntryId,
+      })
+      const wrongParent = yield* runtime
+        .resolveModelResponse({ ...event, sessionParentId: "wrong-parent" })
+        .pipe(Effect.flip)
       expect(wrongParent).toMatchObject({ _tag: "generalist/runtime/SessionEntryCorrupt" })
       expect(pathBefore).toHaveLength(2)
       const interruptedEntry = pathBefore.at(-1)
       expect(interruptedEntry?.parentId).toBe(prefix.id)
       expect(interruptedEntry).toMatchObject({ _tag: "ModelResponse", metadata: { interruptionDigest: exact.digest } })
-      expect(interruptedEntry?._tag === "ModelResponse" && interruptedEntry.content.some((part) => part.type === "text" && part.text === "retained partial")).toBe(true)
+      expect(
+        interruptedEntry?._tag === "ModelResponse" &&
+          interruptedEntry.content.some((part) => part.type === "text" && part.text === "retained partial"),
+      ).toBe(true)
     }),
   )
 
-it.effect("atomically commits one exact interrupted outcome, event, and Session entry in object storage", () => directCommit())
+it.effect("atomically commits one exact interrupted outcome, event, and Session entry in object storage", () =>
+  directCommit(),
+)
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -205,12 +249,20 @@ const backend = "object" as const
             prompt: "begin",
           })
           const running = yield* host
-            .execute(yield* store.claimExecution({
-          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-3", runId: first.runId, ownerId: objectWorkerId }))
+            .execute(
+              yield* store.claimExecution({
+                commandId: "runtime-execution-model-response-interrupted-test-ts-claim-3",
+                runId: first.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             .pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(partialSeen)
           yield* runtime.cancel({
-          commandId: "runtime-execution-model-response-interrupted-test-ts-cancel-3", runId: first.runId, reason: "stop" })
+            commandId: "runtime-execution-model-response-interrupted-test-ts-cancel-3",
+            runId: first.runId,
+            reason: "stop",
+          })
           yield* Fiber.join(running)
           const history = yield* runtime.history({ runId: first.runId, cursor: Cursor.origin, limit: 100 })
           const interruptedIndex = history.findIndex((event) => event._tag === "ModelResponseInterrupted")
@@ -244,8 +296,13 @@ const backend = "object" as const
             idempotencyKey: "second",
             prompt: "continue",
           })
-          yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-4", runId: second.runId, ownerId: objectWorkerId }))
+          yield* host.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-execution-model-response-interrupted-test-ts-claim-4",
+              runId: second.runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           const secondInspection = yield* runtime.inspect(second.runId)
           if (secondInspection.status === "failed") {
             const secondHistory = yield* runtime.history({ runId: second.runId, limit: 100 })
@@ -285,8 +342,13 @@ const backend = "object" as const
           idempotencyKey: "failure",
           prompt: "fail",
         })
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-5", runId: receipt.runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-model-response-interrupted-test-ts-claim-5",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
         const interruptedIndex = history.findIndex((event) => event._tag === "ModelResponseInterrupted")
         const failedIndex = history.findIndex((event) => event._tag === "RunFailed")
@@ -336,8 +398,13 @@ it.effect("fails an empty model operation without writing an interrupted event o
         idempotencyKey: "empty",
         prompt: "fail empty",
       })
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-6",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       expect(history.map((event) => event._tag)).toContain("RunFailed")
       expect(history.map((event) => event._tag)).not.toContain("ModelResponseInterrupted")
@@ -412,8 +479,13 @@ it.effect("commits only the authoritative internal retry response", () => {
         idempotencyKey: "retry",
         prompt: "retry",
       })
-      yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-7", runId: receipt.runId, ownerId: objectWorkerId }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-7",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        }),
+      )
       const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       expect(attempts).toBe(2)
       expect(history.map((event) => event._tag)).not.toContain("ModelResponseInterrupted")
@@ -428,4 +500,3 @@ it.effect("commits only the authoritative internal retry response", () => {
     }),
   )
 })
-

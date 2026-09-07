@@ -1,8 +1,13 @@
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { digest } from "../../../core/durable/canonical-json.js"
 import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution/state.js"
-import { PinnedExecutable } from "../../executable/manifest.js"
+import { PinnedExecutable, ExecutableManifest, ExecutableRef } from "../../executable/manifest.js"
+import { ExecutableRegistration } from "../../executable/registration.js"
+import { Message } from "../../messaging/message.js"
+import { TreePolicy } from "../../tree/policy.js"
+import { BudgetLimits } from "../../../core/durable/run-budget.js"
+import { encode } from "../../execution/payload/index.js"
 import { RunOutcome } from "../../run.js"
 import { RunWait } from "../../run/wait.js"
 import { ExecutionContinuation } from "../../run/steering.js"
@@ -10,6 +15,54 @@ import { ExecutionContinuation } from "../../run/steering.js"
 /** A Run address owned by an external partition. */
 export const ExternalRunRef = Schema.Struct({ partition: Schema.String, runId: Schema.String })
 export type ExternalRunRef = typeof ExternalRunRef.Type
+const PlacementId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(4096))
+
+/** Immutable, serializable admission authority retained before any receiver dispatch. @experimental */
+export const AdmissionRequest = Schema.Struct({
+  parent: ExternalRunRef,
+  ref: ExternalRunRef,
+  root: Schema.Struct({
+    message: Message,
+    executableRef: ExecutableRef,
+    executableManifest: ExecutableManifest,
+    registrations: Schema.Array(ExecutableRegistration),
+    treePolicy: Schema.optionalKey(TreePolicy),
+    budget: Schema.optionalKey(BudgetLimits),
+  }),
+})
+export type AdmissionRequest = typeof AdmissionRequest.Type
+
+/** Bounded canonical request identity shared by reservation and receiver admission. @experimental */
+export const identifyRequest = (request: AdmissionRequest) =>
+  encode({
+    value: request,
+    boundary: "external child admission",
+    serialize: Schema.encodeSync(Schema.fromJsonString(AdmissionRequest)),
+  }).pipe(
+    Effect.map((encoded) => ({
+      requestDigest: digest(Schema.decodeSync(Schema.fromJsonString(Schema.Json))(encoded)),
+      executableDigest: executableDigest({
+        ref: request.root.executableRef,
+        manifest: request.root.executableManifest,
+      }),
+    })),
+  )
+
+/** Exact receiver command; its envelope is the same one committed by the parent. @experimental */
+export const RootAdmission = Schema.Struct({
+  placementId: PlacementId,
+  ...AdmissionRequest.fields,
+  requestDigest: Schema.String,
+  executableDigest: Schema.String,
+})
+export type RootAdmission = typeof RootAdmission.Type
+
+/** Bounded immutable-key enumeration; restart each recovery sweep from the beginning. @experimental */
+export const PageInput = Schema.Struct({
+  afterPlacementId: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(4096))),
+  limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 1000 })),
+})
+export type PageInput = typeof PageInput.Type
 
 /** Stable digest of the exact executable admitted on the child partition. */
 export const executableDigest = (executable: PinnedExecutable): string =>
@@ -26,7 +79,7 @@ export type ParentSuspension = typeof ParentSuspension.Type
 
 /** Immutable admission facts plus current parent claim authority. */
 export const ReserveInput = Schema.Struct({
-  placementId: Schema.String,
+  placementId: PlacementId,
   runId: Schema.String,
   ownerId: Schema.String,
   attemptFence: Schema.Int,
@@ -37,7 +90,7 @@ export const ReserveInput = Schema.Struct({
     runAttemptFence: Schema.Finite,
     epoch: Schema.String,
   }),
-  ref: ExternalRunRef,
+  request: AdmissionRequest,
   invocationId: Schema.String,
   requestDigest: Schema.String,
   executableDigest: Schema.String,
@@ -47,9 +100,9 @@ export type ReserveInput = typeof ReserveInput.Type
 
 /** Stored placement state returned by every placement operation. */
 export const Placement = Schema.Struct({
-  placementId: Schema.String,
+  placementId: PlacementId,
   parentRunId: Schema.String,
-  ref: ExternalRunRef,
+  request: AdmissionRequest,
   invocationId: Schema.String,
   requestDigest: Schema.String,
   executableDigest: Schema.String,
@@ -65,7 +118,7 @@ export type Placement = typeof Placement.Type
 
 /** A depth-zero child root owned by this partition. */
 export const ExternalRoot = Schema.Struct({
-  placementId: Schema.String,
+  placementId: PlacementId,
   parent: ExternalRunRef,
   ref: ExternalRunRef,
   sessionId: Schema.String,

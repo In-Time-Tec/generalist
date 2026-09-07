@@ -83,11 +83,13 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claim = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({
-          commandId: `runtime-operation-suites-tool-cancellation-ts-claim-${ownerId}`,
-          runId,
-          ownerId: objectWorkerId,
-        }))
+      ? Effect.flatMap(RunStore.RunStore, (store) =>
+          store.claimExecution({
+            commandId: `runtime-operation-suites-tool-cancellation-ts-claim-${ownerId}`,
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
       : options.claim(runId, ownerId)
 
   describeBackend(`durable tool cancellation (${options.name})`, () => {
@@ -172,7 +174,10 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             })
 
             yield* runtime.cancel({
-          commandId: "runtime-operation-suites-tool-cancellation-ts-cancel-1", runId: receipt.runId, reason: "user requested" })
+              commandId: "runtime-operation-suites-tool-cancellation-ts-cancel-1",
+              runId: receipt.runId,
+              reason: "user requested",
+            })
             yield* Fiber.await(original).pipe(Effect.timeout("5 seconds"))
             const committed = yield* store.getOperationByKey({ runId: receipt.runId, operationKey })
             expect(committed).toMatchObject({ status: "cancelling" })
@@ -390,7 +395,10 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               attempt: rootExecution.attempt,
             })
             yield* store.startOperation({
-          commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-2", ...rootClaim, operationId: rootOperation.operationId })
+              commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-2",
+              ...rootClaim,
+              operationId: rootOperation.operationId,
+            })
             const blockedOperation = yield* store.recordOperation({
               ...rootClaim,
               operationKey: `${receipt.runId}:tool:blocked`,
@@ -421,10 +429,16 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               attempt: childExecution.attempt,
             })
             yield* store.startOperation({
-          commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-3", ...childClaim, operationId: childOperation.operationId })
+              commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-3",
+              ...childClaim,
+              operationId: childOperation.operationId,
+            })
 
             yield* runtime.cancel({
-          commandId: "runtime-operation-suites-tool-cancellation-ts-cancel-4", runId: receipt.runId, reason: "cancel tree" })
+              commandId: "runtime-operation-suites-tool-cancellation-ts-cancel-4",
+              runId: receipt.runId,
+              reason: "cancel tree",
+            })
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
             expect((yield* runtime.inspect(child.runId)).status).toBe("cancelling")
             expect(

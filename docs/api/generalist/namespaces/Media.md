@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Media
+[generalist](../../index.md) / [generalist](../index.md) / Media
 
 # Media
 
@@ -16,7 +16,7 @@ Typed media references and provider resolution.
 
 ### File
 
-Re-exports [File](../../media#file)
+Re-exports [File](../../media.md#file)
 
 ***
 
@@ -24,7 +24,7 @@ Re-exports [File](../../media#file)
 
 ### fromPath
 
-Re-exports [fromPath](../../media#frompath)
+Re-exports [fromPath](../../media.md#frompath)
 
 ***
 
@@ -32,7 +32,7 @@ Re-exports [fromPath](../../media#frompath)
 
 ### FromPathError
 
-Re-exports [FromPathError](../../media#frompatherror)
+Re-exports [FromPathError](../../media.md#frompatherror)
 
 ***
 
@@ -40,7 +40,7 @@ Re-exports [FromPathError](../../media#frompatherror)
 
 ### FromPathOptions
 
-Re-exports [FromPathOptions](../../media#frompathoptions)
+Re-exports [FromPathOptions](../../media.md#frompathoptions)
 
 ***
 
@@ -48,7 +48,7 @@ Re-exports [FromPathOptions](../../media#frompathoptions)
 
 ### MediaReadError
 
-Re-exports [MediaReadError](../../media#mediareaderror)
+Re-exports [MediaReadError](../../media.md#mediareaderror)
 
 ***
 
@@ -56,7 +56,7 @@ Re-exports [MediaReadError](../../media#mediareaderror)
 
 ### MediaTypeUnsupported
 
-Re-exports [MediaTypeUnsupported](../../media#mediatypeunsupported)
+Re-exports [MediaTypeUnsupported](../../media.md#mediatypeunsupported)
 
 ***
 
@@ -64,7 +64,7 @@ Re-exports [MediaTypeUnsupported](../../media#mediatypeunsupported)
 
 ### part
 
-Re-exports [part](../../media#part)
+Re-exports [part](../../media.md#part)
 
 ***
 
@@ -72,7 +72,7 @@ Re-exports [part](../../media#part)
 
 ### Ref
 
-Re-exports [Ref](../../media#ref-1)
+Re-exports [Ref](../../media.md#ref-1)
 
 ***
 
@@ -80,7 +80,7 @@ Re-exports [Ref](../../media#ref-1)
 
 ### RefValue
 
-Renames and re-exports [Ref](../../media#ref-1)
+Renames and re-exports [Ref](../../media.md#ref-1)
 
 ***
 
@@ -88,4 +88,4 @@ Renames and re-exports [Ref](../../media#ref-1)
 
 ### resolve
 
-Re-exports [resolve](../../media#resolve)
+Re-exports [resolve](../../media.md#resolve)

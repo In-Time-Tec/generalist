@@ -5,6 +5,7 @@ import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { ArtifactError, ArtifactUpdate } from "../core/artifact.js"
 import type { Host } from "../host/index.js"
 import { ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
+import { authorize, type Authorization } from "./auth.js"
 
 const ClientCommandJson = Schema.fromJsonString(ArtifactClientCommand)
 const ServerEventJson = Schema.fromJsonString(ArtifactServerEvent)
@@ -28,6 +29,7 @@ const closeForError = (
 /** Upgrade one authenticated Artifact route and join it as a human editing peer. */
 export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
   readonly host: Host<Agents>
+  readonly authorization: Authorization
   readonly name: string
   readonly request: HttpServerRequest.HttpServerRequest
   readonly updates: Stream.Stream<ArtifactUpdate, ArtifactError>
@@ -64,9 +66,19 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
 
     const dispatch = (data: string) =>
       Schema.decodeEffect(ClientCommandJson)(data).pipe(
-        Effect.flatMap((command) => options.host.artifacts.edit(options.name, command)),
+        Effect.flatMap((command) =>
+          authorize({
+            policy: options.authorization,
+            resource: { type: "artifact", id: options.name },
+            action: "mutate",
+          }).pipe(Effect.andThen(Effect.suspend(() => options.host.artifacts.edit(options.name, command)))),
+        ),
         Effect.asVoid,
-        Effect.catchTag("SchemaError", () => close(1003, "malformed-artifact-command")),
+        Effect.catchTags({
+          SchemaError: () => close(1003, "malformed-artifact-command"),
+          "generalist/server/Forbidden": () => close(1008, "forbidden"),
+          "generalist/server/Unauthorized": () => close(1008, "unauthorized"),
+        }),
         Effect.catchTag("SocketError", () => Effect.void),
         Effect.catch((error) => closeForError(close, error)),
       )

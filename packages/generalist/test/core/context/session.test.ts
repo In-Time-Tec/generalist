@@ -18,7 +18,6 @@ const promptTexts = (prompt: Prompt.Prompt): ReadonlyArray<string> =>
   })
 
 describe("Session", () => {
-
   ItLayer.make(
     it,
     "starts empty",
@@ -45,7 +44,10 @@ describe("Session", () => {
           const store = yield* Session.acquire("test")
 
           const first = yield* store.append({ _tag: "Message", message: user("one") }, { commandId: "fixture-51" })
-          const second = yield* store.append({ _tag: "Message", message: assistant("two") }, { commandId: "fixture-52" })
+          const second = yield* store.append(
+            { _tag: "Message", message: assistant("two") },
+            { commandId: "fixture-52" },
+          )
           const third = yield* store.append({ _tag: "Message", message: user("three") }, { commandId: "fixture-53" })
           const path = yield* store.path()
 
@@ -67,7 +69,12 @@ describe("Session", () => {
           const store = yield* Session.acquire("paged")
           const appended = []
           for (let index = 0; index < 10; index += 1) {
-            appended.push(yield* store.append({ _tag: "Message", message: user(`message-${index}`) }, { commandId: `fixture-74-${index}` }))
+            appended.push(
+              yield* store.append(
+                { _tag: "Message", message: user(`message-${index}`) },
+                { commandId: `fixture-74-${index}` },
+              ),
+            )
           }
           const fixedLeaf = appended.at(-1)!.id
           let page = yield* store.pathPage({ leafId: fixedLeaf, limit: 3 })
@@ -91,18 +98,27 @@ describe("Session", () => {
             projectedHistory: Prompt.fromMessages([user("projected")]),
             telemetry: [],
           })).checkpoint
-          const suffix = yield* store.append({ _tag: "Message", message: assistant("suffix") }, { commandId: "fixture-98" })
+          const suffix = yield* store.append(
+            { _tag: "Message", message: assistant("suffix") },
+            { commandId: "fixture-98" },
+          )
           expect((yield* store.effectivePath()).map((entry) => entry.id)).toEqual([checkpoint.id, suffix.id])
           expect((yield* store.path()).length).toBeGreaterThan(2)
           expect(yield* store.latestCompaction()).toEqual(checkpoint)
 
-          const handoff = yield* store.append({
-                      _tag: "Handoff",
-                      handoffId: "paged-handoff",
-                      target: "specialist",
-                      projectedHistory: Prompt.fromMessages([user("handoff projection")]),
-                    }, { commandId: "fixture-103" })
-          const afterHandoff = yield* store.append({ _tag: "Message", message: assistant("after handoff") }, { commandId: "fixture-109" })
+          const handoff = yield* store.append(
+            {
+              _tag: "Handoff",
+              handoffId: "paged-handoff",
+              target: "specialist",
+              projectedHistory: Prompt.fromMessages([user("handoff projection")]),
+            },
+            { commandId: "fixture-103" },
+          )
+          const afterHandoff = yield* store.append(
+            { _tag: "Message", message: assistant("after handoff") },
+            { commandId: "fixture-109" },
+          )
           expect((yield* store.effectivePath()).map((entry) => entry.id)).toEqual([handoff.id, afterHandoff.id])
           expect(yield* store.latestCompaction()).toEqual(checkpoint)
         }),
@@ -240,12 +256,21 @@ describe("Session", () => {
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          const first = yield* store.append({ _tag: "Message", message: user("authored before") }, { commandId: "fixture-247" })
-          yield* store.append({
-                      _tag: "Message",
-                      message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
-                    }, { commandId: "fixture-248" })
-          const kept = yield* store.append({ _tag: "Message", message: assistant("model before") }, { commandId: "fixture-252" })
+          const first = yield* store.append(
+            { _tag: "Message", message: user("authored before") },
+            { commandId: "fixture-247" },
+          )
+          yield* store.append(
+            {
+              _tag: "Message",
+              message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
+            },
+            { commandId: "fixture-248" },
+          )
+          const kept = yield* store.append(
+            { _tag: "Message", message: assistant("model before") },
+            { commandId: "fixture-252" },
+          )
           const id = yield* store.reserveEntryId("memory-checkpoint")
           yield* store.appendCheckpoint({
             id,
@@ -313,7 +338,10 @@ describe("Session", () => {
           const store = yield* Session.acquire("test")
 
           yield* store.append({ _tag: "Message", message: user("main") }, { commandId: "fixture-319" })
-          yield* store.append({ _tag: "BranchSummary", summary: "alternate branch tried X" }, { commandId: "fixture-320" })
+          yield* store.append(
+            { _tag: "BranchSummary", summary: "alternate branch tried X" },
+            { commandId: "fixture-320" },
+          )
           yield* store.append({ _tag: "Message", message: assistant("continue") }, { commandId: "fixture-321" })
 
           expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual([
@@ -348,7 +376,10 @@ describe("Session", () => {
           })
 
           yield* store.append({ _tag: "Memory", items: ["customer is enterprise"] }, { commandId: "fixture-354" })
-          yield* store.append({ _tag: "Skill", name: "research", body: "Use primary sources." }, { commandId: "fixture-355" })
+          yield* store.append(
+            { _tag: "Skill", name: "research", body: "Use primary sources." },
+            { commandId: "fixture-355" },
+          )
           yield* store.append({ _tag: "Steering", message: user("Prioritize docs.") }, { commandId: "fixture-356" })
           yield* store.append({ _tag: "ToolCall", part: toolCall }, { commandId: "fixture-357" })
           yield* store.append({ _tag: "ToolResult", part: toolResult }, { commandId: "fixture-358" })
@@ -461,7 +492,10 @@ describe("Session", () => {
         layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source sentinel") }, { commandId: "fixture-468" })
+          const source = yield* store.append(
+            { _tag: "Message", message: user("source sentinel") },
+            { commandId: "fixture-468" },
+          )
           const checkpointId = yield* store.reserveEntryId("handoff-checkpoint")
           yield* store.appendCheckpoint({
             id: checkpointId,
@@ -469,7 +503,10 @@ describe("Session", () => {
             projectedHistory: Prompt.fromMessages([user("compacted")]),
             telemetry: [],
           })
-          const between = yield* store.append({ _tag: "Message", message: assistant("between") }, { commandId: "fixture-476" })
+          const between = yield* store.append(
+            { _tag: "Message", message: assistant("between") },
+            { commandId: "fixture-476" },
+          )
           yield* store.append(
             {
               _tag: "Handoff",
@@ -763,7 +800,10 @@ describe("Session", () => {
             telemetry: [],
           }
           yield* store.appendCheckpoint(prepared)
-          const descendant = yield* store.append({ _tag: "Message", message: user("descendant") }, { commandId: "fixture-770", expectedLeafId: prepared.id })
+          const descendant = yield* store.append(
+            { _tag: "Message", message: user("descendant") },
+            { commandId: "fixture-770", expectedLeafId: prepared.id },
+          )
 
           const delayed = yield* store.appendCheckpoint(prepared)
 
@@ -775,7 +815,10 @@ describe("Session", () => {
           ])
 
           yield* store.setLeaf(source.id, "fixture-523")
-          yield* store.append({ _tag: "Message", message: user("other branch") }, { commandId: "fixture-785", expectedLeafId: source.id })
+          yield* store.append(
+            { _tag: "Message", message: user("other branch") },
+            { commandId: "fixture-785", expectedLeafId: source.id },
+          )
           const abandoned = yield* Effect.flip(store.appendCheckpoint(prepared))
 
           expect(abandoned._tag).toBe("generalist/core/SessionConflict")
@@ -882,5 +925,4 @@ describe("Session", () => {
         }),
       ] as const,
   )
-
 })

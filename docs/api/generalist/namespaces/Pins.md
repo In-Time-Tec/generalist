@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Pins
+[generalist](../../index.md) / [generalist](../index.md) / Pins
 
 # Pins
 

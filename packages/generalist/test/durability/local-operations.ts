@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import * as Journal from "../../src/durability/internal/journal.js"
+import { type Head as JournalHead, type State, make } from "../../src/durability/internal/journal.js"
 import { ObjectStore, ObjectStoreFailure, type Service } from "../../src/durability/object-store.js"
 import { atomicCreates, byteIntegrity, freshReads, listing } from "../../src/testing/durability/index.js"
 
@@ -12,10 +12,10 @@ export const Head = Schema.Struct({
 const receipt = Schema.decodeUnknownSync(Schema.Struct({ count: Schema.Int }))
 const check = (condition: boolean, message: string) => (condition ? Effect.void : Effect.die(new Error(message)))
 export const open = (store: Service) =>
-  Journal.make({ environment: "local", tenant: "integration", partition: "journal", snapshotEvery: 2 }).pipe(
+  make({ environment: "local", tenant: "integration", partition: "journal", snapshotEvery: 2 }).pipe(
     Effect.provideService(ObjectStore, store),
   )
-const increment = (state: Journal.State) =>
+const increment = (state: State) =>
   Effect.succeed({
     patches: [{ op: "set" as const, path: ["count"], value: Number(state.count ?? 0) + 1 }],
     receipt: { count: Number(state.count ?? 0) + 1 },
@@ -79,7 +79,7 @@ export const exercise = <E, R>(connect: Effect.Effect<Service, E, R>) =>
     return yield* journal.read
   })
 
-export const recover = ({ store, expected }: { readonly store: Service; readonly expected: Journal.Head }) =>
+export const recover = ({ store, expected }: { readonly store: Service; readonly expected: JournalHead }) =>
   Effect.gen(function* () {
     const journal = yield* open(store)
     const actual = yield* journal.read

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / PackageCatalog
+[generalist](../../index.md) / [instructions](../index.md) / PackageCatalog
 
 # PackageCatalog
 
@@ -258,13 +258,13 @@ Every installed package's tool handlers; provide it wherever the toolkit runs.
 
 ##### instructions
 
-> `readonly` **instructions**: readonly [`Provider`](../index#provider)\<`never`\>[]
+> `readonly` **instructions**: readonly [`Provider`](../index.md#provider)\<`never`\>[]
 
 <a id="skills"></a>
 
 ##### skills
 
-> `readonly` **skills**: [`Service`](../../generalist/namespaces/SkillCatalog#service)
+> `readonly` **skills**: [`Service`](../../generalist/namespaces/SkillCatalog.md#service)
 
 <a id="toolkit"></a>
 

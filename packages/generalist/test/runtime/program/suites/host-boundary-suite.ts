@@ -90,11 +90,13 @@ const execute = (address: Address.Address) =>
     const store = yield* RunStore.RunStore
     const host = yield* RunExecutor.RunExecutor
     const receipt = yield* runtime.send({ to: address, sessionId: address, idempotencyKey: address, prompt: "run" })
-    yield* host.execute(yield* store.claimExecution({
-      commandId: "runtime-program-suites-host-boundary-suite-ts-claim-1",
-      runId: receipt.runId,
-      ownerId: objectWorkerId,
-    }))
+    yield* host.execute(
+      yield* store.claimExecution({
+        commandId: "runtime-program-suites-host-boundary-suite-ts-claim-1",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      }),
+    )
     return { runId: receipt.runId, outcome: (yield* runtime.snapshot(receipt.runId)).outcome }
   })
 
@@ -232,15 +234,20 @@ describe("durable Program host boundary", () => {
         })
         runId = receipt.runId
         const fiber = yield* host
-          .execute(yield* store.claimExecution({
-            commandId: "runtime-program-suites-host-boundary-suite-ts-claim-2",
-            runId,
-            ownerId: objectWorkerId,
-          }))
+          .execute(
+            yield* store.claimExecution({
+              commandId: "runtime-program-suites-host-boundary-suite-ts-claim-2",
+              runId,
+              ownerId: objectWorkerId,
+            }),
+          )
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
         yield* runtime.cancel({
-          commandId: "runtime-program-suites-host-boundary-suite-ts-cancel-1", runId, reason: "stop" })
+          commandId: "runtime-program-suites-host-boundary-suite-ts-cancel-1",
+          runId,
+          reason: "stop",
+        })
         yield* Fiber.await(fiber)
         expect((yield* runtime.inspect(runId)).status).toBe("cancelled")
         expect(lifecycle).toEqual(["service:cancelling", "sandbox-active:cancelling"])

@@ -9,6 +9,15 @@ export default defineConfig({
     alias: [{ find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) }],
   },
   server: {
+    host: "127.0.0.1",
     port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:4000",
+        changeOrigin: false,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
   },
 })

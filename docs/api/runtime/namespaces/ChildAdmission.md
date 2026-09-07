@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / ChildAdmission
+[generalist](../../index.md) / [runtime](../index.md) / ChildAdmission
 
 # ChildAdmission
 
@@ -174,7 +174,7 @@ One direct child as the parent may observe it.
 
 ##### outcome?
 
-> `readonly` `optional` **outcome?**: [`RunOutcome`](./Run#runoutcome)
+> `readonly` `optional` **outcome?**: [`RunOutcome`](./Run.md#runoutcome)
 
 <a id="readiness"></a>
 
@@ -186,7 +186,7 @@ One direct child as the parent may observe it.
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 ***
 
@@ -339,7 +339,7 @@ handle never carries an answer, so a caller that must wait polls this or follows
 
 ##### listDirect
 
-> `readonly` **listDirect**: (`parentRunId`) => `Effect`\<readonly [`ChildInspection`](#childinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+> `readonly` **listDirect**: (`parentRunId`) => `Effect`\<readonly [`ChildInspection`](#childinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ###### Parameters
 
@@ -349,7 +349,7 @@ handle never carries an answer, so a caller that must wait polls this or follows
 
 ###### Returns
 
-`Effect`\<readonly [`ChildInspection`](#childinspection)[], [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`RunNotFound`](./Errors#runnotfound)\>
+`Effect`\<readonly [`ChildInspection`](#childinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
 ## Type Aliases
 
@@ -357,7 +357,7 @@ handle never carries an answer, so a caller that must wait polls this or follows
 
 ### AdmitChildError
 
-> **AdmitChildError** = [`ChildDepthExceeded`](./Errors#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors#childselectionmissing) \| [`IdempotencyConflict`](./Errors#idempotencyconflict) \| [`RunIdConflict`](./Errors#runidconflict) \| [`RunNotFound`](./Errors#runnotfound) \| [`RunTerminal`](./Errors#runterminal) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget#exhausted)
+> **AdmitChildError** = [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted)
 
 Non-blocking direct-child operations scoped to one parent Run.
 
@@ -394,7 +394,7 @@ wants the answer joins explicitly, so a crash between admission and join never l
 
 ### ChildLookupError
 
-> **ChildLookupError** = [`ChildParentageInvalid`](#childparentageinvalid) \| [`RunNotFound`](./Errors#runnotfound) \| [`RuntimeUnavailable`](./Errors#runtimeunavailable)
+> **ChildLookupError** = [`ChildParentageInvalid`](#childparentageinvalid) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../durability.md#durabilityfailure)
 
 ## Variables
 
@@ -492,7 +492,7 @@ blocking route exactly as before.
 
 ##### store
 
-[`Service`](./RunStore#service)
+[`Service`](./RunStore.md#service)
 
 #### Returns
 
@@ -524,7 +524,7 @@ over speed here and the read must not be optimised away.
 
 ##### store
 
-[`Service`](./RunStore#service)
+[`Service`](./RunStore.md#service)
 
 #### Returns
 
@@ -556,7 +556,7 @@ Read the origin an invocation id carries, if it carries one.
 
 ### parentRunId
 
-> `const` **parentRunId**: `Effect.Effect`\<`string`, [`ChildParentageInvalid`](#childparentageinvalid), [`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext)\>
+> `const` **parentRunId**: `Effect.Effect`\<`string`, [`ChildParentageInvalid`](#childparentageinvalid), [`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>
 
 Parent Run identity the host derived, never text the model supplied.
 

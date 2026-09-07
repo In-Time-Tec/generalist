@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.foldkit](../index) / Connection
+[generalist](../../index.md) / [unstable.foldkit](../index.md) / Connection
 
 # Connection
 
@@ -126,7 +126,7 @@
 
 ###### command
 
-\{ `_tag`: `"SendMessage"`; `prompt`: `string`; `sessionId`: `string`; \} \| \{ `_tag`: `"ResolveApproval"`; `decision`: \{ `_tag`: `"Approved"`; \} \| \{ `_tag`: `"Denied"`; `reason?`: `string`; \}; `sessionId`: `string`; `token`: `string`; \} \| \{ `_tag`: `"Cancel"`; `sessionId`: `string`; \}
+\{ `_tag`: `"SendMessage"`; `prompt`: `string`; `sessionId`: `string`; \} \| \{ `_tag`: `"ResolveApproval"`; `decision`: \{ `_tag`: `"Approved"`; \} \| \{ `_tag`: `"Denied"`; `reason?`: `string`; \}; `sessionId`: `string`; `token`: `string`; \} \| \{ `_tag`: `"Cancel"`; `commandId`: `string`; `sessionId`: `string`; \}
 
 ###### Returns
 
@@ -143,10 +143,6 @@
 ###### Parameters
 
 ###### options
-
-###### afterSeq?
-
-`number`
 
 ###### sessionId
 
@@ -186,7 +182,7 @@
 
 ###### command
 
-\{ `_tag`: `"SendMessage"`; `prompt`: `string`; `sessionId`: `string`; \} \| \{ `_tag`: `"ResolveApproval"`; `decision`: \{ `_tag`: `"Approved"`; \} \| \{ `_tag`: `"Denied"`; `reason?`: `string`; \}; `sessionId`: `string`; `token`: `string`; \} \| \{ `_tag`: `"Cancel"`; `sessionId`: `string`; \}
+\{ `_tag`: `"SendMessage"`; `prompt`: `string`; `sessionId`: `string`; \} \| \{ `_tag`: `"ResolveApproval"`; `decision`: \{ `_tag`: `"Approved"`; \} \| \{ `_tag`: `"Denied"`; `reason?`: `string`; \}; `sessionId`: `string`; `token`: `string`; \} \| \{ `_tag`: `"Cancel"`; `commandId`: `string`; `sessionId`: `string`; \}
 
 ###### Returns
 
@@ -226,7 +222,7 @@
 
 ### Incoming
 
-> **Incoming** = [`HostEvent`](../../host#hostevent) \| *typeof* `ConnectionOpened.Type` \| *typeof* `ConnectionLost.Type` \| *typeof* `ConnectionFailed.Type`
+> **Incoming** = *typeof* `SessionSnapshot.Type` \| *typeof* `HostDelivery.Type` \| *typeof* `ConnectionOpened.Type` \| *typeof* `ConnectionLost.Type` \| *typeof* `ConnectionFailed.Type`
 
 **`Experimental`**
 
@@ -256,7 +252,7 @@
 
 ### ConnectionFailed
 
-> `const` **ConnectionFailed**: `CallableTaggedStruct`\<`"ConnectionFailed"`, \{ `error`: *typeof* `TransportError`; `operation`: `Schema.Literal`\<`"connect"`\>; `reason`: *typeof* `Schema.String`; \}\>
+> `const` **ConnectionFailed**: `CallableTaggedStruct`\<`"ConnectionFailed"`, *typeof* `DeliveryIdentity` & `object`\>
 
 **`Experimental`**
 
@@ -266,7 +262,7 @@
 
 ### ConnectionLost
 
-> `const` **ConnectionLost**: `CallableTaggedStruct`\<`"ConnectionLost"`, `Record`\<`never`, `never`\>\>
+> `const` **ConnectionLost**: `CallableTaggedStruct`\<`"ConnectionLost"`, \{ `epoch`: `Schema.Int`; `sessionId`: `Schema.String`; \}\>
 
 **`Experimental`**
 
@@ -276,9 +272,19 @@
 
 ### ConnectionOpened
 
-> `const` **ConnectionOpened**: `CallableTaggedStruct`\<`"ConnectionOpened"`, `Record`\<`never`, `never`\>\>
+> `const` **ConnectionOpened**: `CallableTaggedStruct`\<`"ConnectionOpened"`, \{ `epoch`: `Schema.Int`; `sessionId`: `Schema.String`; \}\>
+
+***
+
+<a id="hostdelivery"></a>
+
+### HostDelivery
+
+> `const` **HostDelivery**: `CallableTaggedStruct`\<`"HostDelivery"`, \{ `epoch`: `Schema.Int`; `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"RunStarted"`, \{ `cursor`: [`Cursor`](../../runtime/namespaces/Cursor.md#cursor); `event`: `Schema.refine`\<`object` & `object` & `object`, `Schema.Codec`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), `object` & ..., `never`, `never`\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Turn"`, \{ `cursor`: [`Cursor`](../../runtime/namespaces/Cursor.md#cursor); `event`: `Schema.refine`\<... & ... & ... \| ... & ... & ..., `Schema.Codec`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), `object` & ..., `never`, `never`\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ToolCall"`, \{ `cursor`: [`Cursor`](../../runtime/namespaces/Cursor.md#cursor); `event`: `Schema.refine`\<... & ... & ... \| ... & ... & ... \| ... & ... & ... \| ... & ... & ..., `Schema.Codec`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), `object` & ..., `never`, `never`\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"TasksUpdated"`, \{ `cursor`: `Schema.Int`; `items`: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<...\>; `status`: `Schema.Literals`\<...\>; `title`: `Schema.String`; \}\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ArtifactUpdated"`, \{ `cursor`: `Schema.Int`; `runId`: `Schema.String`; `sessionId`: `Schema.String`; `update`: `Schema.Struct`\<\{ `artifact`: `Schema.String`; `attribution`: `Schema.Union`\<readonly ...\>; `base`: `Schema.Int`; `branch`: `Schema.optionalKey`\<`Schema.String`\>; `result`: `Schema.Int`; \}\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalRequested"`, \{ `cursor`: [`Cursor`](../../runtime/namespaces/Cursor.md#cursor); `event`: `Schema.refine`\<`object` & [`ApprovalRequested`](../../generalist/namespaces/AgentEvent.md#approvalrequested) & `object`, `Schema.Codec`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), `object` & ..., `never`, `never`\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Compacted"`, \{ `cursor`: [`Cursor`](../../runtime/namespaces/Cursor.md#cursor); `event`: `Schema.refine`\<`object` & `object` & `object`, `Schema.Codec`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), `object` & ..., `never`, `never`\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Completed"`, \{ `cursor`: [`Cursor`](../../runtime/namespaces/Cursor.md#cursor); `event`: `Schema.refine`\<... & ... & ... \| ... & ... & ... \| ... & ... & ..., `Schema.Codec`\<[`RunEvent`](../../runtime/namespaces/RunEvent.md#runevent), `object` & ..., `never`, `never`\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Conversation"`, \{ `cursor`: `Schema.Int`; `sessionId`: `Schema.String`; `update`: `Schema.Struct`\<\{ `afterEntryId`: `Schema.NullOr`\<`Schema.String`\>; `entries`: `Schema.$Array`\<`Schema.Struct`\<...\>\>; `leafId`: `Schema.NullOr`\<`Schema.String`\>; `previousLeafId`: `Schema.NullOr`\<`Schema.String`\>; \}\>; \}\>\]\>; \}\>
 
 **`Experimental`**
+
+One committed Host event delivered within an established snapshot epoch.
 
 ***
 
@@ -331,3 +337,15 @@
 #### Returns
 
 `Layer.Layer`\<[`Connection`](#connection), `never`, `HttpClient.HttpClient` \| `Socket.WebSocketConstructor`\>
+
+***
+
+<a id="sessionsnapshot"></a>
+
+### SessionSnapshot
+
+> `const` **SessionSnapshot**: `CallableTaggedStruct`\<`"SessionSnapshot"`, \{ `epoch`: `Schema.Int`; `snapshot`: `Schema.Codec`\<[`HostSessionSnapshot`](../../runtime/namespaces/HostSession.md#hostsessionsnapshot), `unknown`, `never`, `never`\>; \}\>
+
+**`Experimental`**
+
+A committed snapshot establishes a new connection-local delivery epoch.

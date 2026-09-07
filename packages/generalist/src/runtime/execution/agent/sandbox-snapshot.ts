@@ -6,7 +6,15 @@ const SandboxSnapshot = Schema.TaggedStruct("SandboxSnapshot", { snapshotId: Sna
 
 /** Select the newest restorable Sandbox image from the authoritative retained journal. */
 export const latestSandboxSnapshotId = (events: ReadonlyArray<RunEvent>): string | undefined => {
-  const latest = events.findLast((event) => event._tag === "ToolProgress" && event.message === "SandboxSnapshot")
-  if (latest?._tag !== "ToolProgress") return undefined
-  return Option.getOrUndefined(Schema.decodeUnknownOption(SandboxSnapshot)(latest.data))?.snapshotId
+  let cutoff = Number.POSITIVE_INFINITY
+  for (const event of events.toReversed()) {
+    if (event.sequence > cutoff) continue
+    if (event._tag === "RunRewound") {
+      cutoff = event.toSequence
+      continue
+    }
+    if (event._tag !== "ToolProgress" || event.message !== "SandboxSnapshot") continue
+    return Option.getOrUndefined(Schema.decodeUnknownOption(SandboxSnapshot)(event.data))?.snapshotId
+  }
+  return undefined
 }

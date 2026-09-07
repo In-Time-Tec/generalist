@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Message
+[generalist](../../index.md) / [runtime](../index.md) / Message
 
 # Message
 
@@ -44,7 +44,7 @@
 
 ###### from?
 
-[`Address`](./Address#address)
+[`Address`](./Address.md#address)
 
 ###### id
 
@@ -72,7 +72,7 @@
 
 ###### to
 
-[`Address`](./Address#address)
+[`Address`](./Address.md#address)
 
 #### Returns
 

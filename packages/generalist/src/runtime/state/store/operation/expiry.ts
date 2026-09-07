@@ -4,7 +4,7 @@ import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import { isTerminal } from "../../../run.js"
 import { canBlindRetry, type OperationRecord, type OperationStatus } from "../../../operation/record.js"
 import { appendLifecycle } from "../../append.js"
-import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../state.js"
+import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../projection.js"
 
 const getRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -23,7 +23,8 @@ export const expireRunningOperation: {
       { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
       RuntimeState,
     ],
-    RunNotFound | RuntimeUnavailable, PreparedObservation
+    RunNotFound | RuntimeUnavailable,
+    PreparedObservation
   >
   (
     state: RuntimeState,
@@ -33,7 +34,8 @@ export const expireRunningOperation: {
       { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
       RuntimeState,
     ],
-    RunNotFound | RuntimeUnavailable, PreparedObservation
+    RunNotFound | RuntimeUnavailable,
+    PreparedObservation
   >
 } = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {

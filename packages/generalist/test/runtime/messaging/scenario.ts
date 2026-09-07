@@ -1,6 +1,7 @@
-import { objectRuntimeLayer } from "../execution/object.js"
+import { objectRuntimeLayer, type ObjectRuntimeOptions } from "../execution/object.js"
 import { Effect, Layer } from "effect"
 import { Runtime, RunStore, type AgentDirectory, type Messaging } from "../../../src/runtime/index.js"
+import type { Client, Simulator } from "../../../src/testing/durability/index.js"
 import {
   assistantAddress,
   assistantRef,
@@ -26,8 +27,11 @@ export interface MessagingOverrides {
 }
 
 /** An object-backed Runtime whose messaging policy the test chooses. */
-export const messagingLayer = (overrides: MessagingOverrides) =>
-  objectRuntimeLayer({ ...options, ...overrides }).pipe(Layer.provide(resolverLayer))
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Test fixture accepts optional shared storage for explicit reopen boundaries.
+export const messagingLayer = (overrides: MessagingOverrides, storage?: Client | Simulator, activate = true) =>
+  objectRuntimeLayer({ ...options, ...overrides } satisfies ObjectRuntimeOptions, storage, activate).pipe(
+    Layer.provide(resolverLayer),
+  )
 
 /**
  * One object-backed host used by the addressed-messaging suites.

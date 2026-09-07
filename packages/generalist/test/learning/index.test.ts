@@ -62,7 +62,6 @@ const trajectory: Trajectory = {
   gates: [],
 }
 
-
 const handlers = (apply: (proposal: Proposal) => Effect.Effect<void>): ApplyHandlers => ({
   RefineInstruction: apply,
   AuthorSkill: apply,

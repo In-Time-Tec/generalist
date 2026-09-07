@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Recovery
+[generalist](../../index.md) / [runtime](../index.md) / Recovery
 
 # Recovery
 
@@ -50,13 +50,13 @@ Store-neutral facts read atomically from one Run journal.
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 <a id="suspension"></a>
 
 ##### suspension?
 
-> `readonly` `optional` **suspension?**: [`ExecutionSuspension`](./ExecutionState#executionsuspension)
+> `readonly` `optional` **suspension?**: [`ExecutionSuspension`](./ExecutionState.md#executionsuspension)
 
 <a id="waits"></a>
 
@@ -96,7 +96,7 @@ One operation fact needed to derive recovery from the authoritative journal.
 
 ##### status
 
-> `readonly` **status**: `"unknown"` \| `"failed"` \| `"cancelled"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"cancelling"` \| `"requested"` \| `"reserved"`
+> `readonly` **status**: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"running"` \| `"waiting"` \| `"cancelling"` \| `"requested"` \| `"reserved"`
 
 ***
 
@@ -106,7 +106,6 @@ One operation fact needed to derive recovery from the authoritative journal.
 
 #### Extended by
 
-- [`RetryInput`](#retryinput)
 - [`ResolveUnknownInput`](#resolveunknowninput)
 
 #### Properties
@@ -167,44 +166,6 @@ One operation fact needed to derive recovery from the authoritative journal.
 
 [`OperatorActionInput`](#operatoractioninput).[`runId`](#runid-1)
 
-***
-
-<a id="retryinput"></a>
-
-### RetryInput
-
-#### Extends
-
-- [`OperatorActionInput`](#operatoractioninput)
-
-#### Properties
-
-<a id="operationid-2"></a>
-
-##### operationId
-
-> `readonly` **operationId**: `string`
-
-<a id="operator-2"></a>
-
-##### operator
-
-> `readonly` **operator**: `string`
-
-###### Inherited from
-
-[`OperatorActionInput`](#operatoractioninput).[`operator`](#operator)
-
-<a id="runid-3"></a>
-
-##### runId
-
-> `readonly` **runId**: `string`
-
-###### Inherited from
-
-[`OperatorActionInput`](#operatoractioninput).[`runId`](#runid-1)
-
 ## Type Aliases
 
 <a id="action"></a>
@@ -251,7 +212,15 @@ One operation fact needed to derive recovery from the authoritative journal.
 
 ### ResolveApprovalDecision
 
-> **ResolveApprovalDecision** = [`Approved`](../../approvals#approved) \| [`Denied`](../../approvals#denied)
+> **ResolveApprovalDecision** = [`Approved`](../../approvals.md#approved) \| [`Denied`](../../approvals.md#denied)
+
+***
+
+<a id="retryinput"></a>
+
+### RetryInput
+
+> **RetryInput** = [`OperatorActionInput`](#operatoractioninput)
 
 ***
 

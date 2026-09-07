@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Stream } from "effect"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { objectWorkerId } from "../object.js"
 import {
   assistantAddress,
   completedResult,
@@ -31,8 +32,12 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
       yield* driver.complete({
+        commandId: "fifo-suite-33",
         ...(yield* driver.claimExecution({
-          commandId: "runtime-execution-suites-fifo-suite-ts-claim-1", runId: first.runId, ownerId: "test" })),
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-1",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: first.runId,
         result: completedResult("one"),
       })
@@ -65,8 +70,12 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
 
       yield* driver.complete({
+        commandId: "fifo-suite-67",
         ...(yield* driver.claimExecution({
-          commandId: "runtime-execution-suites-fifo-suite-ts-claim-2", runId: first.runId, ownerId: "test" })),
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-2",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })),
         result: completedResult("assistant"),
       })
       expect((yield* runtime.inspect(second.runId)).status).toBe("running")
@@ -91,7 +100,10 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
       })
       yield* driver.suspend({
         ...(yield* driver.claimExecution({
-          commandId: "runtime-execution-suites-fifo-suite-ts-claim-3", runId: first.runId, ownerId: "test" })),
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-3",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: first.runId,
         waits: [openWait({ waitId: "approval:1", reason: "approval" })],
         suspension: suspension({ waitId: "approval:1", reason: "approval" }),
@@ -102,8 +114,12 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
       yield* driver.complete({
+        commandId: "fifo-suite-104",
         ...(yield* driver.claimExecution({
-          commandId: "runtime-execution-suites-fifo-suite-ts-claim-4", runId: first.runId, ownerId: "test" })),
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-4",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: first.runId,
         result: completedResult("one"),
       })
@@ -128,7 +144,10 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
         prompt: textPrompt("two"),
       })
       yield* runtime.cancel({
-          commandId: "runtime-execution-suites-fifo-suite-ts-cancel-4", runId: second.runId, reason: "client-cancel" })
+        commandId: "runtime-execution-suites-fifo-suite-ts-cancel-4",
+        runId: second.runId,
+        reason: "client-cancel",
+      })
       expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")
       const secondInspection = yield* runtime.inspect(second.runId)
@@ -140,8 +159,12 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
       expect(secondTags).toContain("RunCancellationRequested")
       expect(secondTags.at(-1)).toBe("RunCancelled")
       yield* driver.complete({
+        commandId: "fifo-suite-142",
         ...(yield* driver.claimExecution({
-          commandId: "runtime-execution-suites-fifo-suite-ts-claim-5", runId: first.runId, ownerId: "test" })),
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-5",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: first.runId,
         result: completedResult("one"),
       })
@@ -166,7 +189,10 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
       })
       yield* driver.suspend({
         ...(yield* driver.claimExecution({
-          commandId: "runtime-execution-suites-fifo-suite-ts-claim-6", runId: first.runId, ownerId: "test" })),
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-6",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })),
         runId: first.runId,
         waits: [openWait({ waitId: "timer:1", reason: "timer" })],
         suspension: suspension({ waitId: "timer:1" }),
@@ -175,7 +201,10 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
         .events({ runId: first.runId })
         .pipe(Stream.take(4), Stream.runCollect, Effect.forkChild)
       yield* runtime.signal({
-          commandId: "runtime-execution-suites-fifo-suite-ts-signal-6", runId: first.runId, name: "timer:1" })
+        commandId: "runtime-execution-suites-fifo-suite-ts-signal-6",
+        runId: first.runId,
+        name: "timer:1",
+      })
       const events = [...(yield* Fiber.join(follower))]
       expect(events.map((event) => event._tag)).toContain("RunResumed")
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")

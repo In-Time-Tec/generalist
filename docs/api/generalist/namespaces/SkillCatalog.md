@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / SkillCatalog
+[generalist](../../index.md) / [generalist](../index.md) / SkillCatalog
 
 # SkillCatalog
 

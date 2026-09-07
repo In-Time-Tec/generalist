@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions](../index) / Store
+[generalist](../../index.md) / [instructions](../index.md) / Store
 
 # Store
 

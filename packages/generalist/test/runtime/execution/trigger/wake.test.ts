@@ -1,4 +1,4 @@
-import { objectRuntimeLayer } from "../object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Clock, Effect, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -71,8 +71,13 @@ const suspend = Effect.fn("test.suspendAwaitEvent")(function* () {
     sessionId: "await-event-session",
     idempotencyKey: "await-event-run",
   })
-  yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-trigger-wake-test-ts-claim-1", runId: handle.runId, ownerId: "await-before" }))
+  yield* executor.execute(
+    yield* store.claimExecution({
+      commandId: "runtime-execution-trigger-wake-test-ts-claim-1",
+      runId: handle.runId,
+      ownerId: objectWorkerId,
+    }),
+  )
   expect(yield* runtime.inspect(handle.runId)).toMatchObject({
     status: "waiting",
     waits: [
@@ -104,10 +109,16 @@ it.effect("journals, deduplicates, and resumes one matching event without redisp
         headers: { "x-github-delivery": "delivery-349" },
       }
 
-      expect(yield* runtime.wake(runId, event)).toMatchObject({ _tag: "Resumed" })
-      expect(yield* runtime.wake(runId, event)).toEqual({ _tag: "Duplicate" })
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-trigger-wake-test-ts-claim-2", runId, ownerId: "await-after" }))
+      expect(yield* runtime.wake({ runId, event, commandId: "wake-delivery-1" })).toMatchObject({ _tag: "Resumed" })
+      expect(yield* runtime.wake({ runId, event, commandId: "wake-delivery-1" })).toMatchObject({ _tag: "Resumed" })
+      expect(yield* runtime.wake({ runId, event, commandId: "wake-delivery-2" })).toEqual({ _tag: "Duplicate" })
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-trigger-wake-test-ts-claim-2",
+          runId,
+          ownerId: objectWorkerId,
+        }),
+      )
 
       expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
       const history = yield* runtime.history({ runId, limit: 100 })
@@ -134,10 +145,19 @@ it.effect("resumes an elapsed await with TimedOut under TestClock", () => {
       const [due] = yield* store.dueAwaitEvents({ now, limit: 10 })
       expect(due).toBeDefined()
       if (due === undefined) return
-      expect(yield* store.timeoutAwaitEvent({
-          commandId: "runtime-execution-trigger-wake-test-ts-timeoutAwaitEvent-1", ...due, now })).toBe(true)
-      yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-trigger-wake-test-ts-claim-3", runId, ownerId: "await-timeout" }))
+      expect(
+        yield* store.timeoutAwaitEvent({
+          commandId: "runtime-execution-trigger-wake-test-ts-timeoutAwaitEvent-1",
+          ...due,
+        }),
+      ).toBe(true)
+      yield* executor.execute(
+        yield* store.claimExecution({
+          commandId: "runtime-execution-trigger-wake-test-ts-claim-3",
+          runId,
+          ownerId: objectWorkerId,
+        }),
+      )
 
       expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
       const history = yield* runtime.history({ runId, limit: 100 })

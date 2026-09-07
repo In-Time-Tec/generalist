@@ -1,83 +1,40 @@
-# Rivet actors
+---
+title: "Rivet actors"
+description: "Use Rivet wake and sleep scopes over the shared object durability engine."
+---
 
-One Rivet Actor owns one durable Runtime partition in actor-local SQLite.
-Rivet schedules and cron wake the actor; SQLite remains the execution authority.
+One Rivet Actor hosts one object-backed Runtime partition. The application supplies S3 or native R2 transport, Crypto, and the executable resolver. Actor memory, schedules, and cron are compute lifecycle state and wake hints, not a second persistence authority.
 
-## Usage
+## Configure an actor
+
+This configuration fragment wraps a fully supplied actor configuration; obtain object transport and namespace options from [object durability](./durable-stores.md):
 
 ```ts
-import { Layer } from "effect"
-import { createClient, setup } from "rivetkit"
-import { Agent } from "generalist"
-import { ExecutableResolver } from "generalist/runtime"
-import { makeRuntimeActor } from "generalist/unstable/rivet"
+import { makeRuntimeActor, type RuntimeActorOptions } from "generalist/unstable/rivet"
 
-const runtimePartition = makeRuntimeActor({
-  addresses: [{ address, executable, registrations }],
-  resolver: ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, agentServices) }]).pipe(
-    Layer.orDie,
-  ),
-})
-const registry = setup({ use: { runtimePartition } })
-const client = createClient<typeof registry>()
-const partition = client.runtimePartition.getOrCreate(["tenant-7"])
-
-const receipt = await partition.runtime.send({
-  to: address,
-  sessionId: "session:review-42",
-  idempotencyKey: "send:review-42",
-  prompt: "Review pull request 42",
-})
-await partition.runtime.drain()
-const run = await partition.runtime.inspect(receipt.runId)
+declare const options: RuntimeActorOptions
+const runtimePartition = makeRuntimeActor(options)
 ```
 
-## What runs
+`options` includes explicit `environment`, `tenant`, `partition`, and address registrations, plus `storage` (ObjectStore and Crypto) and `resolver` Layers. `drainFuel` bounds scheduler work, and `recoveryIntervalMillis` configures periodic reconciliation. Install the current catalog peers `rivetkit@2.3.15` and `@standard-schema/spec@1.1.0`; optional compatibility with 2.3.10 is not established.
 
-```text
-getOrCreate(["tenant-7"])
-└── actor wake
-    ├── open actor-local SQLite
-    ├── allocate owner "actor-id:3"
-    ├── recover stale claims, pages of 100
-    └── drain authoritative activations, fuel 64
+Register the actor with Rivet's `setup` and route each configured partition to a stable actor identity. Authentication, resource authorization, and routing belong to the application; untrusted input must not choose another tenant's namespace.
 
-runtime.send({ idempotencyKey: "send:review-42", ... })
-├── validate action input
-├── SQLite transaction: admit Run "run_01J..."
-└── arm lossy runtime.drain doorbell after commit
+## Wake and shutdown
 
-runtime.drain()
-└── claim due activation from SQLite
-    ├── resolve executable and run the agent
-    └── commit Run { status: "succeeded", durability: "durable" }
-```
+On wake, `makeRuntimeActor` constructs a scoped `ManagedRuntime`, installs the application resolver and object storage, arms a periodic recovery cron, activates fresh object-journal ownership, and drains bounded work. Mutating actions validate their inputs and request a drain notification after success. Cancellation and signal commands require explicit `commandId` values; retry the same payload with the same identity.
 
-If admission commits but its doorbell is lost, the next actor wake or periodic
-cron drains the activation. If a wake replaces an interrupted owner, startup
-increments the incarnation and recovers stale claims; never-replay work becomes
-`needs-resolution` and is not dispatched again.
+Schedules and cron only request a wake. The canonical journal decides whether work is pending, claimed, or terminal. If a post-commit notification is lost, later periodic reconciliation reads authoritative state rather than inferring success from notification delivery. An application-provided `reconcile` callback can include product-owned obligations in that bounded lifecycle.
 
-## Invariants
+Sleep and destroy dispose the owned `ManagedRuntime` and await its finalizers. That interrupts this host's work for recovery; it is not a user cancellation request. Fresh ownership fences late canonical writes from obsolete attempts, but cannot undo an external request already dispatched.
 
-- One actor instance owns one Runtime partition and one actor-local SQLite handle.
-- SQLite owns Runs, Sessions, events, operations, claims, and activation rows.
-- Actions expose `send`, `signal`, `respond`, `cancel`, `resolveOperation`, `inspect`, and `drain` directly, without an RPC envelope.
-- A successful mutating action arms a one-shot drain only after its Runtime transaction commits.
-- Wake and cron are lossy doorbells; startup and periodic drains read authoritative activation rows.
-- Drain fuel defaults to 64 and is clamped to at least 1.
-- Recovery page size defaults to 100 and is clamped to 1–1000.
-- The recovery interval defaults to 5 seconds and cannot be configured below 5 seconds.
-- Every wake increments the persisted host incarnation; the owner ID is `<actorId>:<incarnation>`.
-- Startup recovers stale Run and Session-writer claims before draining activations.
-- Repeated drains converge through claim predicates and do not redispatch completed work.
-- Sleep and destroy dispose the scoped `ManagedRuntime`; the adapter never closes Rivet's actor-owned SQL handle.
-- Raw statements and transactions serialize; nested transactions fail with `SqlError`.
-- SQL interruption waits for an in-flight statement or rollback to settle.
-- The published `generalist/unstable/rivet` subpath is ESM-only.
+## Limits and verification
+
+The raw Rivet SDK is a compute-host integration. It does not provide a Generalist SQL backend or a different recovery format. Host tests and local object-service tests establish only their exercised scenarios; they do not certify a hosted Rivet deployment, AWS S3, or deployed R2. Keep the exact executable pins available across host replacement and exercise recovery under the application's actual routing and shutdown policy.
+
+Next: read [recovery actions](./recovery.md) for unknown outcomes and [Cloudflare](./cloudflare.md) for another compute host over the same object engine.
 
 ## Related
 
-- Source: `packages/generalist/src/rivet/actors/`
-- Site: `/docs/start/installation`, `/docs/reference/runtime/versioning`
-- Decisions/tradeoffs: [Rivet actors Runtime host](../decisions/rivet-actors-runtime-host.md)
+- Source: `packages/generalist/src/unstable/rivet/actors/`
+- Decision: [`rivet-actors-runtime-host.md`](../decisions/rivet-actors-runtime-host.md)

@@ -2,8 +2,13 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CryptoHasher, version as bunVersion } from "bun"
-import { builtinModules } from "node:module"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
+import { auditInstalledDependencyGraph } from "./package-smoke-dependency-graph.js"
+import {
+  isForbiddenTransportRuntime,
+  isForbiddenWorkerRuntime,
+  shippedBundleGraph,
+} from "./package-smoke-bundle-graph.js"
 import {
   catalogVersion,
   compressedSizeLimit,
@@ -68,19 +73,8 @@ const RootManifest = Schema.Struct({
     catalogs: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))),
   }),
 })
-const WranglerMetafile = Schema.Struct({
-  inputs: Schema.Record(Schema.String, Schema.Unknown),
-  outputs: Schema.Record(
-    Schema.String,
-    Schema.Struct({
-      imports: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.String }))),
-    }),
-  ),
-})
-
 const parsePackageManifest = Schema.decodeSync(Schema.fromJsonString(PackageManifest))
 const parseRootManifest = Schema.decodeSync(Schema.fromJsonString(RootManifest))
-const parseWranglerMetafile = Schema.decodeSync(Schema.fromJsonString(WranglerMetafile))
 
 const encodeJson = (value: Schema.Json): string => Schema.encodeSync(Schema.fromJsonString(Schema.Json))(value)
 
@@ -188,7 +182,9 @@ for (const probe of probes) {
     }
   }
 }
-${profile.name === "durability-s3" ? `// Package-loading boundary: this dependency exists only in the signed transport profile.
+${
+  profile.name === "durability-s3"
+    ? `// Package-loading boundary: this dependency exists only in the signed transport profile.
 const { Effect } = await import("effect")
 const { make } = await import("generalist/durability/s3")
 const transport = await Effect.runPromise(make({
@@ -197,7 +193,9 @@ const transport = await Effect.runPromise(make({
   credentials: { accessKeyId: "package-smoke", secretAccessKey: "package-smoke" },
 }))
 console.log("constructed signed S3 transport without requests", transport.capabilities)
-` : ""}
+`
+    : ""
+}
 console.log(\`[consumer profile \${profile}] [runtime \${runtime}] imported \${probes.length} specifiers\`)
 `
 }
@@ -323,7 +321,6 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
       forbidProviders: false,
     },
   ] as const
-  const nodeBuiltins = new Set(builtinModules.map((specifier) => specifier.replace(/^node:/, "").split("/")[0]))
   yield* fileSystem.makeDirectory(workerDirectory)
   for (const group of workerGroups) {
     const sourceName = `${group.name}.ts`
@@ -356,17 +353,11 @@ export default { test: () => void loaded }
       ["deploy", "--config", wranglerConfig, "--dry-run", "--outdir", bundleDirectory, "--metafile", metafile],
       input.consumerDirectory,
     )
-    const metadata = parseWranglerMetafile(yield* fileSystem.readFileString(metafile))
-    const graph = new Set<string>(Object.keys(metadata.inputs))
-    for (const output of Object.values(metadata.outputs)) {
-      for (const item of output.imports ?? []) graph.add(item.path)
-    }
+    const graph = yield* shippedBundleGraph(yield* fileSystem.readFileString(metafile))
     const forbidden = sorted(
       Array.from(graph).filter((item) => {
         const normalized = item.replaceAll("\\", "/").toLowerCase()
-        const bare = normalized.replace(/^node:/, "").split("/")[0] ?? normalized
-        if (normalized.startsWith("node:") || normalized.startsWith("bun:") || nodeBuiltins.has(bare)) return true
-        if (isSqlGraphEntry(normalized)) return true
+        if (isForbiddenWorkerRuntime(item)) return true
         if (
           [
             "node-built-in-modules:",
@@ -479,28 +470,9 @@ export default { test: () => void checks }
     args: ["deploy", "--config", wranglerConfig, "--dry-run", "--outdir", bundleDirectory, "--metafile", metafile],
     cwd: input.directory,
   })
-  const metadata = parseWranglerMetafile(yield* fileSystem.readFileString(metafile))
-  const graph = new Set<string>(Object.keys(metadata.inputs))
-  for (const output of Object.values(metadata.outputs)) {
-    for (const item of output.imports ?? []) graph.add(item.path)
-  }
-  const nodeBuiltins = new Set(builtinModules.map((specifier) => specifier.replace(/^node:/, "").split("/")[0]))
-  const forbidden = sorted(
-    Array.from(graph).filter((item) => {
-      const normalized = item.replaceAll("\\", "/").toLowerCase()
-      const bare = normalized.replace(/^node:/, "").split("/")[0] ?? normalized
-      return (
-        normalized.startsWith("node:") ||
-        normalized.startsWith("bun:") ||
-        nodeBuiltins.has(bare) ||
-        normalized.includes("node-built-in-modules:") ||
-        isSqlGraphEntry(normalized) ||
-        normalized.includes("@aws-sdk") ||
-        normalized.includes("@smithy") ||
-        normalized.includes("unenv/runtime/node/")
-      )
-    }),
-    (left, right) => left.localeCompare(right),
+  const graph = yield* shippedBundleGraph(yield* fileSystem.readFileString(metafile))
+  const forbidden = sorted(Array.from(graph).filter(isForbiddenWorkerRuntime), (left, right) =>
+    left.localeCompare(right),
   )
   if (forbidden.length > 0) {
     return yield* smokeError(
@@ -543,7 +515,7 @@ const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumC
   const optionalPeers = Object.keys(input.manifest.peerDependencies ?? {}).filter(
     (dependency) => dependency !== "effect",
   )
-  const profiledPeers = new Set(minimumConsumerProfiles.flatMap((profile) => profile.peers))
+  const profiledPeers = new Set<string>(minimumConsumerProfiles.flatMap((profile) => profile.peers))
   for (const dependency of optionalPeers) {
     if (!profiledPeers.has(dependency)) {
       return yield* smokeError(`minimum consumer profile matrix is missing optional peer ${dependency}`)
@@ -566,15 +538,19 @@ const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumC
 
 const verifyInstalledDependencyGraph = Effect.fn("PackageSmoke.verifyInstalledDependencyGraph")(function* (
   directory: string,
-  forbidAws = false,
+  profiles: ReadonlyArray<MinimumConsumerProfile>,
+  forbidAws: boolean = false,
 ) {
   const manifests = yield* run("find", ["node_modules", "-type", "f", "-name", "package.json", "-print"], directory)
-  const forbidden = manifests.split("\n").filter((entry) =>
-    isSqlGraphEntry(entry) || (forbidAws && (entry.includes("@aws-sdk") || entry.includes("@smithy"))),
+  const audit = yield* auditInstalledDependencyGraph({
+    directory,
+    manifests: manifests.split("\n").filter(Boolean),
+    profiles,
+    forbidAws,
+  })
+  yield* Console.log(
+    `consumer installed graph: ${audit.installedPackages} packages; ${audit.nativeSql.length} SQL packages owned exclusively by explicitly installed native hosts`,
   )
-  if (forbidden.length > 0) {
-    return yield* smokeError(`consumer installed a forbidden dependency graph:\n${forbidden.join("\n")}`)
-  }
 })
 
 const verifyTransportBundle = Effect.fn("PackageSmoke.verifyTransportBundle")(function* (input: {
@@ -611,25 +587,19 @@ console.log(${imports.map((_, index) => `Entry${index}`).join(", ")})
     ],
     cwd: input.directory,
   })
-  const metadata = parseWranglerMetafile(
+  const graph = yield* shippedBundleGraph(
     yield* fileSystem.readFileString(path.join(input.directory, "transport-bundle.meta.json")),
   )
-  const graph = [
-    ...Object.keys(metadata.inputs),
-    ...Object.values(metadata.outputs).flatMap((item) => (item.imports ?? []).map((entry) => entry.path)),
-  ]
-  const forbidden = graph.filter((item) => {
-    const normalized = item.replaceAll("\\", "/").toLowerCase()
-    if (isSqlGraphEntry(normalized)) return true
-    if (input.profile.name === "durability-s3") return false
-    if (normalized.includes("@aws-sdk") || normalized.includes("@smithy")) return true
-    return input.profile.name === "core-runtime" && /\/durability\/(?:s3|r2)\.js$/.test(normalized)
-  })
+  const forbidden = Array.from(graph).filter((item) =>
+    isForbiddenTransportRuntime({ profile: input.profile.name, item }),
+  )
   if (forbidden.length > 0) {
-    return yield* smokeError(`${input.profile.name} consumer bundle contains forbidden dependencies:\n${forbidden.join("\n")}`)
+    return yield* smokeError(
+      `${input.profile.name} consumer bundle contains forbidden dependencies:\n${forbidden.join("\n")}`,
+    )
   }
   yield* Console.log(
-    `${input.profile.name} ${input.runtime} consumer bundle: ${graph.length} graph entries, 0 forbidden; no remote qualification performed`,
+    `${input.profile.name} ${input.runtime} consumer bundle: ${graph.size} graph entries, 0 forbidden; no remote qualification performed`,
   )
 })
 
@@ -665,23 +635,33 @@ const program = Effect.gen(function* () {
     ) {
       return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
     }
-    const sqlDependencies = [
-      ...Object.keys(rootManifest.dependencies ?? {}),
-      ...Object.keys(rootManifest.devDependencies ?? {}),
-      ...Object.keys(rootManifest.optionalDependencies ?? {}),
-      ...Object.keys(rootManifest.workspaces.catalog),
-      ...Object.values(rootManifest.workspaces.catalogs ?? {}).flatMap(Object.keys),
-      ...Object.keys(manifest.dependencies ?? {}),
-      ...Object.keys(manifest.optionalDependencies ?? {}),
-      ...Object.keys(manifest.peerDependencies ?? {}),
-      ...Object.keys(manifest.devDependencies ?? {}),
-    ].filter(isSqlGraphEntry)
-    if (sqlDependencies.length > 0) {
-      return yield* smokeError(`package manifests/catalogs contain SQL dependencies: ${sqlDependencies.join(", ")}`)
-    }
+    const validateSqlDependencies = Effect.gen(function* () {
+      const sqlDependencies = [
+        ...Object.keys(rootManifest.dependencies ?? {}),
+        ...Object.keys(rootManifest.devDependencies ?? {}),
+        ...Object.keys(rootManifest.optionalDependencies ?? {}),
+        ...Object.keys(rootManifest.workspaces.catalog),
+        ...Object.values(rootManifest.workspaces.catalogs ?? {}).flatMap(Object.keys),
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.optionalDependencies ?? {}),
+        ...Object.keys(manifest.peerDependencies ?? {}),
+        ...Object.keys(manifest.devDependencies ?? {}),
+      ].filter(isSqlGraphEntry)
+      if (sqlDependencies.length > 0) {
+        return yield* smokeError(`package manifests/catalogs contain SQL dependencies: ${sqlDependencies.join(", ")}`)
+      }
+    })
+    yield* validateSqlDependencies
     return { effectVersion, manifestPath, sourceManifest }
   })
   const { effectVersion, manifestPath, sourceManifest } = yield* validateSourcePackage
+  const consumerVersions = yield* Schema.decodeUnknownEffect(
+    Schema.Struct({ esbuild: Schema.String, foldkit: Schema.String, typescript: Schema.String, vitest: Schema.String }),
+  )(rootManifest.workspaces.catalog).pipe(
+    Effect.mapError(() =>
+      smokeError("root catalog must define esbuild, foldkit, typescript, and vitest for consumer checks"),
+    ),
+  )
   const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-package-smoke-" })
   const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
@@ -846,22 +826,25 @@ const program = Effect.gen(function* () {
       if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
         return yield* smokeError(`${packageName} must not bundle dependencies`)
       }
-      for (const dependency of packedEffectDependencies) {
-        const dependencyVersion = manifest.peerDependencies?.[dependency]
-        if (dependencyVersion !== effectVersion) {
-          return yield* smokeError(
-            `${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
-          )
+      const validatePeerPins = Effect.gen(function* () {
+        for (const dependency of packedEffectDependencies) {
+          const dependencyVersion = manifest.peerDependencies?.[dependency]
+          if (dependencyVersion !== effectVersion) {
+            return yield* smokeError(
+              `${packageName} must pin ${dependency}@${effectVersion}; packed ${String(dependencyVersion)}`,
+            )
+          }
         }
-      }
-      for (const dependency of packedProviderDependencies) {
-        const dependencyVersion = catalogVersion({ rootManifest, dependency, reference: "catalog:" })
-        if (dependencyVersion === undefined || manifest.peerDependencies?.[dependency] !== dependencyVersion) {
-          return yield* smokeError(
-            `${packageName} must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
-          )
+        for (const dependency of packedProviderDependencies) {
+          const dependencyVersion = catalogVersion({ rootManifest, dependency, reference: "catalog:" })
+          if (dependencyVersion === undefined || manifest.peerDependencies?.[dependency] !== dependencyVersion) {
+            return yield* smokeError(
+              `${packageName} must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
+            )
+          }
         }
-      }
+      })
+      yield* validatePeerPins
     })
     yield* validateManifestDependencies
     if ((yield* fileSystem.readFileString(manifestPath)) !== sourceManifest) {
@@ -896,9 +879,9 @@ const program = Effect.gen(function* () {
         [packageName]: packageTarball,
         ...integrationPeers,
         effect: effectVersion,
-        esbuild: rootManifest.workspaces.catalog.esbuild,
-        foldkit: rootManifest.workspaces.catalog.foldkit,
-        typescript: rootManifest.workspaces.catalog.typescript,
+        esbuild: consumerVersions.esbuild,
+        foldkit: consumerVersions.foldkit,
+        typescript: consumerVersions.typescript,
       },
       /**
        * FoldKit 0.148.2 still declares rc.109, so its targeted override proves the current rc.112
@@ -907,7 +890,7 @@ const program = Effect.gen(function* () {
        */
       overrides: {
         foldkit: { effect: effectVersion },
-        vitest: rootManifest.workspaces.catalog.vitest,
+        vitest: consumerVersions.vitest,
       },
     }),
   )
@@ -1023,7 +1006,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
       `consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`,
     )
   }
-  yield* verifyInstalledDependencyGraph(consumerDirectory)
+  yield* verifyInstalledDependencyGraph(consumerDirectory, minimumConsumerProfiles)
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
   yield* run(
     "bun",
@@ -1064,7 +1047,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
   if (npmEffects.length !== 1) {
     return yield* smokeError(`npm consumer installed ${npmEffects.length} Effect copies`)
   }
-  yield* verifyInstalledDependencyGraph(npmConsumerDirectory)
+  yield* verifyInstalledDependencyGraph(npmConsumerDirectory, minimumConsumerProfiles)
   yield* run("npx", ["tsc", "--noEmit"], npmConsumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
@@ -1154,31 +1137,34 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
     const specifiers = profile.imports.filter((item) => item.runtimes.includes(runtime)).map((item) => item.specifier)
     const profileDirectory = path.join(directory, "profiles", `${profile.name}-${runtime}`)
     yield* fileSystem.makeDirectory(profileDirectory, { recursive: true })
-    const peerDependencies: Record<string, string> = {}
-    for (const dependency of profile.peers) {
-      const dependencyVersion = packedManifest.peerDependencies?.[dependency]
-      if (dependencyVersion === undefined) {
-        return yield* smokeError(
-          `${profileContext(profile, runtime, specifiers)} missing package ${dependency} version`,
-        )
+    const writeProfileManifest = Effect.gen(function* () {
+      const peerDependencies: Record<string, string> = {}
+      for (const dependency of profile.peers) {
+        const dependencyVersion = packedManifest.peerDependencies?.[dependency]
+        if (dependencyVersion === undefined) {
+          return yield* smokeError(
+            `${profileContext(profile, runtime, specifiers)} missing package ${dependency} version`,
+          )
+        }
+        peerDependencies[dependency] = dependencyVersion
       }
-      peerDependencies[dependency] = dependencyVersion
-    }
-    const profileManifest = {
-      name: `generalist-package-smoke-${profile.name}-${runtime}`,
-      private: true,
-      type: "module",
-      dependencies: { effect: effectVersion, [packageName]: packageTarball, ...peerDependencies },
-    } satisfies Schema.Json
-    if (profile.peers.includes("foldkit") || profile.peers.includes("vitest")) {
-      Object.assign(profileManifest, {
-        overrides: {
-          ...(profile.peers.includes("foldkit") && { foldkit: { effect: effectVersion } }),
-          ...(profile.peers.includes("vitest") && { vitest: rootManifest.workspaces.catalog.vitest }),
-        },
-      })
-    }
-    yield* fileSystem.writeFileString(path.join(profileDirectory, "package.json"), encodeJson(profileManifest))
+      const profileManifest = {
+        name: `generalist-package-smoke-${profile.name}-${runtime}`,
+        private: true,
+        type: "module",
+        dependencies: { effect: effectVersion, [packageName]: packageTarball, ...peerDependencies },
+      } satisfies Schema.Json
+      if (profile.peers.includes("foldkit") || profile.peers.includes("vitest")) {
+        Object.assign(profileManifest, {
+          overrides: {
+            ...(profile.peers.includes("foldkit") && { foldkit: { effect: effectVersion } }),
+            ...(profile.peers.includes("vitest") && { vitest: consumerVersions.vitest }),
+          },
+        })
+      }
+      yield* fileSystem.writeFileString(path.join(profileDirectory, "package.json"), encodeJson(profileManifest))
+    })
+    yield* writeProfileManifest
     if (runtime === "node") {
       yield* runProfileCommand({
         profile,
@@ -1201,6 +1187,7 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
     }
     yield* verifyInstalledDependencyGraph(
       profileDirectory,
+      [profile],
       profile.name === "core-runtime" || profile.name === "durability-r2" || profile.name === "cloudflare",
     )
 
@@ -1287,7 +1274,7 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
       tools: {
         bun: bunVersion,
         node: (yield* run("node", ["--version"], root)).trim(),
-        typescript: rootManifest.workspaces.catalog.typescript,
+        typescript: consumerVersions.typescript,
       },
       packages: [evidencePackage],
     }

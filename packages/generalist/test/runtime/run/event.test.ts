@@ -90,8 +90,8 @@ it.live("round-trips every RunFailure variant through object-backed history", ()
         expect(terminal?._tag).toBe("RunFailed")
         if (terminal?._tag !== "RunFailed") continue
         expect(terminal.error.constructor).toBe(failure.constructor)
-        expect(Schema.encodeSync(RunEvent.RunFailure)(terminal.error)).toEqual(
-          Schema.encodeSync(RunEvent.RunFailure)(failure),
+        expect(yield* Schema.encodeEffect(RunEvent.RunFailure)(terminal.error)).toEqual(
+          yield* Schema.encodeEffect(RunEvent.RunFailure)(failure),
         )
       }
     }),
@@ -202,10 +202,15 @@ it.live("makes a changed object resolver identity terminal once without schedule
   const storage = makeObjectStorage()
   let runId = ""
   const admit = provideScoped(
-    objectRuntimeLayer({
-      addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-      scheduler: { pollInterval: "1 day" },
-    }, storage).pipe(Layer.provide(resolverLayer)),
+    objectRuntimeLayer(
+      {
+        addresses: [
+          { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+        ],
+        scheduler: { pollInterval: "1 day" },
+      },
+      storage,
+    ).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       runId = (yield* runtime.send({

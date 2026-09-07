@@ -71,12 +71,16 @@ it.live("emits TasksUpdated and restores the list from object storage without re
     }
     let dispatches = 0
     const hooks = Hooks.layer([
-      Hooks.onToolCall(({ tool }) =>
-        Effect.sync(() => {
-          if (tool === writeToolName) dispatches += 1
-          return Hooks.Continue()
-        }),
-      ),
+      Hooks.onToolCall({
+        key: "test.tasks.index.onToolCall.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ tool }) =>
+          Effect.sync(() => {
+            if (tool === writeToolName) dispatches += 1
+            return Hooks.Continue()
+          }),
+      }),
     ])
     let firstModelCalls = 0
     const firstModel = modelLayer(() => {
@@ -451,6 +455,7 @@ it.effect("applies Tasks.update through runtime steer", () =>
       model,
       authorization,
       handlers,
+      Tasks.layer(),
     )
 
     yield* scopedWith(runtimeLayer)(
@@ -471,6 +476,7 @@ it.effect("applies Tasks.update through runtime steer", () =>
               commandId: "tasks:steering",
             }),
           )
+          .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
         yield* runtime.send(handle.runId, Tasks.update([{ id: "ship", status: "done" }]), { policy: "steer" })
         yield* Deferred.succeed(release, undefined)

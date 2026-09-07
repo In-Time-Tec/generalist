@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / sandbox
+[generalist](./index.md) / sandbox
 
 # sandbox
 
@@ -559,13 +559,13 @@ service is process-local authority and is deliberately not serializable.
 
 ##### capabilities
 
-> `readonly` **capabilities**: [`Service`](./generalist/namespaces/ProgramCapabilities#service)
+> `readonly` **capabilities**: [`Service`](./generalist/namespaces/ProgramCapabilities.md#service)
 
 <a id="request"></a>
 
 ##### request
 
-> `readonly` **request**: [`Request`](./generalist/namespaces/CodeExecutor#request)
+> `readonly` **request**: [`Request`](./generalist/namespaces/CodeExecutor.md#request)
 
 ***
 
@@ -906,7 +906,7 @@ Factual physical boundary. It is not a security rating.
 
 ### layerBunKernel
 
-> `const` **layerBunKernel**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](#sandboxprovider), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore#kernelsnapshotstore) \| `Path.Path`\>
+> `const` **layerBunKernel**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](#sandboxprovider), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool.md#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore) \| `Path.Path`\>
 
 Provide the process-isolated BunKernel Sandbox leaf.
 
@@ -918,7 +918,7 @@ Provide the process-isolated BunKernel Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](#sandboxprovider), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore#kernelsnapshotstore) \| `Path.Path`\>
+`Layer.Layer`\<[`SandboxProvider`](#sandboxprovider), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool.md#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore) \| `Path.Path`\>
 
 ***
 
@@ -976,7 +976,7 @@ Construct collected and streaming variants from one scoped command start operati
 
 ### makeBunKernelProvider
 
-> `const` **makeBunKernelProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](#sandboxproviderservice), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore#kernelsnapshotstore) \| `Path.Path`\>
+> `const` **makeBunKernelProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](#sandboxproviderservice), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool.md#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore) \| `Path.Path`\>
 
 Construct a provider over an existing BunKernelPool and BunKernelSnapshotStore.
 
@@ -988,7 +988,7 @@ Construct a provider over an existing BunKernelPool and BunKernelSnapshotStore.
 
 #### Returns
 
-`Effect.Effect`\<[`SandboxProviderService`](#sandboxproviderservice), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore#kernelsnapshotstore) \| `Path.Path`\>
+`Effect.Effect`\<[`SandboxProviderService`](#sandboxproviderservice), `never`, `FileSystem.FileSystem` \| [`KernelPool`](./repl/namespaces/KernelPool.md#kernelpool) \| [`KernelSnapshotStore`](./repl/namespaces/KernelSnapshotStore.md#kernelsnapshotstore) \| `Path.Path`\>
 
 ***
 

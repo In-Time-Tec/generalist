@@ -2,7 +2,7 @@ import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 import { expect, layer } from "@effect/vitest"
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { build } from "esbuild"
-import { Miniflare } from "miniflare"
+import { Miniflare, convertV4MiniflareOptions } from "miniflare"
 
 const ConformanceResponse = Schema.Struct({
   sequence: Schema.Finite,
@@ -39,47 +39,56 @@ layer(bunLayer, { excludeTestServices: true, timeout: 60_000 })("Miniflare nativ
       const fileSystem = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-r2-host-" })
-      const bundle = yield* Effect.tryPromise(() => build({
-        entryPoints: [path.resolve("packages/generalist/test/unstable/cloudflare/workerd/worker.ts")],
-        bundle: true,
-        format: "esm",
-        logLevel: "silent",
-        write: false,
-        platform: "browser",
-        target: "es2022",
-      }))
+      const bundle = yield* Effect.tryPromise(() =>
+        build({
+          entryPoints: [path.resolve("packages/generalist/test/unstable/cloudflare/workerd/worker.ts")],
+          bundle: true,
+          format: "esm",
+          logLevel: "silent",
+          write: false,
+          platform: "browser",
+          target: "es2022",
+        }),
+      )
       const script = bundle.outputFiles[0]!.text
       for (const sequence of [1, 2]) {
-        yield* Effect.scoped(Effect.gen(function* () {
-          const worker = yield* Effect.acquireRelease(
-            Effect.sync(() => new Miniflare({
-              modules: true,
-              script,
-              compatibilityDate: "2026-08-19",
-              r2Buckets: ["BUCKET"],
-              r2Persist: path.join(directory, "bucket"),
-              durableObjects: { OBJECTS: "RuntimeObject" },
-              // Each host gets empty local storage; only the canonical bucket survives.
-              durableObjectsPersist: path.join(directory, `host-${sequence}`),
-            })),
-            (worker) => Effect.promise(() => worker.dispose()),
-          )
-          yield* Effect.promise(() => worker.ready)
-          const response = yield* Effect.promise(() => worker.dispatchFetch(`http://host/?sequence=${sequence}`))
-          expect(response.status).toBe(200)
-          const result = yield* Effect.promise(() => response.json()).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(ConformanceResponse)),
-          )
-          expect(result.sequence).toBe(sequence)
-          expect(result.priorCancellationStatus).toBe(sequence === 1 ? undefined : "cancelled")
-          expect(result.acknowledgementTailSequences).toEqual([result.acknowledgedSequence + 1])
-          const agentResponse = yield* Effect.promise(() => worker.dispatchFetch("http://host/agent"))
-          expect(agentResponse.status).toBe(200)
-          const agent = yield* Effect.promise(() => agentResponse.json()).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(AgentConformanceResponse)),
-          )
-          expect(agent.facts).toEqual(["Provider serves Boise"])
-        }))
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const worker = yield* Effect.acquireRelease(
+              Effect.sync(
+                () =>
+                  new Miniflare({
+                    ...convertV4MiniflareOptions({
+                      modules: true,
+                      script,
+                      compatibilityDate: "2026-08-18",
+                      r2Buckets: ["BUCKET"],
+                      durableObjects: { OBJECTS: { className: "RuntimeObject", unsafeUniqueKey: `host-${sequence}` } },
+                    }),
+                    host: "127.0.0.1",
+                    resourcePersistencePath: directory,
+                    telemetry: { enabled: false },
+                  }),
+              ),
+              (runtime) => Effect.promise(() => runtime.dispose()),
+            )
+            yield* Effect.promise(() => worker.ready)
+            const response = yield* Effect.promise(() => worker.dispatchFetch(`http://host/?sequence=${sequence}`))
+            expect(response.status, yield* Effect.promise(() => response.clone().text())).toBe(200)
+            const result = yield* Effect.promise(() => response.json()).pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(ConformanceResponse)),
+            )
+            expect(result.sequence).toBe(sequence)
+            expect(result.priorCancellationStatus).toBe(sequence === 1 ? undefined : "cancelled")
+            expect(result.acknowledgementTailSequences).toEqual([result.acknowledgedSequence + 1])
+            const agentResponse = yield* Effect.promise(() => worker.dispatchFetch("http://host/agent"))
+            expect(agentResponse.status, yield* Effect.promise(() => agentResponse.clone().text())).toBe(200)
+            const agent = yield* Effect.promise(() => agentResponse.json()).pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(AgentConformanceResponse)),
+            )
+            expect(agent.facts).toEqual(["Provider serves Boise"])
+          }),
+        )
       }
     }),
   )

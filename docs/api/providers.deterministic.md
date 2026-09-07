@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.deterministic
+[generalist](./index.md) / providers.deterministic
 
 # providers.deterministic
 
@@ -14,7 +14,7 @@
 
 #### Extends
 
-- [`RegistrationOptions`](./providers.openai#registrationoptions)
+- [`RegistrationOptions`](./providers.openai.md#registrationoptions)
 
 #### Properties
 
@@ -30,7 +30,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`metadata`](./providers.openai.md#metadata-3)
 
 <a id="model"></a>
 
@@ -52,7 +52,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`registrationKey`](./providers.openai.md#registrationkey-3)
 
 <a id="response"></a>
 
@@ -68,7 +68,7 @@ Scripted text returned by both streaming and non-streaming calls.
 
 ### layer
 
-> `const` **layer**: (`input?`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+> `const` **layer**: (`input?`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 #### Parameters
 
@@ -78,7 +78,7 @@ Scripted text returned by both streaming and non-streaming calls.
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry)\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry)\>
 
 ***
 
@@ -106,7 +106,7 @@ Scripted model layer for tests and CI; provide it to a run with `Effect.provide`
 
 ### registration
 
-> `const` **registration**: (`input?`) => `Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry#registration-1), `never`, `never`\>
+> `const` **registration**: (`input?`) => `Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1), `never`, `never`\>
 
 #### Parameters
 
@@ -116,4 +116,4 @@ Scripted model layer for tests and CI; provide it to a run with `Effect.provide`
 
 #### Returns
 
-`Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry#registration-1), `never`, `never`\>
+`Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1), `never`, `never`\>

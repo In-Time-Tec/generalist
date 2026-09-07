@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { Response } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { HostEvent } from "generalist/host"
 import { Chat, Connection } from "generalist/unstable/foldkit"
 import { Errors, ExecutableManifest, RunEvent } from "generalist/runtime"
@@ -26,7 +26,10 @@ const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunE
   })
 
 const eventFrame = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
-  Schema.decodeUnknownSync(HostEvent)({ _tag: tag, sessionId, cursor, runId: sessionId, event })
+  Connection.HostDelivery({
+    epoch: 0,
+    event: Schema.decodeUnknownSync(HostEvent)({ _tag: tag, sessionId, cursor, runId: sessionId, event }),
+  })
 
 const agentAction = (event: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedConnection({ event }) })
 
@@ -34,7 +37,25 @@ const readyModel = (): Model => {
   const [model] = update(init()[0], OpenedSession({ sessionId }))
   return Object.assign({}, model, {
     session: SessionReady(),
-    chat: Object.assign({}, model.chat, { connection: "open" as const }),
+    chat: Object.assign(
+      {},
+      Chat.update(
+        model.chat,
+        Chat.ReceivedConnection({
+          event: Connection.SessionSnapshot({
+            epoch: 0,
+            snapshot: {
+              version: 1,
+              session: { id: sessionId, createdAt: "2026-08-03T00:00:00.000Z" },
+              cursor: -1,
+              runs: [],
+              conversation: { leafId: null, entries: [] },
+            },
+          }),
+        }),
+      )[0],
+      { connection: "open" as const },
+    ),
   })
 }
 
@@ -46,7 +67,7 @@ const submittedQuestionModel = (): Model => {
   const [submitted, commands] = update(drafted, GotChatAction({ action: Chat.SubmittedMessage() }))
   expect(commands).toHaveLength(1)
   expect(commands[0]?.name).toBe("SendUserMessage")
-  expect(submitted.chat.entries).toEqual([Chat.UserEntry({ text: "What makes Generalist standalone?" })])
+  expect(submitted.chat.entries).toEqual([])
   return submitted
 }
 
@@ -88,7 +109,47 @@ const toolResult = Object.assign(
 )
 
 const completionFrames: ReadonlyArray<Connection.Incoming> = [
-  eventFrame(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
+  Connection.HostDelivery({
+    epoch: 0,
+    event: {
+      _tag: "Conversation",
+      sessionId,
+      cursor: 0,
+      update: {
+        previousLeafId: null,
+        leafId: "call-entry",
+        afterEntryId: null,
+        entries: [
+          {
+            id: "user-entry",
+            parentId: null,
+            messages: [
+              Prompt.makeMessage("user", {
+                content: [Prompt.makePart("text", { text: "What makes Generalist standalone?" })],
+              }),
+            ],
+          },
+          {
+            id: "call-entry",
+            parentId: "user-entry",
+            messages: [
+              Prompt.makeMessage("assistant", {
+                content: [
+                  Prompt.makePart("tool-call", {
+                    id: "search-1",
+                    name: "web_search",
+                    params: toolCall.params,
+                    providerExecuted: false,
+                  }),
+                ],
+              }),
+            ],
+          },
+        ],
+      },
+    },
+  }),
+  eventFrame(1, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
   eventFrame(2, "ToolCall", runEvent(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall })),
   eventFrame(
     3,
@@ -96,6 +157,47 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     runEvent(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
   ),
   eventFrame(5, "Turn", runEvent(5, { _tag: "TurnStarted", turn: 1 })),
+  Connection.HostDelivery({
+    epoch: 0,
+    event: {
+      _tag: "Conversation",
+      sessionId,
+      cursor: 7,
+      update: {
+        previousLeafId: "call-entry",
+        leafId: "model-response-entry-1",
+        afterEntryId: "call-entry",
+        entries: [
+          {
+            id: "tool-entry",
+            parentId: "call-entry",
+            messages: [
+              Prompt.makeMessage("tool", {
+                content: [
+                  Prompt.makePart("tool-result", {
+                    id: "search-1",
+                    name: "web_search",
+                    isFailure: false,
+                    result: toolResult.result,
+                    providerExecuted: false,
+                  }),
+                ],
+              }),
+            ],
+          },
+          {
+            id: "model-response-entry-1",
+            parentId: "tool-entry",
+            messages: [
+              Prompt.makeMessage("assistant", {
+                content: [Prompt.makePart("text", { text: "Final cited answer\n\nSources:\n[1] Generalist docs" })],
+              }),
+            ],
+          },
+        ],
+      },
+    },
+  }),
   eventFrame(
     8,
     "Completed",
@@ -104,6 +206,7 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
       result: {
         turns: 2,
         text: "Final cited answer\n\nSources:\n[1] Generalist docs",
+        output: "Final cited answer\n\nSources:\n[1] Generalist docs",
         session: { sessionId, leafId: "model-response-entry-1" },
       },
     }),
@@ -119,7 +222,13 @@ describe("deep-research-agent web update", () => {
       Story.model((model) => {
         expect(model.chat.run._tag).toBe("Idle")
         expect(model.chat.connection).toBe("open")
-        expect(model.chat.entries.map((entry) => entry._tag)).toEqual(["UserEntry", "ToolEntry"])
+        expect(model.chat.entries.map((entry) => entry._tag)).toEqual(["UserEntry", "ToolEntry", "AssistantEntry"])
+        expect(model.chat.entries[2]).toEqual(
+          Chat.AssistantEntry({
+            text: "Final cited answer\n\nSources:\n[1] Generalist docs",
+            reasoning: null,
+          }),
+        )
 
         const user = model.chat.entries[0]
         const tool = model.chat.entries[1]
@@ -130,7 +239,7 @@ describe("deep-research-agent web update", () => {
         expect(user).toEqual(Chat.UserEntry({ text: "What makes Generalist standalone?" }))
         expect(tool).toEqual(
           Chat.ToolEntry({
-            callId: "search-1",
+            callId: '["call-entry","search-1"]',
             name: "web_search",
             params: { query: "What makes Generalist standalone?" },
             phase: "executing",
@@ -163,8 +272,11 @@ describe("deep-research-agent web update", () => {
         }),
       ),
       Story.message(GotChatAction({ action: Chat.ClickedCancel() })),
-      Story.Command.expectExact(Chat.CancelRun({ sessionId })),
-      Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun()),
+      Story.Command.expectExact(Chat.CancelRun({ sessionId, commandId: '["cancel","deep-research-story",-1]' })),
+      Story.Command.resolve(
+        Chat.CancelRun({ sessionId, commandId: '["cancel","deep-research-story",-1]' }),
+        Chat.CancelledRun(),
+      ),
       Story.model((model) => {
         expect(model.chat.run).toEqual(Chat.Running({ turn: 0 }))
       }),

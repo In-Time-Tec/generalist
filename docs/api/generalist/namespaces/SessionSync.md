@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / SessionSync
+[generalist](../../index.md) / [generalist](../index.md) / SessionSync
 
 # SessionSync
 

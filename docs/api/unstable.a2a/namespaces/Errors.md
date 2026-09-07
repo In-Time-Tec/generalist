@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.a2a](../index) / Errors
+[generalist](../../index.md) / [unstable.a2a](../index.md) / Errors
 
 # Errors
 

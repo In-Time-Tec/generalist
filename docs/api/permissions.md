@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / permissions
+[generalist](./index.md) / permissions
 
 # permissions
 
@@ -107,6 +107,16 @@ Permission service failure.
 `PermissionError_base.constructor`
 
 #### Properties
+
+<a id="cause"></a>
+
+##### cause?
+
+> `readonly` `optional` **cause?**: `unknown`
+
+###### Inherited from
+
+`PermissionError_base.cause`
 
 <a id="hint-1"></a>
 
@@ -328,23 +338,6 @@ One JSON or YAML permission-rule file.
 
 ***
 
-<a id="rulestoresqloptions"></a>
-
-### RuleStoreSqlOptions
-
-SQL permission-rule scope. Rules are stored and read per scope; pass a session id for
-per-session rules. Defaults to `"global"`.
-
-#### Properties
-
-<a id="scope"></a>
-
-##### scope?
-
-> `readonly` `optional` **scope?**: `string`
-
-***
-
 <a id="service"></a>
 
 ### Service
@@ -363,7 +356,7 @@ Permission policy service boundary.
 
 ###### request
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest)
 
 ###### Returns
 
@@ -477,7 +470,7 @@ Evaluate a base policy with remembered rules as a last-match overlay.
 
 ###### request
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest)
 
 ##### Returns
 
@@ -505,7 +498,7 @@ Evaluate a base policy with remembered rules as a last-match overlay.
 
 ###### request
 
-[`AccessRequest`](./generalist/namespaces/ToolAuthorization#accessrequest)
+[`AccessRequest`](./generalist/namespaces/ToolAuthorization.md#accessrequest)
 
 ##### Returns
 
@@ -600,27 +593,6 @@ Non-durable in-memory remembered-rule store.
 #### Returns
 
 `Layer.Layer`\<[`RuleStore`](#rulestore)\>
-
-***
-
-<a id="layerrulestoresql"></a>
-
-### layerRuleStoreSql
-
-> `const` **layerRuleStoreSql**: (`options?`) => `Layer.Layer`\<[`RuleStore`](#rulestore), [`PermissionError`](#permissionerror), `SqlClient.SqlClient`\>
-
-A RuleStore in the Runtime `SqlClient`. The `generalist_permission_rules` table is part of
-the Runtime SQL schema, so the schema must be migrated before this Layer is used.
-
-#### Parameters
-
-##### options?
-
-[`RuleStoreSqlOptions`](#rulestoresqloptions)
-
-#### Returns
-
-`Layer.Layer`\<[`RuleStore`](#rulestore), [`PermissionError`](#permissionerror), `SqlClient.SqlClient`\>
 
 ***
 

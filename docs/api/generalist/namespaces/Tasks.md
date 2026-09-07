@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Tasks
+[generalist](../../index.md) / [generalist](../index.md) / Tasks
 
 # Tasks
 
@@ -12,7 +12,7 @@
 
 ### Item
 
-Re-exports [Item](../../tasks#item-1)
+Re-exports [Item](../../tasks.md#item-1)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [Item](../../tasks#item-1)
 
 ### Items
 
-Re-exports [Items](../../tasks#items-1)
+Re-exports [Items](../../tasks.md#items-1)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [Items](../../tasks#items-1)
 
 ### layer
 
-Re-exports [layer](../../tasks#layer)
+Re-exports [layer](../../tasks.md#layer)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [layer](../../tasks#layer)
 
 ### Status
 
-Re-exports [Status](../../tasks#status-1)
+Re-exports [Status](../../tasks.md#status-1)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [Status](../../tasks#status-1)
 
 ### TaskItem
 
-Renames and re-exports [Item](../../tasks#item-1)
+Renames and re-exports [Item](../../tasks.md#item-1)
 
 ***
 
@@ -52,7 +52,7 @@ Renames and re-exports [Item](../../tasks#item-1)
 
 ### TaskItems
 
-Renames and re-exports [Items](../../tasks#items-1)
+Renames and re-exports [Items](../../tasks.md#items-1)
 
 ***
 
@@ -60,7 +60,7 @@ Renames and re-exports [Items](../../tasks#items-1)
 
 ### TaskStatus
 
-Renames and re-exports [Status](../../tasks#status-1)
+Renames and re-exports [Status](../../tasks.md#status-1)
 
 ***
 
@@ -68,7 +68,7 @@ Renames and re-exports [Status](../../tasks#status-1)
 
 ### update
 
-Re-exports [update](../../tasks#update-1)
+Re-exports [update](../../tasks.md#update-1)
 
 ***
 
@@ -76,4 +76,4 @@ Re-exports [update](../../tasks#update-1)
 
 ### Update
 
-Re-exports [Update](../../tasks#update-2)
+Re-exports [Update](../../tasks.md#update-2)

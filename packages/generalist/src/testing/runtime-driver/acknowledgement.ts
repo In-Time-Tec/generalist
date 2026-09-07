@@ -51,9 +51,21 @@ export const registerAcknowledgement = <LayerError, ClaimsLayerError>(input: {
         }
 
         const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "host-acknowledgement" })
-        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnCompleted"}:${0}`, event: { _tag: "TurnCompleted", turn: 0 } })
-        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnStarted"}:${1}`, event: { _tag: "TurnStarted", turn: 1 } })
-        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnCompleted"}:${1}`, event: { _tag: "TurnCompleted", turn: 1 } })
+        yield* services.store.emitAgentEvent({
+          ...claim,
+          commandId: `${claim.runId}:event:TurnCompleted:0`,
+          event: { _tag: "TurnCompleted", turn: 0 },
+        })
+        yield* services.store.emitAgentEvent({
+          ...claim,
+          commandId: `${claim.runId}:event:TurnStarted:1`,
+          event: { _tag: "TurnStarted", turn: 1 },
+        })
+        yield* services.store.emitAgentEvent({
+          ...claim,
+          commandId: `${claim.runId}:event:TurnCompleted:1`,
+          event: { _tag: "TurnCompleted", turn: 1 },
+        })
         const history = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
         const boundaries = history.filter((event) => event._tag === "TurnCompleted")
         expect(boundaries).toHaveLength(2)

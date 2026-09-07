@@ -12,7 +12,7 @@ import {
   type WakeInput,
 } from "../../../execution/recovery/operator.js"
 import { canBlindRetry, type OperationRecord } from "../../../operation/record.js"
-import { operationKeyMapKey, operationMapKey, runWaits, type RuntimeState, type StoredRun } from "../../state.js"
+import { operationKeyMapKey, operationMapKey, runWaits, type RuntimeState, type StoredRun } from "../../projection.js"
 import { revokeRunSession } from "../execution.js"
 import { signal } from "../control/wait.js"
 import { resolveOperation } from "./resolution.js"
@@ -75,11 +75,25 @@ export const journal: {
 )
 
 export const appendAction: {
-  (runId: string, operator: string, action: Action): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound, PreparedObservation>
-  (state: RuntimeState, runId: string, operator: string, action: Action): Effect.Effect<RuntimeState, RunNotFound, PreparedObservation>
+  (
+    runId: string,
+    operator: string,
+    action: Action,
+  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound, PreparedObservation>
+  (
+    state: RuntimeState,
+    runId: string,
+    operator: string,
+    action: Action,
+  ): Effect.Effect<RuntimeState, RunNotFound, PreparedObservation>
 } = Function.dual(
   4,
-  (state: RuntimeState, runId: string, operator: string, action: Action): Effect.Effect<RuntimeState, RunNotFound, PreparedObservation> => {
+  (
+    state: RuntimeState,
+    runId: string,
+    operator: string,
+    action: Action,
+  ): Effect.Effect<RuntimeState, RunNotFound, PreparedObservation> => {
     const run = state.runs.get(runId)
     if (run === undefined) return Effect.fail(RunNotFound.make({ runId }))
     const operationId = `op_${state.nextOperationCounter}`
@@ -107,8 +121,13 @@ const illegal = (state: RuntimeState, run: StoredRun, action: string) =>
   IllegalOperatorAction.make({ runId: run.runId, decision: explain(journalUnsafe(state, run)).decision, action })
 
 export const retry: {
-  (input: RetryInput): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
-  (state: RuntimeState, input: RetryInput): Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
+  (
+    input: RetryInput,
+  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
+  (
+    state: RuntimeState,
+    input: RetryInput,
+  ): Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
 } = Function.dual(2, (state: RuntimeState, input: RetryInput) => {
   const run = state.runs.get(input.runId)
   if (run === undefined) return Effect.fail(RunNotFound.make({ runId: input.runId }))
@@ -154,8 +173,13 @@ export const retry: {
 })
 
 export const wake: {
-  (input: WakeInput): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
-  (state: RuntimeState, input: WakeInput): Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
+  (
+    input: WakeInput,
+  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
+  (
+    state: RuntimeState,
+    input: WakeInput,
+  ): Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction, PreparedObservation>
 } = Function.dual(2, (state: RuntimeState, input: WakeInput) =>
   Effect.gen(function* () {
     const run = state.runs.get(input.runId)
@@ -185,7 +209,9 @@ export const wake: {
 export const resolveUnknown: {
   (
     input: ResolveUnknownInput,
-  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction | RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<RuntimeState, RunNotFound | IllegalOperatorAction | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     input: ResolveUnknownInput,

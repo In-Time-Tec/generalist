@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.sandbox.agentos
+[generalist](./index.md) / unstable.sandbox.agentos
 
 # unstable.sandbox.agentos
 
@@ -296,7 +296,7 @@ Actor name registered by the agentOS host.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`\>
 
 **`Experimental`**
 
@@ -310,7 +310,7 @@ Provide the hosted agentOS V8-isolate Sandbox leaf.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](./sandbox#sandboxprovider), `Config.ConfigError`\>
+`Layer.Layer`\<[`SandboxProvider`](./sandbox.md#sandboxprovider), `Config.ConfigError`\>
 
 ***
 
@@ -318,7 +318,7 @@ Provide the hosted agentOS V8-isolate Sandbox leaf.
 
 ### makeProvider
 
-> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice)\>
+> `const` **makeProvider**: (`options`) => `Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice)\>
 
 **`Experimental`**
 
@@ -332,4 +332,4 @@ Construct the agentOS provider over an injected public RivetKit client.
 
 #### Returns
 
-`Effect.Effect`\<[`SandboxProviderService`](./sandbox#sandboxproviderservice)\>
+`Effect.Effect`\<[`SandboxProviderService`](./sandbox.md#sandboxproviderservice)\>

@@ -21,8 +21,7 @@ export interface DrainResult {
 
 export interface Service {
   readonly tick: Effect.Effect<void, StartExecutionError, RunStore>
-  readonly drain: (options?: { readonly fuel?: number }) =>
-    Effect.Effect<DrainResult, StartExecutionError, RunStore>
+  readonly drain: (options?: { readonly fuel?: number }) => Effect.Effect<DrainResult, StartExecutionError, RunStore>
   /** Reconcile one cancellation without scanning the store. */
   readonly reconcileCancellation: (
     runId: string,

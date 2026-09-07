@@ -106,7 +106,6 @@ To run both kinds of memory on one key, use `layer` from `generalist/memory`: re
 
 `VectorStore.layerMemory` is process-local and does not survive a process restart. This semantic recall example is intentionally non-durable; use it for tests and short-lived runs, while object durability covers the Runtime journal rather than semantic vectors.
 
-
 ## Next steps
 
 - Understand where recalled items land in the prompt: [Sessions, history, and persistence](/learn/sessions-and-history).

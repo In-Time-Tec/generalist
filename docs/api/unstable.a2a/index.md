@@ -1,14 +1,14 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / unstable.a2a
+[generalist](../index.md) / unstable.a2a
 
 # unstable.a2a
 
 ## Namespaces
 
-- [A2A](./namespaces/A2A)
-- [Content](./namespaces/Content)
-- [Errors](./namespaces/Errors)
-- [Projection](./namespaces/Projection)
+- [A2A](./namespaces/A2A.md)
+- [Content](./namespaces/Content.md)
+- [Errors](./namespaces/Errors.md)
+- [Projection](./namespaces/Projection.md)

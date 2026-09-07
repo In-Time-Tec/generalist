@@ -13,14 +13,14 @@ bun add effect@4.0.0-rc.112 generalist
 
 ## Core surface
 
-| Namespace                              | Role                                                                                                                   |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `Runtime`                              | Admission, durable events and history, disposable live previews, listing, waits, signals, cancellation, and inspection |
-| `RunEvent`                             | Canonical persisted lifecycle and agent-loop event schema                                                              |
-| `RunStore`                             | Memory and SQLite storage seam                                                                                         |
-| `generalist/runtime/sql-driver`        | `RunClaims` multi-worker claims and leases                                                                             |
-| `generalist/runtime/sql-driver`        | `RuntimeWorker` hosted worker loops                                                                                    |
-| `Address` / `ExecutableRef` / `Cursor` | Schema-backed boundary identities                                                                                      |
+| Namespace                                               | Role                                                                                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `Runtime`                                               | Admission, durable events and history, disposable live previews, listing, waits, signals, cancellation, and inspection |
+| `RunEvent`                                              | Canonical persisted lifecycle and agent-loop event schema                                                              |
+| `RunStore`                                              | Canonical Run state and operation storage contract                                                                     |
+| `generalist/durability`                                 | Shared object engine, reconstruction, and explicit scoped activation                                                   |
+| `generalist/durability/s3` / `generalist/durability/r2` | Conditional-create object transports                                                                                   |
+| `Address` / `ExecutableRef` / `Cursor`                  | Schema-backed boundary identities                                                                                      |
 
 ## Staged root activation
 
@@ -34,6 +34,10 @@ bun add effect@4.0.0-rc.112 generalist
 
 ## Runtime layers
 
-`Runtime.layerMemory` is ephemeral and loses state when its process exits. `SqliteRuntime.layerSqlite` from `generalist/runtime/sqlite-bun` is durable for one process. `layer from generalist/pg` and `layer from generalist/mysql` support multi-worker claims and require the schema to be applied before Runtime startup. PostgreSQL uses `generalist/pg RuntimeSchema`; MySQL 8+ uses `generalist/mysql RuntimeSchema`.
+`Durability.layer` from `generalist/durability` reconstructs the sole production Runtime from S3 or native R2. Supply explicit environment, tenant, partition, Crypto, and executable resolver services. Construction is read-only; `Durability.activate` acquires host authority and starts owned execution inside a scope. Do not confuse host activation with `runtime.activate({ runId })`, which makes a staged root runnable.
+
+Local processes, servers, Cloudflare Durable Objects, and Rivet actors are compute choices over that same engine. There is no production memory, filesystem, or SQL Runtime. `generalist/testing/durability` is a test-only object simulator; process-local Agents need neither it nor Runtime. See [object durability](/features/durable-stores) for configuration and local qualification limits.
+
+Caller mutations carry stable command identities: environmental wake takes `{ runId, commandId, event }`, with `event.dedupeKey` separately identifying the external delivery. Steering and operator actions also preserve command IDs across retries. An exact retry returns the original immutable receipt, including its original `duplicate` field; a new command ID means a distinct request.
 
 See [transport](/reference/transport), [A2A](/reference/a2a), and [AG-UI](/reference/ag-ui) for projections.

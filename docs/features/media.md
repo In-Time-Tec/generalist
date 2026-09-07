@@ -1,4 +1,7 @@
-# Media and blob storage
+---
+title: "Media and blob storage"
+description: "Keep verified content-addressed bytes outside the journal in the shared object transport."
+---
 
 Generalist carries images, audio, video, and PDFs as content-addressed references. Blob bytes live in a `BlobStore`; typed Agent inputs, Session projections, durable model responses, Host calls, and HTTP responses carry `Media.Ref` values instead of embedding bytes in the journal.
 
@@ -32,13 +35,10 @@ Generated `Response.FilePart` bytes are stored before the model response is comm
 ```ts
 import { BlobStore } from "generalist"
 
-const memory = BlobStore.layerMemory()
-const files = BlobStore.layerFileSystem({ dir: ".generalist/blobs" })
-const sql = BlobStore.layerSql()
-const s3 = BlobStore.layerS3({ bucket: "attachments", client })
+const blobs = BlobStore.layer({ environment: "development", tenant: "example-team" })
 ```
 
-All adapters expose:
+Provide the same S3 or native R2 ObjectStore and Crypto used by the object engine. This is a Layer fragment; see [object durability](./durable-stores.md) for transport composition. The service exposes:
 
 ```text
 put({ data, mediaType, filename? }) -> Media.Ref
@@ -46,9 +46,9 @@ get(sha256)                        -> { ref, data }
 resolve(ref, { prefer })           -> { ref, data: Uint8Array | URL }
 ```
 
-The default upload limit is 100 MiB; pass `maxBytes` to any Layer constructor to change it. Content is keyed by lowercase SHA-256. Repeated bytes retain the first stored media type and filename. The filesystem adapter writes one blob and one Schema-encoded metadata sidecar. `layerSql` creates `generalist_blobs` through the runtime `SqlClient` seam and stores portable base64 text. It does not change the Runtime schema version.
+The default upload limit is 100 MiB; pass `maxBytes` to `layer` to change it. Content is keyed by lowercase SHA-256 within the explicit environment/tenant namespace and shared across that tenant's partitions. Repeated bytes retain the first stored media type and filename. The object stores the verified reference and payload together; no filesystem, memory, SQL, or independent S3 BlobStore adapter is exposed.
 
-`layerS3` has no AWS SDK dependency. Its injected client implements `head(bucket, key)`, `put(bucket, key, object)`, and `get(bucket, key)`. Keys are `sha256/<digest>`. A returned object may include a signed `url`; `resolve` uses it when the active model's `ModelCatalog` metadata prefers URLs and otherwise returns bytes.
+The current object implementation resolves verified bytes; it does not create signed provider URLs. A content hash identifies bytes, not permission to read them. Authorize attachment access before storage calls, and retain referenced objects across rewind and backup. Never delete production blobs to repair a missing reference.
 
 ## Provider support
 

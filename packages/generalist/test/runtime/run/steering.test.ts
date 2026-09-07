@@ -82,7 +82,10 @@ const verifyInbox = Effect.gen(function* () {
   expect(conflict).toMatchObject({ reason: "input-conflict" })
 
   const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId })
+    commandId: "runtime-run-steering-test-ts-claim-1",
+    runId: receipt.runId,
+    ownerId: objectWorkerId,
+  })
   const firstRead = yield* store.readSteering(claim)
   const secondRead = yield* store.readSteering(claim)
   expect(firstRead.map((entry) => entry.entryId)).toEqual(secondRead.map((entry) => entry.entryId))
@@ -102,8 +105,13 @@ const verifyInbox = Effect.gen(function* () {
     expect.stringContaining("first"),
     expect.stringContaining("second"),
   ])
-  expect((yield* store.complete({
-          commandId: "runtime-run-steering-test-ts-complete-1", ...claim, result: completedResult("premature") }))._tag).toBe("SteeringPending")
+  expect(
+    (yield* store.complete({
+      commandId: "runtime-run-steering-test-ts-complete-1",
+      ...claim,
+      result: completedResult("premature"),
+    }))._tag,
+  ).toBe("SteeringPending")
 
   const invalidConsumption = yield* store
     .recordOperation({
@@ -158,8 +166,13 @@ const verifyInbox = Effect.gen(function* () {
       operationId: operation.operationId,
     }),
   ])
-  expect((yield* store.complete({
-          commandId: "runtime-run-steering-test-ts-complete-2", ...claim, result: completedResult("done") }))._tag).toBe("Completed")
+  expect(
+    (yield* store.complete({
+      commandId: "runtime-run-steering-test-ts-complete-2",
+      ...claim,
+      result: completedResult("done"),
+    }))._tag,
+  ).toBe("Completed")
   const terminal = yield* steer(runtime, receipt.runId, "steer:terminal", "late").pipe(Effect.flip)
   expect(terminal).toBeInstanceOf(Errors.RunTerminal)
 })
@@ -179,11 +192,17 @@ layer(objectLayer)("Runtime durable steering object contract", (test) => {
       })
       yield* steer(runtime, receipt.runId, "steer:cancel", "still pending")
       const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-2", runId: receipt.runId, ownerId: objectWorkerId })
+        commandId: "runtime-run-steering-test-ts-claim-2",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       expect(yield* store.readSteering(claim)).toHaveLength(1)
 
       yield* runtime.cancel({
-          commandId: "runtime-run-steering-test-ts-cancel-3", runId: receipt.runId, reason: "stop" })
+        commandId: "runtime-run-steering-test-ts-cancel-3",
+        runId: receipt.runId,
+        reason: "stop",
+      })
       yield* store.fail({
         ...claim,
         error: Errors.AgentExecutionFailure.make({ message: "execution interrupted" }),
@@ -227,12 +246,23 @@ const backend = "object" as const
           })
           yield* steer(runtime, receipt.runId, "pending", "do not resume")
           const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-run-steering-test-ts-claim-3",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           yield* runtime.cancel({
-          commandId: "runtime-run-steering-test-ts-cancel-4", runId: receipt.runId, reason: "stop" })
+            commandId: "runtime-run-steering-test-ts-cancel-4",
+            runId: receipt.runId,
+            reason: "stop",
+          })
 
-          expect(yield* store.complete({
-          commandId: "runtime-run-steering-test-ts-complete-5", ...claim, result: completedResult("late") })).toEqual({ _tag: "Completed" })
+          expect(
+            yield* store.complete({
+              commandId: "runtime-run-steering-test-ts-complete-5",
+              ...claim,
+              result: completedResult("late"),
+            }),
+          ).toEqual({ _tag: "Completed" })
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
           expect((yield* store.loadExecution(receipt.runId)).continuation).toBeUndefined()
           const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map(
@@ -275,7 +305,10 @@ const backend = "object" as const
             limit: Steering.defaultCapacity,
           })
           const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-4", runId: receipt.runId, ownerId: objectWorkerId })
+            commandId: "runtime-run-steering-test-ts-claim-4",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
           expect(yield* store.readSteering(claim)).toHaveLength(Steering.defaultCapacity)
 
           const byteRun = yield* runtime.send({
@@ -298,7 +331,10 @@ const backend = "object" as const
             limit: Steering.defaultMaxPendingBytes,
           })
           const byteClaim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-5", runId: byteRun.runId, ownerId: objectWorkerId })
+            commandId: "runtime-run-steering-test-ts-claim-5",
+            runId: byteRun.runId,
+            ownerId: objectWorkerId,
+          })
           expect(yield* store.readSteering(byteClaim)).toEqual([])
         }),
       )
@@ -519,7 +555,10 @@ it.live("atomically persists steering consumption and model scheduling before ob
         })
         yield* steer(runtime, receipt.runId, "steer:host", "new direction")
         const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-12", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-run-steering-test-ts-claim-12",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         yield* host.execute(claim)
         const inspection = yield* runtime.inspect(receipt.runId)
         if (inspection.status === "failed") {
@@ -602,7 +641,10 @@ it.effect("steering admitted during model streaming does not interrupt it and re
           prompt: "initial",
         })
         const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-13", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-run-steering-test-ts-claim-13",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -706,7 +748,10 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
           prompt: "run the batch",
         })
         const claim = yield* store.claimExecution({
-          commandId: "runtime-run-steering-test-ts-claim-14", runId: receipt.runId, ownerId: objectWorkerId })
+          commandId: "runtime-run-steering-test-ts-claim-14",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })
         const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started[0])
         if (concurrency === 2) yield* Deferred.await(started[1])

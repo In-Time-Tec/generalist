@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl](../index) / KernelSnapshotStore
+[generalist](../../index.md) / [repl](../index.md) / KernelSnapshotStore
 
 # KernelSnapshotStore
 

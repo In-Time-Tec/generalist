@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [testing](../index) / KernelProviderConformance
+[generalist](../../index.md) / [testing](../index.md) / KernelProviderConformance
 
 # KernelProviderConformance
 
@@ -26,7 +26,7 @@ One fresh provider instance used by the shared KernelPool lifecycle guarantees.
 
 ##### pool
 
-> `readonly` **pool**: [`Service`](../../repl/namespaces/KernelPool#service)
+> `readonly` **pool**: [`Service`](../../repl/namespaces/KernelPool.md#service)
 
 <a id="profile"></a>
 
@@ -56,7 +56,7 @@ One fresh provider instance used by the shared KernelPool lifecycle guarantees.
 
 ###### contractVersion
 
-> `readonly` **contractVersion**: `2`
+> `readonly` **contractVersion**: `1`
 
 ###### image
 
@@ -204,7 +204,7 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 ##### authority
 
-> `readonly` **authority**: [`Service`](../../repl/namespaces/KernelResourceAuthority#service)
+> `readonly` **authority**: [`Service`](../../repl/namespaces/KernelResourceAuthority.md#service)
 
 <a id="changedprofile"></a>
 
@@ -234,7 +234,7 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 ###### contractVersion
 
-> `readonly` **contractVersion**: `2`
+> `readonly` **contractVersion**: `1`
 
 ###### image
 
@@ -308,7 +308,7 @@ Additional two-host and provider lifecycle controls required by remote conforman
 
 ##### changedProfileHost
 
-> `readonly` **changedProfileHost**: [`Service`](../../repl/namespaces/KernelPool#service)
+> `readonly` **changedProfileHost**: [`Service`](../../repl/namespaces/KernelPool.md#service)
 
 <a id="executioncount"></a>
 
@@ -364,7 +364,7 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 ##### hostB
 
-> `readonly` **hostB**: [`Service`](../../repl/namespaces/KernelPool#service)
+> `readonly` **hostB**: [`Service`](../../repl/namespaces/KernelPool.md#service)
 
 <a id="losenextconnection"></a>
 
@@ -386,7 +386,7 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 ##### pause
 
-> `readonly` **pause**: (`sessionId`) => `Effect`\<`boolean`, [`CellExecutionFailed`](../../repl/namespaces/Cell#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell#celloutcomeunknown)\>
+> `readonly` **pause**: (`sessionId`) => `Effect`\<`boolean`, [`CellExecutionFailed`](../../repl/namespaces/Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell.md#celloutcomeunknown)\>
 
 ###### Parameters
 
@@ -396,13 +396,13 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 ###### Returns
 
-`Effect`\<`boolean`, [`CellExecutionFailed`](../../repl/namespaces/Cell#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell#celloutcomeunknown)\>
+`Effect`\<`boolean`, [`CellExecutionFailed`](../../repl/namespaces/Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell.md#celloutcomeunknown)\>
 
 <a id="pool-1"></a>
 
 ##### pool
 
-> `readonly` **pool**: [`Service`](../../repl/namespaces/KernelPool#service)
+> `readonly` **pool**: [`Service`](../../repl/namespaces/KernelPool.md#service)
 
 ###### Inherited from
 
@@ -436,7 +436,7 @@ Exact host-only values that must never occur in a profile, event, failure, or re
 
 ###### contractVersion
 
-> `readonly` **contractVersion**: `2`
+> `readonly` **contractVersion**: `1`
 
 ###### image
 
@@ -526,7 +526,7 @@ Number of live or paused provider resources owned by this isolated fixture.
 
 ##### retryCleanup
 
-> `readonly` **retryCleanup**: `Effect`\<`void`, [`CellExecutionFailed`](../../repl/namespaces/Cell#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell#celloutcomeunknown)\>
+> `readonly` **retryCleanup**: `Effect`\<`void`, [`CellExecutionFailed`](../../repl/namespaces/Cell.md#cellexecutionfailed) \| [`KernelUnavailable`](../../repl/namespaces/Cell.md#kernelunavailable) \| [`KernelProtocolViolation`](../../repl/namespaces/Cell.md#kernelprotocolviolation) \| [`CellOutcomeUnknown`](../../repl/namespaces/Cell.md#celloutcomeunknown)\>
 
 ## Type Aliases
 

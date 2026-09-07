@@ -1,4 +1,5 @@
 import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/object.js"
+import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Permissions } from "../../src/index.js"

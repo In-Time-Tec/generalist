@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Compaction
+[generalist](../../index.md) / [generalist](../index.md) / Compaction
 
 # Compaction
 
@@ -12,7 +12,7 @@
 
 ### AgentSummary
 
-Re-exports [AgentSummary](../../compaction#agentsummary-1)
+Re-exports [AgentSummary](../../compaction.md#agentsummary-1)
 
 ***
 
@@ -20,7 +20,7 @@ Re-exports [AgentSummary](../../compaction#agentsummary-1)
 
 ### cacheAware
 
-Re-exports [cacheAware](../../compaction#cacheaware)
+Re-exports [cacheAware](../../compaction.md#cacheaware)
 
 ***
 
@@ -28,7 +28,7 @@ Re-exports [cacheAware](../../compaction#cacheaware)
 
 ### CacheAwareOptions
 
-Re-exports [CacheAwareOptions](../../compaction#cacheawareoptions)
+Re-exports [CacheAwareOptions](../../compaction.md#cacheawareoptions)
 
 ***
 
@@ -36,7 +36,7 @@ Re-exports [CacheAwareOptions](../../compaction#cacheawareoptions)
 
 ### Compaction
 
-Re-exports [Compaction](../../compaction#compaction)
+Re-exports [Compaction](../../compaction.md#compaction)
 
 ***
 
@@ -44,7 +44,7 @@ Re-exports [Compaction](../../compaction#compaction)
 
 ### CompactionError
 
-Re-exports [CompactionError](../../compaction#compactionerror)
+Re-exports [CompactionError](../../compaction.md#compactionerror)
 
 ***
 
@@ -52,7 +52,7 @@ Re-exports [CompactionError](../../compaction#compactionerror)
 
 ### defaultKeepRecentTokens
 
-Re-exports [defaultKeepRecentTokens](../../compaction#defaultkeeprecenttokens)
+Re-exports [defaultKeepRecentTokens](../../compaction.md#defaultkeeprecenttokens)
 
 ***
 
@@ -60,7 +60,7 @@ Re-exports [defaultKeepRecentTokens](../../compaction#defaultkeeprecenttokens)
 
 ### DefaultOptions
 
-Re-exports [DefaultOptions](../../compaction#defaultoptions)
+Re-exports [DefaultOptions](../../compaction.md#defaultoptions)
 
 ***
 
@@ -68,7 +68,7 @@ Re-exports [DefaultOptions](../../compaction#defaultoptions)
 
 ### defaultReserveTokens
 
-Re-exports [defaultReserveTokens](../../compaction#defaultreservetokens)
+Re-exports [defaultReserveTokens](../../compaction.md#defaultreservetokens)
 
 ***
 
@@ -76,7 +76,7 @@ Re-exports [defaultReserveTokens](../../compaction#defaultreservetokens)
 
 ### defaultStrategy
 
-Re-exports [defaultStrategy](../../compaction#defaultstrategy)
+Re-exports [defaultStrategy](../../compaction.md#defaultstrategy)
 
 ***
 
@@ -84,7 +84,7 @@ Re-exports [defaultStrategy](../../compaction#defaultstrategy)
 
 ### keepRecent
 
-Re-exports [keepRecent](../../compaction#keeprecent)
+Re-exports [keepRecent](../../compaction.md#keeprecent)
 
 ***
 
@@ -92,7 +92,7 @@ Re-exports [keepRecent](../../compaction#keeprecent)
 
 ### KeepRecentOptions
 
-Re-exports [KeepRecentOptions](../../compaction#keeprecentoptions)
+Re-exports [KeepRecentOptions](../../compaction.md#keeprecentoptions)
 
 ***
 
@@ -100,7 +100,7 @@ Re-exports [KeepRecentOptions](../../compaction#keeprecentoptions)
 
 ### layer
 
-Re-exports [layer](../../compaction#layer)
+Re-exports [layer](../../compaction.md#layer)
 
 ***
 
@@ -108,7 +108,7 @@ Re-exports [layer](../../compaction#layer)
 
 ### LayerConstructor
 
-Re-exports [LayerConstructor](../../compaction#layerconstructor)
+Re-exports [LayerConstructor](../../compaction.md#layerconstructor)
 
 ***
 
@@ -116,7 +116,7 @@ Re-exports [LayerConstructor](../../compaction#layerconstructor)
 
 ### LayerOptions
 
-Re-exports [LayerOptions](../../compaction#layeroptions)
+Re-exports [LayerOptions](../../compaction.md#layeroptions)
 
 ***
 
@@ -124,7 +124,7 @@ Re-exports [LayerOptions](../../compaction#layeroptions)
 
 ### layerTest
 
-Re-exports [layerTest](../../compaction#layertest)
+Re-exports [layerTest](../../compaction.md#layertest)
 
 ***
 
@@ -132,7 +132,7 @@ Re-exports [layerTest](../../compaction#layertest)
 
 ### layerTruncate
 
-Re-exports [layerTruncate](../../compaction#layertruncate)
+Re-exports [layerTruncate](../../compaction.md#layertruncate)
 
 ***
 
@@ -140,7 +140,7 @@ Re-exports [layerTruncate](../../compaction#layertruncate)
 
 ### layerTruncateEstimated
 
-Re-exports [layerTruncateEstimated](../../compaction#layertruncateestimated)
+Re-exports [layerTruncateEstimated](../../compaction.md#layertruncateestimated)
 
 ***
 
@@ -148,7 +148,7 @@ Re-exports [layerTruncateEstimated](../../compaction#layertruncateestimated)
 
 ### make
 
-Re-exports [make](../../compaction#make)
+Re-exports [make](../../compaction.md#make)
 
 ***
 
@@ -156,7 +156,7 @@ Re-exports [make](../../compaction#make)
 
 ### MicrocompactResult
 
-Re-exports [MicrocompactResult](../../compaction#microcompactresult)
+Re-exports [MicrocompactResult](../../compaction.md#microcompactresult)
 
 ***
 
@@ -164,7 +164,7 @@ Re-exports [MicrocompactResult](../../compaction#microcompactresult)
 
 ### OutputBoundOptions
 
-Re-exports [OutputBoundOptions](../../compaction#outputboundoptions)
+Re-exports [OutputBoundOptions](../../compaction.md#outputboundoptions)
 
 ***
 
@@ -172,7 +172,7 @@ Re-exports [OutputBoundOptions](../../compaction#outputboundoptions)
 
 ### Plan
 
-Re-exports [Plan](../../compaction#plan)
+Re-exports [Plan](../../compaction.md#plan)
 
 ***
 
@@ -180,7 +180,7 @@ Re-exports [Plan](../../compaction#plan)
 
 ### Request
 
-Re-exports [Request](../../compaction#request)
+Re-exports [Request](../../compaction.md#request)
 
 ***
 
@@ -188,7 +188,7 @@ Re-exports [Request](../../compaction#request)
 
 ### Result
 
-Re-exports [Result](../../compaction#result-1)
+Re-exports [Result](../../compaction.md#result-1)
 
 ***
 
@@ -196,7 +196,7 @@ Re-exports [Result](../../compaction#result-1)
 
 ### Service
 
-Re-exports [Service](../../compaction#service)
+Re-exports [Service](../../compaction.md#service)
 
 ***
 
@@ -204,7 +204,7 @@ Re-exports [Service](../../compaction#service)
 
 ### strategy
 
-Re-exports [strategy](../../compaction#strategy-2)
+Re-exports [strategy](../../compaction.md#strategy-2)
 
 ***
 
@@ -212,7 +212,7 @@ Re-exports [strategy](../../compaction#strategy-2)
 
 ### Strategy
 
-Re-exports [Strategy](../../compaction#strategy-1)
+Re-exports [Strategy](../../compaction.md#strategy-1)
 
 ***
 
@@ -220,7 +220,7 @@ Re-exports [Strategy](../../compaction#strategy-1)
 
 ### StrategyPart
 
-Re-exports [StrategyPart](../../compaction#strategypart)
+Re-exports [StrategyPart](../../compaction.md#strategypart)
 
 ***
 
@@ -228,7 +228,7 @@ Re-exports [StrategyPart](../../compaction#strategypart)
 
 ### structuredSummary
 
-Re-exports [structuredSummary](../../compaction#structuredsummary)
+Re-exports [structuredSummary](../../compaction.md#structuredsummary)
 
 ***
 
@@ -236,7 +236,7 @@ Re-exports [structuredSummary](../../compaction#structuredsummary)
 
 ### StructuredSummaryOptions
 
-Re-exports [StructuredSummaryOptions](../../compaction#structuredsummaryoptions)
+Re-exports [StructuredSummaryOptions](../../compaction.md#structuredsummaryoptions)
 
 ***
 
@@ -244,7 +244,7 @@ Re-exports [StructuredSummaryOptions](../../compaction#structuredsummaryoptions)
 
 ### SummarizeResult
 
-Re-exports [SummarizeResult](../../compaction#summarizeresult)
+Re-exports [SummarizeResult](../../compaction.md#summarizeresult)
 
 ***
 
@@ -252,7 +252,7 @@ Re-exports [SummarizeResult](../../compaction#summarizeresult)
 
 ### summarizeWithModel
 
-Re-exports [summarizeWithModel](../../compaction#summarizewithmodel)
+Re-exports [summarizeWithModel](../../compaction.md#summarizewithmodel)
 
 ***
 
@@ -260,7 +260,7 @@ Re-exports [summarizeWithModel](../../compaction#summarizewithmodel)
 
 ### SummarizeWithModelOptions
 
-Re-exports [SummarizeWithModelOptions](../../compaction#summarizewithmodeloptions)
+Re-exports [SummarizeWithModelOptions](../../compaction.md#summarizewithmodeloptions)
 
 ***
 
@@ -268,7 +268,7 @@ Re-exports [SummarizeWithModelOptions](../../compaction#summarizewithmodeloption
 
 ### summaryTemplate
 
-Re-exports [summaryTemplate](../../compaction#summarytemplate)
+Re-exports [summaryTemplate](../../compaction.md#summarytemplate)
 
 ***
 
@@ -276,7 +276,7 @@ Re-exports [summaryTemplate](../../compaction#summarytemplate)
 
 ### toolOutputBound
 
-Re-exports [toolOutputBound](../../compaction#tooloutputbound)
+Re-exports [toolOutputBound](../../compaction.md#tooloutputbound)
 
 ***
 
@@ -284,7 +284,7 @@ Re-exports [toolOutputBound](../../compaction#tooloutputbound)
 
 ### Usage
 
-Re-exports [Usage](../../compaction#usage-1)
+Re-exports [Usage](../../compaction.md#usage-1)
 
 ***
 
@@ -292,4 +292,4 @@ Re-exports [Usage](../../compaction#usage-1)
 
 ### withLifecycle
 
-Re-exports [withLifecycle](../../compaction#withlifecycle)
+Re-exports [withLifecycle](../../compaction.md#withlifecycle)

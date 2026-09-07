@@ -22,7 +22,7 @@ Use Effect AI directly when one generation is enough. Generalist adds the loop t
 
 ## The shape of the decision
 
-Count the turns and decide whether execution state must survive the process. One model call: use Effect AI directly. For a process-local agent loop, use Generalist. For addressable runs that need replay or recovery, add `generalist/runtime`. Try the [offline quickstart](/start/quickstart), then [local and SQLite reopen](/start/examples#local-and-sqlite-in-five-minutes).
+Count the turns and decide whether execution state must survive the process. One model call: use Effect AI directly. For a process-local agent loop, use Generalist. For addressable runs that need replay or recovery, add `generalist/runtime`. Try the [offline quickstart](/start/quickstart), then [local and object recovery](/start/examples#local-and-object-recovery-in-five-minutes).
 
 ## Compatibility is experimental
 

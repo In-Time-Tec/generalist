@@ -50,7 +50,7 @@ Generalist is not a general-purpose workflow engine, project scaffold, or hosted
 
 ## Where generalist/runtime fits
 
-The core package runs an agent in the current process. generalist/runtime adds persisted events, waits and signals, cancellation, inspection, and recovery. Use its memory layer for local development, SQLite for durable single-process execution, or PostgreSQL/MySQL for multiple workers. [Core and Runtime: where durability lives](/learn/native-runtime) covers the package boundary in depth.
+The core package runs an agent in the current process. generalist/runtime adds persisted events, waits and signals, cancellation, inspection, and recovery. Use the shared object-storage engine through S3 or native R2 when work must survive restart. Local processes, servers, Cloudflare Durable Objects, and Rivet actors host that same engine; there is no production memory, filesystem, or SQL Runtime. [Core and Runtime: where durability lives](/learn/native-runtime) covers the package boundary in depth.
 
 ## Next steps
 

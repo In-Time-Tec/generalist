@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / Session
+[generalist](../../index.md) / [generalist](../index.md) / Session
 
 # Session
 
@@ -196,6 +196,16 @@ Session store operation failure.
 
 #### Properties
 
+<a id="cause"></a>
+
+##### cause?
+
+> `readonly` `optional` **cause?**: `unknown`
+
+###### Inherited from
+
+`SessionStoreError_base.cause`
+
 <a id="hint-2"></a>
 
 ##### hint
@@ -215,6 +225,16 @@ Session store operation failure.
 ###### Inherited from
 
 `SessionStoreError_base.message`
+
+<a id="reason-1"></a>
+
+##### reason?
+
+> `readonly` `optional` **reason?**: `"conflict"` \| `"unavailable"` \| `"corrupt"` \| `"unsupported"` \| `"indeterminate"`
+
+###### Inherited from
+
+`SessionStoreError_base.reason`
 
 ## Interfaces
 
@@ -358,7 +378,7 @@ Session event-log service boundary.
 
 ##### append
 
-> `readonly` **append**: (`entry`, `options?`) => `Effect`\<[`Entry`](#entry-1), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
+> `readonly` **append**: (`entry`, `options`) => `Effect`\<[`Entry`](#entry-1), [`SessionConflict`](#sessionconflict) \| [`SessionStoreError`](#sessionstoreerror)\>
 
 ###### Parameters
 
@@ -366,7 +386,7 @@ Session event-log service boundary.
 
 [`AppendInput`](#appendinput)
 
-###### options?
+###### options
 
 [`AppendOptions`](#appendoptions)
 
@@ -450,7 +470,7 @@ Find checkpoint telemetry without materializing the complete ancestor path.
 
 ##### leaf
 
-> `readonly` **leaf**: `Effect`\<`string` \| `null`\>
+> `readonly` **leaf**: `Effect`\<`string` \| `null`, [`SessionStoreError`](#sessionstoreerror)\>
 
 <a id="path"></a>
 
@@ -474,7 +494,7 @@ Complete lossless ancestry for audit, compaction input, and memory retention.
 
 ##### pathPage
 
-> `readonly` **pathPage**: (`input`) => `Effect`\<[`PathPage`](./SessionHistory#pathpage), [`SessionStoreError`](#sessionstoreerror)\>
+> `readonly` **pathPage**: (`input`) => `Effect`\<[`PathPage`](./SessionHistory.md#pathpage), [`SessionStoreError`](#sessionstoreerror)\>
 
 Read at most one backward page on an immutable leaf; continue only with the returned cursor.
 
@@ -482,29 +502,43 @@ Read at most one backward page on an immutable leaf; continue only with the retu
 
 ###### input
 
-[`PathPageInput`](./SessionHistory#pathpageinput)
+[`PathPageInput`](./SessionHistory.md#pathpageinput)
 
 ###### Returns
 
-`Effect`\<[`PathPage`](./SessionHistory#pathpage), [`SessionStoreError`](#sessionstoreerror)\>
+`Effect`\<[`PathPage`](./SessionHistory.md#pathpage), [`SessionStoreError`](#sessionstoreerror)\>
 
 <a id="reserveentryid"></a>
 
 ##### reserveEntryId
 
-> `readonly` **reserveEntryId**: `Effect`\<`string`, [`SessionStoreError`](#sessionstoreerror)\>
+> `readonly` **reserveEntryId**: (`commandId`) => `Effect`\<`string`, [`SessionStoreError`](#sessionstoreerror)\>
+
+###### Parameters
+
+###### commandId
+
+`string`
+
+###### Returns
+
+`Effect`\<`string`, [`SessionStoreError`](#sessionstoreerror)\>
 
 <a id="setleaf"></a>
 
 ##### setLeaf
 
-> `readonly` **setLeaf**: (`id`) => `Effect`\<`void`, [`SessionStoreError`](#sessionstoreerror)\>
+> `readonly` **setLeaf**: (`id`, `commandId`) => `Effect`\<`void`, [`SessionStoreError`](#sessionstoreerror)\>
 
 ###### Parameters
 
 ###### id
 
 `string` \| `null`
+
+###### commandId
+
+`string`
 
 ###### Returns
 
@@ -598,7 +632,7 @@ An exact point-in-time compaction projection.
 
 ##### compactionCommit?
 
-> `readonly` `optional` **compactionCommit?**: [`CompactionCommit`](./ModelTelemetry#compactioncommit)
+> `readonly` `optional` **compactionCommit?**: [`CompactionCommit`](./ModelTelemetry.md#compactioncommit)
 
 ##### projectedHistory
 
@@ -610,7 +644,7 @@ An exact point-in-time compaction projection.
 
 ##### telemetry
 
-> `readonly` **telemetry**: `ReadonlyArray`\<[`Event`](./ModelTelemetry#event)\>
+> `readonly` **telemetry**: `ReadonlyArray`\<[`Event`](./ModelTelemetry.md#event)\>
 
 ***
 
@@ -934,7 +968,7 @@ Canonical exact checkpoint equivalence.
 
 ### EntryPayload
 
-> `const` **EntryPayload**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Message"`, \{ `message`: `Schema.Codec`\<`Prompt.Message`, `Prompt.MessageEncoded`, `never`, `never`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"ModelResponse"`, \{ `content`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `text`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `text`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `approvalId`: ...; `metadata`: ...; `toolCallId`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `data`: ...; `mediaType`: ...; `metadata`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `fileName`: ...; `id`: ...; `mediaType`: ...; `metadata`: ...; `sourceType`: ...; `title`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `sourceType`: ...; `title`: ...; `type`: ...; `url`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `modelId`: ...; `request`: ...; `timestamp`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `reason`: ...; `response`: ...; `type`: ...; `usage`: ...; \}\>, `Schema.Struct`\<\{ `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `encodedResult`: ...; `id`: ...; `isFailure`: ...; `metadata`: ...; `name`: ...; `preliminary`: ...; `providerExecuted`: ...; `result`: ...; `type`: ...; \}\>\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"ToolCall"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `part`: `Schema.Struct`\<\{ `~effect/ai/Prompt/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Prompt/Part"`\>\>; `id`: `Schema.String`; `name`: `Schema.String`; `options`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<...\>\>\>\>; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.withDecodingDefault`\<`Schema.Boolean`\>; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"ToolResult"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `part`: `Schema.Struct`\<\{ `~effect/ai/Prompt/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Prompt/Part"`\>\>; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `name`: `Schema.String`; `options`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<...\>\>\>\>; `providerExecuted`: `Schema.withDecodingDefault`\<`Schema.Boolean`\>; `result`: `Schema.Unknown`; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"Memory"`, \{ `items`: `Schema.$Array`\<`Schema.String`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"Skill"`, \{ `body`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `name`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Steering"`, \{ `message`: `Schema.Codec`\<`Prompt.Message`, `Prompt.MessageEncoded`, `never`, `never`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"Handoff"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `target`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Compaction"`, \{ `compactionCommit`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `summaryModelCallId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `summary`: `Schema.optionalKey`\<`Schema.String`\>; `telemetry`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `model`: ...; `modelCallId`: ...; `provider`: ...; `purpose`: ...; `startedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `deliveryId`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `registrationKey`: ...; `startedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `deliveryId`: ...; `kind`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `completedAt`: ...; `deliveryId`: ...; `finishReason`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `providerMetadata`: ...; `registrationKey`: ...; `requestId`: ...; `responseModel`: ...; `serviceTier`: ...; `turn`: ...; `usage`: ...; `usageAt`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `category`: ...; `classification`: ...; `deliveryId`: ...; `disposition`: ...; `failedAt`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `providerUsage`: ...; `registrationKey`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `category`: ...; `delayMillis`: ...; `deliveryId`: ...; `modelCallId`: ...; `reason`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `category`: ...; `deliveryId`: ...; `fromCandidate`: ...; `fromModel`: ...; `fromProvider`: ...; `fromRegistrationKey`: ...; `modelCallId`: ...; `toCandidate`: ...; `toModel`: ...; `toProvider`: ...; `toRegistrationKey`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempts`: ...; `completedAt`: ...; `deliveryId`: ...; `failedAttemptUsage`: ...; `finishReason`: ...; `modelCallId`: ...; `purpose`: ...; `turn`: ...; `usage`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempts`: ...; `category`: ...; `classification`: ...; `deliveryId`: ...; `failedAt`: ...; `failedAttemptUsage`: ...; `modelCallId`: ...; `purpose`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `contextTokensBefore`: ...; `deliveryId`: ...; `entriesBefore`: ...; `startedAt`: ...; `trigger`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `skippedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `appliedAt`: ...; `checkpointId`: ...; `commit`: ...; `compactionId`: ...; `deliveryId`: ...; `kind`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `failedAt`: ...; `turn`: ...; \}\>\]\>\>; \}\>, `Schema.TaggedStruct`\<`"BranchSummary"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `summary`: `Schema.String`; \}\>\]\>
+> `const` **EntryPayload**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Message"`, \{ `message`: `Schema.Codec`\<`Prompt.Message`, `Prompt.MessageEncoded`, `never`, `never`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"ModelResponse"`, \{ `content`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `text`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `text`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `approvalId`: ...; `metadata`: ...; `toolCallId`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `data`: ...; `mediaType`: ...; `metadata`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `fileName`: ...; `id`: ...; `mediaType`: ...; `metadata`: ...; `sourceType`: ...; `title`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `sourceType`: ...; `title`: ...; `type`: ...; `url`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `modelId`: ...; `request`: ...; `timestamp`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `metadata`: ...; `reason`: ...; `response`: ...; `type`: ...; `usage`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: ...; `encodedResult`: ...; `id`: ...; `isFailure`: ...; `metadata`: ...; `name`: ...; `preliminary`: ...; `providerExecuted`: ...; `result`: ...; `type`: ...; \}\>\]\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"ToolCall"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `part`: `Schema.Struct`\<\{ `~effect/ai/Prompt/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Prompt/Part"`\>\>; `id`: `Schema.String`; `name`: `Schema.String`; `options`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<...\>\>\>\>; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.withDecodingDefault`\<`Schema.Boolean`\>; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"ToolResult"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `part`: `Schema.Struct`\<\{ `~effect/ai/Prompt/Part`: `Schema.withDecodingDefaultKey`\<`Schema.Literal`\<`"~effect/ai/Prompt/Part"`\>\>; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `name`: `Schema.String`; `options`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<...\>\>\>\>; `providerExecuted`: `Schema.withDecodingDefault`\<`Schema.Boolean`\>; `result`: `Schema.Unknown`; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>; \}\>, `Schema.TaggedStruct`\<`"Memory"`, \{ `items`: `Schema.$Array`\<`Schema.String`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"Skill"`, \{ `body`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `name`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Steering"`, \{ `message`: `Schema.Codec`\<`Prompt.Message`, `Prompt.MessageEncoded`, `never`, `never`\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; \}\>, `Schema.TaggedStruct`\<`"Handoff"`, \{ `handoffId`: `Schema.String`; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `target`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Compaction"`, \{ `compactionCommit`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `checkpointId`: `Schema.String`; `compactionId`: `Schema.String`; `contextTokensAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `contextTokensBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesAfter`: `Schema.optionalKey`\<`Schema.Finite`\>; `entriesBefore`: `Schema.optionalKey`\<`Schema.Finite`\>; `summaryModelCallId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\>; `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `projectedHistory`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `summary`: `Schema.optionalKey`\<`Schema.String`\>; `telemetry`: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `model`: ...; `modelCallId`: ...; `provider`: ...; `purpose`: ...; `startedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `deliveryId`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `registrationKey`: ...; `startedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `deliveryId`: ...; `kind`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `completedAt`: ...; `deliveryId`: ...; `finishReason`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `providerMetadata`: ...; `registrationKey`: ...; `requestId`: ...; `responseModel`: ...; `serviceTier`: ...; `turn`: ...; `usage`: ...; `usageAt`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempt`: ...; `candidate`: ...; `category`: ...; `classification`: ...; `deliveryId`: ...; `disposition`: ...; `failedAt`: ...; `model`: ...; `modelAttemptId`: ...; `modelCallId`: ...; `provider`: ...; `providerUsage`: ...; `registrationKey`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `category`: ...; `delayMillis`: ...; `deliveryId`: ...; `modelCallId`: ...; `reason`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `at`: ...; `attempt`: ...; `category`: ...; `deliveryId`: ...; `fromCandidate`: ...; `fromModel`: ...; `fromProvider`: ...; `fromRegistrationKey`: ...; `modelCallId`: ...; `toCandidate`: ...; `toModel`: ...; `toProvider`: ...; `toRegistrationKey`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempts`: ...; `completedAt`: ...; `deliveryId`: ...; `failedAttemptUsage`: ...; `finishReason`: ...; `modelCallId`: ...; `purpose`: ...; `turn`: ...; `usage`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `attempts`: ...; `category`: ...; `classification`: ...; `deliveryId`: ...; `failedAt`: ...; `failedAttemptUsage`: ...; `modelCallId`: ...; `purpose`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `contextTokensBefore`: ...; `deliveryId`: ...; `entriesBefore`: ...; `startedAt`: ...; `trigger`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `skippedAt`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `appliedAt`: ...; `checkpointId`: ...; `commit`: ...; `compactionId`: ...; `deliveryId`: ...; `kind`: ...; `turn`: ...; \}\>, `Schema.Struct`\<\{ `_tag`: ...; `compactionId`: ...; `deliveryId`: ...; `failedAt`: ...; `turn`: ...; \}\>\]\>\>; \}\>, `Schema.TaggedStruct`\<`"BranchSummary"`, \{ `metadata`: `Schema.optionalKey`\<`Schema.$Record`\<`Schema.String`, `Schema.Unknown`\>\>; `summary`: `Schema.String`; \}\>\]\>
 
 Durable wire form of a Session entry.
 
@@ -976,7 +1010,7 @@ Ref-backed non-durable Session directory with one linear lane per Session ID.
 
 ### ModelResponseContent
 
-> `const` **ModelResponseContent**: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"text"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"reasoning"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `approvalId`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `toolCallId`: `Schema.String`; `type`: `Schema.tag`\<`"tool-approval-request"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `data`: `Schema.Uint8ArrayFromBase64`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `type`: `Schema.tag`\<`"file"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `fileName`: `Schema.optionalKey`\<`Schema.String`\>; `id`: `Schema.String`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `sourceType`: `Schema.tag`\<`"document"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `sourceType`: `Schema.tag`\<`"url"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; `url`: `Schema.URLFromString`; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.optional`\<`Schema.String`\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `modelId`: `Schema.optional`\<`Schema.String`\>; `request`: `Schema.optional`\<*typeof* `Response.HttpRequestDetails`\>; `timestamp`: `Schema.optional`\<`Schema.DateTimeUtcFromString`\>; `type`: `Schema.tag`\<`"response-metadata"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `reason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `response`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Struct`\<\{ `headers`: `Schema.$Record`\<..., ...\>; `status`: `Schema.Int`; \}\>\>\>; `type`: `Schema.tag`\<`"finish"`\>; `usage`: `Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<...\>; `cacheWrite`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; `uncached`: `Schema.optionalKey`\<...\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<...\>; `text`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; \}\>; \}\>; \}\>, `Schema.Struct`\<\{ `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>, `Schema.Struct`\<\{ `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>\]\>\>
+> `const` **ModelResponseContent**: `Schema.$Array`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"text"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `text`: `Schema.String`; `type`: `Schema.tag`\<`"reasoning"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `approvalId`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `toolCallId`: `Schema.String`; `type`: `Schema.tag`\<`"tool-approval-request"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `data`: `Schema.Uint8ArrayFromBase64`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `type`: `Schema.tag`\<`"file"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `fileName`: `Schema.optionalKey`\<`Schema.String`\>; `id`: `Schema.String`; `mediaType`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `sourceType`: `Schema.tag`\<`"document"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.String`; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `sourceType`: `Schema.tag`\<`"url"`\>; `title`: `Schema.String`; `type`: `Schema.tag`\<`"source"`\>; `url`: `Schema.URLFromString`; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `id`: `Schema.optional`\<`Schema.String`\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `modelId`: `Schema.optional`\<`Schema.String`\>; `request`: `Schema.optional`\<*typeof* `Response.HttpRequestDetails`\>; `timestamp`: `Schema.optional`\<`Schema.DateTimeUtcFromString`\>; `type`: `Schema.tag`\<`"response-metadata"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>\>; `metadata`: `Schema.withDecodingDefault`\<`Schema.$Record`\<`Schema.String`, `Schema.Codec`\<`Schema.Json`\>\>\>; `reason`: `Schema.Literals`\<\[`"stop"`, `"length"`, `"content-filter"`, `"tool-calls"`, `"error"`, `"pause"`, `"other"`, `"unknown"`\]\>; `response`: `Schema.optionalKey`\<`Schema.UndefinedOr`\<`Schema.Struct`\<\{ `headers`: `Schema.$Record`\<..., ...\>; `status`: `Schema.Int`; \}\>\>\>; `type`: `Schema.tag`\<`"finish"`\>; `usage`: `Schema.Struct`\<\{ `inputTokens`: `Schema.Struct`\<\{ `cacheRead`: `Schema.optionalKey`\<...\>; `cacheWrite`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; `uncached`: `Schema.optionalKey`\<...\>; \}\>; `outputTokens`: `Schema.Struct`\<\{ `reasoning`: `Schema.optionalKey`\<...\>; `text`: `Schema.optionalKey`\<...\>; `total`: `Schema.optionalKey`\<...\>; \}\>; \}\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>, `never`\>; `id`: `Schema.String`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `params`: `Schema.Unknown`; `providerExecuted`: `Schema.Boolean`; `type`: `Schema.Literal`\<`"tool-call"`\>; \}\>, `Schema.Struct`\<\{ `~effect/ai/Content/Part`: `Schema.withDecodingDefaultKey`\<`Schema.tag`\<`"~effect/ai/Content/Part"`\>, `never`\>; `encodedResult`: `Schema.Unknown`; `id`: `Schema.String`; `isFailure`: `Schema.Boolean`; `metadata`: `Schema.$Record`\<`Schema.String`, `Schema.NullOr`\<`Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>\>\>; `name`: `Schema.String`; `preliminary`: `Schema.Boolean`; `providerExecuted`: `Schema.Boolean`; `result`: `Schema.Unknown`; `type`: `Schema.Literal`\<`"tool-result"`\>; \}\>\]\>\>
 
 ***
 

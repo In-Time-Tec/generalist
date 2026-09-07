@@ -1,5 +1,4 @@
-import type { PreparedObservation } from "../observation.js"
-import { occurredAt as preparedOccurredAt } from "../observation.js"
+import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../observation.js"
 /* oxlint-disable no-accumulating-spread */
 import { Effect, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
@@ -20,8 +19,8 @@ import {
   resumedEvent,
   rejectIfTerminal,
 } from "../append.js"
-import { afterTerminal } from "../lanes.js"
-import { openRunWaits, waitMapKey, type RuntimeState, type StoredRun } from "../state.js"
+import { afterTerminal } from "./admission/lanes.js"
+import { openRunWaits, waitMapKey, type RuntimeState, type StoredRun } from "../projection.js"
 import { reconcileFanOut } from "./fan-out/service.js"
 import { ProgramCancelled } from "../../../core/program/capabilities.js"
 import { hasUnsettledChild, settleParentChild } from "./child/settlement.js"
@@ -34,7 +33,8 @@ type CancelResult = Effect.Effect<RuntimeState, RunNotFound | RuntimeUnavailable
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
 type ResumeResult = Effect.Effect<
   RuntimeState,
-  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable, PreparedObservation
+  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable,
+  PreparedObservation
 >
 
 const getRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
@@ -78,7 +78,10 @@ const reconcileProgramCancellation = (
     return next
   })
 
-const finalizeCancellingParent = (state: RuntimeState, runId: string): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+const finalizeCancellingParent = (
+  state: RuntimeState,
+  runId: string,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const run = state.runs.get(runId)
     if (
@@ -102,7 +105,10 @@ const finalizeCancellingParent = (state: RuntimeState, runId: string): Effect.Ef
     return settled.parentRunId === undefined ? next : yield* finalizeCancellingParent(next, settled.parentRunId)
   })
 
-const settlePendingOutcome = (state: RuntimeState, run: StoredRun): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+const settlePendingOutcome = (
+  state: RuntimeState,
+  run: StoredRun,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     if (run.pendingOutcome === undefined || isTerminal(run.status)) return state
     const pending = run.pendingOutcome
@@ -160,7 +166,10 @@ const cancellationMustWait = (state: RuntimeState, run: StoredRun): boolean =>
   hasUnknownOperation(state, run.runId) ||
   hasUnsettledChild(state, run.runId)
 
-const completeCancellation = (state: RuntimeState, run: StoredRun): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+const completeCancellation = (
+  state: RuntimeState,
+  run: StoredRun,
+): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     if (cancellationMustWait(state, run)) {
       const runs = new Map(state.runs)
@@ -379,16 +388,18 @@ export const resume: {
 export const emitAgentEvent: {
   (input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }): (state: RuntimeState) => SignalResult
   (state: RuntimeState, input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }): SignalResult
-} = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }) =>
-  Effect.gen(function* () {
-    const run = yield* getRun(state, input.runId)
-    const terminal = rejectIfTerminal(run)
-    if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
-    const [event, next] = yield* appendAgentEvent(state, run.runId, input.event)
-    if (input.event._tag !== "TurnCompleted") return next
-    const runs = new Map(next.runs)
-    const { continuation: _, ...withoutContinuation } = next.runs.get(run.runId)!
-    runs.set(run.runId, { ...withoutContinuation, lastTurnCompletedSequence: event.sequence })
-    return { ...next, runs }
-  }),
+} = Function.dual(
+  2,
+  (state: RuntimeState, input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }) =>
+    Effect.gen(function* () {
+      const run = yield* getRun(state, input.runId)
+      const terminal = rejectIfTerminal(run)
+      if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
+      const [event, next] = yield* appendAgentEvent(state, run.runId, input.event)
+      if (input.event._tag !== "TurnCompleted") return next
+      const runs = new Map(next.runs)
+      const { continuation: _, ...withoutContinuation } = next.runs.get(run.runId)!
+      runs.set(run.runId, { ...withoutContinuation, lastTurnCompletedSequence: event.sequence })
+      return { ...next, runs }
+    }),
 )

@@ -1,4 +1,4 @@
-import { makeObjectStorage, objectRuntimeLayer } from "./execution/object.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -157,8 +157,13 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
             idempotencyKey: "counterfactual-fork",
           })
           yield* executor
-            .execute(yield* store.claimExecution({
-          commandId: "runtime-fork-test-ts-claim-1", runId: handle.runId, ownerId: "counterfactual-source" }))
+            .execute(
+              yield* store.claimExecution({
+                commandId: "runtime-fork-test-ts-claim-1",
+                runId: handle.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             .pipe(Effect.forkScoped)
           const completed = yield* runtime.events({ runId: handle.runId }).pipe(
             Stream.filter((event) => event._tag === "ToolExecutionCompleted"),
@@ -207,14 +212,20 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
         const store = yield* RunStore.RunStore
         yield* runtime.register(agent)
         const branch = yield* runtime.fork(source.runId, {
+          commandId: "fork:substitute",
           atSequence: source.atSequence,
           substitute: {
             operationId: source.operationId,
             result: { _tag: "Success", result: "substituted", encodedResult: "substituted" },
           },
         })
-        yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-fork-test-ts-claim-2", runId: branch.runId, ownerId: "counterfactual-branch" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-fork-test-ts-claim-2",
+            runId: branch.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         expect(yield* branch.await).toBe("counterfactual complete")
         expect(toolCalls).toBe(1)
         expect(recoveredModelCalls).toBe(1)
@@ -251,10 +262,13 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
 
         const source = yield* scopedWith(
           Layer.merge(
-            objectRuntimeLayer({
-              addresses: [],
-                      scheduler: { pollInterval: "1 hour" },
-            }).pipe(Layer.provide(resolver)),
+            objectRuntimeLayer(
+              {
+                addresses: [],
+                scheduler: { pollInterval: "1 hour" },
+              },
+              storage,
+            ).pipe(Layer.provide(resolver)),
             cellEnvironment(
               cellModel([
                 { cell: 'let branchCounter = 1; await Bun.write("inherited.txt", "source file"); branchCounter' },
@@ -270,8 +284,13 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
             const executor = yield* RunExecutor.RunExecutor
             yield* runtime.register(agent)
             const handle = yield* runtime.start(agent, "write source state", { sessionId: sourceSessionId })
-            yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-fork-test-ts-claim-3", runId: handle.runId, ownerId: "source-host" }))
+            yield* executor.execute(
+              yield* store.claimExecution({
+                commandId: "runtime-fork-test-ts-claim-3",
+                runId: handle.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             const history = yield* runtime.history({ runId: handle.runId, cursor: -1, limit: 100 })
             const completion = completedCell(history)
             if (completion === undefined) return yield* Effect.die("source cell did not complete")
@@ -282,10 +301,13 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
 
         const branch = yield* scopedWith(
           Layer.merge(
-            objectRuntimeLayer({
-              addresses: [],
-                      scheduler: { pollInterval: "1 hour" },
-            }).pipe(Layer.provide(resolver)),
+            objectRuntimeLayer(
+              {
+                addresses: [],
+                scheduler: { pollInterval: "1 hour" },
+              },
+              storage,
+            ).pipe(Layer.provide(resolver)),
             cellEnvironment(
               cellModel([
                 {
@@ -302,9 +324,17 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
             const store = yield* RunStore.RunStore
             const executor = yield* RunExecutor.RunExecutor
             yield* runtime.register(agent)
-            const handle = yield* runtime.fork(source.runId, { atSequence: source.atSequence })
-            yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-fork-test-ts-claim-4", runId: handle.runId, ownerId: "branch-host" }))
+            const handle = yield* runtime.fork(source.runId, {
+              commandId: "fork:branch",
+              atSequence: source.atSequence,
+            })
+            yield* executor.execute(
+              yield* store.claimExecution({
+                commandId: "runtime-fork-test-ts-claim-4",
+                runId: handle.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             const history = yield* runtime.history({ runId: handle.runId, cursor: -1, limit: 100 })
             const completion = completedCell(history)
             if (completion === undefined) return yield* Effect.die("branch cell did not complete")
@@ -367,8 +397,13 @@ it.live("restores a rewound Run from the retained Sandbox snapshot", () =>
             const executor = yield* RunExecutor.RunExecutor
             yield* runtime.register(agent)
             const handle = yield* runtime.start(agent, "build state to rewind")
-            yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-fork-test-ts-claim-5", runId: handle.runId, ownerId: "source-host" }))
+            yield* executor.execute(
+              yield* store.claimExecution({
+                commandId: "runtime-fork-test-ts-claim-5",
+                runId: handle.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             const sourceHistory = yield* runtime.history({ runId: handle.runId, cursor: -1, limit: 100 })
             const sourceCells = sourceHistory.filter(
               (event) => event._tag === "ToolExecutionCompleted" && event.call.name === CellTool.name,
@@ -378,9 +413,14 @@ it.live("restores a rewound Run from the retained Sandbox snapshot", () =>
             expect(yield* cellValue(first)).toBe("1")
             expect(yield* cellValue(sourceCells[1]!)).toBe("9")
 
-            yield* runtime.rewind(handle.runId, { toSequence: first.sequence })
-            yield* executor.execute(yield* store.claimExecution({
-          commandId: "runtime-fork-test-ts-claim-6", runId: handle.runId, ownerId: "rewound-host" }))
+            yield* runtime.rewind(handle.runId, { commandId: "fork:rewind", toSequence: first.sequence })
+            yield* executor.execute(
+              yield* store.claimExecution({
+                commandId: "runtime-fork-test-ts-claim-6",
+                runId: handle.runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             const rewoundHistory = yield* runtime.history({ runId: handle.runId, cursor: -1, limit: 100 })
             const rewound = completedCell(rewoundHistory)
             if (rewound === undefined) return yield* Effect.die("rewound cell did not complete")

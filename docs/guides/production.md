@@ -3,15 +3,15 @@ title: "Operate an agent service"
 description: "Choose who owns access, limits, shutdown, and recovery before accepting user work."
 ---
 
-Use this guide before exposing a Host through `generalist/server`. First run the [transport guide](/guides/serve-transport) and [SQLite reopen example](/start/examples#local-and-sqlite-in-five-minutes). You need a persistent store if accepted work must survive a restart, plus application-owned authentication, authorization, and operational access.
+Use this guide before exposing a Host through `generalist/server`. First run the [transport guide](/guides/serve-transport) and [object recovery example](/start/examples#local-and-object-recovery-in-five-minutes). You need a persistent store if accepted work must survive a restart, plus application-owned authentication, authorization, and operational access.
 
 ## Authenticate and authorize at the host boundary
 
-`Server.authBearer(Config.redacted("SERVICE_TOKEN"))` authenticates one shared bearer token. It does not establish tenant identity or authorize access to a particular Session, Run, blob, or approval. `Server.Authentication` lets the application supply authentication middleware; a caller-supplied operator string is an audit field, not proof of identity.
+`Server.authBearer({ token: Config.redacted("SERVICE_TOKEN"), principal })` requires a nonempty token and a validated principal with nonempty `id`, `tenantId`, and role `controller` or `spectator`. `Server.layer` also requires an application `authorization` policy: it checks the tenant, prevents spectator mutations, then checks the requested resource before dispatch. A shared token maps to one configured identity; it is not a multi-user identity provider.
 
-Use separate tenant-owned Hosts and stores, or an application gateway that authorizes **every** endpoint against the authenticated principal: reads, writes, event streams, WebSockets, blobs, approvals, and operator actions. Prevent clients from bypassing that gateway. Derive operator identity from authenticated context rather than trusting request payloads. Tool `Permissions` do not replace resource authorization.
+Use tenant-owned Hosts and object namespaces and implement resource authorization for reads, writes, streams, attachments, approvals, and operator actions. Custom `Server.Authentication` middleware must establish `Server.CurrentPrincipal`. Operator attribution comes from that authenticated context, not an arbitrary client label. Tool `Permissions` do not replace resource authorization.
 
-The tutorial's pass-through auth, allow-all permissions, and permissive CORS are demonstrations only. Use TLS, restrict origins, keep model keys on the server, and test cross-tenant denials before accepting traffic. Generalist does not supply a secure multi-tenant Server or a production sandbox. The local Bun kernel runs with host OS permissions; use an isolation provider appropriate to your workload before executing untrusted code.
+The tutorial's development principal, allow-all permissions, and permissive CORS are demonstrations only. Use TLS, restrict origins, keep model keys on the server, and test cross-tenant denials before accepting traffic. Implemented authentication and Session snapshot/resync do not establish full browser or deployment acceptance. The local Bun kernel runs with host OS permissions; use an isolation provider appropriate to your workload before executing untrusted code.
 
 ## Bound work before admission
 
@@ -37,8 +37,8 @@ For `Unknown`, check the external system using the operation's business/idempote
 
 ## Rehearse storage recovery
 
-Keep the authoritative database, journal, and required blobs across deploys. Memory Layers lose data on process exit. Back up and restore the database using your storage provider's procedure; do not repair recovery by deleting journal rows or inventing completion events. Keep executable registrations available so stored work can resolve its pinned executable.
+Keep the complete object namespace, retained journal/receipts, and required blobs across deploys. There is no alternate production memory or filesystem Runtime. Follow the [object backup procedure](/features/durable-stores#backup-and-restore); never delete production objects or invent completion events to repair recovery. Keep executable registrations available so stored work can resolve its pins. Use fresh namespaces for the clean v1 cutover, with no legacy reader or migration fallback.
 
-Run [five-minutes](/start/examples#local-and-sqlite-in-five-minutes) to see an accepted Run reopen with the same ID and result. Then exercise your actual storage adapter through close/reopen, interrupted operations, approvals, and unknown outcomes before rollout. A passing SQLite demo is not PostgreSQL/MySQL recovery evidence, and a skipped database suite is not a pass.
+Run [five-minutes](/start/examples#local-and-object-recovery-in-five-minutes) with object configuration to see an accepted Run reopen with the same ID and result. The repository's local MinIO/Miniflare/workerd suite exercises transport recovery without external credentials. Its patched-emulator evidence does not certify AWS or deployed R2, performance, or full release acceptance. A skipped local service suite is not a pass.
 
 Next: use the [Runtime reference](/reference/runtime) for exact APIs and the [recovery reference](/features/recovery) when a Run needs operator attention.

@@ -68,8 +68,7 @@ export const messagingSendOperationSuite = <StoreError, Extra = never>(
         const original = yield* send
         const replayed = yield* send
 
-        expect(replayed.duplicate).toBe(true)
-        expect(replayed.entryId).toBe(original.entryId)
+        expect(replayed).toEqual(original)
         expect(
           (yield* runtime.history({ runId: first.runId, limit: 100 })).filter((event) => event._tag === "Inbox"),
         ).toHaveLength(1)

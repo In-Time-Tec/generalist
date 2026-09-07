@@ -1082,18 +1082,26 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       return Stream.make(textDelta("parent answer"))
     })
     const hooks = Hooks.layer([
-      Hooks.onChildStart(({ child: started }) =>
-        Effect.sync(() => {
-          childLifecycle.push(`start:${started.selection}`)
-          return Hooks.Continue()
-        }),
-      ),
-      Hooks.onChildEnd(({ child: ended, result }) =>
-        Effect.sync(() => {
-          childLifecycle.push(`end:${ended.selection}:${String(result)}`)
-          return Hooks.Continue()
-        }),
-      ),
+      Hooks.onChildStart({
+        key: "test.core.agent.tool.onChildStart.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ child: started }) =>
+          Effect.sync(() => {
+            childLifecycle.push(`start:${started.selection}`)
+            return Hooks.Continue()
+          }),
+      }),
+      Hooks.onChildEnd({
+        key: "test.core.agent.tool.onChildEnd.1",
+        version: "1",
+        replayPolicy: "never",
+        hook: ({ child: ended, result }) =>
+          Effect.sync(() => {
+            childLifecycle.push(`end:${ended.selection}:${String(result)}`)
+            return Hooks.Continue()
+          }),
+      }),
     ])
     const environment = Layer.mergeAll(
       allowAllAuthorization,
@@ -1103,10 +1111,9 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     )
     const runtimeLayer = (workerId: string) =>
       Layer.merge(
-        objectRuntimeLayer(
-          { addresses: [], scheduler: { pollInterval: "1 hour" }, workerId },
-          storage,
-        ).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
+        objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, workerId }, storage).pipe(
+          Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+        ),
         environment,
       )
     const startOptions = {

@@ -1,12 +1,12 @@
-[**generalist**](../index)
+[**generalist**](../index.md)
 
 ***
 
-[generalist](../index) / unstable.mcp
+[generalist](../index.md) / unstable.mcp
 
 # unstable.mcp
 
 ## Namespaces
 
-- [MCPClient](./namespaces/MCPClient)
-- [OAuth](./namespaces/OAuth)
+- [MCPClient](./namespaces/MCPClient.md)
+- [OAuth](./namespaces/OAuth.md)

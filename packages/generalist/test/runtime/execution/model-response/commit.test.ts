@@ -1,5 +1,5 @@
 import { expect, it, layer } from "@effect/vitest"
-import { Effect, Layer, Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Pins, Session } from "../../../../src/index.js"
 import { Runtime, RunStore } from "../../../../src/runtime/index.js"
@@ -63,13 +63,19 @@ const schedule = (runId: string) =>
       attempt: 0,
     })
     yield* store.startOperation({
-          commandId: "runtime-execution-model-response-commit-test-ts-startOperation-1", ...claim, operationId: operation.operationId })
+      commandId: "runtime-execution-model-response-commit-test-ts-startOperation-1",
+      ...claim,
+      operationId: operation.operationId,
+    })
     const maybeSession = yield* store.claimedSessionStore(claim)
     if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
-    const prefix = yield* maybeSession.value.append({
-      _tag: "Message",
-      message: textPrompt("durable model input").content[0]!,
-    })
+    const prefix = yield* maybeSession.value.append(
+      {
+        _tag: "Message",
+        message: textPrompt("durable model input").content[0]!,
+      },
+      { commandId: "model-response-input" },
+    )
     return { store, claim, operation, operationKey, sessionParentId: prefix.id }
   })
 
@@ -87,6 +93,7 @@ layer(objectLayer)("atomic model response memory commit", (suite) => {
   suite.effect("rejects a divergent outbox and appends one exact event across retries", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
+      yield* runtime.createSession({ id: "session:model-commit-memory" })
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:model-commit-memory",
@@ -112,10 +119,27 @@ layer(objectLayer)("atomic model response memory commit", (suite) => {
         ),
       ).toBe(false)
       expect((yield* sessionProjection(store, "session:model-commit-memory")).content).toHaveLength(1)
+      const beforeModelCommit = yield* runtime.sessionSnapshot("session:model-commit-memory")
 
       const checkpoint = { _tag: "Program" as const, version: "1" as const }
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
+      const committedSnapshot = yield* runtime.sessionSnapshot("session:model-commit-memory")
+      expect(committedSnapshot.runs[0]?.outcome).toBeUndefined()
+      expect(committedSnapshot.conversation.entries).toHaveLength(2)
+      const committedUpdates = yield* runtime
+        .sessionEvents({ sessionId: "session:model-commit-memory", cursor: beforeModelCommit.cursor })
+        .pipe(
+          Stream.takeUntil((entry) => entry.cursor === committedSnapshot.cursor),
+          Stream.runCollect,
+        )
+      expect(committedUpdates.filter((entry) => entry._tag === "Conversation")).toHaveLength(1)
+      expect(
+        committedUpdates.filter((entry) => entry._tag === "Run" && entry.event._tag === "ModelResponseCommitted"),
+      ).toHaveLength(1)
+      expect(
+        committedUpdates.filter((entry) => entry._tag === "Conversation").flatMap((entry) => entry.update.entries),
+      ).toEqual(committedSnapshot.conversation.entries.slice(1))
       const divergentCheckpoint = yield* Effect.exit(
         store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact }),
       )
@@ -175,11 +199,8 @@ const scopedWith =
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
-
-
-
-it.live("rejects mutated completed model response references and Session storage", () => {
-  return scopedWith(objectLayer)(
+it.live("rejects mutated completed model response references and Session storage", () =>
+  scopedWith(objectLayer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const receipt = yield* runtime.send({
@@ -229,6 +250,5 @@ it.live("rejects mutated completed model response references and Session storage
       })
       expect(yield* runtime.resolveModelResponse(event)).toEqual(exact.event.response)
     }),
-  )
-})
-
+  ),
+)

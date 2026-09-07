@@ -6,7 +6,7 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Approvals, BlobStore, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
@@ -60,10 +60,14 @@ layer(services)("Artifact WebSocket", (it) => {
       const fake = yield* makeSocket
       const server = yield* handle<readonly []>({
         host,
+        authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
         name: document.name,
         request: request(fake.socket),
         updates,
-      }).pipe(Effect.forkChild)
+      }).pipe(
+        Effect.provideService(Server.CurrentPrincipal, { id: "controller", tenantId: "test", role: "controller" }),
+        Effect.forkChild,
+      )
 
       const initial = yield* Queue.take(fake.outbound)
       if (Socket.isCloseEvent(initial) || initial instanceof Uint8Array) return yield* Effect.die("expected snapshot")

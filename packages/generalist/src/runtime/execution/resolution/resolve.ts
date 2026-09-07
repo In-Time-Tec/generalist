@@ -1,13 +1,12 @@
 import { Effect } from "effect"
 import { ExecutableIdentityMismatch, UnknownAgent } from "../../errors.js"
 import {
-  verifyAttestation,
   verifyInput,
   type Input as ResolverInput,
   type Resolution,
   type ResolveError,
 } from "../../executable/resolver.js"
-import { decodePinned, equals } from "../../executable/manifest-internal.js"
+import { equals } from "../../executable/manifest-internal.js"
 import type { ExecutionRecord, WorkerMutationError } from "../../run/store.js"
 import type { RunFailure } from "../../run/event.js"
 
@@ -46,10 +45,7 @@ const resolveExecution = (
     if (resolution === undefined) return undefined
     const identityMatches = yield* Effect.sync(() => {
       try {
-        return equals(
-          decodePinned({ ref: claimed.executableRef, manifest: claimed.executableManifest }),
-          verifyAttestation(resolution.attestation),
-        )
+        return equals({ ref: claimed.executableRef, manifest: claimed.executableManifest }, resolution.attestation)
       } catch {
         return false
       }

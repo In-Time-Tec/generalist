@@ -1,7 +1,7 @@
 import type { ModifyState } from "../../../../durability/internal/runtime.js"
 import { DurabilityFailure } from "../../../../durability/errors.js"
 import { artifactAppendCommandId, commands } from "../../../../durability/internal/runtime-command-admission.js"
-import * as Codec from "../../../../durability/internal/runtime-state.js"
+import { decodeReceipt } from "../../../../durability/internal/runtime-state.js"
 import { Effect, Queue, Schema, Stream, SynchronizedRef } from "effect"
 import {
   ArtifactAppendReceipt,
@@ -18,7 +18,7 @@ import {
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { Receipt as JournalReceipt } from "../../../../durability/internal/protocol.js"
 import type { Service as RunStoreService } from "../../../run/store.js"
-import type { ArtifactPublication, RuntimeState, StoredArtifact } from "../../state.js"
+import type { ArtifactPublication, RuntimeState, StoredArtifact } from "../../projection.js"
 
 const CommandReceipt = Schema.Struct({
   value: Schema.Json,
@@ -159,24 +159,27 @@ const artifactAppendReceipt = (
     const commandId = artifactAppendCommandId(input)
     const receipt = yield* lookupReceipt(commandId)
     if (receipt === undefined) return undefined
-    const envelope = yield* Schema.decodeUnknownEffect(CommandReceipt, { onExcessProperty: "error" })(receipt.receipt).pipe(
+    const envelope = yield* Schema.decodeUnknownEffect(CommandReceipt, { onExcessProperty: "error" })(
+      receipt.receipt,
+    ).pipe(
       Effect.mapError((cause) =>
         DurabilityFailure.make({
           reason: "corruption",
           message: `Invalid Artifact command receipt envelope: ${String(cause)}`,
           commandId,
-        })),
+        }),
+      ),
     )
-    return yield* Codec.decodeReceipt(envelope.value, ArtifactAppendReceipt).pipe(
+    return yield* decodeReceipt(envelope.value, ArtifactAppendReceipt).pipe(
       Effect.mapError((cause) =>
         DurabilityFailure.make({
           reason: "corruption",
           message: `Invalid Artifact append receipt: ${cause.message}`,
           commandId,
-        })),
+        }),
+      ),
     )
   })
-
 
 const append = (state: RuntimeState, input: ArtifactAppend) =>
   Effect.gen(function* () {
@@ -296,7 +299,6 @@ export const publish = (input: { readonly state: RuntimeState; readonly publicat
     return changed ? { ...input.state, artifacts } : input.state
   })
 
-
 export const make = (input: {
   readonly stateRef: SynchronizedRef.SynchronizedRef<RuntimeState>
   readonly readState: Effect.Effect<RuntimeState, RuntimeUnavailable | DurabilityFailure>
@@ -314,21 +316,23 @@ export const make = (input: {
   | "artifactUpdates"
   | "artifactRunIsFork"
 > => ({
-  ensureArtifact: (request) => input.modifyState(commands.ensureArtifact, [request], (state, [prepared]) => ensureArtifact(state, prepared)),
+  ensureArtifact: (request) =>
+    input.modifyState(commands.ensureArtifact, [request], (state, [prepared]) => ensureArtifact(state, prepared)),
   artifactHead: (request) =>
     input.readState.pipe(
       Effect.flatMap((state) => requireStored(state, request.artifact, request.branch)),
       Effect.map((stored) => stored.head),
     ),
-  artifactSnapshot: (request) =>
-    input.readState.pipe(Effect.flatMap((state) => snapshot(state, request))),
-  forkArtifact: (request) => input.modifyState(commands.forkArtifact, [request], (state, [prepared]) => forkArtifact(state, prepared)),
+  artifactSnapshot: (request) => input.readState.pipe(Effect.flatMap((state) => snapshot(state, request))),
+  forkArtifact: (request) =>
+    input.modifyState(commands.forkArtifact, [request], (state, [prepared]) => forkArtifact(state, prepared)),
   appendArtifact: (request) =>
-    input.modifyState(commands.appendArtifact, [request], (state, [prepared]) => append(state, prepared)).pipe(
-      Effect.map((receipt) => receipt.update),
-    ),
+    input
+      .modifyState(commands.appendArtifact, [request], (state, [prepared]) => append(state, prepared))
+      .pipe(Effect.map((receipt) => receipt.update)),
   artifactAppendReceipt: (request) => artifactAppendReceipt(request, input.lookupReceipt),
-  artifactUpdates: (request) => Stream.unwrap(input.readState.pipe(Effect.as(follow(input.stateRef, request, input.capacity)))),
+  artifactUpdates: (request) =>
+    Stream.unwrap(input.readState.pipe(Effect.as(follow(input.stateRef, request, input.capacity)))),
   artifactRunIsFork: (runId) =>
     input.readState.pipe(
       Effect.flatMap((state) => {

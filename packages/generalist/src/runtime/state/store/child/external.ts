@@ -1,5 +1,5 @@
 import type { PreparedObservation } from "../../observation.js"
-import { Effect, Equal, Option } from "effect"
+import { Effect, Equal, Option, Schema } from "effect"
 import {
   ExternalChildCapacityUnavailable,
   ExternalChildPlacementConflict,
@@ -8,7 +8,8 @@ import {
   ExternalRootConflict,
   ExternalRootExecutableMismatch,
   ExternalRootNotFound,
-  executableDigest,
+  identifyRequest,
+  PageInput,
   suspensionIdentity,
   type ExternalRoot,
   type ExternalRootSettlement,
@@ -20,17 +21,17 @@ import { isTerminal, type RunInspection, type RunOutcome } from "../../../run.js
 import type { Service as ExternalChildStoreService } from "../../../child/external/store.js"
 import { projectRunSnapshot, type InspectionRun } from "../../../execution/inspection.js"
 import { startDigest } from "../../digest.js"
-import { admitStart } from "../admit.js"
-import { activateRoot as activateAdmittedRoot } from "../activate.js"
+import { admitStart } from "../admission/accept.js"
+import { activateRoot as activateAdmittedRoot } from "../admission/activation.js"
 import { activeChildCount, promoteChildCapacity } from "./capacity.js"
 import { cancel as cancelRun, respond, suspend } from "../control.js"
-import { requireExecutionClaim } from "../execution.js"
-import { openRunWaits, type RuntimeState } from "../../state.js"
+import { requireExecutionClaim } from "../claim.js"
+import { openRunWaits, type RuntimeState } from "../../projection.js"
 
 const immutableEqual = (placement: Placement, input: ReserveInput): boolean =>
   placement.placementId === input.placementId &&
   placement.parentRunId === input.runId &&
-  Equal.equals(placement.ref, input.ref) &&
+  Equal.equals(placement.request, input.request) &&
   placement.invocationId === input.invocationId &&
   placement.requestDigest === input.requestDigest &&
   placement.executableDigest === input.executableDigest &&
@@ -40,6 +41,14 @@ const immutableEqual = (placement: Placement, input: ReserveInput): boolean =>
 
 const reserve = (state: RuntimeState, input: ReserveInput) =>
   Effect.gen(function* () {
+    const identity = yield* identifyRequest(input.request)
+    if (
+      input.request.parent.runId !== input.runId ||
+      identity.requestDigest !== input.requestDigest ||
+      identity.executableDigest !== input.executableDigest
+    ) {
+      return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
+    }
     const existing = state.externalChildPlacements.get(input.placementId)
     if (existing !== undefined) {
       if (!immutableEqual(existing, input)) {
@@ -50,7 +59,7 @@ const reserve = (state: RuntimeState, input: ReserveInput) =>
     if (
       [...state.externalChildPlacements.values()].some(
         (placement) =>
-          Equal.equals(placement.ref, input.ref) ||
+          Equal.equals(placement.request.ref, input.request.ref) ||
           (placement.parentRunId === input.runId && placement.invocationId === input.invocationId),
       )
     ) {
@@ -69,7 +78,7 @@ const reserve = (state: RuntimeState, input: ReserveInput) =>
     const placement: Placement = {
       placementId: input.placementId,
       parentRunId: input.runId,
-      ref: input.ref,
+      request: input.request,
       invocationId: input.invocationId,
       requestDigest: input.requestDigest,
       executableDigest: input.executableDigest,
@@ -124,7 +133,8 @@ const settle = (
   input: { readonly placementId: string; readonly settlementId: string; readonly outcome: RunOutcome },
 ): Effect.Effect<
   readonly [Placement, RuntimeState],
-  ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable, PreparedObservation
+  ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable,
+  PreparedObservation
 > =>
   Effect.gen(function* () {
     const placement = state.externalChildPlacements.get(input.placementId)
@@ -212,6 +222,16 @@ const immutableRootEqual = (stored: ExternalRoot, input: AdmitRootInput, admissi
 
 const admitRoot = (state: RuntimeState, input: AdmitRootInput) =>
   Effect.gen(function* () {
+    const identity = yield* identifyRequest({ parent: input.parent, ref: input.ref, root: input.root })
+    if (identity.executableDigest !== input.executableDigest) {
+      return yield* ExternalRootExecutableMismatch.make({
+        placementId: input.placementId,
+        expected: input.executableDigest,
+        actual: identity.executableDigest,
+      })
+    }
+    if (identity.requestDigest !== input.requestDigest)
+      return yield* ExternalRootConflict.make({ placementId: input.placementId })
     const root = { ...input.root, runId: input.ref.runId, initialChildren: [], initialFanOuts: [] }
     const admissionDigest = startDigest(root)
     const existing = state.externalRoots.get(input.placementId)
@@ -227,17 +247,6 @@ const admitRoot = (state: RuntimeState, input: AdmitRootInput) =>
       )
     ) {
       return yield* ExternalRootConflict.make({ placementId: input.placementId })
-    }
-    const actualExecutableDigest = executableDigest({
-      ref: input.root.executableRef,
-      manifest: input.root.executableManifest,
-    })
-    if (actualExecutableDigest !== input.executableDigest) {
-      return yield* ExternalRootExecutableMismatch.make({
-        placementId: input.placementId,
-        expected: input.executableDigest,
-        actual: actualExecutableDigest,
-      })
     }
     const [receipt, admitted] = yield* admitStart(state, root, { activate: false })
     if (receipt.duplicate) return yield* ExternalRootConflict.make({ placementId: input.placementId })
@@ -325,7 +334,53 @@ const acknowledgeRootSettlement = (
     return [{ ...settlement.value, acknowledged: true }, next] as const
   })
 
+const inspectPlacement = (state: RuntimeState, placementId: string) => {
+  const placement = state.externalChildPlacements.get(placementId)
+  return placement === undefined ? ExternalChildPlacementNotFound.make({ placementId }) : Effect.succeed(placement)
+}
+
+const pageWindow = <A extends { readonly placementId: string }>(values: ReadonlyArray<A>, input: PageInput) =>
+  Effect.gen(function* () {
+    const page = yield* Schema.decodeEffect(PageInput, { onExcessProperty: "error" })(input).pipe(
+      Effect.mapError(() =>
+        RuntimeUnavailable.make({
+          message: "External obligation pages require a limit between 1 and 1000 and a bounded placement cursor",
+        }),
+      ),
+    )
+    const candidates = values
+      .filter((value) => page.afterPlacementId === undefined || value.placementId > page.afterPlacementId)
+      .toSorted((left, right) => {
+        if (left.placementId < right.placementId) return -1
+        return left.placementId > right.placementId ? 1 : 0
+      })
+      .slice(0, page.limit + 1)
+    const window = candidates.slice(0, page.limit)
+    const cursor = candidates.length > page.limit ? window[window.length - 1]?.placementId : undefined
+    return { window, cursor }
+  })
+
+const outstandingPlacements = (state: RuntimeState, input: PageInput) =>
+  Effect.gen(function* () {
+    const page = yield* pageWindow([...state.externalChildPlacements.values()], input)
+    const items = page.window.filter((placement) => !placement.settled)
+    return page.cursor === undefined ? { items } : { items, cursor: page.cursor }
+  })
+
+const outstandingRoots = (state: RuntimeState, input: PageInput) =>
+  Effect.gen(function* () {
+    const page = yield* pageWindow([...state.externalRoots.values()], input)
+    const items = yield* Effect.forEach(
+      page.window.filter((root) => !root.settlementAcknowledged),
+      (root) => rootView(state, root),
+    )
+    return page.cursor === undefined ? { items } : { items, cursor: page.cursor }
+  })
+
 export const externalChildOperations = {
+  inspectPlacement,
+  outstandingPlacements,
+  outstandingRoots,
   reserve,
   acknowledge,
   cancel,

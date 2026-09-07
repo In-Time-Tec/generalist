@@ -1,4 +1,5 @@
-import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
+import { objectRuntimeLayer, objectWorkerId } from "../object.js"
+import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { expect, it } from "@effect/vitest"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -31,7 +32,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
       `${boundary} recovers after ${persisted ? "persisted write" : "pre-write"} interruption/failure on reopened object storage`,
       () =>
         Effect.gen(function* () {
-          const storage = makeObjectStorage()
+          const storage = yield* makeSimulator()
           const started = yield* Deferred.make<void>()
           const committing = yield* Deferred.make<void>()
           const agent = Agent.make({ name: boundary })
@@ -103,7 +104,10 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
                 budget: RunBudget.make({ tokens: 3 }),
               })
               const claim = yield* store.claimExecution({
-          commandId: "runtime-execution-suites-boundaries-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId })
+                commandId: "runtime-execution-suites-boundaries-ts-claim-1",
+                runId: receipt.runId,
+                ownerId: objectWorkerId,
+              })
               const faultyStore: RunStore.Service = {
                 ...store,
                 commitInterruptedModelResponse: (input) =>
@@ -130,7 +134,10 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
                     yield* Deferred.await(started).pipe(Effect.timeout("5 seconds"))
                     // Persist the request before interrupting, as Runtime.cancel does.
                     yield* store.cancel({
-          commandId: "runtime-execution-suites-boundaries-ts-cancel-1", runId: receipt.runId, reason: "test cancellation" })
+                      commandId: "runtime-execution-suites-boundaries-ts-cancel-1",
+                      runId: receipt.runId,
+                      reason: "test cancellation",
+                    })
                   } else {
                     yield* Deferred.await(committing).pipe(Effect.timeout("5 seconds"))
                     expect(exhausted).toBe(true)
@@ -175,8 +182,13 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
               const store = yield* RunStore.RunStore
               const host = yield* RunExecutor.RunExecutor
               if ((yield* runtime.inspect(first.runId)).status !== "needs-resolution") {
-                yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-suites-boundaries-ts-claim-2", runId: first.runId, ownerId: objectWorkerId }))
+                yield* host.execute(
+                  yield* store.claimExecution({
+                    commandId: "runtime-execution-suites-boundaries-ts-claim-2",
+                    runId: first.runId,
+                    ownerId: objectWorkerId,
+                  }),
+                )
               }
               if (!persisted) {
                 expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
@@ -195,8 +207,13 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
                   },
                 })
                 if (boundary !== "cancel-settlement") {
-                  yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-suites-boundaries-ts-claim-3", runId: first.runId, ownerId: objectWorkerId }))
+                  yield* host.execute(
+                    yield* store.claimExecution({
+                      commandId: "runtime-execution-suites-boundaries-ts-claim-3",
+                      runId: first.runId,
+                      ownerId: objectWorkerId,
+                    }),
+                  )
                 }
               }
               const recoveredStatus = persisted ? "succeeded" : "failed"
@@ -231,7 +248,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
 
 it.live("replays a committed tool response across two interruptions and a budget extension without redispatch", () =>
   Effect.gen(function* () {
-    const storage = makeObjectStorage()
+    const storage = yield* makeSimulator()
     const toolkit = Toolkit.make(Tool.make("write", { parameters: Schema.Struct({}), success: Schema.String }))
     const agent = Agent.make({ name: "repeated-model-replay", toolkit })
     const executable = testExecutable(agent)
@@ -312,12 +329,17 @@ it.live("replays a committed tool response across two interruptions and a budget
           } else {
             // Canonical usage exhausted the budget. Reopening must suspend before dispatching anything.
             const host = yield* RunExecutor.RunExecutor
-            yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-suites-boundaries-ts-claim-4", runId, ownerId: objectWorkerId }))
+            yield* host.execute(
+              yield* store.claimExecution({
+                commandId: "runtime-execution-suites-boundaries-ts-claim-4",
+                runId,
+                ownerId: objectWorkerId,
+              }),
+            )
             expect((yield* runtime.inspect(runId)).status).toBe("waiting")
             expect(modelCalls).toBe(1)
             expect(toolCalls).toBe(0)
-            yield* runtime.extendBudget(runId, { tokens: 2 })
+            yield* runtime.extendBudget({ commandId: "budget-exhausted:resume", runId, delta: { tokens: 2 } })
           }
           const paused = yield* Deferred.make<void>()
           const faultyStore: RunStore.Service = {
@@ -327,9 +349,19 @@ it.live("replays a committed tool response across two interruptions and a budget
                 .commitModelResponse(input)
                 .pipe(
                   Effect.tap(() =>
-                    input.transitionDigest === undefined
-                      ? Effect.void
-                      : Deferred.succeed(paused, undefined).pipe(Effect.andThen(Effect.never)),
+                    phase === "write"
+                      ? Deferred.succeed(paused, undefined).pipe(Effect.andThen(Effect.never))
+                      : Effect.void,
+                  ),
+                ),
+            getOperationByKey: (input) =>
+              store
+                .getOperationByKey(input)
+                .pipe(
+                  Effect.tap((record) =>
+                    phase === "replay" && record?.kind === "model" && record.status === "succeeded"
+                      ? Deferred.succeed(paused, undefined).pipe(Effect.andThen(Effect.never))
+                      : Effect.void,
                   ),
                 ),
           }
@@ -339,8 +371,13 @@ it.live("replays a committed tool response across two interruptions and a budget
             Effect.gen(function* () {
               const host = yield* makeRunExecutor
               const caller = yield* host
-                .execute(yield* store.claimExecution({
-          commandId: "runtime-execution-suites-boundaries-ts-claim-5", runId, ownerId: objectWorkerId }))
+                .execute(
+                  yield* store.claimExecution({
+                    commandId: `runtime-execution-suites-boundaries-ts-claim-5:${phase}`,
+                    runId,
+                    ownerId: objectWorkerId,
+                  }),
+                )
                 .pipe(Effect.forkChild({ startImmediately: true }))
               yield* Deferred.await(paused).pipe(Effect.timeout("5 seconds"))
               yield* host.interrupt(runId)
@@ -360,8 +397,13 @@ it.live("replays a committed tool response across two interruptions and a budget
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const host = yield* RunExecutor.RunExecutor
-        yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-execution-suites-boundaries-ts-claim-6", runId, ownerId: objectWorkerId }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-execution-suites-boundaries-ts-claim-6",
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
         expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
         expect(modelCalls).toBe(2)
         expect(toolCalls).toBe(1)

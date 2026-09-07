@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions.skills](../index) / FileSystemCatalog
+[generalist](../../index.md) / [instructions.skills](../index.md) / FileSystemCatalog
 
 # FileSystemCatalog
 
@@ -40,7 +40,7 @@ Filesystem skill catalog options.
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`SkillCatalog`](../../generalist/namespaces/SkillCatalog#skillcatalog), [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`SkillCatalog`](../../generalist/namespaces/SkillCatalog.md#skillcatalog), [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog.md#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
 
 Build a SkillCatalog layer from filesystem roots.
 
@@ -52,7 +52,7 @@ Build a SkillCatalog layer from filesystem roots.
 
 #### Returns
 
-`Layer.Layer`\<[`SkillCatalog`](../../generalist/namespaces/SkillCatalog#skillcatalog), [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
+`Layer.Layer`\<[`SkillCatalog`](../../generalist/namespaces/SkillCatalog.md#skillcatalog), [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog.md#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
 
 ***
 
@@ -60,7 +60,7 @@ Build a SkillCatalog layer from filesystem roots.
 
 ### make
 
-> `const` **make**: (`options`) => `Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
+> `const` **make**: (`options`) => `Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog.md#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
 
 Build a composable SkillCatalog from filesystem roots.
 
@@ -72,4 +72,4 @@ Build a composable SkillCatalog from filesystem roots.
 
 #### Returns
 
-`Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>
+`Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog.md#skillcatalogerror), `FileSystem.FileSystem` \| `Path.Path`\>

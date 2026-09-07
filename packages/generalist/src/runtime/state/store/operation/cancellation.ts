@@ -4,7 +4,7 @@ import type { CancellationOutcome } from "../../../../core/tools/tool-executor.j
 import { decodeCancellableOperation } from "../../../../core/tools/tool-executor-cancellation.js"
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { OperationRecord } from "../../../operation/record.js"
-import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../state.js"
+import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../projection.js"
 
 const getRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -18,7 +18,11 @@ type AcknowledgeInput = CancellationInput & {
   readonly outcome: CancellationOutcome
 }
 type CancellationRecords = Effect.Effect<ReadonlyArray<OperationRecord>, RunNotFound | RuntimeUnavailable>
-type Acknowledgement = Effect.Effect<readonly [OperationRecord, RuntimeState], RunNotFound | RuntimeUnavailable, PreparedObservation>
+type Acknowledgement = Effect.Effect<
+  readonly [OperationRecord, RuntimeState],
+  RunNotFound | RuntimeUnavailable,
+  PreparedObservation
+>
 
 const CancellationEnvelope = Schema.Struct({ cancellation: Schema.Unknown })
 

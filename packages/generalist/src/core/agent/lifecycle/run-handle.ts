@@ -94,6 +94,7 @@ const structuredOutput = <OutputCodec extends Schema.Top>(agent: {
   const schema = Schema.Struct({ output: requiredField(agent.output) })
   return {
     schema,
+    outputSchema: agent.output,
     objectName: "submit",
     objectPrompt: defaultObjectPrompt,
     output: (value: typeof schema.Type) => value.output,

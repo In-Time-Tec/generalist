@@ -1,14 +1,14 @@
-import type { PreparedObservation } from "../observation.js"
-import { occurredAtMillis } from "../observation.js"
+import { type PreparedObservation, occurredAtMillis } from "../observation.js"
 import { Effect, Function } from "effect"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../../run/ownership-errors.js"
 import { activeChildCount } from "./child/capacity.js"
-import { runWaits, type RuntimeState } from "../state.js"
+import { runWaits, type RuntimeState, type StoredRun } from "../projection.js"
 import { checkpointRef } from "../../executable/manifest-internal.js"
 import { appendLifecycle, attemptStartedEvent } from "../append.js"
+import { requireExecutionClaim } from "./claim.js"
 
 const requireRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -57,29 +57,6 @@ export const loadExecution: {
     return executionRecord(state, run)
   }),
 )
-
-export const requireExecutionClaim: {
-  (input: ExecutionClaim): (state: RuntimeState) => Effect.Effect<void, StaleClaim | StaleSessionClaim>
-  (state: RuntimeState, input: ExecutionClaim): Effect.Effect<void, StaleClaim | StaleSessionClaim>
-} = Function.dual(2, (state: RuntimeState, input: ExecutionClaim) => {
-  const run = state.runs.get(input.runId)
-  if (run === undefined || run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
-    return Effect.fail(
-      StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence }),
-    )
-  }
-  const session = state.sessions.get(input.session.sessionId)
-  return session !== undefined &&
-    input.session.runId === input.runId &&
-    input.session.ownerId === input.ownerId &&
-    input.session.runAttemptFence === input.attemptFence &&
-    session.writerEpoch.toString() === input.session.epoch &&
-    session.writer?.runId === input.runId &&
-    session.writer.ownerId === input.ownerId &&
-    session.writer.runAttemptFence === input.attemptFence
-    ? Effect.void
-    : Effect.fail(StaleSessionClaim.make(input.session))
-})
 
 const acquireSession = (
   state: RuntimeState,
@@ -162,8 +139,13 @@ export const revokeRunSession: {
 })
 
 export const releaseExecution: {
-  (input: ExecutionClaim): (state: RuntimeState) => Effect.Effect<readonly [void, RuntimeState], RuntimeUnavailable, PreparedObservation>
-  (state: RuntimeState, input: ExecutionClaim): Effect.Effect<readonly [void, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  (
+    input: ExecutionClaim,
+  ): (state: RuntimeState) => Effect.Effect<readonly [void, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  (
+    state: RuntimeState,
+    input: ExecutionClaim,
+  ): Effect.Effect<readonly [void, RuntimeState], RuntimeUnavailable, PreparedObservation>
 } = Function.dual(2, (state: RuntimeState, input: ExecutionClaim) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
   const run = state.runs.get(input.runId)
@@ -176,28 +158,8 @@ export const releaseExecution: {
   return Effect.succeed([undefined, revokeSession({ ...state, runs }, input)] as const)
 })
 
-export const claimExecution: {
-  (input: {
-    readonly runId: string
-    readonly ownerId: string
-  }): (
-    state: RuntimeState,
-  ) => Effect.Effect<
-    readonly [ExecutionRecord & ExecutionClaim, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation
-  >
-  (
-    state: RuntimeState,
-    input: { readonly runId: string; readonly ownerId: string },
-  ): Effect.Effect<
-    readonly [ExecutionRecord & ExecutionClaim, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation
-  >
-} = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly ownerId: string }) =>
+const requireClaimable = (state: RuntimeState, run: StoredRun, now: number) =>
   Effect.gen(function* () {
-    const run = yield* requireRun(state, input.runId)
-    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    const now = yield* occurredAtMillis
     const lease = run.ownerId === undefined ? undefined : state.workers.get(run.ownerId)
     if (run.ownerId !== undefined && (lease === undefined || lease.expiresAt > now)) {
       return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is owned by ${run.ownerId}` })
@@ -219,6 +181,33 @@ export const claimExecution: {
         message: `Session ${run.message.sessionId} is already bound to Run ${activeSession.writer.runId}`,
       })
     }
+  })
+
+export const claimExecution: {
+  (input: {
+    readonly runId: string
+    readonly ownerId: string
+  }): (
+    state: RuntimeState,
+  ) => Effect.Effect<
+    readonly [ExecutionRecord & ExecutionClaim, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
+  (
+    state: RuntimeState,
+    input: { readonly runId: string; readonly ownerId: string },
+  ): Effect.Effect<
+    readonly [ExecutionRecord & ExecutionClaim, RuntimeState],
+    RunNotFound | RunTerminal | RuntimeUnavailable,
+    PreparedObservation
+  >
+} = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly ownerId: string }) =>
+  Effect.gen(function* () {
+    const run = yield* requireRun(state, input.runId)
+    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    const now = yield* occurredAtMillis
+    yield* requireClaimable(state, run, now)
     const claimed = {
       ...run,
       status: run.cancellationRequested ? ("cancelling" as const) : ("running" as const),
@@ -251,14 +240,16 @@ export const retryExecution: {
     state: RuntimeState,
   ) => Effect.Effect<
     readonly [ExecutionRecord, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim | StaleSessionClaim, PreparedObservation
+    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim | StaleSessionClaim,
+    PreparedObservation
   >
   (
     state: RuntimeState,
     input: ExecutionClaim,
   ): Effect.Effect<
     readonly [ExecutionRecord, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim | StaleSessionClaim, PreparedObservation
+    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim | StaleSessionClaim,
+    PreparedObservation
   >
 } = Function.dual(2, (state: RuntimeState, input: ExecutionClaim) =>
   Effect.gen(function* () {
@@ -284,7 +275,9 @@ export const saveExecution: {
       readonly checkpoint?: ExecutionRecord["checkpoint"]
       readonly suspension?: ExecutionRecord["suspension"]
     },
-  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RunNotFound | RuntimeUnavailable | StaleClaim, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<RuntimeState, RunNotFound | RuntimeUnavailable | StaleClaim, PreparedObservation>
   (
     state: RuntimeState,
     input: ExecutionClaim & {

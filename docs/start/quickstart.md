@@ -87,4 +87,4 @@ A missing handler or policy service usually means the service Layer was not prov
 - [Understand the loop](/learn/agent-loop): turns and streaming events.
 - [Test your agent](/features/testing): scripted responses and assertions.
 - [Browse examples](/start/examples): larger applications to build on.
-- [Run locally and reopen SQLite](/start/examples#local-and-sqlite-in-five-minutes): see when Runtime adds value.
+- [Run locally and reopen object storage](/start/examples#local-and-object-recovery-in-five-minutes): see when Runtime adds value.

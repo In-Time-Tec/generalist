@@ -1,6 +1,9 @@
-# Tasks
+---
+title: "Tasks"
+description: "Give an Agent an explicit Run-scoped durable task component."
+---
 
-`Tasks` gives an Agent a small model-owned task list backed by its existing Run journal. The list is model context, durable recovery state, and a host-facing event source; it is not a separate store.
+`Tasks` gives an Agent a small model-owned task list through an explicit durable component scoped to its Run. The list is model context, recoverable component state, and a host-facing event source; it does not introduce another durability engine.
 
 ## Usage
 
@@ -21,11 +24,12 @@ const hosted = Effect.gen(function* () {
 
   yield* runtime.send(handle.runId, Tasks.update([{ id: "tests", status: "done" }]), {
     policy: "steer",
+    idempotencyKey: "task-edit:tests:1",
   })
 }).pipe(Effect.provide(environment))
 ```
 
-`Tasks.layer()` adds two tools to every Agent run or Runtime registration in its environment:
+This is a composition fragment: provide a model and, for `hosted`, an activated object-backed Runtime. `Tasks.layer()` registers the component and adds two tools to every Agent run or Runtime registration in its environment:
 
 - `tasks_read({})` returns the current list, initially `[]`.
 - `tasks_write({ items })` replaces the complete list. The model must include every item that should remain.
@@ -50,7 +54,9 @@ The Host still emits `ToolCall` when `tasks_write` starts. Its successful comple
 
 ## Persistence and replay
 
-`tasks_write` is an ordinary journaled tool operation. Its successful result updates `LoopDriverState.tasks` in the same checkpoint transition as the tool result. Recovery returns the recorded operation result and reapplies that transition without invoking the handler. Fork and rewind therefore carry the task list through the checkpoint they already copy; there is no task table or secondary event journal.
+`tasks_write` submits a component command using the stable tool operation identity. Its replacement state and command receipt commit through the driver component boundary, independently of the later tool-result publication. If the host stops between those boundaries, the accepted list survives without fabricating a successful tool result. Recovery reads `LoopDriverState.components`, not a separate `tasks` checkpoint field, and exact command retries consume the recorded receipt.
+
+The built-in descriptor pins key `generalist.tasks`, instance `default`, schema and handler version `1`, Run scope, and branch policy `restore`. Fork and rewind restore the selected component state; accepted command receipts remain retained. Missing or incompatible component code fails instead of silently resetting the list. State and command limits are each 65,536 bytes; the receipt limit is 1,048,576 bytes.
 
 Before every model call, the current list is rendered as one canonical system message in Chat history. Compaction normalizes every custom result so that exact message remains in the retained `history` prefix. Session persistence continues to store conversation only; after a Session projection rebuild, the task message is reconstructed from the driver checkpoint.
 
@@ -73,7 +79,7 @@ AgentTool.fanOut({
 
 ## Invariants
 
-- The driver checkpoint is the only task-list authority.
+- The explicitly registered, versioned Run component is the task-list authority inside the driver checkpoint.
 - A successful `tasks_write` replaces the complete list and emits one `TasksUpdated` Host event.
 - Completed-operation replay restores the list without tool dispatch.
 - The canonical current-list message always remains in compaction history verbatim.
@@ -81,5 +87,6 @@ AgentTool.fanOut({
 
 ## Related
 
+- Component tests: [`tasks/component.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/tasks/component.test.ts)
 - Source: `packages/generalist/src/tasks/`, `packages/generalist/src/core/agent/tools/checkpoint-operation.ts`, `packages/generalist/src/host/event.ts`
 - Sibling feature docs: [`steering.md`](./steering.md), [`session-and-compaction.md`](./session-and-compaction.md), [`multi-agent.md`](./multi-agent.md), [`host.md`](./host.md)

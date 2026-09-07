@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / Run
+[generalist](../../index.md) / [runtime](../index.md) / Run
 
 # Run
 
@@ -30,7 +30,7 @@
 
 ##### executableManifest
 
-> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="executableref"></a>
 
@@ -86,7 +86,7 @@
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 <a id="treepolicy"></a>
 
@@ -116,7 +116,7 @@
 
 #### Extended by
 
-- [`RuntimeInspection`](./Runtime#runtimeinspection)
+- [`RuntimeInspection`](./Runtime.md#runtimeinspection)
 
 #### Properties
 
@@ -148,7 +148,7 @@
 
 ##### executableManifest
 
-> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest)
+> `readonly` **executableManifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
 
 <a id="executableref-1"></a>
 
@@ -186,7 +186,7 @@
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 <a id="treepolicy-1"></a>
 
@@ -266,7 +266,7 @@ Encoded durable Run inspection.
 
 ##### executableManifest
 
-> `readonly` **executableManifest**: [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest#executablemanifestencoded)
+> `readonly` **executableManifest**: [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest.md#executablemanifestencoded)
 
 <a id="executableref-2"></a>
 
@@ -312,7 +312,7 @@ Encoded durable Run inspection.
 
 ##### status
 
-> `readonly` **status**: `"failed"` \| `"cancelled"` \| `"queued"` \| `"succeeded"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
 
 ###### Inherited from
 
@@ -350,7 +350,7 @@ Encoded durable Run inspection.
 
 #### Extended by
 
-- [`StartReceipt`](./Runtime#startreceipt)
+- [`StartReceipt`](./Runtime.md#startreceipt)
 
 #### Properties
 
@@ -468,7 +468,7 @@ Encoded durable Run inspection.
 
 ### ExecutionResult
 
-> **ExecutionResult** = [`ExecutionResult`](./ExecutionState#executionresult)
+> **ExecutionResult** = [`ExecutionResult`](./ExecutionState.md#executionresult)
 
 ***
 
@@ -494,7 +494,7 @@ A durable alternate continuation retained from a fork or rewind.
 
 ### RunFailure
 
-> **RunFailure** = [`AgentExecutionFailure`](./Errors#agentexecutionfailure) \| [`ExecutablePinMissing`](./Errors#executablepinmissing) \| [`ExecutableIdentityMismatch`](./Errors#executableidentitymismatch) \| [`ExecutableRegistrationInvalid`](./Errors#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors#executableregistrationmissing) \| [`ExecutionFailure`](../../generalist/namespaces/ProgramRunner#executionfailure)
+> **RunFailure** = [`AgentExecutionFailure`](./Errors.md#agentexecutionfailure) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ExecutionFailure`](../../generalist/namespaces/ProgramRunner.md#executionfailure)
 
 ***
 
@@ -502,7 +502,7 @@ A durable alternate continuation retained from a fork or rewind.
 
 ### RunId
 
-> **RunId** = [`RunId`](../../generalist/index#runid)
+> **RunId** = [`RunId`](../../generalist/index.md#runid)
 
 Runtime uses Core's canonical Agent execution identity.
 
@@ -512,7 +512,7 @@ Runtime uses Core's canonical Agent execution identity.
 
 ### RunOutcome
 
-> **RunOutcome** = \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: [`ExecutionResult`](./ExecutionState#executionresult); \} \| \{ `_tag`: `"Failed"`; `error`: [`RunFailure`](#runfailure); `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}
+> **RunOutcome** = \{ `_tag`: `"Succeeded"`; `eventId`: `string`; `occurredAt`: `string`; `result`: [`ExecutionResult`](./ExecutionState.md#executionresult); \} \| \{ `_tag`: `"Failed"`; `error`: [`RunFailure`](#runfailure); `eventId`: `string`; `occurredAt`: `string`; \} \| \{ `_tag`: `"Cancelled"`; `eventId`: `string`; `occurredAt`: `string`; `reason?`: `string`; \}
 
 ***
 
@@ -776,7 +776,7 @@ Runtime uses Core's canonical Agent execution identity.
 
 ### ExecutionResult
 
-> `const` **ExecutionResult**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `output`: `Schema.optionalKey`\<`Schema.Unknown`\>; `session`: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>; `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `value`: `Schema.Unknown`; \}\>\]\>
+> `const` **ExecutionResult**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `output`: `Schema.Unknown`; `session`: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `sessionId`: `Schema.String`; \}\>; `text`: `Schema.String`; `turns`: `Schema.Finite`; \}\>, `Schema.TaggedStruct`\<`"Program"`, \{ `value`: `Schema.Unknown`; \}\>\]\>
 
 ***
 
@@ -828,7 +828,7 @@ A durable alternate continuation retained from a fork or rewind.
 
 ### RunFailure
 
-> **RunFailure**: `Codec`\<[`RunFailure`](#runfailure), `unknown`, `never`, `never`\>
+> **RunFailure**: `toTaggedUnion`\<`"_tag"`, readonly \[*typeof* [`AgentExecutionFailure`](./Errors.md#agentexecutionfailure), *typeof* [`ExecutablePinMissing`](./Errors.md#executablepinmissing), *typeof* [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch), *typeof* [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid), *typeof* [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing), `Union`\<readonly \[`Union`\<readonly \[*typeof* [`SandboxUnavailable`](../../generalist/namespaces/CodeExecutor.md#sandboxunavailable), *typeof* [`SandboxSourceInvalid`](../../generalist/namespaces/CodeExecutor.md#sandboxsourceinvalid), *typeof* [`SandboxInputInvalid`](../../generalist/namespaces/CodeExecutor.md#sandboxinputinvalid), *typeof* [`SandboxOutputInvalid`](../../generalist/namespaces/CodeExecutor.md#sandboxoutputinvalid), *typeof* [`SandboxExecutionFailure`](../../generalist/namespaces/CodeExecutor.md#sandboxexecutionfailure), *typeof* [`SandboxProtocolViolation`](../../generalist/namespaces/CodeExecutor.md#sandboxprotocolviolation), *typeof* [`SandboxDeadlineExceeded`](../../generalist/namespaces/CodeExecutor.md#sandboxdeadlineexceeded), *typeof* [`SandboxCancelled`](../../generalist/namespaces/CodeExecutor.md#sandboxcancelled), *typeof* [`SandboxResourceExceeded`](../../generalist/namespaces/CodeExecutor.md#sandboxresourceexceeded), *typeof* [`SandboxGuaranteeUnavailable`](../../generalist/namespaces/CodeExecutor.md#sandboxguaranteeunavailable), `Union`\<readonly \[*typeof* [`ProgramCapabilityMissing`](../../generalist/namespaces/ProgramCapabilities.md#programcapabilitymissing), *typeof* [`ProgramCapabilityDenied`](../../generalist/namespaces/ProgramCapabilities.md#programcapabilitydenied), *typeof* [`ProgramAuthorizationFailure`](../../generalist/namespaces/ProgramCapabilities.md#programauthorizationfailure), *typeof* [`ProgramSchemaFailure`](../../generalist/namespaces/ProgramCapabilities.md#programschemafailure), *typeof* [`ProgramToolFailure`](../../generalist/namespaces/ProgramCapabilities.md#programtoolfailure), *typeof* [`ProgramStepFailure`](../../generalist/namespaces/ProgramCapabilities.md#programstepfailure), *typeof* [`ProgramAgentFailure`](../../generalist/namespaces/ProgramCapabilities.md#programagentfailure), *typeof* [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities.md#programbudgetexhausted), *typeof* [`ProgramReplayDivergence`](../../generalist/namespaces/ProgramCapabilities.md#programreplaydivergence), *typeof* [`ProgramOperationUnknown`](../../generalist/namespaces/ProgramCapabilities.md#programoperationunknown), *typeof* [`ProgramSuspended`](../../generalist/namespaces/ProgramCapabilities.md#programsuspended), *typeof* [`ProgramCancelled`](../../generalist/namespaces/ProgramCapabilities.md#programcancelled)\]\>\]\>, *typeof* [`ProgramHandlerMismatch`](../../generalist/namespaces/ProgramRunner.md#programhandlermismatch), *typeof* [`ProgramIdentityMismatch`](../../generalist/namespaces/ProgramRunner.md#programidentitymismatch)\]\>\]\>
 
 ***
 
@@ -888,7 +888,7 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 ##### executableManifest
 
-> `readonly` **executableManifest**: `Schema.Codec`\<[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest#executablemanifest), [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest#executablemanifestencoded), `never`, `never`\>
+> `readonly` **executableManifest**: `Schema.Codec`\<[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest), [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest.md#executablemanifestencoded), `never`, `never`\>
 
 <a id="executableref-3"></a>
 

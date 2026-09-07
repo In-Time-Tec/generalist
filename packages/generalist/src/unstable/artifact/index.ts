@@ -85,9 +85,9 @@ export const open: {
       const crdt = Context.get(crdtContext, ArtifactCrdt)
       yield* Effect.gen(function* () {
         const store = yield* RunStore
-        const existing = yield* store.artifactHead({ artifact: name }).pipe(
-          Effect.catchTag("generalist/artifact/ArtifactNotFound", () => Effect.succeed(undefined)),
-        )
+        const existing = yield* store
+          .artifactHead({ artifact: name })
+          .pipe(Effect.catchTag("generalist/artifact/ArtifactNotFound", () => Effect.void))
         if (existing !== undefined) {
           if (existing.crdt !== crdt.id) {
             return yield* ArtifactCrdtMismatch.make({

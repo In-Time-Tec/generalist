@@ -2,7 +2,8 @@ import { Cause, Effect, Option, Schema, Stream } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { checkpoint, logicalOperationId } from "../../durable/driver/run.js"
 import { digest as canonicalDigest } from "../../durable/canonical-json.js"
-import { DriverInterpreter, operationKey, type StreamSuccessCodec } from "../../durable/driver/interpreter.js"
+import { DriverInterpreter, operationKey } from "../../durable/driver/interpreter.js"
+import type { StreamSuccessCodec } from "../../durable/driver/stream-success.js"
 import { LoopDriverState, modelCallOrdinal } from "../../durable/loop-driver-state.js"
 import { DriverStateInvalid } from "../../durable/service.js"
 import {
@@ -107,6 +108,12 @@ const successCodec = (input: {
           const content = decodeContent(operation.content).map((part): Response.Part<Record<string, Tool.Any>> => {
             if (part.type === "tool-call") return Response.makePart("tool-call", part)
             if (part.type === "tool-result") return Response.makePart("tool-result", part)
+            if (part.type === "finish")
+              return Response.makePart("finish", {
+                ...part,
+                response: part.response,
+                usage: Schema.decodeSync(Response.Usage)(part.usage),
+              })
             return part
           })
           const messages =

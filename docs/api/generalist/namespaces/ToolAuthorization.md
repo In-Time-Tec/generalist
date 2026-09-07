@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ToolAuthorization
+[generalist](../../index.md) / [generalist](../index.md) / ToolAuthorization
 
 # ToolAuthorization
 
@@ -173,7 +173,7 @@ The common identity and context of one authorization attempt.
 #### Extended by
 
 - [`Request`](#request)
-- [`Pending`](../../approvals#pending)
+- [`Pending`](../../approvals.md#pending)
 
 #### Properties
 
@@ -297,13 +297,13 @@ Required services used by the linear authorization pass.
 
 ##### approvals
 
-> `readonly` **approvals**: [`Service`](../../approvals#service)
+> `readonly` **approvals**: [`Service`](../../approvals.md#service)
 
 <a id="permissions"></a>
 
 ##### permissions
 
-> `readonly` **permissions**: [`Service`](../../permissions#service)
+> `readonly` **permissions**: [`Service`](../../permissions.md#service)
 
 <a id="rulestore"></a>
 
@@ -313,21 +313,21 @@ Required services used by the linear authorization pass.
 
 ###### remember
 
-> `readonly` **remember**: (`rule`) => `Effect`\<`void`, [`RuleStoreError`](../../permissions#rulestoreerror)\>
+> `readonly` **remember**: (`rule`) => `Effect`\<`void`, [`RuleStoreError`](../../permissions.md#rulestoreerror)\>
 
 ###### Parameters
 
 ###### rule
 
-[`Rule`](../../permissions#rule)
+[`Rule`](../../permissions.md#rule)
 
 ###### Returns
 
-`Effect`\<`void`, [`RuleStoreError`](../../permissions#rulestoreerror)\>
+`Effect`\<`void`, [`RuleStoreError`](../../permissions.md#rulestoreerror)\>
 
 ###### rules
 
-> `readonly` **rules**: `Effect`\<readonly [`Rule`](../../permissions#rule)[], [`RuleStoreError`](../../permissions#rulestoreerror)\>
+> `readonly` **rules**: `Effect`\<readonly [`Rule`](../../permissions.md#rule)[], [`RuleStoreError`](../../permissions.md#rulestoreerror)\>
 
 ***
 

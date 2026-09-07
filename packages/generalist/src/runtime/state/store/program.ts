@@ -1,5 +1,5 @@
-import type { PreparedObservation } from "../observation.js"
-import { occurredAtMillis } from "../observation.js"
+import { reserveProgramBudget } from "./program-budget.js"
+import { type PreparedObservation, occurredAtMillis } from "../observation.js"
 import { Effect, Function, Schema } from "effect"
 import {
   ProgramBudgetExhausted,
@@ -18,7 +18,6 @@ import { StaleClaim } from "../../run/ownership-errors.js"
 import type {
   CompleteProgramInput,
   ProgramOperationRecord,
-  ProgramRunState,
   ReserveProgramOperationInput,
   SettleProgramOperationInput,
   ProgramStoreFailure,
@@ -29,7 +28,7 @@ import type {
 } from "../../program/store.js"
 import type { CompletionOutcome } from "../../run/store.js"
 import { complete, suspend } from "./control.js"
-import type { RuntimeState } from "../state.js"
+import type { RuntimeState } from "../projection.js"
 import { revokeRunSession, revokeSession } from "./execution.js"
 
 const isTerminalStatus = (status: import("../../run.js").RunStatus): status is "succeeded" | "failed" | "cancelled" =>
@@ -38,6 +37,8 @@ import { admitFanOut } from "./fan-out/service.js"
 import { appendLifecycle } from "../append.js"
 import type { LifecycleEvent, RunEventBase } from "../../run/event.js"
 import { digest as resolutionDigest, type ResolveOperationInput } from "../../operation/resolution.js"
+
+const logSettlementId = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const key = (runId: string, operation: string) => `${runId}\0${operation}`
 
@@ -65,25 +66,24 @@ const requireRun = (state: RuntimeState, runId: string) => {
   return run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run)
 }
 
-const incompatibleReservation = (existing: ProgramOperationRecord, input: ReserveProgramOperationInput) =>
+export const reservationDivergence = ({
+  existing,
+  input,
+}: {
+  readonly existing: ProgramOperationRecord
+  readonly input: ReserveProgramOperationInput
+}): ProgramReplayDivergence | undefined =>
   existing.kind !== input.kind ||
   existing.authoredOperation !== input.authoredOperation ||
   existing.capability !== input.capability ||
   existing.inputDigest !== input.inputDigest ||
   existing.replay !== input.replay
-
-const exhaustedDimension = (
-  current: RuntimeState["programStates"] extends ReadonlyMap<string, infer State> ? State : never,
-  input: ReserveProgramOperationInput,
-) => {
-  const dimensions = [
-    ["toolCalls", input.reservation.toolCalls ?? 0, current.budget.toolCalls],
-    ["agentRuns", input.reservation.agentRuns ?? 0, current.budget.agentRuns],
-    ["logBytes", input.reservation.logBytes ?? 0, current.budget.logBytes],
-    ["activeSlots", input.reservation.activeSlots ?? 0, current.budget.concurrency],
-  ] as const
-  return dimensions.find(([field, amount, limit]) => current[field] + amount > limit)
-}
+    ? ProgramReplayDivergence.make({
+        operation: input.operation,
+        expected: existing.inputDigest,
+        actual: input.inputDigest,
+      })
+    : undefined
 
 export const reserveProgramOperation: {
   (
@@ -92,14 +92,16 @@ export const reserveProgramOperation: {
     state: RuntimeState,
   ) => Effect.Effect<
     readonly [ProgramOperationRecord, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure, PreparedObservation
+    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure,
+    PreparedObservation
   >
   (
     state: RuntimeState,
     input: ReserveProgramOperationInput,
   ): Effect.Effect<
     readonly [ProgramOperationRecord, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure, PreparedObservation
+    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure,
+    PreparedObservation
   >
 } = Function.dual(2, (state: RuntimeState, input: ReserveProgramOperationInput) =>
   Effect.gen(function* () {
@@ -107,62 +109,13 @@ export const reserveProgramOperation: {
     if (isTerminalStatus(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     const existing = state.programOperations.get(key(input.runId, input.operation))
     if (existing !== undefined) {
-      if (incompatibleReservation(existing, input)) {
-        return yield* ProgramReplayDivergence.make({
-          operation: input.operation,
-          expected: existing.inputDigest,
-          actual: input.inputDigest,
-        })
-      }
+      const divergence = reservationDivergence({ existing, input })
+      if (divergence !== undefined) return yield* divergence
       if (existing.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: input.operation })
       return [existing, state] as const
     }
     const nowMillis = yield* occurredAtMillis
-    const current: ProgramRunState = state.programStates.get(input.runId) ?? {
-      runId: input.runId,
-      programPin: input.programPin,
-      budget: input.budget,
-      deadlineMillis: nowMillis + input.budget.wallClockMillis,
-      toolCalls: 0,
-      agentRuns: 0,
-      tokens: 0,
-      logBytes: 0,
-      activeSlots: 0,
-    }
-    if (current.programPin !== input.programPin)
-      return yield* ProgramReplayDivergence.make({
-        operation: input.operation,
-        expected: current.programPin,
-        actual: input.programPin,
-      })
-    const concurrencyRoot = current.concurrencyRoot ?? input.runId
-    const pool = state.programStates.get(concurrencyRoot) ?? current
-    let activeSlots = 0
-    for (const member of state.programStates.values()) {
-      if ((member.concurrencyRoot ?? member.runId) === concurrencyRoot) activeSlots += member.activeSlots
-    }
-    if (activeSlots + (input.reservation.activeSlots ?? 0) > pool.budget.concurrency)
-      return yield* ProgramBudgetExhausted.make({ dimension: "concurrency", limit: pool.budget.concurrency })
-    if (nowMillis > current.deadlineMillis)
-      return yield* ProgramBudgetExhausted.make({
-        dimension: "wallClockMillis",
-        limit: current.budget.wallClockMillis,
-      })
-    const exhausted = exhaustedDimension(current, input)
-    if (exhausted !== undefined) {
-      const [field, , limit] = exhausted
-      return yield* ProgramBudgetExhausted.make({
-        dimension: field === "activeSlots" ? "concurrency" : field,
-        limit,
-      })
-    }
-    const nextState = {
-      ...current,
-      toolCalls: current.toolCalls + (input.reservation.toolCalls ?? 0),
-      agentRuns: current.agentRuns + (input.reservation.agentRuns ?? 0),
-      logBytes: current.logBytes + (input.reservation.logBytes ?? 0),
-      activeSlots: current.activeSlots + (input.reservation.activeSlots ?? 0),
-    }
+    const nextState = yield* reserveProgramBudget({ state, input, nowMillis })
     const record: ProgramOperationRecord = {
       runId: input.runId,
       operation: input.operation,
@@ -257,7 +210,11 @@ export const settleProgramOperation: {
   (
     state: RuntimeState,
     input: SettleProgramOperationInput,
-  ): Effect.Effect<readonly [ProgramOperationRecord, RuntimeState], RunNotFound | RuntimeUnavailable | StaleClaim, PreparedObservation>
+  ): Effect.Effect<
+    readonly [ProgramOperationRecord, RuntimeState],
+    RunNotFound | RuntimeUnavailable | StaleClaim,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: SettleProgramOperationInput) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
@@ -277,7 +234,7 @@ export const settleProgramOperation: {
         ? ProgramBudgetExhausted.make({ dimension: "tokens", limit: current.budget.tokens })
         : undefined
     const outcome = tokenFailure === undefined ? input.outcome : { _tag: "Failed" as const, error: tokenFailure }
-    let record: ProgramOperationRecord = {
+    let record: ProgramOperationRecord & { readonly status: "succeeded" | "failed" | "unknown" } = {
       ...existing,
       status: "unknown",
       completedSequence: run.lastSequence + 1,
@@ -298,7 +255,7 @@ export const settleProgramOperation: {
     const [, next] = yield* appendLifecycle({ ...state, programStates, programOperations }, input.runId, {
       _tag: "ProgramOperationSettled",
       operation: input.operation,
-      status: record.status as "succeeded" | "failed" | "unknown",
+      status: record.status,
     })
     if (outcome._tag !== "Unknown") return [record, next] as const
     const [, unresolved] = yield* appendLifecycle(
@@ -437,6 +394,7 @@ export const commitProgramLog: {
     const [, logged] = yield* appendLifecycle(reserved, input.runId, logEvent)
     return yield* settleProgramOperation(logged, {
       ...input,
+      commandId: logSettlementId(["program-log-settle", input.runId, input.attemptFence, input.operation]),
       outcome: { _tag: "Succeeded", value: undefined },
       releaseSlots: 0,
     })
@@ -449,11 +407,19 @@ export const startProgramOperation: {
     readonly operation: string
   }): (
     state: RuntimeState,
-  ) => Effect.Effect<readonly [ProgramOperationRecord, RuntimeState], RunNotFound | RuntimeUnavailable, PreparedObservation>
+  ) => Effect.Effect<
+    readonly [ProgramOperationRecord, RuntimeState],
+    RunNotFound | RuntimeUnavailable,
+    PreparedObservation
+  >
   (
     state: RuntimeState,
     input: { readonly runId: string; readonly operation: string },
-  ): Effect.Effect<readonly [ProgramOperationRecord, RuntimeState], RunNotFound | RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<
+    readonly [ProgramOperationRecord, RuntimeState],
+    RunNotFound | RuntimeUnavailable,
+    PreparedObservation
+  >
 } = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly operation: string }) =>
   Effect.gen(function* () {
     yield* requireRun(state, input.runId)
@@ -476,18 +442,23 @@ export const completeProgram: {
     state: RuntimeState,
   ) => Effect.Effect<
     readonly [CompletionOutcome, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramBudgetExhausted>, PreparedObservation
+    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramBudgetExhausted>,
+    PreparedObservation
   >
   (
     state: RuntimeState,
     input: CompleteProgramInput,
   ): Effect.Effect<
     readonly [CompletionOutcome, RuntimeState],
-    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramBudgetExhausted>, PreparedObservation
+    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramBudgetExhausted>,
+    PreparedObservation
   >
 } = Function.dual(2, (state: RuntimeState, input: CompleteProgramInput) =>
   Effect.gen(function* () {
-    const outputLimit = Math.min(input.outputLimit, state.programStates.get(input.runId)?.budget.outputBytes ?? input.outputLimit)
+    const outputLimit = Math.min(
+      input.outputLimit,
+      state.programStates.get(input.runId)?.budget.outputBytes ?? input.outputLimit,
+    )
     if (input.outputBytes > outputLimit)
       return yield* ProgramBudgetExhausted.make({
         dimension: "outputBytes",

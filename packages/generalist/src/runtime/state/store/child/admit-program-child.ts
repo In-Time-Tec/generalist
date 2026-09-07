@@ -1,5 +1,4 @@
-import type { PreparedObservation } from "../../observation.js"
-import { occurredAtMillis } from "../../observation.js"
+import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
 import { Effect, Function } from "effect"
 import {
   ChildDepthExceeded,
@@ -16,7 +15,7 @@ import type { RunReceipt } from "../../../run.js"
 import type { AdmitProgramChildInput, Service as RunStoreService } from "../../../run/store.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { childDigest } from "../../digest.js"
-import { idempotencyKey, type RuntimeState, type StoredRun } from "../../state.js"
+import { idempotencyKey, type RuntimeState, type StoredRun } from "../../projection.js"
 import { readinessForAdmission } from "./capacity.js"
 import { suspend } from "../control/suspend.js"
 import { revokeSession } from "../execution.js"
@@ -33,7 +32,8 @@ type AdmitProgramChildResult = Effect.Effect<
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
-  | Exhausted, PreparedObservation
+  | Exhausted,
+  PreparedObservation
 >
 
 export const admitProgramChild: {
@@ -106,7 +106,7 @@ export const admitProgramChild: {
       })
     }
     const childReadiness = readinessForAdmission(state, parent)
-    const parentBudget = yield* budgetForEvents(parent.events, yield* occurredAtMillis)
+    const parentBudget = yield* budgetForEvents({ events: parent.events, observedMillis: yield* occurredAtMillis })
     if (parentBudget.children === 0) {
       return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
     }
@@ -177,7 +177,8 @@ type AdmitChildrenResult = Effect.Effect<
   | RuntimeUnavailable
   | ChildDepthExceeded
   | ChildLimitExceeded
-  | Exhausted, PreparedObservation
+  | Exhausted,
+  PreparedObservation
 >
 
 /** Atomically admit one authored child batch and persist the parent's aggregate suspension. */

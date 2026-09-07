@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [runtime](../index) / RunWait
+[generalist](../../index.md) / [runtime](../index.md) / RunWait
 
 # RunWait
 
@@ -46,7 +46,7 @@ Construct the approval reason shared by Runtime producers and controls.
 
 ##### request
 
-[`Request`](./Approval#request)
+[`Request`](./Approval.md#request)
 
 #### Returns
 

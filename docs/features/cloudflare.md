@@ -1,7 +1,11 @@
-# Cloudflare
+---
+title: "Cloudflare"
+description: "Host object-backed Runtime execution and bounded programs with independent Cloudflare adapters."
+---
 
-Three independent adapters run request-scoped Effects, persist Runtime state in a
-Durable Object, and execute agent programs in fresh Worker Loader isolates.
+Three independent adapters run request-scoped Effects, host the object-backed Runtime in a
+Durable Object, and execute agent programs in fresh Worker Loader isolates. Native R2 is
+storage authority; Durable Object storage is not a Generalist database.
 
 ## Usage
 
@@ -44,14 +48,34 @@ explicit binding allowlist through Effect `Config`.
 ## Durable Objects
 
 ```ts
-const sqlLayer = layerSqlClient(state.storage)
-const storeLayer = layerRunStore({ addresses: [] }).pipe(Layer.provide(sqlLayer))
-const live = Layer.merge(sqlLayer, storeLayer)
+import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
+import type * as R2 from "generalist/durability/r2"
+
+declare const bucket: R2.Bucket
+
+const runtime = DurableObjects.layer({
+  bucket,
+  environment: "development",
+  tenant: "example-team",
+  partition: "assistant",
+  addresses: [],
+  schedulerMode: "external",
+})
 ```
 
-`layerSqlClient` adapts Durable Object SQLite storage to Effect SQL.
-`layerRunStore` installs the SQL Runtime stores and defaults their source to
-`"durable-object"`; the Durable Object remains the scope owner.
+This is a binding fragment: supply the application's native R2 binding, Worker-compatible
+Crypto, pinned executable resolver, and an owned scope. `layer` reconstructs and activates
+the shared object Runtime; `layerRunStore` supplies storage without starting execution.
+The Durable Object owns the scope and alarms only accelerate wakeup.
+
+Run `reconcile(options, fuel?)` from an independent Cron Trigger or queue consumer for
+every configured partition. It activates, drains bounded work, and closes the scope.
+A lost alarm cannot erase a canonical wait or schedule, but a host that never reconciles
+can strand it. Neither alarm delivery nor Durable Object identity is a commit receipt.
+
+Qualification is local Miniflare/workerd, including the committed exact-EOF range patch
+and the emulator's native/S3 gateway boundary. Deployed R2 and full host acceptance are
+not certified by those checks; see [object durability](./durable-stores.md).
 
 ## Dynamic Workers
 
@@ -81,7 +105,7 @@ typed `SandboxUnavailable` boundary.
 
 - The three Cloudflare subpaths are independent; there is no exported `generalist/cloudflare` root.
 - Worker request scopes finalize before `fetch` resolves.
-- Durable Object SQLite transactions use the host storage transaction boundary.
+- All canonical Runtime state and ownership fencing use the shared object-journal protocol.
 - Source rejects bare, computed, CommonJS, missing, escaping, and case-conflicting imports.
 - Dynamic Worker outbound networking is disabled with `globalOutbound: null`.
 - `v8-isolate` is an honest runtime boundary, not a container or microVM claim.
@@ -91,5 +115,5 @@ typed `SandboxUnavailable` boundary.
 
 ## Related
 
-- Source: `packages/generalist/src/cloudflare/workers/`, `packages/generalist/src/cloudflare/durable-objects/`, `packages/generalist/src/cloudflare/dynamic-workers/`
+- Source: `packages/generalist/src/unstable/cloudflare/workers/`, `packages/generalist/src/unstable/cloudflare/durable-objects/`, `packages/generalist/src/unstable/cloudflare/dynamic-workers/`
 - Examples: `examples/cloudflare-worker`

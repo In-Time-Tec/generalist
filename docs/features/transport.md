@@ -32,15 +32,15 @@ SSE and WebSocket carry `Server.HostEvent`. Its cursor is the Host Session's dur
 
 ## Migration from the removed transport exports
 
-| Removed API                        | Replacement                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------- |
-| `RunClient.streamSSE`              | `client.events.subscribe({ sessionId, cursor? })`                               |
-| `RunClient.connect`                | `client.events.connect({ sessionId, cursor? })`                                 |
-| WebSocket `Cancel`                 | `client.runs.cancel({ runId, reason? })` or `connection.cancel(runId, reason?)` |
-| `Snapshot.get`                     | `client.runs.inspect({ runId })`                                                |
-| `Replay.page`                      | `client.events.subscribe({ sessionId, cursor })`                                |
-| `Wire.observerCodec`               | `Server.eventCodec`                                                             |
-| `SSE.respond` / `WebSocket.handle` | mount `Server.layer({ host, auth })`                                            |
+| Removed API                        | Replacement                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `RunClient.streamSSE`              | `client.events.subscribe({ sessionId, cursor? })`                                                     |
+| `RunClient.connect`                | `client.events.connect({ sessionId, cursor? })`                                                       |
+| WebSocket `Cancel`                 | `client.runs.cancel({ runId, commandId, reason? })` or `connection.cancel(runId, commandId, reason?)` |
+| `Snapshot.get`                     | `client.runs.inspect({ runId })`                                                                      |
+| `Replay.page`                      | `client.events.subscribe({ sessionId, cursor })`                                                      |
+| `Wire.observerCodec`               | `Server.eventCodec`                                                                                   |
+| `SSE.respond` / `WebSocket.handle` | mount `Server.layer({ host, auth })`                                                                  |
 
 There are no compatibility subpaths or transport shims. A caller must create a Host Session before starting a Run and retain the Session ID for streaming.
 

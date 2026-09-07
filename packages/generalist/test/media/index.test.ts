@@ -4,16 +4,21 @@ import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Path, Schema, Stream } from "effect"
 import { LanguageModel, Model, Prompt, Response } from "effect/unstable/ai"
-import { BlobStore, layerMemory, type Service as BlobStoreService } from "../../src/blob-store/index.js"
+import { BlobStore, layer as blobStoreLayer, type Service as BlobStoreService } from "../../src/blob-store/index.js"
 import { layerTest as layerModelCatalogTest } from "../../src/ai/model-catalog.js"
+import { ObjectStore } from "../../src/durability/object-store.js"
 import { Agent, Media, Session } from "../../src/index.js"
+import { makeObjectStorage } from "../runtime/execution/object.js"
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: 1, total: 1, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 1, text: 1, reasoning: undefined },
 })
 const finish = Response.makePart("finish", { reason: "stop", usage, response: undefined })
-const mediaLayer = layerMemory().pipe(Layer.provide(BunCrypto.layer))
+const mediaStorage = makeObjectStorage()
+const mediaLayer = blobStoreLayer({ environment: "test", tenant: "media" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, mediaStorage.store))),
+)
 
 const promptFile = (prompt: Prompt.Prompt): Prompt.FilePart | undefined => {
   for (const message of prompt.content) {

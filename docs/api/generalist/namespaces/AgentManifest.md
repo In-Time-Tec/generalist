@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / AgentManifest
+[generalist](../../index.md) / [generalist](../index.md) / AgentManifest
 
 # AgentManifest
 
@@ -112,13 +112,13 @@ Closed, reconstructable identity contract for one Agent.
 
 ##### toolScheduling
 
-> `readonly` **toolScheduling**: [`ToolSchedulingPolicy`](./Agent#toolschedulingpolicy)
+> `readonly` **toolScheduling**: [`ToolSchedulingPolicy`](./Agent.md#toolschedulingpolicy)
 
 <a id="version"></a>
 
 ##### version
 
-> `readonly` **version**: `"2"`
+> `readonly` **version**: `"1"`
 
 ***
 
@@ -390,7 +390,7 @@ Exact identity of the host-owned content one capability registration must recons
 
 ### PolicyIdentity
 
-> **PolicyIdentity** = \{ `_tag`: `"Portable"`; `policy`: [`PortablePolicy`](#portablepolicy); \} \| \{ `_tag`: `"Pinned"`; `pin`: [`CapabilityPin`](./Pins#capabilitypin); \}
+> **PolicyIdentity** = \{ `_tag`: `"Portable"`; `policy`: [`PortablePolicy`](#portablepolicy); \} \| \{ `_tag`: `"Pinned"`; `pin`: [`CapabilityPin`](./Pins.md#capabilitypin); \}
 
 Exact identity of either a portable policy or an opaque policy capability.
 
@@ -462,7 +462,7 @@ Build an exact manifest for a live Agent using explicitly supplied opaque depend
 
 ###### budget
 
-[`BudgetLimits`](./RunBudget#budgetlimits)
+[`BudgetLimits`](./RunBudget.md#budgetlimits)
 
 ###### children
 
@@ -474,7 +474,7 @@ Build an exact manifest for a live Agent using explicitly supplied opaque depend
 
 ###### model
 
-[`ModelPin`](./Pins#modelpin)
+[`ModelPin`](./Pins.md#modelpin)
 
 ###### policy
 
@@ -526,13 +526,13 @@ Build an exact manifest for a live Agent using explicitly supplied opaque depend
 
 ###### agent
 
-[`Agent`](./Agent#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `Top`, `Top`\>
+[`Agent`](./Agent.md#agent)\<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `Top`, `Top`\>
 
 ###### identity
 
 ###### budget
 
-[`BudgetLimits`](./RunBudget#budgetlimits)
+[`BudgetLimits`](./RunBudget.md#budgetlimits)
 
 ###### children
 
@@ -544,7 +544,7 @@ Build an exact manifest for a live Agent using explicitly supplied opaque depend
 
 ###### model
 
-[`ModelPin`](./Pins#modelpin)
+[`ModelPin`](./Pins.md#modelpin)
 
 ###### policy
 

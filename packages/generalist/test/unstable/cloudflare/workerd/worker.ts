@@ -1,5 +1,5 @@
 import { Crypto, Effect, Exit, Layer, PlatformError, Schema } from "effect"
-import * as Durability from "generalist/durability"
+import { activate } from "generalist/durability"
 import { Prompt, Response as AiResponse, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Permissions } from "generalist"
 import { decodeConfig as decodeOpenRouterConfig } from "generalist/providers/openrouter"
@@ -18,9 +18,13 @@ const cryptoLayer = Layer.succeed(
     digest: (algorithm, data) =>
       Effect.tryPromise({
         try: () => crypto.subtle.digest(algorithm, new Uint8Array(data)),
-        catch: (cause) => new PlatformError.SystemError({
-          module: "Crypto", method: "digest", reason: "Unknown", cause,
-        }),
+        catch: (cause) =>
+          PlatformError.systemError({
+            module: "Crypto",
+            method: "digest",
+            _tag: "Unknown",
+            cause,
+          }),
       }).pipe(Effect.map((buffer) => new Uint8Array(buffer))),
   }),
 )
@@ -80,7 +84,6 @@ const failClosed = Permissions.layerRuleset({
   rules: [{ pattern: "lookup", level: "allow" }],
   fallback: "deny",
 })
-
 
 const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(function* () {
   let lookupExecutions = 0
@@ -161,7 +164,10 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
 })
 
 export class RuntimeObject {
-  constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
+  constructor(
+    private readonly state: DurableObjectState,
+    private readonly env: Env,
+  ) {}
 
   // This fixture has no running executor. Production alarms call LocalScheduler.drain;
   // its canonical obligations remain discoverable by an independent reconciler.
@@ -180,7 +186,7 @@ export class RuntimeObject {
       workerId: "workerd",
       addresses: [],
     }).pipe(Layer.provide(cryptoLayer))
-    const live = Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(liveStore))
+    const live = Layer.effectDiscard(activate).pipe(Layer.provideMerge(liveStore))
     const program = Effect.scoped(
       Effect.flatMap(Layer.build(live), (context) =>
         Effect.gen(function* () {
@@ -188,14 +194,13 @@ export class RuntimeObject {
           const cancellationRunId = `workerd-cancellation-${sequence}`
           const pluralRunId = `workerd-plural-${sequence}`
           const acknowledgementRunId = `workerd-acknowledgement-${sequence}`
-          const priorCancellationStatus = sequence > 1
-            ? (yield* store.inspect(`workerd-cancellation-${sequence - 1}`)).status
-            : undefined
+          const priorCancellationStatus =
+            sequence > 1 ? (yield* store.inspect(`workerd-cancellation-${sequence - 1}`)).status : undefined
           const cancellationExecutable = test("workerd-cancellation", "1")
           const cancellationMessage = makeMessage({
             id: cancellationRunId,
             to: Address.make("agent:test"),
-            sessionId: "session",
+            sessionId: `session:${cancellationRunId}`,
             prompt: Prompt.make("cancel"),
             idempotencyKey: cancellationRunId,
             correlationId: cancellationRunId,
@@ -203,7 +208,7 @@ export class RuntimeObject {
           const pluralMessage = makeMessage({
             id: pluralRunId,
             to: Address.make("agent:test"),
-            sessionId: "session",
+            sessionId: `session:${pluralRunId}`,
             prompt: Prompt.make("wait for three responses"),
             idempotencyKey: pluralRunId,
             correlationId: pluralRunId,
@@ -308,13 +313,21 @@ export class RuntimeObject {
           })
           const pluralRemainingAfterOutOfOrder = suffixes((yield* store.inspect(pluralRunId)).waits)
           yield* store.respond({ runId: pluralRunId, waitId: pluralWaitIds[0]!, resolution: firstResolution })
-          const pluralConflictingTag = yield* store
+          const pluralConflict = yield* store
             .respond({
               runId: pluralRunId,
               waitId: pluralWaitIds[0]!,
               resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
             })
-            .pipe(Effect.match({ onFailure: (error) => error._tag, onSuccess: () => "success" }))
+            .pipe(
+              Effect.match({
+                onFailure: (error) => ({
+                  tag: error._tag,
+                  reason: error._tag === "generalist/durability/DurabilityFailure" ? error.reason : undefined,
+                }),
+                onSuccess: () => ({ tag: "success", reason: undefined }),
+              }),
+            )
           yield* store.respond({
             runId: pluralRunId,
             waitId: pluralWaitIds[1]!,
@@ -398,7 +411,7 @@ export class RuntimeObject {
             alarm: yield* Effect.promise(() => storage.getAlarm()),
             pluralInitialOrder,
             pluralRemainingAfterOutOfOrder,
-            pluralConflictingTag,
+            pluralConflictingTag: pluralConflict.tag,
             pluralFinalOpen,
             pluralResumeEvents,
             acknowledgementInitialSequence,

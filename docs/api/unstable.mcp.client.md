@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.mcp.client
+[generalist](./index.md) / unstable.mcp.client
 
 # unstable.mcp.client
 
@@ -396,13 +396,13 @@
 
 ### fromTransport
 
-> `const` **fromTransport**: \{(`transport`, `options?`): (`name`) => `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope`\>; (`name`, `transport`, `options?`): `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope`\>; \}
+> `const` **fromTransport**: \{(`transport`, `options?`): (`name`) => `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope`\>; (`name`, `transport`, `options?`): `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope`\>; \}
 
 **`Experimental`**
 
 #### Call Signature
 
-> (`transport`, `options?`): (`name`) => `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope`\>
+> (`transport`, `options?`): (`name`) => `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope`\>
 
 ##### Parameters
 
@@ -416,11 +416,11 @@
 
 ##### Returns
 
-(`name`) => `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope`\>
+(`name`) => `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope`\>
 
 #### Call Signature
 
-> (`name`, `transport`, `options?`): `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope`\>
+> (`name`, `transport`, `options?`): `Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope`\>
 
 ##### Parameters
 
@@ -438,7 +438,7 @@
 
 ##### Returns
 
-`Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror), `Scope`\>
+`Effect`\<[`Service`](#service), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror), `Scope`\>
 
 ***
 
@@ -446,7 +446,7 @@
 
 ### layer
 
-> `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](#mcpclient), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> `const` **layer**: (`options`) => `Layer.Layer`\<[`MCPClient`](#mcpclient), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 **`Experimental`**
 
@@ -458,7 +458,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`MCPClient`](#mcpclient), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+`Layer.Layer`\<[`MCPClient`](#mcpclient), [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ***
 
@@ -466,13 +466,13 @@
 
 ### layerTagged
 
-> `const` **layerTagged**: \{(`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>; \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>; \}
+> `const` **layerTagged**: \{(`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>; \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>; \}
 
 **`Experimental`**
 
 #### Call Signature
 
-> (`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> (`options`): \<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ##### Parameters
 
@@ -482,11 +482,11 @@
 
 ##### Returns
 
-\<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+\<`Identifier`\>(`tag`) => `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 #### Call Signature
 
-> \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+> \<`Identifier`\>(`tag`, `options`): `Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ##### Type Parameters
 
@@ -506,7 +506,7 @@
 
 ##### Returns
 
-`Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth#oauthprovidererror)\>
+`Layer`\<`Identifier`, [`MCPConnectionFailed`](#mcpconnectionfailed) \| [`OAuthProviderError`](./unstable.mcp.oauth.md#oauthprovidererror)\>
 
 ***
 
@@ -514,6 +514,6 @@
 
 ### MCPToolFailure
 
-> `const` **MCPToolFailure**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"generalist/mcp/MCPToolCallFailed"`\>; `hint`: `Schema.withConstructorDefault`\<`Schema.withDecodingDefaultKey`\<`Schema.String`, `never`\>\>; `message`: `Schema.String`; `server`: `Schema.String`; `tool`: `Schema.String`; \}\>
+> `const` **MCPToolFailure**: `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"generalist/mcp/MCPToolCallFailed"`\>; `hint`: `Schema.withConstructorDefault`\<`Schema.String`\>; `message`: `Schema.String`; `server`: `Schema.String`; `tool`: `Schema.String`; \}\>
 
 **`Experimental`**

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [generalist](../index) / ProgramManifest
+[generalist](../../index.md) / [generalist](../index.md) / ProgramManifest
 
 # ProgramManifest
 
@@ -64,11 +64,11 @@ An Agent Program manifest paired with its constructor-owned digest.
 
 ###### capabilities.steps
 
-> `readonly` **steps**: readonly [`NamedCapability`](./AgentManifest#namedcapability)[]
+> `readonly` **steps**: readonly [`NamedCapability`](./AgentManifest.md#namedcapability)[]
 
 ###### capabilities.tools
 
-> `readonly` **tools**: readonly [`NamedCapability`](./AgentManifest#namedcapability)[]
+> `readonly` **tools**: readonly [`NamedCapability`](./AgentManifest.md#namedcapability)[]
 
 ###### input
 
@@ -204,7 +204,7 @@ Bounded resources available to one Agent Program.
 
 ### ProgramCapabilityManifest
 
-> `const` **ProgramCapabilityManifest**: `Schema.Struct`\<\{ `agents`: `Schema.$Array`\<`Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>\>; `steps`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; `tools`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; \}\>
+> `const` **ProgramCapabilityManifest**: `Schema.Struct`\<\{ `agents`: `Schema.$Array`\<`Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>\>; `steps`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest.md#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; `tools`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest.md#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; \}\>
 
 Exact host capabilities visible inside one Agent Program sandbox.
 
@@ -214,7 +214,7 @@ Exact host capabilities visible inside one Agent Program sandbox.
 
 ### ProgramManifest
 
-> `const` **ProgramManifest**: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `capabilities`: `Schema.Struct`\<\{ `agents`: `Schema.$Array`\<`Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>\>; `steps`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; `tools`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; \}\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `name`: `Schema.String`; `output`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `sandbox`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `source`: `Schema.Struct`\<\{ `language`: `Schema.Literal`\<`"javascript"`\>; `text`: `Schema.String`; \}\>; `version`: `Schema.Literal`\<`"1"`\>; \}\>
+> `const` **ProgramManifest**: `Schema.Struct`\<\{ `budget`: `Schema.Struct`\<\{ `agentRuns`: `Schema.Int`; `concurrency`: `Schema.Int`; `logBytes`: `Schema.Int`; `outputBytes`: `Schema.Int`; `tokens`: `Schema.Int`; `toolCalls`: `Schema.Int`; `wallClockMillis`: `Schema.Int`; \}\>; `capabilities`: `Schema.Struct`\<\{ `agents`: `Schema.$Array`\<`Schema.Struct`\<\{ `agent`: `Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `selection`: `Schema.String`; \}\>\>; `steps`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest.md#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; `tools`: `Schema.$Array`\<`Schema.Codec`\<[`NamedCapability`](./AgentManifest.md#namedcapability), `NamedCapabilityEncoded`, `never`, `never`\>\>; \}\>; `input`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `name`: `Schema.String`; `output`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `sandbox`: `Schema.brand`\<`Schema.String`, `"generalist/capability-pin"`\>; `source`: `Schema.Struct`\<\{ `language`: `Schema.Literal`\<`"javascript"`\>; `text`: `Schema.String`; \}\>; `version`: `Schema.Literal`\<`"1"`\>; \}\>
 
 Closed reconstructable identity contract for one Agent Program.
 

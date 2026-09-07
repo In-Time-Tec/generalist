@@ -6,9 +6,7 @@ import { Session, SessionHistory } from "../../../src/index"
 
 /** One isolated in-memory Session per test, built and released in the test's own scope. */
 const withSession = <A, E>(effect: Effect.Effect<A, E, Session.SessionDirectory>): Effect.Effect<A, E> =>
-  Effect.scoped(
-    Effect.flatMap(Layer.build(layerMemory), (context) => effect.pipe(Effect.provideContext(context))),
-  )
+  Effect.scoped(Effect.flatMap(Layer.build(layerMemory), (context) => effect.pipe(Effect.provideContext(context))))
 
 const userEntry = (text: string) => ({
   _tag: "Message" as const,
@@ -20,7 +18,8 @@ const seed = (count: number) =>
     Effect.scoped(
       Effect.gen(function* () {
         const store = yield* Session.acquire("history-test")
-        for (let index = 0; index < count; index += 1) yield* store.append(userEntry(`entry-${index}`), { commandId: `fixture-23-${index}` })
+        for (let index = 0; index < count; index += 1)
+          yield* store.append(userEntry(`entry-${index}`), { commandId: `fixture-23-${index}` })
         return yield* store.path()
       }),
     ),

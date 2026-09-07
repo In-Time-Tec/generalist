@@ -9,7 +9,7 @@ import {
   type SubscriberError,
   type SubscriberQueue,
   type TreeSubscriberQueue,
-} from "../state.js"
+} from "../projection.js"
 
 type StoredRun = RuntimeState["runs"] extends ReadonlyMap<string, infer R> ? R : never
 

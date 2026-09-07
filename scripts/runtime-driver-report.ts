@@ -1,6 +1,6 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- the Vitest reporter is a test-runner boundary. */
 import { layer } from "@effect/platform-bun/BunServices"
-import { Effect, FileSystem, Option, Schema } from "effect"
+import { Array, Effect, FileSystem, Option, Order, Schema } from "effect"
 import type { TestModule } from "vitest/node"
 import type { Reporter, TestRunEndReason } from "vitest/reporters"
 import { Suite } from "../packages/generalist/src/testing/report.js"
@@ -35,7 +35,8 @@ const qualification: HostReport["qualification"] = {
   },
   "r2-native-s3-interoperability": {
     status: "unmet",
-    reason: "Native R2 and S3 API cross-transport qualification requires an authorized native endpoint contract and remote evidence.",
+    reason:
+      "Native R2 and S3 API cross-transport qualification requires an authorized native endpoint contract and remote evidence.",
   },
 }
 
@@ -60,12 +61,25 @@ const collectPassedSuites = (modules: ReadonlyArray<TestModule>): Array<Suite> =
 
 const updateReport = Effect.fn("RuntimeDriverReport.updateReport")(function* (suites: ReadonlyArray<Suite>) {
   const fileSystem = yield* FileSystem.FileSystem
+  const normalizedSuites: Array<Suite> = []
+  for (const suite of suites) {
+    normalizedSuites.push(
+      Suite.make({
+        name: suite.name,
+        capabilities: Array.sort(suite.capabilities, Order.String),
+      }),
+    )
+  }
   const report = HostReport.make({
     schemaVersion: 1,
-    suites: suites.map((suite) => Suite.make({
-      name: suite.name,
-      capabilities: [...suite.capabilities].toSorted(),
-    })).toSorted((left, right) => left.name.localeCompare(right.name)),
+    suites: Array.sort(
+      normalizedSuites,
+      Order.make((left: Suite, right: Suite) => {
+        const compared = left.name.localeCompare(right.name)
+        if (compared < 0) return -1
+        return compared > 0 ? 1 : 0
+      }),
+    ),
     qualification,
   })
   const text = yield* Schema.encodeEffect(Schema.fromJsonString(HostReport))(report)
@@ -74,10 +88,12 @@ const updateReport = Effect.fn("RuntimeDriverReport.updateReport")(function* (su
 
 export class RuntimeDriverReport implements Reporter {
   onTestRunEnd(modules: ReadonlyArray<TestModule>, errors: ReadonlyArray<unknown>, reason: TestRunEndReason) {
-    const registered = modules.some((module) => [...module.children.allSuites()].some((suite) => {
-      const meta = certificationMeta(suite.meta())
-      return Option.isSome(meta) && meta.value.generalistCertification.name === objectNativeSuiteName
-    }))
+    const registered = modules.some((module) =>
+      [...module.children.allSuites()].some((suite) => {
+        const meta = certificationMeta(suite.meta())
+        return Option.isSome(meta) && meta.value.generalistCertification.name === objectNativeSuiteName
+      }),
+    )
     if (!registered) return
     const suites = reason === "passed" && errors.length === 0 ? collectPassedSuites(modules) : []
     return Effect.runPromise(updateReport(suites).pipe(Effect.provide(layer)))

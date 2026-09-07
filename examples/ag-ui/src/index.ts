@@ -2,12 +2,12 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { layer as bunHttpServer } from "@effect/platform-bun/BunHttpServer"
 import { EventSchemas, EventType, RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/core"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Redacted, Schema, Stream, type Types } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
-import * as Durability from "generalist/durability"
-import * as S3 from "generalist/durability/s3"
+import { activate, layer as layerDurability } from "generalist/durability"
+import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
@@ -93,38 +93,51 @@ const resolver = ExecutableResolver.layerStatic([
     agent: Agent.close(agent, Layer.mergeAll(scriptedModel, handlers, authorization)),
   },
 ]).pipe(Layer.orDie)
-const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
-  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-  const tenant = yield* Config.string("GENERALIST_TENANT")
-  const partition = yield* Config.string("GENERALIST_PARTITION")
-  const bucket = yield* Config.string("GENERALIST_BUCKET")
-  const region = yield* Config.string("AWS_REGION")
-  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
-  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
-  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
-  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [{ address, executable, registrations }] }).pipe(
-    Layer.provide(resolver),
-    Layer.provide(S3.layer({
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    const connection: Types.Mutable<ConnectionOptions> = {
       bucket,
       region,
-      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
-      ...(endpoint === undefined ? {} : {
-        endpoint,
-        forcePathStyle: true,
-        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
-      }),
-    })),
-    Layer.provide(BunCrypto.layer),
-  )
-  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
-}))
+      credentials: { accessKeyId, secretAccessKey },
+    }
+    if (sessionToken !== undefined) connection.credentials = { accessKeyId, secretAccessKey, sessionToken }
+    if (endpoint !== undefined) {
+      connection.endpoint = endpoint
+      connection.forcePathStyle = true
+      connection.capabilities = {
+        conditionalCreate: confirmed,
+        strongReadAfterWrite: confirmed,
+        consistentListing: confirmed,
+      }
+    }
+    const reconstructed = layerDurability({
+      environment,
+      tenant,
+      partition,
+      addresses: [{ address, executable, registrations }],
+    }).pipe(Layer.provide(resolver), Layer.provide(layerS3(connection)), Layer.provide(BunCrypto.layer))
+    return Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed))
+  }),
+)
 const agentServices = Layer.mergeAll(runtimeLayer, scriptedModel, handlers, authorization)
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const aguiRoute = HttpRouter.add("POST", "/ag-ui", (request) =>
   Effect.gen(function* () {
+    const expected = Redacted.value(yield* Config.redacted("GENERALIST_SERVER_TOKEN"))
+    if (expected.length === 0 || request.headers.authorization !== `Bearer ${expected}`) {
+      return HttpServerResponse.empty({ status: 401 })
+    }
     const parsed = RunAgentInputSchema.safeParse(yield* request.json)
     if (!parsed.success) {
       return yield* HttpServerResponse.json({ error: parsed.error.message }, { status: 400 })
@@ -142,16 +155,28 @@ const aguiRoute = HttpRouter.add("POST", "/ag-ui", (request) =>
   }),
 )
 const aguiLayer = AGUI.layer({ address })
-const aguiRoutes = aguiRoute.pipe(Layer.provide(aguiLayer))
-const demoAuth = Layer.succeed(Server.Authentication, Server.Authentication.of({ bearer: (httpEffect) => httpEffect }))
+const aguiRoutes = aguiRoute.pipe(HttpRouter.provideRequest(aguiLayer))
+const applicationAuth = Server.authBearer({
+  token: Config.redacted("GENERALIST_SERVER_TOKEN"),
+  principal: { id: "example-controller", tenantId: "example", role: "controller" },
+})
 const routes = Layer.unwrap(
   Generalist.create({ agents: [agent] }).pipe(
-    Effect.map((host) => Layer.merge(Server.layer({ host, auth: demoAuth }), aguiRoutes)),
+    Effect.map((host) =>
+      Layer.merge(
+        Server.layer({
+          authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },
+          host,
+          auth: applicationAuth,
+        }),
+        aguiRoutes,
+      ),
+    ),
     Effect.orDie,
   ),
 ).pipe(Layer.provide(agentServices))
 const serverLayer = HttpRouter.serve(routes, { disableLogger: true }).pipe(
-  Layer.provideMerge(bunHttpServer({ port: 0 })),
+  Layer.provideMerge(bunHttpServer({ hostname: "127.0.0.1", port: 0 })),
 )
 
 const runInput: RunAgentInput = {
@@ -164,12 +189,12 @@ const runInput: RunAgentInput = {
   forwardedProps: {},
 }
 
-const fetchAguiEvents = async (baseUrl: string) => {
+const fetchAguiEvents = async (baseUrl: string, credential: Redacted.Redacted) => {
   try {
     // oxlint-disable-next-line effecttsgo/global-fetch -- This example intentionally demonstrates a plain-fetch client.
     const response = await fetch(`${baseUrl}/ag-ui`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(credential)}` },
       body: encodeJson(runInput),
     })
     if (!response.ok || response.body === null) {
@@ -211,8 +236,8 @@ const fetchAguiEvents = async (baseUrl: string) => {
   }
 }
 
-const readAguiEvents = Effect.fn("readAguiEvents")(function* (baseUrl: string) {
-  const result = yield* Effect.promise(() => fetchAguiEvents(baseUrl))
+const readAguiEvents = Effect.fn("readAguiEvents")(function* (baseUrl: string, credential: Redacted.Redacted) {
+  const result = yield* Effect.promise(() => fetchAguiEvents(baseUrl, credential))
   if (result._tag === "Failure") return yield* Effect.die(result.message)
   return result.events
 })
@@ -223,12 +248,14 @@ const approvalMetadata = Schema.Struct({
 const inspection = Schema.Struct({ status: Schema.String })
 const decodeInspection = Schema.decodeUnknownEffect(Schema.fromJsonString(inspection))
 
-const awaitSucceeded = (baseUrl: string): Effect.Effect<string> =>
+const awaitSucceeded = (baseUrl: string, credential: Redacted.Redacted): Effect.Effect<string> =>
   Effect.gen(function* () {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const response = yield* Effect.tryPromise(() =>
         // oxlint-disable-next-line effecttsgo/global-fetch-in-effect -- This example intentionally demonstrates a plain-fetch client.
-        fetch(`${baseUrl}/runs/${encodeURIComponent(runInput.runId)}`),
+        fetch(`${baseUrl}/runs/${encodeURIComponent(runInput.runId)}`, {
+          headers: { authorization: `Bearer ${Redacted.value(credential)}` },
+        }),
       ).pipe(Effect.orDie)
       const current = yield* Effect.tryPromise(() => response.text()).pipe(
         Effect.flatMap(decodeInspection),
@@ -244,7 +271,8 @@ const program = Effect.gen(function* () {
   const server = yield* HttpServer.HttpServer
   if (server.address._tag !== "TcpAddress") return yield* Effect.die("The AG-UI example requires a TCP server")
   const baseUrl = `http://127.0.0.1:${server.address.port}`
-  const events = yield* readAguiEvents(baseUrl)
+  const credential = yield* Config.redacted("GENERALIST_SERVER_TOKEN").pipe(Effect.orDie)
+  const events = yield* readAguiEvents(baseUrl, credential)
   const interrupted = events.find(
     (event) => event.type === EventType.RUN_FINISHED && event.outcome?.type === "interrupt",
   )
@@ -259,12 +287,12 @@ const program = Effect.gen(function* () {
     // oxlint-disable-next-line effecttsgo/global-fetch-in-effect -- This example intentionally demonstrates a plain-fetch client.
     fetch(`${baseUrl}/runs/${encodeURIComponent(runInput.runId)}/approvals/${encodeURIComponent(token)}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(credential)}` },
       body: encodeJson({ decision: { _tag: "Approved" }, operator: "operator:ag-ui-example" }),
     }),
   ).pipe(Effect.orDie)
   if (!approval.ok) return yield* Effect.die(`Approval request failed with ${approval.status}`)
-  const status = yield* awaitSucceeded(baseUrl)
+  const status = yield* awaitSucceeded(baseUrl, credential)
   if (publishCalls !== 1) return yield* Effect.die("The approved tool did not run exactly once")
 
   yield* Console.log(`AG-UI events: ${events.map((event) => event.type).join(" -> ")}`)

@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [unstable.ag-ui](../index) / Errors
+[generalist](../../index.md) / [unstable.ag-ui](../index.md) / Errors
 
 # Errors
 

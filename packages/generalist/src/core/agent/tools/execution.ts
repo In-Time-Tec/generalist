@@ -1,4 +1,4 @@
-import { Cause, Context, Deferred, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Context, Deferred, Effect, Equal, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type Event } from "../event.js"
 import {
@@ -30,8 +30,11 @@ import { ToolContext } from "../../tools/tool-context.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
-import { intercept } from "../../durable/driver/run.js"
-import { type DriverInterpreter, operationKey as makeOperationKey } from "../../durable/driver/interpreter.js"
+import { checkpoint, intercept } from "../../durable/driver/run.js"
+import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
+import { LoopDriverState } from "../../durable/loop-driver-state.js"
+import { DriverStateInvalid } from "../../durable/service.js"
+import { effectiveCall } from "./checkpoint.js"
 import { handoffDispatch } from "../handoff/tool-execution.js"
 import { applyToolOutcome } from "./checkpoint-operation.js"
 import { memoizeRegistered } from "../../memo/tool.js"
@@ -44,6 +47,7 @@ import type { RunInbox } from "../../turn/steering-inbox.js"
 import { taintForCall } from "../../capability/internal.js"
 import { make as makeToolProgress } from "../tool/progress.js"
 import { managedToolHandlers } from "../../artifact.js"
+import { toolReplayPolicy } from "../../durable/component.js"
 
 const provideManagedHandlers = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -52,6 +56,26 @@ const provideManagedHandlers = <A, E, R>(
   Effect.contextWith((context: Context.Context<R>) =>
     effect.pipe(Effect.provideContext(Context.merge(context, handlers))),
   )
+
+const operationKeyFor = (request: Request) =>
+  Effect.gen(function* () {
+    const current = yield* checkpoint
+    const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+      Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+    )
+    const entry = state.toolBatch?.calls[request.toolCallIndex]
+    const call = entry === undefined ? undefined : effectiveCall(entry)
+    if (
+      entry === undefined ||
+      state.toolBatch?.turn !== request.turn ||
+      call?.id !== request.call.id ||
+      call.name !== request.call.name ||
+      !Equal.equals(call.params, request.call.params)
+    ) {
+      return yield* DriverStateInvalid.make({ message: "Tool execution does not match its authoritative batch call" })
+    }
+    return entry.operationKey
+  })
 
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
@@ -231,8 +255,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const droppedProgress = yield* Ref.make(0)
         const emitSemaphore = yield* Semaphore.make(1)
         const signal = yield* Effect.abortSignal
-        const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-        const durableOperationKey = makeOperationKey(logicalId, "tool", turn, call.id, call.name)
+        const durableOperationKey = yield* operationKeyFor(request)
         const invocation = options.invocation ?? {}
         const emit = emitProgress(turn, call, progressQueue, droppedProgress, emitSemaphore)
         const contextBase = {
@@ -257,7 +280,10 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const executionRequest = yield* withParentTasks(request, registry)
         const requestExecutor =
           !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
-        const replayPolicy = requestExecutor?.replayPolicy?.(request) ?? "never"
+        const replayPolicy = toolReplayPolicy({
+          tool: registry.toolkit.tools[request.call.name],
+          fallback: requestExecutor?.replayPolicy?.(request),
+        })
         const cancellation =
           requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
             ? { cancellation: cancellableOperation(request) }
@@ -386,8 +412,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
           ? yield* Effect.scoped(
               Effect.gen(function* () {
                 const signal = yield* Effect.abortSignal
-                const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-                const operationKey = makeOperationKey(logicalId, "tool", turn, call.id, call.name)
+                const operationKey = yield* operationKeyFor(request)
                 const context = ToolContext.of({
                   signal,
                   sessionId,

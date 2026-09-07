@@ -3,7 +3,7 @@ import { Effect, Function } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
 import type { RunEvent } from "../../../run/event.js"
 import type { FanOutMemberResult } from "../../../child/fan-out.js"
-import type { RuntimeState, StoredFanOut, StoredRun } from "../../state.js"
+import type { RuntimeState, StoredFanOut, StoredRun } from "../../projection.js"
 import { promoteChildCapacity, settleFanOutMember } from "../child/capacity.js"
 import { completeJoin } from "./completion.js"
 import { applyRemainder } from "./remainder.js"
@@ -74,13 +74,19 @@ export const reconcileFanOut: {
   (
     child: StoredRun,
     event: RunEvent,
-    settlePending: (state: RuntimeState, parent: StoredRun) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
+    settlePending: (
+      state: RuntimeState,
+      parent: StoredRun,
+    ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
   ): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     child: StoredRun,
     event: RunEvent,
-    settlePending: (state: RuntimeState, parent: StoredRun) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
+    settlePending: (
+      state: RuntimeState,
+      parent: StoredRun,
+    ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
   ): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
 } = Function.dual(
   4,
@@ -88,7 +94,10 @@ export const reconcileFanOut: {
     state: RuntimeState,
     child: StoredRun,
     event: RunEvent,
-    settlePending: (state: RuntimeState, parent: StoredRun) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
+    settlePending: (
+      state: RuntimeState,
+      parent: StoredRun,
+    ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
   ) =>
     Effect.gen(function* () {
       const target = reconciliationTarget(state, child.runId)

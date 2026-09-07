@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / unstable.providers.model-route
+[generalist](./index.md) / unstable.providers.model-route
 
 # unstable.providers.model-route
 
@@ -108,7 +108,7 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 ##### candidates
 
-> `readonly` **candidates**: readonly \[[`Registration`](./generalist/namespaces/ModelRegistry#registration-1), [`Registration`](./generalist/namespaces/ModelRegistry#registration-1)\]
+> `readonly` **candidates**: readonly \[[`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1), [`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1)\]
 
 **`Experimental`**
 
@@ -126,7 +126,7 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 ##### registration
 
-> `readonly` **registration**: [`Registration`](./generalist/namespaces/ModelRegistry#registration-1)
+> `readonly` **registration**: [`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1)
 
 **`Experimental`**
 
@@ -134,7 +134,7 @@ An ordered candidate route contains a candidate without provider-approved availa
 
 ##### selection
 
-> `readonly` **selection**: [`ModelSelection`](./generalist/namespaces/ModelRegistry#modelselection)
+> `readonly` **selection**: [`ModelSelection`](./generalist/namespaces/ModelRegistry.md#modelselection)
 
 **`Experimental`**
 

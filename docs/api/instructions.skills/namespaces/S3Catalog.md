@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [instructions.skills](../index) / S3Catalog
+[generalist](../../index.md) / [instructions.skills](../index.md) / S3Catalog
 
 # S3Catalog
 
@@ -90,7 +90,7 @@ Manifest-backed S3 catalog options.
 
 ### layer
 
-> `const` **layer**: (`options`) => `ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog#layer)\>
+> `const` **layer**: (`options`) => `ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog.md#layer)\>
 
 Build a manifest-backed S3 catalog layer.
 
@@ -102,7 +102,7 @@ Build a manifest-backed S3 catalog layer.
 
 #### Returns
 
-`ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog#layer)\>
+`ReturnType`\<*typeof* [`layer`](../../generalist/namespaces/SkillCatalog.md#layer)\>
 
 ***
 
@@ -110,7 +110,7 @@ Build a manifest-backed S3 catalog layer.
 
 ### make
 
-> `const` **make**: (`options`) => `Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `Crypto` \| `HttpClient`\>
+> `const` **make**: (`options`) => `Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog.md#skillcatalogerror), `Crypto` \| `HttpClient`\>
 
 Build a manifest-backed S3 catalog.
 
@@ -122,4 +122,4 @@ Build a manifest-backed S3 catalog.
 
 #### Returns
 
-`Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog#skillcatalogerror), `Crypto` \| `HttpClient`\>
+`Effect.Effect`\<\{ `all`: `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill)[], `never`, `never`\>; `get`: (`name`) => `Effect.Effect`\<[`Skill`](../../generalist/namespaces/SkillCatalog.md#skill) \| `undefined`, `never`, `never`\>; \}, [`SkillCatalogError`](../../generalist/namespaces/SkillCatalog.md#skillcatalogerror), `Crypto` \| `HttpClient`\>

@@ -1,9 +1,12 @@
 import type { DurabilityFailure } from "../../durability/errors.js"
-import type { CommandIdentity } from "./store-types.js"
 import type { Prompt } from "effect/unstable/ai"
 /* eslint-disable max-lines -- RunStore keeps one storage service contract. */
 import { Context, Effect, Schema, Stream, Option } from "effect"
-import type { BudgetLimits, Exhausted as RunBudgetExhausted, Invalid as RunBudgetInvalid } from "../../core/durable/run-budget.js"
+import type {
+  BudgetLimits,
+  Exhausted as RunBudgetExhausted,
+  Invalid as RunBudgetInvalid,
+} from "../../core/durable/run-budget.js"
 import type { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
 import type { InboxFull } from "../../core/turn/steering.js"
 import type { SessionStore as SessionService } from "../../core/context/session.js"
@@ -83,6 +86,7 @@ import type {
   AdmitRollbackInput,
   AdmitSteeringInput,
   CompletionOutcome,
+  CommandIdentity,
   DirectoryLookupError,
   Durability,
   ExecutionClaim,
@@ -163,7 +167,9 @@ export interface Service {
   /** Read-only durable conversation history for one Session identity. */
   readonly sessionReader: (sessionId: string) => Effect.Effect<Option.Option<SessionReader>, DurabilityFailure>
   /** Session writer bound to one storage-issued execution claim. */
-  readonly claimedSessionStore: (claim: ExecutionClaim) => Effect.Effect<Option.Option<SessionService>, DurabilityFailure>
+  readonly claimedSessionStore: (
+    claim: ExecutionClaim,
+  ) => Effect.Effect<Option.Option<SessionService>, DurabilityFailure>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string
@@ -178,7 +184,8 @@ export interface Service {
     | RunIdConflict
     | ExecutableRegistrationConflict
     | RuntimeUnavailable
-    | TreePolicyInvalid | DurabilityFailure
+    | TreePolicyInvalid
+    | DurabilityFailure
   >
   readonly admitStart: (
     input: AdmitStartInput,
@@ -197,14 +204,20 @@ export interface Service {
     | ChildDepthExceeded
     | ChildLimitExceeded
     | RunBudgetExhausted
-    | TreePolicyInvalid | DurabilityFailure
+    | TreePolicyInvalid
+    | DurabilityFailure
   >
-  readonly activate: (input: CommandIdentity & {
-    readonly runId: string
-  }) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable | DurabilityFailure>
-  readonly extendBudget: (input: CommandIdentity & { readonly runId: string; readonly delta: BudgetLimits }) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly activate: (
+    input: CommandIdentity & {
+      readonly runId: string
+    },
+  ) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly extendBudget: (
+    input: CommandIdentity & { readonly runId: string; readonly delta: BudgetLimits },
+  ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly admitSpawn: (
-    input: Omit<SpawnInput, "prompt"> & { readonly prompt: Prompt.Prompt;
+    input: Omit<SpawnInput, "prompt"> & {
+      readonly prompt: Prompt.Prompt
       readonly message: Message
       readonly parentRunId: string
     },
@@ -217,7 +230,8 @@ export interface Service {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | RunBudgetExhausted | DurabilityFailure
+    | RunBudgetExhausted
+    | DurabilityFailure
   >
   readonly admitProgramChild: (
     input: AdmitProgramChildInput,
@@ -232,7 +246,8 @@ export interface Service {
     | import("./ownership-errors.js").StaleSessionClaim
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | RunBudgetExhausted | DurabilityFailure
+    | RunBudgetExhausted
+    | DurabilityFailure
   >
   readonly admitProgramChildAndSuspend: (
     input: AdmitProgramChildAndSuspendInput,
@@ -247,7 +262,8 @@ export interface Service {
     | import("./ownership-errors.js").StaleSessionClaim
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | RunBudgetExhausted | DurabilityFailure
+    | RunBudgetExhausted
+    | DurabilityFailure
   >
   readonly events: (input: {
     readonly runId: string
@@ -255,41 +271,60 @@ export interface Service {
   }) => Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable | DurabilityFailure>
   readonly respond: (
     input: RespondInput,
-  ) => Effect.Effect<void, RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable | DurabilityFailure>
+  ) => Effect.Effect<
+    void,
+    RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable | DurabilityFailure
+  >
   readonly respondApproval: (
     input: RespondApprovalInput,
   ) => Effect.Effect<void, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable | DurabilityFailure>
-  readonly signal: (input: CommandIdentity & SignalInput) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
-  readonly wake: (input: {
-    readonly runId: string
-    readonly event: WakeEvent
-  }) => Effect.Effect<WakeDisposition, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
+  readonly signal: (
+    input: CommandIdentity & SignalInput,
+  ) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
+  readonly wake: (
+    input: CommandIdentity & {
+      readonly runId: string
+      readonly event: WakeEvent
+    },
+  ) => Effect.Effect<WakeDisposition, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
   readonly dueAwaitEvents: (input: {
     readonly now: number
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<DueAwaitEvent>, RuntimeUnavailable | DurabilityFailure>
-  readonly timeoutAwaitEvent: (input: CommandIdentity & {
-    readonly runId: string
-    readonly waitId: string
-    readonly deadline: string
-  }) => Effect.Effect<boolean, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
-  readonly registerSchedule: (record: ScheduleRecord) => Effect.Effect<ScheduleReceipt, RuntimeUnavailable | DurabilityFailure>
-  readonly claimSchedules: (input: CommandIdentity & {
-    readonly ownerId: string
-    readonly leaseMillis: number
-    readonly limit: number
-  }) => Effect.Effect<ReadonlyArray<ClaimedSchedule>, RuntimeUnavailable | DurabilityFailure>
-  readonly advanceSchedule: (input: CommandIdentity & {
-    readonly scheduleId: string
-    readonly ownerId: string
-    readonly occurrence: number
-    readonly nextAt: string
-  }) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
-  readonly cancel: (input: CommandIdentity & CancelInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
-  readonly cancelSession: (input: CommandIdentity & {
-    readonly sessionId: string
-    readonly reason?: string
-  }) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable | DurabilityFailure>
+  readonly timeoutAwaitEvent: (
+    input: CommandIdentity & {
+      readonly runId: string
+      readonly waitId: string
+      readonly deadline: string
+    },
+  ) => Effect.Effect<boolean, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
+  readonly registerSchedule: (
+    record: ScheduleRecord,
+  ) => Effect.Effect<ScheduleReceipt, RuntimeUnavailable | DurabilityFailure>
+  readonly claimSchedules: (
+    input: CommandIdentity & {
+      readonly ownerId: string
+      readonly leaseMillis: number
+      readonly limit: number
+    },
+  ) => Effect.Effect<ReadonlyArray<ClaimedSchedule>, RuntimeUnavailable | DurabilityFailure>
+  readonly advanceSchedule: (
+    input: CommandIdentity & {
+      readonly scheduleId: string
+      readonly ownerId: string
+      readonly occurrence: number
+      readonly nextAt: string
+    },
+  ) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
+  readonly cancel: (
+    input: CommandIdentity & CancelInput,
+  ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly cancelSession: (
+    input: CommandIdentity & {
+      readonly sessionId: string
+      readonly reason?: string
+    },
+  ) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable | DurabilityFailure>
   readonly admitSteering: (
     input: AdmitSteeringInput,
   ) => Effect.Effect<
@@ -309,9 +344,12 @@ export interface Service {
     | NoSnapshot
     | RunBudgetInvalid
     | RunBudgetExhausted
-    | RuntimeUnavailable | DurabilityFailure
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
-  readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError | DurabilityFailure>
+  readonly readSteering: (
+    input: ExecutionClaim,
+  ) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError | DurabilityFailure>
   /** Read pending inbox entries without claiming execution ownership. */
   readonly pendingSteering: (input: {
     readonly runId: string
@@ -331,23 +369,43 @@ export interface Service {
     readonly name: AgentName
   }) => Effect.Effect<DirectoryEntry, RunNotFound | AgentNameConflict | RuntimeUnavailable | DurabilityFailure>
   /** Parent, direct children, and siblings under one parent, from durable links only. */
-  readonly listRelated: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryLookupError | DurabilityFailure>
+  readonly listRelated: (
+    runId: string,
+  ) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryLookupError | DurabilityFailure>
   /** Ordered durable child settlements addressed to one exact parent Run. */
   readonly settlementNotifications: (input: {
     readonly parentRunId: string
     readonly afterSequence: number
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<ChildSettlementNotification>, RunNotFound | RuntimeUnavailable | DurabilityFailure>
-  readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly inspect: (
+    runId: string,
+  ) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly fork: (
     input: ForkRunInput,
   ) => Effect.Effect<
     RunReceipt,
-    RunNotFound | ForkSequenceInvalid | NoSnapshot | SubstitutionInvalid | RunBudgetExhausted | RunBudgetInvalid | RuntimeUnavailable | DurabilityFailure
+    | RunNotFound
+    | ForkSequenceInvalid
+    | NoSnapshot
+    | SubstitutionInvalid
+    | RunBudgetExhausted
+    | RunBudgetInvalid
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   readonly rewind: (
     input: RewindRunInput,
-  ) => Effect.Effect<void, RunNotFound | ForkSequenceInvalid | NoSnapshot | RunBudgetInvalid | RunBudgetExhausted | RuntimeUnavailable | DurabilityFailure>
+  ) => Effect.Effect<
+    void,
+    | RunNotFound
+    | ForkSequenceInvalid
+    | NoSnapshot
+    | RunBudgetInvalid
+    | RunBudgetExhausted
+    | RuntimeUnavailable
+    | DurabilityFailure
+  >
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   /** Durably advance the host processed-through point to an exact committed model cycle. */
   readonly acknowledge: (input: {
@@ -355,14 +413,24 @@ export interface Service {
     readonly sequence: number
   }) => Effect.Effect<void, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable | DurabilityFailure>
   /** Read the durable host processed-through point; -1 means no cycle is acknowledged. */
-  readonly acknowledged: (runId: string) => Effect.Effect<AcknowledgementPoint, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly acknowledged: (
+    runId: string,
+  ) => Effect.Effect<AcknowledgementPoint, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   /** Persist one product-facing Session identity and metadata. */
   readonly createHostSession: (input: {
     readonly id: string
     readonly title?: string
   }) => Effect.Effect<HostSession, SessionConflict | RuntimeUnavailable | DurabilityFailure>
   /** Read one product-facing Session by identity. */
-  readonly hostSession: (sessionId: string) => Effect.Effect<HostSession, SessionNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly hostSession: (
+    sessionId: string,
+  ) => Effect.Effect<HostSession, SessionNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly hostSessionSnapshot: (
+    sessionId: string,
+  ) => Effect.Effect<
+    import("../session/host.js").HostSessionSnapshot,
+    import("../session/host.js").SessionSnapshotError
+  >
   /** List product-facing Sessions in creation order. */
   readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
   /** List root Runs admitted through one product-facing Session. */
@@ -399,14 +467,24 @@ export interface Service {
     input: ArtifactFork,
   ) => Effect.Effect<
     ArtifactHead,
-    ArtifactNotFound | ArtifactVersionNotFound | ArtifactVersionConflict | ArtifactCrdtMismatch | RuntimeUnavailable | DurabilityFailure
+    | ArtifactNotFound
+    | ArtifactVersionNotFound
+    | ArtifactVersionConflict
+    | ArtifactCrdtMismatch
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   /** Append one CRDT operation if the expected branch head still matches. */
   readonly appendArtifact: (
     input: ArtifactAppend,
   ) => Effect.Effect<
     ArtifactUpdate,
-    ArtifactNotFound | ArtifactVersionNotFound | ArtifactCrdtMismatch | ArtifactVersionConflict | RuntimeUnavailable | DurabilityFailure
+    | ArtifactNotFound
+    | ArtifactVersionNotFound
+    | ArtifactCrdtMismatch
+    | ArtifactVersionConflict
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   /** Look up one persisted append receipt without mutating artifact state. */
   readonly artifactAppendReceipt: (input: {
@@ -424,17 +502,23 @@ export interface Service {
     ArtifactNotFound | ArtifactVersionNotFound | ArtifactSubscriberLagged | RuntimeUnavailable | DurabilityFailure
   >
   /** Whether this Run was created by Runtime fork or rewind branch retention. */
-  readonly artifactRunIsFork: (runId: string) => Effect.Effect<boolean, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly artifactRunIsFork: (
+    runId: string,
+  ) => Effect.Effect<boolean, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly treeCheckpoint: (
     rootRunId: string,
   ) => Effect.Effect<import("../tree.js").Checkpoint, RunNotFound | RuntimeUnavailable | DurabilityFailure>
-  readonly sessionRoots: (sessionId: string) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable | DurabilityFailure>
+  readonly sessionRoots: (
+    sessionId: string,
+  ) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable | DurabilityFailure>
   readonly history: (input: {
     readonly runId: string
     readonly cursor: Cursor
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | CursorExpired | RuntimeUnavailable | DurabilityFailure>
-  readonly recordReward: (input: CommandIdentity & RewardInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly recordReward: (
+    input: CommandIdentity & RewardInput,
+  ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly treeReplay: (input: {
     readonly rootRunId: string
     readonly position: number
@@ -453,10 +537,11 @@ export interface Service {
     readonly afterRunId?: string
   }) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable | DurabilityFailure>
   readonly complete: (
-    input: CommandIdentity & ExecutionClaim & {
-      readonly runId: string
-      readonly result: ExecutionResult
-    },
+    input: CommandIdentity &
+      ExecutionClaim & {
+        readonly runId: string
+        readonly result: ExecutionResult
+      },
   ) => Effect.Effect<CompletionOutcome, WorkerMutationError | DurabilityFailure>
   readonly fail: (
     input: ExecutionClaim & {
@@ -473,23 +558,32 @@ export interface Service {
       readonly continuation?: ExecutionContinuation | null
     },
   ) => Effect.Effect<void, WorkerMutationError | DurabilityFailure>
-  readonly resume: (input: CommandIdentity & {
-    readonly runId: string
-    readonly waitId: string
-    readonly resolution: WaitResolution
-  }) => Effect.Effect<void, RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable | DurabilityFailure>
+  readonly resume: (
+    input: CommandIdentity & {
+      readonly runId: string
+      readonly waitId: string
+      readonly resolution: WaitResolution
+    },
+  ) => Effect.Effect<
+    void,
+    RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable | DurabilityFailure
+  >
   readonly emitAgentEvent: (
-    input: CommandIdentity & ExecutionClaim & {
-      readonly runId: string
-      readonly event: EmittableAgentLoopEvent
-    },
+    input: CommandIdentity &
+      ExecutionClaim & {
+        readonly runId: string
+        readonly event: EmittableAgentLoopEvent
+      },
   ) => Effect.Effect<void, WorkerMutationError | DurabilityFailure>
-  readonly recordOperation: (input: RecordOperationInput) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
+  readonly recordOperation: (
+    input: RecordOperationInput,
+  ) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
   readonly startOperation: (
-    input: CommandIdentity & ExecutionClaim & {
-      readonly runId: string
-      readonly operationId: string
-    },
+    input: CommandIdentity &
+      ExecutionClaim & {
+        readonly runId: string
+        readonly operationId: string
+      },
   ) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
   readonly completeOperation: (
     input: ExecutionClaim & {
@@ -501,21 +595,26 @@ export interface Service {
       readonly steeringEntryIds?: ReadonlyArray<string>
     },
   ) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
-  readonly commitModelResponse: (input: CommitModelResponseInput) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
+  readonly commitModelResponse: (
+    input: CommitModelResponseInput,
+  ) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
   readonly commitInterruptedModelResponse: (
     input: CommitInterruptedModelResponseInput,
   ) => Effect.Effect<OperationRecord, WorkerMutationError | DurabilityFailure>
   readonly expireRunningOperation: (
-    input: CommandIdentity & ExecutionClaim & {
-      readonly runId: string
-      readonly operationId: string
-    },
+    input: CommandIdentity &
+      ExecutionClaim & {
+        readonly runId: string
+        readonly operationId: string
+      },
   ) => Effect.Effect<
     { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
     WorkerMutationError | DurabilityFailure
   >
   /** Reconcile operations left running by the prior owner before execution resumes. */
-  readonly recoverRunningOperations: (input: CommandIdentity & ExecutionClaim) => Effect.Effect<"ready" | "blocked", WorkerMutationError | DurabilityFailure>
+  readonly recoverRunningOperations: (
+    input: CommandIdentity & ExecutionClaim,
+  ) => Effect.Effect<"ready" | "blocked", WorkerMutationError | DurabilityFailure>
   readonly getOperation: (input: {
     readonly runId: string
     readonly operationId: string
@@ -539,43 +638,55 @@ export interface Service {
     input: ResolveOperationInput,
   ) => Effect.Effect<void, RunNotFound | OperationResolutionConflict | RuntimeUnavailable | DurabilityFailure>
   /** Read the normalized durable facts from which operator recovery is derived. */
-  readonly recoveryJournal: (runId: string) => Effect.Effect<RecoveryJournal, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly recoveryJournal: (
+    runId: string,
+  ) => Effect.Effect<RecoveryJournal, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly retryRecovery: (
     input: CommandIdentity & RetryInput,
   ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
   readonly wakeRecovery: (
     input: CommandIdentity & WakeInput,
   ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
-  readonly extendBudgetRecovery: (input: CommandIdentity & {
-    readonly runId: string
-    readonly delta: BudgetLimits
-    readonly operator: string
-  }) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
+  readonly extendBudgetRecovery: (
+    input: CommandIdentity & {
+      readonly runId: string
+      readonly delta: BudgetLimits
+      readonly operator: string
+    },
+  ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
   readonly resolveUnknown: (
     input: CommandIdentity & ResolveUnknownInput,
   ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
-  readonly claimExecution: (input: CommandIdentity & {
-    readonly runId: string
-    readonly ownerId: string
-  }) => Effect.Effect<
+  readonly claimExecution: (
+    input: CommandIdentity & {
+      readonly runId: string
+      readonly ownerId: string
+    },
+  ) => Effect.Effect<
     ExecutionRecord & ExecutionClaim,
     RunNotFound | RunTerminal | RuntimeUnavailable | import("./ownership-errors.js").StaleClaim | DurabilityFailure
   >
-  readonly loadExecution: (runId: string) => Effect.Effect<ExecutionRecord, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly loadExecution: (
+    runId: string,
+  ) => Effect.Effect<ExecutionRecord, RunNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly releaseExecution: (input: ExecutionClaim) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
   readonly saveExecution: (
-    input: CommandIdentity & ExecutionClaim & {
-      readonly checkpoint?: ExecutionCheckpoint
-      readonly suspension?: ExecutionSuspension
-    },
+    input: CommandIdentity &
+      ExecutionClaim & {
+        readonly checkpoint?: ExecutionCheckpoint
+        readonly suspension?: ExecutionSuspension
+      },
   ) => Effect.Effect<
     void,
     | RunNotFound
     | RuntimeUnavailable
     | import("./ownership-errors.js").StaleClaim
-    | import("./ownership-errors.js").StaleSessionClaim | DurabilityFailure
+    | import("./ownership-errors.js").StaleSessionClaim
+    | DurabilityFailure
   >
-  readonly retryExecution: (input: CommandIdentity & ExecutionClaim) => Effect.Effect<ExecutionRecord, WorkerMutationError | DurabilityFailure>
+  readonly retryExecution: (
+    input: CommandIdentity & ExecutionClaim,
+  ) => Effect.Effect<ExecutionRecord, WorkerMutationError | DurabilityFailure>
   readonly admitFanOut: (
     input: AdmitFanOutInput,
   ) => Effect.Effect<
@@ -588,9 +699,12 @@ export interface Service {
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
-    | RunBudgetExhausted | DurabilityFailure
+    | RunBudgetExhausted
+    | DurabilityFailure
   >
-  readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly inspectFanOut: (
+    fanOutId: string,
+  ) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable | DurabilityFailure>
   readonly reserveProgramOperation: (
     input: ReserveProgramOperationInput,
   ) => Effect.Effect<ProgramOperationRecord, WorkerMutationError | ProgramStoreFailure | DurabilityFailure>
@@ -604,7 +718,8 @@ export interface Service {
     | FanOutConflict
     | ChildSelectionMissing
     | ChildDepthExceeded
-    | ChildLimitExceeded | DurabilityFailure
+    | ChildLimitExceeded
+    | DurabilityFailure
   >
   readonly suspendProgramOperation: (
     input: SuspendProgramOperationInput,

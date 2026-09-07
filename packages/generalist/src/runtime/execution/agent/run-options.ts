@@ -12,6 +12,20 @@ type HostedRunOptions = Omit<RunOptions, "memory" | "steering">
 const sandboxInvocation = (snapshot: Ref.Ref<string | undefined> | undefined) =>
   snapshot === undefined ? {} : { inheritedSandboxSnapshot: snapshot }
 
+const continuationOptions = (
+  continuation: ExecutionContinuation | undefined,
+): Pick<HostedRunOptions, "turnStart" | "initialSteering"> => {
+  if (continuation === undefined) return {}
+  return {
+    turnStart: continuation.nextTurn,
+    initialSteering: {
+      queue: continuation.queue ?? "steering",
+      count: continuation.steeringEntryIds.length,
+      turn: Math.max(0, continuation.nextTurn - 1),
+    },
+  }
+}
+
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly execution: ExecutionRecord
@@ -44,21 +58,12 @@ export const make = (input: {
     executableRef: input.execution.executableRef,
     executableManifest: input.execution.executableManifest,
     budget: input.budget,
+    ...continuationOptions(input.continuation),
   }
   if (input.compaction !== undefined) Object.assign(options, { compaction: input.compaction })
   if (input.checkpoint !== undefined) Object.assign(options, { driverCheckpoint: input.checkpoint })
   if (input.history !== undefined) Object.assign(options, { history: input.history })
-  const turnStart = input.turnStart ?? input.continuation?.nextTurn
-  if (turnStart !== undefined) Object.assign(options, { turnStart })
-  if (input.continuation !== undefined) {
-    Object.assign(options, {
-      initialSteering: {
-        queue: input.continuation.queue ?? "steering",
-        count: input.continuation.steeringEntryIds.length,
-        turn: Math.max(0, input.continuation.nextTurn - 1),
-      },
-    })
-  }
+  if (input.turnStart !== undefined) Object.assign(options, { turnStart: input.turnStart })
   if (Option.isSome(agentSuspension)) {
     const resume: NonNullable<HostedRunOptions["resume"]> = { suspension: agentSuspension.value }
     const waitIds = new Set(agentSuspension.value.waits.map((wait) => wait.waitId))

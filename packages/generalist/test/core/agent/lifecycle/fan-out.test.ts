@@ -147,18 +147,26 @@ it.effect("executes AgentTool.fanOut without a caller-supplied handler", () => {
   let parentCalls = 0
   const lifecycle = new Array<string>()
   const hooks = Hooks.layer([
-    Hooks.onChildStart(({ child: started }) =>
-      Effect.sync(() => {
-        lifecycle.push(`start:${started.operation}:${started.selection}`)
-        return Hooks.Continue()
-      }),
-    ),
-    Hooks.onChildEnd(({ child: ended, result }) =>
-      Effect.sync(() => {
-        lifecycle.push(`end:${ended.operation}:${String(result)}`)
-        return Hooks.Continue()
-      }),
-    ),
+    Hooks.onChildStart({
+      key: "test.core.agent.lifecycle.fan.out.onChildStart.1",
+      version: "1",
+      replayPolicy: "never",
+      hook: ({ child: started }) =>
+        Effect.sync(() => {
+          lifecycle.push(`start:${started.operation}:${started.selection}`)
+          return Hooks.Continue()
+        }),
+    }),
+    Hooks.onChildEnd({
+      key: "test.core.agent.lifecycle.fan.out.onChildEnd.1",
+      version: "1",
+      replayPolicy: "never",
+      hook: ({ child: ended, result }) =>
+        Effect.sync(() => {
+          lifecycle.push(`end:${ended.operation}:${String(result)}`)
+          return Hooks.Continue()
+        }),
+    }),
   ])
   const layer = Layer.effect(
     LanguageModel.LanguageModel,

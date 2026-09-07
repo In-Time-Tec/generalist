@@ -1,7 +1,7 @@
 import { Context, Effect, Function, Layer, Option, Schema, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { fromLiveAgent } from "../../core/durable/manifest/agent-manifest.js"
-import { makeCapability, makeModel } from "../../core/durable/pin.js"
+import { makeCapability, makeModel, type CapabilityPin } from "../../core/durable/pin.js"
 import {
   close,
   type Agent,
@@ -22,6 +22,8 @@ import type { Input as ResolverInput, Resolution, Service as ResolverService } f
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
+import { CommandTool, namespace } from "../../core/durable/component.js"
+import { Hooks } from "../../hooks/index.js"
 
 const codec = "generalist/runtime/registered-agent"
 const version = "1"
@@ -117,7 +119,11 @@ const graphFor = (root: AnyAgent): AgentGraph => {
   return { agents, children }
 }
 
-const pinnedAgent = (agent: AnyAgent, children: ReadonlyArray<{ readonly selection: string }>) => {
+const pinnedAgent = (
+  agent: AnyAgent,
+  children: ReadonlyArray<{ readonly selection: string }>,
+  hooks: CapabilityPin | undefined,
+) => {
   const hidden: unknown = agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; every graph member originates from Agent.make.
   const erased = hidden as ErasedAgent
@@ -132,7 +138,17 @@ const pinnedAgent = (agent: AnyAgent, children: ReadonlyArray<{ readonly selecti
       pin: makeCapability({ runtime: "registered-agent", agent: agent.name, tool: name }),
     })),
     skills: [],
-    services: [],
+    services: [
+      ...(hooks === undefined ? [] : [{ name: "hooks", pin: hooks }]),
+      ...new Map(
+        Object.values(agent.toolkit.tools).flatMap((tool) => {
+          const component = Context.getOption(tool.annotations, CommandTool)
+          if (Option.isNone(component)) return []
+          const name = `component:${namespace(component.value.descriptor)}`
+          return [[name, { name, pin: component.value.pin }] as const]
+        }),
+      ).values(),
+    ],
     policy:
       agent.policy.snapshot === undefined
         ? { _tag: "Pinned", pin: makeCapability({ runtime: "registered-agent", agent: agent.name, policy: "1" }) }
@@ -142,7 +158,7 @@ const pinnedAgent = (agent: AnyAgent, children: ReadonlyArray<{ readonly selecti
   })
 }
 
-const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any> = []) => {
+const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any> = [], hooks?: CapabilityPin) => {
   const graph = graphFor(root)
   const implementations = new Map(
     graph.agents.map((agent) => {
@@ -160,6 +176,7 @@ const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any
           pinnedAgent(
             implementations.get(agent)!,
             (graph.children.get(agent) ?? []).map(({ selection }) => ({ selection })),
+            hooks,
           ),
         ] as const,
     ),
@@ -250,7 +267,12 @@ export const capture = <
   Effect.gen(function* () {
     const context = yield* Effect.context<ClosedServices<Tools, R, InputCodec, OutputCodec>>()
     const tasks = yield* Effect.serviceOption(Tasks)
-    const graph = graphIdentities(agent, Option.isSome(tasks) ? tasks.value.tools : [])
+    const hooks = yield* Effect.serviceOption(Hooks)
+    const graph = graphIdentities(
+      agent,
+      Option.isSome(tasks) ? tasks.value.tools : [],
+      Option.isSome(hooks) && hooks.value.declarations.length > 0 ? hooks.value.pin : undefined,
+    )
     const erasedContext = Context.makeUnsafe<unknown>(context.mapUnsafe)
     return graph.graph.agents.map((member) =>
       registered(member, graph.implementations.get(member)!, erasedContext, graph.identities.get(member)!),

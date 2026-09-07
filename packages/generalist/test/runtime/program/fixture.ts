@@ -244,7 +244,12 @@ export const executeProgramFixture = Effect.gen(function* () {
     idempotencyKey: "program-run",
     prompt: "run",
   })
-  yield* host.execute(yield* store.claimExecution({
-          commandId: "runtime-program-fixture-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId }))
+  yield* host.execute(
+    yield* store.claimExecution({
+      commandId: "runtime-program-fixture-ts-claim-1",
+      runId: receipt.runId,
+      ownerId: objectWorkerId,
+    }),
+  )
   return receipt.runId
 })

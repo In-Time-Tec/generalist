@@ -1,0 +1,66 @@
+import { Effect, Ref, Schema } from "effect"
+import type { Event } from "../../../core/agent/event.js"
+import type { DriverCheckpoint } from "../../../core/durable/driver.js"
+import type { AttemptFailed } from "../../../core/model/telemetry/events.js"
+import type { ExecutionContinuation } from "../../run/steering.js"
+import type { ExecutionClaim, Service as RunStore } from "../../run/store.js"
+
+const maxExecutionAttempts = 3
+
+type EscapedFailure = {
+  readonly modelCallId: string
+  readonly turn: number
+}
+
+export type Retry = {
+  readonly attempt: number
+  readonly checkpoint: DriverCheckpoint
+  readonly continuation?: ExecutionContinuation
+  readonly turn: number
+}
+
+const isRecoverable = (event: AttemptFailed): boolean =>
+  event.classification === "transient" ||
+  event.category === "rate-limit" ||
+  event.category === "transport" ||
+  event.category === "truncated-stream" ||
+  event.category === "timeout"
+
+export const make = (initialAttempt: number) =>
+  Effect.gen(function* () {
+    const attempt = yield* Ref.make(initialAttempt)
+    const escaped = yield* Ref.make<EscapedFailure | undefined>(undefined)
+    const observe = (event: Event): Effect.Effect<void> => {
+      if (event._tag === "ModelAttemptFailed") {
+        return Ref.set(escaped, isRecoverable(event) ? { modelCallId: event.modelCallId, turn: event.turn } : undefined)
+      }
+      return event._tag === "ModelCallCompleted" ? Ref.set(escaped, undefined) : Effect.void
+    }
+    const retry = (store: RunStore, claim: ExecutionClaim): Effect.Effect<Retry | undefined> =>
+      Effect.gen(function* () {
+        const failure = yield* Ref.get(escaped)
+        if (failure === undefined || failure.turn <= 0) return undefined
+        const latest = yield* store.loadExecution(claim.runId)
+        const checkpoint =
+          latest.checkpoint !== undefined && "driverVersion" in latest.checkpoint ? latest.checkpoint : undefined
+        if (latest.attempt >= maxExecutionAttempts || checkpoint === undefined) return undefined
+        const retried = yield* store.retryExecution({
+          ...claim,
+          commandId: yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Array(Schema.Json)))([
+            "retry-execution",
+            claim.runId,
+            claim.attemptFence,
+            failure.modelCallId,
+          ]).pipe(Effect.orDie),
+        })
+        yield* Ref.set(attempt, retried.attempt)
+        const nextRetry: Retry = {
+          attempt: retried.attempt,
+          checkpoint,
+          turn: failure.turn,
+        }
+        if (retried.continuation !== undefined) Object.assign(nextRetry, { continuation: retried.continuation })
+        return nextRetry
+      }).pipe(Effect.orDie)
+    return { attempt: Ref.get(attempt), observe, retry }
+  })

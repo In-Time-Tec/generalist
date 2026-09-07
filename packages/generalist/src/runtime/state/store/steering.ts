@@ -4,7 +4,7 @@ import { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from 
 import { RunBusy, RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../errors.js"
 import type { AdmitSteeringInput, ExecutionClaim, SteeringAdmission } from "../../run/store.js"
 import { appendLifecycle, rejectIfTerminal } from "../append.js"
-import type { RuntimeState, StoredRun } from "../state.js"
+import type { RuntimeState, StoredRun } from "../projection.js"
 
 const requireRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))

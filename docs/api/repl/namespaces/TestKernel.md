@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl](../index) / TestKernel
+[generalist](../../index.md) / [repl](../index.md) / TestKernel
 
 # TestKernel
 
@@ -16,7 +16,7 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 #### Extends
 
-- [`Service`](./KernelResourceAuthority#service)
+- [`Service`](./KernelResourceAuthority.md#service)
 
 #### Properties
 
@@ -24,81 +24,81 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ##### acquire
 
-> `readonly` **acquire**: (`request`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **acquire**: (`request`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
 ###### request
 
-[`AcquireRequest`](./KernelResourceAuthority#acquirerequest)
+[`AcquireRequest`](./KernelResourceAuthority.md#acquirerequest)
 
 ###### Returns
 
-`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`acquire`](./KernelResourceAuthority#acquire)
+[`Service`](./KernelResourceAuthority.md#service).[`acquire`](./KernelResourceAuthority.md#acquire)
 
 <a id="admit"></a>
 
 ##### admit
 
-> `readonly` **admit**: (`request`) => `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **admit**: (`request`) => `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
 ###### request
 
-[`AdmitRequest`](./KernelResourceAuthority#admitrequest)
+[`AdmitRequest`](./KernelResourceAuthority.md#admitrequest)
 
 ###### Returns
 
-`Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`admit`](./KernelResourceAuthority#admit)
+[`Service`](./KernelResourceAuthority.md#service).[`admit`](./KernelResourceAuthority.md#admit)
 
 <a id="bind"></a>
 
 ##### bind
 
-> `readonly` **bind**: (`request`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **bind**: (`request`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
 ###### request
 
-[`BindRequest`](./KernelResourceAuthority#bindrequest)
+[`BindRequest`](./KernelResourceAuthority.md#bindrequest)
 
 ###### Returns
 
-`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`bind`](./KernelResourceAuthority#bind)
+[`Service`](./KernelResourceAuthority.md#service).[`bind`](./KernelResourceAuthority.md#bind)
 
 <a id="confirmdeletion"></a>
 
 ##### confirmDeletion
 
-> `readonly` **confirmDeletion**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **confirmDeletion**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
 ###### request
 
-[`DeletionRequest`](./KernelResourceAuthority#deletionrequest)
+[`DeletionRequest`](./KernelResourceAuthority.md#deletionrequest)
 
 ###### Returns
 
-`Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`confirmDeletion`](./KernelResourceAuthority#confirmdeletion)
+[`Service`](./KernelResourceAuthority.md#service).[`confirmDeletion`](./KernelResourceAuthority.md#confirmdeletion)
 
 <a id="expire"></a>
 
@@ -120,13 +120,13 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ##### failDeletion
 
-> `readonly` **failDeletion**: (`request`, `message`) => `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **failDeletion**: (`request`, `message`) => `Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
 ###### request
 
-[`DeletionRequest`](./KernelResourceAuthority#deletionrequest)
+[`DeletionRequest`](./KernelResourceAuthority.md#deletionrequest)
 
 ###### message
 
@@ -134,37 +134,37 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ###### Returns
 
-`Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<\{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`failDeletion`](./KernelResourceAuthority#faildeletion)
+[`Service`](./KernelResourceAuthority.md#service).[`failDeletion`](./KernelResourceAuthority.md#faildeletion)
 
 <a id="finish"></a>
 
 ##### finish
 
-> `readonly` **finish**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **finish**: (`request`) => `Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
 ###### request
 
-[`FinishRequest`](./KernelResourceAuthority#finishrequest)
+[`FinishRequest`](./KernelResourceAuthority.md#finishrequest)
 
 ###### Returns
 
-`Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<`void`, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`finish`](./KernelResourceAuthority#finish)
+[`Service`](./KernelResourceAuthority.md#service).[`finish`](./KernelResourceAuthority.md#finish)
 
 <a id="inspect"></a>
 
 ##### inspect
 
-> `readonly` **inspect**: (`sessionId`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \} \| `undefined`, [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority#kernelresourceauthorityunavailable)\>
+> `readonly` **inspect**: (`sessionId`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \} \| `undefined`, [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority.md#kernelresourceauthorityunavailable)\>
 
 ###### Parameters
 
@@ -174,27 +174,27 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ###### Returns
 
-`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \} \| `undefined`, [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority#kernelresourceauthorityunavailable)\>
+`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \} \| `undefined`, [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority.md#kernelresourceauthorityunavailable)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`inspect`](./KernelResourceAuthority#inspect)
+[`Service`](./KernelResourceAuthority.md#service).[`inspect`](./KernelResourceAuthority.md#inspect)
 
 <a id="pendingdeletion"></a>
 
 ##### pendingDeletion
 
-> `readonly` **pendingDeletion**: `Effect`\<readonly `object`[], [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority#kernelresourceauthorityunavailable)\>
+> `readonly` **pendingDeletion**: `Effect`\<readonly `object`[], [`KernelResourceAuthorityUnavailable`](./KernelResourceAuthority.md#kernelresourceauthorityunavailable)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`pendingDeletion`](./KernelResourceAuthority#pendingdeletion)
+[`Service`](./KernelResourceAuthority.md#service).[`pendingDeletion`](./KernelResourceAuthority.md#pendingdeletion)
 
 <a id="renew"></a>
 
 ##### renew
 
-> `readonly` **renew**: (`claim`, `leaseMillis`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **renew**: (`claim`, `leaseMillis`) => `Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
@@ -218,17 +218,17 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ###### Returns
 
-`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<\{ `claim`: \{ `generation`: `number`; `ownerId`: `string`; `sessionId`: `string`; \}; `expiresAtMillis`: `number`; `requestedProfileDigest`: `string`; `requestedProvider`: `string`; `resource?`: \{ `activeCell?`: \{ `cellId`: `string`; `epoch`: `number`; `generation`: `number`; `ownerId`: `string`; `profileDigest`: `string`; `sessionId`: `string`; \}; `checkpoint`: `"filesystem"` \| `"namespace"` \| `"live-process"` \| `"restart-only"`; `cleanupFailure?`: \{ `attempts`: `number`; `message`: `string`; \}; `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; `state`: `"live"` \| `"paused"` \| `"deleting"`; \}; \}, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`renew`](./KernelResourceAuthority#renew)
+[`Service`](./KernelResourceAuthority.md#service).[`renew`](./KernelResourceAuthority.md#renew)
 
 <a id="revoke"></a>
 
 ##### revoke
 
-> `readonly` **revoke**: (`claim`) => `Effect`\<\{ `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; \} \| `undefined`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+> `readonly` **revoke**: (`claim`) => `Effect`\<\{ `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; \} \| `undefined`, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Parameters
 
@@ -248,11 +248,11 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ###### Returns
 
-`Effect`\<\{ `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; \} \| `undefined`, [`KernelResourceFailure`](./KernelResourceAuthority#kernelresourcefailure)\>
+`Effect`\<\{ `epoch`: `number`; `profileDigest`: `string`; `provider`: `string`; `resourceId`: `string`; \} \| `undefined`, [`KernelResourceFailure`](./KernelResourceAuthority.md#kernelresourcefailure)\>
 
 ###### Inherited from
 
-[`Service`](./KernelResourceAuthority#service).[`revoke`](./KernelResourceAuthority#revoke)
+[`Service`](./KernelResourceAuthority.md#service).[`revoke`](./KernelResourceAuthority.md#revoke)
 
 ***
 
@@ -266,7 +266,7 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ##### bindings?
 
-> `readonly` `optional` **bindings?**: readonly [`Binding`](./KernelPool#binding)[]
+> `readonly` `optional` **bindings?**: readonly [`Binding`](./KernelPool.md#binding)[]
 
 <a id="profile"></a>
 
@@ -296,7 +296,7 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ###### contractVersion
 
-> `readonly` **contractVersion**: `2`
+> `readonly` **contractVersion**: `1`
 
 ###### image
 
@@ -376,7 +376,7 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ###### request
 
-[`ExecuteRequest`](./KernelPool#executerequest)
+[`ExecuteRequest`](./KernelPool.md#executerequest)
 
 ###### Returns
 
@@ -388,7 +388,7 @@ In-memory resource authority controls used only by deterministic provider tests.
 
 ### Script
 
-> **Script** = \{ `_tag`: `"Value"`; `stderr?`: `string`; `stdout?`: `string`; `value`: `string`; \} \| \{ `_tag`: `"Throw"`; `message`: `string`; `name`: `string`; `stderr?`: `string`; \} \| \{ `_tag`: `"Failure"`; `failure`: [`CellFailure`](./Cell#cellfailure); \}
+> **Script** = \{ `_tag`: `"Value"`; `stderr?`: `string`; `stdout?`: `string`; `value`: `string`; \} \| \{ `_tag`: `"Throw"`; `message`: `string`; `name`: `string`; `stderr?`: `string`; \} \| \{ `_tag`: `"Failure"`; `failure`: [`CellFailure`](./Cell.md#cellfailure); \}
 
 What the scripted pool does with one cell.
 
@@ -398,7 +398,7 @@ What the scripted pool does with one cell.
 
 ### layerMemoryResourceAuthority
 
-> `const` **layerMemoryResourceAuthority**: `Layer.Layer`\<[`KernelResourceAuthority`](./KernelResourceAuthority#kernelresourceauthority)\>
+> `const` **layerMemoryResourceAuthority**: `Layer.Layer`\<[`KernelResourceAuthority`](./KernelResourceAuthority.md#kernelresourceauthority)\>
 
 ***
 
@@ -406,7 +406,7 @@ What the scripted pool does with one cell.
 
 ### layerMemoryStore
 
-> `const` **layerMemoryStore**: `Layer.Layer`\<[`KernelSnapshotStore`](./KernelSnapshotStore#kernelsnapshotstore)\>
+> `const` **layerMemoryStore**: `Layer.Layer`\<[`KernelSnapshotStore`](./KernelSnapshotStore.md#kernelsnapshotstore)\>
 
 ***
 
@@ -414,7 +414,7 @@ What the scripted pool does with one cell.
 
 ### layerTestPool
 
-> `const` **layerTestPool**: (`options`) => `Layer.Layer`\<[`KernelPool`](./KernelPool#kernelpool)\>
+> `const` **layerTestPool**: (`options`) => `Layer.Layer`\<[`KernelPool`](./KernelPool.md#kernelpool)\>
 
 #### Parameters
 
@@ -424,7 +424,7 @@ What the scripted pool does with one cell.
 
 #### Returns
 
-`Layer.Layer`\<[`KernelPool`](./KernelPool#kernelpool)\>
+`Layer.Layer`\<[`KernelPool`](./KernelPool.md#kernelpool)\>
 
 ***
 
@@ -432,7 +432,7 @@ What the scripted pool does with one cell.
 
 ### layerTestSandbox
 
-> `const` **layerTestSandbox**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](../../sandbox#sandboxprovider)\>
+> `const` **layerTestSandbox**: (`options`) => `Layer.Layer`\<[`SandboxProvider`](../../sandbox.md#sandboxprovider)\>
 
 A process-local Sandbox fake backed by TestKernel. It does not model an independent
 security boundary and must not be used to certify a production provider.
@@ -445,7 +445,7 @@ security boundary and must not be used to certify a production provider.
 
 #### Returns
 
-`Layer.Layer`\<[`SandboxProvider`](../../sandbox#sandboxprovider)\>
+`Layer.Layer`\<[`SandboxProvider`](../../sandbox.md#sandboxprovider)\>
 
 ***
 
@@ -464,7 +464,7 @@ takeover reconciliation, and retained cleanup without pretending to be durable s
 
 ### makeMemoryStore
 
-> `const` **makeMemoryStore**: `Effect.Effect`\<[`Service`](./KernelSnapshotStore#service)\>
+> `const` **makeMemoryStore**: `Effect.Effect`\<[`Service`](./KernelSnapshotStore.md#service)\>
 
 An in-memory snapshot store keyed by Session identity.
 
@@ -474,7 +474,7 @@ An in-memory snapshot store keyed by Session identity.
 
 ### makeTest
 
-> `const` **makeTest**: (`options`) => `Effect.Effect`\<[`Service`](./KernelPool#service)\>
+> `const` **makeTest**: (`options`) => `Effect.Effect`\<[`Service`](./KernelPool.md#service)\>
 
 A KernelPool that evaluates nothing. It enforces the observable kernel contract —
 cell-local monotonic sequences, epochs across restart, closed sessions — so hosts and projections
@@ -488,4 +488,4 @@ can be tested without a worker process.
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](./KernelPool#service)\>
+`Effect.Effect`\<[`Service`](./KernelPool.md#service)\>

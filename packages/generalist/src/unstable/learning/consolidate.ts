@@ -252,11 +252,15 @@ export const runStartDeclaration = (
   memory: MemoryService,
   configuration: Configuration,
 ): Declaration =>
-  onRunStart((input) =>
-    input.agentName === agentName
-      ? consolidationPrompt(runtime, memory, configuration).pipe(Effect.map(AddContext))
-      : Effect.void,
-  )
+  onRunStart({
+    key: "generalist.learning.consolidation-context",
+    version: "1",
+    replayPolicy: "provider-idempotent",
+    hook: (input) =>
+      input.agentName === agentName
+        ? consolidationPrompt(runtime, memory, configuration).pipe(Effect.map(AddContext))
+        : Effect.void,
+  })
 
 /** @experimental Build the scheduled journal-backed consolidation proposer used by `Learning.layer`. */
 export const consolidate = (options: ConsolidateOptions): ConsolidationProposer => {

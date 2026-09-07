@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.openai-compatible-embedding
+[generalist](./index.md) / providers.openai-compatible-embedding
 
 # providers.openai-compatible-embedding
 

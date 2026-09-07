@@ -61,7 +61,7 @@ export const memoize = <E, R>(input: {
       capabilityScope: dependencies.value.capabilityScope,
     })
     const storageFailure = (cause: { readonly message: string }) =>
-      FrameworkFailure.make({ stage: "handler", tool: input.tool.name, message: cause.message })
+      FrameworkFailure.make({ stage: "handler", tool: String(input.tool.name), message: cause.message })
     const cached = yield* store.value.get(key).pipe(Effect.mapError(storageFailure))
     if (Option.isSome(cached)) {
       const decoded = Schema.decodeUnknownOption(Outcome)(cached.value.value)
@@ -71,12 +71,14 @@ export const memoize = <E, R>(input: {
     }
     const outcome = yield* input.execute
     if (outcome._tag === "Success") {
-      yield* store.value.put(key, {
-        value: outcome,
-        fromRun: input.run,
-        fromOperation: input.operation,
-        expiresAtMillis: yield* expiresAt(configured.value.ttl),
-      }).pipe(Effect.mapError(storageFailure))
+      yield* store.value
+        .put(key, {
+          value: outcome,
+          fromRun: input.run,
+          fromOperation: input.operation,
+          expiresAtMillis: yield* expiresAt(configured.value.ttl),
+        })
+        .pipe(Effect.mapError(storageFailure))
     }
     return outcome
   })

@@ -140,7 +140,9 @@ layer(objectLayer)("Runtime operator legality", (test) => {
         prompt: "remain resumable",
       })
 
-      const wake = yield* runtime.operator.wake(receipt.runId, "operator:test").pipe(Effect.flip)
+      const wake = yield* runtime.operator
+        .wake(receipt.runId, "operator:test", "operator-illegal:wake")
+        .pipe(Effect.flip)
       expect(wake).toMatchObject({
         _tag: "generalist/runtime/IllegalOperatorAction",
         runId: receipt.runId,
@@ -148,7 +150,7 @@ layer(objectLayer)("Runtime operator legality", (test) => {
         action: "wake",
       })
       const extend = yield* runtime.operator
-        .extendBudget(receipt.runId, { tokens: 1 }, "operator:test")
+        .extendBudget(receipt.runId, { tokens: 1 }, "operator:test", "operator-illegal:budget")
         .pipe(Effect.flip)
       expect(extend).toMatchObject({
         _tag: "generalist/runtime/IllegalOperatorAction",

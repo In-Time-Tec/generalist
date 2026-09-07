@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [memory](../index) / SemanticRecall
+[generalist](../../index.md) / [memory](../index.md) / SemanticRecall
 
 # SemanticRecall
 
@@ -32,7 +32,7 @@
 
 ### layer
 
-> `const` **layer**: (`options?`) => `Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `never`, [`VectorStore`](./VectorStore#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
+> `const` **layer**: (`options?`) => `Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory), `never`, [`VectorStore`](./VectorStore.md#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
 
 #### Parameters
 
@@ -42,7 +42,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory#memory), `never`, [`VectorStore`](./VectorStore#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
+`Layer.Layer`\<[`Memory`](../../generalist/namespaces/Memory.md#memory), `never`, [`VectorStore`](./VectorStore.md#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
 
 ***
 
@@ -50,7 +50,7 @@
 
 ### make
 
-> `const` **make**: (`options?`) => `Effect.Effect`\<[`Service`](../../generalist/namespaces/Memory#service), `never`, [`VectorStore`](./VectorStore#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
+> `const` **make**: (`options?`) => `Effect.Effect`\<[`Service`](../../generalist/namespaces/Memory.md#service), `never`, [`VectorStore`](./VectorStore.md#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
 
 #### Parameters
 
@@ -60,4 +60,4 @@
 
 #### Returns
 
-`Effect.Effect`\<[`Service`](../../generalist/namespaces/Memory#service), `never`, [`VectorStore`](./VectorStore#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>
+`Effect.Effect`\<[`Service`](../../generalist/namespaces/Memory.md#service), `never`, [`VectorStore`](./VectorStore.md#vectorstore) \| `EmbeddingModel.EmbeddingModel`\>

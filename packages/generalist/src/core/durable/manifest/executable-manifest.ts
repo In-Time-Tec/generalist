@@ -2,7 +2,7 @@ import { Effect, Function, Schema } from "effect"
 import type { ParseOptions } from "effect/SchemaAST"
 import { AgentManifest, make as makeManifest, type PinnedAgent } from "./agent-manifest.js"
 import { ProgramManifest, make as makeProgramManifest, type PinnedProgram } from "./program-manifest.js"
-import { makeExecutable } from "../pin-internal.js"
+import { makeExecutable } from "./pin-internal.js"
 import { AgentPin, ExecutablePin, ProgramPin, makeCapability, makeModel } from "../pin.js"
 
 const compareText = (left: string, right: string): number => {

@@ -114,7 +114,10 @@ void cursor
 void serverClient
 void Server.api
 void Server.layer
-void Server.authBearer(Config.redacted("TOKEN"))
+void Server.authBearer({
+  token: Config.redacted("TOKEN"),
+  principal: { id: "package-smoke", tenantId: "package-smoke", role: "controller" },
+})
 void Server.eventCodec
 const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
 void reasoning

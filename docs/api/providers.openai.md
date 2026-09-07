@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.openai
+[generalist](./index.md) / providers.openai
 
 # providers.openai
 
@@ -234,13 +234,13 @@
 
 #### Extended by
 
-- [`Options`](./providers.amazon-bedrock#options)
-- [`Options`](./providers.anthropic#options)
-- [`Options`](./providers.deterministic#options)
+- [`Options`](./providers.amazon-bedrock.md#options)
+- [`Options`](./providers.anthropic.md#options)
+- [`Options`](./providers.deterministic.md#options)
 - [`Options`](#options)
-- [`Options`](./providers.openai-chat-completions#options)
-- [`Options`](./providers.openai-responses#options)
-- [`Options`](./providers.openrouter#options)
+- [`Options`](./providers.openai-chat-completions.md#options)
+- [`Options`](./providers.openai-responses.md#options)
+- [`Options`](./providers.openrouter.md#options)
 
 #### Properties
 
@@ -274,7 +274,7 @@
 
 ### classifyFailure
 
-> `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `const` **classifyFailure**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 ***
 
@@ -300,7 +300,7 @@
 
 ### layer
 
-> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -310,7 +310,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -356,7 +356,7 @@ Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`.
 
 ### layerOrDeterministic
 
-> `const` **layerOrDeterministic**: (`options`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layerOrDeterministic**: (`options`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 Selects OpenAI when its configured API key is present, otherwise the deterministic model.
 
@@ -368,7 +368,7 @@ Selects OpenAI when its configured API key is present, otherwise the determinist
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -394,7 +394,7 @@ Selects OpenAI when its configured API key is present, otherwise the determinist
 
 ### registration
 
-> `const` **registration**: (`input`) => `Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry#registration-1), `never`, `OpenAIClient.OpenAiClient`\>
+> `const` **registration**: (`input`) => `Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1), `never`, `OpenAIClient.OpenAiClient`\>
 
 Bare registration effect; the consumer provides the OpenAI client (see layerConfig).
 
@@ -406,7 +406,7 @@ Bare registration effect; the consumer provides the OpenAI client (see layerConf
 
 #### Returns
 
-`Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry#registration-1), `never`, `OpenAIClient.OpenAiClient`\>
+`Effect.Effect`\<[`Registration`](./generalist/namespaces/ModelRegistry.md#registration-1), `never`, `OpenAIClient.OpenAiClient`\>
 
 ***
 
@@ -414,4 +414,4 @@ Bare registration effect; the consumer provides the OpenAI client (see layerConf
 
 ### toolJsonSchemaCompiler
 
-> `const` **toolJsonSchemaCompiler**: [`ToolJsonSchemaCompiler`](./generalist/namespaces/ModelRegistry#tooljsonschemacompiler-1)
+> `const` **toolJsonSchemaCompiler**: [`ToolJsonSchemaCompiler`](./generalist/namespaces/ModelRegistry.md#tooljsonschemacompiler-1)

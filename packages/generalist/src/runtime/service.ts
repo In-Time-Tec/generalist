@@ -371,7 +371,8 @@ export type SendError =
   | ExecutableRegistrationConflict
   | ExecutableRegistrationMissing
   | TreePolicyInvalid
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
 export type StartExecutionError =
   | ChildDepthExceeded
   | ChildLimitExceeded
@@ -388,7 +389,8 @@ export type StartExecutionError =
   | FanOutInvalid
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
   | import("../core/durable/run-budget.js").Exhausted
 /** Typed Agent start failures before a Run handle exists. */
 export type StartError = StartExecutionError | UnknownAgent | AgentError
@@ -403,7 +405,8 @@ export type SpawnError =
   | RunTerminal
   | ChildSelectionMissing
   | IdempotencyConflict
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
   | ChildDepthExceeded
   | ChildLimitExceeded
   | import("../core/durable/run-budget.js").Exhausted
@@ -421,11 +424,18 @@ export type SendMessageError =
   | BudgetExhausted
   | CursorExpired
   | import("../core/turn/steering.js").InboxFull
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
 export type DirectoryError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable | DurabilityFailure
-export type EventsError = RunNotFound | CursorExpired | HistoryLimitInvalid | SubscriberLagged | RuntimeUnavailable | DurabilityFailure
+export type EventsError =
+  | RunNotFound
+  | CursorExpired
+  | HistoryLimitInvalid
+  | SubscriberLagged
+  | RuntimeUnavailable
+  | DurabilityFailure
 /** Durable host acknowledgement failures. */
 export type AckError = RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable | DurabilityFailure
 export type TreeReplayError =
@@ -435,10 +445,22 @@ export type TreeReplayError =
   | TreeCursorExpired
   | TreeCursorFuture
   | TreeReplayLimitInvalid
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
 export type TreeEventsError = TreeReplayError
-export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable | DurabilityFailure
-export type RespondApprovalError = RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable | DurabilityFailure
+export type RespondError =
+  | RunNotFound
+  | WaitNotOpen
+  | ResponseConflict
+  | RunTerminal
+  | RuntimeUnavailable
+  | DurabilityFailure
+export type RespondApprovalError =
+  | RunNotFound
+  | ApprovalStale
+  | ApprovalMismatch
+  | RuntimeUnavailable
+  | DurabilityFailure
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure
 export type CancelError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type RunSendError =
@@ -453,7 +475,8 @@ export type RunSendError =
   | BudgetExhausted
   | CursorExpired
   | import("../core/turn/steering.js").InboxFull
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
 
 export interface SendFunction {
   (
@@ -465,8 +488,23 @@ export interface SendFunction {
 }
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable | DurabilityFailure
 export type InspectError = RunNotFound | RuntimeUnavailable | DurabilityFailure
-export type ForkError = RunNotFound | ForkSequenceInvalid | NoSnapshot | SubstitutionInvalid | BudgetInvalid | BudgetExhausted | RuntimeUnavailable | DurabilityFailure
-export type RewindError = RunNotFound | ForkSequenceInvalid | NoSnapshot | BudgetInvalid | BudgetExhausted | RuntimeUnavailable | DurabilityFailure
+export type ForkError =
+  | RunNotFound
+  | ForkSequenceInvalid
+  | NoSnapshot
+  | SubstitutionInvalid
+  | BudgetInvalid
+  | BudgetExhausted
+  | RuntimeUnavailable
+  | DurabilityFailure
+export type RewindError =
+  | RunNotFound
+  | ForkSequenceInvalid
+  | NoSnapshot
+  | BudgetInvalid
+  | BudgetExhausted
+  | RuntimeUnavailable
+  | DurabilityFailure
 export type ExtendBudgetError = InspectError | BudgetInvalid
 export type OperatorActionError = InspectError | IllegalOperatorAction
 export type OperatorApprovalError = ResolveDurableApprovalError | IllegalOperatorAction
@@ -483,7 +521,8 @@ export type FanOutError =
   | FanOutInvalid
   | FanOutRemainderUnsupported
   | ChildSelectionMissing
-  | RuntimeUnavailable | DurabilityFailure
+  | RuntimeUnavailable
+  | DurabilityFailure
   | import("../core/durable/run-budget.js").Exhausted
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable | DurabilityFailure
 export type AwaitFanOutError = InspectFanOutError | EventsError
@@ -588,19 +627,28 @@ export interface Service extends RuntimeHostSessions {
   readonly treeChanges: (rootRunId: string) => Stream.Stream<void, TreeEventsError>
   /** Atomically pair a point-in-time tree inspection with its exclusive replay cursor. */
   readonly treeCheckpoint: (rootRunId: string) => Effect.Effect<import("./tree.js").Checkpoint, InspectError>
-  readonly list: (input: ListInput) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable | DurabilityFailure>
+  readonly list: (
+    input: ListInput,
+  ) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable | DurabilityFailure>
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   /** Journal one validated environmental event and resume one matching wait at most once. */
-  readonly wake: (runId: string, event: WakeEvent) => Effect.Effect<WakeDisposition, WakeError>
+  readonly wake: (
+    input: CommandIdentity & {
+      readonly runId: string
+      readonly event: WakeEvent
+    },
+  ) => Effect.Effect<WakeDisposition, WakeError>
   /** Durably admit cancellation and request interruption from a process-local owner.
    * Successful return does not acknowledge terminal cancellation. Observe Run state or events when
    * the caller must know whether owned work exited and external outcomes became definitive.
    */
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly cancelSession: (input: CancelSessionInput) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
-  readonly awaitSessionTerminal: (input: AwaitSessionTerminalInput) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
+  readonly awaitSessionTerminal: (
+    input: AwaitSessionTerminalInput,
+  ) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
   /**
    * Send one addressed message into the target's durable inbox.
    *
@@ -633,7 +681,9 @@ export interface Service extends RuntimeHostSessions {
   /** Continue this Run from an earlier prefix while retaining its old suffix as a branch. */
   readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   /** Primitive used by the operator API to journal a budget top-up and resume budget suspension. */
-  readonly extendBudget: (input: CommandIdentity & { readonly runId: string; readonly delta: BudgetDelta }) => Effect.Effect<void, ExtendBudgetError>
+  readonly extendBudget: (
+    input: CommandIdentity & { readonly runId: string; readonly delta: BudgetDelta },
+  ) => Effect.Effect<void, ExtendBudgetError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, InspectFanOutError>
   readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>

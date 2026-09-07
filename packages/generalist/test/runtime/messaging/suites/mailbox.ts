@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Errors } from "../../../../src/runtime/index.js"
 import { completedResult, textPrompt } from "../../execution/fixtures.js"
+import { objectWorkerId } from "../../execution/object.js"
 import { messagingBackend, type MessagingBackend } from "../scenario.js"
 
 export const messagingMailboxSuite = <StoreError, Extra = never>(backend: MessagingBackend<StoreError, Extra>) => {
@@ -26,9 +27,7 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
         const replay = yield* send()
 
         expect(initial.duplicate).toBe(false)
-        expect(replay.duplicate).toBe(true)
-        expect(replay.entryId).toBe(initial.entryId)
-        expect(replay.sequence).toBe(initial.sequence)
+        expect(replay).toEqual(initial)
         expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toHaveLength(1)
       }).pipe(provide()),
     )
@@ -161,9 +160,15 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
       Effect.gen(function* () {
         const { runtime, store, parent, first } = yield* familyFor(session("terminal"))
         const claim = yield* store.claimExecution({
-          commandId: "runtime-messaging-suites-mailbox-ts-claim-1", runId: first.runId, ownerId: "terminal-test" })
+          commandId: "runtime-messaging-suites-mailbox-ts-claim-1",
+          runId: first.runId,
+          ownerId: objectWorkerId,
+        })
         yield* store.complete({
-          commandId: "runtime-messaging-suites-mailbox-ts-complete-1", ...claim, result: completedResult("done") })
+          commandId: "runtime-messaging-suites-mailbox-ts-complete-1",
+          ...claim,
+          result: completedResult("done"),
+        })
 
         const error = yield* runtime
           .sendMessage({

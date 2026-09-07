@@ -1,8 +1,8 @@
-[**generalist**](../../index)
+[**generalist**](../../index.md)
 
 ***
 
-[generalist](../../index) / [repl](../index) / CellTool
+[generalist](../../index.md) / [repl](../index.md) / CellTool
 
 # CellTool
 
@@ -22,7 +22,7 @@ The cell source parameter.
 
 ### layer
 
-> `const` **layer**: `Layer.Layer`\<[`ToolExecutor`](../../generalist/namespaces/ToolExecutor#toolexecutor), `never`, [`SandboxProvider`](../../sandbox#sandboxprovider)\>
+> `const` **layer**: `Layer.Layer`\<[`ToolExecutor`](../../generalist/namespaces/ToolExecutor.md#toolexecutor), `never`, [`SandboxProvider`](../../sandbox.md#sandboxprovider)\>
 
 ***
 
@@ -70,7 +70,7 @@ The cell source parameter.
 
 ### route
 
-> `const` **route**: [`Route`](../../generalist/namespaces/ToolPlacement#route)\<[`ToolContext`](../../generalist/namespaces/ToolContext#toolcontext) \| [`SandboxProvider`](../../sandbox#sandboxprovider)\>
+> `const` **route**: [`Route`](../../generalist/namespaces/ToolPlacement.md#route)\<[`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext) \| [`SandboxProvider`](../../sandbox.md#sandboxprovider)\>
 
 The cell route: one tool, ToolContext progress and interruption, typed cell outcomes.
 
@@ -100,7 +100,7 @@ A durable marker recording that cell state cannot be restored.
 
 ### scheduling
 
-> `const` **scheduling**: [`ToolSchedulingPolicy`](../../generalist/namespaces/Agent#toolschedulingpolicy)
+> `const` **scheduling**: [`ToolSchedulingPolicy`](../../generalist/namespaces/Agent.md#toolschedulingpolicy)
 
 One shared namespace means one cell at a time: the cell tool is never parallel-safe
 and every call is an authored-order exclusive barrier.
@@ -111,7 +111,7 @@ and every call is an authored-order exclusive barrier.
 
 ### tool
 
-> `const` **tool**: `Tool.Tool`\<`"typescript"`, \{ `failure`: `Schema.Union`\<readonly \[[`CellExecutionFailed`](./Cell#cellexecutionfailed), *typeof* [`KernelUnavailable`](./Cell#kernelunavailable), *typeof* [`KernelProtocolViolation`](./Cell#kernelprotocolviolation), [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\]\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `code`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `cellId`: `Schema.String`; `durationMillis`: `Schema.Int`; `epoch`: `Schema.Int`; `sequence`: `Schema.Int`; `stderr`: `Schema.String`; `stdout`: `Schema.String`; `value`: `Schema.String`; \}\>; \}, `never`\>
+> `const` **tool**: `Tool.Tool`\<`"typescript"`, \{ `failure`: `Schema.Union`\<readonly \[[`CellExecutionFailed`](./Cell.md#cellexecutionfailed), *typeof* [`KernelUnavailable`](./Cell.md#kernelunavailable), *typeof* [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation), [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\]\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `code`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `cellId`: `Schema.String`; `durationMillis`: `Schema.Int`; `epoch`: `Schema.Int`; `sequence`: `Schema.Int`; `stderr`: `Schema.String`; `stdout`: `Schema.String`; `value`: `Schema.String`; \}\>; \}, `never`\>
 
 The one Effect AI tool a conversational Generalist agent advertises.
 
@@ -121,4 +121,4 @@ The one Effect AI tool a conversational Generalist agent advertises.
 
 ### toolkit
 
-> `const` **toolkit**: `Toolkit.Toolkit`\<\{ `typescript`: `Tool.Tool`\<`"typescript"`, \{ `failure`: `Schema.Union`\<readonly \[[`CellExecutionFailed`](./Cell#cellexecutionfailed), *typeof* [`KernelUnavailable`](./Cell#kernelunavailable), *typeof* [`KernelProtocolViolation`](./Cell#kernelprotocolviolation), [`CellOutcomeUnknown`](./Cell#celloutcomeunknown)\]\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `code`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `cellId`: `Schema.String`; `durationMillis`: `Schema.Int`; `epoch`: `Schema.Int`; `sequence`: `Schema.Int`; `stderr`: `Schema.String`; `stdout`: `Schema.String`; `value`: `Schema.String`; \}\>; \}, `never`\>; \}\>
+> `const` **toolkit**: `Toolkit.Toolkit`\<\{ `typescript`: `Tool.Tool`\<`"typescript"`, \{ `failure`: `Schema.Union`\<readonly \[[`CellExecutionFailed`](./Cell.md#cellexecutionfailed), *typeof* [`KernelUnavailable`](./Cell.md#kernelunavailable), *typeof* [`KernelProtocolViolation`](./Cell.md#kernelprotocolviolation), [`CellOutcomeUnknown`](./Cell.md#celloutcomeunknown)\]\>; `failureMode`: `"return"`; `parameters`: `Schema.Struct`\<\{ `code`: `Schema.String`; \}\>; `success`: `Schema.Struct`\<\{ `cellId`: `Schema.String`; `durationMillis`: `Schema.Int`; `epoch`: `Schema.Int`; `sequence`: `Schema.Int`; `stderr`: `Schema.String`; `stdout`: `Schema.String`; `value`: `Schema.String`; \}\>; \}, `never`\>; \}\>

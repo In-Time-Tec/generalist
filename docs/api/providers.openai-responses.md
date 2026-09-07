@@ -1,8 +1,8 @@
-[**generalist**](./index)
+[**generalist**](./index.md)
 
 ***
 
-[generalist](./index) / providers.openai-responses
+[generalist](./index.md) / providers.openai-responses
 
 # providers.openai-responses
 
@@ -34,7 +34,7 @@
 
 ##### classifyFailure?
 
-> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 ###### Inherited from
 
@@ -108,7 +108,7 @@
 
 #### Extends
 
-- [`RegistrationOptions`](./providers.openai#registrationoptions)
+- [`RegistrationOptions`](./providers.openai.md#registrationoptions)
 
 #### Extended by
 
@@ -120,7 +120,7 @@
 
 ##### classifyFailure?
 
-> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry#failureclassifier)
+> `readonly` `optional` **classifyFailure?**: [`FailureClassifier`](./generalist/namespaces/ModelRegistry.md#failureclassifier)
 
 <a id="config-1"></a>
 
@@ -140,7 +140,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`metadata`](./providers.openai#metadata-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`metadata`](./providers.openai.md#metadata-3)
 
 <a id="model-1"></a>
 
@@ -162,7 +162,7 @@
 
 ###### Inherited from
 
-[`RegistrationOptions`](./providers.openai#registrationoptions).[`registrationKey`](./providers.openai#registrationkey-3)
+[`RegistrationOptions`](./providers.openai.md#registrationoptions).[`registrationKey`](./providers.openai.md#registrationkey-3)
 
 ## Variables
 
@@ -170,7 +170,7 @@
 
 ### layer
 
-> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+> `const` **layer**: (`input`) => `Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 #### Parameters
 
@@ -180,7 +180,7 @@
 
 #### Returns
 
-`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
+`Layer.Layer`\<[`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry), `Config.ConfigError`, `HttpClient.HttpClient`\>
 
 ***
 
@@ -208,7 +208,7 @@ Model layer over `OpenAiClient`; provide it to a run with `Effect.provide`.
 
 ### decodeConfig
 
-Re-exports [decodeConfig](./providers.openai#decodeconfig)
+Re-exports [decodeConfig](./providers.openai.md#decodeconfig)
 
 ***
 
@@ -216,7 +216,7 @@ Re-exports [decodeConfig](./providers.openai#decodeconfig)
 
 ### layerConfig
 
-Re-exports [layerConfig](./providers.openai#layerconfig)
+Re-exports [layerConfig](./providers.openai.md#layerconfig)
 
 ***
 
@@ -224,4 +224,4 @@ Re-exports [layerConfig](./providers.openai#layerconfig)
 
 ### toolJsonSchemaCompiler
 
-Re-exports [toolJsonSchemaCompiler](./providers.openai#tooljsonschemacompiler)
+Re-exports [toolJsonSchemaCompiler](./providers.openai.md#tooljsonschemacompiler)

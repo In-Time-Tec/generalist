@@ -1,4 +1,4 @@
-import { Console, Effect, ManagedRuntime } from "effect"
+import { Console, Effect } from "effect"
 import { Session } from "generalist"
 import { Prompt } from "effect/unstable/ai"
 
@@ -13,11 +13,15 @@ const assistant = (text: string): Prompt.Message =>
 const program = Effect.scoped(
   Effect.gen(function* () {
     const store = yield* Session.acquire("travel-planner")
-    yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })))
-    yield* store.append(message(user("Plan a trip to Boise.")))
-    yield* store.append(message(assistant("Three days in Boise, starting downtown.")))
-    const kept = yield* store.append(message(user("Add a rafting day.")))
-    const checkpointId = yield* store.reserveEntryId
+    yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })), {
+      commandId: "travel-planner:system:1",
+    })
+    yield* store.append(message(user("Plan a trip to Boise.")), { commandId: "travel-planner:question:1" })
+    yield* store.append(message(assistant("Three days in Boise, starting downtown.")), {
+      commandId: "travel-planner:answer:1",
+    })
+    const kept = yield* store.append(message(user("Add a rafting day.")), { commandId: "travel-planner:question:2" })
+    const checkpointId = yield* store.reserveEntryId("travel-planner:compact:1")
 
     const before = Session.buildContext(yield* store.path())
     yield* Console.log(`before: ${before.content.map((entry) => entry.role).join(" ")}`)
@@ -37,5 +41,4 @@ const program = Effect.scoped(
   }),
 )
 
-const runtime = ManagedRuntime.make(Session.layerMemory)
-await runtime.runPromise(program)
+await Effect.runPromise(program.pipe(Effect.provide(Session.layerMemory)))

@@ -3,6 +3,7 @@ import { Cause, Effect, Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import {
   Continue,
+  chainPin,
   Decision,
   HookFailed,
   Hooks,
@@ -23,13 +24,16 @@ import {
   type ToolResultInput,
   type TurnStartInput,
 } from "../../../hooks/index.js"
-import { DriverInterpreter } from "../../durable/driver/interpreter.js"
+import { DriverInterpreter, DriverUnknownReplay } from "../../durable/driver/interpreter.js"
+import { Exhausted } from "../../durable/run-budget.js"
+import { digest, type CapabilityPin } from "../../durable/pin.js"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../../durable/service.js"
 import type { RunId } from "../../durable/run-id.js"
 import type { Middleware } from "../../model/middleware.js"
 import { Suspended as NestedOperationSuspended } from "../../tools/nested-operation.js"
 import { AgentError } from "../event.js"
+import { encode as encodeHookInput } from "../../../hooks/input.js"
 
 /** Result of one complete ordered hook declaration chain. */
 export interface Result<Input> {
@@ -51,10 +55,14 @@ const hookFailure = (event: HookEvent, cause: Cause.Cause<unknown>): Effect.Effe
         }),
       )
 
-const invoke = <Input>(declaration: Declaration, input: Input): Effect.Effect<HookDecision, HookFailed> => {
+const invoke = <Input>(
+  declaration: Declaration,
+  input: Input,
+  operationKey: string,
+): Effect.Effect<HookDecision, HookFailed> => {
   // SAFETY: evaluate filters declarations by event, and each event helper supplies that declaration's exact input.
   const hook = declaration.hook as Hook<Input>
-  return Effect.suspend(() => hook(input)).pipe(
+  return Effect.suspend(() => hook(input, { operationKey })).pipe(
     Effect.catchCause((cause) => hookFailure(declaration.event, cause)),
     Effect.flatMap((decision) =>
       decision === undefined
@@ -97,41 +105,79 @@ const apply = <Input>(
 }
 
 const loadRecorded = (
-  interpreter: Option.Option<typeof DriverInterpreter.Service>,
+  interpreter: typeof DriverInterpreter.Service,
   key: string,
   event: HookEvent,
-): Effect.Effect<Option.Option<HookCheckpoint>, DriverStateInvalid> => {
-  if (Option.isNone(interpreter)) return Effect.succeed(Option.none())
-  return Effect.gen(function* () {
-    const checkpoint = yield* interpreter.value.checkpoint
+  chain: CapabilityPin,
+): Effect.Effect<
+  { readonly recorded: HookCheckpoint | undefined; readonly logicalOperationId: string; readonly initialized: boolean },
+  DriverStateInvalid
+> =>
+  Effect.gen(function* () {
+    const checkpoint = yield* interpreter.checkpoint
     const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state).pipe(
       Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
     )
     const recorded = state.hooks?.find((entry) => entry.key === key)
+    if (state.hooks?.some((entry) => entry.chain !== chain) === true) {
+      return yield* DriverStateInvalid.make({ message: "Registered hook chain does not match the checkpoint" })
+    }
     if (recorded !== undefined && recorded.event !== event) {
       return yield* DriverStateInvalid.make({
         message: `Hook checkpoint ${key} changed from ${recorded.event} to ${event}`,
       })
     }
-    return Option.fromNullishOr(recorded)
+    return { recorded, logicalOperationId: state.logicalOperationId, initialized: (state.hooks?.length ?? 0) > 0 }
   })
-}
+
+const prepare = (options: {
+  readonly key: string
+  readonly event: HookEvent
+  readonly input: { readonly runId: string }
+}) =>
+  Effect.gen(function* () {
+    const interpreter = yield* Effect.serviceOption(DriverInterpreter)
+    const service = yield* Effect.serviceOption(Hooks)
+    const allDeclarations = Option.isSome(service) ? service.value.declarations : []
+    const chain = yield* Effect.try({
+      try: () => chainPin(allDeclarations),
+      catch: () => DriverStateInvalid.make({ message: "Invalid hook chain declaration" }),
+    })
+    const loaded = Option.isSome(interpreter)
+      ? yield* loadRecorded(interpreter.value, options.key, options.event, chain)
+      : { recorded: undefined, logicalOperationId: options.input.runId, initialized: false }
+    const recorded = loaded.recorded
+    const declarations = allDeclarations.filter((declaration) => declaration.event === options.event)
+    if (Option.isSome(interpreter) && recorded === undefined && (declarations.length > 0 || !loaded.initialized)) {
+      yield* interpreter.value.recordHookDecisions({
+        chain,
+        key: options.key,
+        event: options.event,
+        decisions: [],
+        complete: declarations.length === 0,
+      })
+    }
+    return { interpreter, chain, recorded, declarations, logicalOperationId: loaded.logicalOperationId }
+  })
 
 /** Run or replay one keyed hook chain through the current durable checkpoint. */
-export const evaluate = <Input>(options: {
+export const evaluate = <
+  Input extends { readonly runId: string },
+  S extends Schema.Top = typeof Schema.Unknown,
+>(options: {
   readonly key: string
   readonly event: HookEvent
   readonly input: Input
   readonly applyDecision: ApplyDecision<Input>
-}): Effect.Effect<Result<Input>, HookFailed | DriverError | DriverStateInvalid> =>
+  readonly outputSchema?: S
+}): Effect.Effect<
+  Result<Input>,
+  HookFailed | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+  S["EncodingServices"]
+> =>
   Effect.gen(function* () {
-    const interpreter = yield* Effect.serviceOption(DriverInterpreter)
-    const recorded = Option.getOrUndefined(yield* loadRecorded(interpreter, options.key, options.event))
+    const { interpreter, chain, recorded, declarations, logicalOperationId } = yield* prepare(options)
     if (recorded?.complete === true) return apply(options.input, recorded.decisions, options.applyDecision)
-    const service = yield* Effect.serviceOption(Hooks)
-    const declarations = Option.isSome(service)
-      ? service.value.declarations.filter((declaration) => declaration.event === options.event)
-      : []
     const decisions = [...(recorded?.decisions ?? [])]
     if (declarations.length === 0) return apply(options.input, decisions, options.applyDecision)
     if (decisions.length > declarations.length) {
@@ -142,14 +188,40 @@ export const evaluate = <Input>(options: {
     let current = apply(options.input, decisions, options.applyDecision).input
     for (let index = decisions.length; index < declarations.length; index += 1) {
       const declaration = declarations[index]!
-      const decision = yield* invoke(declaration, current)
+      const operationKey = `${logicalOperationId}:hook:${digest({ checkpoint: options.key, index, declaration: declaration.key })}`
+      const operationInput = yield* encodeHookInput<S>({
+        event: options.event,
+        value: current,
+        outputSchema: options.outputSchema,
+      })
+      const effect = invoke(declaration, current, operationKey)
+      const decision = yield* Option.isSome(interpreter)
+        ? interpreter.value.run(
+            {
+              kind: "hook",
+              key: operationKey,
+              input: {
+                chain,
+                event: options.event,
+                key: declaration.key,
+                version: declaration.version,
+                input: operationInput,
+              },
+              replayPolicy: declaration.replayPolicy,
+              success: Decision,
+              failure: HookFailed,
+            },
+            effect,
+          )
+        : effect
       decisions.push(decision)
       current = options.applyDecision(current, decision)
       if (Option.isSome(interpreter)) {
         const checkpoint = yield* interpreter.value.recordHookDecisions({
+          chain,
           key: options.key,
           event: options.event,
-          decisions,
+          decisions: [...decisions],
           complete: decision._tag === "Block" || index === declarations.length - 1,
         })
         if (checkpoint.decisions.length !== decisions.length) {
@@ -186,13 +258,7 @@ export const modelCallMiddleware = (runId: RunId): Middleware => ({
         })
       }
       return result.input.prompt
-    }).pipe(
-      Effect.mapError((error) =>
-        Schema.is(DriverError)(error) || Schema.is(DriverStateInvalid)(error)
-          ? AgentError.make({ message: error.message, turn: context.turn, cause: error })
-          : error,
-      ),
-    ),
+    }),
 })
 
 /** @internal Apply RunStart hooks to the initial prompt. */
@@ -369,11 +435,15 @@ export const runStartWithSteering = (options: {
 }
 
 /** @internal Apply RunEnd hooks before the terminal Completed event is exposed. */
-export const runEnd = <Output>(input: RunEndInput<Output>) =>
-  evaluate<RunEndInput<Output>>({
+export const runEnd = <Output, S extends Schema.Top>(options: {
+  readonly input: RunEndInput<Output>
+  readonly outputSchema: S
+}) =>
+  evaluate<RunEndInput<Output>, S>({
     key: "hook:run:end",
     event: "RunEnd",
-    input,
+    input: options.input,
+    outputSchema: options.outputSchema,
     applyDecision: (current, decision) =>
       decision._tag === "Replace" ? { ...current, output: replacementOutput<Output>(decision.value) } : current,
   }).pipe(
@@ -382,7 +452,7 @@ export const runEnd = <Output>(input: RunEndInput<Output>) =>
         ? Effect.succeed(result.input)
         : AgentError.make({
             message: `RunEnd hook blocked completion: ${result.blocked}`,
-            turn: Math.max(0, input.turns - 1),
+            turn: Math.max(0, options.input.turns - 1),
           }),
     ),
     Effect.catchTag("generalist/core/HookFailed", (error) =>
