@@ -8,6 +8,12 @@
 - Add conditional immutable commits, input-bound receipts, indeterminate-write reconciliation, and ownership fencing. Retain committed slots even after snapshots; automatic live-history deletion is not supported. Document provider-contract requirements, namespace isolation, conservative backup/restore, and explicit external-operation uncertainty.
 - Migrate hosted examples and tutorials to explicit S3/R2 configuration. All public exports remain `@experimental`; no real-provider performance or deployed recovery certification is implied by this cutover.
 
+## 0.63.0
+
+- Add `layerActorRuntime(context, options)` and `ActorRuntime` to `generalist/unstable/rivet` for application-owned Rivet actors. A custom actor can initialize product tables, compose a product activation projection into the same `Runtime.send` transaction as Generalist's durable activation projection, run typed actions through one wake-scoped `ManagedRuntime`, and dispose it on sleep or destroy. Startup and periodic recovery use that same projection and SQLite authority; `makeRuntimeActor` now delegates to the same Layer. Pin the raw RivetKit SDK to `2.3.15`; `@rivetkit/effect` is not used.
+- Construct actor executable resolvers from the activation's actual SQL, RunStore, ExternalChildStore and owner. Add product reconciliation, a separate admission gate, and RunExecutor decoration without duplicating Runtime authority. Initialization and projection callbacks now receive `{ sql, ownerId }`.
+- Support nested actor SQLite savepoints, including three-level nesting and isolated concurrent sibling rollback. Wait for rollback and in-flight statements before interruption completes.
+
 ## 0.62.0
 
 - Preserve fork/rewind operation identity and branch-local response bytes, authenticate source response digests before copying, and support nested-fork continuation after reopening storage. SQL schema authority advances to 11; incompatible older stores are refused, not automatically migrated.
