@@ -1,9 +1,11 @@
 ---
 title: "How to build a chat UI with FoldKit"
-description: "Embed the headless Chat submodel in a FoldKit application, observe semantic RunEvents, and render committed entries, run state, and approvals."
+description: "Restore a committed Session conversation, follow live updates, and render entries, run state, and approvals with the headless Chat submodel."
 ---
 
-`generalist/unstable/foldkit` adapts transport frames into FoldKit's Elm architecture. `Connection.Connection` is a long-lived resource that observes decoded durable RunEvent frames and connection facts; `Chat` is a headless submodel with a pure `update` that projects those frames into display state. It ships no styled components; rendering stays yours.
+`generalist/unstable/foldkit` adapts committed Session snapshots and `HostEvent` frames into FoldKit's Elm architecture. `Connection.Connection` owns snapshot-first observation and connection facts; `Chat` is a headless submodel with a pure `update` that restores and updates display state. It ships no styled components; rendering stays yours.
+
+The snapshot's bounded `conversation` restores user messages, tool calls/results, and assistant text from the active Session path, with original entry IDs and leaf identity. Live Conversation updates share the Run lifecycle cursor and replace the suffix after their retained-prefix anchor. This also handles rewinds and branch changes. A stale leaf or missing anchor triggers snapshot resynchronization; old connection epochs cannot overwrite the restored view. Internal instruction, memory, and skill bodies are omitted. An oversized snapshot fails explicitly instead of showing a truncated conversation; see the [current limits](/features/server#snapshot-limits).
 
 **Terminal**
 

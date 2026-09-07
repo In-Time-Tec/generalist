@@ -139,7 +139,24 @@ export const equalBytes = Function.dual<
   (left: Uint8Array, right: Uint8Array) => boolean
 >(2, (left: Uint8Array, right: Uint8Array): boolean => {
   if (left.length !== right.length) return false
-  for (let index = 0; index < left.length; index++) {
+  let index = 0
+  if (left.length >= 4 && left.byteOffset % 4 === 0 && right.byteOffset % 4 === 0) {
+    const length = Math.floor(left.length / 4)
+    const leftWords = new Uint32Array(left.buffer, left.byteOffset, length)
+    const rightWords = new Uint32Array(right.buffer, right.byteOffset, length)
+    for (let word = 0; word < length; word++) {
+      if (leftWords[word] !== rightWords[word]) return false
+    }
+    index = length * 4
+  } else if (left.length >= 4) {
+    const leftWords = new DataView(left.buffer, left.byteOffset, left.byteLength)
+    const rightWords = new DataView(right.buffer, right.byteOffset, right.byteLength)
+    const end = left.length - (left.length % 4)
+    for (; index < end; index += 4) {
+      if (leftWords.getUint32(index) !== rightWords.getUint32(index)) return false
+    }
+  }
+  for (; index < left.length; index++) {
     if (left[index] !== right[index]) return false
   }
   return true

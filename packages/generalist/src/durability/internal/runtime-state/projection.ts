@@ -5,7 +5,6 @@ import { fields as stateFields, type CanonicalState } from "./schema.js"
 import { make as makeTable } from "./table.js"
 import { normalize, restore, Value } from "./value.js"
 
-const Envelope = Schema.Struct({ version: Schema.Literal(1), data: Value })
 const strict = { onExcessProperty: "error" } as const
 type Diff = (previous: State, next: State) => ReadonlyArray<Patch>
 const object = (value: Schema.Json): value is State => Predicate.isObject(value) && !Array.isArray(value)
@@ -23,6 +22,10 @@ export const make = ({ originals, diff }: { readonly originals: WeakMap<object, 
   })
   const schema: Schema.Codec<CanonicalState, unknown> = Schema.Struct(fields)
   const storedFields = Schema.Struct(Record.map(fields, () => Schema.Unknown))
+  const Envelope = Schema.Struct({
+    version: Schema.Literal(1),
+    data: Schema.Struct({ type: Schema.Literal("object"), fields: storedFields }),
+  })
   const tables = new Map(
     Object.entries(fields).flatMap(([key, field]) => {
       const table = metadata.get(field)
@@ -31,32 +34,31 @@ export const make = ({ originals, diff }: { readonly originals: WeakMap<object, 
   )
   let source: State | undefined
   let current: CanonicalState | undefined
-  let currentFields: Readonly<Record<string, Value>> | undefined
+  let currentFields: Readonly<Record<string, unknown>> | undefined
   let stagedSource: State | undefined
   let staged: CanonicalState | undefined
-  let stagedFields: Readonly<Record<string, Value>> | undefined
+  let stagedFields: Readonly<Record<string, unknown>> | undefined
   return {
     decode: (persisted: State) =>
       Effect.gen(function* () {
         if (persisted === source && isImmutable(persisted)) return current!
         const envelope = yield* Schema.decodeUnknownEffect(Envelope)(persisted, strict)
-        if (!Predicate.isObject(envelope.data) || envelope.data.type !== "object")
-          return yield* Effect.fail(new SchemaIssue.InvalidValue({ message: "Runtime state must be an object" }))
         let state: CanonicalState
         if (current === undefined) {
-          const decoded: Record<string, ReturnType<typeof restore> | Value> = {}
+          const decoded: Record<string, unknown> = {}
           for (const [key, value] of Object.entries(envelope.data.fields)) {
-            const item = tables.has(key) ? value : yield* Effect.try(() => restore(value))
+            const wire = tables.has(key) ? undefined : yield* Schema.decodeUnknownEffect(Value)(value, strict)
+            const item = tables.has(key) ? value : yield* Effect.try(() => restore(wire!))
             Object.defineProperty(decoded, key, { value: item, enumerable: true })
           }
           state = yield* Schema.decodeEffect(schema)(decoded, strict)
         } else {
-          yield* Schema.decodeUnknownEffect(storedFields)(envelope.data.fields, strict)
           state = { ...current }
           for (const key of Record.keys(fields)) {
             const value = envelope.data.fields[key]!
             if (Object.is(value, currentFields?.[key]) && (!Predicate.isObject(value) || isImmutable(value))) continue
-            const item = tables.has(key) ? value : yield* Effect.try(() => restore(value))
+            const wire = tables.has(key) ? undefined : yield* Schema.decodeUnknownEffect(Value)(value, strict)
+            const item = tables.has(key) ? value : yield* Effect.try(() => restore(wire!))
             Reflect.set(state, key, yield* Schema.decodeEffect(fields[key])(item, strict))
           }
         }

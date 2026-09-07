@@ -78,8 +78,8 @@ const verifyInbox = Effect.gen(function* () {
       { idempotencyKey: "steer:1" },
     )
     .pipe(Effect.flip)
-  expect(conflict).toBeInstanceOf(DurabilityFailure)
-  expect(conflict).toMatchObject({ reason: "input-conflict" })
+  expect(conflict).toBeInstanceOf(Errors.SteeringConflict)
+  expect(conflict).toMatchObject({ runId: receipt.runId, idempotencyKey: "steer:1" })
 
   const claim = yield* store.claimExecution({
     commandId: "runtime-run-steering-test-ts-claim-1",

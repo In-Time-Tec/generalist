@@ -1,12 +1,12 @@
 import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { type Entry, SessionStoreError } from "../../../core/context/session.js"
-import { promptFromResponseParts } from "../../../media/prompt.js"
-import { RuntimeUnavailable } from "../../errors.js"
-import { ConversationUpdate, type ConversationEntry } from "../../session/conversation.js"
-import { type HostSessionEvent, SessionSnapshotTooLarge } from "../../session/host.js"
-import { emptySession, type RuntimeSession, type RuntimeState } from "../projection.js"
-import { SessionReads } from "../session-reader.js"
+import { type Entry, SessionStoreError } from "../../../../core/context/session.js"
+import { promptFromResponseParts } from "../../../../media/prompt.js"
+import { RuntimeUnavailable } from "../../../errors.js"
+import { ConversationUpdate, type ConversationEntry } from "../../../session/conversation.js"
+import { type HostSessionEvent, SessionSnapshotTooLarge } from "../../../session/host.js"
+import { emptySession, type RuntimeSession, type RuntimeState } from "../../projection.js"
+import { SessionReads } from "../../session-reader.js"
 
 const visible = (entry: Entry): ConversationEntry | undefined => {
   let messages: ReadonlyArray<Prompt.Message>

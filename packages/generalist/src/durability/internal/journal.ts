@@ -1,5 +1,6 @@
 import { make as makeRecovery } from "./journal-recovery.js"
 import { make as makeStorage, transport, ownReceipt, type Loaded } from "./journal-storage.js"
+import { canonicalize } from "../../core/durable/canonical-json.js"
 import { Crypto, Effect, Result } from "effect"
 import { DurabilityFailure } from "../errors.js"
 import { ObjectStore, type ObjectStoreFailure } from "../object-store.js"
@@ -13,7 +14,6 @@ import {
   failure,
   freeze,
   nextSequence,
-  parse,
   sequenceName,
   type Json,
   type Patch,
@@ -203,7 +203,15 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
           const evaluated = yield* evaluate(loaded.head.state)
           const decoded = yield* decode(Transition, evaluated, "encoding")
           // Detach the reducer's output: later user mutation must not change attempted bytes or receipts.
-          const transition = yield* decode(Transition, yield* parse(yield* bytes(decoded)), "encoding")
+          const transition = yield* decode(
+            Transition,
+            yield* Effect.try({
+              try: () => canonicalize(decoded),
+              catch: (cause) =>
+                failure({ reason: "encoding", message: `Cannot detach canonical transition: ${String(cause)}` }),
+            }),
+            "encoding",
+          )
           freeze(transition)
           const state = yield* apply(loaded.head.state, transition.patches, "encoding")
           const sequence = nextSequence(loaded.head.sequence)

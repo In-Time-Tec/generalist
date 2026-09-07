@@ -23,7 +23,9 @@ bun add effect@4.0.0-rc.112 generalist
 
 ## Session events
 
-`client.events.subscribe({ sessionId, cursor? })` follows SSE. `client.events.connect({ sessionId, cursor? })` opens WebSocket. Both carry the same HostEvent and resume strictly after the last durable Session cursor. Last-Event-ID takes precedence over the SSE query cursor.
+`client.events.subscribe({ sessionId, cursor? })` follows SSE. `client.events.connect({ sessionId })` obtains a committed Session snapshot before opening WebSocket observation strictly after its cursor. Both transports carry the same HostEvent: Conversation updates share the durable Session cursor with Run-derived lifecycle events. Last-Event-ID takes precedence over the SSE query cursor.
+
+`client.sessions.snapshot({ sessionId })` returns the current version-1 metadata, Run projections, active-path `conversation: { leafId, entries }`, and exact cursor. The conversation preserves original entry and parent IDs and restores user/tool/assistant content, excluding internal instruction, memory, and skill bodies. Live updates describe retained-prefix/suffix replacement rather than append-only text. The [snapshot limits](/features/server#snapshot-limits) fail with `SessionSnapshotTooLarge`; responses are never silently truncated.
 
 Both routes resolve the Session before committing the response, so an unknown Session returns the typed `SessionNotFound` body with HTTP 404 instead of opening a stream. After SSE headers are committed, a cursor, lag, or Runtime failure is sent as one terminal `effect/httpapi/stream/failure` event containing the encoded `ApiError`; the generated client exposes it as the stream failure.
 

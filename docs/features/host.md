@@ -57,6 +57,7 @@ host.attachments.get(sha256)                         -> { ref, data }
 
 host.sessions.create({ id?, title? }) -> HostSession
 host.sessions.get(sessionId)          -> HostSession
+host.sessions.snapshot(sessionId)     -> HostSessionSnapshot
 host.sessions.list()                  -> HostSession[]
 host.sessions.fork(runId, { commandId, atSequence, budget?, programBudget?, substitute? }) -> HostRun<unknown>
 
@@ -72,7 +73,7 @@ host.runs.cancel(runId, commandId, reason?)       -> void
 host.runs.rewind(runId, { commandId, toSequence, budget? }) -> void
 
 host.events.subscribe(sessionId, cursor?)
-  -> Effect<Stream<RunStarted | Turn | ToolCall | TasksUpdated | ApprovalRequested | Compacted | Completed>, SessionError>
+  -> Effect<Stream<HostEvent>, SessionError>
 
 host.approvals.resolve(runId, token, decision, operator) -> void
 
@@ -86,6 +87,10 @@ host.operator.extendBudget(runId, delta, operator, commandId) -> void
 `runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
 
 `runs.startByName` is the serialized-host boundary used by `generalist/server`. It finds one configured Agent by name and decodes the unknown input with that Agent's input Schema before starting it. Unknown names and invalid inputs remain typed Host failures. Approval and operator methods are the same Runtime operations with no second decision or recovery authority; every mutation requires the caller identity recorded by Runtime.
+
+`sessions.snapshot` reads version-1 metadata, Run projections, and a bounded active-path `conversation` at one committed Session cursor. Conversation entries preserve original entry IDs, parent IDs, and the Session leaf; they expose non-system user/tool/assistant messages, not instruction, memory, or skill bodies. Oversized projections fail rather than truncate; see the [snapshot limits](./server.md#snapshot-limits).
+
+Runtime's `HostSessionEvent` is tagged `Run | Conversation`, with one shared cursor. Host maps the Run branch into product lifecycle events and forwards Conversation updates with their Session ID and cursor. Consumers retain the update's common visible prefix and replace its suffix, so branch changes do not append abandoned-path text. `HostEvent` therefore includes `Conversation` as well as `RunStarted`, `Turn`, `ToolCall`, `TasksUpdated`, `ArtifactUpdated`, `ApprovalRequested`, `Compacted`, and `Completed`.
 
 Attachments delegate to an optional ambient `BlobStore`. Provide one of the Layers from `generalist/blob-store` when creating the Host to enable upload and download. Existing Hosts can still be constructed without storage; attachment calls then fail with `BlobStoreError` instead of adding a BlobStore requirement to unrelated Host operations.
 
@@ -136,7 +141,7 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 - Host delegates Run registration, execution, inspection, cancellation, and replay to Runtime; it has no second executor or event journal.
 - `HostRun.send(message, options?)` and `host.runs.send(runId, prompt, options?)` delegate to Runtime's unified durable inbox admission.
 - `sessions.fork` and `runs.rewind` delegate to Runtime's atomic branch transitions. Future server routes can join at these Host methods without owning replay behavior.
-- The object engine persists Session metadata, root membership, snapshots, and Session event cursors in the canonical namespace; host process memory is not recovery authority.
+- The object engine persists Session metadata, root membership, conversation entries, and Session event cursors in the canonical namespace. Snapshots project that committed state; host process memory is not recovery authority.
 - A Session identity is created explicitly before Host starts a Run in it. Omitted Session IDs use Generalist's Effect-based ID generator.
 - Loading a plugin performs no module-level side effects.
 - Host imports only stable Generalist sources and is safe to import in Worker consumers.

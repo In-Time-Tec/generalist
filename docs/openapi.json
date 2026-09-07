@@ -46,14 +46,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -91,10 +103,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -167,14 +184,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -212,10 +241,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -275,14 +309,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -320,10 +366,1434 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/snapshot": {
+      "get": {
+        "tags": ["sessions"],
+        "operationId": "sessions.snapshot",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": { "type": "number", "enum": [1] },
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "minLength": 1 },
+                        "title": { "type": "string" },
+                        "createdAt": { "type": "string" }
+                      },
+                      "required": ["id", "createdAt"],
+                      "additionalProperties": false
+                    },
+                    "cursor": { "type": "integer", "minimum": -1, "maximum": 9007199254740991 },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "run": {
+                            "type": "object",
+                            "properties": {
+                              "runId": { "type": "string", "minLength": 1 },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "queued",
+                                  "running",
+                                  "waiting",
+                                  "needs-resolution",
+                                  "cancelling",
+                                  "succeeded",
+                                  "failed",
+                                  "cancelled"
+                                ]
+                              },
+                              "executableRef": {
+                                "type": "object",
+                                "properties": {
+                                  "executable": {
+                                    "type": "string",
+                                    "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$"
+                                  },
+                                  "active": {
+                                    "anyOf": [
+                                      { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                    ]
+                                  }
+                                },
+                                "required": ["executable", "active"],
+                                "additionalProperties": false
+                              },
+                              "executableManifest": {
+                                "type": "object",
+                                "properties": {
+                                  "version": { "type": "string", "enum": ["1"] },
+                                  "root": {
+                                    "anyOf": [
+                                      { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                    ]
+                                  },
+                                  "profiles": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "selection": { "type": "string" },
+                                        "agent": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      },
+                                      "required": ["selection", "agent"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "entries": {
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Agent"] },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string" },
+                                                "instructions": { "type": "string" },
+                                                "supplemental": { "type": "string" },
+                                                "model": {
+                                                  "type": "string",
+                                                  "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "tools": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "name": { "type": "string" },
+                                                      "pin": {
+                                                        "type": "string",
+                                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                      },
+                                                      "content": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "codec": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 255
+                                                          },
+                                                          "version": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 255
+                                                          },
+                                                          "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                        },
+                                                        "required": ["codec", "version", "digest"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "required": ["name", "pin"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "skills": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "name": { "type": "string" },
+                                                      "pin": {
+                                                        "type": "string",
+                                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                      },
+                                                      "content": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "codec": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 255
+                                                          },
+                                                          "version": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 255
+                                                          },
+                                                          "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                        },
+                                                        "required": ["codec", "version", "digest"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "required": ["name", "pin"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "services": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "name": { "type": "string" },
+                                                      "pin": {
+                                                        "type": "string",
+                                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                      },
+                                                      "content": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "codec": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 255
+                                                          },
+                                                          "version": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 255
+                                                          },
+                                                          "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                        },
+                                                        "required": ["codec", "version", "digest"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "required": ["name", "pin"],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "policy": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "_tag": { "type": "string", "enum": ["Portable"] },
+                                                        "policy": { "$ref": "#/components/schemas/Suspend_" }
+                                                      },
+                                                      "required": ["_tag", "policy"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "_tag": { "type": "string", "enum": ["Pinned"] },
+                                                        "pin": {
+                                                          "type": "string",
+                                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                        }
+                                                      },
+                                                      "required": ["_tag", "pin"],
+                                                      "additionalProperties": false
+                                                    }
+                                                  ]
+                                                },
+                                                "toolScheduling": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "maxConcurrency": { "type": "integer", "exclusiveMinimum": 0 },
+                                                    "parallelSafe": { "type": "array", "items": { "type": "string" } }
+                                                  },
+                                                  "required": ["maxConcurrency", "parallelSafe"],
+                                                  "additionalProperties": false
+                                                },
+                                                "compaction": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "service": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "summaryModel": {
+                                                      "type": "string",
+                                                      "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "contextWindow": { "type": "integer", "exclusiveMinimum": 0 },
+                                                    "reserveTokens": { "type": "integer", "minimum": 0 },
+                                                    "keepRecentTokens": { "type": "integer", "minimum": 0 },
+                                                    "strategyIdentity": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 255
+                                                    },
+                                                    "summaryPromptIdentity": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 255
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "service",
+                                                    "summaryModel",
+                                                    "contextWindow",
+                                                    "reserveTokens",
+                                                    "keepRecentTokens",
+                                                    "strategyIdentity",
+                                                    "summaryPromptIdentity"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                "programAuthority": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "sandbox": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "input": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "output": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "maxSourceBytes": { "type": "integer", "minimum": 0 },
+                                                    "tools": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "name": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 128
+                                                          },
+                                                          "pin": {
+                                                            "type": "string",
+                                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          },
+                                                          "content": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "codec": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "version": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "digest": {
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-f]{64}$"
+                                                              }
+                                                            },
+                                                            "required": ["codec", "version", "digest"],
+                                                            "additionalProperties": false
+                                                          }
+                                                        },
+                                                        "required": ["name", "pin"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      "maxItems": 64
+                                                    },
+                                                    "agents": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "selection": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 128
+                                                          },
+                                                          "agent": {
+                                                            "type": "string",
+                                                            "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          },
+                                                          "input": {
+                                                            "type": "string",
+                                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          }
+                                                        },
+                                                        "required": ["selection", "agent", "input"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      "maxItems": 64
+                                                    },
+                                                    "steps": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "name": {
+                                                            "type": "string",
+                                                            "minLength": 1,
+                                                            "maxLength": 128
+                                                          },
+                                                          "pin": {
+                                                            "type": "string",
+                                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          },
+                                                          "content": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "codec": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "version": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "digest": {
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-f]{64}$"
+                                                              }
+                                                            },
+                                                            "required": ["codec", "version", "digest"],
+                                                            "additionalProperties": false
+                                                          }
+                                                        },
+                                                        "required": ["name", "pin"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      "maxItems": 64
+                                                    },
+                                                    "budget": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "agentRuns": { "type": "integer", "minimum": 0 },
+                                                        "concurrency": { "type": "integer", "minimum": 1 },
+                                                        "toolCalls": { "type": "integer", "minimum": 0 },
+                                                        "tokens": { "type": "integer", "minimum": 0 },
+                                                        "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                                        "logBytes": { "type": "integer", "minimum": 0 },
+                                                        "outputBytes": { "type": "integer", "minimum": 0 }
+                                                      },
+                                                      "required": [
+                                                        "agentRuns",
+                                                        "concurrency",
+                                                        "toolCalls",
+                                                        "tokens",
+                                                        "wallClockMillis",
+                                                        "logBytes",
+                                                        "outputBytes"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "sandbox",
+                                                    "input",
+                                                    "output",
+                                                    "maxSourceBytes",
+                                                    "tools",
+                                                    "agents",
+                                                    "steps",
+                                                    "budget"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                "budget": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "tokens": {
+                                                      "type": "integer",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "usd": {
+                                                      "type": "number",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "duration": {
+                                                      "type": "number",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "toolCalls": {
+                                                      "type": "integer",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "children": {
+                                                      "type": "integer",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    }
+                                                  },
+                                                  "additionalProperties": false
+                                                },
+                                                "children": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": { "selection": { "type": "string" } },
+                                                    "required": ["selection"],
+                                                    "additionalProperties": false
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "model",
+                                                "tools",
+                                                "skills",
+                                                "services",
+                                                "policy",
+                                                "toolScheduling",
+                                                "budget",
+                                                "children"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Program"] },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string" },
+                                                "source": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "language": { "type": "string", "enum": ["javascript"] },
+                                                    "text": { "type": "string" }
+                                                  },
+                                                  "required": ["language", "text"],
+                                                  "additionalProperties": false
+                                                },
+                                                "sandbox": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "output": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "capabilities": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "tools": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "name": { "type": "string" },
+                                                          "pin": {
+                                                            "type": "string",
+                                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          },
+                                                          "content": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "codec": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "version": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "digest": {
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-f]{64}$"
+                                                              }
+                                                            },
+                                                            "required": ["codec", "version", "digest"],
+                                                            "additionalProperties": false
+                                                          }
+                                                        },
+                                                        "required": ["name", "pin"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "agents": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "selection": { "type": "string" },
+                                                          "agent": {
+                                                            "type": "string",
+                                                            "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          },
+                                                          "input": {
+                                                            "type": "string",
+                                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          }
+                                                        },
+                                                        "required": ["selection", "agent", "input"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "steps": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "name": { "type": "string" },
+                                                          "pin": {
+                                                            "type": "string",
+                                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                          },
+                                                          "content": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "codec": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "version": {
+                                                                "type": "string",
+                                                                "minLength": 1,
+                                                                "maxLength": 255
+                                                              },
+                                                              "digest": {
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-f]{64}$"
+                                                              }
+                                                            },
+                                                            "required": ["codec", "version", "digest"],
+                                                            "additionalProperties": false
+                                                          }
+                                                        },
+                                                        "required": ["name", "pin"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": ["tools", "agents", "steps"],
+                                                  "additionalProperties": false
+                                                },
+                                                "budget": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "agentRuns": { "type": "integer", "minimum": 0 },
+                                                    "concurrency": { "type": "integer", "minimum": 1 },
+                                                    "toolCalls": { "type": "integer", "minimum": 0 },
+                                                    "tokens": { "type": "integer", "minimum": 0 },
+                                                    "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                                    "logBytes": { "type": "integer", "minimum": 0 },
+                                                    "outputBytes": { "type": "integer", "minimum": 0 }
+                                                  },
+                                                  "required": [
+                                                    "agentRuns",
+                                                    "concurrency",
+                                                    "toolCalls",
+                                                    "tokens",
+                                                    "wallClockMillis",
+                                                    "logBytes",
+                                                    "outputBytes"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "source",
+                                                "sandbox",
+                                                "input",
+                                                "output",
+                                                "capabilities",
+                                                "budget"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": ["version", "root", "profiles", "entries"],
+                                "additionalProperties": false
+                              },
+                              "parentRunId": { "type": "string", "minLength": 1 },
+                              "childReadiness": { "type": "string", "enum": ["queued", "ready", "settled"] },
+                              "depth": { "type": "integer", "minimum": 0 },
+                              "treePolicy": {
+                                "type": "object",
+                                "properties": {
+                                  "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                                  "maxSubagents": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                                },
+                                "required": ["maxDepth", "maxSubagents"],
+                                "additionalProperties": false
+                              },
+                              "waits": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "waitId": { "type": "string" },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": { "_tag": { "type": "string", "enum": ["ToolWait"] } },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Approval"] },
+                                            "request": {
+                                              "type": "object",
+                                              "properties": {
+                                                "approvalId": { "type": "string", "minLength": 1 },
+                                                "operation": { "type": "string", "minLength": 1 },
+                                                "capability": { "type": "string", "minLength": 1 },
+                                                "input": {}
+                                              },
+                                              "required": ["approvalId", "operation", "capability", "input"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "request"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Signal"] },
+                                            "name": { "type": "string" }
+                                          },
+                                          "required": ["_tag", "name"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Timer"] },
+                                            "dueAt": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["External"] },
+                                            "capability": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["AwaitEvent"] },
+                                            "filter": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": { "type": "string", "enum": ["Timer"] },
+                                                    "scheduleId": { "type": "string" }
+                                                  },
+                                                  "required": ["_tag"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": { "type": "string", "enum": ["Webhook"] },
+                                                    "source": { "type": "string" }
+                                                  },
+                                                  "required": ["_tag"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                                    "childRunId": { "type": "string" }
+                                                  },
+                                                  "required": ["_tag"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                                    "path": { "type": "string" },
+                                                    "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                                  },
+                                                  "required": ["_tag"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                                    "approvalId": { "type": "string" }
+                                                  },
+                                                  "required": ["_tag"],
+                                                  "additionalProperties": false
+                                                }
+                                              ]
+                                            },
+                                            "deadline": { "type": "string" }
+                                          },
+                                          "required": ["_tag", "filter", "deadline"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": ["open", "responded", "signaled", "cancelled"]
+                                    },
+                                    "resolution": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": { "_tag": { "type": "string", "enum": ["Approved"] } },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Denied"] },
+                                            "reason": { "type": "string" }
+                                          },
+                                          "required": ["_tag"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["ToolResult"] },
+                                            "result": {},
+                                            "encodedResult": {}
+                                          },
+                                          "required": ["_tag", "result", "encodedResult"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Signal"] },
+                                            "name": { "type": "string" },
+                                            "payload": {}
+                                          },
+                                          "required": ["_tag", "name"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "openedAt": { "type": "string" },
+                                    "closedAt": { "type": "string" }
+                                  },
+                                  "required": ["waitId", "reason", "status", "openedAt"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "lastSequence": { "type": "integer", "minimum": -1 },
+                              "durability": { "type": "string", "enum": ["ephemeral", "durable"] },
+                              "branches": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "runId": { "type": "string", "minLength": 1 },
+                                    "forkedAt": { "type": "integer", "minimum": 0 }
+                                  },
+                                  "required": ["runId", "forkedAt"],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "runId",
+                              "status",
+                              "executableRef",
+                              "executableManifest",
+                              "depth",
+                              "treePolicy",
+                              "waits",
+                              "lastSequence",
+                              "durability",
+                              "branches"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "cursor": { "type": "integer", "minimum": -1, "maximum": 9007199254740991 },
+                          "turn": { "type": "integer", "minimum": 0 },
+                          "outcome": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Succeeded"] },
+                                  "result": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "text": { "type": "string" },
+                                          "output": {},
+                                          "turns": { "type": "number" },
+                                          "session": {
+                                            "type": "object",
+                                            "properties": {
+                                              "sessionId": { "type": "string" },
+                                              "leafId": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+                                            },
+                                            "required": ["sessionId", "leafId"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["text", "output", "turns", "session"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Program"] },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "value"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "result", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Failed"] },
+                                  "error": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_AgentExecutionFailureEncoded"
+                                      },
+                                      { "$ref": "#/components/schemas/generalist_runtime_ExecutablePinMissingEncoded" },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableIdentityMismatchEncoded"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationInvalidEncoded"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationMissingEncoded"
+                                      },
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxUnavailableEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxSourceInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxInputInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxOutputInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxExecutionFailureEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxProtocolViolationEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxDeadlineExceededEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxCancelledEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxResourceExceededEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxGuaranteeUnavailableEncoded"
+                                              },
+                                              {
+                                                "anyOf": [
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCapabilityMissingEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCapabilityDeniedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramAuthorizationFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramSchemaFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramToolFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramStepFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramAgentFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramBudgetExhaustedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramReplayDivergenceEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramOperationUnknownEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramSuspendedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCancelledEncoded"
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "$ref": "#/components/schemas/generalist_core_ProgramHandlerMismatchEncoded"
+                                          },
+                                          {
+                                            "$ref": "#/components/schemas/generalist_core_ProgramIdentityMismatchEncoded"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "error", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Cancelled"] },
+                                  "reason": { "type": "string" },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "usageFacts": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Completed"] },
+                                    "runId": { "type": "string", "minLength": 1 },
+                                    "turn": { "type": "number" },
+                                    "purpose": {
+                                      "type": "string",
+                                      "enum": ["conversation", "structured-output", "compaction-summary"]
+                                    },
+                                    "modelCallId": { "type": "string" },
+                                    "modelAttemptId": { "type": "string" },
+                                    "attempt": { "type": "integer" },
+                                    "usageAt": { "type": "number" },
+                                    "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                                    "provider": { "type": "string" },
+                                    "model": { "type": "string" },
+                                    "requestId": { "type": "string" },
+                                    "responseModel": { "type": "string" },
+                                    "serviceTier": { "type": "string" }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "runId",
+                                    "turn",
+                                    "purpose",
+                                    "modelCallId",
+                                    "modelAttemptId",
+                                    "attempt",
+                                    "usageAt",
+                                    "usage"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Failed"] },
+                                    "runId": { "type": "string", "minLength": 1 },
+                                    "turn": { "type": "number" },
+                                    "purpose": {
+                                      "type": "string",
+                                      "enum": ["conversation", "structured-output", "compaction-summary"]
+                                    },
+                                    "modelCallId": { "type": "string" },
+                                    "modelAttemptId": { "type": "string" },
+                                    "attempt": { "type": "integer" },
+                                    "category": {
+                                      "type": "string",
+                                      "enum": [
+                                        "authentication",
+                                        "rate-limit",
+                                        "transport",
+                                        "provider-response",
+                                        "stream-decode",
+                                        "truncated-stream",
+                                        "context-overflow",
+                                        "invalid-tool-call",
+                                        "token-budget",
+                                        "timeout",
+                                        "cancellation",
+                                        "unknown"
+                                      ]
+                                    },
+                                    "usageAt": { "type": "number" },
+                                    "providerUsage": {
+                                      "type": "object",
+                                      "properties": {
+                                        "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                        "outputTokens": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 9007199254740991
+                                        },
+                                        "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "provider": { "type": "string" },
+                                    "model": { "type": "string" }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "runId",
+                                    "turn",
+                                    "purpose",
+                                    "modelCallId",
+                                    "modelAttemptId",
+                                    "attempt",
+                                    "category",
+                                    "usageAt",
+                                    "providerUsage"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "budget": {
+                            "type": "object",
+                            "properties": {
+                              "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                              "usd": {
+                                "anyOf": [
+                                  { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                  { "type": "string", "enum": ["unknown"] }
+                                ]
+                              },
+                              "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                              "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                              "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                            },
+                            "additionalProperties": false
+                          },
+                          "compactions": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Running"] },
+                                    "runId": { "type": "string", "minLength": 1 },
+                                    "turn": { "type": "number" },
+                                    "compactionId": { "type": "string" },
+                                    "startedAt": { "type": "number" },
+                                    "trigger": { "type": "string", "enum": ["threshold", "overflow"] },
+                                    "contextTokensBefore": { "type": "number" },
+                                    "entriesBefore": { "type": "number" }
+                                  },
+                                  "required": ["_tag", "runId", "turn", "compactionId", "startedAt", "trigger"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Applied"] },
+                                    "runId": { "type": "string", "minLength": 1 },
+                                    "turn": { "type": "number" },
+                                    "compactionId": { "type": "string" },
+                                    "startedAt": { "type": "number" },
+                                    "trigger": { "type": "string", "enum": ["threshold", "overflow"] },
+                                    "contextTokensBefore": { "type": "number" },
+                                    "entriesBefore": { "type": "number" },
+                                    "checkpointId": { "type": "string" },
+                                    "appliedAt": { "type": "number" },
+                                    "kind": { "type": "string", "enum": ["microcompact", "summarize"] },
+                                    "commit": {
+                                      "type": "object",
+                                      "properties": {
+                                        "compactionId": { "type": "string" },
+                                        "checkpointId": { "type": "string" },
+                                        "summaryModelCallId": { "type": "string" },
+                                        "contextTokensBefore": { "type": "number" },
+                                        "contextTokensAfter": { "type": "number" },
+                                        "entriesBefore": { "type": "number" },
+                                        "entriesAfter": { "type": "number" }
+                                      },
+                                      "required": ["compactionId", "checkpointId"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "runId",
+                                    "turn",
+                                    "compactionId",
+                                    "startedAt",
+                                    "trigger",
+                                    "checkpointId",
+                                    "appliedAt",
+                                    "kind",
+                                    "commit"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Failed"] },
+                                    "runId": { "type": "string", "minLength": 1 },
+                                    "turn": { "type": "number" },
+                                    "compactionId": { "type": "string" },
+                                    "startedAt": { "type": "number" },
+                                    "trigger": { "type": "string", "enum": ["threshold", "overflow"] },
+                                    "contextTokensBefore": { "type": "number" },
+                                    "entriesBefore": { "type": "number" },
+                                    "failedAt": { "type": "number" }
+                                  },
+                                  "required": [
+                                    "_tag",
+                                    "runId",
+                                    "turn",
+                                    "compactionId",
+                                    "startedAt",
+                                    "trigger",
+                                    "failedAt"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "gates": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": { "type": "string" },
+                                "verdict": { "type": "string", "enum": ["pass", "fail"] },
+                                "evidence": {}
+                              },
+                              "required": ["name", "verdict", "evidence"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["run", "cursor", "turn", "usageFacts", "budget", "compactions", "gates"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "conversation": {
+                      "type": "object",
+                      "properties": {
+                        "leafId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "parentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                              "messages": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    { "$ref": "#/components/schemas/SystemMessage" },
+                                    { "$ref": "#/components/schemas/UserMessage" },
+                                    { "$ref": "#/components/schemas/AssistantMessage" },
+                                    { "$ref": "#/components/schemas/ToolMessage" }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": ["id", "parentId", "messages"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["leafId", "entries"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["version", "session", "cursor", "runs", "conversation"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -379,14 +1849,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -424,10 +1906,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -505,7 +1992,7 @@
                       "executableManifest": {
                         "type": "object",
                         "properties": {
-                          "version": { "type": "string", "enum": ["2"] },
+                          "version": { "type": "string", "enum": ["1"] },
                           "root": {
                             "anyOf": [
                               { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
@@ -536,7 +2023,7 @@
                                     "manifest": {
                                       "type": "object",
                                       "properties": {
-                                        "version": { "type": "string", "enum": ["2"] },
+                                        "version": { "type": "string", "enum": ["1"] },
                                         "name": { "type": "string" },
                                         "instructions": { "type": "string" },
                                         "supplemental": { "type": "string" },
@@ -1230,14 +2717,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -1275,10 +2774,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -1343,7 +2847,7 @@
                     "executableManifest": {
                       "type": "object",
                       "properties": {
-                        "version": { "type": "string", "enum": ["2"] },
+                        "version": { "type": "string", "enum": ["1"] },
                         "root": {
                           "anyOf": [
                             { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
@@ -1374,7 +2878,7 @@
                                   "manifest": {
                                     "type": "object",
                                     "properties": {
-                                      "version": { "type": "string", "enum": ["2"] },
+                                      "version": { "type": "string", "enum": ["1"] },
                                       "name": { "type": "string" },
                                       "instructions": { "type": "string" },
                                       "supplemental": { "type": "string" },
@@ -2163,32 +3667,7 @@
                             "sessionEntryId": { "type": "string" },
                             "budgetCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                             "digest": { "type": "string" },
-                            "usage": {
-                              "type": "object",
-                              "properties": {
-                                "inputTokens": {
-                                  "type": "object",
-                                  "properties": {
-                                    "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "outputTokens": {
-                                  "type": "object",
-                                  "properties": {
-                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                  },
-                                  "additionalProperties": false
-                                }
-                              },
-                              "required": ["inputTokens", "outputTokens"],
-                              "additionalProperties": false
-                            },
+                            "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
                             "finishReason": {
                               "type": "string",
                               "enum": [
@@ -2237,32 +3716,7 @@
                             "sessionEntryId": { "type": "string" },
                             "reason": { "type": "string", "enum": ["cancel", "failure"] },
                             "digest": { "type": "string" },
-                            "usage": {
-                              "type": "object",
-                              "properties": {
-                                "inputTokens": {
-                                  "type": "object",
-                                  "properties": {
-                                    "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "outputTokens": {
-                                  "type": "object",
-                                  "properties": {
-                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                  },
-                                  "additionalProperties": false
-                                }
-                              },
-                              "required": ["inputTokens", "outputTokens"],
-                              "additionalProperties": false
-                            },
+                            "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
                             "finishReason": {
                               "type": "string",
                               "enum": [
@@ -2653,32 +4107,7 @@
                           "properties": {
                             "_tag": { "type": "string", "enum": ["TurnCompleted"] },
                             "turn": { "type": "number" },
-                            "usage": {
-                              "type": "object",
-                              "properties": {
-                                "inputTokens": {
-                                  "type": "object",
-                                  "properties": {
-                                    "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "outputTokens": {
-                                  "type": "object",
-                                  "properties": {
-                                    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                    "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                  },
-                                  "additionalProperties": false
-                                }
-                              },
-                              "required": ["inputTokens", "outputTokens"],
-                              "additionalProperties": false
-                            },
+                            "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
                             "finishReason": {
                               "type": "string",
                               "enum": [
@@ -2790,32 +4219,7 @@
                                 "modelAttemptId": { "type": "string" },
                                 "attempt": { "type": "integer", "minimum": 0 },
                                 "completedAt": { "type": "number" },
-                                "usage": {
-                                  "type": "object",
-                                  "properties": {
-                                    "inputTokens": {
-                                      "type": "object",
-                                      "properties": {
-                                        "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                      },
-                                      "additionalProperties": false
-                                    },
-                                    "outputTokens": {
-                                      "type": "object",
-                                      "properties": {
-                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                      },
-                                      "additionalProperties": false
-                                    }
-                                  },
-                                  "required": ["inputTokens", "outputTokens"],
-                                  "additionalProperties": false
-                                },
+                                "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
                                 "usageAt": { "type": "number" },
                                 "finishReason": {
                                   "type": "string",
@@ -3023,32 +4427,7 @@
                                 },
                                 "attempts": { "type": "integer", "minimum": 0 },
                                 "completedAt": { "type": "number" },
-                                "usage": {
-                                  "type": "object",
-                                  "properties": {
-                                    "inputTokens": {
-                                      "type": "object",
-                                      "properties": {
-                                        "uncached": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "cacheRead": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "cacheWrite": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                      },
-                                      "additionalProperties": false
-                                    },
-                                    "outputTokens": {
-                                      "type": "object",
-                                      "properties": {
-                                        "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "text": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
-                                        "reasoning": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
-                                      },
-                                      "additionalProperties": false
-                                    }
-                                  },
-                                  "required": ["inputTokens", "outputTokens"],
-                                  "additionalProperties": false
-                                },
+                                "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
                                 "failedAttemptUsage": {
                                   "type": "object",
                                   "properties": {
@@ -3298,7 +4677,7 @@
                                             "additionalProperties": false
                                           }
                                         },
-                                        "required": ["text", "turns", "session"],
+                                        "required": ["text", "output", "turns", "session"],
                                         "additionalProperties": false
                                       },
                                       {
@@ -3509,14 +4888,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -3554,10 +4945,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -3601,14 +4997,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -3646,10 +5054,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -3672,7 +5085,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "reason": { "type": "string" } },
+                "properties": { "commandId": { "type": "string" }, "reason": { "type": "string" } },
+                "required": ["commandId"],
                 "additionalProperties": false
               }
             }
@@ -3726,12 +5140,30 @@
                                 {
                                   "type": "object",
                                   "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/server/Forbidden"] },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "hint"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/server/Unauthorized"] },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "hint"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/host/AgentInputInvalid"] },
                                     "name": { "type": "string" },
                                     "message": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "name", "message"],
+                                  "required": ["_tag", "name", "message", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3741,7 +5173,7 @@
                                     "name": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "name"],
+                                  "required": ["_tag", "name", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3754,7 +5186,7 @@
                                     "expectedApprovalId": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "runId", "approvalId", "mismatch"],
+                                  "required": ["_tag", "runId", "approvalId", "mismatch", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3765,7 +5197,7 @@
                                     "approvalId": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "runId", "approvalId"],
+                                  "required": ["_tag", "runId", "approvalId", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3775,7 +5207,7 @@
                                     "sha256": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "sha256"],
+                                  "required": ["_tag", "sha256", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3786,7 +5218,7 @@
                                     "reason": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "operation", "reason"],
+                                  "required": ["_tag", "operation", "reason", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3797,7 +5229,7 @@
                                     "maxBytes": { "type": "integer" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "bytes", "maxBytes"],
+                                  "required": ["_tag", "bytes", "maxBytes", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3807,7 +5239,7 @@
                                     "message": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "message"],
+                                  "required": ["_tag", "message", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3878,7 +5310,7 @@
                                     "action": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "runId", "decision", "action"],
+                                  "required": ["_tag", "runId", "decision", "action", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3888,7 +5320,7 @@
                                     "operation": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "operation"],
+                                  "required": ["_tag", "operation", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3899,7 +5331,7 @@
                                     "message": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "operation", "message"],
+                                  "required": ["_tag", "operation", "message", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3909,7 +5341,7 @@
                                     "runId": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "runId"],
+                                  "required": ["_tag", "runId", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3919,7 +5351,7 @@
                                     "message": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "message"],
+                                  "required": ["_tag", "message", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3929,7 +5361,7 @@
                                     "sessionId": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "sessionId"],
+                                  "required": ["_tag", "sessionId", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3942,7 +5374,7 @@
                                     "latestCursor": { "type": "integer" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor"],
+                                  "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3952,7 +5384,7 @@
                                     "sessionId": { "type": "string" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "sessionId"],
+                                  "required": ["_tag", "sessionId", "hint"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -3963,7 +5395,22 @@
                                     "lastDeliveredCursor": { "type": "integer" },
                                     "hint": { "type": "string" }
                                   },
-                                  "required": ["_tag", "sessionId", "lastDeliveredCursor"],
+                                  "required": ["_tag", "sessionId", "lastDeliveredCursor", "hint"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/host/SessionSnapshotTooLarge"] },
+                                    "sessionId": { "type": "string" },
+                                    "limit": {
+                                      "type": "string",
+                                      "enum": ["scanned-runs", "runs", "events", "entries", "bytes"]
+                                    },
+                                    "maximum": { "type": "integer" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "sessionId", "limit", "maximum", "hint"],
                                   "additionalProperties": false
                                 }
                               ]
@@ -3992,6 +5439,8 @@
                   },
                   "errorSchema": {
                     "anyOf": [
+                      { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                      { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
@@ -4008,7 +5457,8 @@
                       { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" },
-                      { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                      { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" },
+                      { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
                     ]
                   },
                   "failureEvent": "effect/httpapi/stream/failure"
@@ -4032,14 +5482,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4077,10 +5539,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4127,14 +5594,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4172,10 +5651,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4231,7 +5715,20 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
             }
           },
           "404": {
@@ -4292,7 +5789,20 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
             }
           },
           "404": {
@@ -4358,14 +5868,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4403,10 +5925,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4490,14 +6017,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4535,10 +6074,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4601,14 +6145,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4646,10 +6202,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4837,14 +6398,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4882,10 +6455,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4929,14 +6507,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4974,10 +6564,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5000,8 +6595,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "operator": { "type": "string" } },
-                "required": ["operator"],
+                "properties": { "commandId": { "type": "string" }, "operator": { "type": "string" } },
+                "required": ["commandId", "operator"],
                 "additionalProperties": false
               }
             }
@@ -5034,14 +6629,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5079,10 +6686,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5105,8 +6717,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "operator": { "type": "string" } },
-                "required": ["operator"],
+                "properties": { "commandId": { "type": "string" }, "operator": { "type": "string" } },
+                "required": ["commandId", "operator"],
                 "additionalProperties": false
               }
             }
@@ -5139,14 +6751,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5184,10 +6808,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5211,6 +6840,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "commandId": { "type": "string" },
                   "operationId": { "type": "string" },
                   "resolution": {
                     "anyOf": [
@@ -5230,7 +6860,7 @@
                   },
                   "operator": { "type": "string" }
                 },
-                "required": ["operationId", "resolution", "operator"],
+                "required": ["commandId", "operationId", "resolution", "operator"],
                 "additionalProperties": false
               }
             }
@@ -5263,14 +6893,26 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
             }
           },
           "403": {
-            "description": "generalist/server/OperatorDisabled",
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5308,10 +6950,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/host/SessionSnapshotTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSnapshotTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -5335,6 +6982,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "commandId": { "type": "string" },
                   "delta": {
                     "type": "object",
                     "properties": {
@@ -5348,7 +6996,7 @@
                   },
                   "operator": { "type": "string" }
                 },
-                "required": ["delta", "operator"],
+                "required": ["commandId", "delta", "operator"],
                 "additionalProperties": false
               }
             }
@@ -5360,6 +7008,34 @@
   },
   "components": {
     "schemas": {
+      "generalist_server_ForbiddenEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/Forbidden"] },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_server_OperatorDisabledEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
+          "operation": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "operation", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_server_UnauthorizedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/Unauthorized"] },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "hint"],
+        "additionalProperties": false
+      },
       "generalist_host_AgentInputInvalidEncoded": {
         "type": "object",
         "properties": {
@@ -5368,7 +7044,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "name", "message"],
+        "required": ["_tag", "name", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_RunBudgetInvalidEncoded": {
@@ -5378,7 +7054,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_host_AgentNotRegisteredEncoded": {
@@ -5388,7 +7064,7 @@
           "name": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "name"],
+        "required": ["_tag", "name", "hint"],
         "additionalProperties": false
       },
       "generalist_blob-store_BlobNotFoundEncoded": {
@@ -5398,7 +7074,7 @@
           "sha256": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "sha256"],
+        "required": ["_tag", "sha256", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_RunNotFoundEncoded": {
@@ -5408,7 +7084,7 @@
           "runId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "runId"],
+        "required": ["_tag", "runId", "hint"],
         "additionalProperties": false
       },
       "generalist_host_SessionNotFoundEncoded": {
@@ -5418,7 +7094,7 @@
           "sessionId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "sessionId"],
+        "required": ["_tag", "sessionId", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ApprovalMismatchEncoded": {
@@ -5431,7 +7107,7 @@
           "expectedApprovalId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "runId", "approvalId", "mismatch"],
+        "required": ["_tag", "runId", "approvalId", "mismatch", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ApprovalStaleEncoded": {
@@ -5442,7 +7118,7 @@
           "approvalId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "runId", "approvalId"],
+        "required": ["_tag", "runId", "approvalId", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_IllegalOperatorActionEncoded": {
@@ -5507,7 +7183,7 @@
           "action": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "runId", "decision", "action"],
+        "required": ["_tag", "runId", "decision", "action", "hint"],
         "additionalProperties": false
       },
       "generalist_server_RequestFailedEncoded": {
@@ -5518,7 +7194,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation", "message"],
+        "required": ["_tag", "operation", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_host_SessionConflictEncoded": {
@@ -5528,7 +7204,7 @@
           "sessionId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "sessionId"],
+        "required": ["_tag", "sessionId", "hint"],
         "additionalProperties": false
       },
       "generalist_host_SessionCursorExpiredEncoded": {
@@ -5541,7 +7217,7 @@
           "latestCursor": { "type": "integer" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor"],
+        "required": ["_tag", "sessionId", "cursor", "earliestCursor", "latestCursor", "hint"],
         "additionalProperties": false
       },
       "generalist_host_SessionSubscriberLaggedEncoded": {
@@ -5552,7 +7228,7 @@
           "lastDeliveredCursor": { "type": "integer" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "sessionId", "lastDeliveredCursor"],
+        "required": ["_tag", "sessionId", "lastDeliveredCursor", "hint"],
         "additionalProperties": false
       },
       "generalist_blob-store_BlobStoreErrorEncoded": {
@@ -5563,7 +7239,7 @@
           "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation", "reason"],
+        "required": ["_tag", "operation", "reason", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_RuntimeUnavailableEncoded": {
@@ -5573,7 +7249,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_blob-store_BlobTooLargeEncoded": {
@@ -5584,26 +7260,19 @@
           "maxBytes": { "type": "integer" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "bytes", "maxBytes"],
+        "required": ["_tag", "bytes", "maxBytes", "hint"],
         "additionalProperties": false
       },
-      "generalist_server_OperatorDisabledEncoded": {
+      "generalist_host_SessionSnapshotTooLargeEncoded": {
         "type": "object",
         "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/server/OperatorDisabled"] },
-          "operation": { "type": "string" },
+          "_tag": { "type": "string", "enum": ["generalist/host/SessionSnapshotTooLarge"] },
+          "sessionId": { "type": "string" },
+          "limit": { "type": "string", "enum": ["scanned-runs", "runs", "events", "entries", "bytes"] },
+          "maximum": { "type": "integer" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation"],
-        "additionalProperties": false
-      },
-      "generalist_server_UnauthorizedEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": { "type": "string", "enum": ["generalist/server/Unauthorized"] },
-          "hint": { "type": "string" }
-        },
-        "required": ["_tag"],
+        "required": ["_tag", "sessionId", "limit", "maximum", "hint"],
         "additionalProperties": false
       },
       "Suspend_": {
@@ -5641,32 +7310,6 @@
           }
         ]
       },
-      "effect_ai_AiResponse_UsageEncoded": {
-        "type": "object",
-        "properties": {
-          "inputTokens": {
-            "type": "object",
-            "properties": {
-              "uncached": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
-              "total": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
-              "cacheRead": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
-              "cacheWrite": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
-            },
-            "additionalProperties": false
-          },
-          "outputTokens": {
-            "type": "object",
-            "properties": {
-              "total": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
-              "text": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
-              "reasoning": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
-            },
-            "additionalProperties": false
-          }
-        },
-        "required": ["inputTokens", "outputTokens"],
-        "additionalProperties": false
-      },
       "generalist_core_RunBudgetExhaustedEncoded": {
         "type": "object",
         "properties": {
@@ -5676,7 +7319,7 @@
           "remaining": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "budget", "requested"],
+        "required": ["_tag", "budget", "requested", "hint"],
         "additionalProperties": false
       },
       "generalist_core_GateFailedEncoded": {
@@ -5695,7 +7338,7 @@
           },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "gate"],
+        "required": ["_tag", "gate", "hint"],
         "additionalProperties": false
       },
       "generalist_core_PermissionDeniedEncoded": {
@@ -5705,7 +7348,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_AgentSuspendedEncoded": {
@@ -6019,7 +7662,7 @@
           },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "checkpoint", "waits"],
+        "required": ["_tag", "checkpoint", "waits", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ResumeMismatchEncoded": {
@@ -6033,7 +7676,7 @@
           "received": { "$ref": "#/components/schemas/generalist_core_AgentSuspendedEncoded" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "reason", "received"],
+        "required": ["_tag", "reason", "received", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_AgentExecutionFailureEncoded": {
@@ -6052,7 +7695,7 @@
           "cause": {},
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ExecutablePinMissingEncoded": {
@@ -6076,7 +7719,7 @@
           },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "runId", "ref"],
+        "required": ["_tag", "runId", "ref", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ExecutableIdentityMismatchEncoded": {
@@ -6114,7 +7757,7 @@
           },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "runId", "expectedRef", "actualRef"],
+        "required": ["_tag", "runId", "expectedRef", "actualRef", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ExecutableRegistrationInvalidEncoded": {
@@ -6124,7 +7767,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ExecutableRegistrationMissingEncoded": {
@@ -6134,7 +7777,7 @@
           "pin": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "pin"],
+        "required": ["_tag", "pin", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxUnavailableEncoded": {
@@ -6144,7 +7787,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxSourceInvalidEncoded": {
@@ -6154,7 +7797,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxInputInvalidEncoded": {
@@ -6164,7 +7807,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxOutputInvalidEncoded": {
@@ -6174,7 +7817,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxExecutionFailureEncoded": {
@@ -6184,7 +7827,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxProtocolViolationEncoded": {
@@ -6194,7 +7837,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxDeadlineExceededEncoded": {
@@ -6204,7 +7847,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxCancelledEncoded": {
@@ -6214,7 +7857,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "message"],
+        "required": ["_tag", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxResourceExceededEncoded": {
@@ -6225,7 +7868,7 @@
           "limit": { "type": "integer", "minimum": 1 },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "resource", "limit"],
+        "required": ["_tag", "resource", "limit", "hint"],
         "additionalProperties": false
       },
       "generalist_core_SandboxGuaranteeUnavailableEncoded": {
@@ -6249,7 +7892,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "guarantee", "message"],
+        "required": ["_tag", "guarantee", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramCapabilityMissingEncoded": {
@@ -6259,7 +7902,7 @@
           "capability": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "capability"],
+        "required": ["_tag", "capability", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramCapabilityDeniedEncoded": {
@@ -6276,7 +7919,7 @@
           "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "capability", "operation", "reason"],
+        "required": ["_tag", "capability", "operation", "reason", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramAuthorizationFailureEncoded": {
@@ -6293,7 +7936,7 @@
           "cause": {},
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "capability", "operation", "cause"],
+        "required": ["_tag", "capability", "operation", "cause", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramSchemaFailureEncoded": {
@@ -6317,7 +7960,7 @@
           "message": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "boundary", "message"],
+        "required": ["_tag", "boundary", "message", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramToolFailureEncoded": {
@@ -6334,7 +7977,7 @@
           "cause": {},
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "tool", "operation", "cause"],
+        "required": ["_tag", "tool", "operation", "cause", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramStepFailureEncoded": {
@@ -6351,7 +7994,7 @@
           "cause": {},
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "step", "operation", "cause"],
+        "required": ["_tag", "step", "operation", "cause", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramAgentFailureEncoded": {
@@ -6368,7 +8011,7 @@
           "cause": {},
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "selection", "operation", "cause"],
+        "required": ["_tag", "selection", "operation", "cause", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramBudgetExhaustedEncoded": {
@@ -6382,7 +8025,7 @@
           "limit": { "type": "number" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "dimension", "limit"],
+        "required": ["_tag", "dimension", "limit", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramReplayDivergenceEncoded": {
@@ -6399,7 +8042,7 @@
           "actual": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation", "expected", "actual"],
+        "required": ["_tag", "operation", "expected", "actual", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramOperationUnknownEncoded": {
@@ -6414,7 +8057,7 @@
           },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation"],
+        "required": ["_tag", "operation", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramSuspendedEncoded": {
@@ -6431,7 +8074,7 @@
           "token": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "operation", "reason"],
+        "required": ["_tag", "operation", "reason", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramCancelledEncoded": {
@@ -6441,7 +8084,7 @@
           "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "reason"],
+        "required": ["_tag", "reason", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramHandlerMismatchEncoded": {
@@ -6453,7 +8096,7 @@
           "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "kind", "name", "reason"],
+        "required": ["_tag", "kind", "name", "reason", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramIdentityMismatchEncoded": {
@@ -6464,7 +8107,262 @@
           "actual": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "expected", "actual"],
+        "required": ["_tag", "expected", "actual", "hint"],
+        "additionalProperties": false
+      },
+      "effect_ai_AiResponse_UsageEncoded": {
+        "type": "object",
+        "properties": {
+          "inputTokens": {
+            "type": "object",
+            "properties": {
+              "uncached": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "total": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "cacheRead": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "cacheWrite": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
+            },
+            "additionalProperties": false
+          },
+          "outputTokens": {
+            "type": "object",
+            "properties": {
+              "total": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "text": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+              "reasoning": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["inputTokens", "outputTokens"],
+        "additionalProperties": false
+      },
+      "SystemMessage": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Message": { "type": "string", "enum": ["~effect/ai/Prompt/Message"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "role": { "type": "string", "enum": ["system"] },
+          "content": { "type": "string" }
+        },
+        "required": ["role", "content"],
+        "additionalProperties": false
+      },
+      "TextPart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["text"] },
+          "text": { "type": "string" }
+        },
+        "required": ["type", "text"],
+        "additionalProperties": false
+      },
+      "FilePart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["file"] },
+          "mediaType": { "type": "string" },
+          "fileName": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "data": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "string", "format": "byte", "contentEncoding": "base64" },
+              { "type": "string" }
+            ]
+          }
+        },
+        "required": ["type", "mediaType", "data"],
+        "additionalProperties": false
+      },
+      "UserMessage": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Message": { "type": "string", "enum": ["~effect/ai/Prompt/Message"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "role": { "type": "string", "enum": ["user"] },
+          "content": {
+            "anyOf": [
+              { "type": "string" },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [{ "$ref": "#/components/schemas/TextPart" }, { "$ref": "#/components/schemas/FilePart" }]
+                }
+              }
+            ]
+          }
+        },
+        "required": ["role", "content"],
+        "additionalProperties": false
+      },
+      "ReasoningPart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["reasoning"] },
+          "text": { "type": "string" }
+        },
+        "required": ["type", "text"],
+        "additionalProperties": false
+      },
+      "ToolCallPart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["tool-call"] },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "params": {},
+          "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] }
+        },
+        "required": ["type", "id", "name", "params"],
+        "additionalProperties": false
+      },
+      "ToolResultPart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["tool-result"] },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "isFailure": { "type": "boolean" },
+          "result": {},
+          "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] }
+        },
+        "required": ["type", "id", "name", "isFailure", "result"],
+        "additionalProperties": false
+      },
+      "ToolApprovalRequestPart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["tool-approval-request"] },
+          "approvalId": { "type": "string" },
+          "toolCallId": { "type": "string" }
+        },
+        "required": ["type", "approvalId", "toolCallId"],
+        "additionalProperties": false
+      },
+      "AssistantMessage": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Message": { "type": "string", "enum": ["~effect/ai/Prompt/Message"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "role": { "type": "string", "enum": ["assistant"] },
+          "content": {
+            "anyOf": [
+              { "type": "string" },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/TextPart" },
+                    { "$ref": "#/components/schemas/FilePart" },
+                    { "$ref": "#/components/schemas/ReasoningPart" },
+                    { "$ref": "#/components/schemas/ToolCallPart" },
+                    { "$ref": "#/components/schemas/ToolResultPart" },
+                    { "$ref": "#/components/schemas/ToolApprovalRequestPart" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "required": ["role", "content"],
+        "additionalProperties": false
+      },
+      "ToolApprovalResponsePart": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Part": { "type": "string", "enum": ["~effect/ai/Prompt/Part"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "type": { "type": "string", "enum": ["tool-approval-response"] },
+          "approvalId": { "type": "string" },
+          "approved": { "type": "boolean" },
+          "reason": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+        },
+        "required": ["type", "approvalId", "approved"],
+        "additionalProperties": false
+      },
+      "ToolMessage": {
+        "type": "object",
+        "properties": {
+          "~effect/ai/Prompt/Message": { "type": "string", "enum": ["~effect/ai/Prompt/Message"] },
+          "options": {
+            "anyOf": [
+              { "type": "object", "additionalProperties": { "anyOf": [{}, { "type": "null" }] } },
+              { "type": "null" }
+            ]
+          },
+          "role": { "type": "string", "enum": ["tool"] },
+          "content": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                { "$ref": "#/components/schemas/ToolResultPart" },
+                { "$ref": "#/components/schemas/ToolApprovalResponsePart" }
+              ]
+            }
+          }
+        },
+        "required": ["role", "content"],
         "additionalProperties": false
       },
       "generalist_runtime_UnknownAgentEncoded": {
@@ -6475,7 +8373,7 @@
           "runId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "name", "runId"],
+        "required": ["_tag", "name", "runId", "hint"],
         "additionalProperties": false
       },
       "generalist_core_NestedOperationSuspendedEncoded": {
@@ -6488,7 +8386,7 @@
           "capability": { "type": "string", "minLength": 1, "maxLength": 128 },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "token", "operationKey", "ordinal", "capability"],
+        "required": ["_tag", "token", "operationKey", "ordinal", "capability", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactAlreadyOpenEncoded": {
@@ -6498,7 +8396,7 @@
           "artifact": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact"],
+        "required": ["_tag", "artifact", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactBaseStaleEncoded": {
@@ -6510,7 +8408,7 @@
           "expected": { "type": "integer", "minimum": 0 },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "base"],
+        "required": ["_tag", "artifact", "base", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactCrdtMismatchEncoded": {
@@ -6522,7 +8420,7 @@
           "actual": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "expected", "actual"],
+        "required": ["_tag", "artifact", "expected", "actual", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactSubscriberLaggedEncoded": {
@@ -6534,7 +8432,7 @@
           "branch": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "lastDeliveredVersion"],
+        "required": ["_tag", "artifact", "lastDeliveredVersion", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactVersionConflictEncoded": {
@@ -6547,7 +8445,7 @@
           "branch": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "expected", "actual"],
+        "required": ["_tag", "artifact", "expected", "actual", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactVersionNotFoundEncoded": {
@@ -6559,7 +8457,7 @@
           "branch": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "version"],
+        "required": ["_tag", "artifact", "version", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactNotFoundEncoded": {
@@ -6569,7 +8467,7 @@
           "artifact": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact"],
+        "required": ["_tag", "artifact", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactRangeInvalidEncoded": {
@@ -6582,7 +8480,7 @@
           "to": { "type": "integer" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "length", "from", "to"],
+        "required": ["_tag", "artifact", "length", "from", "to", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactStorageErrorEncoded": {
@@ -6594,7 +8492,7 @@
           "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "artifact", "operation", "reason"],
+        "required": ["_tag", "artifact", "operation", "reason", "hint"],
         "additionalProperties": false
       },
       "GeneralistMediaRef": {

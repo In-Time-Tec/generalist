@@ -112,6 +112,8 @@ Future ingress features add one HttpApi group to `Server.api` and one matching i
 
 Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter.
 
+`Conversation` events carry committed conversation changes alongside the Run lifecycle wrappers. Both advance the same Session cursor. A Conversation event has `sessionId`, `cursor`, and `update`; it is not a Run event and has no `runId` or `event` field. Host filters some Runtime Run events, so visible cursor values need not be consecutive.
+
 Both event routes resolve the Session before committing an SSE response or upgrading a WebSocket. An unknown Session therefore returns the declared `SessionNotFound` JSON body with HTTP 404. If an SSE stream fails after its HTTP 200 headers have been committed—for example, because its cursor expired or its subscriber lagged—Effect HttpApi emits one terminal `effect/httpapi/stream/failure` event containing the encoded `ApiError`, then closes the stream. The generated client decodes that event into the typed stream failure.
 
 The WebSocket URL is `/sessions/:id/ws`. Server frames use `Server.eventCodec`. The client cancellation command is `{ _tag: "Cancel", runId, commandId, reason? }`; the server verifies that the Run belongs to the path Session before cancelling it. Preserve `commandId` when retrying. Closing a stream only stops observation.
@@ -122,7 +124,25 @@ Browser WebSocket constructors cannot attach an Authorization header. A bearer-p
 
 ## Session snapshot and resynchronization
 
-`client.sessions.snapshot({ sessionId })` reads a bounded authoritative Session snapshot with its exclusive cursor. `client.events.connect({ sessionId })` obtains that snapshot before observation; the connection exposes `snapshot`, events, and status. FoldKit establishes a connection-local epoch from the snapshot and rejects events from obsolete epochs. A reconnect can rebuild the view from committed state without submitting a new user message. Snapshots are inspection resources, not a second journal, and oversized snapshots fail with `SessionSnapshotTooLarge`.
+`client.sessions.snapshot({ sessionId })` returns the current version-1 `HostSessionSnapshot`: Session metadata, its exact exclusive `cursor`, bounded `runs`, and `conversation: { leafId, entries }`. The conversation follows the authoritative active Session path. Each visible entry retains its original `id`, `parentId`, and Effect AI `Prompt.Message` values; `leafId` remains the original Session leaf, even when that leaf or a parent is a filtered context entry. This is a committed user/tool/assistant display projection, not a transcript reconstructed from Run summaries. System messages and internal context bodies, including memory and skill entries, are omitted.
+
+`client.events.connect({ sessionId })` obtains the snapshot before observing events strictly after its cursor. A Conversation update contains `previousLeafId`, `leafId`, `afterEntryId`, and `entries`. Retain the visible prefix through `afterEntryId` and replace the rest with `entries`; a null anchor replaces the whole visible path. Appends, rewinds, and branch changes use this same contract. An empty suffix can still advance a leaf through a non-display entry.
+
+FoldKit validates the previous leaf, retained-prefix anchor, and duplicate entry IDs. An inconsistent update triggers bounded snapshot resynchronization rather than an invented append. Each accepted snapshot establishes a new connection-local epoch; deliveries from obsolete epochs cannot modify it. Reopening or resynchronizing restores committed user messages, tool calls/results, and assistant text without sending another user message. Snapshots are projections of the canonical state, not a second journal.
+
+### Snapshot limits
+
+The object-backed snapshot operation rejects a request with `SessionSnapshotTooLarge { sessionId, limit, maximum }` when any of these bounds is exceeded. It does not return a truncated or partial conversation.
+
+| Limit          | Maximum                 | What is counted                                                                                         |
+| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `scanned-runs` | 10,000                  | All Runs in the partition, checked before filtering for this Session                                    |
+| `runs`         | 128                     | Runs in this Session's root Run trees, including descendants                                            |
+| `events`       | 8,192                   | Canonical Run events accumulated across those Runs                                                      |
+| `entries`      | 8,192                   | Entries traversed on the active Session path, including filtered context entries                        |
+| `bytes`        | 1,048,576 bytes (1 MiB) | Accumulated encoded Run-event bytes and, separately, the complete encoded snapshot; both use UTF-8 JSON |
+
+An individual encoded Conversation update also has a 1 MiB limit. Publication failure retains `SessionSnapshotTooLarge` as the cause of a `SessionStoreError` with reason `unsupported`; it does not silently drop the update.
 
 Browser authentication and snapshot/resync are implemented contracts, not a claim of completed browser acceptance. Verify your own cookie/header policy, tenant denials, initial view, reconnect, lag, and spectator behavior before deployment.
 

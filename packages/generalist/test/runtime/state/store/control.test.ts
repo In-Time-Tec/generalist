@@ -76,15 +76,15 @@ const duplicateResponseAfterCancellation = (waitId: string) =>
         resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
       }),
       store.resume({
-        commandId: `${runId}:control:resume`,
+        commandId: `${runId}:control:resume:changed`,
         runId,
         waitId,
         resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
       }),
     ]) {
       const error = yield* respond.pipe(Effect.flip)
-      expect(error).toBeInstanceOf(DurabilityFailure)
-      expect(error).toMatchObject({ reason: "input-conflict" })
+      expect(error).toBeInstanceOf(Errors.ResponseConflict)
+      expect(error).toMatchObject({ runId, waitId })
     }
   })
 
@@ -169,8 +169,8 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
           resolution: { _tag: "ToolResult", result: "two", encodedResult: "two" },
         })
         .pipe(Effect.flip)
-      expect(error).toBeInstanceOf(DurabilityFailure)
-      expect(error).toMatchObject({ reason: "input-conflict" })
+      expect(error).toBeInstanceOf(Errors.ResponseConflict)
+      expect(error).toMatchObject({ runId: receipt.runId, waitId: "wait:1" })
     }),
   )
 

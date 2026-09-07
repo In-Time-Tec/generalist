@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import type { RuntimeState, RuntimePublication } from "../../../runtime/state/projection.js"
 import { publish } from "../../../runtime/state/store/event/publications.js"
 import { publish as publishArtifact } from "../../../runtime/state/store/artifact/index.js"
-import { publish as publishSession } from "../../../runtime/state/store/host-session.js"
+import { publish as publishSession } from "../../../runtime/state/store/host-session/index.js"
 import { detach } from "./cache.js"
 
 export interface Changes {

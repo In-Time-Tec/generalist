@@ -1,7 +1,7 @@
-import type { ModifyState } from "../../../durability/internal/runtime.js"
-import type { DurabilityFailure } from "../../../durability/errors.js"
-import { commands } from "../../../durability/internal/runtime-command-admission.js"
-import { occurredAt as preparedOccurredAt } from "../observation.js"
+import type { ModifyState } from "../../../../durability/internal/runtime.js"
+import type { DurabilityFailure } from "../../../../durability/errors.js"
+import { commands } from "../../../../durability/internal/runtime-command-admission.js"
+import { occurredAt as preparedOccurredAt } from "../../observation.js"
 import { Effect, Function, Queue, Schema, Stream, SynchronizedRef } from "effect"
 import {
   type HostSession,
@@ -12,19 +12,19 @@ import {
   SessionNotFound,
   SessionSubscriberLagged,
   type HostSessionEvent,
-} from "../../session/host.js"
-import { RuntimeUnavailable } from "../../errors.js"
-import { validate as validatePayload } from "../../execution/payload/index.js"
-import type { Service as RunStoreService } from "../../run/store.js"
+} from "../../../session/host.js"
+import { RuntimeUnavailable } from "../../../errors.js"
+import { validate as validatePayload } from "../../../execution/payload/index.js"
+import type { Service as RunStoreService } from "../../../run/store.js"
 import {
   emptySession,
   type HostSessionPublication,
   type HostSessionSubscriberQueue,
   type RuntimeState,
-} from "../projection.js"
-import { toInspection } from "./events.js"
-import { projectRunSnapshot } from "../../execution/inspection.js"
-import { projectConversation } from "./host-conversation.js"
+} from "../../projection.js"
+import { toInspection } from "../events.js"
+import { projectRunSnapshot } from "../../../execution/inspection.js"
+import { projectConversation } from "./conversation.js"
 
 const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {

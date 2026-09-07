@@ -199,3 +199,60 @@ it.effect("does not retain uncommitted mutable opaque payloads as normalization 
     )
   }),
 )
+
+it.effect("validates raw container metadata before reusing retained rows", () =>
+  Effect.gen(function* () {
+    const table = make({ row: Schema.Finite, originals: new WeakMap(), diff })
+    const wire = freeze(
+      normalize(
+        new Map([
+          ["first", 1],
+          ["second", 2],
+        ]),
+      ),
+    )
+    if (!Predicate.isObject(wire) || wire.type !== "map") return yield* Effect.die("Missing canonical table")
+    yield* Schema.decodeEffect(table.schema)(wire)
+    table.accept()
+    const inheritedOrder = { "1": "s:second", extra: "s:first" }
+    Object.setPrototypeOf(inheritedOrder, { "0": "s:first" })
+    for (const corrupted of [
+      { ...wire, extra: true },
+      { ...wire, length: -1 },
+      { ...wire, length: 0.5 },
+      { ...wire, length: Infinity },
+      { ...wire, order: { "0": 4, "1": "s:second" } },
+      { ...wire, order: ["s:first", "s:second"] },
+      { ...wire, order: inheritedOrder },
+      { ...wire, entries: [1, 2] },
+      { ...wire, entries: { "s:first": 1 } },
+    ]) {
+      expect((yield* Schema.decodeUnknownEffect(table.schema)(corrupted).pipe(Effect.flip))._tag).toBe("SchemaError")
+    }
+    expect([...(yield* Schema.decodeEffect(table.schema)(wire))]).toEqual([
+      ["first", 1],
+      ["second", 2],
+    ])
+  }),
+)
+
+it.effect("freezes constructed table containers without retaining mutable source rows", () =>
+  Effect.gen(function* () {
+    const table = make({ row: Schema.Struct({ value: Schema.Finite }), originals: new WeakMap(), diff })
+    const source = normalize(new Map([["row", { value: 1 }]]))
+    if (!Predicate.isObject(source) || source.type !== "map") return yield* Effect.die("Missing canonical table")
+    const initial = yield* Schema.decodeEffect(table.schema)(source)
+    table.accept()
+    const wire = yield* Schema.encodeEffect(table.schema)(initial)
+    if (!Predicate.isObject(wire) || wire.type !== "map") return yield* Effect.die("Missing constructed table")
+    expect(Object.isFrozen(wire)).toBe(true)
+    expect(Object.isFrozen(wire.entries)).toBe(true)
+    expect(Object.isFrozen(wire.order)).toBe(true)
+    expect(Object.isFrozen(wire.entries["s:row"])).toBe(true)
+    expect(Reflect.set(wire.entries, "s:row", null)).toBe(false)
+    expect(Object.isFrozen(source.entries)).toBe(false)
+    Reflect.set(source.entries, "s:row", normalize({ value: 2 }))
+    expect(initial.get("row")).toEqual({ value: 1 })
+    expect((yield* Schema.decodeEffect(table.schema)(source)).get("row")).toEqual({ value: 2 })
+  }),
+)

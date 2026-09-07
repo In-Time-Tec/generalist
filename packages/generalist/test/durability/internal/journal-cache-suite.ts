@@ -1,6 +1,6 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, it } from "@effect/vitest"
-import { Crypto, Effect, Fiber } from "effect"
+import { Crypto, Effect, Fiber, Schema } from "effect"
 import { ObjectStore, type Service } from "../../../src/durability/object-store.js"
 import { make as makeJournal } from "../../../src/durability/internal/journal.js"
 import { make as makeStorage } from "../../../src/durability/internal/journal-storage.js"
@@ -21,6 +21,28 @@ const commitKey = `${prefix}commits/00000000000000000001.json`
 const transition = Effect.succeed({ patches: [], receipt: null })
 
 it.layer(BunCrypto.layer)((test) => {
+  test.effect("compares canonical bytes exactly across unaligned words and partial tails", () =>
+    Effect.sync(() => {
+      for (const length of [0, 1, 3, 4, 7, 8, 15, 16, 31, 255, 1024]) {
+        for (const leftOffset of [0, 1, 2, 3]) {
+          for (const rightOffset of [0, 1, 2, 3]) {
+            const left = new Uint8Array(length + leftOffset).subarray(leftOffset)
+            const right = new Uint8Array(length + rightOffset).subarray(rightOffset)
+            for (let index = 0; index < length; index++) left[index] = right[index] = index % 251
+            expect(equalBytes(left, right)).toBe(true)
+            expect(equalBytes(left, new Uint8Array(length + 1))).toBe(false)
+            if (length === 0) continue
+            for (const index of new Set([0, Math.floor(length / 2), length - 1])) {
+              right[index]! ^= 1
+              expect(equalBytes(left, right)).toBe(false)
+              right[index] = left[index]!
+            }
+          }
+        }
+      }
+    }),
+  )
+
   for (const publication of ["created", "lost-ack", "uncertain"] as const) {
     test.effect(`retains a published snapshot graph only after confirmation: ${publication}`, () =>
       Effect.gen(function* () {
@@ -241,6 +263,46 @@ it.layer(BunCrypto.layer)((test) => {
       expect(sealed.bytes).toEqual(yield* encodeBytes({ digest: sealed.digest, record }))
       expect((yield* storage.unseal({ ...sealed, etag: "fixture" }, "fixture", 1024 * 1024)).record).toEqual(
         yield* parse(yield* encodeBytes(record)),
+      )
+    }),
+  )
+
+  test.effect("detaches transitions with canonical JSON semantics before provider dispatch", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const journal = yield* makeJournal(identity).pipe(Effect.provideService(ObjectStore, bucket.store))
+      const key = `${prefix}commits/${sequenceName("0")}.json`
+      const payload = {
+        zero: -0,
+        nested: { value: 1 },
+        text: "雪🚀\uD800",
+        ["__proto__"]: { literal: true },
+        constructor: "ordinary",
+      }
+      const expected = yield* parse(yield* encodeBytes(payload))
+      const paused = yield* bucket.faults.pauseNextCreate(key)
+      const committed = yield* Effect.forkScoped(
+        journal.commitWithHead({ id: "detached", input: null }, () =>
+          Effect.succeed({ patches: [{ op: "set", path: ["payload"], value: payload }], receipt: payload }),
+        ),
+      )
+      yield* paused.entered
+      expect(Object.isFrozen(payload)).toBe(false)
+      payload.nested.value = 99
+      payload.zero = 1
+      yield* paused.release
+      const result = yield* Fiber.join(committed)
+      expect(result.receipt).toEqual(expected)
+      expect(result.head.state.payload).toEqual(expected)
+      const receipt = yield* Schema.decodeUnknownEffect(Schema.Struct({ zero: Schema.Finite }))(result.receipt)
+      expect(Object.is(receipt.zero, 0)).toBe(true)
+      const stored = yield* bucket.store.read(key, { maxBytes: 1024 * 1024 })
+      if (stored === undefined) return yield* Effect.die("committed transition is missing")
+      expect(stored.bytes).toEqual(yield* encodeBytes(yield* parse(stored.bytes)))
+      const fresh = yield* makeJournal(identity).pipe(Effect.provideService(ObjectStore, (yield* bucket.connect).store))
+      expect(yield* fresh.head).toEqual(result.head)
+      expect(yield* fresh.commit({ id: "detached", input: null }, () => Effect.die("must not reevaluate"))).toEqual(
+        expected,
       )
     }),
   )

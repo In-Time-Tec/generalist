@@ -28,7 +28,7 @@ import { emptySession, type RuntimeSession, type RuntimeState } from "./projecti
 import type { ExecutionClaim } from "../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../run/ownership-errors.js"
 import { reader, SessionReads, sessionStorageFailure } from "./session-reader.js"
-import { publishConversation } from "./store/host-conversation.js"
+import { publishConversation } from "./store/host-session/conversation.js"
 
 const { pathTo } = SessionReads
 

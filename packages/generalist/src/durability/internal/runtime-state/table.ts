@@ -4,9 +4,16 @@ import { ownership, type DataSchema } from "./cache.js"
 import { make as makeValues, Value } from "./value.js"
 
 type Wire = Extract<Value, { readonly type: "map" }>
+const StoredTable = Schema.Struct({
+  type: Schema.Literal("map"),
+  length: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(0xffffffff)),
+  order: Schema.Record(Schema.String, Schema.String),
+  entries: Schema.Record(Schema.String, Schema.Unknown),
+})
 type Diff = (previous: State, next: State) => ReadonlyArray<Patch>
-type Row<A> = { readonly wire: Value; readonly value: A }
+type Row<A> = { readonly source: unknown; readonly wire: Value; readonly value: A }
 type Generation<A> = {
+  readonly source: unknown
   readonly wire: Wire
   readonly rows: ReadonlyMap<string, Row<A>>
   readonly value: ReadonlyMap<string, A>
@@ -68,8 +75,11 @@ export const make = <S extends DataSchema>({
     const candidate = pending?.rows.get(key)
     return candidate !== undefined && same(item, candidate.wire) ? { ...candidate, wire: item } : undefined
   }
-  const decodeStoredRow = (item: Value) =>
+  const decodeStoredRow = <Input>(key: string, source: Input) =>
     Effect.gen(function* () {
+      const item = freeze(yield* SchemaParser.decodeUnknownEffect(Value)(source, { onExcessProperty: "error" }))
+      const retained = retainedRow(key, item)
+      if (retained !== undefined) return { ...retained, source }
       const restored = yield* Effect.try({
         try: () => values.restore(item),
         catch: () => invalid("Invalid canonical table value"),
@@ -77,9 +87,9 @@ export const make = <S extends DataSchema>({
       owned.retain(restored)
       const value = yield* decodeRow(restored, { onExcessProperty: "error" })
       owned.retain(value)
-      return { wire: item, value }
+      return { source, wire: item, value }
     })
-  const orderedKey = (wire: Wire, index: number, seen: ReadonlyMap<string, Row<S["Type"]>>) => {
+  const orderedKey = (wire: typeof StoredTable.Type, index: number, seen: ReadonlyMap<string, Row<S["Type"]>>) => {
     const encoded = wire.order[String(index)]
     if (encoded === undefined || !encoded.startsWith("s:") || !Object.hasOwn(wire.entries, encoded))
       return invalid("Canonical table order has an invalid or missing key")
@@ -111,38 +121,49 @@ export const make = <S extends DataSchema>({
       const value = yield* decodeRow(restored, { onExcessProperty: "error" })
       owned.retain(value)
       changed.add(key)
-      return { wire, value }
+      return { source: wire, wire, value }
     })
-  const decodeTable = (wire: Wire) =>
+  const decodeTable = <Input>(source: Input, wire: typeof StoredTable.Type) =>
     Effect.gen(function* () {
       const rows = new Map<string, Row<S["Type"]>>()
       const result = new Map<string, S["Type"]>()
+      const entries: Record<string, Value> = {}
       for (let index = 0; index < wire.length; index++) {
         const key = orderedKey(wire, index, rows)
         if (!Predicate.isString(key)) return yield* Effect.fail(key)
         const item = wire.entries[`s:${key}`]!
-        const retained = retainedRow(key, item) ?? (yield* decodeStoredRow(item))
+        const previous = current?.rows.get(key)
+        const retained =
+          previous !== undefined &&
+          isImmutable(item) &&
+          (Object.is(previous.source, item) || Object.is(previous.wire, item))
+            ? previous
+            : yield* decodeStoredRow(key, item)
+        entries[`s:${key}`] = retained.wire
         rows.set(key, retained)
         result.set(key, retained.value)
       }
-      staged = { wire, rows, value: result }
+      const validated: Wire = Object.freeze({
+        ...wire,
+        order: freeze(orderedEntries(current?.wire, rows)),
+        entries: Object.freeze(entries),
+      })
+      staged = { source, wire: validated, rows, value: result }
       return result
     })
   const decode = <Input>(input: Input) =>
     Effect.gen(function* () {
       if (current !== undefined && input === current.value) return current.value
       if (pending !== undefined && input === pending.value) return pending.value
-      const wire = yield* SchemaParser.decodeUnknownEffect(Value)(input, { onExcessProperty: "error" })
-      if (!Predicate.isObject(wire) || wire.type !== "map")
-        return yield* Effect.fail(invalid("Expected a canonical table"))
-      if (current?.wire === wire && isImmutable(wire)) {
+      if (current !== undefined && (input === current.source || input === current.wire) && isImmutable(input)) {
         staged = current
         return current.value
       }
+      const wire = yield* SchemaParser.decodeUnknownEffect(StoredTable)(input, { onExcessProperty: "error" })
       if (Object.keys(wire.entries).length !== wire.length || Object.keys(wire.order).length !== wire.length) {
         return yield* Effect.fail(invalid("Canonical table cardinality does not match its order"))
       }
-      return yield* decodeTable(wire)
+      return yield* decodeTable(input, wire)
     })
   const encodeTable = (input: ReadonlyMap<unknown, unknown>) =>
     Effect.gen(function* () {
@@ -167,8 +188,13 @@ export const make = <S extends DataSchema>({
         pending = current
         return current.wire
       }
-      const wire: Wire = freeze({ type: "map", length: rows.size, order, entries })
-      pending = { wire, rows, value: result }
+      const wire: Wire = Object.freeze({
+        type: "map",
+        length: rows.size,
+        order: freeze(order),
+        entries: Object.freeze(entries),
+      })
+      pending = { source: wire, wire, rows, value: result }
       return wire
     })
   const encode = <Input>(input: Input) =>

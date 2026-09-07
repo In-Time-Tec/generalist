@@ -10,7 +10,7 @@ import {
 } from "./history.js"
 import { Effect, Function, Predicate, Types } from "effect"
 import { ForkSequenceInvalid, NoSnapshot, RuntimeUnavailable, SubstitutionInvalid } from "../../../errors.js"
-import { publishConversation } from "../host-conversation.js"
+import { publishConversation } from "../host-session/conversation.js"
 import type { RunEvent } from "../../../run/event.js"
 import type { ForkRunInput as ForkCommand, RewindRunInput as RewindCommand } from "../../../run/store-types.js"
 import type { OperationRecord } from "../../../operation/record.js"

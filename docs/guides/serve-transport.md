@@ -128,11 +128,13 @@ live:   0:RunAccepted 1:RunAttemptStarted 2:TurnStarted 3:ModelCallStarted 4:Mod
 replay: 3:ModelCallStarted 4:ModelAttemptStarted 5:ModelAttemptFirstOutput 6:ModelResponseCommitted 7:ModelAttemptCompleted 8:ModelCallCompleted 9:TurnCompleted 10:RunCompleted
 ```
 
-- A Host Session assigns one durable cursor across the visible events from its root Run trees.
-- `ModelResponseCommitted` references the exact Runtime Session entry containing the complete normalized response for a successful model operation; `ModelResponseInterrupted` references normalized output retained before cancellation or failure. Runtime stores the content once in Session. Host does not include these model-response records in its product event projection, and provider fragments never enter the durable stream.
+- A Host Session assigns one durable cursor across Run lifecycle entries and committed Conversation updates. Some Run entries are filtered from the product stream, so visible cursor values can have gaps.
+- `ModelResponseCommitted` references the exact Runtime Session entry containing the complete normalized response for a successful model operation; `ModelResponseInterrupted` references normalized output retained before cancellation or failure. Runtime stores the content once in Session. Host filters those raw Run events but exposes committed user/tool/assistant content through the Session conversation snapshot and Conversation updates. Provider fragments never enter that durable display stream.
 - Terminal lifecycle facts are `RunCompleted`, `RunFailed`, and `RunCancelled`.
 - A Server cursor is exclusive: cursor n requests Host events after authoritative Session entry n.
 - The Host Session ID addresses streaming and lists root Runs; the Run ID addresses inspection and control.
+
+For an existing Session, `client.events.connect({ sessionId })` first reads a version-1 snapshot containing metadata, Run projections, `conversation: { leafId, entries }`, and the exact exclusive cursor. Each visible entry keeps its original ID and parent ID. Live updates retain the prefix through `afterEntryId` and replace the suffix, rather than assuming every change is an append. FoldKit validates the prior leaf and resynchronizes from a new snapshot when the prefix does not match. Internal instruction, memory, and skill bodies are not display entries. [Snapshot limits](/features/server#snapshot-limits) reject oversized responses instead of truncating them.
 
 ## 2. Resolve approval waits
 

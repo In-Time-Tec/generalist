@@ -94,7 +94,7 @@ import {
 import { externalChildOperations } from "./store/child/external.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import { acknowledge, loadAcknowledged } from "./store/acknowledgement.js"
-import { make as makeHostSessionStore } from "./store/host-session.js"
+import { make as makeHostSessionStore } from "./store/host-session/index.js"
 import {
   appendAction as appendOperatorAction,
   journal as recoveryJournal,

@@ -1,14 +1,17 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import type { Entry, MessageEntry } from "../../../../src/core/context/session.js"
+import type { Entry, MessageEntry } from "../../../../../src/core/context/session.js"
 import {
   emptySession,
   emptyState,
   type RuntimeSession,
   type RuntimeState,
-} from "../../../../src/runtime/state/projection.js"
-import { projectConversation, publishConversation } from "../../../../src/runtime/state/store/host-conversation.js"
+} from "../../../../../src/runtime/state/projection.js"
+import {
+  projectConversation,
+  publishConversation,
+} from "../../../../../src/runtime/state/store/host-session/conversation.js"
 
 const user = (id: string, parentId: string | null): MessageEntry => ({
   id,

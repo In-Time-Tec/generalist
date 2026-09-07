@@ -9,7 +9,6 @@ import {
   equalBytes,
   failure,
   freeze,
-  nextSequence,
   sequenceFromName,
   sequenceName,
 } from "./protocol.js"
@@ -55,16 +54,14 @@ export const make = ({
         return yield* failure({ reason: "corruption", message: "Invalid numbered commit key", key })
       sequences.push(sequence)
     }
-    sequences.sort(compareSequence)
-    let expected = "0"
-    for (const sequence of sequences) {
-      if (sequence !== expected)
+    sequences.sort((left, right) => left.length - right.length || (left < right ? -1 : Number(left > right)))
+    for (let index = 0; index < sequences.length; index++) {
+      if (sequences[index] !== String(index))
         return yield* failure({
           reason: "corruption",
           message: "Retained commit history contains a gap",
-          key: commitKey(expected),
+          key: commitKey(String(index)),
         })
-      expected = nextSequence(expected)
     }
     return sequences
   })
@@ -196,8 +193,12 @@ export const make = ({
         loaded = known
       }
     }
-    for (const sequence of sequences) {
-      if (compareSequence(sequence, loaded.head.sequence) <= 0) continue
+    for (
+      let index = loaded.head.sequence === "-1" ? 0 : sequences.indexOf(loaded.head.sequence) + 1;
+      index < sequences.length;
+      index++
+    ) {
+      const sequence = sequences[index]!
       if (loaded.replayRecords >= snapshotEvery) {
         return yield* failure({
           reason: "limit",

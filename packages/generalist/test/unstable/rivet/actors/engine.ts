@@ -59,6 +59,7 @@ export const layer = Layer.effect(
       ChildProcess.make(binary, ["start"], {
         cwd: directory,
         env: {
+          RUST_LOG: "info,pegboard=debug,pegboard_envoy=debug,guard=debug,gasoline=debug",
           RIVET__FILE_SYSTEM__PATH: path.join(directory, "data"),
           RIVET__GUARD__HOST: "127.0.0.1",
           RIVET__GUARD__PORT: String(enginePort),

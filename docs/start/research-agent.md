@@ -484,7 +484,9 @@ bun add -d vite
 
 ### Wire the chat
 
-`generalist/unstable/foldkit` ships a headless chat submodel that decodes durable HostEvents and projects connection, turn, tool, approval, cancellation, and terminal state. The program embeds `Chat.Model` in its own model, forwards `Chat.subscriptions` with `Subscription.lift`, routes every child action through a `GotChatAction` wrapper, and provides the connection as a layer: `Connection.layerWebSocket`. When `model.chat.run` is `AwaitingApproval`, the view renders Approve and Deny buttons dispatching `Chat.ClickedApprove` and `Chat.ClickedDeny`. Those commands resolve the same durable approval token as Part 2. Host intentionally excludes internal model-response records from the product event stream, so this projection does not currently reconstruct incremental or committed assistant-response rows.
+`generalist/unstable/foldkit` restores committed user messages, tool calls/results, and assistant text from the Session snapshot before following live Conversation and Run-derived HostEvents. The program embeds `Chat.Model` in its own model, forwards `Chat.subscriptions` with `Subscription.lift`, routes every child action through a `GotChatAction` wrapper, and provides the connection as a layer: `Connection.layerWebSocket`. When `model.chat.run` is `AwaitingApproval`, the view renders Approve and Deny buttons dispatching `Chat.ClickedApprove` and `Chat.ClickedDeny`. Those commands resolve the same durable approval token as Part 2.
+
+Conversation updates preserve original Session identities and replace the suffix after a retained-prefix anchor, so reopening, rewind, and resynchronization do not duplicate abandoned-path messages. Invalid leaf/prefix state triggers a fresh snapshot and delivery epoch. Internal instruction, memory, and skill bodies are excluded, and [oversized snapshots are rejected](/features/server#snapshot-limits) rather than truncated. Committed assistant rows come from this conversation contract; raw provider fragments and internal model-response Run records are not the display stream.
 
 **main.ts**
 

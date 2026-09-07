@@ -405,7 +405,7 @@ export const encodeCommandValue = Function.dual<
   ): Effect.Effect<Schema.Json, DurabilityFailure> =>
     Effect.gen(function* () {
       const encoded = yield* Schema.encodeEffect(schema)(value).pipe(Effect.mapError(encodingFailure))
-      const normalized = yield* Effect.try({ try: () => normalize(encoded), catch: encodingFailure })
+      const normalized = yield* Effect.try({ try: () => freeze(normalize(encoded)), catch: encodingFailure })
       return yield* Schema.decodeEffect(Value)(normalized, strict).pipe(Effect.mapError(encodingFailure))
     }),
 )

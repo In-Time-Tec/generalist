@@ -168,7 +168,33 @@ layer(services)("Server", (it) => {
             Stream.runCollect,
           ),
         )
-        expect(events.map((event) => event._tag)).toEqual(["RunStarted", "Turn", "Turn", "Completed"])
+        expect(events.map((event) => event._tag)).toEqual([
+          "RunStarted",
+          "Turn",
+          "Conversation",
+          "Conversation",
+          "Turn",
+          "Completed",
+        ])
+        expect(events.map((event) => event.cursor)).toEqual([0, 2, 3, 7, 11, 12])
+        const conversation = events
+          .filter((event) => event._tag === "Conversation")
+          .flatMap((event) => event.update.entries)
+        expect(
+          conversation
+            .flatMap((entry) => entry.messages)
+            .map((message) => ({
+              role: message.role,
+              text: message.content
+                .filter((part) => part.type === "text")
+                .map((part) => part.text)
+                .join(""),
+            })),
+        ).toEqual([
+          { role: "user", text: '{"question":"status"}' },
+          { role: "assistant", text: "server complete" },
+        ])
+        expect((yield* client.sessions.snapshot({ sessionId: session.id })).conversation.entries).toEqual(conversation)
         const resumed = Array.from(
           yield* client.events.subscribe({ sessionId: session.id, cursor: events[0]!.cursor }).pipe(
             Stream.takeUntil((event) => event._tag === "Completed"),
@@ -176,6 +202,7 @@ layer(services)("Server", (it) => {
           ),
         )
         expect(resumed.map((event) => event.cursor)).toEqual(events.slice(1).map((event) => event.cursor))
+        expect(resumed).toEqual(events.slice(1))
 
         const cancelled = yield* client.runs.start({
           sessionId: session.id,
