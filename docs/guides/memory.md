@@ -1,6 +1,6 @@
 ---
 title: "How to add memory"
-description: "Recall and remember across runs with Memory.Key, WorkingMemory, and SemanticRecall over a VectorStore, including a pgvector adapter recipe."
+description: "Recall and remember across runs with Memory.Key, WorkingMemory, and SemanticRecall over a VectorStore, including an offline-safe local composition."
 ---
 
 Memory is an optional recall/remember seam: before turn 0 the loop asks the `Memory` service for items to inject, and after turns it hands back the transcript to remember. You opt in per run with `RunOptions.memory` and a `Memory.Key` of `{ agent, subject }` that you choose. Generalist never derives memory identity from session ids or users.
@@ -78,7 +78,7 @@ Pass `summarize: { model }` to `WorkingMemory.layer` with a closed LanguageModel
 
 ## 2. Add semantic recall for long-lived subjects
 
-`SemanticRecall.layer` embeds the run's user text, queries a `VectorStore` scoped to the key, and injects the top matches; on terminal turns it embeds and stores the final user–assistant exchange. It needs two services: a `VectorStore` and an `Ai.EmbeddingModel`; `generalist/providers/openai-embedding` supplies the latter:
+`SemanticRecall.layer` embeds the run's user text, queries a `VectorStore` scoped to the key, and injects the top matches; on terminal turns it embeds and stores the final user–assistant exchange. It needs two services: a `VectorStore` and the provider-neutral `EmbeddingModel` from `effect/unstable/ai`; `generalist/providers/openai-embedding` supplies the latter:
 
 **semantic-recall.ts**
 
@@ -104,23 +104,8 @@ export const workingLayer: Layer.Layer<Memory.Memory> = WorkingMemory.layer({ ma
 
 To run both kinds of memory on one key, use `layer` from `generalist/memory`: recall merges items from both, remember writes to both.
 
-## Recipe: a pgvector VectorStore
+`VectorStore.layerMemory` is process-local and does not survive a process restart. This semantic recall example is intentionally non-durable; use it for tests and short-lived runs, while object durability covers the Runtime journal rather than semantic vectors.
 
-`layerPgVector` stores active vectors plus append-only version history and filters on the complete memory key before ranking by cosine distance. It uses the application's existing `effect/unstable/sql` client:
-
-**pgvector-store.ts**
-
-```typescript
-import { Layer } from "effect"
-import { SqlClient } from "effect/unstable/sql"
-import { layerPgVector, VectorStore } from "generalist/memory"
-
-// Provide this layer with the application's existing effect/unstable/sql SqlClient.
-export const pgvectorLayer: Layer.Layer<VectorStore.VectorStore, VectorStore.VectorStoreError, SqlClient.SqlClient> =
-  layerPgVector({ table: "memory_documents", dimensions: 1_536 })
-```
-
-The in-process `VectorStore.layerMemory` remains the offline-safe default; swap layers, not call sites, when you move to Postgres.
 
 ## Next steps
 

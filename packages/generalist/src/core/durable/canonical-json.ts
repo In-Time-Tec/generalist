@@ -138,7 +138,7 @@ export const sha256Text = (text: string): string => {
   return text.length < cacheMinimumLength ? hex : remember(text, hex)
 }
 
-const canonicalize = (value: Schema.Json): Schema.Json => {
+export const canonicalize = (value: Schema.Json): Schema.Json => {
   if (Array.isArray(value)) return value.map(canonicalize)
   if (value === null || !Schema.is(Schema.JsonObject)(value)) return Object.is(value, -0) ? 0 : value
   return Object.fromEntries(

@@ -14,6 +14,7 @@ import {
   researcherRef,
   textPrompt,
 } from "../../execution/fixtures.js"
+import { objectWorkerId } from "../../execution/object.js"
 import { testExecutable, unusedModel } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 import { allowAllAuthorization } from "../../../authorization.js"
@@ -82,7 +83,11 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claim = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({ runId, ownerId }))
+      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({
+          commandId: `runtime-operation-suites-tool-cancellation-ts-claim-${ownerId}`,
+          runId,
+          ownerId: objectWorkerId,
+        }))
       : options.claim(runId, ownerId)
 
   describeBackend(`durable tool cancellation (${options.name})`, () => {
@@ -166,7 +171,8 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               replayPolicy: "never",
             })
 
-            yield* runtime.cancel({ runId: receipt.runId, reason: "user requested" })
+            yield* runtime.cancel({
+          commandId: "runtime-operation-suites-tool-cancellation-ts-cancel-1", runId: receipt.runId, reason: "user requested" })
             yield* Fiber.await(original).pipe(Effect.timeout("5 seconds"))
             const committed = yield* store.getOperationByKey({ runId: receipt.runId, operationKey })
             expect(committed).toMatchObject({ status: "cancelling" })
@@ -305,7 +311,12 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             } else {
               yield* options.expireClaim(receipt.runId)
               const recoveryClaim = yield* claim(receipt.runId, "tool-interruption-recovery")
-              expect(yield* store.recoverRunningOperations(recoveryClaim)).toBe("blocked")
+              expect(
+                yield* store.recoverRunningOperations({
+                  ...recoveryClaim,
+                  commandId: "runtime-operation-suites-tool-cancellation-ts-recoverRunningOperations-1",
+                }),
+              ).toBe("blocked")
               yield* store.releaseExecution(recoveryClaim)
               yield* Fiber.interrupt(original)
             }
@@ -378,7 +389,8 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               replayPolicy: "never",
               attempt: rootExecution.attempt,
             })
-            yield* store.startOperation({ ...rootClaim, operationId: rootOperation.operationId })
+            yield* store.startOperation({
+          commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-2", ...rootClaim, operationId: rootOperation.operationId })
             const blockedOperation = yield* store.recordOperation({
               ...rootClaim,
               operationKey: `${receipt.runId}:tool:blocked`,
@@ -408,9 +420,11 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
               replayPolicy: "never",
               attempt: childExecution.attempt,
             })
-            yield* store.startOperation({ ...childClaim, operationId: childOperation.operationId })
+            yield* store.startOperation({
+          commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-3", ...childClaim, operationId: childOperation.operationId })
 
-            yield* runtime.cancel({ runId: receipt.runId, reason: "cancel tree" })
+            yield* runtime.cancel({
+          commandId: "runtime-operation-suites-tool-cancellation-ts-cancel-4", runId: receipt.runId, reason: "cancel tree" })
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
             expect((yield* runtime.inspect(child.runId)).status).toBe("cancelling")
             expect(
@@ -434,7 +448,11 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             ).toBe("generalist/runtime/RuntimeUnavailable")
             expect(
               (yield* store
-                .startOperation({ ...rootClaim, operationId: blockedOperation.operationId })
+                .startOperation({
+                  ...rootClaim,
+                  operationId: blockedOperation.operationId,
+                  commandId: "runtime-operation-suites-tool-cancellation-ts-startOperation-blocked",
+                })
                 .pipe(Effect.flip))._tag,
             ).toBe("generalist/runtime/RuntimeUnavailable")
             expect(cancellationRequests).toHaveLength(0)

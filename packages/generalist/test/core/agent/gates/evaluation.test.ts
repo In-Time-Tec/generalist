@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../../../runtime/execution/object.js"
 /* oxlint-disable effecttsgo/strict-effect-provide -- tests provide scripted models and gate requirements at the process boundary. */
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
@@ -291,7 +292,7 @@ it.effect("suspends on retry budget exhaustion without false completion", () =>
       onGateFailure: "retry",
     })
     const runtimeLayer = Layer.merge(
-      Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+      objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }).pipe(
         Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
       ),
       allowAllAuthorization,

@@ -24,6 +24,7 @@ export const RuleFile = Schema.Array(RuleSchema)
 /** Permission service failure. */
 export class PermissionError extends ActionableTaggedError<PermissionError>()("generalist/core/PermissionError", {
   message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
   hint: errorHint("Restore access to the permission rule store, then retry the operation."),
 }) {}
 

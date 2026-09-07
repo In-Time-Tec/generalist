@@ -1,18 +1,16 @@
 import { expect, it } from "@effect/vitest"
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import { AckBeyondCommitted, AckInvalid, RunNotFound } from "../../runtime/errors.js"
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
-import { RunClaims } from "../../runtime/sql/run/claims.js"
 import type { Options, RuntimeCapability, Services } from "./contract.js"
 
 const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services => {
-  const claims = Context.getOption(context, RunClaims)
   const services: Services = {
     runtime: Context.get(context, Runtime),
     store: Context.get(context, RunStore),
   }
-  return Option.isSome(claims) ? { ...services, claims: claims.value } : services
+  return services
 }
 
 const provide = <A, E, LayerError, ClaimsLayerError>(
@@ -52,10 +50,10 @@ export const registerAcknowledgement = <LayerError, ClaimsLayerError>(input: {
           ).toBeInstanceOf(AckInvalid)
         }
 
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "host-acknowledgement" })
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnCompleted", turn: 0 } })
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnCompleted", turn: 1 } })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "host-acknowledgement" })
+        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnCompleted"}:${0}`, event: { _tag: "TurnCompleted", turn: 0 } })
+        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnStarted"}:${1}`, event: { _tag: "TurnStarted", turn: 1 } })
+        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnCompleted"}:${1}`, event: { _tag: "TurnCompleted", turn: 1 } })
         const history = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
         const boundaries = history.filter((event) => event._tag === "TurnCompleted")
         expect(boundaries).toHaveLength(2)

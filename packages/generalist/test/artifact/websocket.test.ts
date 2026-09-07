@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, makeObjectStorage } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Layer, Queue, Schema } from "effect"
@@ -9,6 +10,7 @@ import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
+import { ObjectStore } from "../../src/durability/object-store.js"
 import { handle } from "../../src/server/artifact-websocket.js"
 
 const makeSocket = Effect.gen(function* () {
@@ -35,11 +37,14 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest => 
   return value
 }
 
+const storage = makeObjectStorage()
 const services = Layer.mergeAll(
-  Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+  objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
     Layer.provide(ExecutableResolver.layerStatic([])),
   ),
-  BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer)),
+  BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+    Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
+  ),
   artifactLayer,
   TestModel.layer([]),
   Permissions.layerAllowAll,
@@ -68,6 +73,7 @@ layer(services)("Artifact WebSocket", (it) => {
       })
 
       const command = yield* Schema.encodeEffect(Schema.fromJsonString(Server.ArtifactClientCommand))({
+        commandId: "browser:edit-1",
         _tag: "Edit",
         base: 0,
         operation: { _tag: "Insert", at: 5, text: " together" },

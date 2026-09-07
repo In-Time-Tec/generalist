@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, it } from "@effect/vitest"
-import { Context, Effect, Layer, Option, Stream } from "effect"
+import { Context, Effect, Fiber, Layer, Option, Stream } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { RunExecutor } from "../../runtime/execution/run-executor.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
-import { StaleClaim } from "../../runtime/sql/errors.js"
+import { StaleClaim } from "../../runtime/run/ownership-errors.js"
 import { registerPayload } from "./payload/index.js"
-import { RunClaims } from "../../runtime/sql/run/claims.js"
 import { checkpoint, replay } from "../../runtime/tree.js"
 import { registerAdmission, registerAgentStart } from "./agent-start.js"
 import { registerAcknowledgement } from "./acknowledgement.js"
@@ -23,8 +23,7 @@ import type {
   RunTreeCapability,
   RuntimeCapability,
   Services,
-  SqlTransactionCapability,
-  WorkerClaim,
+  AtomicCommitCapability,
 } from "./contract.js"
 import { pluralWaitsConformance, toolSuspension } from "./plural-waits.js"
 import { registerChildRuns } from "./children/runs.js"
@@ -33,9 +32,7 @@ import { registerArtifacts } from "./artifact/index.js"
 
 export type * from "./contract.js"
 export * from "./model-response-fault.js"
-export * from "./sql-transaction-fault.js"
 const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services => {
-  const optionalClaims = Context.getOption(context, RunClaims)
   const optionalExecutor = Context.getOption(context, RunExecutor)
   const services: Services = {
     runtime: Context.get(context, Runtime),
@@ -44,7 +41,6 @@ const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services =>
   return {
     ...services,
     ...(Option.isSome(optionalExecutor) ? { executor: optionalExecutor.value } : undefined),
-    ...(Option.isSome(optionalClaims) ? { claims: optionalClaims.value } : undefined),
   }
 }
 
@@ -85,19 +81,6 @@ const provide = <A, E, LayerError, ClaimsLayerError>(
   use: (services: Services) => Effect.Effect<A, E>,
 ): Effect.Effect<A, E | LayerError> => prepare(options, provideLayer(options.layer, use))
 
-const provideClaims = <A, E, LayerError>(
-  layer: Layer.Layer<Runtime | RunStore | RunClaims, LayerError, never>,
-  use: (services: Services & { readonly claims: RunClaims["Service"] }) => Effect.Effect<A, E>,
-): Effect.Effect<A, E | LayerError> =>
-  Effect.scoped(
-    Effect.flatMap(Layer.build(layer), (context) =>
-      use({
-        runtime: Context.get(context, Runtime),
-        store: Context.get(context, RunStore),
-        claims: Context.get(context, RunClaims),
-      }),
-    ),
-  )
 
 const slug = (value: string): string => value.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()
 
@@ -112,6 +95,7 @@ const identity = (name: string, test: string) => {
 
 const completedResult = (sessionId: string, text: string): ExecutionResult => ({
   text,
+  output: text,
   turns: 1,
   session: { sessionId, leafId: null },
 })
@@ -143,7 +127,7 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
           idempotencyKey: id.idempotencyKey,
           prompt: "wait for signal",
         })
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "control-a" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "control-a" })
         const waitId = `${id.idempotencyKey}:signal`
         yield* services.store.suspend({
           ...claim,
@@ -157,9 +141,9 @@ const registerRuntime = <LayerError, ClaimsLayerError>(
           ],
           suspension: toolSuspension([waitId]),
         })
-        yield* services.runtime.signal({ runId: receipt.runId, name: waitId })
-        const resumed = yield* capability.claim(services, { runId: receipt.runId, workerId: "control-b" })
-        yield* services.store.complete({ ...resumed, result: completedResult(id.sessionId, "completed") })
+        yield* services.runtime.signal({ runId: receipt.runId, commandId: `${receipt.runId}:signal:${waitId}`, name: waitId })
+        const resumed = yield* capability.claim(services, { runId: receipt.runId, commandId: "control-b" })
+        yield* services.store.complete({ ...resumed, commandId: `${receipt.runId}:complete`, result: completedResult(id.sessionId, "completed") })
 
         const inspection = yield* services.runtime.inspect(receipt.runId)
         const events = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
@@ -201,9 +185,9 @@ const registerRunTree = <LayerError, ClaimsLayerError>(
           prompt: "tree replay",
         })
         const before = yield* checkpoint(root.runId).pipe(Effect.provideService(Runtime, services.runtime))
-        const claim = yield* capability.claim(services, { runId: root.runId, workerId: "tree" })
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 2 } })
+        const claim = yield* capability.claim(services, { runId: root.runId, commandId: "tree" })
+        yield* services.store.emitAgentEvent({ ...claim, commandId: `${root.runId}:turn:1`, event: { _tag: "TurnStarted", turn: 1 } })
+        yield* services.store.emitAgentEvent({ ...claim, commandId: `${root.runId}:turn:2`, event: { _tag: "TurnStarted", turn: 2 } })
         const first = yield* replay({ rootRunId: root.runId, cursor: before.cursor, limit: 1 }).pipe(
           Effect.provideService(Runtime, services.runtime),
         )
@@ -239,132 +223,127 @@ const registerRunTree = <LayerError, ClaimsLayerError>(
   )
 }
 
-const registerSqlTransactions = <LayerError, ClaimsLayerError>(
+const registerAtomicCommits = <LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
-  capability: SqlTransactionCapability,
+  capability: AtomicCommitCapability,
 ) => {
-  it.effect("rolls back failed state and event commits, then commits once", () =>
+  it.effect("keeps failed publication atomic and retries one exact completion", () =>
     provide(options, (services) =>
       Effect.gen(function* () {
-        const id = identity(options.name, "sql-transaction")
+        const id = identity(options.name, "atomic-commit")
         const receipt = yield* services.runtime.send({
           to: options.address,
           sessionId: id.sessionId,
           idempotencyKey: id.idempotencyKey,
-          prompt: "transaction",
+          prompt: "atomic completion",
         })
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "transaction" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "atomic-commit" })
+        const next = yield* services.runtime.send({
+          to: options.address, sessionId: id.sessionId, idempotencyKey: `${id.idempotencyKey}:next`, prompt: "next root",
+        })
+        const beforeNext = yield* services.runtime.history({ runId: next.runId, limit: 100 })
+        expect((yield* services.runtime.inspect(next.runId)).status).toBe("queued")
         const before = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
-        const failed = yield* Effect.exit(
-          capability.forceRollback(
-            services.store.complete({ ...claim, result: completedResult(id.sessionId, "committed") }),
-          ),
-        )
-        expect(failed._tag).toBe("Failure")
+        const complete = { ...claim, commandId: `${receipt.runId}:complete`, result: completedResult(id.sessionId, "committed") }
+        yield* capability.failNextCommit(services)
+        expect((yield* Effect.exit(services.store.complete(complete)))._tag).toBe("Failure")
         expect((yield* services.runtime.inspect(receipt.runId)).status).toBe("running")
         expect(yield* services.runtime.history({ runId: receipt.runId, limit: 100 })).toEqual(before)
-
-        yield* services.store.complete({ ...claim, result: completedResult(id.sessionId, "committed") })
+        expect(yield* services.runtime.history({ runId: next.runId, limit: 100 })).toEqual(beforeNext)
+        expect((yield* services.runtime.inspect(next.runId)).status).toBe("queued")
+        const first = yield* services.store.complete(complete)
+        expect(yield* services.store.complete(complete)).toEqual(first)
         const committed = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
         expect((yield* services.runtime.inspect(receipt.runId)).status).toBe("succeeded")
         expect(committed.filter((event) => event._tag === "RunCompleted")).toHaveLength(1)
+        expect((yield* services.runtime.inspect(next.runId)).status).toBe("running")
       }),
     ),
   )
+  for (const contended of [false, true]) {
+    it.effect(`interrupts unpublished work${contended ? " after an independent writer wins its slot" : ""} without leaking state or blocking retry`, () =>
+      prepare(options, provideLayerPair(options.layer, (left, right) => Effect.gen(function* () {
+        const id = identity(options.name, `interrupted-commit:${contended}`)
+        const receipt = yield* left.runtime.send({
+          to: options.address, sessionId: id.sessionId, idempotencyKey: id.idempotencyKey, prompt: "interrupt publication",
+        })
+        const claim = yield* capability.claim(left, { runId: receipt.runId, commandId: "interrupt-publication" })
+        const before = yield* left.runtime.history({ runId: receipt.runId, limit: 100 })
+        const command = { ...claim, commandId: `${receipt.runId}:complete`, result: completedResult(id.sessionId, "exact completion") }
+        const pause = yield* capability.pauseNextCommit(left)
+        const pending = yield* left.store.complete(command).pipe(Effect.forkChild)
+        yield* pause.entered
+        if (contended) {
+          const other = yield* right.runtime.send({
+            to: options.address, sessionId: `${id.sessionId}:other`, idempotencyKey: `${id.idempotencyKey}:other`, prompt: "independent winner",
+          })
+          expect((yield* right.runtime.inspect(other.runId)).status).toBe("running")
+        }
+        yield* Fiber.interrupt(pending)
+        yield* pause.release
+        expect(yield* right.runtime.history({ runId: receipt.runId, limit: 100 })).toEqual(before)
+        expect((yield* right.runtime.inspect(receipt.runId)).status).toBe("running")
+        const completed = yield* left.store.complete(command)
+        expect(yield* left.store.complete(command)).toEqual(completed)
+        expect((yield* right.runtime.history({ runId: receipt.runId, limit: 100 })).filter((event) => event._tag === "RunCompleted")).toHaveLength(1)
+      }))),
+    )
+  }
 }
 
 const registerMultiWorkerClaims = <LayerError, ClaimsLayerError>(
   options: Options<LayerError, ClaimsLayerError>,
   capability: MultiWorkerClaimCapability<ClaimsLayerError>,
 ) => {
-  it.effect("atomically distributes concurrent claims across workers", () =>
-    prepare(
-      options,
-      provideClaims(capability.layer, ({ runtime, claims }) =>
-        Effect.gen(function* () {
-          const receipts = yield* Effect.forEach(
-            Array.from({ length: 6 }, (_, index) => index),
-            (index) => {
-              const id = identity(options.name, `claims-concurrent-${index}`)
-              return runtime.send({
-                to: options.address,
-                sessionId: id.sessionId,
-                idempotencyKey: id.idempotencyKey,
-                prompt: `claim ${index}`,
-              })
-            },
-          )
-          const batches = yield* Effect.all(
-            ["worker-a", "worker-b", "worker-c"].map((workerId) =>
-              claims.claimReadyRuns({ workerId, limit: 2, lease: "10 seconds" }),
-            ),
-            { concurrency: "unbounded" },
-          )
-          const claimed = batches.flat()
-          expect(batches.map((batch) => batch.length)).toEqual([2, 2, 2])
-          expect(new Set(claimed.map((item) => item.run.runId)).size).toBe(receipts.length)
-          expect(claimed.map((item) => item.run.runId).toSorted()).toEqual(
-            receipts.map((receipt) => receipt.runId).toSorted(),
-          )
-        }),
-      ),
-    ),
+  it.effect("gives one independent activated worker each contested execution", () =>
+    prepare(options, provideLayerPair(capability.layer, (left, right) =>
+      Effect.gen(function* () {
+        for (let index = 0; index < 6; index += 1) {
+          const id = identity(options.name, `claims-concurrent-${index}`)
+          const receipt = yield* left.runtime.send({
+            to: options.address, sessionId: id.sessionId, idempotencyKey: id.idempotencyKey, prompt: `claim ${index}`,
+          })
+          const results = yield* Effect.all([
+            Effect.exit(capability.claim(left, { runId: receipt.runId, commandId: `left:${index}` })),
+            Effect.exit(capability.claim(right, { runId: receipt.runId, commandId: `right:${index}` })),
+          ], { concurrency: "unbounded" })
+          expect(results.map((result) => result._tag).toSorted()).toEqual(["Failure", "Success"])
+          const winner = results[0]._tag === "Success" ? results[0].value : results[1]._tag === "Success" ? results[1].value : undefined
+          if (winner === undefined) return yield* Effect.die("no execution claim won")
+          const owner = results[0]._tag === "Success" ? left : right
+          yield* owner.store.complete({ ...winner, commandId: `${receipt.runId}:complete`, result: completedResult(id.sessionId, "winner") })
+          expect((yield* right.runtime.inspect(receipt.runId)).status).toBe("succeeded")
+        }
+      }),
+    )),
   )
 
-  it.effect("raises fences and rejects stale renew, release, and commit", () =>
-    prepare(
-      options,
-      provideClaims(capability.layer, ({ runtime, claims }) =>
-        Effect.gen(function* () {
-          const id = identity(options.name, "claims-stale")
-          const receipt = yield* runtime.send({
-            to: options.address,
-            sessionId: id.sessionId,
-            idempotencyKey: id.idempotencyKey,
-            prompt: "stale claim",
-          })
-          const [first] = yield* claims.claimReadyRuns({ workerId: "stale-a", limit: 1, lease: "10 seconds" })
-          if (first === undefined) return yield* Effect.die("initial conformance claim is missing")
-          const stale: WorkerClaim = {
-            runId: first.run.runId,
-            workerId: first.workerId,
-            attemptFence: first.attemptFence,
-            session: first.session,
-          }
-          yield* capability.expire(stale)
-          const [second] = yield* claims.claimReadyRuns({ workerId: "stale-b", limit: 1, lease: "10 seconds" })
-          if (second === undefined) return yield* Effect.die("replacement conformance claim is missing")
-          expect(second.run.runId).toBe(receipt.runId)
-          expect(second.attemptFence).toBeGreaterThan(first.attemptFence)
-          expect(
-            yield* claims.refreshLease({
-              ...stale,
-              cancellationRequested: false,
-              lease: "10 seconds",
-            }),
-          ).toBe(false)
-          yield* claims.releaseClaim(stale)
-          expect(yield* claims.claimReadyRuns({ workerId: "stale-c", limit: 1, lease: "10 seconds" })).toEqual([])
-          const staleCommit = yield* claims
-            .commitWithClaim({
-              ...stale,
-              transition: "complete",
-              result: completedResult(id.sessionId, "stale"),
-            })
-            .pipe(Effect.flip)
-          expect(staleCommit).toBeInstanceOf(StaleClaim)
-          yield* claims.commitWithClaim({
-            runId: second.run.runId,
-            workerId: second.workerId,
-            attemptFence: second.attemptFence,
-            session: second.session,
-            transition: "complete",
-            result: completedResult(id.sessionId, "fresh"),
-          })
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-        }),
-      ),
-    ),
+  it.effect("raises run and Session fences after fresh-host recovery and rejects stale writes", () =>
+    prepare(options, Effect.gen(function* () {
+      const stale = yield* provideLayer(capability.layer, (services) => Effect.gen(function* () {
+        const id = identity(options.name, "claims-stale")
+        const receipt = yield* services.runtime.send({
+          to: options.address, sessionId: id.sessionId, idempotencyKey: id.idempotencyKey, prompt: "stale claim",
+        })
+        return yield* capability.claim(services, { runId: receipt.runId, commandId: "stale-before" })
+      }))
+      yield* provideLayer(capability.layer, (services) => Effect.gen(function* () {
+        const fresh = yield* capability.claim(services, { runId: stale.runId, commandId: "stale-after" })
+        expect(fresh.attemptFence).toBeGreaterThan(stale.attemptFence)
+        expect(BigInt(fresh.session.epoch)).toBeGreaterThan(BigInt(stale.session.epoch))
+        const session = Option.getOrThrow(yield* services.store.claimedSessionStore(stale))
+        expect((yield* Effect.exit(session.append({ _tag: "Message", message: Prompt.make("stale").content[0]! }, { commandId: "stale-write" })))._tag).toBe("Failure")
+        yield* services.store.releaseExecution(stale)
+        const error = yield* services.store.complete({
+          ...stale, commandId: `${stale.runId}:stale-complete`, result: completedResult(stale.session.sessionId, "stale"),
+        }).pipe(Effect.flip)
+        expect(error).toBeInstanceOf(StaleClaim)
+        yield* services.store.complete({
+          ...fresh, commandId: `${fresh.runId}:fresh-complete`, result: completedResult(fresh.session.sessionId, "fresh"),
+        })
+        expect((yield* services.runtime.inspect(stale.runId)).status).toBe("succeeded")
+      }))
+    })),
   )
 }
 
@@ -387,8 +366,8 @@ const registerNotificationRecovery = <LayerError, ClaimsLayerError>(
             })
             const events = yield* services.runtime.history({ runId: receipt.runId, limit: 100 })
             const cursor = events.at(-1)!.sequence
-            const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "notification" })
-            yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 41 } })
+            const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "notification" })
+            yield* services.store.emitAgentEvent({ ...claim, commandId: `${receipt.runId}:missed-event`, event: { _tag: "TurnStarted", turn: 41 } })
             return { runId: receipt.runId, cursor }
           }),
         )
@@ -445,8 +424,8 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
         open: (use) => provideLayer(options.layer, use),
       })
     }
-    if (options.capabilities.sqlTransactions !== undefined) {
-      registerSqlTransactions(options, options.capabilities.sqlTransactions)
+    if (options.capabilities.atomicCommits !== undefined) {
+      registerAtomicCommits(options, options.capabilities.atomicCommits)
     }
     if (options.capabilities.multiWorkerClaims !== undefined) {
       registerMultiWorkerClaims(options, options.capabilities.multiWorkerClaims)

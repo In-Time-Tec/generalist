@@ -2,7 +2,7 @@ import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { explain, verify, type Journal } from "../../../../src/runtime/execution/recovery/operator.js"
 import { Runtime } from "../../../../src/runtime/service.js"
-import { assistantAddress, memoryLayer } from "../fixtures.js"
+import { assistantAddress, objectLayer } from "../fixtures.js"
 
 const journal = (overrides: Partial<Journal> = {}): Journal => ({
   runId: "run:operator-recovery",
@@ -129,7 +129,7 @@ describe("Recovery decisions", () => {
   })
 })
 
-layer(memoryLayer)("Runtime operator legality", (test) => {
+layer(objectLayer)("Runtime operator legality", (test) => {
   test.effect("rejects wake and budget extension when the journal has only Resume", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime

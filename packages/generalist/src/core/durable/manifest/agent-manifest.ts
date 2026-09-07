@@ -60,7 +60,7 @@ export interface ProgramAuthority {
 
 /** Closed, reconstructable identity contract for one Agent. */
 export interface AgentManifest {
-  readonly version: "2"
+  readonly version: "1"
   readonly name: string
   readonly instructions?: string
   readonly supplemental?: string
@@ -164,7 +164,7 @@ export const ProgramAuthority = Schema.Struct({
 })
 /** Closed, reconstructable identity contract for one Agent. */
 export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = Schema.Struct({
-  version: Schema.Literal("2"),
+  version: Schema.Literal("1"),
   name: Schema.String,
   instructions: Schema.optionalKey(Schema.String),
   supplemental: Schema.optionalKey(Schema.String),
@@ -210,13 +210,13 @@ const capabilityIdentity = (value: NamedCapability): string => value.pin
 const childOrder = (value: ChildSelection): string => value.selection
 
 /** Construct and pin a canonical closed Agent manifest. */
-export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "2" }): PinnedAgent => {
+export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "1" }): PinnedAgent => {
   const invalidToolScheduling = toolSchedulingFailure(
     input.toolScheduling,
     input.tools.map(({ name }) => name),
   )
   if (invalidToolScheduling !== undefined) throw new TypeError(invalidToolScheduling)
-  const version = "2" as const
+  const version = "1" as const
   const canonical = {
     ...input,
     version,

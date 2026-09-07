@@ -1,4 +1,5 @@
-import { Clock, Context, Duration, Effect, Layer, Option, Ref } from "effect"
+import { Clock, Context, Duration, Effect, Layer, Option, Ref, Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 export interface Provenance {
   readonly fromRun: string
@@ -10,9 +11,18 @@ export interface Entry extends Provenance {
   readonly expiresAtMillis: number
 }
 
+/** Optional reuse storage failed; operation replay remains the driver's authority. */
+export class MemoError extends ActionableTaggedError<MemoError>()("generalist/core/MemoError", {
+  operation: Schema.Literals(["get", "put"]),
+  key: Schema.String,
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+  hint: errorHint("Restore access to the memo store or explicitly remove memoization, then retry."),
+}) {}
+
 export interface StoreService {
-  readonly get: (key: string) => Effect.Effect<Option.Option<Entry>>
-  readonly put: (key: string, entry: Entry) => Effect.Effect<void>
+  readonly get: (key: string) => Effect.Effect<Option.Option<Entry>, MemoError>
+  readonly put: (key: string, entry: Entry) => Effect.Effect<void, MemoError>
   readonly modelsEnabled: boolean
 }
 

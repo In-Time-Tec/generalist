@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Session, ToolContext } from "../../../src/index.js"
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { Json } from "../json.js"
 import { withProviderFinish } from "../provider-finish.js"
 
@@ -32,7 +33,7 @@ describe("memory SessionDirectory binding", () => {
     let bothStarted: Deferred.Deferred<void> | undefined
     const prompts: Array<string> = []
     const layer = Layer.merge(
-      Session.layerMemory,
+      layerMemory,
       modelLayer((options) =>
         Stream.fromEffect(
           Effect.gen(function* () {
@@ -54,13 +55,13 @@ describe("memory SessionDirectory binding", () => {
         yield* Effect.scoped(
           Effect.gen(function* () {
             const alice = yield* Session.acquire("alice")
-            yield* alice.append({ _tag: "Message", message: user("alice seed") })
+            yield* alice.append({ _tag: "Message", message: user("alice seed") }, { commandId: "fixture-58" })
           }),
         )
         yield* Effect.scoped(
           Effect.gen(function* () {
             const bob = yield* Session.acquire("bob")
-            yield* bob.append({ _tag: "Message", message: user("bob seed") })
+            yield* bob.append({ _tag: "Message", message: user("bob seed") }, { commandId: "fixture-64" })
           }),
         )
 
@@ -103,7 +104,7 @@ describe("memory SessionDirectory binding", () => {
     let otherStarted: Deferred.Deferred<void> | undefined
     let queuedPrompt = ""
     const layer = Layer.merge(
-      Session.layerMemory,
+      layerMemory,
       modelLayer((options) => {
         const prompt = Json.stringify(options.prompt.content)
         return Stream.fromEffect(
@@ -189,7 +190,7 @@ describe("memory SessionDirectory binding", () => {
   it.effect("rejects a nested Run requesting its active parent Session before model execution", () => {
     let modelCalls = 0
     const layer = Layer.mergeAll(
-      Session.layerMemory,
+      layerMemory,
       ToolContext.layerTest({
         signal: new AbortController().signal,
         emit: () => Effect.succeed(true),
@@ -215,4 +216,108 @@ describe("memory SessionDirectory binding", () => {
       }),
     )
   })
+})
+
+describe("memory Session command receipts", () => {
+  it.effect("reuses reservations without consuming another invocation's identity", () =>
+    provideScoped(
+      layerMemory,
+      Effect.gen(function* () {
+        const store = yield* Session.acquire("reservations")
+        const reserve = store.reserveEntryId("first-checkpoint")
+        const first = yield* reserve
+        const second = yield* store.reserveEntryId("second-checkpoint")
+        expect(yield* reserve).toBe(first)
+        expect(second).not.toBe(first)
+        const appended = yield* store.append(
+          { _tag: "Message", message: user("not a reserved checkpoint") },
+          { commandId: "append" },
+        )
+        expect([first, second]).not.toContain(appended.id)
+      }),
+    ),
+  )
+
+  it.effect("returns the original append receipt and rejects changed input after the leaf moves", () =>
+    provideScoped(
+      layerMemory,
+      Effect.gen(function* () {
+        const store = yield* Session.acquire("append-receipts")
+        const input: Session.AppendInput = { _tag: "Message", message: user("A") }
+        const options = { commandId: "first-A" }
+        const append = store.append(input, options)
+        const first = yield* append
+        const second = yield* store.append({ _tag: "Message", message: user("B") }, { commandId: "B" })
+        expect(yield* append).toEqual(first)
+        expect(yield* store.path()).toEqual([first, second])
+        const changed = yield* Effect.flip(
+          store.append({ _tag: "Message", message: user("changed") }, options),
+        )
+        const changedExpectation = yield* Effect.flip(
+          store.append(input, { ...options, expectedLeafId: null }),
+        )
+        expect(changed).toMatchObject({ _tag: "generalist/core/SessionConflict", reason: "entry-id-reused" })
+        expect(changedExpectation).toMatchObject({
+          _tag: "generalist/core/SessionConflict",
+          reason: "entry-id-reused",
+        })
+        yield* store.setLeaf(null, "new-branch")
+        const laterA = yield* store.append(input, { commandId: "later-A" })
+        expect(laterA.id).not.toBe(first.id)
+        expect(yield* append).toEqual(first)
+        expect(yield* store.path()).toEqual([laterA])
+      }),
+    ),
+  )
+
+  it.effect("does not replay old leaf changes over newer invocations", () =>
+    provideScoped(
+      layerMemory,
+      Effect.gen(function* () {
+        const store = yield* Session.acquire("leaf-receipts")
+        const first = yield* store.append({ _tag: "Message", message: user("A") }, { commandId: "A" })
+        const second = yield* store.append({ _tag: "Message", message: user("B") }, { commandId: "B" })
+        yield* store.setLeaf(first.id, "select-A")
+        yield* store.setLeaf(second.id, "select-B")
+        yield* store.setLeaf(first.id, "select-A")
+        expect(yield* store.leaf).toBe(second.id)
+        const reused = yield* Effect.flip(store.setLeaf(second.id, "select-A"))
+        expect(reused).toMatchObject({ _tag: "generalist/core/SessionStoreError", reason: "conflict" })
+        yield* store.setLeaf(first.id, "select-A-again")
+        expect(yield* store.leaf).toBe(first.id)
+      }),
+    ),
+  )
+
+  it.effect("allocates distinct Session entries for new Runs with repeated branch content", () =>
+    provideScoped(
+      Layer.merge(layerMemory, modelLayer(() => Stream.make(textDelta("done")))),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "repeated-branch-agent" })
+        const paths: Array<ReadonlyArray<Session.Entry>> = []
+        for (const [invocation, prompt] of ["A", "B", "A"].entries()) {
+          yield* Agent.run(agent, prompt, { sessionId: "repeated-branch" })
+          const path = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const store = yield* Session.acquire("repeated-branch")
+              const entries = yield* store.path()
+              yield* store.setLeaf(null, `next-branch-${invocation}`)
+              return entries
+            }),
+          )
+          expect(Session.buildContext(path).content.map((message) => ({
+            role: message.role,
+            text: message.role === "system"
+              ? message.content
+              : message.content.map((part) => part.type === "text" ? part.text : "").join(""),
+          }))).toEqual([{ role: "user", text: prompt }, { role: "assistant", text: "done" }])
+          paths.push(path)
+        }
+        const first = paths[0]![0]!
+        const repeated = paths[2]![0]!
+        expect(repeated.id).not.toBe(first.id)
+        expect(new Set(paths.flatMap((path) => path.map((entry) => entry.id))).size).toBe(6)
+      }),
+    ),
+  )
 })

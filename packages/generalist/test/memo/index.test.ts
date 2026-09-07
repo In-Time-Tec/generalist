@@ -1,36 +1,21 @@
-import { layer as sqliteClientLayer } from "@effect/sql-sqlite-bun/SqliteClient"
-import { describe } from "@effect/vitest"
+import { BunCrypto } from "@effect/platform-bun"
 import { Layer } from "effect"
 import { adjust as adjustTestClock } from "effect/testing/TestClock"
-import { layerMemory, layerSql } from "../../src/memo.js"
-import { apply as applySqliteSchema } from "../../src/runtime/sql/migrate.js"
+import { layerMemo } from "../../src/durability/auxiliary.js"
+import { ObjectStore } from "../../src/durability/object-store.js"
+import { layerMemory } from "../../src/memo.js"
 import { Testing } from "../../src/testing/index.js"
-import { mysqlAvailable, mysqlDatabase } from "../mysql/runtime/environment.js"
-import { postgresAvailable, postgresDatabase } from "../pg/database.js"
+import { makeObjectStorage } from "../runtime/execution/object.js"
+
+const memoStorage = makeObjectStorage()
+const objectMemoLayer = layerMemo({
+  environment: "test",
+  tenant: "memo",
+  partition: "conformance",
+}).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, memoStorage.store))),
+)
 
 Testing.memo({ layer: layerMemory(), adjustClock: adjustTestClock("1 hour") })
+Testing.memo({ layer: objectMemoLayer, adjustClock: adjustTestClock("1 hour") })
 
-const sqliteSchema = Layer.effectDiscard(applySqliteSchema("memo-conformance")).pipe(
-  Layer.provideMerge(sqliteClientLayer({ filename: ":memory:" })),
-)
-Testing.memo({ layer: layerSql().pipe(Layer.provide(sqliteSchema)), adjustClock: adjustTestClock("1 hour") })
-
-if (postgresAvailable) {
-  const database = postgresDatabase("memo_conformance")
-  Testing.memo({
-    layer: database.provision(layerSql().pipe(Layer.provide(database.client))),
-    adjustClock: adjustTestClock("1 hour"),
-  })
-} else {
-  describe.skip("PostgreSQL Memo conformance (set GENERALIST_DATABASE_URL or DATABASE_URL)", () => undefined)
-}
-
-if (mysqlAvailable) {
-  const database = mysqlDatabase("memo_conformance")
-  Testing.memo({
-    layer: database.provision(layerSql().pipe(Layer.provide(database.client))),
-    adjustClock: adjustTestClock("1 hour"),
-  })
-} else {
-  describe.skip("MySQL Memo conformance (set GENERALIST_MYSQL_URL or MYSQL_URL)", () => undefined)
-}

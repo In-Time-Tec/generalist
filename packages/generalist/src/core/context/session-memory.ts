@@ -23,6 +23,12 @@ interface State {
   readonly order: ReadonlyArray<EntryId>
   readonly leaf: EntryId | null
   readonly counter: number
+  readonly reservations: HashMap.HashMap<string, EntryId>
+  readonly appends: HashMap.HashMap<
+    string,
+    { readonly entry: Entry; readonly expectedLeafId: EntryId | null | undefined }
+  >
+  readonly leafChanges: HashMap.HashMap<string, EntryId | null>
 }
 
 type Success<A> = { readonly _tag: "Success"; readonly value: A }
@@ -34,6 +40,9 @@ const initialState: State = {
   order: [],
   leaf: null,
   counter: 0,
+  reservations: HashMap.empty(),
+  appends: HashMap.empty(),
+  leafChanges: HashMap.empty(),
 }
 
 const success = <A>(value: A): Result<A> => ({ _tag: "Success", value })
@@ -194,13 +203,28 @@ const existingAppend = (
 const appendState = (
   state: State,
   input: AppendInput,
-  options?: AppendOptions,
+  options: AppendOptions,
 ): readonly [Result<Entry> | SessionConflict, State] => {
-  if (options?.id !== undefined) {
+  if (options.id === undefined) {
+    const receipt = HashMap.get(state.appends, options.commandId)
+    if (Option.isSome(receipt)) {
+      const previous = receipt.value
+      return [
+        previous.expectedLeafId === options.expectedLeafId &&
+        appendMatches(previous.entry, input, previous.entry.parentId)
+          ? success(previous.entry)
+          : SessionConflict.make({
+              reason: "entry-id-reused",
+              message: `Session append command ${options.commandId} was reused with different input`,
+            }),
+        state,
+      ]
+    }
+  } else {
     const existing = HashMap.get(state.entries, options.id)
     if (Option.isSome(existing)) return [existingAppend(state, input, options, existing.value), state]
   }
-  if (options?.expectedLeafId !== undefined && options.expectedLeafId !== state.leaf) {
+  if (options.expectedLeafId !== undefined && options.expectedLeafId !== state.leaf) {
     return [
       SessionConflict.make({
         reason: "stale-leaf",
@@ -210,18 +234,23 @@ const appendState = (
     ]
   }
   let generatedCounter = state.counter
-  if (options?.id === undefined) {
+  if (options.id === undefined) {
     while (Option.isSome(HashMap.get(state.entries, String(generatedCounter)))) generatedCounter += 1
   }
-  const id = options?.id ?? String(generatedCounter)
+  const id = options.id ?? String(generatedCounter)
   const entry = entryFromInput(input, id, state.leaf)
   return [
     success(entry),
     {
+      ...state,
       entries: HashMap.set(state.entries, id, entry),
       order: [...state.order, id],
       leaf: id,
-      counter: options?.id === undefined ? generatedCounter + 1 : state.counter + 1,
+      counter: options.id === undefined ? generatedCounter + 1 : state.counter + 1,
+      appends:
+        options.id === undefined
+          ? HashMap.set(state.appends, options.commandId, { entry, expectedLeafId: options.expectedLeafId })
+          : state.appends,
     },
   ]
 }
@@ -302,19 +331,41 @@ const appendCheckpointState = (
   ]
 }
 
-const setLeafState = (state: State, id: EntryId | null): readonly [Result<void>, State] => {
+const setLeafState = (state: State, id: EntryId | null, commandId: string): readonly [Result<void>, State] => {
+  const receipt = HashMap.get(state.leafChanges, commandId)
+  if (Option.isSome(receipt)) {
+    return [
+      receipt.value === id
+        ? success(undefined)
+        : {
+            _tag: "Failure",
+            error: SessionStoreError.make({
+              reason: "conflict",
+              message: `Session leaf command ${commandId} was reused with a different target`,
+            }),
+          },
+      state,
+    ]
+  }
   if (id !== null && Option.isNone(HashMap.get(state.entries, id)))
     return [failure(`Session entry ${id} does not exist`), state]
-  return [success(undefined), { ...state, leaf: id }]
+  return [success(undefined), { ...state, leaf: id, leafChanges: HashMap.set(state.leafChanges, commandId, id) }]
 }
 
 const makeStore: Effect.Effect<SessionStore> = Ref.make(initialState).pipe(
   Effect.map((state) => ({
-    reserveEntryId: Ref.modify(state, (current) => {
-      let counter = current.counter
-      while (Option.isSome(HashMap.get(current.entries, String(counter)))) counter += 1
-      return [String(counter), { ...current, counter: counter + 1 }]
-    }),
+    reserveEntryId: (commandId) =>
+      Ref.modify(state, (current) => {
+        const receipt = HashMap.get(current.reservations, commandId)
+        if (Option.isSome(receipt)) return [receipt.value, current]
+        let counter = current.counter
+        while (Option.isSome(HashMap.get(current.entries, String(counter)))) counter += 1
+        const id = String(counter)
+        return [
+          id,
+          { ...current, counter: counter + 1, reservations: HashMap.set(current.reservations, commandId, id) },
+        ]
+      }),
     append: (entry, options) =>
       Ref.modify(state, (current) => appendState(current, entry, options)).pipe(Effect.flatMap(effectFromAppendResult)),
     appendCheckpoint: (checkpoint) =>
@@ -347,7 +398,8 @@ const makeStore: Effect.Effect<SessionStore> = Ref.make(initialState).pipe(
             : effectFromResult(pathFromState(current, leaf ?? current.leaf ?? "")),
         ),
       ),
-    setLeaf: (id) => Ref.modify(state, (current) => setLeafState(current, id)).pipe(Effect.flatMap(effectFromResult)),
+    setLeaf: (id, commandId) =>
+      Ref.modify(state, (current) => setLeafState(current, id, commandId)).pipe(Effect.flatMap(effectFromResult)),
     leaf: Ref.get(state).pipe(Effect.map((current) => current.leaf)),
   })),
 )

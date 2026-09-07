@@ -4,14 +4,14 @@ import { Runtime, RunStore } from "../../../../src/runtime/index.js"
 import {
   assistantAddress,
   completedResult,
-  memoryLayer,
+  objectLayer,
   openWait,
   researcherAddress,
   suspension,
   textPrompt,
 } from "../fixtures.js"
 
-layer(memoryLayer)("Runtime FIFO lanes", (it) => {
+layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("keeps only the lane head runnable until it settles", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -31,7 +31,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
       yield* driver.complete({
-        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-1", runId: first.runId, ownerId: "test" })),
         runId: first.runId,
         result: completedResult("one"),
       })
@@ -64,7 +65,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
 
       yield* driver.complete({
-        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-2", runId: first.runId, ownerId: "test" })),
         result: completedResult("assistant"),
       })
       expect((yield* runtime.inspect(second.runId)).status).toBe("running")
@@ -88,7 +90,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
         prompt: textPrompt("two"),
       })
       yield* driver.suspend({
-        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-3", runId: first.runId, ownerId: "test" })),
         runId: first.runId,
         waits: [openWait({ waitId: "approval:1", reason: "approval" })],
         suspension: suspension({ waitId: "approval:1", reason: "approval" }),
@@ -99,7 +102,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
       yield* driver.complete({
-        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-4", runId: first.runId, ownerId: "test" })),
         runId: first.runId,
         result: completedResult("one"),
       })
@@ -123,7 +127,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
         idempotencyKey: "b",
         prompt: textPrompt("two"),
       })
-      yield* runtime.cancel({ runId: second.runId, reason: "client-cancel" })
+      yield* runtime.cancel({
+          commandId: "runtime-execution-suites-fifo-suite-ts-cancel-4", runId: second.runId, reason: "client-cancel" })
       expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")
       const secondInspection = yield* runtime.inspect(second.runId)
@@ -135,7 +140,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       expect(secondTags).toContain("RunCancellationRequested")
       expect(secondTags.at(-1)).toBe("RunCancelled")
       yield* driver.complete({
-        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-5", runId: first.runId, ownerId: "test" })),
         runId: first.runId,
         result: completedResult("one"),
       })
@@ -159,7 +165,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
         prompt: textPrompt("two"),
       })
       yield* driver.suspend({
-        ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-execution-suites-fifo-suite-ts-claim-6", runId: first.runId, ownerId: "test" })),
         runId: first.runId,
         waits: [openWait({ waitId: "timer:1", reason: "timer" })],
         suspension: suspension({ waitId: "timer:1" }),
@@ -167,7 +174,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       const follower = yield* runtime
         .events({ runId: first.runId })
         .pipe(Stream.take(4), Stream.runCollect, Effect.forkChild)
-      yield* runtime.signal({ runId: first.runId, name: "timer:1" })
+      yield* runtime.signal({
+          commandId: "runtime-execution-suites-fifo-suite-ts-signal-6", runId: first.runId, name: "timer:1" })
       const events = [...(yield* Fiber.join(follower))]
       expect(events.map((event) => event._tag)).toContain("RunResumed")
       expect((yield* runtime.inspect(first.runId)).status).toBe("running")

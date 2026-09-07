@@ -75,7 +75,7 @@ jobs:
             echo "tag=$tag"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
-      - name: Require successful database CI for the exact release commit
+      - name: Require successful durability CI for the exact release commit
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -89,7 +89,7 @@ jobs:
             | max_by(.run_number)
             | .status == "completed" and .conclusion == "success"
           ' <<< "$evidence" >/dev/null || {
-            echo "Exact release commit has no successful latest main CI run. Wait for CI (including PostgreSQL/MySQL tests), then reconcile this immutable tag." >&2
+            echo "Exact release commit has no successful latest main CI run. Wait for durability CI, then reconcile this immutable tag." >&2
             exit 1
           }
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2

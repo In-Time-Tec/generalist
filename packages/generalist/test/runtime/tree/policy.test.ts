@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -102,7 +103,7 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
           ),
   })
   const handlers = Toolkit.make(noop).toLayer({ noop: () => Effect.die("ToolExecutor test layer owns execution") })
-  const runtimeLayer = Runtime.layerMemory({
+  const runtimeLayer = objectRuntimeLayer({
     addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],
     scheduler: { pollInterval: "1 day" },
   }).pipe(
@@ -133,7 +134,8 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
       selection: "child",
       prompt: Prompt.make("heavy work"),
     })
-    yield* host.execute(yield* store.claimExecution({ runId: child.runId, ownerId: "heavy" }))
+    yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-tree-policy-test-ts-claim-1", runId: child.runId, ownerId: "heavy" }))
     const inspection = yield* runtime.inspect(child.runId)
     expect(modelCalls).toBe(4)
     expect(inspection.status).toBe("succeeded")

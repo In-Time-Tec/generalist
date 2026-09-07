@@ -11,15 +11,7 @@ import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { RecoveryDecision } from "./execution/recovery/operator.js"
 
 export { TreeCursorInvalid, TreeCursorRootMismatch }
-export {
-  MultiWorkerUnsupported,
-  SchemaChecksumMismatch,
-  SchemaDirty,
-  SchemaMigrationFailed,
-  SchemaUpgradeRequired,
-  SchemaVersionUnsupported,
-  StaleClaim,
-} from "./sql/errors.js"
+export { StaleClaim } from "./run/ownership-errors.js"
 
 export class AddressNotFound extends ActionableTaggedError<AddressNotFound>()("generalist/runtime/AddressNotFound", {
   address: Address,

@@ -18,9 +18,9 @@ import { promptDigest } from "../prompt-identity.js"
 export type AttemptBody = (
   activePrompt: Prompt.Prompt,
   retryOverflow: boolean,
-  compactOverflow?: boolean,
-  overflowCause?: Cause.Cause<RunError>,
-  operationKey?: string,
+  compactOverflow: boolean,
+  overflowCause: Cause.Cause<RunError> | undefined,
+  operationKey: string,
 ) => Stream.Stream<AttemptEvent, RunError, ActiveModelServices<Record<string, Tool.Any>, never>>
 
 type OperationDigestInput = typeof Schema.Unknown.Type
@@ -149,8 +149,13 @@ export const wrapDriverAttempt =
       replayFromHistory: boolean,
     ) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
     readonly completed: (operation: CompletedModelOperation, attempt: AttemptCompleted) => void
-  }): AttemptBody =>
-  (activePrompt, retryOverflow, compactOverflow = false, overflowCause) =>
+  }) =>
+  (
+    activePrompt: Prompt.Prompt,
+    retryOverflow: boolean,
+    compactOverflow = false,
+    overflowCause?: Cause.Cause<RunError>,
+  ) =>
     Stream.unwrap(
       Effect.gen(function* () {
         const logicalId = yield* logicalOperationId

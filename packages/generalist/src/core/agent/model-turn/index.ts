@@ -212,17 +212,18 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
     const attemptBody = (
       activePrompt: Prompt.Prompt,
       retryOverflow: boolean,
-      compactOverflow = false,
-      overflowCause?: Cause.Cause<RunError>,
-      operationKey?: string,
+      compactOverflow: boolean,
+      overflowCause: Cause.Cause<RunError> | undefined,
+      operationKey: string,
     ): Stream.Stream<AttemptEvent, RunError, ActiveModelServices<Record<string, Tool.Any>, never>> => {
       let emitted = false
       let classifyFailure = classifyOtherFailure
+      const invocationId = `${operationKey}:${compactOverflow ? "overflow" : "prepare"}`
       const responseInput: Parameters<typeof attemptResponse>[0] = {
         service: activeModelResponse,
         turn,
+        operationKey,
       }
-      if (operationKey !== undefined) Object.assign(responseInput, { operationKey })
       const currentResponse = attemptResponse(responseInput)
       let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
       const canRetryOverflow = makeRetryableOverflow({
@@ -246,7 +247,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                     )
                       ? Prompt.fromMessages(normalizedActiveContent)
                       : activePrompt
-                    const prepared = yield* preparePrompt(turn, normalizedActivePrompt, compactOverflow)
+                    const prepared = yield* preparePrompt(turn, normalizedActivePrompt, compactOverflow, invocationId)
                     if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
                       return yield* Effect.failCause(overflowCause)
                     }
@@ -264,7 +265,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                         AgentError.make({ message: "Invalid framework tool history", turn, cause }),
                       ),
                     )
-                    const sessionPath = yield* syncSession(turn, responsePrompt)
+                    const sessionPath = yield* syncSession(turn, responsePrompt, invocationId)
                     const sessionParentId = currentResponse.setSessionParentId(sessionPath.at(-1)?.id ?? null)
                     if (Option.isSome(compactionService)) {
                       state.currentContext = responsePrompt

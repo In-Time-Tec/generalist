@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite"
+import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schedule, Schema, Scope, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
@@ -13,11 +13,9 @@ import {
   RunStore,
 } from "../../../../src/runtime/index.js"
 import { testExecutable } from "../../run/identity.js"
-import { assistantAddress, memoryLayer, registrationsFor, textPrompt } from "../fixtures.js"
-import { sqliteLayer, tempDbPath } from "../../sql/scenario.js"
+import { assistantAddress, objectLayer, registrationsFor, textPrompt } from "../fixtures.js"
 import { CompletedModelResponse } from "../../../../src/runtime/run/event.js"
 
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 const jsonText = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const interrupted = (
@@ -53,20 +51,22 @@ const scopedWith =
   <B, E2, R extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
-const directCommit = (backend: "memory" | "sqlite") => {
-  const filename = backend === "sqlite" ? tempDbPath("interrupted-direct") : undefined
-  const runtimeLayer = backend === "memory" ? memoryLayer : sqliteLayer(filename!)
-  return scopedWith(runtimeLayer)(
+const directCommit = () =>
+  scopedWith(objectLayer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
-        sessionId: `session:interrupted-direct:${backend}`,
-        idempotencyKey: `interrupted-direct:${backend}`,
+        sessionId: "session:interrupted-direct:object",
+        idempotencyKey: "interrupted-direct:object",
         prompt: textPrompt("answer"),
       })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "interrupted-direct" })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-execution-model-response-interrupted-test-ts-claim-1",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
       const operationKey = `${receipt.runId}:model:0`
       const operation = yield* store.recordOperation({
         ...claim,
@@ -77,62 +77,31 @@ const directCommit = (backend: "memory" | "sqlite") => {
         replayPolicy: "never",
         attempt: 0,
       })
-      yield* store.startOperation({ ...claim, operationId: operation.operationId })
+      yield* store.startOperation({ commandId: "runtime-execution-model-response-interrupted-test-ts-startOperation-1", ...claim, operationId: operation.operationId })
       const session = yield* store.claimedSessionStore(claim)
       if (Option.isNone(session)) return yield* Effect.die("expected Session store")
-      const prefix = yield* session.value.append({
-        _tag: "Message",
-        message: textPrompt("durable input").content[0]!,
-      })
-      const empty = interrupted(operationKey, prefix.id, "")
-      const rejectedEmpty = yield* Effect.exit(
-        store.commitInterruptedModelResponse({
-          ...claim,
-          operationId: operation.operationId,
-          outcome: failedOutcome,
-          event: empty,
-        }),
+      const prefix = yield* session.value.append(
+        { _tag: "Message", message: textPrompt("durable input").content[0]! },
+        { commandId: "runtime-execution-model-response-interrupted-test-ts-prefix-1", expectedLeafId: null },
       )
+      const empty = interrupted(operationKey, prefix.id, "")
+      const rejectedEmpty = yield* Effect.exit(store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: empty }))
       expect(rejectedEmpty._tag).toBe("Failure")
       expect(yield* session.value.path()).toEqual([prefix])
-      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
-        "running",
-      )
+      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe("running")
       const exact = interrupted(operationKey, prefix.id)
-      yield* store.commitInterruptedModelResponse({
-        ...claim,
-        operationId: operation.operationId,
-        outcome: failedOutcome,
-        event: exact,
-      })
-      yield* store.commitInterruptedModelResponse({
-        ...claim,
-        operationId: operation.operationId,
-        outcome: failedOutcome,
-        event: exact,
-      })
-
+      yield* store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: exact })
+      yield* store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: exact })
       const beforeDivergence = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       const pathBefore = yield* session.value.path()
       const divergent = interrupted(operationKey, prefix.id, "different partial")
-      const rejected = yield* Effect.exit(
-        store.commitInterruptedModelResponse({
-          ...claim,
-          operationId: operation.operationId,
-          outcome: failedOutcome,
-          event: divergent,
-        }),
-      )
+      const rejected = yield* Effect.exit(store.commitInterruptedModelResponse({ ...claim, operationId: operation.operationId, outcome: failedOutcome, event: divergent }))
       expect(rejected._tag).toBe("Failure")
       expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toEqual(beforeDivergence)
       expect(yield* session.value.path()).toEqual(pathBefore)
-
       const record = yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })
       const events = beforeDivergence.filter((event) => event._tag === "ModelResponseInterrupted")
-      expect(record).toMatchObject({
-        status: "failed",
-        error: { _tag: "generalist/runtime/AgentExecutionFailure", message: "model terminated" },
-      })
+      expect(record).toMatchObject({ status: "failed", error: { _tag: "generalist/runtime/AgentExecutionFailure", message: "model terminated" } })
       expect(events).toHaveLength(1)
       expect(events[0]).toMatchObject({ digest: exact.digest, sessionParentId: prefix.id })
       expect(events[0]).not.toHaveProperty("response")
@@ -140,104 +109,18 @@ const directCommit = (backend: "memory" | "sqlite") => {
       if (event === undefined) return yield* Effect.die("expected interrupted event")
       expect(yield* runtime.resolveModelResponse(event)).toEqual(exact.response)
       const corrupt = yield* runtime.resolveModelResponse({ ...event, digest: "corrupt" }).pipe(Effect.flip)
-      expect(corrupt).toMatchObject({
-        _tag: "generalist/runtime/SessionEntryCorrupt",
-        sessionId: event.sessionId,
-        entryId: event.sessionEntryId,
-      })
-      const wrongParent = yield* runtime
-        .resolveModelResponse({ ...event, sessionParentId: "wrong-parent" })
-        .pipe(Effect.flip)
+      expect(corrupt).toMatchObject({ _tag: "generalist/runtime/SessionEntryCorrupt", sessionId: event.sessionId, entryId: event.sessionEntryId })
+      const wrongParent = yield* runtime.resolveModelResponse({ ...event, sessionParentId: "wrong-parent" }).pipe(Effect.flip)
       expect(wrongParent).toMatchObject({ _tag: "generalist/runtime/SessionEntryCorrupt" })
       expect(pathBefore).toHaveLength(2)
       const interruptedEntry = pathBefore.at(-1)
       expect(interruptedEntry?.parentId).toBe(prefix.id)
-      expect(interruptedEntry).toMatchObject({
-        _tag: "ModelResponse",
-        metadata: { interruptionDigest: exact.digest },
-      })
-      expect(
-        interruptedEntry?._tag === "ModelResponse" &&
-          interruptedEntry.content.some((part) => part.type === "text" && part.text === "retained partial"),
-      ).toBe(true)
+      expect(interruptedEntry).toMatchObject({ _tag: "ModelResponse", metadata: { interruptionDigest: exact.digest } })
+      expect(interruptedEntry?._tag === "ModelResponse" && interruptedEntry.content.some((part) => part.type === "text" && part.text === "retained partial")).toBe(true)
     }),
   )
-}
 
-it.effect("atomically commits one exact interrupted outcome, event, and Session entry in memory and SQLite", () =>
-  Effect.gen(function* () {
-    yield* directCommit("memory")
-    yield* directCommit("sqlite")
-  }),
-)
-
-it.live("rolls back SQLite outcome, Session entry, event, and subscriber notification together", () => {
-  const filename = tempDbPath("interrupted-rollback")
-  return scopedWith(sqliteLayer(filename))(
-    Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "session:interrupted-rollback",
-        idempotencyKey: "interrupted-rollback",
-        prompt: textPrompt("answer"),
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "interrupted-rollback" })
-      const operationKey = `${receipt.runId}:model:0`
-      const operation = yield* store.recordOperation({
-        ...claim,
-        operationKey,
-        kind: "model",
-        inputDigest: Pins.digest({ turn: 0 }),
-        input: { turn: 0 },
-        replayPolicy: "never",
-        attempt: 0,
-      })
-      yield* store.startOperation({ ...claim, operationId: operation.operationId })
-      const before = yield* runtime.history({ runId: receipt.runId, limit: 100 })
-      const seen = yield* Ref.make<ReadonlyArray<string>>([])
-      const subscriber = yield* runtime.events({ runId: receipt.runId, cursor: before.at(-1)!.sequence }).pipe(
-        Stream.tap((event) => Ref.update(seen, (tags) => [...tags, event._tag])),
-        Stream.take(1),
-        Stream.runCollect,
-        Effect.forkChild({ startImmediately: true }),
-      )
-      const database = new Database(filename)
-      database.run(`
-        CREATE TRIGGER fail_interrupted_commit_after_event
-        BEFORE UPDATE ON generalist_tree_roots
-        WHEN EXISTS (
-          SELECT 1 FROM generalist_run_events
-          WHERE run_id = '${receipt.runId.replaceAll("'", "''")}'
-            AND event_json LIKE '%"_tag":"ModelResponseInterrupted"%'
-        )
-        BEGIN
-          SELECT RAISE(ABORT, 'forced interrupted commit rollback');
-        END
-      `)
-      const rejected = yield* Effect.exit(
-        store.commitInterruptedModelResponse({
-          ...claim,
-          operationId: operation.operationId,
-          outcome: failedOutcome,
-          event: interrupted(operationKey, null),
-        }),
-      )
-      expect(rejected._tag).toBe("Failure")
-      expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toEqual(before)
-      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
-        "running",
-      )
-      const session = yield* store.sessionReader("session:interrupted-rollback")
-      expect(Option.isSome(session) ? yield* session.value.path() : []).toEqual([])
-      expect(yield* Ref.get(seen)).toEqual([])
-      database.run("DROP TRIGGER fail_interrupted_commit_after_event")
-      database.close()
-      yield* Fiber.interrupt(subscriber)
-    }),
-  )
-})
+it.effect("atomically commits one exact interrupted outcome, event, and Session entry in object storage", () => directCommit())
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -249,7 +132,7 @@ const finish = Response.makePart("finish", {
 })
 
 const hostLayer = (input: {
-  readonly backend: "memory" | "sqlite"
+  readonly backend: "object"
   readonly label: string
   readonly streamText: Parameters<typeof LanguageModel.make>[0]["streamText"]
   readonly resilience?: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.Misconfigured>
@@ -283,14 +166,12 @@ const hostLayer = (input: {
   )
   return {
     address,
-    layer: (input.backend === "memory"
-      ? Runtime.layerMemory(options)
-      : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(input.label) })
-    ).pipe(Layer.provide(resolverLayer)),
+    layer: objectRuntimeLayer(options).pipe(Layer.provide(resolverLayer)),
   }
 }
 
-for (const backend of ["memory", "sqlite"] as const) {
+const backend = "object" as const
+{
   it.effect(`${backend} commits a text partial before Run cancellation and exposes it to the later Session`, () =>
     Effect.gen(function* () {
       const partialSeen = yield* Deferred.make<void>()
@@ -324,10 +205,12 @@ for (const backend of ["memory", "sqlite"] as const) {
             prompt: "begin",
           })
           const running = yield* host
-            .execute(yield* store.claimExecution({ runId: first.runId, ownerId: "cancel-host" }))
+            .execute(yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-3", runId: first.runId, ownerId: objectWorkerId }))
             .pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(partialSeen)
-          yield* runtime.cancel({ runId: first.runId, reason: "stop" })
+          yield* runtime.cancel({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-cancel-3", runId: first.runId, reason: "stop" })
           yield* Fiber.join(running)
           const history = yield* runtime.history({ runId: first.runId, cursor: Cursor.origin, limit: 100 })
           const interruptedIndex = history.findIndex((event) => event._tag === "ModelResponseInterrupted")
@@ -361,7 +244,8 @@ for (const backend of ["memory", "sqlite"] as const) {
             idempotencyKey: "second",
             prompt: "continue",
           })
-          yield* host.execute(yield* store.claimExecution({ runId: second.runId, ownerId: "later-host" }))
+          yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-4", runId: second.runId, ownerId: objectWorkerId }))
           const secondInspection = yield* runtime.inspect(second.runId)
           if (secondInspection.status === "failed") {
             const secondHistory = yield* runtime.history({ runId: second.runId, limit: 100 })
@@ -401,7 +285,8 @@ for (const backend of ["memory", "sqlite"] as const) {
           idempotencyKey: "failure",
           prompt: "fail",
         })
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "failure-host" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-5", runId: receipt.runId, ownerId: objectWorkerId }))
         const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
         const interruptedIndex = history.findIndex((event) => event._tag === "ModelResponseInterrupted")
         const failedIndex = history.findIndex((event) => event._tag === "RunFailed")
@@ -436,7 +321,7 @@ it.effect("fails an empty model operation without writing an interrupted event o
     reason: AiError.UnknownError.make({ description: "terminal model failure" }),
   })
   const hosted = hostLayer({
-    backend: "memory",
+    backend: "object",
     label: "interrupted-empty",
     streamText: () => Stream.fail(escaped),
   })
@@ -451,7 +336,8 @@ it.effect("fails an empty model operation without writing an interrupted event o
         idempotencyKey: "empty",
         prompt: "fail empty",
       })
-      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "empty-host" }))
+      yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId }))
       const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       expect(history.map((event) => event._tag)).toContain("RunFailed")
       expect(history.map((event) => event._tag)).not.toContain("ModelResponseInterrupted")
@@ -483,7 +369,7 @@ it.effect("commits only the authoritative internal retry response", () => {
   })
   let attempts = 0
   const hosted = hostLayer({
-    backend: "memory",
+    backend: "object",
     label: "interrupted-internal-retry",
     resilience: ModelResilience.layer({ retrySchedule: Schedule.recurs(1) }),
     streamText: () =>
@@ -526,7 +412,8 @@ it.effect("commits only the authoritative internal retry response", () => {
         idempotencyKey: "retry",
         prompt: "retry",
       })
-      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "retry-host" }))
+      yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-model-response-interrupted-test-ts-claim-7", runId: receipt.runId, ownerId: objectWorkerId }))
       const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       expect(attempts).toBe(2)
       expect(history.map((event) => event._tag)).not.toContain("ModelResponseInterrupted")
@@ -542,137 +429,3 @@ it.effect("commits only the authoritative internal retry response", () => {
   )
 })
 
-it.live("rejects mutated interrupted model response references and Session storage", () => {
-  const filename = tempDbPath("interrupted-hydration-corruption")
-  return scopedWith(sqliteLayer(filename))(
-    Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const sessionId = "session:interrupted-hydration-corruption"
-      const receipt = yield* runtime.send({
-        to: assistantAddress,
-        sessionId,
-        idempotencyKey: "interrupted-hydration-corruption",
-        prompt: textPrompt("answer"),
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "interrupted-corruption" })
-      const operationKey = `${receipt.runId}:model:0`
-      const operation = yield* store.recordOperation({
-        ...claim,
-        operationKey,
-        kind: "model",
-        inputDigest: Pins.digest({ turn: 0 }),
-        input: { turn: 0 },
-        replayPolicy: "never",
-        attempt: 0,
-      })
-      yield* store.startOperation({ ...claim, operationId: operation.operationId })
-      const session = yield* store.claimedSessionStore(claim)
-      if (Option.isNone(session)) return yield* Effect.die("expected Session store")
-      const prefix = yield* session.value.append({
-        _tag: "Message",
-        message: textPrompt("durable input").content[0]!,
-      })
-      const exact = interrupted(operationKey, prefix.id)
-      yield* store.commitInterruptedModelResponse({
-        ...claim,
-        operationId: operation.operationId,
-        outcome: failedOutcome,
-        event: exact,
-      })
-      const event = (yield* runtime.history({ runId: receipt.runId, limit: 100 })).find(
-        (candidate) => candidate._tag === "ModelResponseInterrupted",
-      )
-      if (event?._tag !== "ModelResponseInterrupted") return yield* Effect.die("expected interrupted response event")
-
-      const assertCorrupt = (candidate: typeof event) =>
-        Effect.gen(function* () {
-          const error = yield* runtime.resolveModelResponse(candidate).pipe(Effect.flip)
-          expect(error).toMatchObject({
-            _tag: "generalist/runtime/SessionEntryCorrupt",
-            sessionId: candidate.sessionId,
-            entryId: candidate.sessionEntryId,
-          })
-        })
-
-      for (const candidate of [
-        { ...event, originRunId: "corrupt-run" },
-        { ...event, operationKey: "corrupt-operation" },
-        { ...event, sessionEntryId: "corrupt-entry" },
-        { ...event, turn: event.turn + 1 },
-        { ...event, modelCallId: "corrupt-model-call" },
-        { ...event, modelAttemptId: "corrupt-model-attempt" },
-        { ...event, attempt: event.attempt + 1 },
-        { ...event, sessionParentId: null },
-        { ...event, reason: event.reason === "cancel" ? ("failure" as const) : ("cancel" as const) },
-        { ...event, digest: "corrupt-digest" },
-      ]) {
-        yield* assertCorrupt(candidate)
-      }
-      const wrongSession = yield* runtime
-        .resolveModelResponse({ ...event, sessionId: "corrupt-session" })
-        .pipe(Effect.flip)
-      expect(wrongSession).toMatchObject({
-        _tag: "generalist/runtime/SessionEntryNotFound",
-        sessionId: "corrupt-session",
-        entryId: event.sessionEntryId,
-      })
-
-      const database = new Database(filename)
-      const row = database
-        .query<
-          { session_id: string; entry_id: string; parent_id: string | null; tag: string; payload_json: string },
-          [string, string]
-        >("SELECT session_id, entry_id, parent_id, tag, payload_json FROM generalist_session_entries WHERE session_id = ? AND entry_id = ?")
-        .get(event.sessionId, event.sessionEntryId)
-      if (row === null) return yield* Effect.die("expected persisted interrupted Session entry")
-
-      database
-        .query("UPDATE generalist_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
-        .run("corrupt-entry", row.session_id, row.entry_id)
-      const missingIdentity = yield* runtime.resolveModelResponse(event).pipe(Effect.flip)
-      expect(missingIdentity).toMatchObject({
-        _tag: "generalist/runtime/SessionEntryNotFound",
-        sessionId: event.sessionId,
-        entryId: event.sessionEntryId,
-      })
-      database
-        .query("UPDATE generalist_session_entries SET entry_id = ? WHERE session_id = ? AND entry_id = ?")
-        .run(row.entry_id, row.session_id, "corrupt-entry")
-
-      database
-        .query("UPDATE generalist_session_entries SET parent_id = NULL WHERE session_id = ? AND entry_id = ?")
-        .run(row.session_id, row.entry_id)
-      yield* assertCorrupt(event)
-      database
-        .query("UPDATE generalist_session_entries SET parent_id = ? WHERE session_id = ? AND entry_id = ?")
-        .run(row.parent_id, row.session_id, row.entry_id)
-
-      database
-        .query("UPDATE generalist_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
-        .run("Message", row.session_id, row.entry_id)
-      yield* assertCorrupt(event)
-      database
-        .query("UPDATE generalist_session_entries SET tag = ? WHERE session_id = ? AND entry_id = ?")
-        .run(row.tag, row.session_id, row.entry_id)
-
-      const payload = yield* Schema.decodeEffect(Schema.fromJsonString(Session.EntryPayload))(row.payload_json)
-      if (payload._tag !== "ModelResponse") return yield* Effect.die("expected persisted ModelResponse payload")
-      for (const mutated of [
-        { ...payload, metadata: { ...payload.metadata, interruptionDigest: "corrupt-digest" } },
-        { ...payload, _tag: "Message" },
-        { ...payload, content: [{ type: "text", text: "corrupt content" }] },
-      ]) {
-        database
-          .query("UPDATE generalist_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
-          .run(jsonText(mutated), row.session_id, row.entry_id)
-        yield* assertCorrupt(event)
-        database
-          .query("UPDATE generalist_session_entries SET payload_json = ? WHERE session_id = ? AND entry_id = ?")
-          .run(row.payload_json, row.session_id, row.entry_id)
-      }
-      database.close()
-      expect(yield* runtime.resolveModelResponse(event)).toEqual(exact.response)
-    }),
-  )
-})

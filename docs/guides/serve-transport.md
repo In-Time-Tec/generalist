@@ -8,19 +8,22 @@ description: "Expose a Generalist Host through one typed HttpApi with HTTP, SSE,
 **Terminal**
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist
+bun add effect@4.0.0-rc.112 generalist @aws-sdk/client-s3 @smithy/fetch-http-handler
 ```
 
-## 1. Run an agent in memory
+## 1. Run an agent with object durability
 
-`Runtime.layerMemory` hosts Agents registered once at process startup. The in-memory process claims admitted work through the provided `RunStore` and executes it with `RunExecutor`. `Generalist.create` registers configured Agents and returns the Host. `host.runs.start` retains typed in-process inputs and outputs; the Server route uses `host.runs.startByName` to decode serialized input through the selected Agent Schema.
+`Durability.layer` reconstructs the object-backed Runtime and `Durability.activate` starts its scheduler only inside an owned scope. `S3.layer` supplies the canonical object transport; the host also supplies `BunCrypto` and an `ExecutableResolver`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. For a custom endpoint, also set `GENERALIST_S3_ENDPOINT` and `GENERALIST_S3_CAPABILITIES_CONFIRMED` only after qualifying its conditional-create, strong-read, and consistent-listing guarantees. The object transport is not a provider certification or a claim of deployed support.
 
 **session-frames.ts**
 
 ```typescript
-import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
@@ -49,12 +52,32 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.merge(
-  Runtime.layerMemory({
-    addresses: [],
-  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
-  agentServices,
-)
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  return Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+}))
 
 const collectRun = (runId: string, cursor?: number) => {
   const options = { runId }
@@ -72,18 +95,21 @@ const tags = (events: Iterable<{ readonly sequence: number; readonly _tag: strin
     .map((event) => `${event.sequence}:${event._tag}`)
     .join(" ")
 
-const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  const handle = yield* runtime.start(agent, "Say hello", {
-    sessionId: "docs-1",
-    idempotencyKey: "hello-1",
-  })
-  const live = yield* collectRun(handle.runId)
-  yield* Console.log(`live:   ${tags(live)}`)
-  const replayed = yield* collectRun(handle.runId, 2)
-  yield* Console.log(`replay: ${tags(replayed)}`)
-})
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    yield* Durability.activate
+    const runtime = yield* Runtime.Runtime
+    yield* runtime.register(agent)
+    const handle = yield* runtime.start(agent, "Say hello", {
+      sessionId: "docs-1",
+      idempotencyKey: "hello-1",
+    })
+    const live = yield* collectRun(handle.runId)
+    yield* Console.log(`live:   ${tags(live)}`)
+    const replayed = yield* collectRun(handle.runId, 2)
+    yield* Console.log(`replay: ${tags(replayed)}`)
+  }),
+)
 
 const runtime = ManagedRuntime.make(runtimeLayer)
 await runtime.runPromise(program)
@@ -110,9 +136,12 @@ A durable approval emits an approval token and suspends the Run. Resolve it with
 **approval-resume.ts**
 
 ```typescript
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
 
 const deployTool = Tool.make("deploy", {
@@ -175,40 +204,63 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.merge(
-  Runtime.layerMemory({
-    addresses: [],
-  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
-  agentServices,
-)
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  return Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+}))
 
-const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  const handle = yield* runtime.start(agent, "Deploy the api service", {
-    sessionId: "release-1",
-    idempotencyKey: "deploy-1",
-  })
-  const firstRun = yield* handle.events.pipe(
-    Stream.takeUntil((event) => event._tag === "RunWaiting"),
-    Stream.runCollect,
-  )
-  const waiting = Array.from(firstRun).find((event) => event._tag === "RunWaiting")
-  if (waiting === undefined || waiting._tag !== "RunWaiting") {
-    return yield* Effect.die("expected a RunWaiting event")
-  }
-  yield* Console.log(`waiting for ${waiting.wait.reason._tag} on ${waiting.wait.waitId}`)
-  yield* runtime.respond({ runId: handle.runId, waitId: waiting.wait.waitId, resolution: { _tag: "Approved" } })
-  const secondRun = yield* runtime.events({ runId: handle.runId, cursor: Cursor.make(waiting.sequence) }).pipe(
-    Stream.takeUntil((event) => event._tag === "RunCompleted"),
-    Stream.runCollect,
-  )
-  const completed = Array.from(secondRun).find((event) => event._tag === "RunCompleted")
-  if (completed === undefined || completed._tag !== "RunCompleted" || "_tag" in completed.result) {
-    return yield* Effect.die("expected an Agent RunCompleted event")
-  }
-  yield* Console.log(completed.result.text)
-})
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    yield* Durability.activate
+    const runtime = yield* Runtime.Runtime
+    yield* runtime.register(agent)
+    const handle = yield* runtime.start(agent, "Deploy the api service", {
+      sessionId: "release-1",
+      idempotencyKey: "deploy-1",
+    })
+    const firstRun = yield* handle.events.pipe(
+      Stream.takeUntil((event) => event._tag === "RunWaiting"),
+      Stream.runCollect,
+    )
+    const waiting = Array.from(firstRun).find((event) => event._tag === "RunWaiting")
+    if (waiting === undefined || waiting._tag !== "RunWaiting") {
+      return yield* Effect.die("expected a RunWaiting event")
+    }
+    yield* Console.log(`waiting for ${waiting.wait.reason._tag} on ${waiting.wait.waitId}`)
+    yield* runtime.respond({ runId: handle.runId, waitId: waiting.wait.waitId, resolution: { _tag: "Approved" } })
+    const secondRun = yield* runtime.events({ runId: handle.runId, cursor: Cursor.make(waiting.sequence) }).pipe(
+      Stream.takeUntil((event) => event._tag === "RunCompleted"),
+      Stream.runCollect,
+    )
+    const completed = Array.from(secondRun).find((event) => event._tag === "RunCompleted")
+    if (completed === undefined || completed._tag !== "RunCompleted" || "_tag" in completed.result) {
+      return yield* Effect.die("expected an Agent RunCompleted event")
+    }
+    yield* Console.log(completed.result.text)
+  }),
+)
 
 const runtime = ManagedRuntime.make(runtimeLayer)
 await runtime.runPromise(program)
@@ -231,18 +283,45 @@ WebSocket carries Host events and explicit cancellation only. Resolve approvals 
 **http-routes.ts**
 
 ```typescript
-import { Config, Effect, Layer, Redacted } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
+import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 
 const agent = Agent.make({ name: "research-agent" })
-const runtimeLayer = Runtime.layerMemory({ addresses: [] }).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-)
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
+}))
 const services = Layer.mergeAll(
   runtimeLayer,
   TestModel.layer([TestModel.text("Answer.")]),
@@ -262,7 +341,7 @@ const apiLayer = Layer.unwrap(
   ),
 )
 
-export const serverLayer: Layer.Layer<never, never, HttpServer.HttpServer> = HttpRouter.serve(
+export const serverLayer = HttpRouter.serve(
   Layer.merge(apiLayer, HttpRouter.cors()).pipe(Layer.provide(HttpServer.layerServices)),
   { disableLogger: false },
 ).pipe(Layer.provideMerge(services), Layer.provideMerge(FetchHttpClient.layer))
@@ -280,8 +359,12 @@ SESSION_ID=$(curl -s -X POST localhost:4000/sessions \
 RUN_ID=$(curl -s -X POST "localhost:4000/sessions/$SESSION_ID/runs" \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"agent":"research-agent","input":"Research Effect fibers","idempotencyKey":"message-1"}' | jq -r .id)
+curl -s -X POST "localhost:4000/runs/$RUN_ID/cancel" \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"commandId":"cancel:docs-1","reason":"operator requested"}'
 curl -N "localhost:4000/sessions/$SESSION_ID/events" -H "authorization: Bearer $TOKEN"
 ```
+The cancel payload must include a caller-chosen `commandId`; retry the exact payload with that identity rather than generating a new cancellation command. Closing the stream does not cancel the Run.
 
 ## 4. Cursors and backpressure
 
@@ -289,6 +372,6 @@ curl -N "localhost:4000/sessions/$SESSION_ID/events" -H "authorization: Bearer $
 - A lagging subscriber fails without affecting the Run or other subscribers. The reconnecting client resumes from its last admitted Host cursor.
 - `client.runs.inspect({ runId })` is finite Run inspection, separate from the Session event stream.
 - `Runtime.previews({ runId })` is a bounded, append-only, lossy process-local observer with detectable sequence and offset gaps. It is not transported, persisted, cursor-addressed, checkpointed, or durably replayed.
-- Closing SSE or WebSocket never cancels the run. Cancellation is always explicit through `Runtime.cancel`.
+- Closing SSE or WebSocket never cancels the run. Cancellation is always explicit through `Runtime.cancel` or the authenticated Server route, and each cancellation command carries a caller-supplied `commandId`.
 
 The wire contract is in [the generalist/server reference](/reference/transport), and Runtime ownership is documented in [the generalist/runtime reference](/reference/runtime).

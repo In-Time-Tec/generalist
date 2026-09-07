@@ -3,16 +3,41 @@ import { Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.js"
+import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { registrationsFor } from "../fixtures.js"
 import { testExecutable } from "../../run/identity.js"
 import { operationRecoverySuite } from "../../operation/suites/recovery.js"
-import { tempDbPath } from "../../sql/scenario.js"
 import { toolCancellationSuite } from "../../operation/suites/tool-cancellation.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { JournalFault } from "../../../../src/runtime/operation/journal-fault.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { memoryRecoverySuite } from "./memory.js"
+
+const objectClaims = new Map<string, { readonly claim: ExecutionClaim; readonly release: Effect.Effect<void, WorkerMutationError> }>()
+
+const objectClaim = (runId: string, label: string) =>
+  Effect.flatMap(RunStore.RunStore, (store) =>
+    store.claimExecution({
+      commandId: `runtime-execution-recovery-exclusive-test-ts-claim-${label}`,
+      runId,
+      ownerId: objectWorkerId,
+    }).pipe(
+      Effect.tap((claim) =>
+        Effect.sync(() => {
+          objectClaims.set(runId, { claim, release: () => store.releaseExecution(claim) })
+        }),
+      ),
+    ),
+  )
+
+const expireObjectClaim = (runId: string) =>
+  Effect.suspend(() => {
+    const entry = objectClaims.get(runId)
+    if (entry === undefined) return Effect.void
+    objectClaims.delete(runId)
+    return entry.release()
+  })
 
 memoryRecoverySuite()
 
@@ -45,18 +70,22 @@ const layerInterruptAfter = (operationCount: number): Layer.Layer<JournalFault> 
   )
 
 operationRecoverySuite({
-  name: "sqlite",
-  makeLayer: (options) => SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("operation-recovery") }),
+  name: "object",
+  makeLayer: objectRuntimeLayer,
+  claim: objectClaim,
+  expireClaim: expireObjectClaim,
 })
 
 toolCancellationSuite({
-  name: "sqlite",
-  makeLayer: (options) => SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("tool-cancellation") }),
+  name: "object",
+  makeLayer: objectRuntimeLayer,
+  claim: objectClaim,
+  expireClaim: expireObjectClaim,
 })
 
 it.live("reopens a typed Agent start without redispatching its completed tool call", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("typed-agent-start-recovery")
+    const storage = makeObjectStorage()
     const tool = Tool.make("write_once", {
       parameters: Schema.Struct({ value: Schema.String }),
       success: Schema.String,
@@ -73,7 +102,6 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     })
     const resolver = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
     const options = {
-      filename,
       addresses: [],
       scheduler: { pollInterval: "1 hour" as const },
     }
@@ -102,7 +130,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     )
     const firstEnvironment = Layer.mergeAll(allowAllAuthorization, firstModel, handlers)
     const firstLayer = Layer.merge(
-      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, layerInterruptAfter(5)))),
+      objectRuntimeLayer(options, storage).pipe(Layer.provide(Layer.merge(resolver, layerInterruptAfter(5)))),
       firstEnvironment,
     )
 
@@ -113,7 +141,8 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
         const store = yield* RunStore.RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "write exactly once", startOptions)
-        yield* host.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "before-restart" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-1", runId: handle.runId, ownerId: objectWorkerId }))
 
         expect((yield* runtime.inspect(handle.runId)).status).toBe("running")
         expect(toolCalls).toBe(1)
@@ -138,7 +167,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     )
     const recoveredEnvironment = Layer.mergeAll(allowAllAuthorization, recoveredModel, handlers)
     const recoveredLayer = Layer.merge(
-      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolver)),
+      objectRuntimeLayer(options, storage).pipe(Layer.provide(resolver)),
       recoveredEnvironment,
     )
 
@@ -151,7 +180,8 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
         const handle = yield* runtime.start(agent, "write exactly once", startOptions)
 
         expect(handle.runId).toBe(runId)
-        yield* host.execute(yield* store.claimExecution({ runId, ownerId: "after-restart" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-2", runId, ownerId: objectWorkerId }))
         expect(yield* handle.await).toBe("complete after restart")
         expect(toolCalls).toBe(1)
         expect(recoveredModelCalls).toBe(1)
@@ -165,7 +195,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
 
 it.live("reconciles a crashed framework tool before resuming its Agent", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("execution-crash-recovery")
+    const storage = makeObjectStorage()
     const tool = Tool.make("external_write", { parameters: Schema.Struct({}), success: Schema.String })
     const toolkit = Toolkit.make(tool)
     const agent = Agent.make({ name: "execution-crash-recovery", toolkit })
@@ -210,11 +240,10 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
       },
     ]).pipe(Layer.orDie)
     const first = yield* scopedWith(
-      SqliteRuntime.layerSqlite({
-        filename,
+      objectRuntimeLayer({
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }).pipe(Layer.provide(firstResolverLayer)),
+      }, storage).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -227,7 +256,8 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
           prompt: "write once",
         })
         const fiber = yield* host
-          .execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "process-before-crash" }))
+          .execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId }))
           .pipe(Effect.forkIn(crashScope))
         const progress = yield* runtime.events({ runId: receipt.runId }).pipe(
           Stream.filter((event) => event._tag === "ToolProgress"),
@@ -291,11 +321,10 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     ]).pipe(Layer.orDie)
 
     yield* scopedWith(
-      SqliteRuntime.layerSqlite({
-        filename,
+      objectRuntimeLayer({
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }).pipe(Layer.provide(recoveredResolverLayer)),
+      }, storage).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -304,7 +333,8 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
 
         const reopened = yield* runtime.inspect(first.runId)
         if (reopened.status === "running") {
-          yield* host.execute(yield* store.claimExecution({ runId: first.runId, ownerId: "recovery-check" }))
+          yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-4", runId: first.runId, ownerId: objectWorkerId }))
         }
 
         expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
@@ -334,8 +364,10 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
             },
           },
           "operator:crash-recovery",
+          "runtime-execution-recovery-exclusive-test-ts-resolveUnknown-1",
         )
-        yield* host.execute(yield* store.claimExecution({ runId: first.runId, ownerId: "recovery-resume" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-5", runId: first.runId, ownerId: objectWorkerId }))
 
         const completedHistory = yield* runtime.history({ runId: first.runId, limit: 100 })
         expect((yield* runtime.inspect(first.runId)).status).toBe("succeeded")
@@ -350,9 +382,9 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
   }),
 )
 
-it.live("keeps one tool operation key across approval suspension and SQLite restart", () =>
+it.live("keeps one tool operation key across approval suspension and object storage restart", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("approval-operation-key-restart")
+    const storage = makeObjectStorage()
     const tool = Tool.make("gated_write", {
       parameters: Schema.Struct({ value: Schema.String }),
       success: Schema.String,
@@ -399,11 +431,10 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
     ]).pipe(Layer.orDie)
 
     const suspended = yield* scopedWith(
-      SqliteRuntime.layerSqlite({
-        filename,
+      objectRuntimeLayer({
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }).pipe(Layer.provide(firstResolverLayer)),
+      }, storage).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -415,7 +446,8 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
           idempotencyKey: "approval-operation-key-restart",
           prompt: "write once after approval",
         })
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-restart" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId }))
 
         const inspection = yield* runtime.inspect(receipt.runId)
         const approvalToken = `runtime-approval:${encodeURIComponent(receipt.runId)}:approval:gated-write-1`
@@ -480,11 +512,10 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
     ]).pipe(Layer.orDie)
 
     yield* scopedWith(
-      SqliteRuntime.layerSqlite({
-        filename,
+      objectRuntimeLayer({
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
         scheduler: { pollInterval: "1 hour" },
-      }).pipe(Layer.provide(recoveredResolverLayer)),
+      }, storage).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -504,7 +535,8 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
           waitId: suspended.approvalToken,
           resolution: { _tag: "Approved" },
         })
-        yield* host.execute(yield* store.claimExecution({ runId: suspended.runId, ownerId: "after-restart" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-7", runId: suspended.runId, ownerId: objectWorkerId }))
 
         expect((yield* runtime.inspect(suspended.runId)).status).toBe("succeeded")
         expect(invocation?.operationKey).toBe(suspended.operationKey)
@@ -526,8 +558,9 @@ it.live("keeps one tool operation key across approval suspension and SQLite rest
   }),
 )
 
-it.effect("sqlite reconciles every running operation before execution", () => {
-  const backend = "sqlite"
+it.effect("object storage reconciles every running operation before execution", () => {
+  const backend = "object"
+  const storage = makeObjectStorage()
   const agent = Agent.make({ name: `retry-safe-recovery-${backend}` })
   const executable = testExecutable(agent, `retry-safe-recovery-${backend}-v1`)
   const address = Address.make(`agent:retry-safe-recovery-${backend}`)
@@ -542,10 +575,7 @@ it.effect("sqlite reconciles every running operation before execution", () => {
     addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     scheduler: { pollInterval: "1 hour" as const },
   }
-  const runtimeLayer = SqliteRuntime.layerSqlite({
-    ...options,
-    filename: tempDbPath(`retry-safe-recovery-${backend}`),
-  }).pipe(
+  const runtimeLayer = objectRuntimeLayer(options, storage).pipe(
     Layer.provide(
       ExecutableResolver.layerStatic([
         { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model)) },
@@ -562,7 +592,8 @@ it.effect("sqlite reconciles every running operation before execution", () => {
         idempotencyKey: "retry-safe-recovery",
         prompt: "recover",
       })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-recovery" })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-recovery-exclusive-test-ts-claim-8", runId: receipt.runId, ownerId: objectWorkerId })
       const pure = yield* store.recordOperation({
         ...claim,
         operationKey: "memory:pure",
@@ -599,11 +630,20 @@ it.effect("sqlite reconciles every running operation before execution", () => {
         replayPolicy: "never",
         attempt: claim.attempt,
       })
-      for (const operation of [pure, idempotent, firstNever, secondNever]) {
-        yield* store.startOperation({ ...claim, operationId: operation.operationId })
+      for (const [index, operation] of [pure, idempotent, firstNever, secondNever].entries()) {
+        yield* store.startOperation({
+          commandId: `runtime-execution-recovery-exclusive-test-ts-startOperation-${index + 1}`,
+          ...claim,
+          operationId: operation.operationId,
+        })
       }
 
-      expect(yield* store.recoverRunningOperations(claim)).toBe("blocked")
+      expect(
+        yield* store.recoverRunningOperations({
+          ...claim,
+          commandId: "runtime-execution-recovery-exclusive-test-ts-recoverRunningOperations-1",
+        }),
+      ).toBe("blocked")
       expect((yield* store.getOperation({ runId: receipt.runId, operationId: pure.operationId })).status).toBe(
         "requested",
       )

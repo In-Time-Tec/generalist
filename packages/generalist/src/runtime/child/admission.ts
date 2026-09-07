@@ -4,7 +4,7 @@ import { ToolContext } from "../../core/tools/tool-context.js"
 import { make as makeAddress } from "../address.js"
 import { childSessionId } from "./session.js"
 import { make as makeMessage } from "../messaging/message.js"
-import { normalizePrompt } from "../memory/prompt.js"
+import { normalizePrompt } from "../state/prompt.js"
 import type {
   ChildSelectionMissing,
   IdempotencyConflict,

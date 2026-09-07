@@ -6,13 +6,13 @@ import {
   alternateResearcherRef,
   assistantAddress,
   completedResult,
-  memoryLayer,
+  objectLayer,
   parentRelativeLayer,
   researcherRef,
   textPrompt,
 } from "../execution/fixtures.js"
 
-layer(memoryLayer)("Runtime children", (it) => {
+layer(objectLayer)("Runtime children", (it) => {
   it.effect("isolates each spawned child's Session from its parent and its siblings", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -85,12 +85,14 @@ layer(memoryLayer)("Runtime children", (it) => {
       expect(duplicate.runId).toBe(child.runId)
       expect(duplicate.duplicate).toBe(true)
       yield* driver.emitAgentEvent({
-        ...(yield* driver.claimExecution({ runId: child.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-child-runs-test-ts-claim-1", runId: child.runId, ownerId: "test" })),
         runId: child.runId,
         event: { _tag: "TurnStarted", turn: 0 },
       })
       yield* driver.complete({
-        ...(yield* driver.claimExecution({ runId: child.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-child-runs-test-ts-claim-2", runId: child.runId, ownerId: "test" })),
         runId: child.runId,
         result: completedResult("notes"),
       })
@@ -147,7 +149,8 @@ layer(memoryLayer)("Runtime children", (it) => {
         prompt: textPrompt("research"),
       })
       yield* driver.complete({
-        ...(yield* driver.claimExecution({ runId: child.runId, ownerId: "test" })),
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-child-runs-test-ts-claim-3", runId: child.runId, ownerId: "test" })),
         runId: child.runId,
         result: completedResult("notes"),
       })
@@ -184,7 +187,8 @@ layer(memoryLayer)("Runtime children", (it) => {
         prompt: textPrompt("two"),
       })
 
-      yield* runtime.cancel({ runId: parent.runId, reason: "stop" })
+      yield* runtime.cancel({
+          commandId: "runtime-child-runs-test-ts-cancel-4", runId: parent.runId, reason: "stop" })
 
       expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
       expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
@@ -215,8 +219,10 @@ layer(memoryLayer)("Runtime children", (it) => {
         idempotencyKey: "parent",
         prompt: textPrompt("parent"),
       })
-      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "test" })
-      yield* store.complete({ ...claim, result: completedResult("done") })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-child-runs-test-ts-claim-4", runId: parent.runId, ownerId: "test" })
+      yield* store.complete({
+          commandId: "runtime-child-runs-test-ts-complete-5", ...claim, result: completedResult("done") })
       const before = yield* RunTree.checkpoint(parent.runId)
       const failure = yield* runtime
         .spawn({
@@ -243,7 +249,8 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      yield* store.claimExecution({ runId: parent.runId, ownerId: "test-parent" })
+      yield* store.claimExecution({
+          commandId: "runtime-child-runs-test-ts-claim-5", runId: parent.runId, ownerId: "test-parent" })
       const children = ChildRuns.make(store)
       const input = {
         parentRunId: parent.runId,
@@ -259,7 +266,8 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
       if (first._tag !== "Suspend") return
       const large = "終🚀".repeat(7_000)
       yield* store.complete({
-        ...(yield* store.claimExecution({ runId: first.token, ownerId: "test" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-runs-test-ts-claim-6", runId: first.token, ownerId: "test" })),
         result: completedResult(large),
       })
       expect(yield* children.invoke(input)).toMatchObject({

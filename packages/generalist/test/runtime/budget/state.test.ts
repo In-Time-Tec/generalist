@@ -1,3 +1,4 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -21,8 +22,6 @@ import {
   researcherRef,
 } from "../execution/fixtures.js"
 import { closedTestAgent } from "../run/identity.js"
-import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
-import { tempDbPath } from "../sql/scenario.js"
 import { provideScoped } from "../execution/scoped-provide.js"
 
 const usage = Response.Usage.make({
@@ -44,7 +43,7 @@ const textModel = modelLayer([
 const agent = Agent.make({ name: "runtime-budget", toolkit: Toolkit.empty })
 const runtimeLayer = (model: Layer.Layer<LanguageModel.LanguageModel>) =>
   Layer.merge(
-    Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+    objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     ),
     Layer.merge(allowAllAuthorization, model),
@@ -56,7 +55,8 @@ const execute = Effect.fn("test.executeBudgetRun")(function* (budget: RunBudget.
   const store = yield* RunStore.RunStore
   yield* runtime.register(agent)
   const handle = yield* runtime.start(agent, "run", { budget })
-  yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: `budget:${handle.runId}` }))
+  yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-1", runId: handle.runId, ownerId: `budget:${handle.runId}` }))
   return yield* runtime.inspect(handle.runId)
 })
 
@@ -73,7 +73,8 @@ it.effect("suspends on exhaustion, journals extension, and resumes", () =>
         idempotencyKey: "budget-suspend",
         budget: RunBudget.make({ tokens: 0, usd: 1, duration: "1 minute", toolCalls: 1, children: 1 }),
       })
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget-test" }))
+      yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-2", runId: handle.runId, ownerId: "budget-test" }))
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "waiting",
         budget: { tokens: 0 },
@@ -108,7 +109,8 @@ it.effect("suspends on exhaustion, journals extension, and resumes", () =>
         action: "extendBudget",
       })
       expect((yield* store.recoveryJournal(handle.runId)).actions).toHaveLength(2)
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget-test-resume" }))
+      yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-3", runId: handle.runId, ownerId: "budget-test-resume" }))
       expect(yield* handle.await).toBe("done")
       const inspection = yield* runtime.inspect(handle.runId)
       expect(inspection.status).toBe("succeeded")
@@ -155,7 +157,8 @@ it.effect("suspends when elapsed duration is exhausted before provider dispatch"
       yield* runtime.register(agent)
       const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ duration: "1 second" }) })
       yield* TestClock.adjust("2 seconds")
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget:duration" }))
+      yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-4", runId: handle.runId, ownerId: "budget:duration" }))
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "waiting",
         budget: { duration: 0 },
@@ -217,14 +220,16 @@ it.effect("one tool-call extension pays for exactly one handler execution", () =
       const store = yield* RunStore.RunStore
       yield* runtime.register(toolAgent)
       const handle = yield* runtime.start(toolAgent, "run", { budget: RunBudget.make({ toolCalls: 0 }) })
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget:tool" }))
+      yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-5", runId: handle.runId, ownerId: "budget:tool" }))
       expect(calls).toBe(0)
       expect(yield* runtime.inspect(handle.runId)).toMatchObject({
         status: "waiting",
         suspension: { _tag: "BudgetExhausted", budget: "toolCalls" },
       })
       yield* runtime.extendBudget(handle.runId, { toolCalls: 1 })
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget:tool-resume" }))
+      yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-6", runId: handle.runId, ownerId: "budget:tool-resume" }))
       expect(yield* handle.await).toBe("done")
       expect(calls).toBe(1)
       expect(modelCalls).toBe(2)
@@ -250,7 +255,7 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
     { executable: researcherRef, agent: closedTestAgent(researcher) },
   ]).pipe(Layer.orDie)
   const address = Address.make("agent:budget-parent")
-  const layer = Runtime.layerMemory({
+  const layer = objectRuntimeLayer({
     addresses: [{ address, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
     scheduler: { pollInterval: "1 hour" },
   }).pipe(Layer.provide(resolver))
@@ -268,7 +273,8 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
         treePolicy: { maxDepth: 1, maxSubagents: 1 },
       })
       yield* runtime.extendBudget(receipt.runId, { children: 0 })
-      yield* executor.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "budget:child" }))
+      yield* executor.execute(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-7", runId: receipt.runId, ownerId: "budget:child" }))
       const inspection = yield* runtime.inspect(receipt.runId)
       expect(inspection).toMatchObject({
         status: "waiting",
@@ -285,7 +291,8 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
       })
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ budget: { children: 0 } })
       yield* store.complete({
-        ...(yield* store.claimExecution({ runId: child.childRunId, ownerId: "budget:child-settlement" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-budget-state-test-ts-claim-8", runId: child.childRunId, ownerId: "budget:child-settlement" })),
         result: completedResult("done"),
       })
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ budget: { children: 0 } })
@@ -293,8 +300,8 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
   )
 })
 
-it.effect("recomputes spend after SQLite reopen and resumes without redispatch", () => {
-  const filename = tempDbPath("runtime-budget-reopen")
+it.effect("recomputes spend after fresh object-host recovery and resumes without redispatch", () => {
+  const storage = makeObjectStorage()
   let modelCalls = 0
   const countedModel = Layer.effect(
     LanguageModel.LanguageModel,
@@ -311,7 +318,7 @@ it.effect("recomputes spend after SQLite reopen and resumes without redispatch",
   )
   const layer = () =>
     Layer.merge(
-      SqliteRuntime.layerSqlite({ filename, addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+      objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }, storage).pipe(
         Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
       ),
       Layer.merge(allowAllAuthorization, countedModel),
@@ -324,7 +331,13 @@ it.effect("recomputes spend after SQLite reopen and resumes without redispatch",
         const store = yield* RunStore.RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ tokens: 1 }) })
-        yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "budget:before-reopen" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+            commandId: "budget-before-recovery",
+          }),
+        )
         const inspection = yield* runtime.inspect(handle.runId)
         expect(inspection).toMatchObject({
           status: "waiting",
@@ -356,14 +369,20 @@ it.effect("recomputes spend after SQLite reopen and resumes without redispatch",
         })
         expect(reopened.lastEvent).toBeDefined()
         yield* runtime.register(agent)
-        yield* runtime.operator.extendBudget(runId, { tokens: 10 }, "operator:budget-reopen")
+        yield* runtime.operator.extendBudget(runId, { tokens: 10 }, "operator:budget-recovery", "budget-extension")
         expect((yield* store.recoveryJournal(runId)).actions).toEqual([
           expect.objectContaining({
-            operator: "operator:budget-reopen",
+            operator: "operator:budget-recovery",
             action: { _tag: "ExtendBudget", delta: { tokens: 10 } },
           }),
         ])
-        yield* executor.execute(yield* store.claimExecution({ runId, ownerId: "budget:after-reopen" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            runId,
+            ownerId: objectWorkerId,
+            commandId: "budget-after-recovery",
+          }),
+        )
         expect(yield* runtime.inspect(runId)).toMatchObject({ status: "succeeded", budget: { tokens: 9 } })
       }).pipe((effect) => provideScoped(layer(), effect)),
     )

@@ -1,3 +1,4 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -6,8 +7,7 @@ import { RunStore, Runtime } from "../../../../src/runtime/index.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
 import { settleInterruptedExecution } from "../../../../src/runtime/execution/interruption.js"
 import { make as makeActiveModelResponse } from "../../../../src/core/model/result/active-model-response.js"
-import { assistantAddress } from "../fixtures.js"
-import { sqliteManualClaimLayer, tempDbPath } from "../../sql/scenario.js"
+import { assistantAddress, assistantRef, registrationsFor, resolverLayer } from "../fixtures.js"
 
 const scopedWith =
   <A, E>(layer: Layer.Layer<A, E>) =>
@@ -20,7 +20,8 @@ for (const replayPolicy of ["pure", "never"] as const) {
       `${replayPolicy} stream interrupted ${persisted ? "after" : "before"} completion write reopens safely`,
       () =>
         Effect.gen(function* () {
-          const filename = tempDbPath("stream-operation-boundary")
+          const storage = makeObjectStorage()
+          const layerObject = () => objectRuntimeLayer({ addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }], scheduler: { pollInterval: "1 hour" } }, storage).pipe(Layer.provide(resolverLayer))
           const committing = yield* Deferred.make<void>()
           let invocations = 0
           const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream", sessionId: "stream" })
@@ -37,7 +38,7 @@ for (const replayPolicy of ["pure", "never"] as const) {
             invocations += 1
             return Stream.make("authored result")
           })
-          const first = yield* scopedWith(sqliteManualClaimLayer(filename))(
+          const first = yield* scopedWith(layerObject())(
             Effect.gen(function* () {
               const store = yield* RunStore.RunStore
               const runtime = yield* Runtime.Runtime
@@ -47,7 +48,8 @@ for (const replayPolicy of ["pure", "never"] as const) {
                 idempotencyKey: "stream",
                 prompt: "unused",
               })
-              const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "first" })
+              const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId })
               const active = yield* Ref.make<ReadonlySet<string>>(new Set())
               let operationId = ""
               const interpreter = yield* DurableDriver.makeInline({
@@ -67,7 +69,8 @@ for (const replayPolicy of ["pure", "never"] as const) {
                         checkpoint,
                       })
                       operationId = record.operationId
-                      yield* store.startOperation({ ...claim, operationId })
+                      yield* store.startOperation({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-1", ...claim, operationId })
                       yield* Ref.set(active, new Set([operationId]))
                     }).pipe(Effect.orDie),
                   onCompleted: (_operation, outcome, checkpoint) =>
@@ -119,7 +122,7 @@ for (const replayPolicy of ["pure", "never"] as const) {
               return { runId: receipt.runId, operationId }
             }),
           )
-          yield* scopedWith(sqliteManualClaimLayer(filename))(
+          yield* scopedWith(layerObject())(
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
@@ -131,7 +134,8 @@ for (const replayPolicy of ["pure", "never"] as const) {
                   resolution: { _tag: "Succeeded", value: ["external result"] },
                 })
               }
-              const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "reopened" })
+              const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-2", runId: first.runId, ownerId: objectWorkerId })
               expect(yield* store.recoverRunningOperations(claim)).toBe("ready")
               const reopened = yield* store.loadExecution(first.runId)
               const interpreter = yield* DurableDriver.makeInline({
@@ -143,7 +147,8 @@ for (const replayPolicy of ["pure", "never"] as const) {
                       const record = yield* store.getOperation(first)
                       if (record.status === "succeeded") return { _tag: "Succeeded" as const, value: record.result }
                       expect(record.status).toBe("requested")
-                      yield* store.startOperation({ ...claim, operationId: first.operationId })
+                      yield* store.startOperation({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-2", ...claim, operationId: first.operationId })
                       return undefined
                     }).pipe(Effect.orDie),
                   onCompleted: (_operation, outcome, checkpoint) =>
@@ -177,9 +182,10 @@ for (const persisted of [false, true]) {
     `settlement expiration failure ${persisted ? "after" : "before"} a write preserves recovery of every operation`,
     () =>
       Effect.gen(function* () {
-        const filename = tempDbPath("settlement-expiration")
+        const storage = makeObjectStorage()
+        const layerObject = () => objectRuntimeLayer({ addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }], scheduler: { pollInterval: "1 hour" } }, storage).pipe(Layer.provide(resolverLayer))
         const fault = RuntimeUnavailable.make({ message: "injected expiration failure" })
-        const first = yield* scopedWith(sqliteManualClaimLayer(filename))(
+        const first = yield* scopedWith(layerObject())(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
@@ -189,7 +195,8 @@ for (const persisted of [false, true]) {
               idempotencyKey: "expiration",
               prompt: "unused",
             })
-            const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "first" })
+            const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
             const ids: string[] = []
             for (const replayPolicy of ["pure", "never"] as const) {
               const operation = yield* store.recordOperation({
@@ -202,7 +209,8 @@ for (const persisted of [false, true]) {
                 attempt: claim.attempt,
               })
               ids.push(operation.operationId)
-              yield* store.startOperation({ ...claim, operationId: operation.operationId })
+              yield* store.startOperation({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-startOperation-3", ...claim, operationId: operation.operationId })
             }
             let writes = 0
             const activeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set(ids))
@@ -236,11 +244,12 @@ for (const persisted of [false, true]) {
             return { runId: receipt.runId, ids }
           }),
         )
-        yield* scopedWith(sqliteManualClaimLayer(filename))(
+        yield* scopedWith(layerObject())(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const store = yield* RunStore.RunStore
-            const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "reopened" })
+            const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-operation-boundaries-ts-claim-4", runId: first.runId, ownerId: objectWorkerId })
             expect(yield* store.recoverRunningOperations(claim)).toBe("blocked")
             expect((yield* store.getOperation({ runId: first.runId, operationId: first.ids[0]! })).status).toBe(
               "requested",

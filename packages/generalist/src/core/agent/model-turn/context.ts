@@ -54,6 +54,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
     turn: number,
     prompt: Prompt.Prompt,
     overflow: boolean,
+    invocationId: string,
   ) => Effect.Effect<
     { readonly prompt: Prompt.Prompt; readonly changed: boolean },
     RunError,
@@ -63,6 +64,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly syncSession: (
     turn: number,
     transcript: Prompt.Prompt,
+    invocationId: string,
   ) => Effect.Effect<ReadonlyArray<import("../../context/session.js").Entry>, RunError, DriverInterpreter>
   readonly replayMessages: (sessionParentId: string) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>

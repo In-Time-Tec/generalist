@@ -44,7 +44,7 @@ export const narrowGrant: {
 
 export const firstExhausted = (remaining: Remaining): Dimension | undefined => {
   for (const dimension of ["tokens", "usd", "duration"] as const) {
-    if (remaining[dimension] === 0) return dimension
+    if (remaining[dimension] === 0 || remaining[dimension] === "unknown") return dimension
   }
   return undefined
 }
@@ -60,7 +60,7 @@ export const requireRunAvailable = (runId: string) => (store: RunStore) =>
 export const runnableLimits = (remaining: Remaining): BudgetLimits => {
   const limits: Types.Mutable<BudgetLimits> = {}
   if (remaining.tokens !== undefined) limits.tokens = remaining.tokens
-  if (remaining.usd !== undefined && remaining.usd !== "unknown") limits.usd = remaining.usd
+  if (remaining.usd !== undefined) limits.usd = remaining.usd === "unknown" ? 0 : remaining.usd
   if (remaining.duration !== undefined) limits.duration = remaining.duration
   if (remaining.toolCalls !== undefined) limits.toolCalls = remaining.toolCalls
   if (remaining.children !== undefined) limits.children = remaining.children
@@ -85,9 +85,9 @@ export const replayCheckpoint =
   }
 
 /** Reconstruct elapsed run time from journaled active and suspended boundaries. */
-export const durationForEvents = (events: ReadonlyArray<RunEvent>): Effect.Effect<number> =>
+export const durationForEvents = (events: ReadonlyArray<RunEvent>, observedMillis?: number): Effect.Effect<number> =>
   Effect.gen(function* () {
-    const now = yield* DateTime.now
+    const nowMillis = observedMillis ?? (yield* DateTime.now.pipe(Effect.map(DateTime.toEpochMillis)))
     let activeSince: number | undefined
     let duration = 0
     for (const event of events) {
@@ -101,6 +101,7 @@ export const durationForEvents = (events: ReadonlyArray<RunEvent>): Effect.Effec
         activeSince !== undefined &&
         (event._tag === "RunWaiting" ||
           event._tag === "BudgetSuspended" ||
+          event._tag === "RunRewound" ||
           event._tag === "RunCompleted" ||
           event._tag === "RunFailed" ||
           event._tag === "RunCancelled")
@@ -109,5 +110,5 @@ export const durationForEvents = (events: ReadonlyArray<RunEvent>): Effect.Effec
         activeSince = undefined
       }
     }
-    return activeSince === undefined ? duration : duration + Math.max(0, DateTime.toEpochMillis(now) - activeSince)
+    return activeSince === undefined ? duration : duration + Math.max(0, nowMillis - activeSince)
   })

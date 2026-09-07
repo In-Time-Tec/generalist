@@ -1,12 +1,8 @@
 /* oxlint-disable anti-slop/no-chained-type-assertions, anti-slop/no-object-parameters, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, typescript/no-unsafe-type-assertion -- This internal adapter preserves Schema.TaggedError's overloaded public type while extending its generated Error class. */
 import { Effect, Option, Schema } from "effect"
 
-/** @internal Required error hint with backwards-compatible decoding and constructor defaults. */
-export const errorHint = (value: string) =>
-  Schema.String.pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(value)),
-    Schema.withConstructorDefault(Effect.succeed(value)),
-  )
+/** @internal Required encoded hint with a default only when constructing a new error. */
+export const errorHint = (value: string) => Schema.String.pipe(Schema.withConstructorDefault(Effect.succeed(value)))
 
 const identifyingFields = new Set([
   "runId",

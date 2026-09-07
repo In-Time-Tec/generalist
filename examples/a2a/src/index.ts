@@ -1,10 +1,13 @@
+import { BunCrypto } from "@effect/platform-bun"
 import { type AgentCard, type Message, Role, type SendMessageRequest, type StreamResponse } from "@a2a-js/sdk"
 import { ServerCallContext } from "@a2a-js/sdk/server"
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
-import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
+import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { A2A } from "generalist/unstable/a2a"
 
 const agentBAddress = Address.make("agent:a2a-example-b")
@@ -35,7 +38,7 @@ const registrations = [...ExecutableRegistration.requiredPins(agentBExecutable)]
 
 const card: AgentCard = {
   name: "Generalist Agent B",
-  description: "The delegated offline specialist",
+  description: "The delegated specialist",
   supportedInterfaces: [
     { url: "http://127.0.0.1/a2a", protocolBinding: "JSONRPC", protocolVersion: "1.0", tenant: "" },
   ],
@@ -88,7 +91,7 @@ const hostModel = modelLayer((options) => {
         Response.makePart("tool-call", {
           id: "delegate-1",
           name: delegate.name,
-          params: { request: "Complete the offline delegated task." },
+          params: { request: "Complete the delegated task." },
           providerExecuted: false,
         }),
         finish("tool-calls"),
@@ -152,10 +155,39 @@ const resolver = ExecutableResolver.layerStatic([
     agent: Agent.close(agentB, Layer.mergeAll(agentBModel, authorization())),
   },
 ]).pipe(Layer.orDie)
-const runtimeLayer = Runtime.layerMemory({
-  addresses: [{ address: agentBAddress, executable: agentBExecutable, registrations }],
-  scheduler: { concurrency: 2 },
-}).pipe(Layer.provide(resolver))
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  const reconstructed = Durability.layer({
+    environment,
+    tenant,
+    partition,
+    addresses: [{ address: agentBAddress, executable: agentBExecutable, registrations }],
+    scheduler: { concurrency: 2 },
+  }).pipe(
+    Layer.provide(resolver),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
+}))
 const protocolServices = delegateHandlers.pipe(
   Layer.provideMerge(A2A.layer({ address: agentBAddress, card })),
   Layer.provideMerge(runtimeLayer),

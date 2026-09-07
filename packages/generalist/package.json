@@ -9,19 +9,17 @@
     "@a2a-js/sdk": "catalog:",
     "@ag-ui/core": "catalog:",
     "@aws-sdk/client-bedrock-runtime": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/credential-provider-node": "catalog:",
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
     "@effect/ai-openrouter": "catalog:",
-    "@effect/sql-mysql2": "catalog:",
-    "@effect/sql-pg": "catalog:",
-    "@effect/sql-sqlite-bun": "catalog:",
-    "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@rivet-dev/agentos": "catalog:",
     "@smithy/types": "catalog:",
+    "@smithy/fetch-http-handler": "catalog:",
     "@standard-schema/spec": "catalog:",
     "effect": "4.0.0-rc.112",
     "es-module-lexer": "catalog:",
@@ -29,9 +27,7 @@
     "modal": "catalog:",
     "rivetkit": "catalog:",
     "vitest": "catalog:",
-    "yjs": "catalog:",
-    "pg": "catalog:",
-    "pg-cursor": "catalog:"
+    "yjs": "catalog:"
   },
   "files": [
     "dist",
@@ -64,6 +60,18 @@
       "types": "./dist/blob-store/index.d.ts",
       "import": "./dist/blob-store/index.js"
     },
+    "./durability": {
+      "types": "./dist/durability/index.d.ts",
+      "import": "./dist/durability/index.js"
+    },
+    "./durability/s3": {
+      "types": "./dist/durability/s3.d.ts",
+      "import": "./dist/durability/s3.js"
+    },
+    "./durability/r2": {
+      "types": "./dist/durability/r2.d.ts",
+      "import": "./dist/durability/r2.js"
+    },
     "./compaction": {
       "types": "./dist/core/turn/compaction.d.ts",
       "import": "./dist/core/turn/compaction.js"
@@ -95,14 +103,6 @@
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
-    },
-    "./runtime/sqlite-bun": {
-      "types": "./dist/runtime/sqlite-bun.d.ts",
-      "import": "./dist/runtime/sqlite-bun.js"
-    },
-    "./runtime/sql-driver": {
-      "types": "./dist/runtime/sql-driver.d.ts",
-      "import": "./dist/runtime/sql-driver.js"
     },
     "./instructions": {
       "types": "./dist/instructions/index.d.ts",
@@ -147,6 +147,10 @@
     "./testing/runtime-driver": {
       "types": "./dist/testing/runtime-driver/index.d.ts",
       "import": "./dist/testing/runtime-driver/index.js"
+    },
+    "./testing/durability": {
+      "types": "./dist/testing/durability/index.d.ts",
+      "import": "./dist/testing/durability/index.js"
     },
     "./trajectory": {
       "types": "./dist/trajectory/index.d.ts",
@@ -203,14 +207,6 @@
     "./providers/openai-compatible-embedding": {
       "types": "./dist/ai/model/openai-compatible-embedding.d.ts",
       "import": "./dist/ai/model/openai-compatible-embedding.js"
-    },
-    "./pg": {
-      "types": "./dist/pg/index.d.ts",
-      "import": "./dist/pg/index.js"
-    },
-    "./mysql": {
-      "types": "./dist/mysql/index.d.ts",
-      "import": "./dist/mysql/index.js"
     },
     "./unstable/runtime/external-child-placement": {
       "types": "./dist/runtime/child/external/placement.d.ts",
@@ -335,20 +331,18 @@
     "@a2a-js/sdk": "catalog:",
     "@ag-ui/core": "catalog:",
     "@aws-sdk/client-bedrock-runtime": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/credential-provider-node": "catalog:",
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
     "@effect/ai-openrouter": "catalog:",
     "@effect/platform-bun": "catalog:",
-    "@effect/sql-mysql2": "catalog:",
-    "@effect/sql-pg": "catalog:",
-    "@effect/sql-sqlite-bun": "catalog:",
-    "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@rivet-dev/agentos": "catalog:",
     "@smithy/types": "catalog:",
+    "@smithy/fetch-http-handler": "catalog:",
     "@standard-schema/spec": "catalog:",
     "@types/bun": "catalog:",
     "effect": "catalog:",
@@ -356,13 +350,12 @@
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:",
     "modal": "catalog:",
+    "miniflare": "5.20260811.1-alpha",
     "rivetkit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "workerd": "1.20260819.1",
-    "yjs": "catalog:",
-    "pg": "catalog:",
-    "pg-cursor": "catalog:"
+    "yjs": "catalog:"
   },
   "repository": {
     "type": "git",
@@ -377,6 +370,9 @@
       "optional": true
     },
     "@aws-sdk/client-bedrock-runtime": {
+      "optional": true
+    },
+    "@aws-sdk/client-s3": {
       "optional": true
     },
     "@aws-sdk/credential-provider-node": {
@@ -394,18 +390,6 @@
     "@effect/ai-openrouter": {
       "optional": true
     },
-    "@effect/sql-mysql2": {
-      "optional": true
-    },
-    "@effect/sql-pg": {
-      "optional": true
-    },
-    "@effect/sql-sqlite-bun": {
-      "optional": true
-    },
-    "@effect/sql-sqlite-do": {
-      "optional": true
-    },
     "@effect/vitest": {
       "optional": true
     },
@@ -416,6 +400,9 @@
       "optional": true
     },
     "@smithy/types": {
+      "optional": true
+    },
+    "@smithy/fetch-http-handler": {
       "optional": true
     },
     "@standard-schema/spec": {
@@ -437,12 +424,6 @@
       "optional": true
     },
     "yjs": {
-      "optional": true
-    },
-    "pg": {
-      "optional": true
-    },
-    "pg-cursor": {
       "optional": true
     }
   }

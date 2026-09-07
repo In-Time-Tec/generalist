@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { DurableDriver, ToolContext } from "../../../src/index.js"
 import { ChildAdmission, Errors, Messaging, RunStore } from "../../../src/runtime/index.js"
-import { memoryLayer, textPrompt } from "./fixtures.js"
+import { objectLayer, textPrompt } from "./fixtures.js"
 import { family } from "../messaging/scenario.js"
 import { provideScoped } from "./scoped-provide.js"
 
@@ -45,7 +45,7 @@ const withAmbient =
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     provideScoped(Layer.merge(ambient(input), interpreter), effect)
 
-layer(memoryLayer)("in-execution parent authority", (it) => {
+layer(objectLayer)("in-execution parent authority", (it) => {
   it.effect("reads the parent Run id from the ambient ToolContext", () =>
     Effect.gen(function* () {
       const { parent } = yield* family("thread:authority-parent")
@@ -163,7 +163,7 @@ layer(memoryLayer)("in-execution parent authority", (it) => {
   )
 })
 
-layer(memoryLayer)("in-execution sender authority", (it) => {
+layer(objectLayer)("in-execution sender authority", (it) => {
   it.effect("sends under the ambient Run even when the payload names another sender", () =>
     Effect.gen(function* () {
       const { runtime, store, parent, first, second } = yield* family("thread:authority-send")

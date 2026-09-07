@@ -11,6 +11,7 @@ import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtim
 import { assistant, assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { closedTestAgent, testExecutable } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
+import { objectWorkerId } from "../../execution/object.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 
 export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
@@ -69,7 +70,11 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claim = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({ runId, ownerId }))
+      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({
+          commandId: `runtime-operation-suites-recovery-ts-claim-${ownerId}`,
+          runId,
+          ownerId: objectWorkerId,
+        }))
       : options.claim(runId, ownerId)
 
   describeBackend(`running operation recovery (${options.name})`, () => {
@@ -320,14 +325,23 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
                   replayPolicy,
                   attempt,
                 })
-                yield* store.startOperation({ ...original, operationId: operation.operationId })
+                yield* store.startOperation({
+                  commandId: `runtime-operation-suites-recovery-ts-startOperation-${key}`,
+                  ...original,
+                  operationId: operation.operationId,
+                })
                 return operation
               }),
           )
 
           if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
           const recovery = yield* claim(receipt.runId, "recovery")
-          expect(yield* store.recoverRunningOperations(recovery)).toBe("blocked")
+          expect(
+            yield* store.recoverRunningOperations({
+              ...recovery,
+              commandId: "runtime-operation-suites-recovery-ts-recoverRunningOperations-policies",
+            }),
+          ).toBe("blocked")
           expect(
             (yield* store.getOperation({ runId: receipt.runId, operationId: operations[0].operationId })).status,
           ).toBe("requested")
@@ -342,12 +356,24 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           ).toBe("unknown")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
 
-          expect(yield* store.recoverRunningOperations(recovery)).toBe("blocked")
+          expect(
+            yield* store.recoverRunningOperations({
+              ...recovery,
+              commandId: "runtime-operation-suites-recovery-ts-recoverRunningOperations-policies",
+            }),
+          ).toBe("blocked")
           const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
           expect(history.filter((event) => event._tag === "OperationUnknown")).toHaveLength(2)
-          expect((yield* store.recoverRunningOperations(original).pipe(Effect.flip))._tag).toBe(
-            "generalist/runtime/StaleClaim",
-          )
+          expect(
+            (
+              yield* store
+                .recoverRunningOperations({
+                  ...original,
+                  commandId: "runtime-operation-suites-recovery-ts-recoverRunningOperations-stale",
+                })
+                .pipe(Effect.flip)
+            )._tag,
+          ).toBe("generalist/runtime/StaleClaim")
 
           yield* runtime.resolveOperation({
             runId: receipt.runId,
@@ -576,7 +602,12 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
 
             if (options.expireClaim !== undefined) yield* options.expireClaim(receipt.runId)
             const recoveryClaim = yield* claim(receipt.runId, "process-after-crash")
-            expect(yield* store.recoverRunningOperations(recoveryClaim)).toBe("ready")
+            expect(
+              yield* store.recoverRunningOperations({
+                ...recoveryClaim,
+                commandId: "runtime-operation-suites-recovery-ts-recoverRunningOperations-idempotent",
+              }),
+            ).toBe("ready")
             if (operation === undefined) return yield* Effect.die("running operation missing")
             expect(
               (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,

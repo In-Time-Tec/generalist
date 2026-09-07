@@ -1,23 +1,32 @@
-import type { Layer } from "effect"
-import type { SqlClient } from "effect/unstable/sql"
-import { SqliteClient } from "@effect/sql-sqlite-do"
-import type { ExternalChildStore } from "../../../runtime/child/external/store.js"
-import type { RunStore } from "../../../runtime/run/store.js"
-import { layerSqliteStore, type SqliteStoreError, type SqliteStoreOptions } from "../../../runtime/sql-driver.js"
+import { Effect, Layer } from "effect"
+import * as Durability from "../../../durability/index.js"
+import { layer as r2Layer, type Bucket } from "../../../durability/r2.js"
+import { LocalScheduler } from "../../../runtime/execution/local-scheduler.js"
 
-/** @experimental */
-export type DurableObjectStorage = NonNullable<Parameters<typeof SqliteClient.make>[0]["storage"]>
+/** @experimental A partition's canonical R2 binding and explicit namespace. */
+export interface Options extends Durability.Options {
+  readonly bucket: Bucket
+}
 
-/** @experimental */
-export const makeSqlClient = (storage: DurableObjectStorage) => SqliteClient.make({ storage })
+/** @experimental Native R2 persistence; Durable Object storage is never runtime authority. */
+export const layerRunStore = ({ bucket, ...options }: Options) =>
+  Durability.layerRunStore(options).pipe(Layer.provide(r2Layer(bucket)))
 
-/** @experimental */
-export const layerSqlClient = (
-  storage: DurableObjectStorage,
-): Layer.Layer<SqlClient.SqlClient | SqliteClient.SqliteClient> => SqliteClient.layer({ storage })
+/** @experimental Scoped execution host. Alarm-driven hosts use schedulerMode: "external". */
+export const layer = ({ bucket, ...options }: Options) =>
+  Layer.effectDiscard(Durability.activate).pipe(
+    Layer.provideMerge(Durability.layer(options).pipe(Layer.provide(r2Layer(bucket)))),
+  )
 
-/** @experimental */
-export const layerRunStore = (
-  options: SqliteStoreOptions,
-): Layer.Layer<RunStore | ExternalChildStore, SqliteStoreError, SqlClient.SqlClient> =>
-  layerSqliteStore({ ...options, source: options.source ?? "durable-object" })
+/**
+ * @experimental Run from an independent Cron Trigger or queue consumer for every configured partition.
+ * Alarms only accelerate this reconciliation: losing an alarm cannot erase canonical work.
+ * The application supplies Crypto and its pinned ExecutableResolver, just as for the Durable Object.
+ */
+export const reconcile = (options: Options, fuel = 64) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const scheduler = yield* LocalScheduler
+      return yield* scheduler.drain({ fuel })
+    }).pipe(Effect.provide(layer({ ...options, schedulerMode: "external" }))),
+  )

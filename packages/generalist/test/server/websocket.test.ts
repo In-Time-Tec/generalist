@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../runtime/execution/object.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Layer, Queue, Schema, Stream } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
@@ -5,7 +6,7 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { handle } from "../../src/server/websocket.js"
 
@@ -43,7 +44,7 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest => 
   return value
 }
 
-const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+const runtime = objectRuntimeLayer({ addresses: [] }).pipe(
   Layer.provide(ExecutableResolver.layerStatic([])),
 )
 const model = Layer.effect(
@@ -79,6 +80,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const command = yield* Schema.encodeEffect(Schema.fromJsonString(Server.ClientCommand))({
           _tag: "Cancel",
           runId: run.id,
+          commandId: "cancel:websocket-run",
           reason: "user stopped",
         })
         yield* Queue.offer(fake.inbound, command)

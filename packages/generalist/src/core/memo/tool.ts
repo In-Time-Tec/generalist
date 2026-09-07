@@ -1,7 +1,7 @@
 import { Context, Duration, Effect, Option, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { digest } from "../durable/canonical-json.js"
-import { Outcome } from "../tools/tool-result-codec.js"
+import { FrameworkFailure, Outcome } from "../tools/tool-result-codec.js"
 import { type Registry, get } from "../tools/tool-registry.js"
 import { Dependencies, Store, expiresAt, type Provenance } from "./service.js"
 
@@ -60,7 +60,9 @@ export const memoize = <E, R>(input: {
       tenant: dependencies.value.tenant,
       capabilityScope: dependencies.value.capabilityScope,
     })
-    const cached = yield* store.value.get(key)
+    const storageFailure = (cause: { readonly message: string }) =>
+      FrameworkFailure.make({ stage: "handler", tool: input.tool.name, message: cause.message })
+    const cached = yield* store.value.get(key).pipe(Effect.mapError(storageFailure))
     if (Option.isSome(cached)) {
       const decoded = Schema.decodeUnknownOption(Outcome)(cached.value.value)
       if (Option.isSome(decoded) && decoded.value._tag === "Success") {
@@ -74,7 +76,7 @@ export const memoize = <E, R>(input: {
         fromRun: input.run,
         fromOperation: input.operation,
         expiresAtMillis: yield* expiresAt(configured.value.ttl),
-      })
+      }).pipe(Effect.mapError(storageFailure))
     }
     return outcome
   })
@@ -93,7 +95,7 @@ export const memoizeRegistered = <E, R>(input: {
   readonly run: string
   readonly operation: string
   readonly execute: Effect.Effect<Outcome, E, R>
-}): Effect.Effect<Outcome, E, R> => {
+}): Effect.Effect<Outcome, E | FrameworkFailure, R> => {
   const tool = get(input.registry, input.name)?.tool
   return tool === undefined || input.skillActivation || input.handoff ? input.execute : memoize({ ...input, tool })
 }

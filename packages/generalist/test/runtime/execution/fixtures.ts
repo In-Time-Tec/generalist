@@ -10,6 +10,7 @@ import {
   Runtime,
 } from "../../../src/runtime/index.js"
 import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
+import { objectRuntimeLayer } from "./object.js"
 
 /** Exact registration set covering every pin an executable requires. */
 export function registrationsFor(
@@ -127,9 +128,9 @@ export const parentRelativeOptions: Runtime.LayerOptions = {
   ],
 }
 
-export const parentRelativeLayer = Runtime.layerMemory(parentRelativeOptions).pipe(Layer.provide(resolverLayer))
+export const parentRelativeLayer = objectRuntimeLayer(parentRelativeOptions).pipe(Layer.provide(resolverLayer))
 
-export const memoryLayer = Runtime.layerMemory({
+export const objectLayer = objectRuntimeLayer({
   addresses: [
     { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
     { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
@@ -137,7 +138,7 @@ export const memoryLayer = Runtime.layerMemory({
   subscriberQueueCapacity: 8,
 }).pipe(Layer.provide(resolverLayer))
 
-export const lagLayer = Runtime.layerMemory({
+export const lagLayer = objectRuntimeLayer({
   addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
   subscriberQueueCapacity: 1,
 }).pipe(Layer.provide(resolverLayer))
@@ -148,6 +149,7 @@ export const emptyTranscript = Prompt.fromMessages([])
 
 export const completedResult = (text: string) => ({
   text,
+  output: text,
   turns: 1,
   session: { sessionId: "test-session", leafId: null },
 })

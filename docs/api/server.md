@@ -620,7 +620,7 @@
 
 ##### ArtifactClientCommand
 
-> `readonly` **ArtifactClientCommand**: `Struct`\<\{ `_tag`: `tag`\<`"Edit"`\>; `attribution`: `TaggedStruct`\<`"Human"`, \{ `actor`: `String`; \}\>; `base`: `Int`; `operation`: `Union`\<readonly \[`TaggedStruct`\<`"Insert"`, \{ `at`: `Int`; `text`: `String`; \}\>, `TaggedStruct`\<`"Delete"`, \{ `from`: `Int`; `to`: `Int`; \}\>, `TaggedStruct`\<`"Replace"`, \{ `from`: `Int`; `text`: `String`; `to`: `Int`; \}\>\]\>; \}\>
+> `readonly` **ArtifactClientCommand**: `Struct`\<\{ `_tag`: `tag`\<`"Edit"`\>; `commandId`: `String`; `attribution`: `TaggedStruct`\<`"Human"`, \{ `actor`: `String`; \}\>; `base`: `Int`; `operation`: `Union`\<readonly \[`TaggedStruct`\<`"Insert"`, \{ `at`: `Int`; `text`: `String`; \}\>, `TaggedStruct`\<`"Delete"`, \{ `from`: `Int`; `to`: `Int`; \}\>, `TaggedStruct`\<`"Replace"`, \{ `from`: `Int`; `text`: `String`; `to`: `Int`; \}\>\]\>; \}\>
 
 <a id="artifactserverevent"></a>
 
@@ -802,7 +802,7 @@ Errors encoded by the declared HttpApi endpoints and SSE stream.
 
 ### ArtifactClientCommand
 
-> **ArtifactClientCommand** = `Struct`\<\{ `_tag`: `tag`\<`"Edit"`\>; `attribution`: `TaggedStruct`\<`"Human"`, \{ `actor`: `String`; \}\>; `base`: `Int`; `operation`: `Union`\<readonly \[`TaggedStruct`\<`"Insert"`, \{ `at`: `Int`; `text`: `String`; \}\>, `TaggedStruct`\<`"Delete"`, \{ `from`: `Int`; `to`: `Int`; \}\>, `TaggedStruct`\<`"Replace"`, \{ `from`: `Int`; `text`: `String`; `to`: `Int`; \}\>\]\>; \}\>
+> **ArtifactClientCommand** = `Struct`\<\{ `_tag`: `tag`\<`"Edit"`\>; `commandId`: `String`; `attribution`: `TaggedStruct`\<`"Human"`, \{ `actor`: `String`; \}\>; `base`: `Int`; `operation`: `Union`\<readonly \[`TaggedStruct`\<`"Insert"`, \{ `at`: `Int`; `text`: `String`; \}\>, `TaggedStruct`\<`"Delete"`, \{ `from`: `Int`; `to`: `Int`; \}\>, `TaggedStruct`\<`"Replace"`, \{ `from`: `Int`; `text`: `String`; `to`: `Int`; \}\>\]\>; \}\>
 
 **`Experimental`**
 

@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, makeObjectStorage } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
 import { Context, Effect, Fiber, Layer, Stream } from "effect"
@@ -8,11 +9,15 @@ import { Generalist } from "generalist/host"
 import { ExecutableResolver, Runtime, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
+import { ObjectStore } from "../../src/durability/object-store.js"
 
-const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+const storage = makeObjectStorage()
+const runtime = objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
   Layer.provide(ExecutableResolver.layerStatic([])),
 )
-const blobStore = BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer))
+const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
+)
 class ModelFixture extends Context.Service<ModelFixture, TestModel.Fixture>()(
   "generalist/test/artifact/index.test/ModelFixture",
 ) {}
@@ -56,6 +61,7 @@ layer(services)("Artifact", (it) => {
       const fixture = yield* ModelFixture
       yield* fixture.awaitRequests(2)
       yield* host.artifacts.edit(document.name, {
+        commandId: "human:plan",
         base: 0,
         operation: { _tag: "Replace", from: 1, to: 3, text: "human" },
         attribution: { _tag: "Human", actor: "alice" },

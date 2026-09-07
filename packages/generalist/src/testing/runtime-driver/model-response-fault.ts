@@ -3,21 +3,16 @@ import { Context, Effect, Layer, Option, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { digest as pinDigest } from "../../core/durable/pin.js"
 import type { Address } from "../../runtime/address.js"
-import { RunStore, type ExecutionClaim } from "../../runtime/run/store.js"
+import { RunStore } from "../../runtime/run/store.js"
 import { Runtime } from "../../runtime/service.js"
-import { RunClaims } from "../../runtime/sql/run/claims.js"
+import type { ClaimExecution, Services } from "./contract.js"
 
-/** A failure point after each durable statement in the completed-model-response projection. */
+/** The atomic projection has one publication boundary, not independently durable statement stages. */
 export const modelResponseFaultBoundaries = [
-  "after-claim-validation",
-  "after-session-entry",
-  "after-session-leaf",
-  "after-operation",
-  "after-checkpoint",
-  "after-event",
-  "after-tree-position",
-  "after-tree-index",
-  "before-commit",
+  "before-publication",
+  "after-publication-lost-ack",
+  "before-publication-unreadable",
+  "after-publication-unreadable",
 ] as const
 
 export type ModelResponseFaultBoundary = (typeof modelResponseFaultBoundaries)[number]
@@ -26,23 +21,14 @@ export interface ModelResponseFaultOptions<LayerError = never> {
   readonly name: string
   readonly address: Address
   readonly layer: Layer.Layer<Runtime | RunStore, LayerError, never>
-  readonly claim: (input: {
-    readonly store: RunStore["Service"]
-    readonly claims?: RunClaims["Service"]
-    readonly runId: string
-    readonly workerId: string
-  }) => Effect.Effect<ExecutionClaim>
-  readonly install: (input: {
-    readonly boundary: ModelResponseFaultBoundary
-    readonly runId: string
-    readonly sessionId: string
-  }) => Effect.Effect<void>
-  readonly remove: (boundary: ModelResponseFaultBoundary) => Effect.Effect<void>
+  /** A genuinely fresh, read-only host over the same objects. */
+  readonly readLayer: Layer.Layer<Runtime | RunStore, LayerError, never>
+  readonly claim: ClaimExecution
+  readonly install: (services: Services, boundary: ModelResponseFaultBoundary) => Effect.Effect<void>
   readonly skip?: boolean
 }
 
 const jsonValue = Schema.decodeUnknownSync(Schema.Json)
-
 const completion = (operationKey: string, sessionParentId: string | null) => {
   const response = { content: [Response.makePart("text", { text: "semantic answer" })], finishReason: "stop" as const }
   const unsigned = {
@@ -74,98 +60,145 @@ const completion = (operationKey: string, sessionParentId: string | null) => {
   }
 }
 
-const slug = (value: string): string => value.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()
+const open = <A, E, LE>(layer: Layer.Layer<Runtime | RunStore, LE>, use: (services: Services) => Effect.Effect<A, E>) =>
+  Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => use({
+    runtime: Context.get(context, Runtime), store: Context.get(context, RunStore),
+  })))
 
-/** Register one reusable atomic-projection fault matrix for a physical SQL driver. */
+/** Retains Session, outcome, checkpoint, run-event and tree-index atomicity through real transport faults. */
 export const modelResponseFaultConformance = <LayerError>(options: ModelResponseFaultOptions<LayerError>): void => {
   const suite = options.skip === true ? describe.skip : describe
   suite(`${options.name} completed model response fault conformance`, () => {
     for (const boundary of modelResponseFaultBoundaries) {
-      it.effect(`rolls back ${boundary}`, () =>
-        Effect.scoped(
-          Effect.flatMap(Layer.build(options.layer), (context) =>
-            Effect.gen(function* () {
-              const runtime = Context.get(context, Runtime)
-              const store = Context.get(context, RunStore)
-              const optionalClaims = Context.getOption(context, RunClaims)
-              const identity = `fault:${slug(options.name)}:${boundary}`
-              const sessionId = `session:${identity}`
-              const receipt = yield* runtime.send({
-                to: options.address,
+      it.effect(`recovers one atomic model projection at ${boundary}`, () =>
+        Effect.gen(function* () {
+          const seeded = yield* open(options.layer, (services) => Effect.gen(function* () {
+            const { runtime, store } = services
+            const identity = `fault:${options.name}:${boundary}`
+            const sessionId = `session:${identity}`
+            const receipt = yield* runtime.send({
+              to: options.address, sessionId, idempotencyKey: identity, prompt: "fault conformance",
+            })
+            const claim = yield* options.claim(services, { runId: receipt.runId, commandId: identity })
+            const operationKey = `${receipt.runId}:model:0`
+            const operation = yield* store.recordOperation({
+              ...claim, operationKey, kind: "model", inputDigest: pinDigest({ turn: 0 }),
+              input: { turn: 0 }, replayPolicy: "never", attempt: 0,
+            })
+            yield* store.startOperation({ ...claim, commandId: `${identity}:start:0`, operationId: operation.operationId })
+            const session = Option.getOrThrow(yield* store.claimedSessionStore(claim))
+            const prefix = yield* session.append(
+              { _tag: "Message", message: Prompt.make("durable model input").content[0]! },
+              { commandId: "model-input" },
+            )
+            const exact = completion(operationKey, prefix.id)
+            const checkpoint = { _tag: "Program" as const, version: "1" as const }
+            const continuation = {
+              schemaVersion: 1 as const,
+              prompt: Prompt.make("continue after durable response"),
+              nextTurn: 1,
+              steeringEntryIds: [],
+              queue: "followUp" as const,
+            }
+            const commit = { ...claim, operationId: operation.operationId, ...exact, checkpoint, continuation }
+            const observe = (host: Services) => Effect.gen(function* () {
+              const reader = Option.getOrThrow(yield* host.store.sessionReader(sessionId))
+              const execution = yield* host.store.loadExecution(receipt.runId)
+              const history = yield* host.runtime.history({ runId: receipt.runId, limit: 100 })
+              const responseEvent = history.find(
+                (event): event is Extract<typeof history[number], { readonly _tag: "ModelResponseCommitted" }> =>
+                  event._tag === "ModelResponseCommitted",
+              )
+              const response = responseEvent === undefined
+                ? undefined
+                : yield* host.runtime.resolveModelResponse(responseEvent)
+              const entry = responseEvent === undefined
+                ? undefined
+                : yield* host.runtime.sessionEntry({
+                  sessionId: responseEvent.sessionId,
+                  entryId: responseEvent.sessionEntryId,
+                })
+              return {
+                history,
+                operation: yield* host.store.getOperation({ runId: receipt.runId, operationId: operation.operationId }),
+                path: yield* reader.path(),
+                leaf: yield* reader.leaf,
+                checkpoint: execution.checkpoint,
+                continuation: execution.continuation,
+                response,
+                entry,
+                tree: yield* host.store.treeReplay({ rootRunId: receipt.runId, position: -1, limit: 100 }),
+              }
+            })
+            const before = yield* observe(services)
+            yield* options.install(services, boundary)
+            const result = yield* Effect.result(store.commitModelResponse(commit))
+            if (boundary === "after-publication-lost-ack") {
+              expect(result._tag).toBe("Success")
+            } else {
+              expect(result._tag).toBe("Failure")
+              if (result._tag === "Failure") expect(result.failure).toMatchObject({ reason: "indeterminate" })
+            }
+            // Reconstruct before retry: neither the live materialization nor its notification cache is evidence.
+            const recovered = yield* open(options.readLayer, observe)
+            if (boundary.startsWith("before-")) {
+              expect(recovered).toEqual(before)
+            } else {
+              expect(recovered.operation.status).toBe("succeeded")
+              expect(recovered.response).toEqual(exact.event.response)
+              expect(recovered.entry).toEqual(recovered.path[1])
+              expect(recovered.entry).toMatchObject({
+                _tag: "ModelResponse",
+                parentId: prefix.id,
+                content: exact.event.response.content,
+              })
+              expect(recovered.history.find((event) => event._tag === "ModelResponseCommitted")).toMatchObject({
+                _tag: "ModelResponseCommitted",
                 sessionId,
-                idempotencyKey: identity,
-                prompt: "fault conformance",
+                sessionParentId: prefix.id,
+                sessionEntryId: recovered.entry?.id,
               })
-              const claim = yield* options.claim({
-                store,
-                ...(Option.isSome(optionalClaims) ? { claims: optionalClaims.value } : undefined),
-                runId: receipt.runId,
-                workerId: identity,
-              })
-              const operationKey = `${receipt.runId}:model:0`
-              const operation = yield* store.recordOperation({
-                ...claim,
-                operationKey,
-                kind: "model",
-                inputDigest: pinDigest({ turn: 0 }),
-                input: { turn: 0 },
-                replayPolicy: "never",
-                attempt: 0,
-              })
-              yield* store.startOperation({ ...claim, operationId: operation.operationId })
-              const claimedSession = yield* store.claimedSessionStore(claim)
-              if (Option.isNone(claimedSession)) return yield* Effect.die("fault conformance Session is missing")
-              const prefix = yield* claimedSession.value.append({
-                _tag: "Message",
-                message: Prompt.make("durable model input").content[0]!,
-              })
-              const exact = completion(operationKey, prefix.id)
-              const checkpoint = { _tag: "Program" as const, version: "1" as const }
-              const beforeHistory = yield* runtime.history({ runId: receipt.runId, limit: 100 })
-              const beforeExecution = yield* store.loadExecution(receipt.runId)
-
-              const failed = yield* Effect.acquireUseRelease(
-                options.install({ boundary, runId: receipt.runId, sessionId }),
-                () =>
-                  Effect.exit(
-                    store.commitModelResponse({
-                      ...claim,
-                      operationId: operation.operationId,
-                      ...exact,
-                      checkpoint,
-                    }),
-                  ),
-                () => options.remove(boundary).pipe(Effect.orDie),
-              )
-              expect(failed._tag, boundary).toBe("Failure")
-              expect(yield* runtime.history({ runId: receipt.runId, limit: 100 }), boundary).toEqual(beforeHistory)
-              expect(
-                (yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
-              ).toBe("running")
-              const reader = yield* store.sessionReader(sessionId)
-              if (Option.isNone(reader)) return yield* Effect.die("fault conformance Session reader is missing")
-              expect(yield* reader.value.path(), boundary).toHaveLength(1)
-              expect((yield* store.loadExecution(receipt.runId)).checkpoint, boundary).toEqual(
-                beforeExecution.checkpoint,
-              )
-
-              yield* store.commitModelResponse({
-                ...claim,
-                operationId: operation.operationId,
-                ...exact,
-                checkpoint,
-              })
-              expect(yield* reader.value.path(), boundary).toHaveLength(2)
-              expect((yield* store.loadExecution(receipt.runId)).checkpoint, boundary).toEqual(checkpoint)
-              expect(
-                (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter(
-                  (event) => event._tag === "ModelResponseCommitted",
-                ),
-                boundary,
-              ).toHaveLength(1)
-            }),
-          ),
-        ),
+              expect(recovered.path).toHaveLength(2)
+              expect(recovered.path[1]).toMatchObject({ parentId: prefix.id, _tag: "ModelResponse" })
+              expect(recovered.leaf).toBe(recovered.path[1]!.id)
+              expect(recovered.checkpoint).toEqual(checkpoint)
+              expect(recovered.continuation).toEqual(continuation)
+              expect(recovered.history.filter((event) => event._tag === "ModelResponseCommitted")).toHaveLength(1)
+              expect(recovered.tree.events.filter(({ event }) => event._tag === "ModelResponseCommitted")).toHaveLength(1)
+            }
+            const committed = yield* store.commitModelResponse(commit)
+            expect(yield* store.commitModelResponse(commit)).toEqual(committed)
+            const after = yield* observe(services)
+            expect(after.operation.status).toBe("succeeded")
+            expect(after.response).toEqual(exact.event.response)
+            expect(after.entry).toEqual(after.path[1])
+            expect(after.entry).toMatchObject({
+              _tag: "ModelResponse",
+              parentId: prefix.id,
+              content: exact.event.response.content,
+            })
+            expect(after.history.find((event) => event._tag === "ModelResponseCommitted")).toMatchObject({
+              _tag: "ModelResponseCommitted",
+              sessionId,
+              sessionParentId: prefix.id,
+              sessionEntryId: after.entry?.id,
+            })
+            expect(after.path).toHaveLength(2)
+            expect(after.path[1]).toMatchObject({ parentId: prefix.id, _tag: "ModelResponse" })
+            expect(after.leaf).toBe(after.path[1]!.id)
+            expect(after.checkpoint).toEqual(checkpoint)
+            expect(after.continuation).toEqual(continuation)
+            expect(after.history.filter((event) => event._tag === "ModelResponseCommitted")).toHaveLength(1)
+            expect(after.tree.events.filter(({ event }) => event._tag === "ModelResponseCommitted")).toHaveLength(1)
+            return { observe, after, commit, committed }
+          }))
+          yield* open(options.readLayer, (services) => Effect.gen(function* () {
+            expect(yield* seeded.observe(services)).toEqual(seeded.after)
+            // The exact durable receipt survives host retirement, including its old execution fence.
+            expect(yield* services.store.commitModelResponse(seeded.commit)).toEqual(seeded.committed)
+            expect(yield* seeded.observe(services)).toEqual(seeded.after)
+          }))
+        }),
       )
     }
   })

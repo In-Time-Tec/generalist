@@ -23,7 +23,7 @@ const learning = Learning.layer({
 })
 ```
 
-The layer requires a hosted `Runtime`, version-capable semantic `Memory`, `ModelRegistry`, and `Approvals`. Provide `SemanticRecall.layer` over `VectorStore.layerMemory` or `layerPgVector` directly rather than the convenience working-plus-semantic memory composition. A model string selects the one registered model whose model name or `provider/model` name matches; use an exact `{ provider, model, registrationKey? }` selection when that name is ambiguous.
+The layer requires a hosted `Runtime`, version-capable semantic `Memory`, `ModelRegistry`, and `Approvals`. Provide `SemanticRecall.layer` over `VectorStore.layerMemory` for deterministic, process-local consolidation examples; this feature does not document a durable `VectorStore` adapter. A model string selects the one registered model whose model name or `provider/model` name matches; use an exact `{ provider, model, registrationKey? }` selection when that name is ambiguous.
 
 ## Runtime flow
 

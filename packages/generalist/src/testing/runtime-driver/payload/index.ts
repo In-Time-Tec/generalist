@@ -20,7 +20,7 @@ export const registerPayload = <LayerError>(input: {
         expect((yield* Effect.flip(services.runtime.send(request)))._tag).toBe("generalist/runtime/RuntimeUnavailable")
         const receipt = yield* services.runtime.send({ ...request, prompt: "bounded admission" })
         expect(receipt.duplicate).toBe(false)
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "payload-bounds" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "payload-bounds" })
         const operation = {
           ...claim,
           operationKey: "bounded-operation",
@@ -37,7 +37,7 @@ export const registerPayload = <LayerError>(input: {
           yield* services.store.getOperationByKey({ runId: receipt.runId, operationKey: operation.operationKey }),
         ).toBeUndefined()
         const recorded = yield* services.store.recordOperation({ ...operation, input: { value: "exact" } })
-        yield* services.store.startOperation({ ...claim, operationId: recorded.operationId })
+        yield* services.store.startOperation({ ...claim, commandId: `${claim.runId}:start:${recorded.operationId}:0`, operationId: recorded.operationId })
         for (const outcome of [
           { _tag: "Succeeded" as const, value: large },
           { _tag: "Failed" as const, error: { _tag: "ToolFailure", detail: large } },
@@ -57,6 +57,7 @@ export const registerPayload = <LayerError>(input: {
           (yield* Effect.flip(
             services.store.emitAgentEvent({
               ...claim,
+              commandId: `${receipt.runId}:oversized-progress`,
               event: {
                 _tag: "ToolProgress",
                 turn: 0,
@@ -70,7 +71,7 @@ export const registerPayload = <LayerError>(input: {
         const session = Option.getOrThrow(yield* services.store.claimedSessionStore(claim))
         const leaf = yield* session.leaf
         expect(
-          (yield* Effect.flip(session.append({ _tag: "Message", message: Prompt.make(large).content[0]! })))._tag,
+          (yield* Effect.flip(session.append({ _tag: "Message", message: Prompt.make(large).content[0]! }, { commandId: "oversized-message" })))._tag,
         ).toBe("generalist/core/SessionStoreError")
         expect(
           (yield* Effect.flip(
@@ -79,7 +80,7 @@ export const registerPayload = <LayerError>(input: {
               handoffId: "bounded-handoff",
               target: "agent:next",
               projectedHistory: Prompt.make(large),
-            }),
+            }, { commandId: "oversized-handoff" }),
           ))._tag,
         ).toBe("generalist/core/SessionStoreError")
         expect(

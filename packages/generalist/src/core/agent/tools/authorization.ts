@@ -70,6 +70,7 @@ export const make = <AuthorizationR, ExecuteR>(input: AuthorizationContext<Autho
           turn,
           arguments: call.params,
           untaintedArguments: requiredUntaintedArguments(candidate.tool),
+          phase: "authored",
         })
         if (capability._tag === "Denied") {
           const encodedFailure = yield* Schema.encodeEffect(Denied)(capability.error).pipe(Effect.orDie)
@@ -93,6 +94,17 @@ export const make = <AuthorizationR, ExecuteR>(input: AuthorizationContext<Autho
           call,
         })
         const resolvedCall = hook.input.call
+        // ToolCall replacements may change arguments, not the selected Tool declaration.
+        const resolvedCandidate = get(registry, resolvedCall.name)
+        if (resolvedCandidate === undefined || resolvedCandidate !== candidate) {
+          return Stream.fail(
+            FrameworkFailure.make({
+              stage: "authorization",
+              tool: resolvedCall.name,
+              message: "ToolCall hooks cannot replace the selected tool",
+            }),
+          )
+        }
         const resolvedBatch: Request["toolCallBatch"] = {
           calls: toolCallBatch.calls.map((entry, index) => (index === toolCallIndex ? resolvedCall : entry)),
         }
@@ -105,6 +117,27 @@ export const make = <AuthorizationR, ExecuteR>(input: AuthorizationContext<Autho
           sessionId: input.sessionId,
         }
         yield* updateToolBatch((checkpoint) => replaceCall(checkpoint, toolCallIndex, resolvedCall))
+        const effectiveCapability = yield* checkCall({
+          descriptors: yield* input.activeCapabilities(),
+          tool: resolvedCall.name,
+          toolCallId: resolvedCall.id,
+          turn,
+          arguments: resolvedCall.params,
+          untaintedArguments: requiredUntaintedArguments(resolvedCandidate.tool),
+          phase: "effective",
+        })
+        if (effectiveCapability._tag === "Denied") {
+          const encodedFailure = yield* Schema.encodeEffect(Denied)(effectiveCapability.error).pipe(Effect.orDie)
+          const result = domainFailureResult(resolvedCall, {
+            _tag: "DomainFailure",
+            failure: effectiveCapability.error,
+            encodedFailure,
+            taint: effectiveCapability.taint,
+          })
+          yield* updateToolBatch((checkpoint) => completed(checkpoint, toolCallIndex, result))
+          const event: Event = { _tag: "ToolExecutionCompleted", turn, call: resolvedCall, result }
+          return Stream.succeed(event)
+        }
         if (hook.blocked !== undefined) {
           yield* updateToolBatch((checkpoint) =>
             updateCall(checkpoint, {
@@ -121,7 +154,7 @@ export const make = <AuthorizationR, ExecuteR>(input: AuthorizationContext<Autho
           agentName,
           turn,
           sessionId: input.sessionId,
-          tool: candidate.tool,
+          tool: resolvedCandidate.tool,
           active: true,
           activeTools,
           activatedSkills,

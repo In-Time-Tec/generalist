@@ -17,7 +17,7 @@ import type {
 import type { RunOutcome } from "../../run.js"
 import type { AdmitStartInput } from "../../run/store.js"
 import type { StartError } from "../../service.js"
-import type { StaleClaim, StaleSessionClaim } from "../../sql/errors.js"
+import type { StaleClaim, StaleSessionClaim } from "../../run/ownership-errors.js"
 
 /** Cross-partition child placement operations supported by single-partition stores. */
 export interface Service {

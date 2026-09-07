@@ -2,14 +2,19 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Runtime, RunStore } from "../../../src/runtime/index.js"
 import type { ExecutableRef } from "../../../src/runtime/executable/manifest.js"
-import { assistantAddress, textPrompt } from "../execution/fixtures.js"
-import { sqliteLayer, tempDbPath } from "../sql/scenario.js"
+import { assistantAddress, assistantRef, resolverLayer, registrationsFor, textPrompt } from "../execution/fixtures.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
+import type { Simulator } from "../../../src/testing/durability/index.js"
 
-const withDb =
-  (filename: string) =>
+const withObject =
+  (storage: Simulator) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     Effect.scoped(
-      Layer.build(sqliteLayer(filename)).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
+      Layer.build(
+        objectRuntimeLayer({
+          addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+        }, storage).pipe(Layer.provide(resolverLayer)),
+      ).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
     )
 
 const checkpoint = (executable: ExecutableRef) => ({
@@ -22,10 +27,10 @@ const checkpoint = (executable: ExecutableRef) => ({
 
 it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("tracer")
+    const storage = makeObjectStorage()
     let externalCounter = 0
 
-    const crashAfterStart = yield* withDb(filename)(
+    const crashAfterStart = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
@@ -36,7 +41,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           prompt: textPrompt("counter"),
         })
         const op = yield* driver.recordOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-1", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationKey: "tool:counter:1",
           kind: "tool",
@@ -46,7 +52,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           attempt: 1,
         })
         yield* driver.startOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-2", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationId: op.operationId,
         })
@@ -54,11 +61,13 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
       }),
     )
 
-    const afterCrashStart = yield* withDb(filename)(
+    const afterCrashStart = yield* withObject(storage)(
       Effect.gen(function* () {
         const driver = yield* RunStore.RunStore
-        const claim = yield* driver.claimExecution({ runId: crashAfterStart.runId, ownerId: "recovery" })
-        const expired = yield* driver.expireRunningOperation({ ...claim, operationId: crashAfterStart.operationId })
+        const claim = yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-3", runId: crashAfterStart.runId, ownerId: "recovery" })
+        const expired = yield* driver.expireRunningOperation({
+          commandId: "runtime-executable-manifest-test-ts-expireRunningOperation-2", ...claim, operationId: crashAfterStart.operationId })
         expect(expired.outcome).toBe("unknown")
         expect(expired.record.status).toBe("unknown")
         expect(externalCounter).toBe(0)
@@ -67,7 +76,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     )
     expect(afterCrashStart.record.status).toBe("unknown")
 
-    const crashAfterObserve = yield* withDb(filename)(
+    const crashAfterObserve = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
@@ -78,7 +87,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           prompt: textPrompt("counter-2"),
         })
         const op = yield* driver.recordOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-4", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationKey: "tool:counter:2",
           kind: "tool",
@@ -88,7 +98,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           attempt: 1,
         })
         yield* driver.startOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-5", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationId: op.operationId,
         })
@@ -97,11 +108,13 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
       }),
     )
 
-    const afterCrashObserve = yield* withDb(filename)(
+    const afterCrashObserve = yield* withObject(storage)(
       Effect.gen(function* () {
         const driver = yield* RunStore.RunStore
-        const claim = yield* driver.claimExecution({ runId: crashAfterObserve.runId, ownerId: "recovery" })
+        const claim = yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-6", runId: crashAfterObserve.runId, ownerId: "recovery" })
         const expired = yield* driver.expireRunningOperation({
+          commandId: "runtime-executable-manifest-test-ts-expireRunningOperation-4",
           ...claim,
           operationId: crashAfterObserve.operationId,
         })
@@ -112,7 +125,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     )
     expect(afterCrashObserve.record.status).toBe("unknown")
 
-    const committed = yield* withDb(filename)(
+    const committed = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
@@ -123,7 +136,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           prompt: textPrompt("counter-3"),
         })
         const op = yield* driver.recordOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-7", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationKey: "tool:counter:3",
           kind: "tool",
@@ -133,12 +147,14 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           attempt: 1,
         })
         yield* driver.startOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-8", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationId: op.operationId,
         })
         externalCounter += 1
-        const completionClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+        const completionClaim = yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-9", runId: receipt.runId, ownerId: "test" })
         const succeeded = yield* driver.completeOperation({
           ...completionClaim,
           runId: receipt.runId,
@@ -147,7 +163,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           checkpoint: checkpoint(completionClaim.executableRef),
         })
         const sameKey = yield* driver.recordOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-10", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationKey: "tool:counter:3",
           kind: "tool",
@@ -164,7 +181,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
       }),
     )
 
-    yield* withDb(filename)(
+    yield* withObject(storage)(
       Effect.gen(function* () {
         const driver = yield* RunStore.RunStore
         const runtime = yield* Runtime.Runtime
@@ -176,7 +193,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
         })
         expect(receipt.duplicate).toBe(true)
         const recorded = yield* driver.recordOperation({
-          ...(yield* driver.claimExecution({ runId: committed.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-11", runId: committed.runId, ownerId: "test" })),
           runId: committed.runId,
           operationKey: "tool:counter:3",
           kind: "tool",
@@ -191,7 +209,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
       }),
     )
 
-    yield* withDb(filename)(
+    yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const driver = yield* RunStore.RunStore
@@ -202,7 +220,8 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           prompt: textPrompt("pure"),
         })
         const op = yield* driver.recordOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-12", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationKey: "model:pure:1",
           kind: "model",
@@ -211,19 +230,24 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
           replayPolicy: "provider-idempotent",
           attempt: 1,
         })
-        const claim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
-        yield* driver.startOperation({ ...claim, operationId: op.operationId })
+        const claim = yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-13", runId: receipt.runId, ownerId: "test" })
+        yield* driver.startOperation({
+          commandId: "runtime-executable-manifest-test-ts-startOperation-6", ...claim, operationId: op.operationId })
         const expired = yield* driver.expireRunningOperation({
+          commandId: "runtime-executable-manifest-test-ts-expireRunningOperation-7",
           ...claim,
           operationId: op.operationId,
         })
         expect(expired.outcome).toBe("retried")
         yield* driver.startOperation({
-          ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+          ...(yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-14", runId: receipt.runId, ownerId: "test" })),
           runId: receipt.runId,
           operationId: op.operationId,
         })
-        const completionClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+        const completionClaim = yield* driver.claimExecution({
+          commandId: "runtime-executable-manifest-test-ts-claim-15", runId: receipt.runId, ownerId: "test" })
         const done = yield* driver.completeOperation({
           ...completionClaim,
           runId: receipt.runId,

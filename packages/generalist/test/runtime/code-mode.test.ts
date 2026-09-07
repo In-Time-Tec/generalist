@@ -1,3 +1,4 @@
+import { makeObjectStorage, objectRuntimeLayer } from "./execution/object.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
@@ -14,9 +15,6 @@ import {
 import { CodeMode, ExecutableResolver, LocalScheduler, RunStore, Runtime } from "../../src/runtime/index.js"
 import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor-internal.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
-import { tempDbPath } from "./sql/scenario.js"
-
-import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 import { allowAllAuthorization } from "../authorization.js"
 const sandboxPin = Pins.makeCapability({ sandbox: "code-mode-test-v1" })
 const inputPin = Pins.makeCapability({ codec: "prompt-v1" })
@@ -181,7 +179,8 @@ const makeCodeMode = (authority: AgentManifest.ProgramAuthority) =>
       idempotencyKey: "root",
       prompt: "fixture",
     })).runId
-    const claim = yield* store.claimExecution({ runId, ownerId: "code-mode-fixture" })
+    const claim = yield* store.claimExecution({
+          commandId: "runtime-code-mode-test-ts-claim-1", runId, ownerId: "code-mode-fixture" })
     const claimed = yield* store.loadExecution(runId)
     return CodeMode.make({ claim, claimed, authority, store })
   })
@@ -203,7 +202,7 @@ const manifestWithAuthority = (programAuthority: AgentManifest.ProgramAuthority)
 describe("Runtime code_mode Program children", () => {
   standalone.effect("background Program admission is exact, bounded and parent-owned", () =>
     withLayer(
-      Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 day" } }).pipe(
+      objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 day" } }).pipe(
         Layer.provide(fixture().resolverLayer),
       ),
     )(
@@ -251,13 +250,13 @@ describe("Runtime code_mode Program children", () => {
       }),
     ),
   )
-  standalone.live("sqlite replays background admission after the child commit but before the tool receipt", () => {
+  standalone.live("object replays background admission after the child commit but before the tool receipt", () => {
     const { resolverLayer, counts } = fixture({ background: "await" })
-    const runtimeLayer = SqliteRuntime.layerSqlite({
+    const storage = makeObjectStorage()
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [],
-      filename: tempDbPath("background-admission-restart"),
       scheduler: { pollInterval: "1 day", concurrency: 1 },
-    }).pipe(Layer.provide(resolverLayer))
+    }, storage).pipe(Layer.provide(resolverLayer))
     let rootRunId = ""
     let childRunId = ""
     const crash = withLayer(runtimeLayer)(
@@ -280,7 +279,8 @@ describe("Runtime code_mode Program children", () => {
         )(
           Effect.gen(function* () {
             const host = yield* makeRunExecutor
-            yield* host.execute(yield* store.claimExecution({ runId: rootRunId, ownerId: "crash" }))
+            yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-code-mode-test-ts-claim-2", runId: rootRunId, ownerId: "crash" }))
           }),
         )
         const children = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.filter(
@@ -318,18 +318,13 @@ describe("Runtime code_mode Program children", () => {
     )
     return crash.pipe(Effect.andThen(reopen))
   })
-  for (const backend of ["memory", "sqlite"] as const) {
-    for (const background of ["complete", "await", "cancel"] as const) {
+  for (const background of ["complete", "await", "cancel"] as const) {
       standalone.live(
-        `${backend} background Program ${background} permits independent parent progress and survives reopen`,
+        `object background Program ${background} permits independent parent progress and survives reopen`,
         () => {
           const { resolverLayer, counts } = fixture({ background })
           const options = { addresses: [], scheduler: { pollInterval: "1 day" as const, concurrency: 1 } }
-          const runtimeLayer = (
-            backend === "memory"
-              ? Runtime.layerMemory(options)
-              : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("background-program") })
-          ).pipe(Layer.provide(resolverLayer))
+          const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(resolverLayer))
           let rootRunId = ""
           let childRunId = ""
           const admit = Effect.gen(function* () {
@@ -380,16 +375,13 @@ describe("Runtime code_mode Program children", () => {
                 ),
               ).toHaveLength(2)
           })
-          return backend === "memory"
-            ? withLayer(runtimeLayer)(admit.pipe(Effect.andThen(complete)))
-            : withLayer(runtimeLayer)(admit).pipe(Effect.andThen(withLayer(runtimeLayer)(complete)))
+          return withLayer(runtimeLayer)(admit.pipe(Effect.andThen(complete)))
         },
       )
     }
-  }
-  for (const backend of ["memory", "sqlite"] as const) {
-    standalone.live(`${backend} admits one exact Program child and resumes the same root Run`, () => {
-      const filename = tempDbPath("code-mode")
+  {
+    standalone.live("object admits one exact Program child and resumes the same root Run", () => {
+      const storage = makeObjectStorage()
       const { resolverLayer } = fixture()
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
@@ -399,7 +391,7 @@ describe("Runtime code_mode Program children", () => {
         rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
-          sessionId: `code-mode:${backend}`,
+          sessionId: "code-mode:object",
           idempotencyKey: "root",
           prompt: "use code mode",
         })).runId
@@ -427,17 +419,13 @@ describe("Runtime code_mode Program children", () => {
         })
         expect((yield* runtime.treeCheckpoint(rootRunId)).inspection.runs).toHaveLength(2)
       })
-      if (backend === "memory") {
-        return withLayer(Runtime.layerMemory(options).pipe(Layer.provide(resolverLayer)))(
-          admit.pipe(Effect.andThen(finishRun)),
-        )
-      }
-      const runtimeLayer = SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(resolverLayer))
-      return withLayer(runtimeLayer)(admit).pipe(Effect.andThen(withLayer(runtimeLayer)(finishRun)))
+      return withLayer(objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))) (
+        admit.pipe(Effect.andThen(finishRun)),
+      )
     })
 
-    standalone.live(`${backend} atomically admits and settles simultaneous authored Code Mode children`, () => {
-      const filename = tempDbPath("code-mode-plural")
+    standalone.live("object atomically admits and settles simultaneous authored Code Mode children", () => {
+      const storage = makeObjectStorage()
       const { resolverLayer, counts } = fixture({ calls: 3 })
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
       const scenario = Effect.gen(function* () {
@@ -447,7 +435,7 @@ describe("Runtime code_mode Program children", () => {
         const rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
-          sessionId: `code-mode-plural:${backend}`,
+          sessionId: "code-mode-plural:object",
           idempotencyKey: "root",
           prompt: "use code mode three times",
         })).runId
@@ -504,20 +492,14 @@ describe("Runtime code_mode Program children", () => {
             .map((event) => event.waitId),
         ).toEqual(waitIds)
       })
-      return backend === "memory"
-        ? withLayer(Runtime.layerMemory(options).pipe(Layer.provide(resolverLayer)))(scenario)
-        : withLayer(SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(resolverLayer)))(scenario)
+      return withLayer(objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)))(scenario)
     })
 
     {
       const { resolverLayer } = fixture()
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
-      const runtimeLayer = (
-        backend === "memory"
-          ? Runtime.layerMemory(options)
-          : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("code-mode-cancel") })
-      ).pipe(Layer.provide(resolverLayer))
-      layer(runtimeLayer)(`${backend} propagates root cancellation to an admitted code_mode Program child`, (it) => {
+      const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(resolverLayer))
+      layer(runtimeLayer)("object propagates root cancellation to an admitted code_mode Program child", (it) => {
         it.effect("propagates root cancellation to the child", () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
@@ -525,7 +507,7 @@ describe("Runtime code_mode Program children", () => {
             const rootRunId = (yield* runtime.startExecution({
               executable,
               registrations,
-              sessionId: `code-mode-cancel:${backend}`,
+              sessionId: "code-mode-cancel:object",
               idempotencyKey: "root",
               prompt: "use code mode",
             })).runId
@@ -534,7 +516,8 @@ describe("Runtime code_mode Program children", () => {
             const childRunId = (yield* runtime.treeCheckpoint(rootRunId)).inspection.runs.find(
               (run) => run.parentRunId === rootRunId,
             )!.run.runId
-            yield* runtime.cancel({ runId: rootRunId, reason: "operator cancelled" })
+            yield* runtime.cancel({
+          commandId: "runtime-code-mode-test-ts-cancel-1", runId: rootRunId, reason: "operator cancelled" })
             expect((yield* runtime.inspect(rootRunId)).status).toBe("cancelled")
             expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
           }),
@@ -544,13 +527,13 @@ describe("Runtime code_mode Program children", () => {
   }
 
   for (const crashPoint of ["before-admission", "after-atomic-admission"] as const) {
-    standalone.live(`sqlite preserves the Code Mode boundary after a crash ${crashPoint}`, () => {
-      const filename = tempDbPath(`code-mode-${crashPoint}`)
+    standalone.live(`object preserves the Code Mode boundary after a crash ${crashPoint}`, () => {
+      const storage = makeObjectStorage()
       const { resolverLayer, counts } = fixture({ calls: 3 })
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
       let childRunIds: ReadonlyArray<string> = []
-      const runtimeLayer = SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(resolverLayer))
+      const runtimeLayer = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
       const crash = withLayer(runtimeLayer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -583,7 +566,8 @@ describe("Runtime code_mode Program children", () => {
           )(
             Effect.gen(function* () {
               const host = yield* makeRunExecutor
-              const claim = yield* store.claimExecution({ runId: rootRunId, ownerId: `crash:${crashPoint}` })
+              const claim = yield* store.claimExecution({
+          commandId: "runtime-code-mode-test-ts-claim-3", runId: rootRunId, ownerId: `crash:${crashPoint}` })
               const scope = yield* Scope.make()
               const fiber = yield* host.execute(claim).pipe(Effect.forkIn(scope))
               yield* Deferred.await(reached)
@@ -631,13 +615,13 @@ describe("Runtime code_mode Program children", () => {
     })
   }
 
-  standalone.live("sqlite resumes once after a crash with a completed Code Mode child", () => {
-    const filename = tempDbPath("code-mode-child-complete")
+  standalone.live("object resumes once after a crash with a completed Code Mode child", () => {
+    const storage = makeObjectStorage()
     const { resolverLayer, counts } = fixture()
     const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
     let rootRunId = ""
     let childRunId = ""
-    const runtimeLayer = SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(resolverLayer))
+    const runtimeLayer = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
     const completeChild = withLayer(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -684,7 +668,7 @@ describe("Runtime code_mode Program children", () => {
 
   {
     const { resolverLayer } = fixture()
-    layer(Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(resolverLayer)))(
+    layer(objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(resolverLayer)))(
       "requires the sandbox and every bounded authority registration at exact root admission",
       (it) => {
         it.effect("requires the sandbox and bounded authority registrations", () =>
@@ -838,7 +822,7 @@ describe("Runtime code_mode Program children", () => {
       }),
     ).toThrow()
     const { resolverLayer } = fixture()
-    return withLayer(Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(resolverLayer)))(
+    return withLayer(objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(resolverLayer)))(
       Effect.gen(function* () {
         const implementation = yield* makeCodeMode(bounded.manifest.programAuthority!)
         const result = yield* implementation.invoke({
@@ -864,7 +848,7 @@ describe("Runtime code_mode Program children", () => {
   })
 
   standalone.effect("returns typed failures when source, capabilities, or budgets exceed ProgramAuthority", () =>
-    withLayer(Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(fixture().resolverLayer)))(
+    withLayer(objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(fixture().resolverLayer)))(
       Effect.gen(function* () {
         const implementation = yield* makeCodeMode(root.manifest.programAuthority!)
         const invoke = (overrides: Partial<CodeMode.Parameters>) =>

@@ -5,7 +5,7 @@ import { expectTypeOf } from "vitest"
 import type { Agent } from "../../../src/index.js"
 import { Errors, Run, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
 import type { RuntimeInspection } from "../../../src/runtime/service.js"
-import { alternateAssistantRef, assistantAddress, memoryLayer, openWait, suspension, textPrompt } from "./fixtures.js"
+import { alternateAssistantRef, assistantAddress, objectLayer, openWait, suspension, textPrompt } from "./fixtures.js"
 
 expectTypeOf<RuntimeInspection>().toExtend<Agent.InspectionSnapshot>()
 
@@ -17,7 +17,7 @@ const activeCall = Schema.decodeSync(Response.ToolCallPart("active_tool", Schema
   providerExecuted: false,
 })
 
-layer(memoryLayer)("Runtime inspection contracts", (it) => {
+layer(objectLayer)("Runtime inspection contracts", (it) => {
   it.effect("exposes canonical snapshot, finite history, list, and structured wait resolution", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -29,7 +29,8 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         prompt: textPrompt("inspect"),
       })
       yield* store.suspend({
-        ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-1", runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
         waits: [openWait({ waitId: "wait:inspection" })],
         suspension: suspension({ waitId: "wait:inspection" }),
@@ -101,12 +102,14 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         idempotencyKey: "usage:1",
         prompt: textPrompt("usage"),
       })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "usage-worker" })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-2", runId: receipt.runId, ownerId: "usage-worker" })
       const usage: Response.Usage = {
         inputTokens: { total: 10, uncached: 10, cacheRead: undefined, cacheWrite: undefined },
         outputTokens: { total: 4, text: 4, reasoning: 0 },
       }
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-1",
         ...claim,
         event: {
           _tag: "ModelCallStarted",
@@ -120,6 +123,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-2",
         ...claim,
         event: {
           _tag: "ModelAttemptCompleted",
@@ -136,6 +140,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-3",
         ...claim,
         event: {
           _tag: "ModelAttemptFailed",
@@ -152,6 +157,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-4",
         ...claim,
         event: {
           _tag: "ToolExecutionStarted",
@@ -160,10 +166,12 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-5",
         ...claim,
         event: { _tag: "TurnCompleted", turn: 2, usage },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-6",
         ...claim,
         event: {
           _tag: "GateResult",
@@ -200,8 +208,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         idempotencyKey: "projection-corruption",
         prompt: textPrompt("corrupt"),
       })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "projection-corruption" })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-3", runId: receipt.runId, ownerId: "projection-corruption" })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-7",
         ...claim,
         event: {
           _tag: "ModelCallStarted",
@@ -214,6 +224,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-8",
         ...claim,
         event: {
           _tag: "ModelCallStarted",
@@ -233,8 +244,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         idempotencyKey: "missing-compaction-start",
         prompt: textPrompt("corrupt"),
       })
-      const secondClaim = yield* store.claimExecution({ runId: second.runId, ownerId: "missing-start" })
+      const secondClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-4", runId: second.runId, ownerId: "missing-start" })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-9",
         ...secondClaim,
         event: {
           _tag: "CompactionFailed",
@@ -273,9 +286,12 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       }
 
       const unordered = yield* makeRun("unordered-attempt")
-      const unorderedClaim = yield* store.claimExecution({ runId: unordered.runId, ownerId: "unordered" })
-      yield* store.emitAgentEvent({ ...unorderedClaim, event: attempt })
+      const unorderedClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-5", runId: unordered.runId, ownerId: "unordered" })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-10", ...unorderedClaim, event: attempt })
+      yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-11",
         ...unorderedClaim,
         event: {
           _tag: "ModelCallStarted",
@@ -289,8 +305,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       expect(yield* runtime.snapshot(unordered.runId).pipe(Effect.flip)).toBeInstanceOf(Errors.RuntimeUnavailable)
 
       const conflicting = yield* makeRun("conflicting-attempt-map")
-      const conflictingClaim = yield* store.claimExecution({ runId: conflicting.runId, ownerId: "conflicting" })
+      const conflictingClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-6", runId: conflicting.runId, ownerId: "conflicting" })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-12",
         ...conflictingClaim,
         event: {
           _tag: "ModelCallStarted",
@@ -301,8 +319,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
           startedAt: 1,
         },
       })
-      yield* store.emitAgentEvent({ ...conflictingClaim, event: attempt })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-13", ...conflictingClaim, event: attempt })
+      yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-14",
         ...conflictingClaim,
         event: { ...attempt, deliveryId: "attempt-2", modelAttemptId: "attempt:other" },
       })
@@ -320,8 +340,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         idempotencyKey: "failed-compaction",
         prompt: textPrompt("compact"),
       })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "failed-compaction" })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-7", runId: receipt.runId, ownerId: "failed-compaction" })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-15",
         ...claim,
         event: {
           _tag: "CompactionStarted",
@@ -333,6 +355,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-16",
         ...claim,
         event: {
           _tag: "CompactionFailed",
@@ -350,8 +373,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         idempotencyKey: "mismatched-compaction",
         prompt: textPrompt("compact"),
       })
-      const mismatchClaim = yield* store.claimExecution({ runId: mismatch.runId, ownerId: "mismatch" })
+      const mismatchClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-inspection-test-ts-claim-8", runId: mismatch.runId, ownerId: "mismatch" })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-17",
         ...mismatchClaim,
         event: {
           _tag: "CompactionStarted",
@@ -363,6 +388,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         },
       })
       yield* store.emitAgentEvent({
+          commandId: "runtime-execution-inspection-test-ts-emitAgentEvent-18",
         ...mismatchClaim,
         event: {
           _tag: "CompactionFailed",

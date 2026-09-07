@@ -40,7 +40,7 @@ export type ExecutableTarget = typeof ExecutableTarget.Type
 
 /** Complete closed executable profile registry and entry closure. */
 export interface ExecutableManifest {
-  readonly version: "2"
+  readonly version: "1"
   readonly root: ExecutableTarget
   readonly profiles: ReadonlyArray<ProfileBinding>
   readonly entries: ReadonlyArray<ExecutableEntry>
@@ -110,7 +110,7 @@ export const ProfileBinding: Schema.Codec<ProfileBinding, ProfileBindingEncoded>
 
 /** Complete closed executable profile registry and entry closure. */
 export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = Schema.Struct({
-  version: Schema.Literal("2"),
+  version: Schema.Literal("1"),
   root: ExecutableTarget,
   profiles: Schema.Array(ProfileBinding),
   entries: Schema.Array(ExecutableEntry),
@@ -198,7 +198,7 @@ export const make = (input: {
   entries.sort((left, right) => compareText(left.pin, right.pin))
   const profiles = [...(input.profiles ?? [])].toSorted((left, right) => compareText(left.selection, right.selection))
   const manifest = Schema.decodeSync(ExecutableManifest, { onExcessProperty: "error" })({
-    version: "2",
+    version: "1",
     root: input.root,
     profiles,
     entries,

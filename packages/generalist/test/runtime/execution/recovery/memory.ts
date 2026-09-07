@@ -1,11 +1,10 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Memory } from "../../../../src/index.js"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../../src/runtime/index.js"
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 import { JournalFault } from "../../../../src/runtime/operation/journal-fault.js"
-import { tempDbPath } from "../../sql/scenario.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { provideScoped } from "../scoped-provide.js"
 
@@ -23,7 +22,7 @@ export const memoryRecoverySuite = () => {
     for (const committed of [false, true]) {
       it.live(`reopens Agent remember terminal=${terminal} committed=${committed} without startup recall`, () =>
         Effect.gen(function* () {
-          const filename = tempDbPath("remember-restart")
+          const storage = makeObjectStorage()
           const toolkit = Toolkit.make(Tool.make("work", { parameters: Schema.Struct({}), success: Schema.String }))
           const agent = Agent.make({
             name: "remember-restart",
@@ -101,7 +100,7 @@ export const memoryRecoverySuite = () => {
           )
           const makeLayer = () =>
             Layer.merge(
-              SqliteRuntime.layerSqlite({ filename, addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+              objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }, storage).pipe(
                 Layer.provide(Layer.merge(resolver, fault)),
               ),
               Layer.mergeAll(model, memory, handlers, allowAllAuthorization),
@@ -116,7 +115,11 @@ export const memoryRecoverySuite = () => {
               idempotencyKey: "memory-test",
             })
             yield* executor.execute(
-              yield* store.claimExecution({ runId: handle.runId, ownerId: restarting ? "after" : "before" }),
+              yield* store.claimExecution({
+                commandId: `runtime-execution-recovery-memory-ts-claim-${restarting ? "after" : "before"}`,
+                runId: handle.runId,
+                ownerId: objectWorkerId,
+              }),
             )
             return {
               failures: (yield* runtime.history({ runId: handle.runId, limit: 1000 })).filter(

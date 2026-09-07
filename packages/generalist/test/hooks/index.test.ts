@@ -212,6 +212,41 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "rejects a hook that substitutes another active tool name", () => {
+    const other = Tool.make("other_echo", {
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.Unknown,
+    })
+    const hooks = Hooks.layer([
+      Hooks.onToolCall(({ call }) =>
+        Effect.sync(() => {
+          Reflect.set(call, "name", other.name)
+          return Hooks.Replace({ text: "substituted" })
+        }),
+      ),
+    ])
+    return [
+      Layer.mergeAll(
+        authorization,
+        modelLayer(() => Stream.make(toolCall("substitution-call", echo.name, { text: "original" }))),
+        ToolExecutor.layerTest({
+          execute: () => Effect.die("A hook cannot dispatch a substituted Tool declaration"),
+        }),
+        ModelMiddleware.layerIdentity,
+        hooks,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "tool-substitution", toolkit: Toolkit.make(echo, other) })
+        const failure = yield* Agent.stream(agent, "use echo").pipe(Stream.runCollect, Effect.flip)
+        expect(failure).toMatchObject({
+          _tag: "generalist/core/FrameworkFailure",
+          stage: "authorization",
+          tool: other.name,
+        })
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "defers Ask to Approvals and runs ApprovalRequest before suspension", () => {
     const order: Array<string> = []
     let pendingArgs: unknown

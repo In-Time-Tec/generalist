@@ -47,13 +47,13 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 - [Offline quickstart](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/quickstart.md): run a tool-calling agent without credentials.
 - [Tools](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/define-tools.md): give an agent functions it can call.
 - [Structured output](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/structured-output.md): return schema-validated objects.
-- [Durable Runtime](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/runtime.md): persist work with SQLite, PostgreSQL, or MySQL.
+- [Object durability](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/durable-stores.md): recover work with the shared object-storage engine and S3 or native R2 transport.
 - [Documentation](https://github.com/In-Time-Tec/generalist/tree/main/docs): guides, examples, and API reference.
 
 ## Status
 
 Generalist is pre-1.0: APIs can change between releases. Requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
-Everything ships in this package. Imports such as `generalist/runtime`, `generalist/pg`, and `generalist/testing/model` are subpaths, not separate installs. You only need the optional dependencies for adapters you use.
+Everything ships in this package. Imports such as `generalist/runtime`, `generalist/durability/s3`, and `generalist/testing/model` are subpaths, not separate installs. You only need the optional dependencies for adapters you use. Object storage is the only production execution authority; ordinary process-local agents need no persistence. The durability contract's long-term intent is not provider certification or a verified performance claim.
 
 [MIT](LICENSE) · [Source](https://github.com/In-Time-Tec/generalist)

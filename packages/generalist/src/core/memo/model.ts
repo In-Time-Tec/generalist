@@ -1,8 +1,9 @@
-import { Effect, Exit, Option, Schema, Stream } from "effect"
+import { Effect, Option, Schema, Stream } from "effect"
 import { LanguageModel, Model, Prompt, type Response } from "effect/unstable/ai"
 import { promptDigest } from "../agent/prompt-identity.js"
 import { digest } from "../durable/canonical-json.js"
 import { adapt, type BroadTools } from "../model/service.js"
+import { defaultResolveFailure } from "../model/response/failure.js"
 import { Dependencies, Store } from "./service.js"
 
 const CachedParts = Schema.Array(Schema.Unknown)
@@ -47,17 +48,19 @@ export const memoizeModel = (run: string) => (model: LanguageModel.Service) =>
           const observed: Array<unknown> = []
           return invoke().pipe(
             Stream.tap((part) => Effect.sync(() => observed.push(part))),
-            Stream.onExit((exit) =>
-              Exit.isFailure(exit) || !observed.some(Schema.is(FinishPart))
-                ? Effect.void
-                : store.value.put(key, {
-                    value: observed,
-                    fromRun: run,
-                    fromOperation: `model:${key}`,
-                    expiresAtMillis: Number.MAX_SAFE_INTEGER,
-                  }),
+            Stream.concat(
+              Stream.fromEffect(Effect.suspend(() =>
+                !observed.some(Schema.is(FinishPart))
+                  ? Effect.void
+                  : store.value.put(key, {
+                      value: observed,
+                      fromRun: run,
+                      fromOperation: `model:${key}`,
+                      expiresAtMillis: Number.MAX_SAFE_INTEGER,
+                    }),
+              )).pipe(Stream.drain),
             ),
           )
         }),
-      ),
+      ).pipe(Stream.mapError((error) => defaultResolveFailure({ error, method: "streamText" }))),
   })

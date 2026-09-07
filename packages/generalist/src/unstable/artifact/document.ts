@@ -1,5 +1,6 @@
 import { Context, Effect, Encoding, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
+import { DurabilityFailure } from "../../durability/errors.js"
 import { BlobStore } from "../../blob-store/index.js"
 import {
   ArtifactBaseStale,
@@ -13,6 +14,7 @@ import {
   RangeOperation,
   Version,
   ManagedArtifactToolTypeId,
+  type ArtifactAppendReceipt,
   type ArtifactCheckpoint,
   type ArtifactHead,
   type CrdtService,
@@ -136,19 +138,83 @@ const readForAgent = (artifact: string, crdt: CrdtService) =>
     return yield* readHead(artifact, crdt, head.branch)
   })
 
+const sameOperation = (left: RangeOperation, right: RangeOperation): boolean => {
+  if (left._tag !== right._tag) return false
+  switch (left._tag) {
+    case "Insert":
+      return right._tag === "Insert" && left.at === right.at && left.text === right.text
+    case "Delete":
+      return right._tag === "Delete" && left.from === right.from && left.to === right.to
+    case "Replace":
+      return right._tag === "Replace" && left.from === right.from && left.to === right.to && left.text === right.text
+  }
+}
+
+const sameAttribution = (left: EditResult["attribution"], right: EditResult["attribution"]): boolean => {
+  if (left._tag !== right._tag) return false
+  return left._tag === "Agent"
+    ? right._tag === "Agent" && left.actor === right.actor && left.runId === right.runId
+    : right._tag === "Human" && left.actor === right.actor
+}
+
+interface CommitInput {
+  readonly artifact: string
+  readonly crdt: CrdtService
+  readonly position: Position
+  readonly commandId: string
+  readonly operation: RangeOperation
+  readonly attribution: EditResult["attribution"]
+}
+
+const receiptResult = (receipt: ArtifactAppendReceipt): EditResult => {
+  const update = receipt.update
+  return {
+    artifact: update.artifact,
+    base: update.base,
+    result: update.result,
+    attribution: update.attribution,
+    ...(update.branch === undefined ? undefined : { branch: update.branch }),
+  }
+}
+
+const matchesLogicalEdit = (input: CommitInput, receipt: ArtifactAppendReceipt): boolean => {
+  const update = receipt.update
+  return receipt.commandId === input.commandId &&
+    receipt.crdt === input.crdt.id &&
+    update.artifact === input.artifact &&
+    update.branch === input.position.branch &&
+    update.base === input.position.version &&
+    sameOperation(update.operation, input.operation) &&
+    sameAttribution(update.attribution, input.attribution)
+}
+
+const reconcileReceipt = (input: CommitInput, receipt: ArtifactAppendReceipt) =>
+  matchesLogicalEdit(input, receipt)
+    ? Effect.succeed(receiptResult(receipt))
+    : Effect.fail(
+        ArtifactStorageError.make({
+          artifact: input.artifact,
+          operation: "reconcile artifact edit",
+          reason: "The command identity already committed with different logical input",
+        }),
+      )
+
+const receiptLookupInput = (input: CommitInput) => ({
+  artifact: input.artifact,
+  commandId: input.commandId,
+  ...(input.position.branch === undefined ? undefined : { branch: input.position.branch }),
+})
+
 const commit = (
-  input: {
-    readonly artifact: string
-    readonly crdt: CrdtService
-    readonly position: Position
-    readonly operation: RangeOperation
-    readonly attribution: EditResult["attribution"]
-  },
+  input: CommitInput,
   conflicts = 0,
 ): Effect.Effect<EditResult, ArtifactError, RunStore | BlobStore> =>
-  Effect.suspend(() =>
-    Effect.gen(function* () {
-      const store = yield* RunStore
+  Effect.gen(function* () {
+    const store = yield* RunStore
+    return yield* Effect.suspend(() =>
+      Effect.gen(function* () {
+      const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
+      if (prior !== undefined) return yield* reconcileReceipt(input, prior)
       const baseHead = yield* ensurePosition(input.artifact, input.crdt, input.position)
       const current = yield* store.artifactHead({
         artifact: input.artifact,
@@ -167,6 +233,7 @@ const commit = (
       const snapshot = yield* putBytes(input.artifact, edited.snapshot)
       const update = yield* store.appendArtifact({
         artifact: input.artifact,
+        commandId: input.commandId,
         crdt: input.crdt.id,
         expected: current.version,
         base: input.position.version,
@@ -187,13 +254,31 @@ const commit = (
       Effect.catchTag("generalist/artifact/ArtifactVersionConflict", (error) =>
         conflicts >= maxCommitConflicts ? error : commit(input, conflicts + 1),
       ),
+      Effect.catchIf(Schema.is(DurabilityFailure), (error) =>
+        error.reason === "input-conflict"
+          ? Effect.gen(function* () {
+              const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
+              if (prior === undefined) return yield* Effect.fail(error)
+              return yield* reconcileReceipt(input, prior)
+            })
+          : Effect.fail(error),
+      ),
       mapStorageError(input.artifact, "edit artifact"),
     ),
   )
+  })
 
 const editForAgent = (artifact: string, crdt: CrdtService, input: { base: Version; operation: RangeOperation }) =>
   Effect.gen(function* () {
     const context = yield* ToolContext
+    const commandId = context.operationKey
+    if (commandId === undefined || commandId.length === 0) {
+      return yield* ArtifactStorageError.make({
+        artifact,
+        operation: "resolve artifact edit identity",
+        reason: "ToolContext.operationKey is required for managed Artifact edits",
+      })
+    }
     const checkpoint = yield* readCheckpoint(artifact)
     if (checkpoint === undefined || input.base !== checkpoint.version) {
       return yield* ArtifactBaseStale.make({
@@ -207,6 +292,7 @@ const editForAgent = (artifact: string, crdt: CrdtService, input: { base: Versio
       artifact,
       crdt,
       position,
+      commandId,
       operation: input.operation,
       attribution: {
         _tag: "Agent",
@@ -221,6 +307,7 @@ const editForHuman = (artifact: string, crdt: CrdtService, input: HumanEdit) =>
     artifact,
     crdt,
     position: { version: input.base },
+    commandId: input.commandId,
     operation: input.operation,
     attribution: input.attribution,
   })

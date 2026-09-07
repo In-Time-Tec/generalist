@@ -12,6 +12,7 @@ export type BaseEntry = { readonly id: EntryId; readonly parentId: EntryId | nul
 /** A verbatim conversation message. */
 export type MessageEntry = BaseEntry & { readonly _tag: "Message"; readonly message: Prompt.Message }
 const ModelToolCall = Schema.Struct({
+  "~effect/ai/Content/Part": Response.TextPart.fields["~effect/ai/Content/Part"],
   type: Schema.Literal("tool-call"),
   id: Schema.String,
   name: Schema.String,
@@ -38,6 +39,7 @@ const ModelFinishPart = Schema.Struct({
   response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
 })
 const ModelToolResult = Schema.Struct({
+  "~effect/ai/Content/Part": Response.TextPart.fields["~effect/ai/Content/Part"],
   type: Schema.Literal("tool-result"),
   id: Schema.String,
   name: Schema.String,
@@ -145,6 +147,8 @@ export type EntryPayload = typeof EntryPayload.Type
 /** Session store operation failure. */
 export class SessionStoreError extends ActionableTaggedError<SessionStoreError>()("generalist/core/SessionStoreError", {
   message: Schema.String,
+  reason: Schema.optionalKey(Schema.Literals(["unavailable", "corrupt", "conflict", "indeterminate", "unsupported"])),
+  cause: Schema.optionalKey(Schema.Defect()),
   hint: errorHint("Restore the session store connection or permissions, then retry the operation."),
 }) {}
 /** Session append conflict with the active path or entry identity. */
@@ -155,6 +159,7 @@ export class SessionConflict extends ActionableTaggedError<SessionConflict>()("g
 }) {}
 /** Expected active leaf for a store-assigned Session entry identity. */
 export type GeneratedAppendOptions = {
+  readonly commandId: string
   readonly id?: never
   readonly expectedLeafId?: EntryId | null
 }
@@ -179,10 +184,10 @@ export interface CheckpointAppend {
 }
 /** Session event-log service boundary. */
 export interface SessionStore {
-  readonly reserveEntryId: Effect.Effect<EntryId, SessionStoreError>
+  readonly reserveEntryId: (commandId: string) => Effect.Effect<EntryId, SessionStoreError>
   readonly append: (
     entry: AppendInput,
-    options?: AppendOptions,
+    options: AppendOptions,
   ) => Effect.Effect<Entry, SessionStoreError | SessionConflict>
   /** Atomically persists projection, telemetry, and commit. Remote failure is ambiguous; retry exactly. */
   readonly appendCheckpoint: (
@@ -200,8 +205,8 @@ export interface SessionStore {
   readonly latestCompaction: (leaf?: EntryId) => Effect.Effect<CompactionEntry | undefined, SessionStoreError>
   /** Complete lossless ancestry for audit, compaction input, and memory retention. */
   readonly path: (leaf?: EntryId) => Effect.Effect<ReadonlyArray<Entry>, SessionStoreError>
-  readonly setLeaf: (id: EntryId | null) => Effect.Effect<void, SessionStoreError>
-  readonly leaf: Effect.Effect<EntryId | null>
+  readonly setLeaf: (id: EntryId | null, commandId: string) => Effect.Effect<void, SessionStoreError>
+  readonly leaf: Effect.Effect<EntryId | null, SessionStoreError>
 }
 /** Keyed Session storage and same-Session Run admission. */
 export interface Directory {

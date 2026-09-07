@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "../../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, FileSystem, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
@@ -154,7 +155,7 @@ it.effect("suspends a durable run when maxSubCalls is exhausted", () =>
     ])
     const leaf = yield* TestModel.make([TestModel.text("must not run")])
     const model = configuredRlmLayer(root, leaf, { maxDepth: 1, maxSubCalls: 0 })
-    const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+    const runtime = objectRuntimeLayer({ addresses: [] }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     )
     const services = Layer.merge(runtime, Layer.mergeAll(allowAllAuthorization, model))
@@ -168,7 +169,11 @@ it.effect("suspends a durable run when maxSubCalls is exhausted", () =>
         const agent = Agent.make({ name: "rlm-budget", toolkit: Toolkit.empty })
         yield* host.register(agent)
         const handle = yield* host.start(agent, "run", { budget: RunBudget.make({}) })
-        const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: "rlm-budget-test" })
+        const claim = yield* store.claimExecution({
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+          commandId: "rlm:budget",
+        })
         yield* executor.execute(claim)
 
         expect(yield* host.inspect(handle.runId)).toMatchObject({

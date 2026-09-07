@@ -13,7 +13,7 @@ import {
 import {
   DuplicateAgent,
   ExecutablePinMissing,
-  type ExecutableRegistrationInvalid,
+  ExecutableRegistrationInvalid,
   type ExecutableRegistrationMissing,
   UnknownAgent,
 } from "../errors.js"
@@ -257,10 +257,6 @@ export const capture = <
     )
   })
 
-const registeredInput = (input: ResolverInput): boolean =>
-  input.registrations.length > 0 &&
-  input.registrations.every((registration) => registration.codec === codec && registration.version === version)
-
 const registeredName = (input: ResolverInput): Effect.Effect<string, ExecutablePinMissing> => {
   const active = input.manifest.entries.find((entry) => entry.pin === input.ref.active)
   return active?._tag === "Agent"
@@ -274,12 +270,17 @@ type ResolveEffect = Effect.Effect<
   Scope.Scope
 >
 
-/** @internal Resolve typed Runtime starts by persisted Agent name, falling back for legacy pinned executables. */
+/** @internal Resolve registered Agent declarations exactly; other executable codecs belong to the host resolver. */
 export const resolve: {
   (fallback: ResolverService, input: ResolverInput): (agents: RegisteredAgents) => ResolveEffect
   (agents: RegisteredAgents, fallback: ResolverService, input: ResolverInput): ResolveEffect
 } = Function.dual(3, (agents: RegisteredAgents, fallback: ResolverService, input: ResolverInput): ResolveEffect => {
-  if (!registeredInput(input)) return fallback.resolve(input)
+  if (!input.registrations.some((registration) => registration.codec === codec)) return fallback.resolve(input)
+  if (input.registrations.some((registration) => registration.codec !== codec || registration.version !== version)) {
+    return ExecutableRegistrationInvalid.make({
+      message: "Registered Agent declarations require one complete version-1 registration set.",
+    })
+  }
   return Effect.gen(function* () {
     const name = yield* registeredName(input)
     const registration = yield* agents.get(name)
@@ -287,7 +288,7 @@ export const resolve: {
     return {
       _tag: "Agent" as const,
       agent: registration.value.agent,
-      attestation: { ref: input.ref, manifest: input.manifest },
+      attestation: registration.value.executable,
     }
   })
 })

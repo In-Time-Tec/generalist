@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -15,11 +16,10 @@ import {
 import type { Service as ActiveExecutionsService } from "../../src/runtime/execution/active-executions.js"
 import { make as makeSteeringAdmission } from "../../src/runtime/run/steering.js"
 import { allowAllAuthorization } from "../authorization.js"
-import { assistantAddress, completedResult, memoryLayer, registrationsFor } from "./execution/fixtures.js"
+import { assistantAddress, completedResult, objectLayer, registrationsFor } from "./execution/fixtures.js"
 import { provideScoped } from "./execution/scoped-provide.js"
 import { testExecutable } from "./run/identity.js"
 import { messagingBackend, messagingLayer } from "./messaging/scenario.js"
-import { sqliteManualClaimLayer, tempDbPath } from "./sql/scenario.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -76,7 +76,7 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
       Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:hooked admission`))),
     ])
     const handlers = toolkit.toLayer({ controlled_tool: () => Effect.die("ToolExecutor owns controlled_tool") })
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     }).pipe(
       Layer.provide(
@@ -102,7 +102,8 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
           prompt: "start",
         })
         const execution = yield* host
-          .execute(yield* store.claimExecution({ runId: run.runId, ownerId: policy }))
+          .execute(yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-1", runId: run.runId, ownerId: objectWorkerId }))
           .pipe(Effect.forkChild({ startImmediately: true }))
         const start = yield* Effect.raceFirst(
           Deferred.await(started).pipe(Effect.as("started" as const)),
@@ -160,7 +161,7 @@ it.effect("interrupt journals first, stops an in-flight tool, and creates an Unk
       execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
     })
     const handlers = toolkit.toLayer({ external_write: () => Effect.die("ToolExecutor owns external_write") })
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     }).pipe(
       Layer.provide(
@@ -186,7 +187,8 @@ it.effect("interrupt journals first, stops an in-flight tool, and creates an Unk
           prompt: "write",
         })
         const execution = yield* host
-          .execute(yield* store.claimExecution({ runId: run.runId, ownerId: "interrupt" }))
+          .execute(yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-2", runId: run.runId, ownerId: objectWorkerId }))
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -232,7 +234,7 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
           ),
       }),
     )
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     }).pipe(
       Layer.provide(
@@ -255,7 +257,8 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
           prompt: "start",
         })
         const execution = yield* host
-          .execute(yield* store.claimExecution({ runId: run.runId, ownerId: "reject" }))
+          .execute(yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-3", runId: run.runId, ownerId: objectWorkerId }))
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -283,7 +286,8 @@ const completionLaneSelection = Effect.gen(function* () {
     idempotencyKey: "run",
     prompt: "start",
   })
-  const claim = yield* store.claimExecution({ runId: run.runId, ownerId: "mixed-completion-lanes" })
+  const claim = yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-4", runId: run.runId, ownerId: objectWorkerId })
   const steering = yield* runtime.send(run.runId, "steer later", {
     policy: "steer",
     idempotencyKey: "steer",
@@ -293,7 +297,8 @@ const completionLaneSelection = Effect.gen(function* () {
     idempotencyKey: "enqueue",
   })
 
-  const first = yield* store.complete({ ...claim, result: completedResult("first") })
+  const first = yield* store.complete({
+          commandId: "runtime-steering-test-ts-complete-1", ...claim, result: completedResult("first") })
   expect(first).toMatchObject({
     _tag: "SteeringPending",
     continuation: { steeringEntryIds: [enqueue.entryId] },
@@ -308,23 +313,19 @@ const completionLaneSelection = Effect.gen(function* () {
     attempt: claim.attemptFence,
     steeringEntryIds: [enqueue.entryId],
   })
-  const second = yield* store.complete({ ...claim, result: completedResult("second") })
+  const second = yield* store.complete({
+          commandId: "runtime-steering-test-ts-complete-2", ...claim, result: completedResult("second") })
   expect(second).toMatchObject({
     _tag: "SteeringPending",
     continuation: { steeringEntryIds: [steering.entryId] },
   })
 })
 
-layer(memoryLayer)("memory completion admission lanes", (test) => {
+layer(objectLayer)("object completion admission lanes", (test) => {
   test.effect("continues one admission lane at a time with enqueue first", () => completionLaneSelection)
 })
 
-layer(sqliteManualClaimLayer(tempDbPath("steering-mixed-completion-lanes")))(
-  "SQLite completion admission lanes",
-  (test) => {
-    test.effect("continues one admission lane at a time with enqueue first", () => completionLaneSelection)
-  },
-)
+
 
 it.effect("completion continuations retain their lane and pass through onSteer", () =>
   Effect.gen(function* () {
@@ -348,7 +349,7 @@ it.effect("completion continuations retain their lane and pass through onSteer",
     const hooks = Hooks.layer([
       Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:completion hook`))),
     ])
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     }).pipe(
       Layer.provide(
@@ -370,12 +371,14 @@ it.effect("completion continuations retain their lane and pass through onSteer",
           idempotencyKey: "run",
           prompt: "start",
         })
-        const claim = yield* store.claimExecution({ runId: run.runId, ownerId: "completion-hook" })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-5", runId: run.runId, ownerId: objectWorkerId })
         const receipt = yield* runtime.send(run.runId, "queued continuation", {
           policy: "enqueue",
           idempotencyKey: "queued",
         })
-        const outcome = yield* store.complete({ ...claim, result: completedResult("first") })
+        const outcome = yield* store.complete({
+          commandId: "runtime-steering-test-ts-complete-3", ...claim, result: completedResult("first") })
         expect(outcome).toMatchObject({
           _tag: "SteeringPending",
           continuation: { queue: "followUp", steeringEntryIds: [receipt.entryId] },
@@ -390,7 +393,7 @@ it.effect("completion continuations retain their lane and pass through onSteer",
   }),
 )
 
-layer(memoryLayer)("rollback admission", (test) => {
+layer(objectLayer)("rollback admission", (test) => {
   test.effect("rewinds to the previous TurnCompleted event before admitting exactly once", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -401,10 +404,14 @@ layer(memoryLayer)("rollback admission", (test) => {
         idempotencyKey: "run",
         prompt: "start",
       })
-      const claim = yield* store.claimExecution({ runId: run.runId, ownerId: "rollback" })
-      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 0 } })
-      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnCompleted", turn: 0 } })
-      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-6", runId: run.runId, ownerId: objectWorkerId })
+      yield* store.emitAgentEvent({
+          commandId: "runtime-steering-test-ts-emitAgentEvent-4", ...claim, event: { _tag: "TurnStarted", turn: 0 } })
+      yield* store.emitAgentEvent({
+          commandId: "runtime-steering-test-ts-emitAgentEvent-5", ...claim, event: { _tag: "TurnCompleted", turn: 0 } })
+      yield* store.emitAgentEvent({
+          commandId: "runtime-steering-test-ts-emitAgentEvent-6", ...claim, event: { _tag: "TurnStarted", turn: 1 } })
       yield* store.releaseExecution(claim)
 
       const [receipt, retry] = yield* Effect.all(
@@ -471,7 +478,7 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
       Hooks.onSteer(({ queue, count }) => Effect.succeed(Hooks.AddContext(`${queue}:${count}:rollback hook`))),
     ])
     const handlers = toolkit.toLayer({ rollback_write: () => Effect.die("ToolExecutor owns rollback_write") })
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
     }).pipe(
       Layer.provide(
@@ -497,7 +504,8 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
           prompt: "write",
         })
         const first = yield* host
-          .execute(yield* store.claimExecution({ runId: run.runId, ownerId: "rollback-first" }))
+          .execute(yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-7", runId: run.runId, ownerId: objectWorkerId }))
           .pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -507,7 +515,8 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
         })
         yield* Fiber.join(first)
 
-        yield* host.execute(yield* store.claimExecution({ runId: run.runId, ownerId: "rollback-replacement" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-claim-8", runId: run.runId, ownerId: objectWorkerId }))
 
         expect(requests).toHaveLength(2)
         expect(requests[1]).toContain("replace the active turn")
@@ -524,7 +533,7 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
   }),
 )
 
-layer(memoryLayer)("admission retry side effects", (test) => {
+layer(objectLayer)("admission retry side effects", (test) => {
   test.effect("interrupts at most once for exact interrupt and rollback retries", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime

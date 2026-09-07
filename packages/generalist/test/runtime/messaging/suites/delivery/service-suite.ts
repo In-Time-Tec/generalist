@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../../../execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
@@ -76,7 +77,7 @@ it.effect("delivers an addressed message at the next turn boundary without inter
         },
       }),
     )
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     }).pipe(
       Layer.provide(
@@ -106,7 +107,8 @@ it.effect("delivers an addressed message at the next turn boundary without inter
           prompt: textPrompt("child"),
         })
 
-        const claim = yield* store.claimExecution({ runId: target.runId, ownerId: "memory" })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-messaging-suites-delivery-service-suite-ts-claim-1", runId: target.runId, ownerId: "memory" })
         const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
         yield* Deferred.await(started)
 
@@ -153,7 +155,7 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
         },
       }),
     )
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     }).pipe(
       Layer.provide(
@@ -190,7 +192,8 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
           prompt: textPrompt("please review"),
         })
 
-        yield* host.execute(yield* store.claimExecution({ runId: target.runId, ownerId: "memory" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-messaging-suites-delivery-service-suite-ts-claim-2", runId: target.runId, ownerId: "memory" }))
 
         const delivered = requests.find((request) => request.includes("please review"))
         expect(delivered).toBeDefined()
@@ -218,7 +221,7 @@ it.effect("holds a message for an idle target until its next execution drains it
         },
       }),
     )
-    const runtimeLayer = Runtime.layerMemory({
+    const runtimeLayer = objectRuntimeLayer({
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     }).pipe(
       Layer.provide(
@@ -259,7 +262,8 @@ it.effect("holds a message for an idle target until its next execution drains it
         expect(yield* runtime.messages({ runId: target.runId, limit: 10 })).toHaveLength(1)
         expect(requests).toHaveLength(0)
 
-        yield* host.execute(yield* store.claimExecution({ runId: target.runId, ownerId: "memory" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-messaging-suites-delivery-service-suite-ts-claim-3", runId: target.runId, ownerId: "memory" }))
 
         expect(requests.some((request) => request.includes("queued while idle"))).toBe(true)
         expect(yield* runtime.messages({ runId: target.runId, limit: 10 })).toEqual([])

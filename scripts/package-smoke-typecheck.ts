@@ -16,7 +16,10 @@ import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
-import { RunStore as SqliteRunStore, Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
+import * as R2 from "generalist/durability/r2"
+import * as TestDurability from "generalist/testing/durability"
 import { Server } from "generalist/server"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool } from "effect/unstable/ai"
@@ -86,10 +89,22 @@ type RuntimeAdmitInputCanonical = Assert<
 type RuntimeActivateInputCanonical = Assert<
   Equal<Parameters<Runtime.Service["activate"]>[0], Runtime.ActivateInput>
 >
-type SqliteRuntimeOptions = import("generalist/runtime/sqlite-bun").Runtime.Options
-type SqliteRunStoreOptions = import("generalist/runtime/sqlite-bun").RunStore.Options
-void SqliteRuntime.layerSqlite
-void SqliteRunStore.layerSqlite
+const s3Options: S3.Options = {
+  bucket: "generalist-package-smoke",
+  region: "us-east-1",
+  credentials: { accessKeyId: "package-smoke", secretAccessKey: "package-smoke" },
+}
+const s3Layer = S3.layer(s3Options)
+const nativeR2Layer = (bucket: R2.Bucket) => R2.layer(bucket)
+const objectRuntimeLayer = (options: Durability.Options) =>
+  Durability.layer(options).pipe(Layer.provide(s3Layer))
+const readOnlyStoreLayer = (options: Durability.Options) =>
+  Durability.layerRunStore(options).pipe(Layer.provide(s3Layer))
+void nativeR2Layer
+void objectRuntimeLayer
+void readOnlyStoreLayer
+void Durability.activate
+void TestDurability.make
 void deterministicLayer
 void makeModelRoute
 const cursor: Cursor.Cursor = Cursor.origin

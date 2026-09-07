@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- This example assembles and owns its complete application Layer. */
 import { BunCrypto } from "@effect/platform-bun"
 import { layer as bunHttpServer } from "@effect/platform-bun/BunHttpServer"
-import { Console, Effect, Layer, ManagedRuntime, Option, Queue, Schema } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Queue, Schema } from "effect"
 import {
   FetchHttpClient,
   HttpClient,
@@ -13,8 +13,10 @@ import {
 } from "effect/unstable/http"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
@@ -46,6 +48,7 @@ const editorPage = `<!doctype html>
       const updates = document.querySelector("#updates")
       let version = 0
       let content = ""
+      let commandSequence = 0
       let pending = false
       const protocol = location.protocol === "https:" ? "wss:" : "ws:"
       const socket = new WebSocket(protocol + "//" + location.host + "/artifacts/plan.md/ws?version=0")
@@ -74,6 +77,7 @@ const editorPage = `<!doctype html>
         pending = true
         editor.disabled = true
         socket.send(JSON.stringify({
+          commandId: "browser-edit-" + (++commandSequence),
           _tag: "Edit",
           base: version,
           operation: { _tag: "Replace", from: 0, to: content.length, text: editor.value },
@@ -84,25 +88,65 @@ const editorPage = `<!doctype html>
   </body>
 </html>`
 
-const runtime = Runtime.layerMemory({ addresses: [], scheduler: { concurrency: 1 } }).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([])),
+const services = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const capabilities =
+      endpoint === undefined
+        ? undefined
+        : {
+            conditionalCreate: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+            strongReadAfterWrite: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+            consistentListing: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          }
+    const objectStore = S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : { endpoint, forcePathStyle: true, capabilities }),
+    })
+    const reconstructed = Durability.layer({
+      environment,
+      tenant,
+      partition,
+      addresses: [],
+      scheduler: { concurrency: 1 },
+    }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      Layer.provide(objectStore),
+      Layer.provide(BunCrypto.layer),
+    )
+    const blobs = BlobStore.layer({ environment, tenant }).pipe(
+      Layer.provide(objectStore),
+      Layer.provide(BunCrypto.layer),
+    )
+    return Layer.mergeAll(
+      Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed)),
+      blobs,
+      artifactLayer,
+      TestModel.layer([
+        TestModel.toolCall("artifact_read_cGxhbi5tZA", {}, { id: "read-plan" }),
+        TestModel.toolCall(
+          "artifact_edit_cGxhbi5tZA",
+          { base: 1, operation: { _tag: "Replace", from: 7, to: 11, text: "document" } },
+          { id: "edit-plan" },
+        ),
+        TestModel.text("The shared plan is updated."),
+      ]),
+      Permissions.layerAllowAll,
+      Approvals.layerAutoApprove,
+    )
+  }),
 )
-const services = Layer.mergeAll(
-  runtime,
-  BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer)),
-  artifactLayer,
-  TestModel.layer([
-    TestModel.toolCall("artifact_read_cGxhbi5tZA", {}, { id: "read-plan" }),
-    TestModel.toolCall(
-      "artifact_edit_cGxhbi5tZA",
-      { base: 1, operation: { _tag: "Replace", from: 7, to: 11, text: "document" } },
-      { id: "edit-plan" },
-    ),
-    TestModel.text("The shared plan is updated."),
-  ]),
-  Permissions.layerAllowAll,
-  Approvals.layerAutoApprove,
-)
+
 
 const pageRoute = HttpRouter.add("GET", "/", () =>
   Effect.succeed(HttpServerResponse.text(editorPage, { contentType: "text/html; charset=utf-8" })),
@@ -167,7 +211,11 @@ const startAgent = (baseUrl: string) =>
       return yield* Effect.die(`Session creation failed with ${session.status}`)
     }
     const response = yield* HttpClientRequest.post(`${baseUrl}/sessions/session%3Aco-edit/runs`).pipe(
-      HttpClientRequest.bodyJsonUnsafe({ agent: "co-edit-writer", input: "Update the shared plan" }),
+      HttpClientRequest.bodyJsonUnsafe({
+        agent: "co-edit-writer",
+        input: "Update the shared plan",
+        idempotencyKey: "co-edit-update-plan",
+      }),
       HttpClient.execute,
       Effect.orDie,
     )
@@ -209,6 +257,7 @@ const program = Effect.scoped(
 
     const command = yield* Schema.encodeEffect(CommandJson)({
       _tag: "Edit",
+      commandId: "browser:edit-1",
       base: 0,
       operation: { _tag: "Replace", from: 0, to: 5, text: "Shared" },
       attribution: { _tag: "Human", actor: "browser-user" },

@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect"
 import { Response, Tool } from "effect/unstable/ai"
-
+import { persistModelResponsePart } from "./persistence.js"
 /** A provider response reduced to semantic content and reported terminal facts. */
 export interface CompletedModelResponse<Tools extends Record<string, Tool.Any>> {
   readonly content: ReadonlyArray<Response.Part<Tools>>
@@ -160,15 +160,7 @@ export const make = <Tools extends Record<string, Tool.Any>>(): Builder<Tools> =
       case "finish":
         usage = part.usage
         finishReason = part.reason
-        entries.push({
-          kind: "part",
-          part: Response.makePart("finish", {
-            reason: part.reason,
-            usage: part.usage,
-            metadata: part.metadata,
-            response: undefined,
-          }),
-        })
+        entries.push({ kind: "part", part: persistModelResponsePart(part) })
         return
       case "tool-call":
       case "tool-result":
@@ -178,16 +170,7 @@ export const make = <Tools extends Record<string, Tool.Any>>(): Builder<Tools> =
         entries.push({ kind: "part", part })
         return
       case "response-metadata":
-        entries.push({
-          kind: "part",
-          part: Response.makePart("response-metadata", {
-            id: part.id,
-            modelId: part.modelId,
-            timestamp: part.timestamp,
-            metadata: part.metadata,
-            request: undefined,
-          }),
-        })
+        entries.push({ kind: "part", part: persistModelResponsePart(part) })
         break
       default:
         break

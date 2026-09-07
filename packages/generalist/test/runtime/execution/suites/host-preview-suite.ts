@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -5,9 +6,6 @@ import { Agent, ToolExecutor } from "../../../../src/index.js"
 import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { pinnedTestExecutable as testExecutable } from "../../run/identity.js"
 import { registrationsFor } from "../fixtures.js"
-import { tempDbPath } from "../../sql/scenario.js"
-
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -25,7 +23,7 @@ const scopedWith =
 
 const execute = (input: {
   readonly observer: "absent" | "slow" | "disconnected"
-  readonly backend: "memory" | "sqlite"
+  readonly backend: "object"
   readonly chunks?: number
 }) =>
   Effect.gen(function* () {
@@ -58,10 +56,7 @@ const execute = (input: {
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const baseLayer =
-      input.backend === "memory"
-        ? Runtime.layerMemory(options)
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath(`model-preview-${input.observer}`) })
+    const baseLayer = objectRuntimeLayer(options)
     const layer = baseLayer.pipe(
       Layer.provide(
         ExecutableResolver.layerStatic([
@@ -90,7 +85,8 @@ const execute = (input: {
                 ),
                 Effect.forkChild({ startImmediately: true }),
               )
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "preview-test" })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
         const preview = input.observer === "absent" ? undefined : yield* Deferred.await(previewSeen)
         if (input.observer === "disconnected" && subscriber !== undefined) yield* Fiber.interrupt(subscriber)
@@ -113,9 +109,9 @@ const execute = (input: {
 
 it.effect("publishes live preview without allowing a blocked subscriber to affect execution", () =>
   Effect.gen(function* () {
-    const baseline = yield* execute({ backend: "memory", observer: "absent" })
-    const observed = yield* execute({ backend: "memory", observer: "slow" })
-    const disconnected = yield* execute({ backend: "memory", observer: "disconnected" })
+    const baseline = yield* execute({ backend: "object", observer: "absent" })
+    const observed = yield* execute({ backend: "object", observer: "slow" })
+    const disconnected = yield* execute({ backend: "object", observer: "disconnected" })
 
     expect(observed.preview).toMatchObject({
       _tag: "ModelPreview",
@@ -176,7 +172,7 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
       execute: () => Effect.succeed({ _tag: "Success", result: "continued", encodedResult: "continued" }),
     })
     const handlers = toolkit.toLayer({ continue: () => Effect.die("ToolExecutor test layer owns execution") })
-    const layer = Runtime.layerMemory({
+    const layer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       scheduler: { pollInterval: "1 day" },
     }).pipe(
@@ -208,7 +204,8 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
           ),
           Effect.forkChild({ startImmediately: true }),
         )
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "preview-test" })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-2", runId: receipt.runId, ownerId: objectWorkerId })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
 
         expect(yield* Deferred.await(secondPreview)).toMatchObject({
@@ -277,7 +274,7 @@ it.effect("retires the published frame when a response commits while keeping the
       execute: () => Effect.succeed({ _tag: "Success", result: "continued", encodedResult: "continued" }),
     })
     const handlers = toolkit.toLayer({ continue: () => Effect.die("ToolExecutor test layer owns execution") })
-    const layer = Runtime.layerMemory({
+    const layer = objectRuntimeLayer({
       addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       scheduler: { pollInterval: "1 day" },
     }).pipe(
@@ -313,7 +310,8 @@ it.effect("retires the published frame when a response commits while keeping the
           ),
           Effect.forkChild({ startImmediately: true }),
         )
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "preview-test" })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-suites-host-preview-suite-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
 
         yield* Deferred.await(secondPreview)
@@ -339,9 +337,9 @@ it.effect("retires the published frame when a response commits while keeping the
   }),
 )
 
-it.effect("never writes Core ModelPart events to SQLite history", () =>
+it.effect("never writes Core ModelPart events to object history", () =>
   Effect.gen(function* () {
-    const completed = yield* execute({ backend: "sqlite", observer: "absent" })
+    const completed = yield* execute({ backend: "object", observer: "absent" })
     expect(completed.status).toBe("succeeded")
     expect(completed.result).toMatchObject({ text: "live answer", turns: 1 })
     expect(completed.tags).not.toContain("ModelPart")
@@ -350,19 +348,17 @@ it.effect("never writes Core ModelPart events to SQLite history", () =>
   }),
 )
 
-it.effect("commits one chunk-independent semantic model response to memory and SQLite", () =>
+it.effect("commits one chunk-independent semantic model response to object storage", () =>
   Effect.gen(function* () {
-    for (const backend of ["memory", "sqlite"] as const) {
-      const whole = yield* execute({ backend, observer: "absent", chunks: 1 })
-      const fragmented = yield* execute({ backend, observer: "absent", chunks: 23 })
-      expect(whole.responses).toHaveLength(1)
-      expect(fragmented.responses).toHaveLength(1)
-      expect(fragmented.responses).toEqual(whole.responses)
-      const text = fragmented.responses[0]?.content.filter((part) => part.type === "text")
-      expect(text).toHaveLength(1)
-      expect(text?.[0]).toMatchObject({ type: "text", text: "live answer" })
-      expect(fragmented.tags.filter((tag) => tag === "ModelResponseCommitted")).toHaveLength(1)
-      expect(fragmented.tags).not.toContain("ModelPart")
-    }
+    const whole = yield* execute({ backend: "object", observer: "absent", chunks: 1 })
+    const fragmented = yield* execute({ backend: "object", observer: "absent", chunks: 23 })
+    expect(whole.responses).toHaveLength(1)
+    expect(fragmented.responses).toHaveLength(1)
+    expect(fragmented.responses).toEqual(whole.responses)
+    const text = fragmented.responses[0]?.content.filter((part) => part.type === "text")
+    expect(text).toHaveLength(1)
+    expect(text?.[0]).toMatchObject({ type: "text", text: "live answer" })
+    expect(fragmented.tags.filter((tag) => tag === "ModelResponseCommitted")).toHaveLength(1)
+    expect(fragmented.tags).not.toContain("ModelPart")
   }),
 )

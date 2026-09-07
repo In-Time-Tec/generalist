@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "../json"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
@@ -593,7 +594,7 @@ describe("Compaction", () => {
     let summaryPrompt = ""
     return [
       Layer.mergeAll(
-        Session.layerMemory,
+        layerMemory,
         modelLayer((options) => {
           summaryCalls += 1
           summaryPrompt = Json.stringify(options.prompt.content)
@@ -604,8 +605,8 @@ describe("Compaction", () => {
       Effect.gen(function* () {
         const path = yield* Effect.scoped(
           Session.acquire("session").pipe(
-            Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") })),
-            Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") })),
+            Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") }, { commandId: "fixture-608" })),
+            Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") }, { commandId: "fixture-609" })),
             Effect.flatMap((store) => store.path()),
           ),
         )
@@ -668,7 +669,7 @@ describe("Compaction", () => {
     )
 
     return [
-      Session.layerMemory,
+      layerMemory,
       Effect.gen(function* () {
         const fallbackModel = yield* LanguageModel.make({
           generateText: () => Effect.die("ambient model should not summarize"),
@@ -828,7 +829,7 @@ describe("Compaction", () => {
     () =>
       [
         Layer.mergeAll(
-          Session.layerMemory,
+          layerMemory,
           modelLayer(() => Effect.succeed([{ type: "text", text: "checkpoint summary" }])),
         ),
         Effect.gen(function* () {
@@ -836,12 +837,12 @@ describe("Compaction", () => {
             Session.acquire("session").pipe(
               Effect.tap((store) =>
                 store.append({
-                  _tag: "Message",
-                  message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
-                }),
+                                  _tag: "Message",
+                                  message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
+                                }, { commandId: "fixture-839" }),
               ),
-              Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") })),
-              Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") })),
+              Effect.tap((store) => store.append({ _tag: "Message", message: user("old goal") }, { commandId: "fixture-608" })),
+              Effect.tap((store) => store.append({ _tag: "Message", message: user("recent tail") }, { commandId: "fixture-609" })),
               Effect.flatMap((store) => store.path()),
             ),
           )
@@ -878,7 +879,7 @@ describe("Compaction", () => {
                 Session.acquire("session").pipe(
                   Effect.flatMap((store) =>
                     Effect.gen(function* () {
-                      const checkpointId = yield* store.reserveEntryId
+                      const checkpointId = yield* store.reserveEntryId("kept-tail-checkpoint")
                       yield* store.appendCheckpoint({
                         id: checkpointId,
                         parentId: yield* store.leaf,

@@ -34,7 +34,7 @@ export interface ConnectOptions {
 
 export interface Connection {
   readonly events: Stream.Stream<HostEvent, TransportError>
-  readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, TransportError>
+  readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, TransportError>
   readonly status: Stream.Stream<ConnectionStatus>
   readonly exhausted: Effect.Effect<never, ReconnectExhausted>
 }
@@ -68,6 +68,7 @@ export interface Client {
     readonly inspect: (options: { readonly runId: string }) => ReturnType<RawClient["runs"]["inspect"]>
     readonly cancel: (options: {
       readonly runId: string
+      readonly commandId: string
       readonly reason?: string
     }) => ReturnType<RawClient["runs"]["cancel"]>
   }
@@ -93,20 +94,24 @@ export interface Client {
     readonly explain: (options: { readonly runId: string }) => ReturnType<RawClient["operator"]["explain"]>
     readonly retry: (options: {
       readonly runId: string
+      readonly commandId: string
       readonly operator: string
     }) => ReturnType<RawClient["operator"]["retry"]>
     readonly wake: (options: {
       readonly runId: string
+      readonly commandId: string
       readonly operator: string
     }) => ReturnType<RawClient["operator"]["wake"]>
     readonly resolveUnknown: (options: {
       readonly runId: string
+      readonly commandId: string
       readonly operationId: string
       readonly resolution: UnknownResolution
       readonly operator: string
     }) => ReturnType<RawClient["operator"]["resolveUnknown"]>
     readonly extendBudget: (options: {
       readonly runId: string
+      readonly commandId: string
       readonly delta: BudgetLimits
       readonly operator: string
     }) => ReturnType<RawClient["operator"]["extendBudget"]>
@@ -293,8 +298,10 @@ const connect = (
 
     return {
       events: Stream.fromQueue(eventQueue),
-      cancel: (runId, reason) =>
-        send(reason === undefined ? { _tag: "Cancel", runId } : { _tag: "Cancel", runId, reason }),
+      cancel: (runId, commandId, reason) =>
+        send(
+          reason === undefined ? { _tag: "Cancel", runId, commandId } : { _tag: "Cancel", runId, commandId, reason },
+        ),
       status: Stream.fromQueue(statusQueue),
       exhausted: Deferred.await(exhausted),
     }
@@ -345,8 +352,8 @@ export const client = (options: {
         },
         list: ({ sessionId }) => raw.runs.list({ params: { sessionId } }),
         inspect: ({ runId }) => raw.runs.inspect({ params: { id: runId } }),
-        cancel: ({ runId, reason }) => {
-          const payload: Types.Mutable<RunCancelPayload> = {}
+        cancel: ({ runId, commandId, reason }) => {
+          const payload: Types.Mutable<RunCancelPayload> = { commandId }
           if (reason !== undefined) payload.reason = reason
           return raw.runs.cancel({ params: { id: runId }, payload })
         },
@@ -362,15 +369,17 @@ export const client = (options: {
       },
       operator: {
         explain: ({ runId }) => raw.operator.explain({ params: { id: runId } }),
-        retry: ({ runId, operator }) => raw.operator.retry({ params: { id: runId }, payload: { operator } }),
-        wake: ({ runId, operator }) => raw.operator.wake({ params: { id: runId }, payload: { operator } }),
-        resolveUnknown: ({ runId, operationId, resolution, operator }) =>
+        retry: ({ runId, commandId, operator }) =>
+          raw.operator.retry({ params: { id: runId }, payload: { commandId, operator } }),
+        wake: ({ runId, commandId, operator }) =>
+          raw.operator.wake({ params: { id: runId }, payload: { commandId, operator } }),
+        resolveUnknown: ({ runId, commandId, operationId, resolution, operator }) =>
           raw.operator.resolveUnknown({
             params: { id: runId },
-            payload: { operationId, resolution, operator },
+            payload: { commandId, operationId, resolution, operator },
           }),
-        extendBudget: ({ runId, delta, operator }) =>
-          raw.operator.extendBudget({ params: { id: runId }, payload: { delta, operator } }),
+        extendBudget: ({ runId, commandId, delta, operator }) =>
+          raw.operator.extendBudget({ params: { id: runId }, payload: { commandId, delta, operator } }),
       },
     }
     return value

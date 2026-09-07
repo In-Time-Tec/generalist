@@ -16,6 +16,7 @@ import {
 } from "../agent/handoff/state.js"
 import type { RunOptions } from "../agent/service.js"
 import { RunError } from "../agent/run/error.js"
+import { AgentError } from "../agent/event.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver/run.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
@@ -212,7 +213,7 @@ export const executeSameRunHandoff = (input: ExecuteInput) =>
         const sessionParentId = Option.isNone(sessionService)
           ? null
           : yield* sessionService.value.leaf.pipe(
-              Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: String(error) })),
+              Effect.mapError((error) => AgentError.make({ message: error.message, turn: input.turn, cause: error })),
             )
         const frame =
           decoded.reason === undefined
@@ -258,7 +259,7 @@ export const executeSameRunHandoff = (input: ExecuteInput) =>
           },
           { id: durable.sessionEntryId, expectedLeafId: durable.sessionParentId },
         )
-        .pipe(Effect.mapError((error) => Rejected.make({ handoffId, turn: input.turn, reason: error.message })))
+        .pipe(Effect.mapError((error) => AgentError.make({ message: error.message, turn: input.turn, cause: error })))
     }
     yield* Ref.set(input.chat.history, durable.projectedHistory)
     const registry = yield* assemble(staticCandidates(committedTarget))

@@ -4,6 +4,8 @@ Generalist is an Effect-native framework for building specialized or general age
 
 Generalist is for teams that want typed agent behavior built from swappable Effect services and Layers. Applications choose the included batteries and own their models, tools, storage configuration, interfaces, and deployment.
 
-Generalist stays provider-neutral. `generalist` runs process-local agents; `generalist/runtime` runs the same Agents durably across supported hosts with addressability, replay, and typed recovery.
+Generalist stays provider-neutral. `generalist` runs process-local agents; `generalist/runtime` defines addressability, replay, and typed recovery. `generalist/durability` implements that contract through one object-storage engine with S3 and native R2 transports. Compute hosts, wake notifications, caches, and projections are not execution authority.
 
 Generalist is not a hosted service, general workflow engine, product UI, identity system, or deployment platform.
+
+The object durability contract is the intended long-term storage boundary. All public exports remain `@experimental`; provider conformance, deployed recovery, and performance require evidence for the exact provider and host configuration. Object commits do not guarantee exactly-once external effects.

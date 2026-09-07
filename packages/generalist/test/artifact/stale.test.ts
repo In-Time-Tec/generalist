@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, makeObjectStorage } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
@@ -6,12 +7,19 @@ import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
+import { ObjectStore } from "../../src/durability/object-store.js"
 
+const storage = makeObjectStorage()
+const runtime = objectRuntimeLayer(
+  { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
+  storage,
+).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
+)
 const services = Layer.mergeAll(
-  Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([])),
-  ),
-  BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer)),
+  runtime,
+  blobStore,
   artifactLayer,
   TestModel.layer([
     TestModel.toolCall("artifact_read_c3RhbGUubWQ", {}, { id: "read-stale" }),

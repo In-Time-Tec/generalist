@@ -94,12 +94,13 @@ describe("Server client WebSocket", () => {
           expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=7")
           second.open()
           yield* Effect.yieldNow
-          yield* connection.cancel("run-1", "user")
+          yield* connection.cancel("run-1", "cancel:run-1", "user")
           expect(
             yield* Schema.decodeEffect(Schema.fromJsonString(Server.ClientCommand))(sentText(second.sent[0])),
           ).toEqual({
             _tag: "Cancel",
             runId: "run-1",
+            commandId: "cancel:run-1",
             reason: "user",
           })
         }),

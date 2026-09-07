@@ -33,7 +33,7 @@ export class DriverVersionMismatch extends ActionableTaggedError<DriverVersionMi
   {
     expected: Schema.String,
     actual: Schema.String,
-    hint: errorHint("Use the driver version recorded by the checkpoint or migrate the checkpoint explicitly."),
+    hint: errorHint("Use the exact recorded driver implementation, or start a new Run in a fresh namespace."),
   },
 ) {}
 export class DriverStateInvalid extends ActionableTaggedError<DriverStateInvalid>()(

@@ -1,0 +1,98 @@
+/** Hosted Runtime public contract and memory-backed layers. */
+export { Runtime } from "../service.js"
+export type {
+  Service,
+  OperatorService,
+  LayerOptions,
+  AddressBinding,
+  SendInput,
+  StartExecutionInput,
+  StartOptions,
+  ScheduleOptions,
+  ScheduleError,
+  StartEvent,
+  RunHandle,
+  RuntimeInspection,
+  AdmitInput,
+  ActivateInput,
+  InitialChildInput,
+  StartReceipt,
+  SpawnInput,
+  EventsInput,
+  HistoryInput,
+  AckError,
+  SessionEntryInput,
+  SessionEntryError,
+  ResolveModelResponseError,
+  ModelResponseEvent,
+  PreviewsInput,
+  ListInput,
+  RespondInput,
+  SignalInput,
+  CancelInput,
+  CancelSessionInput,
+  AwaitSessionTerminalInput,
+  RunSendOptions,
+  SendMessageInput,
+  MessagesInput,
+  ChildSettlementsInput,
+  ChildSettlementChangesInput,
+  AwaitChildSettlementInput,
+  ChildSettlementError,
+  RegisterAgentNameInput,
+  SendMessageError,
+  DirectoryError,
+  RegisterAgentNameError,
+  SendError,
+  StartError,
+  StartExecutionError,
+  AdmitError,
+  ActivateError,
+  SpawnError,
+  EventsError,
+  TreeReplayError,
+  TreeEventsError,
+  RespondError,
+  RespondApprovalError,
+  SignalError,
+  WakeError,
+  CancelError,
+  RunSendError,
+  InspectError,
+  ExtendBudgetError,
+  OperatorActionError,
+  OperatorApprovalError,
+  OperatorExtendBudgetError,
+  FanOutError,
+  InspectFanOutError,
+} from "../service.js"
+export type {
+  HostSession,
+  HostSessionEvent,
+  CreateSessionInput,
+  SessionEventsInput,
+  CreateSessionError,
+  SessionError,
+  SessionEventsError,
+} from "../session/host.js"
+export { SessionNotFound, SessionConflict, SessionCursorExpired, SessionSubscriberLagged } from "../session/host.js"
+export type {
+  RecoveryDecision,
+  Explanation as RecoveryExplanation,
+  Verification as RecoveryVerification,
+  Obligation as RecoveryObligation,
+  UnknownResolution,
+} from "../execution/recovery/operator.js"
+export type { FanOutInput, FanOutMemberInput } from "../child/fan-out-internal.js"
+export type { Point as AckPoint } from "../run/acknowledgement.js"
+export type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
+export type {
+  Change as ModelPreviewChange,
+  Frame as ModelPreviewFrame,
+  Cleared as ModelPreviewCleared,
+  Event as ModelPreviewEvent,
+} from "../execution/model-response/preview.js"
+export type { SteeringReceipt } from "../run/steering.js"
+export { ScheduleInvalid, ScheduleReceipt } from "../execution/trigger/schedule.js"
+export { WakeDisposition, WakeEventInvalid } from "../execution/trigger/wake.js"
+export { layer } from "../state/layer.js"

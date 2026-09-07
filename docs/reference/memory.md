@@ -32,7 +32,7 @@ bun add effect@4.0.0-rc.112 generalist
 
 ## SemanticRecall
 
-`SemanticRecall.layer(options?)` provides `Memory.Memory` and requires `VectorStore` and `Ai.EmbeddingModel`. Recall embeds the run's user text and queries the store; remember fires only on terminal runs, embedding the final user/assistant exchange as one document.
+`SemanticRecall.layer(options?)` provides `Memory.Memory` and requires `VectorStore` and the provider-neutral `EmbeddingModel` from `effect/unstable/ai`. Recall embeds the run's user text and queries the store; remember fires only on terminal runs, embedding the final user/assistant exchange as one document.
 
 | Option     | Default | Notes                                   |
 | ---------- | ------- | --------------------------------------- |
@@ -52,10 +52,10 @@ The storage seam: `{ upsert(documents), query(query) }` failing with `VectorStor
 | `Match`    | `{ document: Embedded, score: number }`                |
 | `Query`    | `{ key, embedding, limit, minScore? }`                 |
 
-`VectorStore.layerMemory` is the in-process implementation using cosine similarity; it rejects non-finite vectors and mismatched dimensions. `layerTest(implementation)` wraps an explicit service; a Postgres/pgvector store implements the same two functions.
+`VectorStore.layerMemory` is the process-local implementation using cosine similarity; it rejects non-finite vectors and mismatched dimensions and does not survive restart. `layerTest(implementation)` wraps an explicit service for tests. A custom `VectorStore` implementation can provide the same two functions with its own persistence semantics.
 
 ## layer
 
-`layer({ working?, semantic? })` merges both implementations with `Memory.merge`: recalls concatenate (working first), remembers fan out. It carries SemanticRecall's requirements (`VectorStore` and `Ai.EmbeddingModel`). Enabling `working.summarize` requires `summarize.model` or an ambient `LanguageModel` where the layer is built.
+`layer({ working?, semantic? })` merges both implementations with `Memory.merge`: recalls concatenate (working first), remembers fan out. It carries SemanticRecall's requirements (`VectorStore` and provider-neutral `EmbeddingModel`). Enabling `working.summarize` requires `summarize.model` or an ambient `LanguageModel` where the layer is built.
 
 Embedding layers live in [the generalist/providers/\* provider leaves](/reference/providers). See [How to add memory](/guides/memory).

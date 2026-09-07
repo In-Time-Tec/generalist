@@ -105,6 +105,7 @@ export interface RunLoopContext<
   readonly syncSession: (
     turn: number,
     transcript: Prompt.Prompt,
+    invocationId: string,
   ) => Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter>
   readonly applyCompactionResult: (
     turn: number,

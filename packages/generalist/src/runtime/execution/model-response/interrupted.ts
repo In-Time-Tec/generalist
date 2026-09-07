@@ -5,7 +5,7 @@ import type { InterruptedSessionEntry, ModelResponseInterrupted } from "../agent
 import { RuntimeUnavailable, SessionEntryCorrupt } from "../../errors.js"
 import { CompletedModelResponse, RunFailure } from "../../run/event.js"
 import { decodeAuthoredModelResponseContent } from "./content.js"
-import type { OperationRecord } from "../../sql/operations.js"
+import type { OperationRecord } from "../../operation/record.js"
 import type { ExecutionClaim, OperationCompletionOutcome } from "../../run/store.js"
 
 export interface PendingModelResponseInterrupted {

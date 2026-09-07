@@ -1,12 +1,15 @@
 /* oxlint-disable effecttsgo/async-function -- The example intentionally demonstrates a client built with the Promise-only fetch API. */
+import { BunCrypto } from "@effect/platform-bun"
 import { layer as bunHttpServer } from "@effect/platform-bun/BunHttpServer"
 import { EventSchemas, EventType, RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/core"
-import { Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
-import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
+import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { AGUI } from "generalist/unstable/ag-ui"
 
@@ -90,9 +93,33 @@ const resolver = ExecutableResolver.layerStatic([
     agent: Agent.close(agent, Layer.mergeAll(scriptedModel, handlers, authorization)),
   },
 ]).pipe(Layer.orDie)
-const runtimeLayer = Runtime.layerMemory({
-  addresses: [{ address, executable, registrations }],
-}).pipe(Layer.provide(resolver))
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [{ address, executable, registrations }] }).pipe(
+    Layer.provide(resolver),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
+}))
 const agentServices = Layer.mergeAll(runtimeLayer, scriptedModel, handlers, authorization)
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
@@ -114,7 +141,7 @@ const aguiRoute = HttpRouter.add("POST", "/ag-ui", (request) =>
     })
   }),
 )
-const aguiLayer = AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer))
+const aguiLayer = AGUI.layer({ address })
 const aguiRoutes = aguiRoute.pipe(Layer.provide(aguiLayer))
 const demoAuth = Layer.succeed(Server.Authentication, Server.Authentication.of({ bearer: (httpEffect) => httpEffect }))
 const routes = Layer.unwrap(
@@ -125,7 +152,6 @@ const routes = Layer.unwrap(
 ).pipe(Layer.provide(agentServices))
 const serverLayer = HttpRouter.serve(routes, { disableLogger: true }).pipe(
   Layer.provideMerge(bunHttpServer({ port: 0 })),
-  Layer.provide(aguiLayer),
 )
 
 const runInput: RunAgentInput = {

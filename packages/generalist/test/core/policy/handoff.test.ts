@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
@@ -139,7 +140,7 @@ layer(Layer.empty)("Handoff", (it) => {
         supervisorSetup.catalog,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Session.layerMemory,
+        layerMemory,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(

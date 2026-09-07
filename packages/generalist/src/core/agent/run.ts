@@ -51,11 +51,15 @@ const streamInternalImpl = <
   OutputValue,
 >(
   agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
-  options: RunOptions,
+  suppliedOptions: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
   inbox: RunInbox,
-): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices> =>
-  Stream.unwrap(
+): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices> => {
+  const logicalId = suppliedOptions.logicalOperationId ?? inbox.runId
+  const options = suppliedOptions.logicalOperationId === undefined
+    ? { ...suppliedOptions, logicalOperationId: logicalId }
+    : suppliedOptions
+  return Stream.unwrap(
     Effect.gen(function* () {
       const setup = yield* setupRun(agent, options)
       // prettier-ignore
@@ -71,7 +75,6 @@ const streamInternalImpl = <
         activeModelResponse,
         progressPolicy,
         sessionId,
-        sessionAppendOptions,
         skillRuntime,
         initialRegistry,
         resilienceService,
@@ -114,7 +117,7 @@ const streamInternalImpl = <
               turn,
             })
           }
-          const path = yield* syncSession(turn, withPending)
+          const path = yield* syncSession(turn, withPending, suspensionApplicationIdentity(suspension))
           const parentId = path.at(-1)?.id ?? null
           yield* applyCompactionResult(
             turn,
@@ -128,7 +131,7 @@ const streamInternalImpl = <
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
       ): Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter> =>
-        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
+        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint, "pending-results")))
       const state: AgentRunState = {
         text: "",
         turn: 0,
@@ -240,7 +243,7 @@ const streamInternalImpl = <
       const isSkillActivationCall = (call: AnyToolCall, registry: Registry): boolean =>
         get(registry, call.name)?.dispatch === "Builtin" && skillRuntime !== undefined
       const { recallInitialPrompt, rememberTurn } = makeMemoryOperations({
-        logicalId: options.logicalOperationId ?? options.sessionId ?? agent.name,
+        logicalId,
         runId: inbox.runId,
         activeSession,
         runtime: memoryRuntime,
@@ -251,7 +254,6 @@ const streamInternalImpl = <
         activeSession,
         system,
         sessionId,
-        sessionAppendOptions,
         chat,
         options,
         state,
@@ -431,6 +433,7 @@ const streamInternalImpl = <
       attributes: { "generalist.agent.name": agent.name, "generalist.agent.run_id": inbox.runId },
     }),
   )
+}
 export const streamInternal: {
   <
     Tools extends Record<string, Tool.Any>,

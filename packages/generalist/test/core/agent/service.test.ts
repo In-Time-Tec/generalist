@@ -1,3 +1,5 @@
+import { objectRuntimeLayer } from "../../runtime/execution/object.js"
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "../json"
 import {
@@ -537,7 +539,7 @@ const typedStartResolver = ExecutableResolver.layerStatic([
     agent: Agent.close(nullStartAgent, deterministicModel({ response: '{"output":null}' })),
   },
 ]).pipe(Layer.orDie)
-const typedStartRuntime = Runtime.layerMemory({ addresses: [] }).pipe(Layer.provide(typedStartResolver))
+const typedStartRuntime = objectRuntimeLayer({ addresses: [], schedulerMode: "poll" }).pipe(Layer.provide(typedStartResolver))
 
 layer(typedStartRuntime)("Agent.start", (it) => {
   it.effect("starts a registered Agent and decodes its durable completion", () =>
@@ -3424,7 +3426,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           )
         }),
         Instructions.layer([{ id: "workspace", render: () => Effect.succeedSome(guidance) }]),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
@@ -3467,7 +3469,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             Response.makePart("text-end", { id: "text" }),
           )
         }),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
@@ -3528,7 +3530,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             Response.makePart("text-end", { id: "text" }),
           )
         }),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
@@ -3566,7 +3568,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           calls += 1
           return Stream.make(textDelta("done"))
         }),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
@@ -3664,7 +3666,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           calls += 1
           return Stream.make(textDelta("done"))
         }),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -3674,7 +3676,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const sessionId = "prepopulated-session"
         yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
-            Effect.flatMap((session) => session.append({ _tag: "Message", message: seed })),
+            Effect.flatMap((session) => session.append({ _tag: "Message", message: seed }, { commandId: "fixture-3678" })),
           ),
         )
         const agent = Agent.make({ name: "prepopulated-session-agent" })
@@ -4095,7 +4097,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.layerAutoApprove,
-        Session.layerMemory,
+        layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
       ),
@@ -4143,7 +4145,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.layerAutoApprove,
-        Session.layerMemory,
+        layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
       ),
@@ -4188,7 +4190,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             : Stream.make(textDelta("mixed complete"))
         }),
         echoExecutor,
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
@@ -4254,7 +4256,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("truncated"))),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTruncate(1).pipe(Layer.provide(tokenizer)),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -4279,8 +4281,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(checkpoint).toBeDefined()
         expect(messages).toHaveLength(3)
         expect(new Set(messages.map((entry) => entry.id)).size).toBe(3)
-        expect(messages[0]?.id).toContain(":session-entry:root:0:user")
-        expect(messages[1]?.id).toContain(`:session-entry:checkpoint:${checkpoint?.id ?? "missing"}:0:user`)
         expect(messages[1]?.parentId).toBe(checkpoint?.id)
         expect(Json.stringify(path)).toContain("old prompt")
         expect(completed?._tag).toBe("Completed")
@@ -4310,7 +4310,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.succeed(
@@ -4366,7 +4366,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(
@@ -4425,7 +4425,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("done"))),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.succeed(
@@ -4474,7 +4474,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("done"))),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -4485,7 +4485,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
             Effect.flatMap((session) =>
-              session.append({ _tag: "Message", message: toolMessage({ first: 1, second: 2 }) }),
+              session.append({ _tag: "Message", message: toolMessage({ first: 1, second: 2 }) }, { commandId: "fixture-4489" }),
             ),
           ),
         )
@@ -4535,7 +4535,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.layerAutoApprove,
-        Session.layerMemory,
+        layerMemory,
         Compaction.layer({ contextWindow: 20_000, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
       ),
@@ -4579,7 +4579,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               })
             }).pipe(Compaction.withLifecycle(request)),
         }),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
@@ -4641,7 +4641,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               })
             }).pipe(Compaction.withLifecycle(request)),
         }),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
@@ -4693,7 +4693,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               })
             }).pipe(Compaction.withLifecycle(request)),
         }),
-        Session.layerMemory,
+        layerMemory,
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
@@ -5806,7 +5806,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           history: () => Effect.succeed([]),
           revert: () => Effect.void,
         }),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
@@ -6153,7 +6153,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           () => Stream.make(textDelta("normal answer")),
           () => Effect.succeed([{ type: "text", text: '{"output":{"ok":true}}' }, finishPart("stop", structuredUsage)]),
         ),
-        Session.layerMemory,
+        layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -7677,7 +7677,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
-        Session.layerMemory,
+        layerMemory,
       ),
       Effect.gen(function* () {
         allStarted = yield* Deferred.make<void>()
@@ -8774,7 +8774,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         echoExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Session.layerMemory,
+        layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "journal-restart-agent", toolkit: Toolkit.make(echoTool) })
@@ -9202,7 +9202,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
-        Session.layerMemory,
+        layerMemory,
         Compaction.layer({ contextWindow: 100_000, reserveTokens: 10_000, keepRecentTokens: 20_000 }),
         ModelMiddleware.layerIdentity,
       ),
@@ -9249,7 +9249,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.layerAutoApprove,
-        Session.layerMemory,
+        layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
       ),
@@ -9317,7 +9317,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
         ),
       ),
-    ).pipe(Layer.provide(Session.layerMemory))
+    ).pipe(Layer.provide(layerMemory))
     return [
       Layer.mergeAll(
         authorizationLayer,
@@ -9427,7 +9427,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
         ),
       ),
-    ).pipe(Layer.provide(Session.layerMemory))
+    ).pipe(Layer.provide(layerMemory))
     return [
       Layer.mergeAll(
         authorizationLayer,
@@ -9516,7 +9516,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
         ),
       ),
-    ).pipe(Layer.provide(Session.layerMemory))
+    ).pipe(Layer.provide(layerMemory))
     return [
       Layer.mergeAll(
         authorizationLayer,

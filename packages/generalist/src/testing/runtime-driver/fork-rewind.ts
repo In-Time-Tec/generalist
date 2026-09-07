@@ -27,6 +27,17 @@ const finish = Response.makePart("finish", {
 
 const slug = (value: string): string => value.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()
 const jsonText = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
+const awaitTerminal = (services: Services, runId: string) =>
+  Effect.gen(function* () {
+    let inspection = yield* services.runtime.inspect(runId)
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (inspection.status === "succeeded" || inspection.status === "failed" || inspection.status === "cancelled")
+        return inspection
+      yield* Effect.sleep("50 millis")
+      inspection = yield* services.runtime.inspect(runId)
+    }
+    return inspection
+  })
 
 const semanticEvent = (event: { readonly runId: string; readonly rootRunId: string; readonly eventId: string }) => {
   const { runId: _runId, rootRunId: _rootRunId, eventId: _eventId, ...semantic } = event
@@ -51,7 +62,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           idempotencyKey: operationKey,
           prompt: "retain completed unsafe operation",
         })
-        const claim = yield* capability.claim(services, { runId: source.runId, workerId: "retained-operation" })
+        const claim = yield* capability.claim(services, { runId: source.runId, commandId: "retained-operation" })
         const operation = yield* services.store.recordOperation({
           ...claim,
           operationKey,
@@ -61,13 +72,14 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           replayPolicy: "never",
           attempt: 0,
         })
-        yield* services.store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* services.store.startOperation({ ...claim, commandId: `${claim.runId}:start:${operation.operationId}:0`, operationId: operation.operationId })
         yield* services.store.completeOperation({
           ...claim,
           operationId: operation.operationId,
           outcome: { _tag: "Succeeded", value: "external-effect-already-completed" },
         })
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+        yield* services.store.emitAgentEvent({ ...claim, commandId: `${claim.runId}:event:${"TurnStarted"}:${1}`, event: { _tag: "TurnStarted", turn: 1 } })
+        yield* services.store.releaseExecution(claim)
         const branchRunId = `${source.runId}:retained`
         yield* services.store.rewind({ runId: source.runId, branchRunId, toSequence: 0 })
         const retained = yield* services.store.getOperationByKey({ runId: branchRunId, operationKey })
@@ -76,7 +88,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           replayPolicy: "never",
           result: "external-effect-already-completed",
         })
-        return { branchRunId, durability: (yield* services.store.info).durability }
+        return { branchRunId }
       })
     const verify = (services: Services, branchRunId: string) =>
       services.store.getOperationByKey({ runId: branchRunId, operationKey }).pipe(
@@ -94,7 +106,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
     return prepare(
       open(scenario).pipe(
         Effect.flatMap((result) =>
-          result.durability === "durable" ? open((services) => verify(services, result.branchRunId)) : Effect.void,
+          open((services) => verify(services, result.branchRunId)),
         ),
         Effect.orDie,
       ),
@@ -139,14 +151,14 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         const operation = yield* services.store.getOperationByKey({ runId, operationKey: event.operationKey })
         expect(operation).toMatchObject({ status: "succeeded", replayPolicy: "never" })
       })
-    const continueCopied = (services: Services, runId: string, registerAgent: boolean) =>
+    const continueCopied = (services: Services, runId: string) =>
       Effect.gen(function* () {
         if (services.executor === undefined)
           return yield* Effect.die(`${options.name} inherited response continuation requires RunExecutor`)
-        if (registerAgent) yield* register(services.runtime)
-        yield* services.store.activate({ runId })
+        yield* register(services.runtime)
+        yield* services.store.activate({ runId, commandId: "inherited-response-continuation-activate" })
         yield* services.executor.execute(
-          yield* capability.claim(services, { runId, workerId: "inherited-response-continuation" }),
+          yield* capability.claim(services, { runId, commandId: "inherited-response-continuation" }),
         )
         expect((yield* services.store.snapshot(runId)).run.status).toBe("succeeded")
         expect(modelCalls).toBe(1)
@@ -161,7 +173,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           idempotencyKey: `inherited-response:${name}`,
         })
         yield* services.executor.execute(
-          yield* capability.claim(services, { runId: handle.runId, workerId: "inherited-response" }),
+          yield* capability.claim(services, { runId: handle.runId, commandId: "inherited-response" }),
         )
         const event = (yield* services.runtime.history({ runId: handle.runId, limit: 100 })).find(
           (candidate) => candidate._tag === "ModelResponseCommitted",
@@ -179,24 +191,19 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         })
         yield* resolveCopied(services, forkRunId)
         yield* resolveCopied(services, nestedRunId)
-        const durability = (yield* services.store.info).durability
-        if (durability !== "durable") yield* continueCopied(services, nestedRunId, false)
         return {
-          durability,
           runIds: [forkRunId, nestedRunId] as const,
         }
       })
     return prepare(
       open(scenario).pipe(
         Effect.flatMap((result) =>
-          result.durability === "durable"
-            ? open((services) =>
-                Effect.gen(function* () {
-                  yield* Effect.forEach(result.runIds, (runId) => resolveCopied(services, runId), { discard: true })
-                  yield* continueCopied(services, result.runIds[1], true)
-                }),
-              )
-            : Effect.void,
+          open((services) =>
+              Effect.gen(function* () {
+                yield* Effect.forEach(result.runIds, (runId) => resolveCopied(services, runId), { discard: true })
+                yield* continueCopied(services, result.runIds[1])
+              }),
+            ),
         ),
         Effect.orDie,
       ),
@@ -213,7 +220,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           idempotencyKey: `inherited-interruption:${name}`,
           prompt: "retain an interrupted response",
         })
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "inherited-interruption" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "inherited-interruption" })
         const operationKey = `${receipt.runId}:model:interrupted`
         const operation = yield* services.store.recordOperation({
           ...claim,
@@ -224,7 +231,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           replayPolicy: "never",
           attempt: 0,
         })
-        yield* services.store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* services.store.startOperation({ ...claim, commandId: `${claim.runId}:start:${operation.operationId}:0`, operationId: operation.operationId })
         yield* services.store.commitInterruptedModelResponse({
           ...claim,
           operationId: operation.operationId,
@@ -247,6 +254,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           (candidate) => candidate._tag === "ModelResponseInterrupted",
         )
         if (event?._tag !== "ModelResponseInterrupted") return yield* Effect.die("missing interrupted response")
+        yield* services.store.releaseExecution(claim)
         const forkRunId = `${receipt.runId}:interrupted-fork`
         yield* services.store.fork({ runId: receipt.runId, newRunId: forkRunId, atSequence: event.sequence })
         yield* services.store.rewind({
@@ -269,7 +277,6 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           replayPolicy: "never",
         })
         return {
-          durability: (yield* services.store.info).durability,
           forkRunId,
           operationKey: copied.operationKey,
         }
@@ -289,9 +296,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
     return prepare(
       open(scenario).pipe(
         Effect.flatMap((result) =>
-          result.durability === "durable"
-            ? open((services) => verify(services, result.forkRunId, result.operationKey))
-            : Effect.void,
+          open((services) => verify(services, result.forkRunId, result.operationKey)),
         ),
         Effect.orDie,
       ),
@@ -314,9 +319,10 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           runId: plainForkRunId,
           forkedAt: 0,
         })
-        const claim = yield* capability.claim(services, { runId: source.runId, workerId: "fork-rewind" })
+        const claim = yield* capability.claim(services, { runId: source.runId, commandId: "fork-rewind" })
         yield* services.store.emitAgentEvent({
           ...claim,
+          commandId: `${source.runId}:snapshot-unavailable`,
           event: {
             _tag: "ToolProgress",
             turn: 0,
@@ -326,12 +332,18 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           },
         })
         const unavailableAt = (yield* services.store.inspect(source.runId)).lastSequence
+        yield* services.store.releaseExecution(claim)
         const noSnapshot = yield* services.store
           .fork({ runId: source.runId, newRunId: `${source.runId}:no-snapshot`, atSequence: unavailableAt })
           .pipe(Effect.flip)
         expect(noSnapshot._tag).toBe("generalist/runtime/NoSnapshot")
+        const availableClaim = yield* capability.claim(services, {
+          runId: source.runId,
+          commandId: "fork-rewind-snapshot-available",
+        })
         yield* services.store.emitAgentEvent({
-          ...claim,
+          ...availableClaim,
+          commandId: `${source.runId}:snapshot-available`,
           event: {
             _tag: "ToolProgress",
             turn: 0,
@@ -341,7 +353,12 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           },
         })
         const forkAt = (yield* services.store.inspect(source.runId)).lastSequence
-        yield* services.store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+        yield* services.store.emitAgentEvent({
+          ...availableClaim,
+          commandId: `${availableClaim.runId}:event:${"TurnStarted"}:${1}`,
+          event: { _tag: "TurnStarted", turn: 1 },
+        })
+        yield* services.store.releaseExecution(availableClaim)
         const forkRunId = `${source.runId}:fork`
         yield* services.store.fork({ runId: source.runId, newRunId: forkRunId, atSequence: forkAt })
         const sourcePrefix = yield* services.store.history({ runId: source.runId, cursor: -1, limit: forkAt + 1 })
@@ -355,7 +372,10 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         const branchRunId = `${source.runId}:discarded`
         yield* services.store.rewind({ runId: source.runId, branchRunId, toSequence: forkAt })
         const inspection = yield* services.store.inspect(source.runId)
-        expect(inspection.lastSequence).toBe(forkAt)
+        // Rewind restores the selected execution branch while retaining the canonical audit suffix.
+        expect(inspection.lastSequence).toBeGreaterThan(forkAt)
+        const retainedSuffix = yield* services.store.history({ runId: source.runId, cursor: forkAt, limit: 100 })
+        expect(retainedSuffix.some((event) => event._tag === "TurnStarted" && event.turn === 1)).toBe(true)
         expect(inspection.branches).toEqual(
           expect.arrayContaining([
             { runId: plainForkRunId, forkedAt: 0 },
@@ -448,22 +468,34 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
           idempotencyKey: `completed-tool-rewind:${name}`,
         })
         yield* services.executor.execute(
-          yield* capability.claim(services, { runId: handle.runId, workerId: "rewind-source" }),
+          yield* capability.claim(services, { runId: handle.runId, commandId: "rewind-source" }),
         )
-        expect((yield* services.runtime.inspect(handle.runId)).status).toBe("succeeded")
+        const initialInspection = yield* awaitTerminal(services, handle.runId)
+        const initialHistory = yield* services.runtime.history({ runId: handle.runId, limit: 100 })
+        const initialTerminal = initialHistory.findLast(
+          (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+        )
+        const initialEvidence =
+          initialTerminal?._tag === "RunFailed"
+            ? `${initialTerminal.error._tag}: ${"message" in initialTerminal.error ? initialTerminal.error.message : "no message"}`
+            : (initialTerminal?._tag ?? "no terminal event")
+        expect(initialInspection.status, initialEvidence).toBe("succeeded")
         const history = yield* services.runtime.history({ runId: handle.runId, limit: 100 })
         const completedTool = history.find((event) => event._tag === "ToolExecutionCompleted")
         if (completedTool?._tag !== "ToolExecutionCompleted") {
           return yield* Effect.die("completed-tool rewind did not record ToolExecutionCompleted")
         }
 
-        yield* services.runtime.rewind(handle.runId, { toSequence: completedTool.sequence })
+        yield* services.runtime.rewind(handle.runId, {
+          commandId: "completed-tool-rewind",
+          toSequence: completedTool.sequence,
+        })
         yield* handle.send("Continue with the exact suffix REWOUND-FOLLOW-UP.", { policy: "steer" })
         yield* services.executor.execute(
-          yield* capability.claim(services, { runId: handle.runId, workerId: "rewind-follow-up" }),
+          yield* capability.claim(services, { runId: handle.runId, commandId: "rewind-follow-up" }),
         )
 
-        const inspection = yield* services.runtime.inspect(handle.runId)
+        const inspection = yield* awaitTerminal(services, handle.runId)
         const rewoundHistory = yield* services.runtime.history({ runId: handle.runId, limit: 100 })
         const terminal = rewoundHistory.findLast(
           (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
@@ -481,7 +513,6 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
         yield* inspectSession(services, { source: sourcePath.map((entry) => entry.id), branch })
         return {
           branch,
-          durability: (yield* services.store.info).durability,
           source: sourcePath.map((entry) => entry.id),
         }
       })
@@ -489,7 +520,7 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
     return prepare(
       open(scenario).pipe(
         Effect.flatMap((result) =>
-          result.durability === "durable" ? open((services) => inspectSession(services, result)) : Effect.void,
+          open((services) => inspectSession(services, result)),
         ),
         Effect.orDie,
       ),

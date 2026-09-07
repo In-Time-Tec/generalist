@@ -18,37 +18,6 @@ jobs:
   check:
     name: check
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: generalist
-          POSTGRES_PASSWORD: generalist
-          POSTGRES_DB: generalist
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U generalist -d generalist"
-          --health-interval 1s
-          --health-timeout 3s
-          --health-retries 60
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: generalist
-          MYSQL_DATABASE: generalist
-          MYSQL_USER: generalist
-          MYSQL_PASSWORD: generalist
-        ports:
-          - 33306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -ugeneralist -pgeneralist"
-          --health-interval 1s
-          --health-timeout 3s
-          --health-retries 60
-    env:
-      GENERALIST_DATABASE_URL: postgres://generalist:generalist@127.0.0.1:55432/generalist
-      GENERALIST_MYSQL_URL: mysql://generalist:generalist@127.0.0.1:33306/generalist
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -80,14 +49,17 @@ jobs:
       - name: Make Effect TypeScript binary executable
         run: find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} +
 
-      - name: Configure PostgreSQL test database
-        run: psql "$GENERALIST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector"
-
       - name: Check
         run: bun run check
 
-      - name: Configure MySQL test databases
-        run: mysql -h 127.0.0.1 -P 33306 -uroot -pgeneralist -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT ALL PRIVILEGES ON \`generalist\_%\`.* TO 'generalist'@'%'; FLUSH PRIVILEGES;"
-
       - name: Test
         run: bun run test
+
+      # Match the release consumer toolchain: older npm versions fail on the optional Vitest peer graph.
+      - name: Setup package consumer Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.20.0
+
+      - name: Verify SQL-free package and optional transports
+        run: bun run package

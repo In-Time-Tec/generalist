@@ -221,21 +221,20 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | WebSearch |
 
 ### Runtime and routes
 
-`Runtime.layerMemory` implements the Runtime contract in memory; its data does not survive a process restart. `Generalist.create` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. The approvals layer parks an approval-gated tool until a human resolves its token. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production).
+`Durability.layer` reconstructs the object-backed Runtime and `Durability.activate` starts its scheduler only inside the serving layer scope. `Generalist.create` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. `S3.layer` supplies canonical object storage; also provide `BunCrypto` and an `ExecutableResolver`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. For a custom endpoint, also set `GENERALIST_S3_ENDPOINT` and `GENERALIST_S3_CAPABILITIES_CONFIRMED` only after qualifying conditional-create, strong-read, and consistent-listing guarantees. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production). This example describes the object contract without claiming an independently qualified provider deployment.
 
 **server.ts**
 
 ```typescript
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Effect, Layer, Option } from "effect"
 import { Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
+import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
-import { Effect, Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
-import { agent } from "./agent"
-import { modelLayer } from "./model"
-import { toolkit, toolkitLayer } from "./tools"
-import { cannedLayer } from "./web-search"
 
 export const approvalsLayer = Approvals.layerDurable({
   notify: (request) => Effect.logInfo("approval requested", request),
@@ -258,9 +257,33 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Runtime.layerMemory({ addresses: [] }).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-)
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  const reconstructed = Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+  return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
+}))
 
 const demoAuth = Layer.succeed(Server.Authentication, Server.Authentication.of({ bearer: (httpEffect) => httpEffect }))
 
@@ -276,7 +299,7 @@ const apiLayer = Layer.unwrap(
   ),
 )
 
-export const httpLayer: Layer.Layer<never, never, HttpServer.HttpServer> = HttpRouter.serve(
+export const httpLayer = HttpRouter.serve(
   Layer.merge(apiLayer, HttpRouter.cors()).pipe(Layer.provide(HttpServer.layerServices)),
 ).pipe(Layer.provideMerge(agentServices), Layer.provideMerge(runtimeLayer))
 ```
@@ -400,7 +423,7 @@ await runtime.dispose()
 approved web_search for run_1
 ```
 
-The stream resumes, the tool executes, the second model turn synthesizes, and the run ends. The `Completed` HostEvent carries the cited answer built from the search results. With `OPENROUTER_API_KEY` set, the same frames carry a real model's answer instead.
+The stream resumes, the tool executes, the second model turn synthesizes, and the run ends. The `Completed` HostEvent carries the cited answer built from the search results. The model layer is host-supplied; this tutorial keeps provider credentials out of the deterministic example.
 
 ## Part 3: The FoldKit UI
 

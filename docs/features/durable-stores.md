@@ -1,144 +1,173 @@
-# Durable stores
+---
+title: "Object durability"
+description: "Configure the shared object-storage engine, understand commit uncertainty, and recover a retained namespace."
+---
 
-Durable stores persist Runs, events, operations, Sessions, and related records in one versioned SQL state machine. SQLite hosts one process; PostgreSQL and MySQL add fenced claims for shared workers.
+Use `generalist/durability` when accepted work must survive the process that accepted it. S3 and native R2 are transports for the same canonical engine and object format, not different Runtime backends. Ordinary `Agent.run` calls remain process-local and need no durable storage.
 
-## Usage
+All public exports remain `@experimental`. The object contract is the intended long-term storage boundary, not a compatibility promise, provider certification, or verified performance claim. This guide does not report real-provider conformance or deployed recovery measurements.
+
+## Prerequisites
+
+- Bun 1.4+ for the example below, the matching Effect platform package, and an existing general-purpose S3 bucket. Object requests incur provider charges.
+- Credentials allowed to read, conditionally create, and list objects in the selected namespace. Normal Runtime credentials do not need deletion or bucket-administration permission.
+- Explicit environment, tenant, and partition identities. Keep these stable across restarts; changing them opens different state.
+- A compatible executable build and its pinned resolver registrations. The bucket cannot reconstruct arbitrary application code or replace credentials for external services.
+
+```bash
+bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112
+export GENERALIST_BUCKET="your-generalist-bucket"
+export AWS_REGION="us-east-1"
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export GENERALIST_ENVIRONMENT="development"
+export GENERALIST_TENANT="example-team"
+export GENERALIST_PARTITION="recovery-demo"
+```
+
+Use a fresh, dedicated development namespace, not an existing deployment's partition. Temporary credentials also need their session token; see the transport configuration below.
+
+## Run through S3
+
+Save this as `index.ts` and run `bun index.ts`. The model is scripted: no model API key is needed, but storage is real.
 
 ```ts
-import { Effect, Layer } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Console, Effect, Layer } from "effect"
 import { Agent } from "generalist"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
-import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
-declare const resolverLayer: Layer.Layer<ExecutableResolver.ExecutableResolver>
-const agent = Agent.make({ name: "build-explainer" })
-declare const agentServices: Layer.Layer<Agent.Requirements<typeof agent>>
+import * as TestModel from "generalist/testing/model"
 
-const program = Effect.gen(function* () {
+const assistant = Agent.make({ name: "durability-demo" })
+const services = Layer.unwrap(Effect.gen(function* () {
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const storage = Layer.merge(S3.layer({ bucket, region, credentials: { accessKeyId, secretAccessKey } }), BunCrypto.layer)
+  return Layer.merge(
+    Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+      Layer.provide(storage),
+      Layer.provide(ExecutableResolver.layerStatic([])),
+    ),
+    TestModel.layer([TestModel.text("An acknowledged Run can be recovered from its object namespace.")]),
+  )
+}))
+
+await Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  return yield* runtime.start(agent, "Explain the failed build", {
-    sessionId: "session:42",
-    idempotencyKey: "answer:1",
+  yield* runtime.register(assistant)
+  const run = yield* runtime.start(assistant, "Explain durability", {
+    sessionId: "durability-demo",
+    idempotencyKey: "answer-1",
   })
+  yield* Console.log(run.runId, yield* run.await)
+}).pipe(Effect.provide(services), Effect.runPromise)
+```
+
+The command prints a Run ID and the scripted answer. A second invocation uses the same Session and idempotency key to retrieve the accepted Run, rather than admitting another one. A new input under that identity is a conflict, not a request to overwrite the old Run. The owned Layer scope closes when the effect exits. For an explicit close/reopen comparison, use [five-minutes](/start/examples#local-and-object-recovery-in-five-minutes).
+
+`Durability.layer(options)` provides Runtime, RunStore, executor, and scheduler services. `layerRunStore(options)` provides storage without owning an execution loop. Both require an ObjectStore and Crypto; the full Runtime also requires `ExecutableResolver`. Neither selects a fallback store when configuration is missing.
+
+## Transport configuration
+
+`S3.layer` accepts resolved values, not Effect `Config` values. Resolve application configuration with `Layer.unwrap` as above. Its options include `bucket`, `region`, `endpoint?`, `forcePathStyle?`, `credentials?`, and `requestTimeoutMs?`. Credentials may be `{ accessKeyId, secretAccessKey, sessionToken? }` or an AWS SDK refreshing credential provider. Use the latter for a long-lived host with expiring credentials; do not log secrets.
+
+For a qualified custom endpoint, the following is a **configuration fragment**:
+
+```ts
+import * as S3 from "generalist/durability/s3"
+
+declare const bucket: string
+declare const endpoint: string
+declare const accessKeyId: string
+declare const secretAccessKey: string
+
+const objects = S3.layer({
+  bucket,
+  region: "auto",
+  endpoint,
+  credentials: { accessKeyId, secretAccessKey },
+  capabilities: {
+    conditionalCreate: true,
+    strongReadAfterWrite: true,
+    consistentListing: true,
+  },
 })
-
-const store = Layer.merge(
-  SqliteRuntime.layerSqlite({
-    filename: "./generalist.sqlite",
-    addresses: [],
-  }).pipe(Layer.provide(resolverLayer)),
-  agentServices,
-)
-Effect.runPromise(program.pipe(Effect.provide(store)))
 ```
 
-`Runtime.layerSqlite` supplies the Runtime, store, executor, and local scheduler. Reusing the file reopens the same durable state.
+Use `region: "auto"` for the R2 S3 endpoint; other providers may require a different region. Set `forcePathStyle: true` only when the endpoint requires path-style addressing. `capabilities` is an operator assertion of documented, tested semantics, not a probe or certification. Do not set it merely to silence an initialization failure.
 
-## What runs
+Inside a Worker, native R2 avoids separate S3 credentials. This **binding fragment** receives the application's R2 binding:
 
-```text
-construct SQLite Layer (source = "./generalist.sqlite")
-├── apply/verify schema { version: 11, dirty: false }
-└── Runtime.start(agent, input, { sessionId: "session:42" })
-    └── transaction
-        ├── lock identity "answer:1"; persist Run + Session
-        ├── append RunAccepted
-        └── COMMIT ──> publish local wakeup
-            └── scheduler claim + atomic execution batch
-                └── state + checkpoint + Session + ordered events
+```ts
+import * as R2 from "generalist/durability/r2"
+
+declare const bucket: R2.Bucket
+const objects = R2.layer(bucket)
 ```
 
-Rollback exposes none of the batch and publishes no committed event. An exact retry with the stable identity returns its existing result; changed payload or identity data is rejected.
+Provide this Layer to the same durability engine with a Worker-compatible Crypto Layer and executable resolver. [Cloudflare hosting](/features/cloudflare) adds lifecycle integration. Read canonical state through the binding or direct object API, never an R2 public cached domain.
 
-## Bun SQLite
+## Provider contract and support limits
 
-`generalist/runtime/sqlite-bun` exports `Runtime.layerSqlite` and `RunStore.layerSqlite`; both take `filename`. It uses `bun:sqlite` through `@effect/sql-sqlite-bun`, applies and verifies the baseline during Layer construction, and reports `multiWorker: false`.
-It is Bun-only and single-process; requesting multi-worker operation fails with `MultiWorkerUnsupported`.
+A usable provider must preserve complete bytes, atomically create an absent key, expose acknowledged writes through strong direct reads, and list correctly across every page. Generalist uses its own SHA-256 digests; ETags are opaque provider tokens, not content hashes. The normal ObjectStore surface has `read`, `create`, and `list`, with no unconditional overwrite or delete.
 
-## PostgreSQL
+AWS S3 and Cloudflare R2 are the first-class transport targets. An S3-shaped API alone is insufficient. Before operating a provider, run the current conformance scenarios against independent real clients: simultaneous creates, lost acknowledgements, pagination, authentication failure, and fresh-client recovery. Simulator results do not certify a provider; a skipped or credential-free check is not a remote pass. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
 
-`generalist/pg` exports `layer(options)` and `RuntimeSchema`. Pass `{ url, maxConnections? }`, or omit `url` and provide a caller-owned `PgClient`; the latter lets host SQL and Runtime operations share that transaction service and PostgreSQL savepoints.
+The S3 transport uses ordinary general-purpose buckets and single-object writes. Bucket versioning, Object Lock, multipart conditional completion, native sidecars, and bucket administration are not normal Runtime requirements. Custom endpoints and injected clients must satisfy the declared guarantees. Unsupported semantics fail initialization instead of weakening conditional writes.
 
-```text
-GENERALIST_DATABASE_URL (fallback: DATABASE_URL)
-└── RuntimeSchema.apply ──> layer ──> SKIP LOCKED claims
-    └── row/advisory locks + database leases + LISTEN/NOTIFY
-```
+## Authority, conflicts, and fencing
 
-This multi-worker Layer only verifies an applied schema. Use `RuntimeSchema.plan`, `check`, `apply`, or `markDirty` before startup.
+Object storage owns the recoverable state: admission receipts, operations, Sessions, waits, approvals, schedules, budgets, and pending messages. Host caches, query projections, events, alarms, and queue messages cannot establish that a command committed.
 
-## MySQL
+A partition is the serialization and atomicity boundary. Colocate Runs, their children, and affected Sessions when they change together. The application supplies deterministic routing; do not independently hash a child Session into another partition. Cross-partition atomic transactions and live partition reassignment are not provided.
 
-`generalist/mysql` exports `layer({ url, maxConnections?, claimPollInterval?, ... })` and `RuntimeSchema`. It requires MySQL 8 or newer and initializes every pooled connection to `READ COMMITTED`.
+The engine writes immutable numbered commit slots. A conditional-create conflict causes it to read the winning record and re-evaluate deterministic state changes; it must not repeat a model or tool call to resolve contention. An exact command retry returns its retained receipt. Reuse of an identity with different input fails with an input conflict.
 
-```text
-GENERALIST_MYSQL_URL (fallback: MYSQL_URL)
-└── apply ──> GET_LOCK(30 seconds) ──> baseline once
-    └── layer ──> row/named locks + leases + polling claims
-```
+A timeout is not proof a write failed. The engine reads the attempted slot to reconcile its command identity and digest. If it cannot establish the outcome, `DurabilityFailure` reports `reason: "indeterminate"`; preserve the original identity and reconcile before executing external work. Authentication, rate limits, timeouts, unavailable storage, corrupt bytes, unsupported formats, and configured limits are typed failures, not empty state.
 
-This multi-worker Layer only verifies an applied schema; `RuntimeSchema.plan`, `check`, `apply`, and `markDirty` own schema work.
+Ownership transfer is committed in the same ordering protocol. Protected transitions validate current Run-attempt and Session-writer authority; an expired clock lease alone does not fence a stale writer. Fencing prevents late canonical writes after replacement authority takes effect. It cannot cancel a request already in flight at an external provider.
 
-## sql-driver SPI
+External operations commit intent before dispatch, then commit a known result or explicit `Unknown`. Object atomicity does not provide exactly-once payments, messages, model calls, or other external effects. Preserve `pure`, `provider-idempotent`, and `never` replay policies; resolve unknown non-idempotent outcomes using provider evidence or an authorized operator decision.
 
-`generalist/runtime/sql-driver` exports `layerSqlRuntime`, driver/lock interfaces, `RunClaims`, `RuntimeWorker`, schema contract values, and typed errors. An adapter supplies transactions, locks, schema checks, claims, and optional event streams; `layerSqlRuntime` requires claims and assembles the shared store.
+## Scoping and limits
 
-```text
-RuntimeWorker.run (subscribe before catch-up)
-└── claimReadyRuns(limit = free concurrency)
-    └── fenced execute + half-lease renewal + fallback scan
-```
+Canonical keys include environment, tenant, and partition. Tenant blob keys include environment and tenant and are shared by that tenant's partitions. These are storage namespaces, not authentication: authorize every Run, Session, blob, stream, approval, and operator endpoint against the authenticated principal. Do not let untrusted callers choose another tenant's namespace. Use prefix-scoped credentials where the provider supports them.
 
-`RunClaims` claims bounded ready batches, refreshes leases, releases claims, and commits terminal transitions under the exact worker, Run fence, and Session write claim.
+Configure positive bounded work and storage limits for the actual workload. Runtime options include `maxStateBytes`, `maxCommitBytes`, `maxReplayBytes`, and `snapshotEvery`, alongside scheduler and subscriber bounds. Snapshots contain reconstructible state and retained receipts, not only chat history. The engine still materializes partition state; snapshots and paged user history do not imply constant memory or an unlimited partition. Limit partition growth and test the application's actual Session lengths, retained branches, payloads, and contention.
 
-## Beta operating envelope
+Large attachments belong in `BlobStore.layer({ environment, tenant, maxBytes? })` over the same transport and Crypto, not in the journal. Its default upload ceiling is 100 MiB. Preserve every referenced blob and external sandbox snapshot; storage references do not make those resources disposable.
 
-| Host                       | Recovery authority                          | Deployment boundary                                                                                               |
-| -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Memory                     | Process-local state                         | Tests and ephemeral execution; not restart-safe                                                                   |
-| Bun SQLite                 | One SQLite file                             | One owning process; not a shared-worker backend                                                                   |
-| PostgreSQL / MySQL         | Transactional SQL journal and fenced claims | Multiple workers; run the capability suite against the real server                                                |
-| Cloudflare Durable Objects | Object-owned SQLite stores                  | Storage primitives, not a complete hosted worker/alarm lifecycle; the application owns scheduling and recovery    |
-| Rivet actors               | Actor-local SQLite and incarnation fencing  | Experimental host integration; local tests are not a deployed Rivet outage certification                          |
-| Object storage             | No Runtime driver                           | Suitable for application-owned immutable payloads or backups, not a replacement for transactional claim authority |
+## Scheduling and host recovery
 
-The SQL driver is not a generic key/value storage interface. A new backend must implement atomic multi-record transitions, exclusive ownership/fencing, ordered cursors, and recovery, then register the capabilities it actually proves. Object-only execution would need its own conditional-commit and ownership protocol; adding a blob client does not supply those guarantees.
+The default process scheduler is scoped to the Runtime Layer. A supervisor must restart failed processes. For platform-managed wakeups use `schedulerMode: "external"` and await `LocalScheduler.drain({ fuel })`; its result reports `processed`, `hasMore`, and an optional `nextDueAt`.
 
-### Payload and read limits
+The canonical schedule or wait is authoritative; a successful alarm or schedule call is only a wake hint. Run an independent reconciler so a commit followed by failed wake delivery cannot strand accepted work. Cloudflare Durable Objects and Rivet actors host the same object authority. Their local state is not a second persistence model. See [hosts](/features/hosts).
 
-Durable admission and execution transitions reject JSON values over 1 MiB. The limit applies to the whole transition envelope, not just an individual field. Session entries, including Compaction and Handoff projections, have a 1 MiB encoded limit. Run events have a stricter 256 KiB encoded limit. Preflight rejects cycles, more than 64 levels of nesting, and more than 65,536 visited values before codec expansion. Oversized inputs return `RuntimeUnavailable` (or `SessionStoreError` at the Session boundary); they are not silently shortened into successful replay data. A rejected operation completion leaves the operation unresolved, so do not blindly redispatch a side effect after a size error.
+## Snapshots, retention, and garbage collection
 
-Keep large tool results, attachments, and binary data outside the execution journal and return a bounded, application-owned reference with exact retrieval semantics. The framework does not upload rejected data for you. Existing model-facing tool-output previews are not an exact archival retrieval service. Artifact/CRDT snapshots and updates are a separate store and are **not** covered by these journal limits; the host must apply its own quotas there and at HTTP request admission.
+Snapshots bound replay work; they do not make older commit slots safe to delete. This implementation retains committed slots and command receipts. Do not configure lifecycle expiration on canonical commits, snapshots, or referenced blobs. Deleting a numbered slot can let a paused writer recreate it and invalidate the committed prefix.
 
-SQL Run and Host Session replay fetch at most 128 event rows per page. New admitted event JSON therefore contributes at most 32 MiB per page, excluding SQL-driver buffers, decoded object/string overhead, checkpoints, and the separate live queue. Public `Runtime.history` accepts integer limits from 1 through 1000. Consumers use exclusive cursors; Session cursors may have gaps after rewind. Notifications are hints: each subscriber repairs missing delivery from durable pages before emitting a newer hint. Queue overflow fails explicitly rather than silently dropping committed events.
+Automatic live-history reclamation and safe concurrent blob collection are not provided. Age or an apparently unreferenced upload is not sufficient evidence for deletion: delayed writers, forks, readers, and backups can still need it. Maintenance deletion is a separate capability and credential boundary, not permission to collect a live namespace. Purge only a retired namespace after all writers are stopped and cannot reacquire authority.
 
-These are bounded query/result units, **not a constant-memory Runtime claim**. Full history exports, forks/rewinds, tree projections, artifact reconstruction, and lossless Session paths still materialize retained history. Forks copy their prefixes. An uncompacted model context still grows with the conversation; compact before it exceeds the model or durable checkpoint budget. SQL Session paths use sequential ancestor lookups; cold history no longer has to be decoded for a compacted model prompt, but older telemetry lookup can still traverse the ancestry. MySQL's bounded candidate output still uses a windowed eligibility scan and can examine/sort many rows; `LIMIT` does not cap database work. No production-scale throughput, RSS, database-memory ceiling, or multi-region performance guarantee follows from conformance tests.
+## Backup and restore
 
-### Before accepting beta traffic
+There is no public one-call snapshot restore API or automatic legacy-store importer. Use a quiesced, complete object backup rather than copying an event stream or one latest snapshot:
 
-1. Start with a disposable database and the exact Generalist/Effect versions used to build the executable registrations. Apply and verify the schema; never edit the version/checksum to force an incompatible store to open.
-2. Exercise restart, interrupted operations, fork/rewind, and replay using `generalist/testing/runtime-driver`. PostgreSQL/MySQL suites that skip for missing URLs are not evidence.
-3. Set a positive integer worker concurrency and a nonblank worker ID. Lease must be finite and at least 2 ms; fallback and cancellation intervals must be finite and at least 1 ms. These minima prevent invalid loops, not realistic production lease recommendations. Start with the 30-second lease and measure latency before tuning.
-4. Load-test the application's actual Session lengths, compaction policy, payload sizes, subscribers, and worker contention. Track database query time/temp spill, process RSS, journal/branch growth, subscriber lag, and worker scan/wakeup failures. Bound retention and artifact usage operationally.
-5. Test restoring a consistent database backup together with pinned executables and referenced external bytes before advertising recovery. See [recovery](./recovery.md).
+1. Stop new admissions, drain or explicitly suspend active Runs, and stop every writer and reconciler for the namespace. Revoke or isolate their write access so stale hosts cannot restart against it.
+2. Copy the entire retained canonical namespace, including commit slots, snapshots, tenant blobs, and auxiliary durable-store partitions. Preserve exact bytes and relative keys. Retain external snapshot bytes and the exact compatible executable build and registration configuration separately.
+3. Verify the backup's object inventory, complete pagination, byte lengths, and digests. Keep it read-only. A storage provider's asynchronous replication status is not itself a consistency proof.
+4. Restore into an empty isolated bucket using the same namespace identities and relative keys. Do not merge it with a live or partly restored prefix. Changing encoded environment, tenant, or partition fields requires a format-aware import tool, not a key rename.
+5. Open the destination with the compatible build and new worker identity while external dispatch and public routing remain isolated. Allow the engine to validate the chain and acquire fresh ownership; never edit stored leases or invent successful outcomes.
+6. Inspect Runs, Sessions, budgets, pending approvals, schedules, and unknown operations. Verify all referenced bytes are accessible. Resolve uncertain external effects only with evidence, then enable destination hosts, independent reconciliation, and application routing.
+7. Retain the source backup and prevent source writers from resuming. Once the destination performs new external effects, blindly switching back can repeat them; rollback requires reconciliation.
 
-## Invariants
+Rehearse this procedure with your real provider and failure scenarios before relying on it. A likely startup failure is missing credentials or a custom endpoint without qualified conditional semantics: correct the configuration and provider qualification, not the stored history.
 
-- Version `11`, logical checksum, and baseline `{ id: 1, name: "generalist_runtime" }` are identical across adapters; physical DDL is adapter-owned.
-- `generalist_host_sessions` persists product Session identity, optional title, creation time, and the next Session event sequence. Each `generalist_run_events` row may carry the root Run's Host Session ID plus its unique Session sequence, avoiding a copied Session event journal.
-- Schema checks reject absent/old, dirty, unsupported, checksum-mismatched, or migration-identity-mismatched schemas with typed errors.
-- Baseline creation refuses to overwrite existing Generalist application tables.
-- Server Layers verify an applied schema; SQLite applies and verifies its schema during Layer construction.
-- Store transitions atomically commit state, events, checkpoints, operations, conversation Session changes, and Host Session cursors, or expose none.
-- Exact idempotent retries return the existing result; divergent identity reuse is rejected.
-- Claim commits require the current worker, Run attempt fence, and Session write claim.
-- Claim notifications are lossy hints; durable ordered scans are authoritative.
-- SQLite is single-process; PostgreSQL and MySQL support multiple workers.
-- The capability-based runtime-driver suite registers only each driver's advertised capabilities.
-- SQLite, PostgreSQL, and MySQL run that shared contract for the capabilities they register.
-
-## Related
-
-- Source: `packages/generalist/src/runtime/sql/`, `packages/generalist/src/runtime/sql-driver.ts`, `packages/generalist/src/runtime/sqlite-bun.ts`, `packages/generalist/src/pg/`, `packages/generalist/src/mysql/`
-- Site: `/docs/start/installation`, `/docs/reference/runtime`
-- Sibling feature docs: `./runtime.md`, `./durable-agent-driver.md`
+Next: use [typed recovery actions](/features/recovery) for unresolved work and the [Runtime reference](/reference/runtime) for service contracts.

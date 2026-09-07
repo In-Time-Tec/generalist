@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -606,7 +607,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Compaction.layer({}),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled before wait")] }]),
@@ -696,7 +697,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ).pipe(Compaction.withLifecycle(request))
           },
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
@@ -753,7 +754,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               }),
             ),
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
@@ -805,7 +806,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               })
             }),
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
@@ -866,7 +867,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               return Option.none()
             }),
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context"), bytes, url] }]),
@@ -944,7 +945,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             }).pipe(Compaction.withLifecycle(request))
           },
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
@@ -1028,7 +1029,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               return Option.none()
             }),
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([]),
@@ -1113,7 +1114,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ).pipe(Compaction.withLifecycle(request))
           },
         }),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
@@ -1134,7 +1135,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 const firstPath = yield* session.path()
                 const compaction = firstPath.find((entry) => entry._tag === "Compaction")
                 if (compaction === undefined) return yield* Effect.die("missing compaction entry")
-                yield* session.setLeaf(compaction.id)
+                yield* session.setLeaf(compaction.id, "fixture-1138")
                 return Session.buildContext(yield* session.path())
               }),
             ),
@@ -1184,7 +1185,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Compaction.layer({}),
-        Session.layerMemory,
+        layerMemory,
         Memory.layerTest({
           ...noVersioning,
           recall: () => Effect.succeed([]),
@@ -1196,7 +1197,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         const sessionId = "session-repeated-suffix"
         yield* Effect.scoped(
           Session.acquire(sessionId).pipe(
-            Effect.flatMap((session) => session.append({ _tag: "Message", message: repeated })),
+            Effect.flatMap((session) => session.append({ _tag: "Message", message: repeated }, { commandId: "fixture-1200" })),
           ),
         )
 

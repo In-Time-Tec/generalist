@@ -19,6 +19,7 @@ const forkCheckpoint = (
   sourceRunId: string,
   targetRunId: string,
   targetSessionId: string,
+  targetLogicalOperationId = targetRunId,
 ): ExecutionCheckpoint => {
   const copied = Schema.decodeSync(ExecutionCheckpoint)(Schema.encodeSync(ExecutionCheckpoint)(checkpoint))
   if ("_tag" in copied) return copied
@@ -29,7 +30,7 @@ const forkCheckpoint = (
     ...copied,
     state: {
       ...state,
-      logicalOperationId: targetRunId,
+      logicalOperationId: targetLogicalOperationId,
       sessionId: targetSessionId,
       ...(state.pending === undefined
         ? undefined

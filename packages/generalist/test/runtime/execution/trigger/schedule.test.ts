@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -24,7 +25,7 @@ const model = Layer.effect(
   }),
 )
 const runtimeLayer = Layer.mergeAll(
-  Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "100 millis" } }).pipe(
+  objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "100 millis" } }).pipe(
     Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
   ),
   model,

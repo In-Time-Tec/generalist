@@ -1,3 +1,4 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Clock, Effect, Layer } from "effect"
 import { Pins } from "../../../src/index.js"
@@ -10,7 +11,6 @@ import {
   RunStore,
 } from "../../../src/runtime/index.js"
 import { registrationsFor } from "./fixtures.js"
-import { tempDbPath } from "../sql/scenario.js"
 import {
   agentMapProgramFixture,
   approvalProgramFixture,
@@ -22,16 +22,14 @@ import {
 } from "../program/fixture.js"
 import { programReplayDivergenceContract } from "../program/store-contract.js"
 
-import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
 describe("durable Agent Programs", () => {
-  it.effect("rejects Program replay divergence in memory and SQLite without changing the journal", () => {
-    const memory = programFixture()
-    const sqlite = programFixture()
+  it.effect("rejects Program replay divergence without changing the journal", () => {
+    const fixture = programFixture()
     const options = {
       addresses: [
         {
@@ -41,17 +39,9 @@ describe("durable Agent Programs", () => {
         },
       ],
     }
-    return Effect.gen(function* () {
-      yield* scopedWith(Runtime.layerMemory(options).pipe(Layer.provide(memory.resolverLayer)))(
-        programReplayDivergenceContract,
-      )
-      yield* scopedWith(
-        SqliteRuntime.layerSqlite({
-          ...options,
-          filename: tempDbPath("program-replay-divergence"),
-        }).pipe(Layer.provide(sqlite.resolverLayer)),
-      )(programReplayDivergenceContract)
-    })
+    return scopedWith(objectRuntimeLayer(options).pipe(Layer.provide(fixture.resolverLayer)))(
+      programReplayDivergenceContract,
+    )
   })
 
   it.effect("rejects a live Program whose manifest differs from its claimed pin", () =>
@@ -80,7 +70,7 @@ describe("durable Agent Programs", () => {
 
   const dispatchFixture = programFixture()
   layer(
-    Runtime.layerMemory({
+    objectRuntimeLayer({
       addresses: [
         {
           address: programAddress,
@@ -89,7 +79,7 @@ describe("durable Agent Programs", () => {
         },
       ],
     }).pipe(Layer.provide(dispatchFixture.resolverLayer)),
-  )("dispatches Programs and replays named tool and log operations in memory", (suite) => {
+  )("dispatches Programs and replays named tool and log operations in object storage", (suite) => {
     suite.effect("dispatches and replays named operations", () =>
       Effect.gen(function* () {
         const runId = yield* executeProgramFixture
@@ -114,7 +104,7 @@ describe("durable Agent Programs", () => {
 
   const approvalFixture = approvalProgramFixture()
   layer(
-    Runtime.layerMemory({
+    objectRuntimeLayer({
       addresses: [
         {
           address: programAddress,
@@ -135,7 +125,8 @@ describe("durable Agent Programs", () => {
           idempotencyKey: "approval-run",
           prompt: "run",
         })
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId }))
         const waiting = (yield* runtime.inspect(receipt.runId)).waits[0]
         expect(waiting).toMatchObject({
           waitId: "approval:echo",
@@ -166,7 +157,8 @@ describe("durable Agent Programs", () => {
             resolution: { _tag: "Approved" },
           }),
         )
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-2", runId: receipt.runId, ownerId: objectWorkerId }))
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
         const stale = yield* runtime
           .respondApproval({ runId: receipt.runId, approvalId: "approval:stale", decision: { _tag: "Approved" } })
@@ -177,12 +169,11 @@ describe("durable Agent Programs", () => {
     )
   })
 
-  it.live("reopens SQLite between Program approval and exact resumed dispatch", () => {
-    const filename = tempDbPath("program-approval-reopen")
+  it.live("reopens object storage between Program approval and exact resumed dispatch", () => {
+    const storage = makeObjectStorage()
     const fixture = approvalProgramFixture()
     let runId = ""
     const options = {
-      filename,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
       ],
@@ -198,7 +189,8 @@ describe("durable Agent Programs", () => {
         prompt: "run",
       })
       runId = receipt.runId
-      yield* host.execute(yield* store.claimExecution({ runId, ownerId: "approval-before-reopen" }))
+      yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-3", runId, ownerId: objectWorkerId }))
       expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({
         reason: {
           _tag: "Approval",
@@ -224,14 +216,15 @@ describe("durable Agent Programs", () => {
           suspension: { operation: "echo", reason: "approval" },
           resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
         })
-        yield* host.execute(yield* store.claimExecution({ runId, ownerId: "approval-after-reopen" }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-4", runId, ownerId: objectWorkerId }))
         expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
         expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
       }),
     )
     return Effect.gen(function* () {
-      yield* scopedWith(SqliteRuntime.layerSqlite(options).pipe(Layer.provide(fixture.resolverLayer)))(suspend)
-      yield* scopedWith(SqliteRuntime.layerSqlite(options).pipe(Layer.provide(fixture.resolverLayer)))(resume)
+      yield* scopedWith(objectRuntimeLayer(options, storage).pipe(Layer.provide(fixture.resolverLayer)))(suspend)
+      yield* scopedWith(objectRuntimeLayer(options, storage).pipe(Layer.provide(fixture.resolverLayer)))(resume)
     })
   })
 
@@ -249,17 +242,20 @@ describe("durable Agent Programs", () => {
           idempotencyKey: `program-${resolution}`,
           prompt: "run",
         })
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: `program-${resolution}` }))
+        yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-5", runId: receipt.runId, ownerId: objectWorkerId }))
         if (resolution === "Denied") {
           yield* Approval.deny({
             runId: receipt.runId,
             approvalId: "approval:echo",
             reason: "operator denied",
           })
-          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-denied-resume" }))
+          yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-6", runId: receipt.runId, ownerId: objectWorkerId }))
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
         } else {
-          yield* runtime.cancel({ runId: receipt.runId, reason: "operator cancelled" })
+          yield* runtime.cancel({
+          commandId: "runtime-execution-execute-program-test-ts-cancel-1", runId: receipt.runId, reason: "operator cancelled" })
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "cancelled", waits: [] })
         }
         expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
@@ -268,39 +264,24 @@ describe("durable Agent Programs", () => {
         expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
         expect(fixture.counts().executions).toBe(0)
       })
-    const layerFor = (fixture: ReturnType<typeof approvalProgramFixture>, sqliteName?: string) =>
-      sqliteName === undefined
-        ? Runtime.layerMemory({
-            addresses: [
-              {
-                address: programAddress,
-                executable: programExecutable,
-                registrations: registrationsFor(programExecutable),
-              },
-            ],
-          }).pipe(Layer.provide(fixture.resolverLayer))
-        : SqliteRuntime.layerSqlite({
-            filename: tempDbPath(sqliteName),
-            addresses: [
-              {
-                address: programAddress,
-                executable: programExecutable,
-                registrations: registrationsFor(programExecutable),
-              },
-            ],
-          }).pipe(Layer.provide(fixture.resolverLayer))
+    const layerFor = (fixture: ReturnType<typeof approvalProgramFixture>) =>
+      objectRuntimeLayer({
+        addresses: [
+          {
+            address: programAddress,
+            executable: programExecutable,
+            registrations: registrationsFor(programExecutable),
+          },
+        ],
+      }).pipe(Layer.provide(fixture.resolverLayer))
     return Effect.gen(function* () {
       yield* scopedWith(layerFor(denied))(run(denied, "Denied"))
       yield* scopedWith(layerFor(cancelled))(run(cancelled, "Cancel"))
-      yield* scopedWith(layerFor(approvalProgramFixture(), "program-denied"))(run(approvalProgramFixture(), "Denied"))
-      yield* scopedWith(layerFor(approvalProgramFixture(), "program-cancelled"))(
-        run(approvalProgramFixture(), "Cancel"),
-      )
     })
   })
 
-  it.live("reopens SQLite with the Program result and operation journal intact", () => {
-    const filename = tempDbPath("program-runtime-reopen")
+  it.live("reopens object storage with the Program result and operation journal intact", () => {
+    const storage = makeObjectStorage()
     const first = programFixture()
     let runId = ""
     const write = Effect.gen(function* () {
@@ -318,32 +299,19 @@ describe("durable Agent Programs", () => {
         result: "value:1",
       })
     })
+    const options = {
+      addresses: [
+        {
+          address: programAddress,
+          executable: programExecutable,
+          registrations: registrationsFor(programExecutable),
+        },
+      ],
+    }
     return Effect.gen(function* () {
-      yield* scopedWith(
-        SqliteRuntime.layerSqlite({
-          filename,
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }).pipe(Layer.provide(first.resolverLayer)),
-      )(write)
+      yield* scopedWith(objectRuntimeLayer(options, storage).pipe(Layer.provide(first.resolverLayer)))(write)
       const reopened = programFixture()
-      yield* scopedWith(
-        SqliteRuntime.layerSqlite({
-          filename,
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }).pipe(Layer.provide(reopened.resolverLayer)),
-      )(reopen)
+      yield* scopedWith(objectRuntimeLayer(options, storage).pipe(Layer.provide(reopened.resolverLayer)))(reopen)
     })
   })
 
@@ -358,14 +326,15 @@ describe("durable Agent Programs", () => {
         idempotencyKey: "program-unknown",
         prompt: "run",
       })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-crash" })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-7", runId: receipt.runId, ownerId: objectWorkerId })
       const request = { operation: "echo", tool: "echo", input: "value" }
       yield* store.reserveProgramOperation({
         ...claim,
         programPin: program.pinned.pin,
         budget: program.pinned.manifest.budget,
-        nowMillis: yield* Clock.currentTimeMillis,
         operation: "echo",
+        authoredOperation: "echo",
         kind: "tool",
         capability: "echo",
         inputDigest: Pins.digest({ kind: "tool", capability: "echo", input: request }),
@@ -401,39 +370,25 @@ describe("durable Agent Programs", () => {
           }),
         ),
       ).toMatchObject({ _tag: "generalist/runtime/OperationResolutionConflict" })
-      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-recovery" }))
+      yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-execution-execute-program-test-ts-claim-8", runId: receipt.runId, ownerId: objectWorkerId }))
       expect((yield* runtime.snapshot(receipt.runId)).outcome).toMatchObject({
         _tag: "Succeeded",
         result: { _tag: "Program", value: "recovered|recovered" },
       })
     })
-    const memory = programFixture()
-    const sqlite = programFixture()
-    return Effect.gen(function* () {
-      yield* scopedWith(
-        Runtime.layerMemory({
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }).pipe(Layer.provide(memory.resolverLayer)),
-      )(verify)
-      yield* scopedWith(
-        SqliteRuntime.layerSqlite({
-          filename: tempDbPath("program-unknown"),
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }).pipe(Layer.provide(sqlite.resolverLayer)),
-      )(verify)
-    })
+    const fixture = programFixture()
+    return scopedWith(
+      objectRuntimeLayer({
+        addresses: [
+          {
+            address: programAddress,
+            executable: programExecutable,
+            registrations: registrationsFor(programExecutable),
+          },
+        ],
+      }).pipe(Layer.provide(fixture.resolverLayer)),
+    )(verify)
   })
 
   it.live(
@@ -492,18 +447,14 @@ describe("durable Agent Programs", () => {
         ],
         scheduler: { pollInterval: "1 day" as const },
       }
-      const memory = Effect.gen(function* () {
-        const finalizersBefore = fixture.counts().childFinalizers
-        yield* finishRun(yield* admit, finalizersBefore)
+      const storage = makeObjectStorage()
+      let objectRunId = ""
+      let objectFinalizersBefore = 0
+      const objectAdmit = Effect.gen(function* () {
+        objectFinalizersBefore = fixture.counts().childFinalizers
+        objectRunId = yield* admit
       })
-      const filename = tempDbPath("program-agent-map")
-      let sqliteRunId = ""
-      let sqliteFinalizersBefore = 0
-      const sqliteAdmit = Effect.gen(function* () {
-        sqliteFinalizersBefore = fixture.counts().childFinalizers
-        sqliteRunId = yield* admit
-      })
-      const sqliteReopen = Effect.suspend(() => finishRun(sqliteRunId, sqliteFinalizersBefore))
+      const objectReopen = Effect.suspend(() => finishRun(objectRunId, objectFinalizersBefore))
       const cancelAdmitted = Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
@@ -515,7 +466,11 @@ describe("durable Agent Programs", () => {
         })
         yield* executeReady
         const admitted = yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })
-        yield* runtime.cancel({ runId: receipt.runId, reason: "cancel admitted Program tree" })
+        yield* runtime.cancel({
+          commandId: "runtime-execution-execute-program-test-ts-cancel-2",
+          runId: receipt.runId,
+          reason: "cancel admitted Program tree",
+        })
         expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "cancelled", waits: [] })
         for (const childRunId of admitted?.childRunIds ?? []) {
           expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
@@ -526,20 +481,9 @@ describe("durable Agent Programs", () => {
         expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
       })
       return Effect.gen(function* () {
-        yield* scopedWith(Runtime.layerMemory(options).pipe(Layer.provide(fixture.resolverLayer)))(memory)
-        yield* scopedWith(
-          SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(fixture.resolverLayer)),
-        )(sqliteAdmit)
-        yield* scopedWith(
-          SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(fixture.resolverLayer)),
-        )(sqliteReopen)
-        yield* scopedWith(Runtime.layerMemory(options).pipe(Layer.provide(fixture.resolverLayer)))(cancelAdmitted)
-        yield* scopedWith(
-          SqliteRuntime.layerSqlite({
-            ...options,
-            filename: tempDbPath("program-agent-map-cancel"),
-          }).pipe(Layer.provide(fixture.resolverLayer)),
-        )(cancelAdmitted)
+        yield* scopedWith(objectRuntimeLayer(options, storage).pipe(Layer.provide(fixture.resolverLayer)))(objectAdmit)
+        yield* scopedWith(objectRuntimeLayer(options, storage).pipe(Layer.provide(fixture.resolverLayer)))(objectReopen)
+        yield* scopedWith(objectRuntimeLayer(options).pipe(Layer.provide(fixture.resolverLayer)))(cancelAdmitted)
       })
     },
     15_000,

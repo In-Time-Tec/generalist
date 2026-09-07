@@ -1,12 +1,13 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, BlobStore, Hooks, Instructions, Permissions } from "generalist"
+import { Agent, Approvals, Hooks, Instructions, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
-import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
-import { tempDbPath } from "../runtime/sql/scenario.js"
+import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
+import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
+import { ObjectStore } from "../../src/durability/object-store.js"
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: 1, total: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -25,24 +26,23 @@ const modelLayer = (streamText: Parameters<typeof LanguageModel.make>[0]["stream
   )
 const resolver = ExecutableResolver.layerStatic([])
 const authorization = Layer.mergeAll(Permissions.layerAllowAll, Approvals.layerAutoApprove)
-const blobStore = BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer))
-const memoryRuntime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
-  Layer.provide(resolver),
+const runtimeStorage = makeObjectStorage()
+const attachmentStorage = makeObjectStorage()
+const blobStore = blobStoreLayer({ environment: "test", tenant: "host" }).pipe(
+  Layer.provide(
+    Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, attachmentStorage.store)),
+  ),
 )
-const sqliteRuntime = (filename: string) =>
-  SqliteRuntime.layerSqlite({ filename, addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
-    Layer.provide(resolver),
-  )
-const completeRun = Effect.gen(function* () {
-  const scheduler = yield* LocalScheduler.LocalScheduler
-  yield* scheduler.tick
-  yield* scheduler.idle
-})
+const runtimeLayer = objectRuntimeLayer({ addresses: [] }, runtimeStorage).pipe(Layer.provide(resolver))
+const completeRun = (runId: string, commandId: string) =>
+  Effect.gen(function* () {
+    const executor = yield* RunExecutor.RunExecutor
+    const store = yield* RunStore.RunStore
+    yield* executor.execute(yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId }))
+  })
 
-for (const [backend, runtimeLayer] of [
-  ["memory", memoryRuntime],
-  ["sqlite", sqliteRuntime(tempDbPath("host-api"))],
-] as const) {
+const backend = "object" as const
+{
   layer(
     Layer.mergeAll(
       runtimeLayer,
@@ -61,7 +61,7 @@ for (const [backend, runtimeLayer] of [
         const host = yield* Generalist.create({ agents: [agent] })
         const session = yield* host.sessions.create({ id: `session:host:${backend}`, title: "Support inbox" })
         const run = yield* host.runs.start(session.id, agent, { question: "status" }, { idempotencyKey: "first" })
-        yield* completeRun
+        yield* completeRun(run.id, "host:api")
 
         expect(yield* run.await).toBe(`${backend} complete`)
         expect(yield* host.sessions.get(session.id)).toEqual(session)
@@ -101,7 +101,7 @@ for (const [backend, runtimeLayer] of [
 
 layer(
   Layer.mergeAll(
-    memoryRuntime,
+    runtimeLayer,
     modelLayer(() => textResponse("unused")),
     authorization,
   ),
@@ -123,7 +123,7 @@ layer(
       const host = yield* Generalist.create({ agents: [agent] })
       const session = yield* host.sessions.create({ id: "session:host:cancel" })
       const run = yield* host.runs.start(session.id, agent, "wait")
-      yield* host.runs.cancel(run.id, "user stopped")
+      yield* host.runs.cancel(run.id, "cancel:host-run", "user stopped")
 
       expect(yield* host.runs.inspect(run.id)).toMatchObject({ status: "cancelled" })
       const terminal = yield* run.await.pipe(Effect.flip)
@@ -170,7 +170,7 @@ const model = modelLayer((options) => {
   return textResponse("plugin complete")
 })
 
-layer(Layer.mergeAll(memoryRuntime, model, authorization, handlers))("host plugins", (test) => {
+layer(Layer.mergeAll(runtimeLayer, model, authorization, handlers))("host plugins", (test) => {
   test.effect("loads plugin tools, instructions, and skills in declared order", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "host-plugin" })
@@ -192,7 +192,7 @@ layer(Layer.mergeAll(memoryRuntime, model, authorization, handlers))("host plugi
       const host = yield* Generalist.create({ agents: [agent], plugins: [plugin] })
       const session = yield* host.sessions.create({ id: "session:host:plugin" })
       const run = yield* host.runs.start(session.id, agent, "use the plugin")
-      yield* completeRun
+      yield* completeRun(run.id, "host:plugin")
 
       expect(yield* run.await).toBe("plugin hook complete")
       expect(handled).toBe(true)
@@ -203,18 +203,18 @@ layer(Layer.mergeAll(memoryRuntime, model, authorization, handlers))("host plugi
   )
 })
 
-it.effect("SQLite preserves Sessions and their root Run list across a fresh Layer", () => {
-  const filename = tempDbPath("host-reopen")
+it.effect("object storage preserves Sessions and their root Run list across a fresh Layer", () => {
+  const storage = makeObjectStorage()
   const agent = Agent.make({ name: "host-reopen" })
-  const services = () =>
+  const services = (workerId: string) =>
     Layer.mergeAll(
-      sqliteRuntime(filename),
+      objectRuntimeLayer({ addresses: [], workerId }, storage).pipe(Layer.provide(resolver)),
       modelLayer(() => textResponse("unused")),
       authorization,
     )
   return Effect.gen(function* () {
     const runId = yield* Effect.scoped(
-      Layer.build(services()).pipe(
+      Layer.build(services("host-before-reopen")).pipe(
         Effect.flatMap((context) =>
           Effect.provide(
             Effect.gen(function* () {
@@ -229,7 +229,7 @@ it.effect("SQLite preserves Sessions and their root Run list across a fresh Laye
     )
 
     yield* Effect.scoped(
-      Layer.build(services()).pipe(
+      Layer.build(services("host-after-reopen")).pipe(
         Effect.flatMap((context) =>
           Effect.provide(
             Effect.gen(function* () {

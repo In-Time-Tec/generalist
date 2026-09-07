@@ -1,3 +1,4 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each test is a test-host Layer composition root. */
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
@@ -5,9 +6,7 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, AgentTool, Approvals, Compaction, Hooks, Permissions, RunBudget, Tasks } from "../../src/index.js"
 import { Generalist } from "../../src/host/index.js"
 import { RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
-import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 import { JournalFault } from "../../src/runtime/operation/journal-fault.js"
-import { tempDbPath } from "../runtime/sql/scenario.js"
 
 const usage = Response.Usage.make({
   inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -63,15 +62,10 @@ const formattedItems = [
   "</generalist-tasks>",
 ].join("\n")
 
-it.live("emits TasksUpdated and restores the list from SQLite without redispatching tasks_write", () =>
+it.live("emits TasksUpdated and restores the list from object storage without redispatching tasks_write", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("tasks-reopen")
+    const storage = makeObjectStorage()
     const agent = Agent.make({ name: "tasks-reopen" })
-    const options = {
-      filename,
-      addresses: [],
-      scheduler: { pollInterval: "1 hour" as const },
-    }
     const startOptions = {
       idempotencyKey: "tasks-reopen",
     }
@@ -98,7 +92,9 @@ it.live("emits TasksUpdated and restores the list from SQLite without redispatch
       )
     })
     const firstLayer = Layer.mergeAll(
-      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(Layer.merge(resolver, interruptAfter(5)))),
+      objectRuntimeLayer({ addresses: [], workerId: "tasks-before-reopen" }, storage).pipe(
+        Layer.provide(Layer.merge(resolver, interruptAfter(5))),
+      ),
       firstModel,
       authorization,
       Tasks.layer(),
@@ -112,7 +108,13 @@ it.live("emits TasksUpdated and restores the list from SQLite without redispatch
         const handle = yield* host.runs.start(session.id, agent, "make a task list", startOptions)
         const executor = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
-        yield* executor.execute(yield* store.claimExecution({ runId: handle.id, ownerId: "before-reopen" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            runId: handle.id,
+            ownerId: "tasks-before-reopen",
+            commandId: "tasks:reopen:before",
+          }),
+        )
         expect((yield* host.runs.inspect(handle.id)).status).toBe("running")
         expect(dispatches).toBe(1)
         expect(firstModelCalls).toBe(1)
@@ -129,7 +131,7 @@ it.live("emits TasksUpdated and restores the list from SQLite without redispatch
       return textResponse("recovered")
     })
     const recoveredLayer = Layer.mergeAll(
-      SqliteRuntime.layerSqlite(options).pipe(Layer.provide(resolver)),
+      objectRuntimeLayer({ addresses: [], workerId: "tasks-after-reopen" }, storage).pipe(Layer.provide(resolver)),
       recoveredModel,
       authorization,
       Tasks.layer(),
@@ -143,7 +145,13 @@ it.live("emits TasksUpdated and restores the list from SQLite without redispatch
         const executor = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         expect(handle.id).toBe(run.runId)
-        yield* executor.execute(yield* store.claimExecution({ runId: handle.id, ownerId: "after-reopen" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            runId: handle.id,
+            ownerId: "tasks-after-reopen",
+            commandId: "tasks:reopen:after",
+          }),
+        )
         expect(yield* handle.await).toBe("recovered")
 
         const stream = yield* host.events.subscribe(run.sessionId)
@@ -328,7 +336,7 @@ it.effect("journals task inheritance for durable children", () => {
     return textResponse("parent complete")
   })
   const layer = Layer.mergeAll(
-    Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(Layer.provide(resolver)),
+    objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(resolver)),
     model,
     authorization,
     Tasks.layer(),
@@ -343,16 +351,32 @@ it.effect("journals task inheritance for durable children", () => {
       const handle = yield* runtime.start(parent, "delegate after writing tasks", {
         budget: RunBudget.make({ children: 2 }),
       })
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "tasks-parent-1" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+          commandId: "tasks:parent:initial",
+        }),
+      )
       const tree = yield* runtime.treeCheckpoint(handle.runId)
       const children = tree.inspection.runs.filter((entry) => entry.parentRunId === handle.runId)
       expect(children).toHaveLength(2)
       for (const [index, entry] of children.entries()) {
         yield* executor.execute(
-          yield* store.claimExecution({ runId: entry.run.runId, ownerId: `tasks-child-${index}` }),
+          yield* store.claimExecution({
+            runId: entry.run.runId,
+            ownerId: objectWorkerId,
+            commandId: `tasks:child:${index}`,
+          }),
         )
       }
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "tasks-parent-2" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+          commandId: "tasks:parent:resume",
+        }),
+      )
 
       expect(yield* handle.await).toBe("parent complete")
       expect(childTaskMessages).toHaveLength(2)
@@ -423,11 +447,10 @@ it.effect("applies Tasks.update through runtime steer", () =>
         Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release)), Effect.as("released")),
     })
     const runtimeLayer = Layer.mergeAll(
-      Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(Layer.provide(resolver)),
+      objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(resolver)),
       model,
       authorization,
       handlers,
-      Tasks.layer(),
     )
 
     yield* scopedWith(runtimeLayer)(
@@ -441,8 +464,13 @@ it.effect("applies Tasks.update through runtime steer", () =>
           idempotencyKey: "tasks-steering",
         })
         const execution = yield* executor
-          .execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "tasks-steering" }))
-          .pipe(Effect.forkChild({ startImmediately: true }))
+          .execute(
+            yield* store.claimExecution({
+              runId: handle.runId,
+              ownerId: objectWorkerId,
+              commandId: "tasks:steering",
+            }),
+          )
         yield* Deferred.await(started)
         yield* runtime.send(handle.runId, Tasks.update([{ id: "ship", status: "done" }]), { policy: "steer" })
         yield* Deferred.succeed(release, undefined)

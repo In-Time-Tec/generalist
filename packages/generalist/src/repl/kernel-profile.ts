@@ -5,7 +5,7 @@ import { digest as pinDigest } from "../core/durable/pin.js"
 export const protocolVersion = 1
 
 /** Version of the KernelProfile contract itself. */
-export const contractVersion = 2
+export const contractVersion = 1
 
 const Identifier = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255))
 const Digest = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))

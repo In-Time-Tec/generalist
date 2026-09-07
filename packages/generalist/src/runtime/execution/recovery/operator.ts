@@ -93,9 +93,7 @@ export interface OperatorActionInput {
   readonly operator: string
 }
 
-export interface RetryInput extends OperatorActionInput {
-  readonly operationId: string
-}
+export type RetryInput = OperatorActionInput
 
 export type WakeInput = OperatorActionInput
 

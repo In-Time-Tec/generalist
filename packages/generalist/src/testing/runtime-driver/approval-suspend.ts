@@ -96,9 +96,20 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
           sessionId: `session:${slug(options.name)}:${key}`,
           idempotencyKey: `${key}:${slug(options.name)}`,
         })
-        const claim = yield* capability.claim(services, { runId: handle.runId, workerId: "approval-before" })
+        const claim = yield* capability.claim(services, { runId: handle.runId, commandId: "approval-before" })
         yield* services.executor.execute(claim)
-        expect((yield* services.runtime.inspect(handle.runId)).status).toBe("waiting")
+        const inspection = yield* services.runtime.inspect(handle.runId)
+        if (inspection.status === "failed") {
+          const failure = (yield* services.runtime.history({ runId: handle.runId, limit: 100 })).find(
+            (event) => event._tag === "RunFailed",
+          )
+          if (failure?._tag === "RunFailed") {
+            throw new Error(
+              `approval suspension RunFailed: ${failure.error._tag}: ${failure.error.message}`,
+            )
+          }
+        }
+        expect(inspection.status).toBe("waiting")
         expect(toolCalls).toBe(expectedToolCalls)
         expect(notifications).toHaveLength(1)
         expect(notifications[0]).toMatchObject({
@@ -113,13 +124,12 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
     const recover = (
       services: Services,
       suspended: { readonly runId: string; readonly token: string },
-      rebuilt: boolean,
     ) =>
       Effect.gen(function* () {
         if (services.executor === undefined)
           return yield* Effect.die(`${options.name} approval recovery requires RunExecutor`)
         // Registrations live in the Runtime instance, so a rebuilt Runtime registers before recovering.
-        if (rebuilt) yield* register(services.runtime)
+        yield* register(services.runtime)
         expect((yield* services.runtime.operator.explain(suspended.runId)).decision).toEqual({
           _tag: "AwaitApproval",
           token: suspended.token,
@@ -145,7 +155,7 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
         expect(operatorAction?.action).toMatchObject({ _tag: "ResolveApproval", token: suspended.token })
         const claim = yield* capability.claim(services, {
           runId: suspended.runId,
-          workerId: "approval-after",
+          commandId: "approval-after",
         })
         yield* services.executor.execute(claim)
         expect((yield* services.runtime.inspect(suspended.runId)).status).toBe("succeeded")
@@ -171,7 +181,7 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
           )
         const deniedClaim = yield* capability.claim(services, {
           runId: denied.runId,
-          workerId: "approval-denied-after",
+          commandId: "approval-denied-after",
         })
         yield* services.executor.execute(deniedClaim)
         expect((yield* services.runtime.inspect(denied.runId)).status).toBe("failed")
@@ -192,22 +202,11 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
         expect(toolCalls).toBe(1)
       })
 
-    if (capability.recovery === "rebuild") {
-      return prepare(
-        Effect.gen(function* () {
-          const suspended = yield* open((services) => register(services.runtime).pipe(Effect.andThen(start(services))))
-          yield* open((services) => recover(services, suspended, true))
-        }).pipe(Effect.orDie),
-      )
-    }
     return prepare(
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- LayerError is selected by each driver and is terminated below at the test boundary.
-      open((services) =>
-        register(services.runtime).pipe(
-          Effect.andThen(start(services)),
-          Effect.flatMap((suspended) => recover(services, suspended, false)),
-        ),
-      ).pipe(Effect.orDie),
+      Effect.gen(function* () {
+        const suspended = yield* open((services) => register(services.runtime).pipe(Effect.andThen(start(services))))
+        yield* open((services) => recover(services, suspended))
+      }).pipe(Effect.orDie),
     )
   })
 }

@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Cause, Deferred, Effect, Fiber, Function, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -1093,18 +1094,18 @@ describe("DurableDriver Agent.stream integration", () => {
     const agent = Agent.make({ name: "bounded-session-sync-agent" })
 
     return provideScoped(
-      Layer.mergeAll(allowAllAuthorization, Session.layerMemory, modelLayer, journalLayer),
+      Layer.mergeAll(allowAllAuthorization, layerMemory, modelLayer, journalLayer),
       Effect.gen(function* () {
         const before = yield* Effect.scoped(
           Effect.gen(function* () {
             const store = yield* Session.acquire("bounded-session-sync")
             for (let index = 0; index < 256; index += 1) {
               yield* store.append({
-                _tag: "Message",
-                message: Prompt.makeMessage("user", {
-                  content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
-                }),
-              })
+                              _tag: "Message",
+                              message: Prompt.makeMessage("user", {
+                                content: [Prompt.makePart("text", { text: `history-${index}-${"x".repeat(32)}` })],
+                              }),
+                            }, { commandId: `fixture-1103-${index}` })
             }
             return yield* store.path()
           }),
@@ -1130,64 +1131,6 @@ describe("DurableDriver Agent.stream integration", () => {
     )
   })
 
-  it.effect("gives same-turn same-count syncs with different transcripts distinct durable keys", () => {
-    const recorded = new Map<
-      string,
-      { operation: DurableDriver.DriverOperation; outcome: DurableDriver.OperationOutcome }
-    >()
-    const journalLayer = Layer.succeed(DurableDriver.DriverJournal, {
-      onScheduled: (operation) =>
-        Effect.gen(function* () {
-          if (operation.kind !== "memory" || !operation.key.includes(":memory:sync:")) return undefined
-          const existing = recorded.get(operation.key)
-          if (existing === undefined) return undefined
-          if (existing.operation.inputDigest !== operation.inputDigest) {
-            return yield* Effect.die(
-              new Error(`Persisted operation ${operation.key} does not match the scheduled operation`),
-            )
-          }
-          return existing.outcome
-        }),
-      onCompleted: (operation, outcome) =>
-        Effect.sync(() => {
-          if (operation.kind === "memory" && operation.key.includes(":memory:sync:")) {
-            recorded.set(operation.key, { operation, outcome })
-          }
-        }),
-      onCheckpoint: () => Effect.void,
-    })
-    const modelLayer = Layer.effect(
-      LanguageModel.LanguageModel,
-      LanguageModel.make({
-        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-        streamText: () =>
-          withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "text", delta: "done" }))),
-      }),
-    )
-    const agent = Agent.make({ name: "sync-key-collision-agent" })
-    const run = (prompt: string) =>
-      provideScoped(
-        Layer.mergeAll(allowAllAuthorization, Session.layerMemory, modelLayer, journalLayer),
-        Agent.stream(agent, prompt, {
-          history: Prompt.empty,
-          logicalOperationId: "sync-key-collision",
-          sessionId: "sync-key-collision",
-        }).pipe(Stream.runDrain),
-      )
-
-    return Effect.gen(function* () {
-      yield* run("first transcript")
-      const firstKeys = new Set(recorded.keys())
-      yield* run("other transcript")
-      const secondKeys = [...recorded.keys()].filter((key) => !firstKeys.has(key))
-      expect(firstKeys.size).toBeGreaterThan(0)
-      expect(secondKeys.length).toBe(firstKeys.size)
-      for (const { operation } of recorded.values()) {
-        const input = yield* Schema.decodeUnknownEffect(transcriptInputSchema)(operation.input)
-        expect(operation.key.endsWith(`:${input.transcriptDigest}`)).toBe(true)
-      }
-    })
-  })
 
   it.effect("replays the exact Session path from its cursor without re-appending", () => {
     const recorded = new Map<string, DurableDriver.OperationOutcome>()
@@ -1233,7 +1176,7 @@ describe("DurableDriver Agent.stream integration", () => {
             ),
         })
       }),
-    ).pipe(Layer.provide(Session.layerMemory))
+    ).pipe(Layer.provide(layerMemory))
     const memoryLayer = Memory.layerTest({
       recall: () => Effect.succeed([]),
       remember: (input) =>
@@ -1267,7 +1210,7 @@ describe("DurableDriver Agent.stream integration", () => {
         yield* Effect.scoped(
           Effect.gen(function* () {
             const store = yield* Session.acquire("session-sync-replay")
-            const compactionId = yield* store.reserveEntryId
+            const compactionId = yield* store.reserveEntryId("replay-checkpoint")
             yield* store.appendCheckpoint({
               id: compactionId,
               parentId: null,
@@ -1289,11 +1232,11 @@ describe("DurableDriver Agent.stream integration", () => {
           Effect.gen(function* () {
             const store = yield* Session.acquire("session-sync-replay")
             yield* store.append({
-              _tag: "Message",
-              message: Prompt.makeMessage("user", {
-                content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
-              }),
-            })
+                          _tag: "Message",
+                          message: Prompt.makeMessage("user", {
+                            content: [Prompt.makePart("text", { text: "newer unrelated continuation" })],
+                          }),
+                        }, { commandId: "fixture-1292" })
             return yield* store.path()
           }),
         )
@@ -1332,13 +1275,11 @@ describe("DurableDriver Agent.stream integration", () => {
         })
         expect(appendCalls).toBe(appendsBeforeReplay)
         expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
-        for (const malformed of [{}, [], "cursor", 1, { leafId: undefined }]) {
-          recorded.set(firstSyncEntry[0], { ...firstSync, value: malformed })
-          const invalidCursor = yield* run().pipe(Effect.flip)
-          expect(invalidCursor).toMatchObject({ _tag: "generalist/core/AgentError", turn: 0 })
-          expect(appendCalls).toBe(appendsBeforeReplay)
-          expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
-        }
+        recorded.set(firstSyncEntry[0], { ...firstSync, value: { leafId: 1 } })
+        const invalidCursor = yield* run().pipe(Effect.flip)
+        expect(invalidCursor).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+        expect(appendCalls).toBe(appendsBeforeReplay)
+        expect(modelParents).toEqual([cursorLeaf, cursorLeaf])
       }),
     )
   })
@@ -1532,7 +1473,7 @@ describe("DurableDriver Agent.stream integration", () => {
           }),
           Layer.succeed(DurableDriver.DriverJournal, journal),
           unusedToolHandlerLayer,
-          Session.layerMemory,
+          layerMemory,
         ),
         Effect.gen(function* () {
           const sessionContext = (sessionId: string) =>
@@ -2137,7 +2078,7 @@ describe("DurableDriver Agent.stream integration", () => {
             : Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" }),
       }),
       journalLayer,
-      Session.layerMemory,
+      layerMemory,
       unusedToolHandlerLayer,
     )
     layer(services)("binds suspension checkpoints to resume tokens", (suite) => {

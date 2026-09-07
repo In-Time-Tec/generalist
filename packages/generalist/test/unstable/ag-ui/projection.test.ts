@@ -162,7 +162,12 @@ describe("AG-UI event projection", () => {
         {
           ...base,
           _tag: "RunCompleted",
-          result: { text: "hello", turns: 1, session: { sessionId: "thread-1", leafId: null } },
+          result: {
+            text: "hello",
+            output: "hello",
+            turns: 1,
+            session: { sessionId: "thread-1", leafId: null },
+          },
         },
         { ...base, _tag: "ToolProgress", turn: 0, toolCallId: "tool-1", message: "working", data: { percent: 50 } },
         {

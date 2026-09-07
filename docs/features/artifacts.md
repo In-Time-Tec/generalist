@@ -68,6 +68,7 @@ const current = yield * host.artifacts.read("plan.md")
 
 yield *
   host.artifacts.edit("plan.md", {
+    commandId: "human-plan-note",
     base: current.version,
     operation: { _tag: "Insert", at: current.content.length, text: "\nHuman note" },
     attribution: { _tag: "Human", actor: "alice" },
@@ -76,21 +77,22 @@ yield *
 const updates = yield * host.artifacts.subscribe("plan.md", current.version)
 ```
 
+`commandId` is the caller's stable identity for this logical edit. Reuse it only when retrying the exact same request; keep it unchanged across transport retries, and use a new value for the next edit.
+
 The optional subscription version is exclusive and defaults to 0. Every `ArtifactUpdate` carries `artifact`, `base`, `result`, the range `operation`, `attribution`, CRDT `update` bytes, the complete snapshot `Media.Ref`, and optional `branch`. Replay is ordered by `result`, followed by live updates without a subscribe/replay gap. Producers never wait for slow consumers; a bounded subscriber fails with `ArtifactSubscriberLagged` and reconnects from its last delivered version.
 
 The Server exposes the same open documents:
 
 - `GET /artifacts/:name` returns the current `ReadResult`.
 - `GET /artifacts/:name/ws?version=<exclusive-version>` upgrades to WebSocket. The server first sends `{ _tag: "Snapshot", document }`, then `{ _tag: "Update", update, document }` events.
-- A browser sends `{ _tag: "Edit", base, operation, attribution: { _tag: "Human", actor } }` over that socket.
+- A browser sends `{ _tag: "Edit", commandId, base, operation, attribution: { _tag: "Human", actor } }` over that socket. The browser must retain `commandId` when retrying the same edit after a transport failure.
 
 The exported `Server.ArtifactClientCommand` and `Server.ArtifactServerEvent` Schemas own this JSON boundary. Authentication is inherited from the enclosing Server Layer.
 
 ## Persistence, replay, and fork
-
 The runtime driver's artifact head and operation log are authoritative for ordering. Each compare-and-append stores the base-relative range, result version, attribution, CRDT update, and snapshot reference. `BlobStore` stores complete binary CRDT snapshots as `Media.Ref`; Run events never contain binary CRDT state.
 
-An edit that loses the compare-and-append race reloads the head and retries the same base-relative CRDT merge up to eight times. Continued contention returns the typed `ArtifactVersionConflict` instead of retrying without a bound.
+An edit that loses the compare-and-append race reloads the head and retries the same base-relative CRDT merge with its original `commandId` up to eight times. Continued contention returns the typed `ArtifactVersionConflict` instead of retrying without a bound.
 
 Replaying operation-log updates from a referenced snapshot reproduces the current document. Reopening with a fresh runtime and BlobStore Layer restores both the current snapshot and replay stream.
 

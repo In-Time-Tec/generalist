@@ -97,14 +97,20 @@ const makeFor = (
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
         if (claimed.attemptFence !== claim.attemptFence) {
-          yield* store.saveExecution(claim)
+          yield* store.saveExecution({
+            ...claim,
+            commandId: JSON.stringify(["verify-claim", claim.runId, claim.attemptFence]),
+          })
           return
         }
         if (claimed.cancellationRequested) {
           yield* reconcileCancellation(claim, claimed)
           return
         }
-        if ((yield* store.recoverRunningOperations(claim)) === "blocked") return
+        if ((yield* store.recoverRunningOperations({
+          ...claim,
+          commandId: JSON.stringify(["recover-operations", claim.runId, claim.attemptFence]),
+        })) === "blocked") return
         const runId = claim.runId
         const activeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const completingRetrySafeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
@@ -169,7 +175,7 @@ const makeFor = (
                 const nested = yield* makeOperations({ claim, claimed, store })
                 const budgetContext = { runId, claim, store, nested, codeMode }
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
-                const boundSession = yield* sessionBinding({ store, claim })
+                const boundSession = yield* sessionBinding({ store, claim }).pipe(Effect.orDie)
                 const baseContext = Context.mergeAll(
                   yield* hostContext({ agent, environment, store, codeMode, nested, messaging }),
                   boundSession.context,
@@ -189,6 +195,18 @@ const makeFor = (
                   ): Effect.Effect<void> =>
                     Effect.gen(function* () {
                       const budget = yield* prepareBudget({ ...budgetContext, checkpoint: initialCheckpoint })
+                      const executionAttempt = yield* executionRetry.attempt
+                      // Every new activation has a fresh fence; in-claim segments advance through
+                      // a persisted retry attempt or an admitted steering continuation.
+                      const segment = JSON.stringify([
+                        runId,
+                        claim.attemptFence,
+                        executionAttempt,
+                        continuation?.nextTurn ?? null,
+                        continuation?.steeringEntryIds ?? [],
+                      ])
+                      let checkpointOrdinal = 0
+                      let eventOrdinal = 0
                       if (budget === undefined) return
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
                       const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
@@ -329,12 +347,20 @@ const makeFor = (
                               return { _tag: "Unknown" as const, operationId: record.operationId }
                             const recovered =
                               record.status === "running"
-                                ? yield* store.expireRunningOperation({ ...claim, operationId: record.operationId })
+                                ? yield* store.expireRunningOperation({
+                                    ...claim,
+                                    operationId: record.operationId,
+                                    commandId: JSON.stringify(["expire-operation", claim.runId, claim.attemptFence, record.operationId, attempt]),
+                                  })
                                 : undefined
                             if (recovered?.outcome === "unknown") {
                               return { _tag: "Unknown" as const, operationId: record.operationId }
                             }
-                            yield* store.startOperation({ ...claim, operationId: record.operationId })
+                            yield* store.startOperation({
+                              ...claim,
+                              operationId: record.operationId,
+                              commandId: JSON.stringify(["start-operation", claim.runId, claim.attemptFence, record.operationId, attempt]),
+                            })
                             yield* Ref.update(activeOperationIds, (current) => new Set(current).add(record.operationId))
                             return undefined
                           }).pipe(Effect.mapError((error) => journalFailure("schedule", operation.key, error))),
@@ -377,7 +403,12 @@ const makeFor = (
                               onSome: (fault) => fault.afterCompletedOperation ?? Effect.void,
                             })
                           }).pipe(Effect.mapError((error) => journalFailure("completion", operation.key, error))),
-                        onCheckpoint: (checkpoint) => saveJournalCheckpoint({ store, claim, checkpoint }),
+                        onCheckpoint: (checkpoint) => saveJournalCheckpoint({
+                          store,
+                          claim,
+                          checkpoint,
+                          commandId: JSON.stringify(["checkpoint", segment, checkpointOrdinal++]),
+                        }),
                       }
                       const context = Context.merge(baseContext, Context.make(DriverJournal, journal))
                       if (
@@ -405,8 +436,9 @@ const makeFor = (
                       if (runOptions === undefined) {
                         return yield* deferProgramChildFailure(undecodableSuspension)
                       }
-                      const persistEvent = (event: Event) =>
-                        Effect.gen(function* () {
+                      const persistEvent = (event: Event) => {
+                        const commandId = JSON.stringify(["agent-event", segment, eventOrdinal++])
+                        return Effect.gen(function* () {
                           yield* executionRetry.observe(event)
                           if (event._tag === "ModelPart") return yield* preview.offer(event)
                           if (event._tag === "ModelResponseCommitted") {
@@ -426,7 +458,11 @@ const makeFor = (
                             )
                             const leafId = yield* Option.match(boundSession.session, {
                               onNone: () => Effect.succeed(null),
-                              onSome: (service) => service.leaf.pipe(Effect.orDie),
+                              onSome: (service) => service.leaf.pipe(Effect.mapError((cause) => AgentError.make({
+                                message: "Cannot read the committed Session leaf",
+                                turn: Math.max(0, event.turns - 1),
+                                cause,
+                              }))),
                             })
                             const result = {
                               text: event.text,
@@ -437,7 +473,7 @@ const makeFor = (
                             if (isProgramChild) {
                               return yield* Ref.set(deferredProgramChildTerminal, { _tag: "Complete", result })
                             }
-                            const outcome = yield* store.complete({ ...claim, result })
+                            const outcome = yield* store.complete({ ...claim, commandId, result })
                             if (outcome._tag === "SteeringPending") {
                               yield* Ref.set(pendingCompletion, outcome.continuation)
                             }
@@ -453,8 +489,9 @@ const makeFor = (
                           if ((yield* Ref.get(observed)).length > 0) {
                             return yield* Ref.update(bufferedEvents, (events) => [...events, persistedEvent])
                           }
-                          yield* store.emitAgentEvent({ ...claim, event: persistedEvent })
+                          yield* store.emitAgentEvent({ ...claim, commandId, event: persistedEvent })
                         })
+                      }
                       const exit = yield* HostedRun.stream(hostedAgent, runOptions, inbox).pipe(
                         Stream.runForEach(persistEvent),
                         Effect.provideContext(context),

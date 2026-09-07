@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "../json.js"
 import { Effect, Exit, Layer, Option, Schema, Stream } from "effect"
@@ -239,7 +240,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         Compaction.layerTest({
           maybeCompact: (request) => Effect.sync(() => compactionRequests.push(request)).pipe(Effect.as(Option.none())),
         }),
-        Session.layerMemory,
+        layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "authority-agent", toolkit: Toolkit.make(echoTool) })
@@ -331,7 +332,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
             }),
         }),
         ModelMiddleware.layer([duplicateIdMiddleware]),
-        Session.layerMemory,
+        layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "duplicate-id-agent", toolkit: Toolkit.make(gatedEchoTool) })
@@ -579,7 +580,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layer([exitMiddleware]),
-        Session.layerMemory,
+        layerMemory,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "exit-authority-agent", toolkit: Toolkit.make(echoTool) })
@@ -650,7 +651,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
           unusedExecutor,
           Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
-          Session.layerMemory,
+          layerMemory,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({ name: "response-authority-agent" })

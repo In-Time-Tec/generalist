@@ -85,7 +85,12 @@ const completed = (runId: string, rootRunId: string, sequence: number, sessionId
     _tag: "RunCompleted" as const,
     eventId: `${runId}:terminal`,
     sequence,
-    result: { text: runId, turns: 1, session: { sessionId, leafId: null } },
+    result: {
+      text: runId,
+      output: runId,
+      turns: 1,
+      session: { sessionId, leafId: null },
+    },
   }
   if (depth > 0) Object.assign(event, { parentRunId: rootRunId })
   return event
@@ -205,7 +210,12 @@ const snapshot = (
   turn: 1,
   outcome: {
     _tag: "Succeeded",
-    result: { text: runId, turns: 1, session: { sessionId: `session:${runId}`, leafId: null } },
+    result: {
+      text: runId,
+      output: runId,
+      turns: 1,
+      session: { sessionId: `session:${runId}`, leafId: null },
+    },
     eventId: `${runId}:terminal`,
     occurredAt: "2026-09-01T00:00:01.000Z",
   },

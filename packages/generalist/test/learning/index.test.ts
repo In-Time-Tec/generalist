@@ -1,9 +1,9 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "../../src/index.js"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
-import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 import {
   layer as learningLayer,
   proposeWithModel,
@@ -14,7 +14,6 @@ import {
 import { TestModel } from "../../src/testing/index.js"
 import type { Trajectory } from "../../src/trajectory/index.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
-import { tempDbPath } from "../runtime/sql/scenario.js"
 
 const usage = Response.Usage.make({
   inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -35,7 +34,7 @@ const model = Layer.effect(
 
 const agent = Agent.make({ name: "learning-approval", toolkit: Toolkit.empty })
 
-const runtimeLayer = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+const runtimeLayer = objectRuntimeLayer({ addresses: [] }).pipe(
   Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
 )
 
@@ -63,10 +62,6 @@ const trajectory: Trajectory = {
   gates: [],
 }
 
-const sqliteLayer = (filename: string) =>
-  SqliteRuntime.layerSqlite({ filename, addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-  )
 
 const handlers = (apply: (proposal: Proposal) => Effect.Effect<void>): ApplyHandlers => ({
   RefineInstruction: apply,
@@ -139,7 +134,13 @@ it.effect("journals and applies an approved proposal exactly once", () => {
         idempotencyKey: "learning-approved",
       })
 
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "learning-approved" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+          commandId: "learning:approved",
+        }),
+      )
 
       expect(yield* handle.await).toBe("done")
       expect(proposeCalls).toBe(1)
@@ -192,7 +193,13 @@ it.effect("journals a denied proposal reason without applying it", () => {
         idempotencyKey: "learning-denied",
       })
 
-      yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "learning-denied" }))
+      yield* executor.execute(
+        yield* store.claimExecution({
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+          commandId: "learning:denied",
+        }),
+      )
 
       expect(yield* handle.await).toBe("done")
       expect(applyCalls).toBe(0)
@@ -212,7 +219,13 @@ it.effect("journals a denied proposal reason without applying it", () => {
 })
 
 it.live("recovers a pending proposal, approves it through the operator, and applies it once", () => {
-  const filename = tempDbPath("learning-recovery")
+  const storage = makeObjectStorage()
+  const beforeLayer = objectRuntimeLayer({ addresses: [], workerId: "learning-before-restart" }, storage).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+  )
+  const afterLayer = objectRuntimeLayer({ addresses: [], workerId: "learning-after-restart" }, storage).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+  )
   const requests: Array<Approvals.Pending> = []
   const approvals = Approvals.layerTest({
     resolve: (pending) =>
@@ -227,7 +240,7 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
 
   return Effect.gen(function* () {
     const suspended = yield* provideScoped(
-      sqliteLayer(filename),
+      beforeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const executor = yield* RunExecutor.RunExecutor
@@ -250,7 +263,11 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
         })
 
         yield* executor.execute(
-          yield* store.claimExecution({ runId: handle.runId, ownerId: "learning-before-restart" }),
+          yield* store.claimExecution({
+            runId: handle.runId,
+            ownerId: "learning-before-restart",
+            commandId: "learning:recovery:before",
+          }),
         )
 
         expect(yield* runtime.inspect(handle.runId)).toMatchObject({
@@ -269,7 +286,7 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
     )
 
     yield* provideScoped(
-      sqliteLayer(filename),
+      afterLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const executor = yield* RunExecutor.RunExecutor
@@ -296,7 +313,11 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
           // oxlint-disable-next-line effecttsgo/strict-effect-provide -- The test owns this short-lived in-memory RuleStore Layer.
           .pipe(Effect.provide(Permissions.layerRuleStoreMemory()))
         yield* executor.execute(
-          yield* store.claimExecution({ runId: suspended.runId, ownerId: "learning-after-restart" }),
+          yield* store.claimExecution({
+            runId: suspended.runId,
+            ownerId: "learning-after-restart",
+            commandId: "learning:recovery:after",
+          }),
         )
 
         expect(yield* runtime.inspect(suspended.runId)).toMatchObject({ status: "succeeded" })

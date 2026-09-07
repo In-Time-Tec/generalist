@@ -262,7 +262,7 @@ export const childGrant: {
 } = Function.dual(2, (remaining: Remaining, admittedChildren: number): BudgetLimits => {
   const limits: Record<string, number> = {}
   if (remaining.tokens !== undefined) limits.tokens = remaining.tokens
-  if (remaining.usd !== undefined && remaining.usd !== "unknown") limits.usd = remaining.usd
+  if (remaining.usd !== undefined) limits.usd = remaining.usd === "unknown" ? 0 : remaining.usd
   if (remaining.duration !== undefined) limits.duration = remaining.duration
   if (remaining.toolCalls !== undefined) limits.toolCalls = remaining.toolCalls
   if (remaining.children !== undefined) limits.children = Math.max(0, remaining.children - admittedChildren)

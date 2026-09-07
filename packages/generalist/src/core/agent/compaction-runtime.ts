@@ -12,6 +12,7 @@ import {
   SessionConflict,
   type Entry,
   type SessionStore,
+  type CompactionEntry,
   type SessionStoreError,
 } from "../context/session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./message.js"
@@ -23,12 +24,13 @@ import {
   SessionCursor,
   type SessionCursor as SessionCursorType,
 } from "./session/cursor.js"
-import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/telemetry/events.js"
+import { type CompactionCommit, type Event as ModelTelemetryEvent } from "../model/telemetry/events.js"
 import type { RunOptions } from "./service.js"
 import { RunError } from "./run/error.js"
 import type { AgentRunState } from "./run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
-import { intercept } from "../durable/driver/run.js"
+import { intercept, logicalOperationId } from "../durable/driver/run.js"
+import { digest as canonicalDigest } from "../durable/canonical-json.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver/interpreter.js"
 import type { Key, Memory, MemoryError } from "../context/memory.js"
 import type { SkillCatalogError } from "../context/skill-catalog.js"
@@ -45,9 +47,6 @@ type CompactionContext = {
   readonly runId: RunId
   readonly activeSession: Option.Option<SessionStore>
   readonly sessionId: string
-  readonly sessionAppendOptions: (expectedLeafId: string | null) => {
-    readonly expectedLeafId: string | null
-  }
   readonly chat: Chat.Service
   readonly system: string | undefined
   readonly options: RunOptions
@@ -75,7 +74,6 @@ export const make = (context: CompactionContext) => {
     runId,
     activeSession,
     sessionId,
-    sessionAppendOptions,
     chat,
     system,
     options,
@@ -97,29 +95,27 @@ export const make = (context: CompactionContext) => {
   const resolveCursor = (turn: number, cursor: SessionCursorType) =>
     pathFromCursor({ turn, cursor, session: activeSession, sessionError })
   const appendTranscript = (
-    turn: number,
     transcript: Prompt.Prompt,
     cursor: number,
     path: ReadonlyArray<Entry>,
     session: SessionStore,
+    invocationId: string,
   ) =>
     Effect.gen(function* () {
       let expectedLeafId = path.at(-1)?.id ?? null
-      const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-      const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
-      const root = checkpoint === undefined ? "root" : `checkpoint:${checkpoint.id}`
       for (const [position, message] of transcript.content.entries()) {
         if (position < cursor || message.role === "system") continue
-        const id = operationKey(logicalId, "model", turn, "session-entry", root, position, message.role)
-        const appended = yield* session.append(
-          { _tag: "Message", message },
-          { ...sessionAppendOptions(expectedLeafId), id },
-        )
+        const id = canonicalDigest(["session-entry", invocationId, position, message.role])
+        const appended = yield* session.append({ _tag: "Message", message }, { expectedLeafId, id })
         expectedLeafId = appended.id
       }
       return expectedLeafId === (path.at(-1)?.id ?? null) ? path : yield* session.path()
     })
-  const syncSessionBody = (turn: number, transcript: Prompt.Prompt): Effect.Effect<SessionCursor, AgentError> =>
+  const syncSessionBody = (
+    turn: number,
+    transcript: Prompt.Prompt,
+    invocationId: string,
+  ): Effect.Effect<SessionCursor, AgentError> =>
     Option.match(activeSession, {
       onNone: () => Effect.succeed({ leafId: null }),
       onSome: (session) =>
@@ -146,20 +142,22 @@ export const make = (context: CompactionContext) => {
               diagnostics: diagnoseSessionSync(diagnostics),
             })
           }
-          path = yield* appendTranscript(turn, transcript, cursor.value, path, session)
+          path = yield* appendTranscript(transcript, cursor.value, path, session, invocationId)
           return cursorFromPath(path)
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
   const syncSession = (
     turn: number,
     transcript: Prompt.Prompt,
-  ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
-    const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-    const transcriptDigest = promptDigest(conversationOnly(transcript).content)
-    return intercept(
+    invocationId: string,
+  ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> =>
+    Effect.gen(function* () {
+      const key = operationKey(yield* logicalOperationId, "memory", "sync", turn, invocationId)
+      const transcriptDigest = promptDigest(conversationOnly(transcript).content)
+      return yield* intercept(
       {
         kind: "memory",
-        key: operationKey(logicalId, "memory", "sync", turn, transcript.content.length, transcriptDigest),
+        key,
         turn,
         input: {
           turn,
@@ -170,21 +168,22 @@ export const make = (context: CompactionContext) => {
         success: SessionCursor,
         failure: RunError,
       },
-      syncSessionBody(turn, transcript),
+      syncSessionBody(turn, transcript, key),
     ).pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(SessionCursor)),
       Effect.mapError((error) =>
-        Schema.is(AgentError)(error)
+        Schema.is(RunError)(error)
           ? error
           : AgentError.make({ message: `Invalid Session cursor: ${String(error)}`, turn, cause: error }),
       ),
       Effect.flatMap((cursor) => resolveCursor(turn, cursor)),
-    )
-  }
+      )
+    })
   const sessionPathForCompaction = (
     turn: number,
     history: Prompt.Prompt,
     prompt: Prompt.Prompt,
+    invocationId: string,
   ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> =>
     Option.match(activeSession, {
       onNone: () => Effect.succeed([]),
@@ -197,7 +196,7 @@ export const make = (context: CompactionContext) => {
             Option.isSome(sessionTranscriptCursor(projection.content, Prompt.concat(history, prompt).content))
           )
             return path
-          return yield* syncSession(turn, history)
+          return yield* syncSession(turn, history, operationKey(invocationId, "before-compaction"))
         }),
     })
   const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> =>
@@ -253,6 +252,7 @@ export const make = (context: CompactionContext) => {
     turn: number,
     result: CompactionResult,
     parentId: string | null,
+    commandId: string,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
     onCommitted?: () => void,
   ): Effect.Effect<void, RunError> =>
@@ -286,13 +286,15 @@ export const make = (context: CompactionContext) => {
       },
       onSome: (session) =>
         Effect.gen(function* () {
-          const id = yield* session.reserveEntryId
+          const id = yield* session.reserveEntryId(commandId)
+          const existing = yield* session.entry(id)
+          const previous: CompactionEntry | undefined = existing?._tag === "Compaction" ? existing : undefined
           const telemetryBeforeApplied = Object.freeze([...undeliveredTelemetry])
           const isSummaryCall = (
             event: ModelTelemetryEvent,
           ): event is Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> =>
             event._tag === "ModelCallStarted" && event.compactionId === commitData?.compactionId
-          const summaryCall = commitData === undefined ? undefined : telemetryBeforeApplied.findLast(isSummaryCall)
+          const summaryCall = commitData === undefined ? undefined : (previous?.telemetry ?? telemetryBeforeApplied).findLast(isSummaryCall)
           let compactionCommit: CompactionCommit | undefined
           if (commitData !== undefined) {
             const commitBase = { ...commitData, checkpointId: id }
@@ -302,7 +304,9 @@ export const make = (context: CompactionContext) => {
           const applied =
             compactionCommit === undefined
               ? undefined
-              : prepareTelemetry({
+              : previous?.telemetry.findLast(
+                  (event) => event._tag === "CompactionApplied" && event.checkpointId === id,
+                ) ?? prepareTelemetry({
                   _tag: "CompactionApplied",
                   turn,
                   compactionId: compactionCommit.compactionId,
@@ -311,7 +315,7 @@ export const make = (context: CompactionContext) => {
                   appliedAt: yield* Clock.currentTimeMillis,
                   commit: compactionCommit,
                 })
-          const telemetry = Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
+          const telemetry = previous?.telemetry ?? Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
           const projectedHistory = conversationOnly(result.history)
           const checkpointBase = {
             id,
@@ -338,7 +342,16 @@ export const make = (context: CompactionContext) => {
             ).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
-                  undeliveredTelemetry.splice(0, telemetryBeforeApplied.length)
+                  if (previous === undefined) {
+                    undeliveredTelemetry.splice(0, telemetryBeforeApplied.length)
+                  } else {
+                    const committed = new Set(previous.telemetry.map((event) => event.deliveryId))
+                    let remaining = 0
+                    for (const event of undeliveredTelemetry) {
+                      if (!committed.has(event.deliveryId)) undeliveredTelemetry[remaining++] = event
+                    }
+                    undeliveredTelemetry.length = remaining
+                  }
                   if (applied !== undefined) publishTelemetry(applied)
                   onCommitted?.()
                 }),
@@ -366,25 +379,28 @@ export const make = (context: CompactionContext) => {
     Effect.gen(function* () {
       const tasks = yield* currentTasks
       const retained = Option.isSome(tasks) ? retainTasks(result, tasks.value) : result
-      const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+      const logicalId = yield* logicalOperationId
+      const commandId = operationKey(logicalId, "compaction", "apply", turn, applicationIdentity)
       const interceptionBase = {
         turn,
         tag: retained._tag,
         applicationIdentity,
+        parentId,
+        result: Schema.encodeSync(CompactionResult)(retained),
       }
       const interceptionInput =
-        commitData === undefined ? interceptionBase : { ...interceptionBase, compactionId: commitData.compactionId }
+        commitData === undefined ? interceptionBase : { ...interceptionBase, compactionCommit: commitData }
       yield* intercept(
         {
           kind: "compaction",
-          key: operationKey(logicalId, "compaction", "apply", turn, applicationIdentity),
+          key: commandId,
           turn,
           input: interceptionInput,
           replayPolicy: "pure",
           success: Schema.Void,
           failure: RunError,
         },
-        applyCompactionResultBody(turn, retained, parentId, commitData, onCommitted),
+        applyCompactionResultBody(turn, retained, parentId, commandId, commitData, onCommitted),
       )
       if (Option.isSome(tasks)) yield* Ref.update(chat.history, (history) => withCurrentTasks(history, tasks.value))
     })
@@ -396,14 +412,14 @@ export const make = (context: CompactionContext) => {
     yield* Ref.set(chat.history, retained)
     return { history: retained, tasks }
   })
-  const preparePrompt = (turn: number, prompt: Prompt.Prompt, overflow: boolean) =>
+  const preparePrompt = (turn: number, prompt: Prompt.Prompt, overflow: boolean, invocationId: string) =>
     Option.match(compactionService, {
       onNone: () => historyWithCurrentTasks.pipe(Effect.as({ prompt, changed: false })),
       onSome: (compaction) =>
         Effect.gen(function* () {
           const current = yield* historyWithCurrentTasks
           const history = current.history
-          const path = yield* sessionPathForCompaction(turn, history, prompt)
+          const path = yield* sessionPathForCompaction(turn, history, prompt, invocationId)
           const usage = yield* compactionUsage(turn, history, prompt)
           if (compaction.willCompact !== undefined && !compaction.willCompact({ usage, overflow }))
             return { prompt, changed: false }
@@ -424,8 +440,8 @@ export const make = (context: CompactionContext) => {
           const detachedPath = yield* Effect.forEach(path, detachEntry).pipe(
             Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
           )
-          const compactionId = yield* generateId
-          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const logicalId = yield* logicalOperationId
+          const compactionId = operationKey(logicalId, "compaction", turn, invocationId)
           const compactBase = {
             compactionId,
             agentName: agent.name,

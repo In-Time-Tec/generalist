@@ -1,6 +1,9 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
 
 const deployTool = Tool.make("deploy", {
@@ -63,40 +66,63 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.merge(
-  Runtime.layerMemory({
-    addresses: [],
-  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
-  agentServices,
-)
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  return Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+}))
 
-const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  const handle = yield* runtime.start(agent, "Deploy the api service", {
-    sessionId: "release-1",
-    idempotencyKey: "deploy-1",
-  })
-  const firstRun = yield* handle.events.pipe(
-    Stream.takeUntil((event) => event._tag === "RunWaiting"),
-    Stream.runCollect,
-  )
-  const waiting = Array.from(firstRun).find((event) => event._tag === "RunWaiting")
-  if (waiting === undefined || waiting._tag !== "RunWaiting") {
-    return yield* Effect.die("expected a RunWaiting event")
-  }
-  yield* Console.log(`waiting for ${waiting.wait.reason._tag} on ${waiting.wait.waitId}`)
-  yield* runtime.respond({ runId: handle.runId, waitId: waiting.wait.waitId, resolution: { _tag: "Approved" } })
-  const secondRun = yield* runtime.events({ runId: handle.runId, cursor: Cursor.make(waiting.sequence) }).pipe(
-    Stream.takeUntil((event) => event._tag === "RunCompleted"),
-    Stream.runCollect,
-  )
-  const completed = Array.from(secondRun).find((event) => event._tag === "RunCompleted")
-  if (completed === undefined || completed._tag !== "RunCompleted" || "_tag" in completed.result) {
-    return yield* Effect.die("expected an Agent RunCompleted event")
-  }
-  yield* Console.log(completed.result.text)
-})
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    yield* Durability.activate
+    const runtime = yield* Runtime.Runtime
+    yield* runtime.register(agent)
+    const handle = yield* runtime.start(agent, "Deploy the api service", {
+      sessionId: "release-1",
+      idempotencyKey: "deploy-1",
+    })
+    const firstRun = yield* handle.events.pipe(
+      Stream.takeUntil((event) => event._tag === "RunWaiting"),
+      Stream.runCollect,
+    )
+    const waiting = Array.from(firstRun).find((event) => event._tag === "RunWaiting")
+    if (waiting === undefined || waiting._tag !== "RunWaiting") {
+      return yield* Effect.die("expected a RunWaiting event")
+    }
+    yield* Console.log(`waiting for ${waiting.wait.reason._tag} on ${waiting.wait.waitId}`)
+    yield* runtime.respond({ runId: handle.runId, waitId: waiting.wait.waitId, resolution: { _tag: "Approved" } })
+    const secondRun = yield* runtime.events({ runId: handle.runId, cursor: Cursor.make(waiting.sequence) }).pipe(
+      Stream.takeUntil((event) => event._tag === "RunCompleted"),
+      Stream.runCollect,
+    )
+    const completed = Array.from(secondRun).find((event) => event._tag === "RunCompleted")
+    if (completed === undefined || completed._tag !== "RunCompleted" || "_tag" in completed.result) {
+      return yield* Effect.die("expected an Agent RunCompleted event")
+    }
+    yield* Console.log(completed.result.text)
+  }),
+)
 
 const runtime = ManagedRuntime.make(runtimeLayer)
 await runtime.runPromise(program)

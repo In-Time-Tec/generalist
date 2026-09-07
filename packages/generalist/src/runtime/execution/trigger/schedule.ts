@@ -105,7 +105,7 @@ export interface ScheduleRecord {
   readonly createdAt: string
 }
 
-export const ScheduleRecord: Schema.Codec<ScheduleRecord, unknown> = Schema.Struct({
+export const ScheduleRecord = Schema.Struct({
   scheduleId: Schema.String,
   rrule: Schema.String,
   rule: RRule,
@@ -114,7 +114,7 @@ export const ScheduleRecord: Schema.Codec<ScheduleRecord, unknown> = Schema.Stru
   occurrence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("active"),
   createdAt: Schema.String,
-})
+}) satisfies Schema.Codec<ScheduleRecord, unknown>
 
 /** Schedule occurrence held by one scheduler lease. */
 export interface ClaimedSchedule extends ScheduleRecord {

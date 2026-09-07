@@ -12,7 +12,7 @@ export const AgentCommand = Schema.Union([
       Schema.Struct({ _tag: Schema.tag("Denied"), reason: Schema.optionalKey(Schema.String) }),
     ]),
   }),
-  Schema.Struct({ _tag: Schema.tag("Cancel"), sessionId: Schema.String }),
+  Schema.Struct({ _tag: Schema.tag("Cancel"), sessionId: Schema.String, commandId: Schema.String }),
 ])
 
 export type AgentCommand = typeof AgentCommand.Type

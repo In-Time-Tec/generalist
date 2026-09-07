@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "command": "bun scripts/durability-benchmark.ts",
+  "scope": "local simulator admission and fresh-layer reconstruction; no providers or execution",
+  "runtime": "Bun 1.4.0; darwin/arm64",
+  "fixture": { "admissions": 100, "concurrency": 1, "pageSize": 32, "snapshotPolicy": "engine defaults", "seed": "deterministic authored messages" },
+  "admissionMillis": { "first": 36.501292, "last": 2359.795542, "p50": 1015.576709, "p95": 2452.27625, "max": 2849.15325, "total": 113395.86529500003 },
+  "admissionRequests": { "read": 10002, "create": 102, "list": 615, "readBytes": 85295997, "attemptedWriteBytes": 851405 },
+  "recovery": { "millis": 2388.7695, "recoveredRuns": 100, "read": 200, "create": 0, "list": 10, "readBytes": 1702794, "attemptedWriteBytes": 0 },
+  "limitations": ["No real S3/R2 latency", "No cross-host execution", "No pre-refactor comparison", "No warmup or statistical confidence interval", "Partition state is still eagerly materialized"]
+}

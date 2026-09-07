@@ -113,44 +113,9 @@ and are not rewound by semantic reversion.
 
 ### In-memory
 
-`VectorStore.layerMemory` is deterministic process-local storage for tests and
-short-lived applications. It retains append-only versions and active-version
-pointers but is not durable.
+`VectorStore.layerMemory` is deterministic process-local storage for tests and short-lived applications. It retains append-only versions and active-version pointers but is not durable.
 
-### PostgreSQL with pgvector
-
-`layerPgVector` uses the shared `SqlClient` from `@effect/sql`; it
-does not create a second connection pool or depend on `pg`.
-
-```ts
-import { Layer } from "effect"
-import { layer as layerMemory, layerPgVector } from "generalist/memory"
-import { layerEmbedding } from "generalist/providers/amazon-bedrock"
-
-const memory = layerMemory({ semantic: { limit: 5 } }).pipe(
-  Layer.provide(layerPgVector({ table: "generalist_memory", dimensions: 1024 })),
-  Layer.provide(layerEmbedding({ model: "amazon.titan-embed-text-v2:0" })),
-)
-```
-
-Provide the resulting layer with your existing PostgreSQL `SqlClient`. Before
-the first run, enable pgvector in that database with an account allowed to
-install extensions:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-The application account only needs normal create/read/write privileges for the
-configured table after that. The adapter creates the configured active-vector
-table plus a minimal `<table>_history` companion containing version, evidence,
-supersession, application time, and active-pointer state. This changes the
-pre-1.0 pgvector persisted shape but does not change the durable Runtime SQL
-schema. Existing active rows are backfilled as version `1` with empty evidence
-and the migration time as `appliedAt`; duplicate legacy ids across memory keys
-fail setup because version operations require global entry ids. The adapter
-validates every vector against `dimensions`, scopes rows by the complete
-`{ agent, subject }` key, and keeps data when its layer is closed and rebuilt.
+There is no durable `VectorStore` adapter documented here. Object durability persists the Runtime journal and Run state; semantic vectors remain process-local unless an application supplies its own `VectorStore` service.
 
 ### Supermemory
 
@@ -239,13 +204,9 @@ The vector-store `dimensions` must exactly equal the model output length.
   participates in recall.
 - `forget({ key })` is host-requested cleanup for the whole key;
   `forget({ key, id })` removes one implementation-owned item.
-- Core defines the seam and a no-op layer. Retention policy remains host-owned;
-  only pgvector and hosted Supermemory survive process loss, and only pgvector
-  of those durable adapters supports version history.
+- Core defines the seam and a no-op layer. Retention policy remains host-owned; `VectorStore.layerMemory` does not survive process loss, while hosted adapters such as Supermemory have their own persistence semantics outside object Runtime durability.
 
-The Memory conformance suite records `versioning` separately. The local
-SemanticRecall/VectorStore composition and pgvector register it; WorkingMemory
-and Supermemory do not.
+The Memory conformance suite records `versioning` separately. The local SemanticRecall/VectorStore composition registers it; WorkingMemory and Supermemory do not.
 
 ## Related
 

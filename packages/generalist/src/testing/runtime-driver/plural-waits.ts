@@ -2,7 +2,7 @@ import { expect } from "@effect/vitest"
 import { Effect } from "effect"
 import { AgentSuspended } from "../../core/agent/event.js"
 import type { Address } from "../../runtime/address.js"
-import { ResponseConflict, RuntimeUnavailable } from "../../runtime/errors.js"
+import { RuntimeUnavailable } from "../../runtime/errors.js"
 import type { RuntimeCapability, Services } from "./contract.js"
 
 export const toolSuspension = (waitIds: readonly [string, ...Array<string>]): AgentSuspended => {
@@ -51,7 +51,7 @@ export const pluralWaitsConformance = (input: {
       idempotencyKey: prefix,
       prompt: "wait for three responses",
     })
-    const claim = yield* input.capability.claim(input.services, { runId: receipt.runId, workerId: "plural-a" })
+    const claim = yield* input.capability.claim(input.services, { runId: receipt.runId, commandId: "plural-a" })
     const waitIds = ["a", "b", "c"].map((suffix) => `${prefix}:${suffix}`)
     const waits = waitIds.map((waitId, authoredOrder) => ({
       waitId,
@@ -84,7 +84,7 @@ export const pluralWaitsConformance = (input: {
         resolution: { _tag: "ToolResult", result: "changed", encodedResult: "changed" },
       })
       .pipe(Effect.flip)
-    expect(conflict).toBeInstanceOf(ResponseConflict)
+    expect(conflict).toMatchObject({ _tag: "generalist/durability/DurabilityFailure", reason: "input-conflict" })
     expect((yield* input.services.runtime.inspect(receipt.runId)).waits.map((wait) => wait.waitId)).toEqual([
       waitIds[1],
     ])
@@ -100,7 +100,7 @@ export const pluralWaitsConformance = (input: {
     expect(resumed).toHaveLength(3)
     expect(resumed.map((event) => event.waitId).toSorted()).toEqual(waitIds.toSorted())
 
-    const reclaim = yield* input.capability.claim(input.services, { runId: receipt.runId, workerId: "plural-b" })
+    const reclaim = yield* input.capability.claim(input.services, { runId: receipt.runId, commandId: "plural-b" })
     const reopen = yield* input.services.store.suspend({ ...reclaim, waits, suspension }).pipe(Effect.flip)
     expect(reopen).toBeInstanceOf(RuntimeUnavailable)
     expect((yield* input.services.runtime.inspect(receipt.runId)).waits).toEqual([])

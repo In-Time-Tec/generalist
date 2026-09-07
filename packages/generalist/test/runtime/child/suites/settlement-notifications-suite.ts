@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Random, Stream } from "effect"
 import {
@@ -15,23 +16,13 @@ import {
   resolverLayer,
   textPrompt,
 } from "../../execution/fixtures.js"
-import { tempDbPath } from "../../sql/scenario.js"
-
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
+import { makeObjectStorage } from "../../execution/object.js"
 const options = {
   ...parentRelativeOptions,
   scheduler: { pollInterval: "1 hour" as const },
 }
 
-const layers = [
-  ["memory", Runtime.layerMemory(options).pipe(Layer.provide(resolverLayer))],
-  [
-    "sqlite",
-    SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("child-settlements") }).pipe(
-      Layer.provide(resolverLayer),
-    ),
-  ],
-] as const
+const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(resolverLayer))
 
 it("separates cancelled settlement observation from model delivery", () => {
   const payload: ChildSettlement.Payload = {
@@ -73,8 +64,7 @@ const admit = Effect.gen(function* () {
   return { runtime, parent, child }
 })
 
-for (const [backend, runtimeLayer] of layers) {
-  layer(runtimeLayer)(`${backend} child settlement notifications`, (suite) => {
+layer(runtimeLayer)("object child settlement notifications", (suite) => {
     suite.effect("writes one stable durable notification and does not duplicate it during reconciliation", () =>
       Effect.gen(function* () {
         const { runtime, parent, child } = yield* admit
@@ -102,7 +92,9 @@ for (const [backend, runtimeLayer] of layers) {
         })
         expect(yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 100 })).toHaveLength(0)
         yield* store.complete({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-1",
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-1", runId: child.runId, ownerId: objectWorkerId })),
           result: completedResult("notes"),
         })
         yield* scheduler.tick
@@ -144,11 +136,14 @@ for (const [backend, runtimeLayer] of layers) {
         const { runtime, parent, child } = yield* admit
         const store = yield* RunStore.RunStore
         yield* store.fail({
-          ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "finished" })),
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-2", runId: parent.runId, ownerId: objectWorkerId })),
           error: Errors.AgentExecutionFailure.make({ message: "parent turn ended" }),
         })
         yield* store.complete({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-2",
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-3", runId: child.runId, ownerId: objectWorkerId })),
           result: completedResult("notes"),
         })
         const later = yield* runtime.send({
@@ -170,11 +165,13 @@ for (const [backend, runtimeLayer] of layers) {
         const { runtime, parent, child } = yield* admit
         const store = yield* RunStore.RunStore
         yield* store.fail({
-          ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "finished" })),
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-4", runId: parent.runId, ownerId: objectWorkerId })),
           error: Errors.AgentExecutionFailure.make({ message: "parent turn ended" }),
         })
         yield* store.fail({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-5", runId: child.runId, ownerId: objectWorkerId })),
           error: Errors.AgentExecutionFailure.make({ message: "child provider failed" }),
         })
         const later = yield* runtime.send({
@@ -195,7 +192,8 @@ for (const [backend, runtimeLayer] of layers) {
       Effect.gen(function* () {
         const { runtime, parent, child } = yield* admit
         const store = yield* RunStore.RunStore
-        yield* runtime.cancel({ runId: child.runId, reason: "cancelled by user" })
+        yield* runtime.cancel({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-cancel-3", runId: child.runId, reason: "cancelled by user" })
 
         const notifications = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })
         expect(notifications).toEqual([
@@ -228,7 +226,8 @@ for (const [backend, runtimeLayer] of layers) {
         expect(parentHistory.some((event) => event._tag === "Inbox" || event._tag === "RunResumed")).toBe(false)
 
         yield* store.fail({
-          ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "finished" })),
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-6", runId: parent.runId, ownerId: objectWorkerId })),
           error: Errors.AgentExecutionFailure.make({ message: "parent turn ended" }),
         })
         const later = yield* runtime.send({
@@ -251,7 +250,8 @@ for (const [backend, runtimeLayer] of layers) {
         const { runtime, parent, child } = yield* admit
         const store = yield* RunStore.RunStore
         yield* store.fail({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-7", runId: child.runId, ownerId: objectWorkerId })),
           error: Errors.AgentExecutionFailure.make({ message: "provider rejected the child request" }),
         })
 
@@ -270,15 +270,18 @@ for (const [backend, runtimeLayer] of layers) {
         Effect.gen(function* () {
           const { runtime, parent, child } = yield* admit
           const store = yield* RunStore.RunStore
-          const claim = yield* store.claimExecution({ runId: child.runId, ownerId: "test" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-8", runId: child.runId, ownerId: objectWorkerId })
           const rejected = yield* Effect.flip(
-            store.complete({ ...claim, result: completedResult("x".repeat(345_000)) }),
+            store.complete({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-4", ...claim, result: completedResult("x".repeat(345_000)) }),
           )
           expect(rejected._tag).toBe("generalist/runtime/RuntimeUnavailable")
           expect((yield* store.inspect(child.runId)).status).toBe("running")
           expect(yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })).toEqual([])
           const text = "x".repeat(ChildSettlement.maxResultBytes * 2)
-          yield* store.complete({ ...claim, result: completedResult(text) })
+          yield* store.complete({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-5", ...claim, result: completedResult(text) })
           const terminal = (yield* runtime.history({ runId: child.runId, cursor: -1, limit: 100 })).find(
             (event) => event._tag === "RunCompleted",
           )
@@ -315,39 +318,42 @@ for (const [backend, runtimeLayer] of layers) {
         yield* Effect.yieldNow
         yield* scheduler.idle
         yield* store.complete({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-6",
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-9", runId: child.runId, ownerId: objectWorkerId })),
           result: completedResult("done"),
         })
         expect((yield* Fiber.join(waiter)).childRunId).toBe(child.runId)
       }),
     )
   })
-}
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
   <B, E2, R extends A>(effect: Effect.Effect<B, E2, R>): Effect.Effect<B, E | E2> =>
     Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
-it.effect("SQLite preserves exactly one notification across close and reopen", () => {
-  const filename = tempDbPath("child-settlement-reopen")
-  const sqlite = SqliteRuntime.layerSqlite({ ...options, filename }).pipe(Layer.provide(resolverLayer))
+it.effect("object storage preserves exactly one notification across close and reopen", () => {
+  const storage = makeObjectStorage()
+  const object = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
   let parentRunId = ""
   let childRunId = ""
   return Effect.gen(function* () {
-    yield* scopedWith(sqlite)(
+    yield* scopedWith(object)(
       Effect.gen(function* () {
         const { parent, child } = yield* admit
         const store = yield* RunStore.RunStore
         parentRunId = parent.runId
         childRunId = child.runId
         yield* store.complete({
-          ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-7",
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-10", runId: child.runId, ownerId: objectWorkerId })),
           result: completedResult("persisted"),
         })
       }),
     )
-    yield* scopedWith(sqlite)(
+    yield* scopedWith(object)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const notifications = yield* runtime.childSettlements({ parentRunId, limit: 10 })
@@ -363,8 +369,7 @@ it.effect("SQLite preserves exactly one notification across close and reopen", (
  * child's result as the tool result of the call that started it, so projecting the settlement into
  * steering delivered the same outcome a second time as a user message.
  */
-for (const [backend, runtimeLayer] of layers) {
-  layer(runtimeLayer)(`${backend} settlement observation`, (suite) => {
+layer(runtimeLayer)("object settlement observation", (suite) => {
     suite.effect("never binds a settled child into the parent Session's steering inbox", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -373,12 +378,12 @@ for (const [backend, runtimeLayer] of layers) {
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId,
-          idempotencyKey: `joined:${backend}`,
+          idempotencyKey: `joined:object`,
           prompt: textPrompt("parent"),
         })
         const receipt = yield* runtime.fanOut({
           parentRunId: parent.runId,
-          idempotencyKey: `group:${backend}`,
+          idempotencyKey: `group:object`,
           members: [{ key: "member-0", selection: "researcher", prompt: "member-0" }],
           concurrency: 1,
           join: { _tag: "AllSuccess" },
@@ -386,7 +391,9 @@ for (const [backend, runtimeLayer] of layers) {
         })
         const member = receipt.childRunIds[0]!
         yield* store.complete({
-          ...(yield* store.claimExecution({ runId: member, ownerId: "test" })),
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-complete-8",
+          ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-11", runId: member, ownerId: objectWorkerId })),
           result: completedResult("MEMBER_RESULT_BODY"),
         })
 
@@ -395,12 +402,13 @@ for (const [backend, runtimeLayer] of layers) {
         expect(notification!.joined).toBe(true)
         expect(notification!.resultText).toContain("MEMBER_RESULT_BODY")
 
-        const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-12", runId: parent.runId, ownerId: objectWorkerId })
         yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "parent done" }) })
         const later = yield* runtime.send({
           to: assistantAddress,
           sessionId,
-          idempotencyKey: `later:${backend}`,
+          idempotencyKey: `later:object`,
           prompt: textPrompt("later"),
         })
         expect(
@@ -411,4 +419,3 @@ for (const [backend, runtimeLayer] of layers) {
       }),
     )
   })
-}

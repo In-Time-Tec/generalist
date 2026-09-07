@@ -3,9 +3,8 @@ import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Hooks, Permissions } from "../../../../src/index.js"
 import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 import { provideScoped } from "../../../runtime/execution/scoped-provide.js"
-import { tempDbPath } from "../../../runtime/sql/scenario.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
 
 const finish = (reason: "stop" | "tool-calls") =>
   Response.makePart("finish", {
@@ -19,7 +18,7 @@ const finish = (reason: "stop" | "tool-calls") =>
 
 const approvalBatchScenario = (input: { readonly label: string; readonly blockFirst: boolean }) =>
   Effect.gen(function* () {
-    const filename = tempDbPath(input.label)
+    const storage = makeObjectStorage()
     const first = Tool.make("first_call", { parameters: Schema.Struct({}), success: Schema.String })
     const second = Tool.make("second_call", { parameters: Schema.Struct({}), success: Schema.String })
     const toolkit = Toolkit.make(first, second)
@@ -94,13 +93,12 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
       hooks,
     )
     const resolver = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
-    const runtimeLayer = () =>
+    const runtimeLayer = (workerId: string) =>
       Layer.merge(
-        SqliteRuntime.layerSqlite({
-          filename,
-          addresses: [],
-          scheduler: { pollInterval: "1 hour" },
-        }).pipe(Layer.provide(resolver)),
+        objectRuntimeLayer(
+          { addresses: [], scheduler: { pollInterval: "1 hour" }, workerId },
+          storage,
+        ).pipe(Layer.provide(resolver)),
         environment,
       )
     const startOptions = {
@@ -109,14 +107,20 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
     }
 
     const suspended = yield* provideScoped(
-      runtimeLayer(),
+      runtimeLayer(objectWorkerId),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run the approval batch", startOptions)
-        yield* host.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: `${input.label}:seed` }))
+        yield* host.execute(
+          yield* store.claimExecution({
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+            commandId: `resume-batch:${input.label}:seed`,
+          }),
+        )
         const inspection = yield* runtime.inspect(handle.runId)
         expect(inspection.status).toBe("waiting")
         expect(inspection.waits).toHaveLength(1)
@@ -125,7 +129,7 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
     )
 
     yield* provideScoped(
-      runtimeLayer(),
+      runtimeLayer(`${objectWorkerId}:${input.label}:reopen`),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor.RunExecutor
@@ -139,7 +143,13 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
           resolution: { _tag: "Approved" },
         })
         yield* host
-          .execute(yield* store.claimExecution({ runId: suspended.runId, ownerId: `${input.label}:first-resume` }))
+          .execute(
+            yield* store.claimExecution({
+              runId: suspended.runId,
+              ownerId: `${objectWorkerId}:${input.label}:reopen`,
+              commandId: `resume-batch:${input.label}:first-resume`,
+            }),
+          )
           .pipe(Effect.timeout("5 seconds"))
 
         if (!input.blockFirst) {
@@ -152,7 +162,13 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
             resolution: { _tag: "Approved" },
           })
           yield* host
-            .execute(yield* store.claimExecution({ runId: suspended.runId, ownerId: `${input.label}:second-resume` }))
+            .execute(
+              yield* store.claimExecution({
+                runId: suspended.runId,
+                ownerId: `${objectWorkerId}:${input.label}:reopen`,
+                commandId: `resume-batch:${input.label}:second-resume`,
+              }),
+            )
             .pipe(Effect.timeout("5 seconds"))
         }
 
@@ -167,7 +183,7 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
     expect(modelCalls).toBe(2)
   })
 
-it.live("replays a blocked and approved tool batch once after SQLite reopen", () =>
+it.live("replays a blocked and approved tool batch once after object storage reopen", () =>
   approvalBatchScenario({ label: "blocked-approved-batch-replay", blockFirst: true }),
 )
 

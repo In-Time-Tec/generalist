@@ -18,18 +18,15 @@ description: "How the process-local generalist agent loop composes with the nati
 
 `Runtime.previews({ runId })` observes bounded append frames for text and reasoning from the live Runtime process. Contiguous per-attempt sequences and per-channel UTF-16 offsets let consumers detect a dropped frame. This lane is intentionally lossy, droppable, and non-authoritative: it is not stored, cursor-addressed, checkpointed, durably replayed, transported, or folded into FoldKit Chat.Model. Losing every preview does not change execution or the eventual semantic response event.
 
-## Choose the storage layer
+## Choose a transport, not another state machine
 
-| Layer                         | Use it for                                                       |
-| ----------------------------- | ---------------------------------------------------------------- |
-| `Runtime.layerMemory`         | Local development and tests; all state is lost with the process  |
-| `SqliteRuntime.layerSqlite`   | Durable single-process execution with automatic schema migration |
-| `layer from generalist/pg`    | Durable multi-worker execution on PostgreSQL                     |
-| `layer from generalist/mysql` | Durable multi-worker execution on MySQL 8+                       |
+`generalist/durability` supplies the single production engine. Provide `generalist/durability/s3` for an S3 object endpoint or `generalist/durability/r2` for a native R2 binding, plus Crypto and the executable resolver. Each Runtime names its environment, tenant, and partition explicitly.
 
-PostgreSQL and MySQL startup verifies an already-applied schema rather than running DDL. Use `RuntimeSchema from generalist/pg` for PostgreSQL or `RuntimeSchema from generalist/mysql` for MySQL in a predeploy migration step.
+The partition is the atomic boundary: related Runs, Sessions, and children must be colocated when they change together. Object conditional creation, not a local mutex or a host alarm, orders commits. There are no cross-partition transactions or exactly-once external effects.
 
-Import `Runtime as SqliteRuntime` from `generalist/runtime/sqlite-bun`. The generic `generalist/runtime` entrypoint does not load or require the SQLite peer.
+For a process-local agent, call `Agent.run` without Runtime. The simulator in `generalist/testing/durability` runs the production engine against test objects; it is not durable and must never be a production fallback. Local durability development uses an explicitly configured compatible object server.
+
+See [object durability](/features/durable-stores) for runnable setup, provider requirements, bounds, and backup/restore.
 
 ## The package boundary
 

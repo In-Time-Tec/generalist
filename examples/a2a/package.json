@@ -8,6 +8,9 @@
   },
   "dependencies": {
     "@a2a-js/sdk": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@effect/platform-bun": "catalog:",
+    "@smithy/fetch-http-handler": "catalog:",
     "effect": "catalog:",
     "generalist": "workspace:*"
   },

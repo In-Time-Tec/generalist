@@ -7,9 +7,7 @@ import {
   Message,
   Run,
   RunEvent,
-  RunStore,
   RunTree,
-  Runtime,
   Steering,
   RunExecutor,
   OperationResolution,
@@ -28,8 +26,6 @@ describe("generalist/runtime public surface", () => {
     expect(RunEvent.eventIdFor).toBeDefined()
     expect(RunEvent.SteeringDiscardReason).toBeDefined()
     expect(Steering.SteeringReceipt).toBeDefined()
-    expect(Runtime.layerMemory).toBeDefined()
-    expect(RunStore.layerMemory).toBeDefined()
     expect(RunExecutor.RunExecutor).toBeDefined()
     expect(RunTree.events).toBeDefined()
     expect(RunTree.watch).toBeDefined()

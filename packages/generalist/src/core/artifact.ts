@@ -77,6 +77,13 @@ export const ArtifactUpdate = Schema.Struct({
 })
 /** Full operation-log entry delivered to CRDT peers. @experimental */
 export type ArtifactUpdate = typeof ArtifactUpdate.Type
+/** Internal receipt retained for one committed Artifact append. The nested update is the public result; the surrounding fields prove the original logical command. @internal */
+export const ArtifactAppendReceipt = Schema.Struct({
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+  crdt: Schema.String.check(Schema.isNonEmpty()),
+  update: ArtifactUpdate,
+})
+export type ArtifactAppendReceipt = typeof ArtifactAppendReceipt.Type
 
 /** CRDT snapshot at one branch version. @internal */
 export const ArtifactHead = Schema.Struct({
@@ -98,6 +105,8 @@ export interface ArtifactBranchSource {
 /** Compare-and-append request owned by a Runtime storage driver. @internal */
 export interface ArtifactAppend {
   readonly artifact: string
+  /** Stable identity for one logical append; preserve it across retries. */
+  readonly commandId: string
   readonly crdt: string
   readonly expected: Version
   readonly base: Version
@@ -302,6 +311,8 @@ export class ArtifactCrdt extends Context.Service<ArtifactCrdt, CrdtService>()(
 
 /** Human edit accepted by Host and Server. @experimental */
 export interface HumanEdit {
+  /** Stable identity for one logical edit; preserve it across retries. */
+  readonly commandId: string
   readonly base: Version
   readonly operation: RangeOperation
   readonly attribution: HumanAttribution

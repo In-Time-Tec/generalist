@@ -9,7 +9,7 @@ import {
 } from "../../../../src/runtime/operation/nested-operations.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 import { assistantAddress, suspension, textPrompt } from "../../execution/fixtures.js"
-
+import { objectWorkerId } from "../../execution/object.js"
 const OPERATION_KEY = "outer-operation"
 
 const toolContextValue: ToolContext.Service = {
@@ -64,7 +64,11 @@ const claimed = <R>(label: string, activate: (runId: string) => Effect.Effect<vo
       prompt: textPrompt("work"),
     })
     yield* activate(receipt.runId)
-    const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: `owner:${label}` })
+    const claim = yield* store.claimExecution({
+      commandId: "runtime-operation-suites-nested-ts-claim-1",
+      runId: receipt.runId,
+      ownerId: objectWorkerId,
+    })
     const nested = yield* makeOperations({ claim, claimed: claim, store })
     return { runtime, store, claim, nested, runId: receipt.runId }
   })

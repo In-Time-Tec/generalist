@@ -1,22 +1,29 @@
-import { Effect, Exit, Layer, Schema } from "effect"
+import { Crypto, Effect, Exit, Layer, PlatformError, Schema } from "effect"
+import * as Durability from "generalist/durability"
 import { Prompt, Response as AiResponse, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Permissions } from "generalist"
 import { decodeConfig as decodeOpenRouterConfig } from "generalist/providers/openrouter"
 import { TestModel } from "generalist/testing"
-import { SqlClient } from "effect/unstable/sql"
 import { Address, Errors, ExecutableManifest, Message, RunStore as RunStoreFacade } from "generalist/runtime"
-import {
-  layerRunStore,
-  layerSqlClient,
-  type DurableObjectStorage,
-} from "generalist/unstable/cloudflare/durable-objects"
-import { SqliteRunActivation } from "generalist/runtime/sql-driver"
-import { inspectLogicalSqlSchema } from "../../../runtime/sql/schema-conformance.js"
+import { layerRunStore } from "generalist/unstable/cloudflare/durable-objects"
+import type { Bucket } from "generalist/durability/r2"
 
 const test = ExecutableManifest.makeTest
 const makeMessage = Message.make
 const AgentExecutionFailure = Errors.AgentExecutionFailure
-const RuntimeUnavailable = Errors.RuntimeUnavailable
+const cryptoLayer = Layer.succeed(
+  Crypto.Crypto,
+  Crypto.make({
+    randomBytes: (size) => crypto.getRandomValues(new Uint8Array(size)),
+    digest: (algorithm, data) =>
+      Effect.tryPromise({
+        try: () => crypto.subtle.digest(algorithm, new Uint8Array(data)),
+        catch: (cause) => new PlatformError.SystemError({
+          module: "Crypto", method: "digest", reason: "Unknown", cause,
+        }),
+      }).pipe(Effect.map((buffer) => new Uint8Array(buffer))),
+  }),
+)
 const RunStore = RunStoreFacade.RunStore
 
 interface ObjectId {
@@ -29,11 +36,15 @@ interface ObjectNamespace {
 }
 
 interface Env {
-  readonly SQL_OBJECTS: ObjectNamespace
+  readonly OBJECTS: ObjectNamespace
+  readonly BUCKET: Bucket
 }
 
 interface DurableObjectState {
-  readonly storage: DurableObjectStorage
+  readonly storage: {
+    getAlarm(): Promise<number | null>
+    setAlarm(time: number): Promise<void>
+  }
 }
 
 const lookup = Tool.make("lookup", {
@@ -70,13 +81,6 @@ const failClosed = Permissions.layerRuleset({
   fallback: "deny",
 })
 
-const decodeProbeRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ requests: Schema.Finite })]))
-const decodeCountRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ count: Schema.Finite })]))
-const decodeRequestedRow = Schema.decodeUnknownSync(
-  Schema.Tuple([Schema.Struct({ cancellation_requested: Schema.Unknown, storage_type: Schema.String })]),
-)
-const decodeTerminalRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ status: Schema.String })]))
-const decodeSchemaRow = Schema.decodeUnknownSync(Schema.Tuple([Schema.Struct({ version: Schema.Finite })]))
 
 const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(function* () {
   let lookupExecutions = 0
@@ -156,34 +160,37 @@ const agentConformance = Effect.fn("CloudflareWorkerd.agentConformance")(functio
   })
 })
 
-export class SqlObject {
-  constructor(private readonly state: DurableObjectState) {}
+export class RuntimeObject {
+  constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
 
+  // This fixture has no running executor. Production alarms call LocalScheduler.drain;
+  // its canonical obligations remain discoverable by an independent reconciler.
   alarm(): Promise<void> {
     return Promise.resolve()
   }
 
-  fetch(): Promise<Response> {
+  fetch(request: Request): Promise<Response> {
     const storage = this.state.storage
-    const sqlLayer = layerSqlClient(storage)
-    const storeLayer = layerRunStore({
+    const sequence = Number(new URL(request.url).searchParams.get("sequence"))
+    const liveStore = layerRunStore({
+      bucket: this.env.BUCKET,
+      environment: "workerd",
+      tenant: "conformance",
+      partition: "shared",
+      workerId: "workerd",
       addresses: [],
-    }).pipe(Layer.provide(sqlLayer))
-    const live = Layer.merge(sqlLayer, storeLayer)
+    }).pipe(Layer.provide(cryptoLayer))
+    const live = Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(liveStore))
     const program = Effect.scoped(
       Effect.flatMap(Layer.build(live), (context) =>
         Effect.gen(function* () {
-          const sql = yield* SqlClient.SqlClient
           const store = yield* RunStore
-          yield* sql.unsafe(
-            "CREATE TABLE IF NOT EXISTS workerd_probe (id INTEGER PRIMARY KEY, requests INTEGER NOT NULL)",
-          )
-          yield* sql.unsafe("INSERT OR IGNORE INTO workerd_probe (id, requests) VALUES (1, 0)")
-          yield* sql.unsafe("UPDATE workerd_probe SET requests = requests + 1 WHERE id = 1")
-          const probeCount = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
-          const cancellationRunId = `workerd-cancellation-${probeCount[0]?.requests ?? 0}`
-          const pluralRunId = `workerd-plural-${probeCount[0]?.requests ?? 0}`
-          const acknowledgementRunId = `workerd-acknowledgement-${probeCount[0]?.requests ?? 0}`
+          const cancellationRunId = `workerd-cancellation-${sequence}`
+          const pluralRunId = `workerd-plural-${sequence}`
+          const acknowledgementRunId = `workerd-acknowledgement-${sequence}`
+          const priorCancellationStatus = sequence > 1
+            ? (yield* store.inspect(`workerd-cancellation-${sequence - 1}`)).status
+            : undefined
           const cancellationExecutable = test("workerd-cancellation", "1")
           const cancellationMessage = makeMessage({
             id: cancellationRunId,
@@ -209,49 +216,6 @@ export class SqlObject {
             idempotencyKey: acknowledgementRunId,
             correlationId: acknowledgementRunId,
           })
-          yield* SqliteRunActivation.createSchema
-          const committedAlarm = 4_000_000_000_000
-          const rolledBackAlarm = 3_000_000_000_000
-          const rearm = (at: number) =>
-            Effect.tryPromise({
-              try: () => storage.setAlarm(at),
-              catch: (cause) => RuntimeUnavailable.make({ message: `alarm failed: ${String(cause)}` }),
-            })
-          const insertRun = (runId: string) => sql`
-            INSERT INTO generalist_runs (
-              run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-              executable_ref_json, executable_manifest_json, root_run_id, depth, max_depth, max_subagents,
-              attempt, attempt_fence, last_sequence, cancellation_requested, accepted_sequence,
-              created_at, updated_at
-            ) VALUES (
-              ${runId}, 'running', 'agent:test', 'session', ${runId}, '{}', 'digest', ${runId},
-              '{}', '{}', ${runId}, 0, 4, 4,
-              1, 1, -1, 0, 1,
-              '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z'
-            )
-          `
-          yield* sql.withTransaction(
-            Effect.gen(function* () {
-              yield* sql`DELETE FROM generalist_activations WHERE run_id = 'workerd-committed'`
-              yield* sql`DELETE FROM generalist_runs WHERE run_id = 'workerd-committed'`
-              yield* insertRun("workerd-committed")
-              yield* SqliteRunActivation.makeProjection(sql, rearm(committedAlarm)).applyInTransaction([
-                { runId: "workerd-committed", intent: "execute", attemptFence: 1, runStatus: "running" },
-              ])
-            }),
-          )
-          yield* Effect.exit(
-            sql.withTransaction(
-              Effect.gen(function* () {
-                yield* sql`DELETE FROM generalist_runs WHERE run_id = 'workerd-rolled-back'`
-                yield* insertRun("workerd-rolled-back")
-                yield* SqliteRunActivation.makeProjection(sql, rearm(rolledBackAlarm)).applyInTransaction([
-                  { runId: "workerd-rolled-back", intent: "execute", attemptFence: 1, runStatus: "running" },
-                ])
-                return yield* RuntimeUnavailable.make({ message: "force rollback" })
-              }),
-            ),
-          )
           yield* store.admitStart({
             runId: cancellationRunId,
             message: cancellationMessage,
@@ -262,12 +226,17 @@ export class SqlObject {
             initialChildren: [],
             initialFanOuts: [],
           })
-          const claim = yield* store.claimExecution({ runId: cancellationRunId, ownerId: "workerd" })
-          yield* store.cancel({ runId: cancellationRunId, reason: "close" })
-          const requested = yield* sql<{ readonly cancellation_requested: unknown; readonly storage_type: string }>`
-            SELECT cancellation_requested, typeof(cancellation_requested) AS storage_type
-            FROM generalist_runs WHERE run_id = ${cancellationRunId}
-          `
+          const claim = yield* store.claimExecution({
+            runId: cancellationRunId,
+            ownerId: "workerd",
+            commandId: `${cancellationRunId}:claim`,
+          })
+          yield* store.cancel({
+            runId: cancellationRunId,
+            commandId: `${cancellationRunId}:cancel`,
+            reason: "close",
+          })
+          const cancellationRequestedStatus = (yield* store.inspect(cancellationRunId)).status
           yield* store.fail({
             ...claim,
             error: AgentExecutionFailure.make({ message: "execution interrupted" }),
@@ -282,7 +251,11 @@ export class SqlObject {
             initialChildren: [],
             initialFanOuts: [],
           })
-          const pluralClaim = yield* store.claimExecution({ runId: pluralRunId, ownerId: "workerd" })
+          const pluralClaim = yield* store.claimExecution({
+            runId: pluralRunId,
+            ownerId: "workerd",
+            commandId: `${pluralRunId}:claim`,
+          })
           const pluralWaitIds = ["a", "b", "c"].map((suffix) => `${pluralRunId}:${suffix}`)
           const pluralCalls = pluralWaitIds.map((waitId) => ({
             type: "tool-call" as const,
@@ -350,10 +323,6 @@ export class SqlObject {
           const pluralFinalOpen = (yield* store.inspect(pluralRunId)).waits.length
           const pluralEvents = yield* store.history({ runId: pluralRunId, cursor: -1, limit: 100 })
           const pluralResumeEvents = pluralEvents.filter((event) => event._tag === "RunResumed").length
-          const pluralRows = yield* sql<{ readonly wait_id: string }>`
-            SELECT wait_id FROM generalist_run_waits WHERE run_id = ${pluralRunId} ORDER BY authored_order
-          `
-          const pluralAuthoredHistory = suffixes(pluralRows.map(({ wait_id: waitId }) => ({ waitId })))
 
           yield* store.admitStart({
             runId: acknowledgementRunId,
@@ -368,22 +337,27 @@ export class SqlObject {
           const acknowledgementClaim = yield* store.claimExecution({
             runId: acknowledgementRunId,
             ownerId: "workerd",
+            commandId: `${acknowledgementRunId}:claim`,
           })
           const acknowledgementInitialSequence = (yield* store.acknowledged(acknowledgementRunId)).sequence
           yield* store.emitAgentEvent({
             ...acknowledgementClaim,
+            commandId: `${acknowledgementRunId}:event:turn-completed:0`,
             event: { _tag: "TurnCompleted", turn: 0 },
           })
           yield* store.emitAgentEvent({
             ...acknowledgementClaim,
+            commandId: `${acknowledgementRunId}:event:turn-started:1`,
             event: { _tag: "TurnStarted", turn: 1 },
           })
           yield* store.emitAgentEvent({
             ...acknowledgementClaim,
+            commandId: `${acknowledgementRunId}:event:turn-completed:1`,
             event: { _tag: "TurnCompleted", turn: 1 },
           })
           yield* store.emitAgentEvent({
             ...acknowledgementClaim,
+            commandId: `${acknowledgementRunId}:event:turn-started:2`,
             event: { _tag: "TurnStarted", turn: 2 },
           })
           const acknowledgementHistory = yield* store.history({
@@ -414,88 +388,19 @@ export class SqlObject {
             .filter((event) => event.sequence > acknowledgedSequence)
             .map((event) => event.sequence)
 
-          let transitionAffected: readonly [number, number] = [-1, -1]
-          yield* Effect.exit(
-            sql.withTransaction(
-              Effect.gen(function* () {
-                const probeWaitId = `${pluralRunId}:affected-row-probe`
-                yield* sql`
-                  INSERT INTO generalist_run_waits
-                    (run_id, wait_id, authored_order, reason, status, response_json, opened_at, closed_at)
-                  VALUES
-                    (${pluralRunId}, ${probeWaitId}, 3, '{"_tag":"ToolWait"}', 'open', NULL,
-                     '2026-08-29T00:00:00.000Z', NULL)
-                `
-                const first = yield* sql<{ readonly wait_id: string }>`
-                  UPDATE generalist_run_waits
-                  SET status = 'responded', response_json = '{"_tag":"ToolResult","result":"probe","encodedResult":"probe"}',
-                      closed_at = '2026-08-29T00:00:01.000Z'
-                  WHERE run_id = ${pluralRunId} AND wait_id = ${probeWaitId} AND status = 'open'
-                  RETURNING wait_id
-                `
-                const duplicate = yield* sql<{ readonly wait_id: string }>`
-                  UPDATE generalist_run_waits
-                  SET status = 'responded', response_json = '{"_tag":"ToolResult","result":"probe","encodedResult":"probe"}',
-                      closed_at = '2026-08-29T00:00:01.000Z'
-                  WHERE run_id = ${pluralRunId} AND wait_id = ${probeWaitId} AND status = 'open'
-                  RETURNING wait_id
-                `
-                transitionAffected = [first.length, duplicate.length]
-                return yield* RuntimeUnavailable.make({ message: "roll back affected-row probe" })
-              }),
-            ),
-          )
-          const cancellationTerminal = yield* sql<{ readonly status: string }>`
-            SELECT status FROM generalist_runs WHERE run_id = ${cancellationRunId}
-          `
-          const tables = yield* sql<{ readonly name: string }>`
-            SELECT name FROM sqlite_schema
-            WHERE type = 'table' AND substr(name, 1, 11) = 'generalist_'
-            ORDER BY name
-          `
-          const probe = yield* sql<{ readonly requests: number }>`SELECT requests FROM workerd_probe WHERE id = 1`
-          const committed = yield* sql<{ readonly count: number }>`
-            SELECT COUNT(*) AS count FROM generalist_runs r JOIN generalist_activations a ON a.run_id = r.run_id
-            WHERE r.run_id = 'workerd-committed'
-          `
-          const rolledBack = yield* sql<{ readonly count: number }>`
-            SELECT COUNT(*) AS count FROM generalist_runs r LEFT JOIN generalist_activations a ON a.run_id = r.run_id
-            WHERE r.run_id = 'workerd-rolled-back' OR a.run_id = 'workerd-rolled-back'
-          `
-          const schemaMeta = yield* sql<{
-            readonly version: number
-          }>`SELECT version FROM generalist_schema_meta WHERE id = 1`
-          const migrations = yield* sql<{ readonly id: number; readonly name: string }>`
-            SELECT migration_id AS id, name FROM generalist_sql_migrations ORDER BY migration_id
-          `
-          const [probeRow] = decodeProbeRow(probe)
-          const [committedRow] = decodeCountRow(committed)
-          const [rolledBackRow] = decodeCountRow(rolledBack)
-          const [requestedRow] = decodeRequestedRow(requested)
-          const [terminalRow] = decodeTerminalRow(cancellationTerminal)
-          const [schemaRow] = decodeSchemaRow(schemaMeta)
-          const info = yield* store.info
-          const logicalSchemaViolations = yield* inspectLogicalSqlSchema
+          const cancellationTerminalStatus = (yield* store.inspect(cancellationRunId)).status
+          yield* Effect.promise(() => storage.setAlarm(4_000_000_000_000))
           return Response.json({
-            backend: info.backend,
-            probe: probeRow.requests,
-            tables: tables.map((row) => row.name),
-            committed: committedRow.count,
-            rolledBack: rolledBackRow.count,
-            cancellationStoredType: requestedRow.storage_type,
-            cancellationStoredValue: Number(requestedRow.cancellation_requested),
-            cancellationTerminalStatus: terminalRow.status,
+            sequence,
+            priorCancellationStatus,
+            cancellationRequestedStatus,
+            cancellationTerminalStatus,
             alarm: yield* Effect.promise(() => storage.getAlarm()),
-            schemaVersion: schemaRow.version,
-            logicalSchemaViolations,
-            migrations,
-            transitionAffected,
             pluralInitialOrder,
             pluralRemainingAfterOutOfOrder,
             pluralConflictingTag,
             pluralFinalOpen,
             pluralResumeEvents,
-            pluralAuthoredHistory,
             acknowledgementInitialSequence,
             acknowledgedSequence,
             acknowledgementInvalidTag,
@@ -514,7 +419,7 @@ export default {
     if (new URL(request.url).pathname === "/agent") {
       return Effect.runPromise(Effect.scoped(agentConformance().pipe(Effect.orDie)))
     }
-    const namespace = bindings.SQL_OBJECTS
+    const namespace = bindings.OBJECTS
     return namespace.get(namespace.idFromName("default")).fetch(request)
   },
 }

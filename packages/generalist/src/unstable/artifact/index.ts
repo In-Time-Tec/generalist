@@ -84,6 +84,20 @@ export const open: {
       const crdtContext = yield* Layer.build(options.crdt)
       const crdt = Context.get(crdtContext, ArtifactCrdt)
       yield* Effect.gen(function* () {
+        const store = yield* RunStore
+        const existing = yield* store.artifactHead({ artifact: name }).pipe(
+          Effect.catchTag("generalist/artifact/ArtifactNotFound", () => Effect.succeed(undefined)),
+        )
+        if (existing !== undefined) {
+          if (existing.crdt !== crdt.id) {
+            return yield* ArtifactCrdtMismatch.make({
+              artifact: name,
+              expected: existing.crdt,
+              actual: crdt.id,
+            })
+          }
+          return
+        }
         const initial = yield* crdt.empty(options.initial ?? "")
         const blobs = yield* BlobStore
         const snapshot = yield* blobs.put({
@@ -91,8 +105,22 @@ export const open: {
           mediaType: "application/vnd.generalist.artifact-crdt",
           filename: `${name}.crdt`,
         })
-        const store = yield* RunStore
-        yield* store.ensureArtifact({ artifact: name, crdt: crdt.id, snapshot })
+        yield* store.ensureArtifact({ artifact: name, crdt: crdt.id, snapshot }).pipe(
+          Effect.catchTag("generalist/durability/DurabilityFailure", (error) =>
+            error.reason === "input-conflict"
+              ? Effect.gen(function* () {
+                  const committed = yield* store.artifactHead({ artifact: name })
+                  if (committed.crdt !== crdt.id) {
+                    return yield* ArtifactCrdtMismatch.make({
+                      artifact: name,
+                      expected: committed.crdt,
+                      actual: crdt.id,
+                    })
+                  }
+                })
+              : Effect.fail(error),
+          ),
+        )
       }).pipe(storageError(name, "open artifact"))
       return yield* make({ name, crdt })
     }),

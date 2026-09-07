@@ -7,9 +7,11 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
-    "generalist": "workspace:*",
+    "@aws-sdk/client-s3": "catalog:",
     "@effect/platform-bun": "catalog:",
-    "effect": "catalog:"
+    "@smithy/fetch-http-handler": "catalog:",
+    "effect": "catalog:",
+    "generalist": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

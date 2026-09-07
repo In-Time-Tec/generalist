@@ -37,6 +37,7 @@ import { Message as AddressedMessage, type Message } from "../messaging/message.
 import { Items as TaskItems } from "../../tasks/item.js"
 import { Source as CapabilitySource } from "../../core/capability/state.js"
 import { ArtifactReadJournal, EditResult as ArtifactEditResult } from "../../core/artifact.js"
+import { ProgramBudget } from "../../core/durable/manifest/program-manifest.js"
 
 export type { AgentLoopEvent, ExecutionResult }
 export type { Awaiting, Duplicate, TimedOut, WakeReceived } from "./trigger-event.js"
@@ -70,6 +71,29 @@ export type RunAccepted = RunEventBase & {
   readonly budget?: BudgetLimits
 }
 export type BudgetExtended = RunEventBase & { readonly _tag: "BudgetExtended"; readonly delta: BudgetLimits }
+/** A source reservation is permanent; target history before this boundary is inherited evidence. */
+export type RunForked = RunEventBase & {
+  readonly _tag: "RunForked"
+  readonly sourceRunId: string
+  readonly allocationRunId: string
+  readonly forkRunId: string
+  readonly atSequence: number
+  readonly role: "source" | "target" | "archive"
+  readonly budget: BudgetLimits
+  readonly programBudget?: ProgramBudget
+}
+/** Changes branch-local control without removing the earlier committed history. */
+export type RunRewound = RunEventBase & {
+  readonly _tag: "RunRewound"
+  readonly toSequence: number
+  readonly branchRunId: string
+  readonly allocation?: { readonly runId: string; readonly budget: BudgetLimits; readonly baseline: Spend }
+}
+export type ProgramOperationSettled = RunEventBase & {
+  readonly _tag: "ProgramOperationSettled"
+  readonly operation: string
+  readonly status: "succeeded" | "failed" | "unknown"
+}
 export type BudgetSuspended = RunEventBase & {
   readonly _tag: "BudgetSuspended"
   readonly budget: import("../../core/durable/run-budget.js").Dimension
@@ -215,6 +239,9 @@ export type LifecycleEvent =
   | TriggerEvent
   | RunAccepted
   | BudgetExtended
+  | RunForked
+  | RunRewound
+  | ProgramOperationSettled
   | BudgetSuspended
   | RunAttemptStarted
   | RunWaiting
@@ -243,6 +270,9 @@ export const LifecycleTag = Schema.Literals([
   ...TriggerTags,
   "RunAccepted",
   "BudgetExtended",
+  "RunForked",
+  "RunRewound",
+  "ProgramOperationSettled",
   "BudgetSuspended",
   "RunAttemptStarted",
   "RunWaiting",
@@ -466,6 +496,24 @@ const LifecycleEventSchema = Schema.Union([
     budget: Schema.optionalKey(BudgetLimits),
   }),
   Schema.TaggedStruct("BudgetExtended", { delta: BudgetLimits }),
+  Schema.TaggedStruct("RunForked", {
+    sourceRunId: RunId,
+    allocationRunId: RunId,
+    forkRunId: RunId,
+    atSequence: Sequence,
+    role: Schema.Literals(["source", "target", "archive"]),
+    budget: BudgetLimits,
+    programBudget: Schema.optionalKey(ProgramBudget),
+  }),
+  Schema.TaggedStruct("RunRewound", {
+    toSequence: Sequence,
+    branchRunId: RunId,
+    allocation: Schema.optionalKey(Schema.Struct({ runId: RunId, budget: BudgetLimits, baseline: Spend })),
+  }),
+  Schema.TaggedStruct("ProgramOperationSettled", {
+    operation: Schema.String,
+    status: Schema.Literals(["succeeded", "failed", "unknown"]),
+  }),
   Schema.TaggedStruct("BudgetSuspended", { budget: Dimension }),
   Schema.TaggedStruct("RunAttemptStarted", { attempt: Schema.Finite }),
   Schema.TaggedStruct("RunWaiting", { wait: RunWait }),
@@ -558,10 +606,29 @@ type RunEventEncoded = typeof RunEventBase.Encoded & typeof EventPayload.Encoded
 export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareConstructor<RunEvent, RunEventEncoded>()(
   [RunEventBase, EventPayload],
   ([baseCodec, payloadCodec]) =>
-    (input, _ast, options) =>
-      Effect.zipWith(
-        SchemaParser.decodeUnknownEffect(baseCodec)(input, options),
-        SchemaParser.decodeUnknownEffect(payloadCodec)(input, options),
+    (input, _ast, options) => {
+      // Each codec owns disjoint fields. Preserve unknown payload fields so strict
+      // decoding still rejects them rather than treating the other half as excess.
+      let baseInput: unknown = input
+      let payloadInput: unknown = input
+      if (typeof input === "object" && input !== null && !Array.isArray(input)) {
+        const base: Record<string, unknown> = {}
+        const payload: Record<string, unknown> = {}
+        for (const [key, value] of Object.entries(input)) {
+          Object.defineProperty(Object.hasOwn(RunEventBase.fields, key) ? base : payload, key, {
+            value,
+            enumerable: true,
+            configurable: true,
+            writable: true,
+          })
+        }
+        baseInput = base
+        payloadInput = payload
+      }
+      return Effect.zipWith(
+        SchemaParser.decodeUnknownEffect(baseCodec)(baseInput, options),
+        SchemaParser.decodeUnknownEffect(payloadCodec)(payloadInput, options),
         (base, payload) => Object.assign({}, base, payload),
-      ),
+      )
+    },
 )

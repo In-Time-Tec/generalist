@@ -80,7 +80,11 @@ const resolveApproval = (model: Model, approved: boolean, reason: string | null)
 const cancelRun = (model: Model): UpdateResult =>
   model.sessionId === null
     ? [model, [], Option.none()]
-    : [model, [CancelRun({ sessionId: model.sessionId })], Option.none()]
+    : [
+        model,
+        [CancelRun({ sessionId: model.sessionId, commandId: JSON.stringify(["cancel", model.sessionId, model.lastSeq]) })],
+        Option.none(),
+      ]
 
 /** @experimental */
 export const update: {

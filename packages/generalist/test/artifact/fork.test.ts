@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, makeObjectStorage, objectWorkerId } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
@@ -7,11 +8,15 @@ import { Generalist } from "generalist/host"
 import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
+import { ObjectStore } from "../../src/durability/object-store.js"
 
-const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+const storage = makeObjectStorage()
+const runtime = objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
   Layer.provide(ExecutableResolver.layerStatic([])),
 )
-const blobStore = BlobStore.layerMemory().pipe(Layer.provide(BunCrypto.layer))
+const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
+)
 const model = TestModel.layer([
   TestModel.toolCall("artifact_read_Zm9yay5tZA", {}, { id: "read-source" }),
   TestModel.text("source done"),
@@ -45,7 +50,7 @@ layer(services)("Artifact Runtime fork", (it) => {
       const source = yield* host.runs.start(session.id, writer, "read the plan")
       const store = yield* RunStore.RunStore
       const executor = yield* RunExecutor.RunExecutor
-      yield* executor.execute(yield* store.claimExecution({ runId: source.id, ownerId: "artifact-source" }))
+      yield* executor.execute(yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId }))
       expect(yield* source.await).toBe("source done")
 
       const runtimeService = yield* Runtime.Runtime
@@ -57,12 +62,13 @@ layer(services)("Artifact Runtime fork", (it) => {
       expect(read.artifactRead).toEqual({ artifact: document.name, version: 0 })
 
       yield* host.artifacts.edit(document.name, {
+        commandId: "human:fork-main",
         base: 0,
         operation: { _tag: "Replace", from: 0, to: 4, text: "main" },
         attribution: { _tag: "Human", actor: "alice" },
       })
       const branch = yield* host.sessions.fork(source.id, { atSequence: read.sequence })
-      yield* executor.execute(yield* store.claimExecution({ runId: branch.id, ownerId: "artifact-branch" }))
+      yield* executor.execute(yield* store.claimExecution({ runId: branch.id, ownerId: objectWorkerId }))
       expect(yield* branch.await).toBe("branch done")
       expect(yield* Artifact.read(document)).toMatchObject({ version: 1, content: "main" })
 

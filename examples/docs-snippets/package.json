@@ -7,7 +7,8 @@
   },
   "dependencies": {
     "@effect/platform-bun": "catalog:",
-    "@effect/sql-pg": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@smithy/fetch-http-handler": "catalog:",
     "effect": "catalog:",
     "foldkit": "catalog:",
     "generalist": "workspace:*"

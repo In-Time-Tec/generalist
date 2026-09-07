@@ -141,14 +141,14 @@ export type RunFailure =
   | ExecutableRegistrationMissing
   | ExecutionFailure
 
-export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
+export const RunFailure = Schema.Union([
   AgentExecutionFailure,
   ExecutablePinMissing,
   ExecutableIdentityMismatch,
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
   ExecutionFailure,
-])
+]).pipe(Schema.toTaggedUnion("_tag")) satisfies Schema.Codec<RunFailure, unknown>
 
 export type RunOutcome =
   | {

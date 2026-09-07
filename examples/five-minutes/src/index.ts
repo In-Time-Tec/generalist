@@ -1,9 +1,10 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- this example provides the Bun platform at its entry point. */
-import { layer as bunServices } from "@effect/platform-bun/BunServices"
-import { Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Console, Effect, Layer, Option, Schema } from "effect"
 import { Agent } from "generalist"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
-import { Runtime as SqliteRuntime } from "generalist/runtime/sqlite-bun"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
+import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
 import { layer as testModel, object, text } from "generalist/testing/model"
 
 const assistant = Agent.make({
@@ -28,17 +29,41 @@ const program = Effect.gen(function* () {
   )
   yield* Console.log(`Local: ${local.summary}`)
 
-  const fileSystem = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-five-minutes-" })
-  const filename = path.join(directory, "runs.sqlite")
-  const runtimeLayer = () =>
-    Layer.merge(
-      SqliteRuntime.layerSqlite({ filename, addresses: [] }).pipe(
-        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-      ),
-      model,
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  const storage = S3.layer({
+    bucket,
+    region,
+    credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+    ...(endpoint === undefined ? {} : {
+      endpoint,
+      forcePathStyle: true,
+      capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+    }),
+  })
+  // Both scopes use the same remote namespace. Only the reopened scope executes the accepted work.
+  const runtimeLayer = () => {
+    const reconstructed = Durability.layer({
+      environment,
+      tenant,
+      partition,
+      addresses: [],
+      schedulerMode: "external",
+    }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      Layer.provide(storage),
+      Layer.provide(BunCrypto.layer),
     )
+    return Layer.merge(reconstructed, model)
+  }
   const start = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     yield* runtime.register(assistant)
@@ -61,15 +86,17 @@ const program = Effect.gen(function* () {
       Effect.flatMap((context) =>
         Effect.gen(function* () {
           const handle = yield* start
+          yield* Durability.activate
+          const scheduler = yield* LocalScheduler.LocalScheduler
           return { runId: handle.runId, output: yield* handle.await }
         }).pipe(Effect.provide(context)),
       ),
     ),
   )
 
-  if (recovered.runId !== firstRunId) return yield* Effect.fail("SQLite did not recover the same Run")
-  if (recovered.output.summary !== expected) return yield* Effect.fail("SQLite recovered an unexpected result")
+  if (recovered.runId !== firstRunId) return yield* Effect.fail("Object storage did not recover the same Run")
+  if (recovered.output.summary !== expected) return yield* Effect.fail("Object storage recovered an unexpected result")
   yield* Console.log(`Recovered ${recovered.runId}: ${recovered.output.summary}`)
 })
 
-await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(bunServices)))
+await Effect.runPromise(program.pipe(Effect.scoped))

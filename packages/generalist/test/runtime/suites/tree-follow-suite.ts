@@ -1,10 +1,17 @@
 import { expect, it as testIt, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
-import { Deferred, Effect, Fiber, Ref, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { RunStore, RunTree, Runtime } from "../../../src/runtime/index.js"
-import { assistantAddress, completedResult, memoryLayer, textPrompt } from "../execution/fixtures.js"
-import { sqliteLayer, tempDbPath } from "../sql/scenario.js"
+import {
+  assistantAddress,
+  completedResult,
+  objectLayer,
+  parentRelativeOptions,
+  resolverLayer,
+  textPrompt,
+} from "../execution/fixtures.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 
 const startRoot = (sessionId: string) =>
   Effect.gen(function* () {
@@ -55,14 +62,16 @@ const subscribeBeforeReplayRace = () =>
     const store = yield* RunStore.RunStore
     const root = yield* startRoot("tree-follow:subscribe-before-replay")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
-    const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "subscribe-before-replay" })
+    const claim = yield* store.claimExecution({
+          commandId: "runtime-suites-tree-follow-suite-ts-claim-1", runId: root.runId, ownerId: objectWorkerId })
     const scripted: Runtime.Service = {
       ...runtime,
       treeChanges: (rootRunId) =>
         runtime.treeChanges(rootRunId).pipe(
           Stream.take(1),
           Stream.tap(() =>
-            store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 11 } }).pipe(Effect.orDie),
+            store.emitAgentEvent({
+          commandId: "runtime-suites-tree-follow-suite-ts-emitAgentEvent-1", ...claim, event: { _tag: "TurnStarted", turn: 11 } }).pipe(Effect.orDie),
           ),
         ),
     }
@@ -112,8 +121,10 @@ const missedWakeRecovery = () =>
       Effect.forkChild({ startImmediately: true }),
     )
     yield* Deferred.await(initialRead)
-    const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "recovery" })
-    yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 7 } })
+    const claim = yield* store.claimExecution({
+          commandId: "runtime-suites-tree-follow-suite-ts-claim-2", runId: root.runId, ownerId: objectWorkerId })
+    yield* store.emitAgentEvent({
+          commandId: "runtime-suites-tree-follow-suite-ts-emitAgentEvent-2", ...claim, event: { _tag: "TurnStarted", turn: 7 } })
     yield* TestClock.adjust("999 millis")
     expect(following.pollUnsafe()).toBeUndefined()
     yield* TestClock.adjust("1 milli")
@@ -132,11 +143,16 @@ const replayEquivalence = () =>
       selection: "researcher",
       prompt: textPrompt("child"),
     })
-    const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
-    yield* store.emitAgentEvent({ ...childClaim, event: { _tag: "TurnStarted", turn: 1 } })
-    yield* store.complete({ ...childClaim, result: completedResult("child") })
-    const rootClaim = yield* store.claimExecution({ runId: root.runId, ownerId: "root" })
-    yield* store.complete({ ...rootClaim, result: completedResult("root") })
+    const childClaim = yield* store.claimExecution({
+          commandId: "runtime-suites-tree-follow-suite-ts-claim-3", runId: child.runId, ownerId: objectWorkerId })
+    yield* store.emitAgentEvent({
+          commandId: "runtime-suites-tree-follow-suite-ts-emitAgentEvent-3", ...childClaim, event: { _tag: "TurnStarted", turn: 1 } })
+    yield* store.complete({
+          commandId: "runtime-suites-tree-follow-suite-ts-complete-4", ...childClaim, result: completedResult("child") })
+    const rootClaim = yield* store.claimExecution({
+          commandId: "runtime-suites-tree-follow-suite-ts-claim-4", runId: root.runId, ownerId: objectWorkerId })
+    yield* store.complete({
+          commandId: "runtime-suites-tree-follow-suite-ts-complete-5", ...rootClaim, result: completedResult("root") })
 
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const watched = Array.from(yield* RunTree.watch({ rootRunId: root.runId }).pipe(Stream.runCollect))
@@ -179,7 +195,7 @@ const boundedRecovery = () =>
     yield* Fiber.interrupt(following)
   })
 
-layer(memoryLayer)("RunTree replay-then-follow memory", (it) => {
+layer(objectLayer)("RunTree replay-then-follow memory", (it) => {
   it.effect("delivers an immediate descendant change without advancing the clock", immediateDescendantDelivery)
   it.effect("re-reads durable history after subscribing", subscribeBeforeReplayRace)
   it.effect("rejects invalid follow cursors immediately", followCursorValidation)
@@ -188,27 +204,36 @@ layer(memoryLayer)("RunTree replay-then-follow memory", (it) => {
   it.effect("bounds recovery reads", boundedRecovery)
 })
 
-layer(sqliteLayer(tempDbPath("tree-follow")))("RunTree replay-then-follow SQLite", (it) => {
-  it.effect("delivers an immediate descendant change without advancing the clock", immediateDescendantDelivery)
-  it.effect("re-reads durable history after subscribing", subscribeBeforeReplayRace)
-  it.effect("rejects invalid follow cursors immediately", followCursorValidation)
-  it.effect("recovers a missed wake from durable history", missedWakeRecovery)
-  it.effect("matches finite replay exactly", replayEquivalence)
-  it.effect("bounds recovery reads", boundedRecovery)
-})
-
-testIt.live("replays a terminal SQLite tree immediately after restart", () => {
-  const filename = tempDbPath("tree-follow-restart")
+testIt.live("replays a terminal object tree immediately after host reopen", () => {
+  const storage = makeObjectStorage()
+  const options = {
+    ...parentRelativeOptions,
+    scheduler: { pollInterval: "1 day" as const },
+  }
+  const first = objectRuntimeLayer(options, storage, false).pipe(Layer.provide(resolverLayer))
+  const second = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
   return Effect.gen(function* () {
     const seeded = yield* provideScoped(
-      sqliteLayer(filename),
+      first,
       Effect.gen(function* () {
         const store = yield* RunStore.RunStore
         const root = yield* startRoot("tree-follow:restart")
         const before = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
-        const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "restart" })
-        yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 13 } })
-        yield* store.complete({ ...claim, result: completedResult("done") })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-suites-tree-follow-suite-ts-claim-5",
+          runId: root.runId,
+          ownerId: objectWorkerId,
+        })
+        yield* store.emitAgentEvent({
+          commandId: "runtime-suites-tree-follow-suite-ts-emitAgentEvent-6",
+          ...claim,
+          event: { _tag: "TurnStarted", turn: 13 },
+        })
+        yield* store.complete({
+          commandId: "runtime-suites-tree-follow-suite-ts-complete-7",
+          ...claim,
+          result: completedResult("done"),
+        })
         const tail = yield* RunTree.replay({ rootRunId: root.runId, cursor: before.cursor, limit: 100 })
         return {
           rootRunId: root.runId,
@@ -219,7 +244,7 @@ testIt.live("replays a terminal SQLite tree immediately after restart", () => {
     )
 
     const replayed = yield* provideScoped(
-      sqliteLayer(filename),
+      second,
       RunTree.watch({ rootRunId: seeded.rootRunId, cursor: seeded.cursor }).pipe(Stream.runCollect),
     )
     expect(Array.from(replayed, ({ event }) => event.eventId)).toEqual(seeded.eventIds)

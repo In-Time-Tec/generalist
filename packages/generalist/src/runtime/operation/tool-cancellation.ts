@@ -19,8 +19,14 @@ export const make = (options: {
     return (claim: ExecutionClaim, claimed: ExecutionRecord) =>
       Effect.scoped(
         Effect.gen(function* () {
-          yield* options.store.recoverRunningOperations(claim)
-          const operations = yield* options.store.operationCancellations(claim)
+          yield* options.store.recoverRunningOperations({
+            ...claim,
+            commandId: JSON.stringify(["recover-operations", claim.runId, claim.attemptFence]),
+          })
+          const operations = yield* options.store.operationCancellations({
+            ...claim,
+            commandId: JSON.stringify(["operation-cancellations", claim.runId, claim.attemptFence]),
+          })
           if (operations.length > 0) {
             const resolution = yield* ExecutionResolution.resolve(
               options.resolver,

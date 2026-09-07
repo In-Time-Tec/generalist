@@ -16,13 +16,12 @@ import {
   ToolPlacement,
 } from "../../../src/index"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
-import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { withProviderFinish } from "../provider-finish"
 import { allowAllAuthorization } from "../../authorization.js"
 import { provideScoped } from "../../runtime/execution/scoped-provide"
-import { tempDbPath } from "../../runtime/sql/scenario"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../runtime/execution/object.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type Equal<Left, Right> =
@@ -1066,7 +1065,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   })
 
   it("runs an inline child durably and reopens without redispatch", () => {
-    const filename = tempDbPath("inline-agent-tool")
+    const storage = makeObjectStorage()
     const child = Agent.make({ name: "inline-child" })
     const childTool = AgentTool.asTool(child, { name: "ask_child" })
     const parent = Agent.make({ name: "inline-parent", toolkit: Toolkit.make(childTool.tool) })
@@ -1102,13 +1101,12 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       hooks,
       ToolExecutor.layerToolkit(childTool).pipe(Layer.provide(Layer.merge(model, allowAllAuthorization))),
     )
-    const runtimeLayer = () =>
+    const runtimeLayer = (workerId: string) =>
       Layer.merge(
-        SqliteRuntime.layerSqlite({
-          filename,
-          addresses: [],
-          scheduler: { pollInterval: "1 hour" },
-        }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
+        objectRuntimeLayer(
+          { addresses: [], scheduler: { pollInterval: "1 hour" }, workerId },
+          storage,
+        ).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
         environment,
       )
     const startOptions = {
@@ -1125,7 +1123,13 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "delegate", startOptions)
       runId = handle.runId
-      yield* host.execute(yield* store.claimExecution({ runId, ownerId: "inline-agent-tool:first" }))
+      yield* host.execute(
+        yield* store.claimExecution({
+          runId,
+          ownerId: objectWorkerId,
+          commandId: "agent-tool:inline:first",
+        }),
+      )
 
       expect(yield* handle.await).toBe("parent answer")
       expect(parentFollowUp).toContain("child answer")
@@ -1156,8 +1160,8 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       expect(history.map((event) => [event.sequence, event.eventId])).toEqual(firstHistory)
     })
 
-    return Effect.scoped(provideScoped(runtimeLayer(), execute)).pipe(
-      Effect.andThen(Effect.scoped(provideScoped(runtimeLayer(), reopen))),
+    return Effect.scoped(provideScoped(runtimeLayer(objectWorkerId), execute)).pipe(
+      Effect.andThen(Effect.scoped(provideScoped(runtimeLayer(`${objectWorkerId}:reopen`), reopen))),
     )
   })
 

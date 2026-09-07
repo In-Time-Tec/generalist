@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -42,7 +43,7 @@ const semanticMemory = SemanticRecall.layer({ limit: 20 }).pipe(
   Layer.provideMerge(embeddingLayer),
 )
 
-const runtimeLayer = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+const runtimeLayer = objectRuntimeLayer({ addresses: [] }).pipe(
   Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
 )
 
@@ -64,8 +65,12 @@ const execute = (
   executor: RunExecutor.Service,
   store: RunStore.Service,
   runId: Memory.OperationRef["runId"],
-  ownerId: string,
-) => Effect.flatMap(store.claimExecution({ runId, ownerId }), executor.execute)
+  commandId: string,
+) =>
+  Effect.flatMap(
+    store.claimExecution({ runId, ownerId: objectWorkerId, commandId }),
+    executor.execute,
+  )
 
 const handlers = (
   memory: Memory.Service,

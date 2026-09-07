@@ -1,14 +1,15 @@
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
-import { Config, Deferred, Effect, Layer, Redacted, Schema, Stream } from "effect"
+import { Config, Deferred, Effect, Fiber, Layer, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { layerMemory as layerBlobStoreMemory } from "generalist/blob-store"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver, LocalScheduler, RunStore, Runtime } from "generalist/runtime"
+import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { Server, type Client } from "generalist/server"
-
+import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
+import { ObjectStore } from "../../src/durability/object-store.js"
 const usage = Response.Usage.make({
   inputTokens: { uncached: 1, total: 1, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 1, text: 1, reasoning: undefined },
@@ -21,10 +22,14 @@ const model = Layer.effect(
     streamText: () => Stream.make(Response.makePart("text-delta", { id: "answer", delta: "server complete" }), finish),
   }),
 )
-const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+const runtimeStorage = makeObjectStorage()
+const attachmentStorage = makeObjectStorage()
+const runtime = objectRuntimeLayer({ addresses: [] }, runtimeStorage).pipe(
   Layer.provide(ExecutableResolver.layerStatic([])),
 )
-const blobStore = layerBlobStoreMemory().pipe(Layer.provide(BunCrypto.layer))
+const blobStore = blobStoreLayer({ environment: "test", tenant: "server" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, attachmentStorage.store))),
+)
 const services = Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerAutoApprove, blobStore)
 
 const makeTransport = (handler: (request: Request) => Promise<Response>): HttpClient.HttpClient =>
@@ -44,11 +49,12 @@ const makeClient = (transport: HttpClient.HttpClient, token: string): Effect.Eff
     ),
   )
 
-const runScheduler = Effect.gen(function* () {
-  const scheduler = yield* LocalScheduler.LocalScheduler
-  yield* scheduler.tick
-  yield* scheduler.idle
-})
+const runScheduler = (runId: string, commandId: string) =>
+  Effect.gen(function* () {
+    const executor = yield* RunExecutor.RunExecutor
+    const store = yield* RunStore.RunStore
+    yield* executor.execute(yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId }))
+  })
 
 layer(services)("Server", (it) => {
   it.effect("rejects unknown Session streams and Run inspection before committing a success response", () =>
@@ -142,7 +148,7 @@ layer(services)("Server", (it) => {
           agent: agent.name,
           input: { question: "status" },
         })
-        yield* runScheduler
+        yield* runScheduler(started.id, "server:primary")
 
         expect(yield* client.runs.inspect({ runId: started.id })).toMatchObject({
           runId: started.id,
@@ -168,11 +174,27 @@ layer(services)("Server", (it) => {
           agent: agent.name,
           input: { question: "cancel" },
         })
-        yield* client.runs.cancel({ runId: cancelled.id, reason: "user stopped" })
+        const missingCommand = yield* Effect.promise(() =>
+          app.handler(
+            new Request(`http://generalist.test/runs/${cancelled.id}/cancel`, {
+              method: "POST",
+              headers: { authorization: "Bearer secret", "content-type": "application/json" },
+              body: JSON.stringify({ reason: "user stopped" }),
+            }),
+          ),
+        )
+        expect(missingCommand.status).toBe(400)
+        yield* client.runs.cancel({ runId: cancelled.id, commandId: "cancel:http-run", reason: "user stopped" })
         expect(yield* client.runs.inspect({ runId: cancelled.id })).toMatchObject({ status: "cancelled" })
+        yield* client.runs.cancel({ runId: cancelled.id, commandId: "cancel:http-run", reason: "user stopped" })
+        expect(
+          yield* client.runs
+            .cancel({ runId: cancelled.id, commandId: "cancel:http-run", reason: "different intent" })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/server/RequestFailed", operation: "runs.cancel" })
 
         const disabled = yield* client.operator
-          .retry({ runId: started.id, operator: "operator:test" })
+          .retry({ runId: started.id, commandId: "retry:disabled", operator: "operator:test" })
           .pipe(Effect.flip)
         expect(disabled).toMatchObject({ _tag: "generalist/server/OperatorDisabled", operation: "retry" })
 
@@ -219,8 +241,9 @@ layer(services)("Server", (it) => {
         const input = { sessionId: session.id, agent: agent.name, input: "answer", idempotencyKey: "answer-once" }
         const run = yield* client.runs.start(input)
         expect((yield* client.runs.start(input)).id).toBe(run.id)
-        const scheduler = yield* LocalScheduler.LocalScheduler
-        yield* scheduler.tick
+        const execution = yield* runScheduler(run.id, "server:disconnect").pipe(
+          Effect.forkChild({ startImmediately: true }),
+        )
         yield* Deferred.await(entered)
 
         const response = yield* Effect.promise(() =>
@@ -238,7 +261,7 @@ layer(services)("Server", (it) => {
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "running" })
 
         yield* Deferred.succeed(release, undefined)
-        yield* scheduler.idle
+        yield* Fiber.join(execution)
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
         expect(calls).toBe(1)
         const events = yield* client.events.subscribe({ sessionId: session.id }).pipe(
@@ -268,7 +291,11 @@ layer(services)("Server", (it) => {
         const session = yield* client.sessions.create({ id: "session:server:unknown" })
         const run = yield* client.runs.start({ sessionId: session.id, agent: agent.name, input: "answer" })
         const store = yield* RunStore.RunStore
-        const claim = yield* store.claimExecution({ runId: run.id, ownerId: "failed-worker" })
+        const claim = yield* store.claimExecution({
+          runId: run.id,
+          ownerId: objectWorkerId,
+          commandId: "claim:operator-explain",
+        })
         const operation = yield* store.recordOperation({
           ...claim,
           operationKey: "tool:external-write",
@@ -278,14 +305,19 @@ layer(services)("Server", (it) => {
           replayPolicy: "never",
           attempt: 1,
         })
-        yield* store.startOperation({ ...claim, operationId: operation.operationId })
-        yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+        yield* store.startOperation({ ...claim, operationId: operation.operationId, commandId: "start:external-write" })
+        yield* store.expireRunningOperation({
+          ...claim,
+          operationId: operation.operationId,
+          commandId: "expire:external-write",
+        })
         expect(yield* client.operator.explain({ runId: run.id })).toMatchObject({
           status: "needs-resolution",
           decision: { _tag: "Unknown", operationId: operation.operationId },
         })
         const resolution = {
           runId: run.id,
+          commandId: "resolve:external-write",
           operationId: operation.operationId,
           operator: "operator:test",
           resolution: { outcome: "succeeded" as const, result: "confirmed external receipt" },
@@ -311,7 +343,24 @@ layer(services)("Server", (it) => {
         const tenants = yield* Effect.forEach(
           ["tenant-a", "tenant-b"],
           Effect.fn(function* (tenant) {
-            const context = yield* Layer.build(Layer.fresh(services))
+            const context = yield* Layer.build(
+              Layer.mergeAll(
+                objectRuntimeLayer({ addresses: [], workerId: `server:${tenant}` }, makeObjectStorage()).pipe(
+                  Layer.provide(ExecutableResolver.layerStatic([])),
+                ),
+                model,
+                Permissions.layerAllowAll,
+                Approvals.layerAutoApprove,
+                blobStoreLayer({ environment: "test", tenant }).pipe(
+                  Layer.provide(
+                    Layer.merge(
+                      BunCrypto.layer,
+                      Layer.succeed(ObjectStore, makeObjectStorage().store),
+                    ),
+                  ),
+                ),
+              ),
+            )
             const agent = Agent.make({ name: "tenant-assistant" })
             const host = yield* Generalist.create({ agents: [agent] }).pipe(Effect.provideContext(context))
             const app = HttpRouter.toWebHandler(
@@ -428,7 +477,7 @@ layer(approvalServices)("Server approvals", (it) => {
         const client = yield* makeClient(makeTransport(app.handler), "secret")
         const session = yield* client.sessions.create({ id: "session:server:approval" })
         const run = yield* client.runs.start({ sessionId: session.id, agent: agent.name, input: "approve" })
-        yield* runScheduler
+        yield* runScheduler(run.id, "server:approval:initial")
 
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "waiting" })
         expect(approvalRequests).toHaveLength(1)
@@ -439,7 +488,7 @@ layer(approvalServices)("Server approvals", (it) => {
           decision: { _tag: "Approved" },
           operator: "operator:test",
         })
-        yield* runScheduler
+        yield* runScheduler(run.id, "server:approval:resume")
 
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
         expect(approvalToolCalls).toBe(1)

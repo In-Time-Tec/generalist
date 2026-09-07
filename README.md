@@ -56,7 +56,7 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 | Test without calling a model API      | [Testing](docs/features/testing.md)                   |
 | Recover work after a restart          | [Durable Runtime](docs/features/runtime.md)           |
 
-The durable Runtime supports Bun SQLite, PostgreSQL, and MySQL; Cloudflare and Rivet adapters are experimental. You do not need a database or Runtime to use the agent loop. See the [host comparison](docs/features/hosts.md) for capabilities and limitations.
+Durable execution uses one object-storage engine through `generalist/durability`, with S3 and native R2 transports. There is no production memory or filesystem durability backend. You do not need storage or Runtime for the process-local agent loop. Start with the [object durability guide](docs/features/durable-stores.md); the [host comparison](docs/features/hosts.md) separates host integration from provider conformance.
 
 ## Documentation and examples
 
@@ -69,6 +69,6 @@ The durable Runtime supports Bun SQLite, PostgreSQL, and MySQL; Cloudflare and R
 
 Generalist is pre-1.0: APIs can change between releases. It currently requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are marked `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
-Everything ships in the `generalist` package. Imports such as `generalist/runtime` and `generalist/pg` are subpaths, not separate packages.
+Everything ships in the `generalist` package. Imports such as `generalist/runtime` and `generalist/durability/s3` are subpaths, not separate packages. The durability contract is intended to be the long-term storage boundary, but remains `@experimental`; that intent is not provider certification or a performance claim.
 
 [MIT](LICENSE) · Built by [In Time Tec](https://intimetec.com).

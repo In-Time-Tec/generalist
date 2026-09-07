@@ -1,3 +1,4 @@
+import type { DurabilityFailure } from "../../durability/errors.js"
 import { Context, Effect, Function, Layer, Option, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../../core/agent/service.js"
@@ -94,7 +95,7 @@ export const sessionBinding = (input: {
 }): Effect.Effect<{
   readonly session: Option.Option<SessionService>
   readonly context: Context.Context<SessionDirectory>
-}> =>
+}, DurabilityFailure> =>
   input.store.claimedSessionStore(input.claim).pipe(
     Effect.map((session) => ({
       session,

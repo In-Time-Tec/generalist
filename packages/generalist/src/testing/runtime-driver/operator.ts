@@ -36,14 +36,14 @@ const startOperation = (
       replayPolicy,
       attempt: 0,
     })
-    yield* services.store.startOperation({ ...claim, operationId: operation.operationId })
+    yield* services.store.startOperation({ ...claim, commandId: `${claim.runId}:start:${operation.operationId}:0`, operationId: operation.operationId })
     return operation
   })
 
 const seedUnknown = (services: Services, claim: ExecutionClaim, operationKey: string) =>
   Effect.gen(function* () {
     const operation = yield* startOperation(services, claim, operationKey, "never")
-    expect(yield* services.store.recoverRunningOperations(claim)).toBe("blocked")
+    expect(yield* services.store.recoverRunningOperations({ ...claim, commandId: `${claim.runId}:recover:${claim.attemptFence}` })).toBe("blocked")
     return operation
   })
 
@@ -84,7 +84,7 @@ const registerRetry = <LayerError>(
           idempotencyKey: id.idempotencyKey,
           prompt: "retry operation",
         })
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "operator-retry" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "operator-retry" })
         const operation = yield* startOperation(services, claim, `${id.idempotencyKey}:operation`, "pure")
         expect((yield* services.runtime.operator.explain(receipt.runId)).decision).toEqual({
           _tag: "RetryOperation",
@@ -92,7 +92,8 @@ const registerRetry = <LayerError>(
           attempt: 0,
         })
 
-        yield* services.runtime.operator.retry(receipt.runId, "operator:retry")
+        yield* services.runtime.operator.retry(receipt.runId, "operator:retry", `${id.idempotencyKey}:retry`)
+        yield* services.runtime.operator.retry(receipt.runId, "operator:retry", `${id.idempotencyKey}:retry`)
         expect(
           (yield* services.store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status,
         ).toBe("requested")
@@ -100,8 +101,15 @@ const registerRetry = <LayerError>(
         const [operatorAction] = (yield* services.store.recoveryJournal(receipt.runId)).actions
         expect(operatorAction?.operator).toBe("operator:retry")
         expect(operatorAction?.action).toEqual({ _tag: "Retry", operationId: operation.operationId })
-        const illegal = yield* services.runtime.operator.retry(receipt.runId, "operator:retry").pipe(Effect.flip)
+        const illegal = yield* services.runtime.operator.retry(receipt.runId, "operator:retry", `${id.idempotencyKey}:retry-again`).pipe(Effect.flip)
         expect(illegal._tag).toBe("generalist/runtime/IllegalOperatorAction")
+        const next = yield* capability.claim(services, { runId: receipt.runId, commandId: "operator-retry-attempt-1" })
+        const start = { ...next, operationId: operation.operationId, commandId: `${id.idempotencyKey}:start:1` }
+        const started = yield* services.store.startOperation(start)
+        expect(yield* services.store.startOperation(start)).toEqual(started)
+        expect((yield* services.store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe("running")
+        yield* services.runtime.operator.retry(receipt.runId, "operator:retry", `${id.idempotencyKey}:retry:1`)
+        expect((yield* services.store.recoveryJournal(receipt.runId)).actions).toHaveLength(2)
       }),
     ),
   )
@@ -112,49 +120,50 @@ const registerResolveUnknown = <LayerError>(
   open: Open<LayerError>,
   capability: OperatorResolveUnknownCapability,
 ) => {
-  it.effect("resolves exactly one unknown outcome and rejects a second resolution", () =>
-    open((services) =>
-      Effect.gen(function* () {
-        const id = identity(options.name, "operator-resolve-unknown")
+  it.effect("recovers Unknown without redispatch and resolves exactly one outcome across reopen", () =>
+    Effect.gen(function* () {
+      const id = identity(options.name, "operator-resolve-unknown")
+      const seeded = yield* open((services) => Effect.gen(function* () {
         const receipt = yield* services.runtime.send({
-          to: options.address,
-          sessionId: id.sessionId,
-          idempotencyKey: id.idempotencyKey,
-          prompt: "resolve unknown",
+          to: options.address, sessionId: id.sessionId, idempotencyKey: id.idempotencyKey, prompt: "resolve unknown",
         })
-        const claim = yield* capability.claim(services, {
-          runId: receipt.runId,
-          workerId: "operator-resolve-unknown",
-        })
-        const operation = yield* seedUnknown(services, claim, `${id.idempotencyKey}:operation`)
-        expect((yield* services.runtime.operator.explain(receipt.runId)).decision._tag).toBe("Unknown")
-
-        yield* services.runtime.operator.resolveUnknown(
-          receipt.runId,
-          operation.operationId,
-          { outcome: "succeeded", result: "already completed" },
-          "operator:resolve",
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "operator-unknown-before" })
+        const operation = yield* startOperation(services, claim, `${id.idempotencyKey}:operation`, "never")
+        return { runId: receipt.runId, operationId: operation.operationId }
+      }))
+      yield* open((services) => Effect.gen(function* () {
+        // Read-only explanation must not turn an unresolved external effect into a replayable operation.
+        const before = yield* services.store.getOperation(seeded)
+        expect(before).toMatchObject({ status: "running", replayPolicy: "never" })
+        yield* services.runtime.operator.explain(seeded.runId)
+        expect(yield* services.store.getOperation(seeded)).toEqual(before)
+        const claim = yield* capability.claim(services, { runId: seeded.runId, commandId: "operator-unknown-recovery" })
+        expect(yield* services.store.recoverRunningOperations({
+          ...claim, commandId: `${seeded.runId}:recover-unknown`,
+        })).toBe("blocked")
+        expect(yield* services.store.getOperation(seeded)).toMatchObject({ status: "unknown", replayPolicy: "never" })
+      }))
+      yield* open((services) => Effect.gen(function* () {
+        expect((yield* services.runtime.operator.explain(seeded.runId)).decision._tag).toBe("Unknown")
+        const resolve = services.runtime.operator.resolveUnknown(
+          seeded.runId, seeded.operationId, { outcome: "succeeded", result: "already completed" },
+          "operator:resolve", `${id.idempotencyKey}:resolve`,
         )
-        expect(
-          yield* services.store.getOperation({ runId: receipt.runId, operationId: operation.operationId }),
-        ).toMatchObject({ status: "succeeded", result: "already completed" })
-        const [operatorAction] = (yield* services.store.recoveryJournal(receipt.runId)).actions
-        expect(operatorAction?.operator).toBe("operator:resolve")
-        expect(operatorAction?.action).toMatchObject({
-          _tag: "ResolveUnknown",
-          operationId: operation.operationId,
+        yield* resolve
+        yield* resolve
+        expect(yield* services.store.getOperation(seeded)).toMatchObject({ status: "succeeded", result: "already completed" })
+        const actions = (yield* services.store.recoveryJournal(seeded.runId)).actions
+        expect(actions).toHaveLength(1)
+        expect(actions[0]).toMatchObject({
+          operator: "operator:resolve", action: { _tag: "ResolveUnknown", operationId: seeded.operationId },
         })
-        const illegal = yield* services.runtime.operator
-          .resolveUnknown(
-            receipt.runId,
-            operation.operationId,
-            { outcome: "failed", error: "different answer" },
-            "operator:resolve",
-          )
-          .pipe(Effect.flip)
+        const illegal = yield* services.runtime.operator.resolveUnknown(
+          seeded.runId, seeded.operationId, { outcome: "failed", error: "different answer" },
+          "operator:resolve", `${id.idempotencyKey}:resolve-again`,
+        ).pipe(Effect.flip)
         expect(illegal._tag).toBe("generalist/runtime/IllegalOperatorAction")
-      }),
-    ),
+      }))
+    }),
   )
 }
 
@@ -173,7 +182,7 @@ const registerScan = <LayerError>(
           idempotencyKey: id.idempotencyKey,
           prompt: "scan obligations",
         })
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "operator-scan" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "operator-scan" })
         const operation = yield* seedUnknown(services, claim, `${id.idempotencyKey}:operation`)
         const obligations = Array.from(
           yield* services.runtime.operator.scanObligations().pipe(

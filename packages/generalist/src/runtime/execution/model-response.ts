@@ -1,3 +1,4 @@
+import type { DurabilityFailure } from "../../durability/errors.js"
 import {
   type DriverCheckpoint,
   DriverError,
@@ -6,17 +7,32 @@ import {
 } from "../../core/durable/driver.js"
 import { withPending } from "../../core/durable/loop-driver.js"
 import { Effect, Function, Option, Ref, Schema } from "effect"
+import { digest } from "../../core/durable/canonical-json.js"
+
 import { RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"
 import type { WorkerMutationError } from "../run/store-types.js"
 import type { ExecutionContinuation } from "../run/steering.js"
-import type { OperationRecord } from "../sql/operations.js"
+import type { OperationRecord } from "../operation/record.js"
 import {
   completedOperationRefValue,
   liveModelResponseEvent,
   type LiveModelResponseCommitted,
 } from "./model-response/commit.js"
 import { hydrateCompletedOperation } from "./model-response/hydration.js"
+
+const jsonValue = (value: unknown): Schema.Json =>
+  Schema.decodeSync(Schema.fromJsonString(Schema.Json))(
+    Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value),
+  )
+
+const sameJson = (left: unknown, right: unknown): boolean => {
+  try {
+    return digest(jsonValue(left)) === digest(jsonValue(right))
+  } catch {
+    return false
+  }
+}
 
 interface PreparedCompletion {
   readonly continuation?: ExecutionContinuation | null
@@ -89,15 +105,16 @@ export const saveJournalCheckpoint = (input: {
   readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly checkpoint: DriverCheckpoint
+  readonly commandId: string
 }): Effect.Effect<void, DriverError> =>
   input.store
-    .saveExecution({ ...input.claim, checkpoint: input.checkpoint })
+    .saveExecution({ ...input.claim, commandId: input.commandId, checkpoint: input.checkpoint })
     .pipe(Effect.mapError((error) => journalFailure("checkpoint", input.claim.runId, error)))
 
 export const hydratePersistedModelOperation = (input: {
   readonly store: RunStoreService
   readonly value: unknown
-}): Effect.Effect<unknown, RuntimeUnavailable> =>
+}): Effect.Effect<unknown, RuntimeUnavailable | DurabilityFailure> =>
   Effect.gen(function* () {
     const reference = completedOperationRefValue(input.value)
     if (reference === undefined)
@@ -123,15 +140,7 @@ export const verifyCommittedModelEvent = (input: {
   readonly store: RunStoreService
   readonly claim: ExecutionClaim
   readonly event: LiveModelResponseCommitted
-}): Effect.Effect<
-  void,
-  | RuntimeUnavailable
-  | import("../errors.js").RunNotFound
-  | import("../sql/errors.js").StaleClaim
-  | import("../sql/errors.js").StaleSessionClaim
-  | import("effect/unstable/sql/SqlError").SqlError
-  | import("../errors.js").RunTerminal
-> =>
+}): Effect.Effect<void, WorkerMutationError> =>
   Effect.gen(function* () {
     const persisted = yield* input.store.getOperationByKey({
       runId: input.claim.runId,
@@ -147,13 +156,38 @@ export const verifyCommittedModelEvent = (input: {
         message: `committed model operation ${input.event.operationKey} has no transition identity`,
       })
     }
-    yield* input.store.commitModelResponse({
-      ...input.claim,
-      operationId: persisted.operationId,
-      outcome: { _tag: "Succeeded", value: persisted.result },
-      transitionDigest: reference.transitionDigest,
-      event: input.event,
-    })
+    if (reference.operationId !== input.event.operationKey) {
+      return yield* RuntimeUnavailable.make({
+        message: `committed model operation ${input.event.operationKey} operation identity diverges`,
+      })
+    }
+    if (reference.sessionId !== input.claim.session.sessionId) {
+      return yield* RuntimeUnavailable.make({
+        message: `committed model operation ${input.event.operationKey} session identity diverges`,
+      })
+    }
+    const session = yield* input.store.sessionReader(reference.sessionId)
+    if (Option.isNone(session)) {
+      return yield* RuntimeUnavailable.make({
+        message: `Session ${reference.sessionId} is unavailable`,
+      })
+    }
+    const operation = yield* hydrateCompletedOperation({ session: session.value, reference }).pipe(
+      Effect.mapError((error) =>
+        RuntimeUnavailable.make({
+          message:
+            error._tag === "generalist/runtime/SessionEntryCorrupt"
+              ? error.message
+              : `Session entry ${error.entryId} is missing from ${error.sessionId}`,
+        }),
+      ),
+    )
+    const expected = liveModelResponseEvent(operation)
+    if (Schema.is(RuntimeUnavailable)(expected) || !sameJson(expected, input.event)) {
+      return yield* RuntimeUnavailable.make({
+        message: `committed model operation ${input.event.operationKey} event identity diverges`,
+      })
+    }
   })
 
 /** Release process-local completion bookkeeping after the durable store commit. */

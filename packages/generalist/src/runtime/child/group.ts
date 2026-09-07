@@ -187,7 +187,7 @@ export const Tools = { make: makeTools }
 const MessagePayload = Schema.Struct({ message: Schema.String })
 const ResultPayload = Schema.Struct({
   text: Schema.String,
-  output: Schema.optionalKey(Schema.Unknown),
+  output: Schema.Unknown,
   turns: Schema.Finite,
 })
 const ChildMetadata = Schema.Struct({
@@ -336,7 +336,7 @@ export const resultFromInspection = (inspection: FanOutInspection): GroupResult 
     if (member.label !== undefined) child.label = member.label
     if (result._tag === "Some") {
       child.text = result.value.text
-      if (result.value.output !== undefined) child.output = result.value.output
+      child.output = result.value.output
       child.turns = result.value.turns
     }
     if (message !== undefined) child.message = message

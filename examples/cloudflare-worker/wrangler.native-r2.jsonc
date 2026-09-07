@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "generalist-native-r2-qualification",
+  "main": "src/native-r2-qualification.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "NATIVE_R2_QUALIFICATION_ENABLED": "0",
+    "NATIVE_R2_QUALIFICATION_ENVIRONMENT": "replace-with-fixed-environment",
+    "NATIVE_R2_QUALIFICATION_TENANT": "replace-with-fixed-tenant"
+  },
+  "r2_buckets": [
+    {
+      "binding": "NATIVE_R2_QUALIFICATION_BUCKET",
+      "bucket_name": "replace-with-test-bucket"
+    }
+  ]
+}

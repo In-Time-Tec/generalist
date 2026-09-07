@@ -382,11 +382,11 @@ export const ResolveApproval = define("ResolveApproval", {
 
 /** @experimental */
 export const CancelRun = define("CancelRun", {
-  args: { sessionId: Schema.String },
+  args: { sessionId: Schema.String, commandId: Schema.String },
   messages: [CancelledRun, FailedAgentCommand],
-  execute: ({ sessionId }) =>
+  execute: ({ sessionId, commandId }) =>
     Connection.use((connection) =>
-      catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
+      catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId, commandId }).pipe(Effect.as(CancelledRun()))),
     ),
 })
 

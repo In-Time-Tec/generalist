@@ -1,8 +1,10 @@
-import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
+import { BunCrypto } from "@effect/platform-bun"
+import { Console, Config, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
-
 const agent = Agent.make({ name: "chat-agent" })
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
@@ -29,12 +31,32 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.merge(
-  Runtime.layerMemory({
-    addresses: [],
-  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
-  agentServices,
-)
+const runtimeLayer = Layer.unwrap(Effect.gen(function* () {
+  const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+  const tenant = yield* Config.string("GENERALIST_TENANT")
+  const partition = yield* Config.string("GENERALIST_PARTITION")
+  const bucket = yield* Config.string("GENERALIST_BUCKET")
+  const region = yield* Config.string("AWS_REGION")
+  const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+  const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+  const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+  const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+  return Durability.layer({ environment, tenant, partition, addresses: [] }).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    Layer.provide(S3.layer({
+      bucket,
+      region,
+      credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+      ...(endpoint === undefined ? {} : {
+        endpoint,
+        forcePathStyle: true,
+        capabilities: { conditionalCreate: confirmed, strongReadAfterWrite: confirmed, consistentListing: confirmed },
+      }),
+    })),
+    Layer.provide(BunCrypto.layer),
+  )
+}))
 
 const collectRun = (runId: string, cursor?: number) => {
   const options = { runId }
@@ -52,18 +74,21 @@ const tags = (events: Iterable<{ readonly sequence: number; readonly _tag: strin
     .map((event) => `${event.sequence}:${event._tag}`)
     .join(" ")
 
-const program = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
-  const handle = yield* runtime.start(agent, "Say hello", {
-    sessionId: "docs-1",
-    idempotencyKey: "hello-1",
-  })
-  const live = yield* collectRun(handle.runId)
-  yield* Console.log(`live:   ${tags(live)}`)
-  const replayed = yield* collectRun(handle.runId, 2)
-  yield* Console.log(`replay: ${tags(replayed)}`)
-})
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    yield* Durability.activate
+    const runtime = yield* Runtime.Runtime
+    yield* runtime.register(agent)
+    const handle = yield* runtime.start(agent, "Say hello", {
+      sessionId: "docs-1",
+      idempotencyKey: "hello-1",
+    })
+    const live = yield* collectRun(handle.runId)
+    yield* Console.log(`live:   ${tags(live)}`)
+    const replayed = yield* collectRun(handle.runId, 2)
+    yield* Console.log(`replay: ${tags(replayed)}`)
+  }),
+)
 
 const runtime = ManagedRuntime.make(runtimeLayer)
 await runtime.runPromise(program)

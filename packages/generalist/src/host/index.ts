@@ -130,7 +130,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
     readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, InspectError>
     readonly send: RunSend
-    readonly cancel: (runId: string, reason?: string) => Effect.Effect<void, CancelError>
+    readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, CancelError>
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
   readonly events: {
@@ -149,18 +149,20 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   }
   readonly operator: {
     readonly explain: (runId: string) => Effect.Effect<Explanation, InspectError>
-    readonly retry: (runId: string, operator: string) => Effect.Effect<void, OperatorActionError>
-    readonly wake: (runId: string, operator: string) => Effect.Effect<void, OperatorActionError>
+    readonly retry: (runId: string, operator: string, commandId: string) => Effect.Effect<void, OperatorActionError>
+    readonly wake: (runId: string, operator: string, commandId: string) => Effect.Effect<void, OperatorActionError>
     readonly resolveUnknown: (
       runId: string,
       operationId: string,
       resolution: UnknownResolution,
       operator: string,
+      commandId: string,
     ) => Effect.Effect<void, OperatorActionError>
     readonly extendBudget: (
       runId: string,
       delta: BudgetLimits,
       operator: string,
+      commandId: string,
     ) => Effect.Effect<void, OperatorExtendBudgetError>
   }
 }
@@ -461,8 +463,11 @@ const create = <
         list: runtime.sessionRuns,
         inspect: runtime.inspect,
         send: (runId, prompt, sendOptions) => runtime.send(runId, prompt, sendOptions),
-        cancel: (runId, reason) => {
-          const input: Types.Mutable<{ readonly runId: string; readonly reason?: string }> = { runId }
+        cancel: (runId, commandId, reason) => {
+          const input: Types.Mutable<{ readonly runId: string; readonly commandId: string; readonly reason?: string }> = {
+            runId,
+            commandId,
+          }
           if (reason !== undefined) input.reason = reason
           return runtime.cancel(input)
         },

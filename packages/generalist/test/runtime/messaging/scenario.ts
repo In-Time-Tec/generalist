@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../execution/object.js"
 import { Effect, Layer } from "effect"
 import { Runtime, RunStore, type AgentDirectory, type Messaging } from "../../../src/runtime/index.js"
 import {
@@ -24,17 +25,15 @@ export interface MessagingOverrides {
   readonly messagingPolicy?: Messaging.MessagingPolicy.Service
 }
 
-/** A memory Runtime whose messaging policy the test chooses. */
+/** An object-backed Runtime whose messaging policy the test chooses. */
 export const messagingLayer = (overrides: MessagingOverrides) =>
-  Runtime.layerMemory({ ...options, ...overrides }).pipe(Layer.provide(resolverLayer))
+  objectRuntimeLayer({ ...options, ...overrides }).pipe(Layer.provide(resolverLayer))
 
 /**
- * One backend the addressed-messaging suites run against.
+ * One object-backed host used by the addressed-messaging suites.
  *
  * `layer` is a factory rather than a value because cross-session policy is a Runtime construction
- * option, so each policy is a different Runtime. `activate`
- * exists because the memory and SQLite Runtimes bundle a LocalScheduler that promotes a queued Run
- * itself while the SQL Runtimes expect an external worker to claim ready work.
+ * option, so each policy is a different Runtime.
  */
 export interface MessagingBackend<StoreError, Extra = never> {
   readonly name: string

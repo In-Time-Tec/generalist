@@ -121,7 +121,7 @@ export const layerWebSocket = (options: {
           if (runId === undefined) {
             return yield* SendFailed.make({ reason: "No Run event has been received for this Session" })
           }
-          yield* owner.connection.cancel(runId)
+          yield* owner.connection.cancel(runId, command.commandId)
         })
       }
 

@@ -85,7 +85,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
     const progressPolicy = yield* validateOptions(options, agent)
 
     const sessionId = options.sessionId ?? "local"
-    const sessionAppendOptions = (expectedLeafId: string | null) => ({ expectedLeafId })
 
     const promptContext = yield* setupPromptContext({ agent, options, activeSession, resumeChat, staticCandidates })
     const {
@@ -290,7 +289,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
       activeModelResponse,
       progressPolicy,
       sessionId,
-      sessionAppendOptions,
       instructionsService,
       skillCatalog,
       skillRuntime,

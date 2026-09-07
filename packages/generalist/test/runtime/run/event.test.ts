@@ -1,24 +1,23 @@
 import "./suites/event-telemetry-suite.js"
 import { expect, it } from "@effect/vitest"
 import { ProgramCapabilities, ProgramRunner, CodeExecutor, Gate } from "../../../src/index.js"
-import { Effect, Layer, Schema, Stream, pipe } from "effect"
+import { Effect, Layer, Schema, Stream } from "effect"
 import { provideScoped } from "../execution/scoped-provide.js"
-import { Response } from "effect/unstable/ai"
 import { Errors, ExecutableResolver, LocalScheduler, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
 import type { RunFailure as RunFailureType } from "../../../src/runtime/run/event.js"
-import { decodeEvent, encodeEvent } from "../../../src/runtime/sql/codec/codecs.js"
 import {
   alternateAssistant,
   alternateAssistantRef,
   assistantAddress,
   assistantRef,
-  memoryLayer,
+  objectLayer,
+  resolverLayer,
   textPrompt,
+  registrationsFor,
 } from "../execution/fixtures.js"
-import { sqliteLayer, tempDbPath } from "../sql/scenario.js"
 import { closedTestAgent } from "./identity.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 
-import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 const failures: ReadonlyArray<RunFailureType> = [
   Errors.AgentExecutionFailure.make({ message: "agent failed", cause: new Error("model detail") }),
   Errors.AgentExecutionFailure.make({
@@ -64,217 +63,114 @@ const failures: ReadonlyArray<RunFailureType> = [
   ProgramRunner.ProgramIdentityMismatch.make({ expected: "source-a", actual: "source-b" }),
 ]
 
-const failedEvent = (error: RunFailureType) => ({
-  _tag: "RunFailed" as const,
-  specVersion: "1" as const,
-  eventId: "run:codec:0",
-  runId: "run:codec",
-  sequence: 0,
-  executableRef: assistantRef.ref,
-  depth: 0,
-  rootRunId: "run:codec",
-  occurredAt: "2026-08-05T00:00:00.000Z",
-  error,
-})
-
-it("round-trips every RunFailure variant through the durable RunEvent codec", () => {
-  for (const failure of failures) {
-    const decoded = pipe(failedEvent(failure), encodeEvent, decodeEvent)
-    expect(decoded._tag).toBe("RunFailed")
-    if (decoded._tag !== "RunFailed") throw new Error("expected RunFailed")
-    expect(decoded.error.constructor).toBe(failure.constructor)
-    expect(Schema.encodeSync(RunEvent.RunFailure)(decoded.error)).toEqual(
-      Schema.encodeSync(RunEvent.RunFailure)(failure),
-    )
-  }
-})
-
-it("round-trips exact identity-bearing steering lifecycle facts", () => {
-  const common = {
-    specVersion: "1" as const,
-    runId: "run:steering-codec",
-    executableRef: assistantRef.ref,
-    rootRunId: "run:steering-codec",
-    depth: 0,
-    occurredAt: "2026-08-05T00:00:00.000Z",
-  }
-  const events: ReadonlyArray<RunEvent.RunEvent> = [
-    {
-      ...common,
-      _tag: "SteeringAccepted",
-      eventId: "event:steering:accepted",
-      sequence: 3,
-      entryId: "opaque-entry",
-      steeringSequence: 0,
-      idempotencyKey: "steer:1",
-      digest: "digest:1",
-      prompt: textPrompt("change direction"),
-    },
-    {
-      ...common,
-      _tag: "SteeringConsumed",
-      eventId: "event:steering:consumed",
-      sequence: 4,
-      entryIds: ["opaque-entry", "opaque-entry-2"],
-      operationId: "operation:1",
-    },
-    {
-      ...common,
-      _tag: "SteeringDiscarded",
-      eventId: "event:steering:discarded",
-      sequence: 5,
-      entryIds: ["opaque-entry-3"],
-      reason: "cancelled",
-    },
-  ]
-
-  for (const event of events) {
-    expect(decodeEvent(encodeEvent(event))).toEqual(event)
-  }
-})
-
-it("round-trips a completion gate result", () => {
-  const base = failedEvent(failures[0]!)
-  const event: RunEvent.RunEvent = {
-    _tag: "GateResult",
-    specVersion: base.specVersion,
-    eventId: base.eventId,
-    runId: base.runId,
-    sequence: base.sequence,
-    executableRef: base.executableRef,
-    rootRunId: base.rootRunId,
-    depth: base.depth,
-    occurredAt: base.occurredAt,
-    turn: 2,
-    name: "quality",
-    verdict: "pass",
-    evidence: { score: 1 },
-  }
-  expect(decodeEvent(encodeEvent(event))).toEqual(event)
-})
-
-it("round-trips an exported trajectory reward", () => {
-  const { error: _, ...base } = failedEvent(failures[0]!)
-  const event: RunEvent.RunEvent = {
-    ...base,
-    _tag: "Rewarded",
-    leaf: "run:codec:leaf",
-    value: 0.75,
-    source: "eval:quality",
-  }
-  expect(decodeEvent(encodeEvent(event))).toEqual(event)
-})
-
-it("round-trips the canonical ApprovalRequested identity and payload", () => {
-  const call = Response.makePart("tool-call", {
-    id: "call:delete",
-    name: "delete_draft",
-    params: { draftId: "draft-1" },
-    providerExecuted: false,
-  })
-  const event = {
-    ...failedEvent(failures[0]!),
-    _tag: "ApprovalRequested" as const,
-    turn: 2,
-    call,
-    request: {
-      approvalId: "approval:delete",
-      operation: "call:delete",
-      capability: "delete_draft",
-      input: { draftId: "draft-1" },
-    },
-  }
-  const decoded = pipe(event, encodeEvent, decodeEvent)
-  expect(decoded).toMatchObject({
-    _tag: "ApprovalRequested",
-    turn: 2,
-    request: {
-      approvalId: "approval:delete",
-      operation: "call:delete",
-      capability: "delete_draft",
-      input: { draftId: "draft-1" },
-    },
-  })
-})
-
-it("rejects corrupted event payloads without fallback parsing", () => {
-  const EventRecord = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
-  const encodedEvent = failures[0]!.pipe(failedEvent, encodeEvent)
-  const encoded = pipe(encodedEvent, Schema.decodeSync(EventRecord))
-  expect(() => decodeEvent(Schema.encodeSync(EventRecord)({ ...encoded, sequence: -1 }))).toThrow()
-  expect(() =>
-    decodeEvent(
-      Schema.encodeSync(EventRecord)({ ...encoded, error: { _tag: "generalist/runtime/AgentExecutionFailure" } }),
-    ),
-  ).toThrow()
-  expect(() => decodeEvent(Schema.encodeSync(EventRecord)({ ...encoded, _tag: "UnknownEvent" }))).toThrow()
-})
-
-it.live("keeps memory and SQLite failure history and inspection in parity", () => {
-  const failure = failures.find((candidate) => candidate._tag === "generalist/core/ProgramOperationUnknown")!
-  const settle = (backend: "memory" | "sqlite") =>
-    provideScoped(
-      backend === "memory" ? memoryLayer : sqliteLayer(tempDbPath("run-event-codec-parity")),
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+it.live("round-trips every RunFailure variant through object-backed history", () =>
+  provideScoped(
+    objectLayer,
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      for (const [index, failure] of failures.entries()) {
+        const runId = `run:event-codec:${index}`
         const receipt = yield* runtime.send({
+          runId,
           to: assistantAddress,
-          sessionId: `codec:${backend}`,
-          idempotencyKey: `codec:${backend}`,
+          sessionId: `session:event-codec:${index}`,
+          idempotencyKey: `event-codec:${index}`,
           prompt: textPrompt("fail"),
         })
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: `codec-${backend}` })
-        yield* store.fail({ ...claim, error: failure })
-        yield* runtime.recordReward({
+        const claim = yield* store.claimExecution({
+          commandId: `runtime-run-event-test-ts-failure-claim-${index}`,
           runId: receipt.runId,
-          leaf: `${receipt.runId}:leaf`,
-          value: 0.75,
-          source: "eval:quality",
+          ownerId: objectWorkerId,
         })
-        const snapshot = yield* runtime.snapshot(receipt.runId)
-        const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 20 })
-        const terminal = history.find((event) => event._tag === "RunFailed")
-        const rewarded = history.find((event) => event._tag === "Rewarded")
-        expect(snapshot.run.status).toBe("failed")
-        expect(snapshot.outcome?._tag).toBe("Failed")
-        if (terminal?._tag !== "RunFailed") throw new Error("expected RunFailed")
+        yield* store.fail({ ...claim, error: failure })
+        const terminal = (yield* runtime.history({ runId, cursor: -1, limit: 20 })).find(
+          (event) => event._tag === "RunFailed",
+        )
+        expect(terminal?._tag).toBe("RunFailed")
+        if (terminal?._tag !== "RunFailed") continue
         expect(terminal.error.constructor).toBe(failure.constructor)
-        expect(rewarded).toMatchObject({ _tag: "Rewarded", value: 0.75, source: "eval:quality" })
-        return yield* Schema.encodeEffect(RunEvent.RunFailure)(terminal.error)
-      }),
-    )
-  return Effect.all([settle("memory"), settle("sqlite")]).pipe(
-    Effect.tap(([memoryFailure, sqliteFailure]) => Effect.sync(() => expect(sqliteFailure).toEqual(memoryFailure))),
-  )
-})
+        expect(Schema.encodeSync(RunEvent.RunFailure)(terminal.error)).toEqual(
+          Schema.encodeSync(RunEvent.RunFailure)(failure),
+        )
+      }
+    }),
+  ),
+)
 
-it.live("reopens SQLite failure history, stream, snapshot, and inspection with the typed failure", () => {
-  const filename = tempDbPath("run-event-codec")
+it.live("keeps object failure history and inspection typed", () =>
+  provideScoped(
+    objectLayer,
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "codec:object",
+        idempotencyKey: "codec:object",
+        prompt: textPrompt("fail"),
+      })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-run-event-test-ts-claim-1",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
+      const failure = failures.find((candidate) => candidate._tag === "generalist/core/ProgramOperationUnknown")!
+      yield* store.fail({ ...claim, error: failure })
+      yield* runtime.recordReward({
+        commandId: "runtime-run-event-test-ts-recordReward-1",
+        runId: receipt.runId,
+        leaf: `${receipt.runId}:leaf`,
+        value: 0.75,
+        source: "eval:quality",
+      })
+      const snapshot = yield* runtime.snapshot(receipt.runId)
+      const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 20 })
+      const terminal = history.find((event) => event._tag === "RunFailed")
+      const rewarded = history.find((event) => event._tag === "Rewarded")
+      expect(snapshot.run.status).toBe("failed")
+      expect(snapshot.outcome?._tag).toBe("Failed")
+      if (terminal?._tag !== "RunFailed") throw new Error("expected RunFailed")
+      expect(terminal.error.constructor).toBe(failure.constructor)
+      expect(rewarded).toMatchObject({ _tag: "Rewarded", value: 0.75, source: "eval:quality" })
+      return yield* Schema.encodeEffect(RunEvent.RunFailure)(terminal.error)
+    }),
+  ),
+)
+
+it.live("reopens object failure history, stream, snapshot, and inspection with the typed failure", () => {
+  const storage = makeObjectStorage()
+  const options = {
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+  }
   let runId = ""
   const failure = Errors.ExecutableIdentityMismatch.make({
-    runId: "run:sqlite-codec",
+    runId: "run:object-codec",
     expectedRef: assistantRef.ref,
     actualRef: alternateAssistantRef.ref,
   })
   const write = provideScoped(
-    sqliteLayer(filename),
+    objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       runId = (yield* runtime.send({
         runId: failure.runId,
         to: assistantAddress,
-        sessionId: "codec:sqlite",
-        idempotencyKey: "codec:sqlite",
+        sessionId: "codec:object-reopen",
+        idempotencyKey: "codec:object-reopen",
         prompt: textPrompt("fail"),
       })).runId
-      const claim = yield* store.claimExecution({ runId, ownerId: "codec-sqlite" })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-run-event-test-ts-claim-2",
+        runId,
+        ownerId: objectWorkerId,
+      })
       yield* store.fail({ ...claim, error: failure })
     }),
   )
   const reopen = provideScoped(
-    sqliteLayer(filename),
+    objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       expect((yield* runtime.inspect(runId)).status).toBe("failed")
@@ -302,11 +198,14 @@ it.live("reopens SQLite failure history, stream, snapshot, and inspection with t
   return write.pipe(Effect.andThen(reopen))
 })
 
-it.live("makes a changed SQLite resolver identity terminal once without scheduler retry", () => {
-  const filename = tempDbPath("resolver-identity-terminal")
+it.live("makes a changed object resolver identity terminal once without scheduler retry", () => {
+  const storage = makeObjectStorage()
   let runId = ""
   const admit = provideScoped(
-    sqliteLayer(filename),
+    objectRuntimeLayer({
+      addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+      scheduler: { pollInterval: "1 day" },
+    }, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       runId = (yield* runtime.send({
@@ -326,11 +225,9 @@ it.live("makes a changed SQLite resolver identity terminal once without schedule
       }),
   })
   const execute = provideScoped(
-    SqliteRuntime.layerSqlite({
-      filename,
-      addresses: [],
-      scheduler: { pollInterval: "1 day" },
-    }).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, changedResolver))),
+    objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 day" } }, storage).pipe(
+      Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, changedResolver)),
+    ),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const scheduler = yield* LocalScheduler.LocalScheduler

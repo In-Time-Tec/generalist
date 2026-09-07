@@ -10,7 +10,7 @@ import type { ExecutionClaim } from "../../run/store.js"
 import type { ExecutionCheckpoint } from "../state.js"
 import { CompletedModelResponse } from "../../run/event.js"
 import { decodeAuthoredModelResponseContent } from "./content.js"
-import type { OperationRecord } from "../../sql/operations.js"
+import type { OperationRecord } from "../../operation/record.js"
 
 export type LiveModelResponseCommitted = Extract<Event, { readonly _tag: "ModelResponseCommitted" }>
 

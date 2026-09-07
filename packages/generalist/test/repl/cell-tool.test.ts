@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../runtime/execution/object.js"
 import "./suites/bun-cell-isolation-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
@@ -406,7 +407,7 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
       ]).pipe(Layer.orDie)
 
       yield* provideScoped(
-        Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+        objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }).pipe(
           Layer.provide(firstResolver),
         ),
         Effect.gen(function* () {

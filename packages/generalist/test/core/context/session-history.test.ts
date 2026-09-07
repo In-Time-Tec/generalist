@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -6,7 +7,7 @@ import { Session, SessionHistory } from "../../../src/index"
 /** One isolated in-memory Session per test, built and released in the test's own scope. */
 const withSession = <A, E>(effect: Effect.Effect<A, E, Session.SessionDirectory>): Effect.Effect<A, E> =>
   Effect.scoped(
-    Effect.flatMap(Layer.build(Session.layerMemory), (context) => effect.pipe(Effect.provideContext(context))),
+    Effect.flatMap(Layer.build(layerMemory), (context) => effect.pipe(Effect.provideContext(context))),
   )
 
 const userEntry = (text: string) => ({
@@ -19,7 +20,7 @@ const seed = (count: number) =>
     Effect.scoped(
       Effect.gen(function* () {
         const store = yield* Session.acquire("history-test")
-        for (let index = 0; index < count; index += 1) yield* store.append(userEntry(`entry-${index}`))
+        for (let index = 0; index < count; index += 1) yield* store.append(userEntry(`entry-${index}`), { commandId: `fixture-23-${index}` })
         return yield* store.path()
       }),
     ),
@@ -90,7 +91,8 @@ describe("SessionHistory.page", () => {
           // window is the newest page, which is exactly what a caller asking for entries BEFORE
           // something must not mistake for an answer, so the page names the cursor it could not use.
           const store = yield* Session.acquire("unknown-cursor")
-          for (const text of ["a", "b", "c"]) yield* store.append(userEntry(text))
+          for (const [index, text] of ["a", "b", "c"].entries())
+            yield* store.append(userEntry(text), { commandId: `history-${index}` })
           const path = yield* store.path()
           const page = SessionHistory.page(path, { limit: 2, before: "no-such-entry" })
           expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(-2).map((entry) => entry.id))
@@ -128,10 +130,10 @@ describe("Session history behind a compaction checkpoint", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const store = yield* Session.acquire("compacted-history")
-        yield* store.append(userEntry("pre-1"))
-        yield* store.append(userEntry("pre-2"))
+        yield* store.append(userEntry("pre-1"), { commandId: "fixture-132" })
+        yield* store.append(userEntry("pre-2"), { commandId: "fixture-133" })
         const parentId = yield* store.leaf
-        const id = yield* store.reserveEntryId
+        const id = yield* store.reserveEntryId("history-checkpoint")
         yield* store.appendCheckpoint({
           id,
           parentId,
@@ -140,7 +142,7 @@ describe("Session history behind a compaction checkpoint", () => {
           ]),
           telemetry: [],
         })
-        yield* store.append(userEntry("post-1"))
+        yield* store.append(userEntry("post-1"), { commandId: "fixture-144" })
         return yield* store.path()
       }),
     ),

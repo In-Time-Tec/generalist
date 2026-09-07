@@ -1,3 +1,6 @@
+import type { DurabilityFailure } from "../../durability/errors.js"
+import type { Inheritance } from "../../core/agent/lifecycle/fan-out.js"
+import type { StaleClaim, StaleSessionClaim } from "./ownership-errors.js"
 import type { TreePolicy } from "../tree/policy.js"
 import type { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import type { Message } from "../messaging/message.js"
@@ -8,7 +11,7 @@ import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/state.js"
 import type { ExecutableManifest, ExecutableRef } from "../executable/manifest.js"
 import type { InitialChildInput } from "../service.js"
-import type { OperationKind, ReplayPolicy } from "../sql/operations.js"
+import type { OperationKind, ReplayPolicy } from "../operation/record.js"
 import type { AdmissionPolicy, ExecutionContinuation, MessageSource, SteeringReceipt } from "./steering.js"
 import type { ExecutableRegistration } from "../executable/registration.js"
 import type { Prompt } from "effect/unstable/ai"
@@ -17,8 +20,12 @@ import type { SessionStore as SessionService } from "../../core/context/session.
 import type { BudgetLimits } from "../../core/durable/run-budget.js"
 import type { ForkOptions, RewindOptions } from "../fork.js"
 
-export type Durability = "ephemeral" | "durable"
-export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
+export type Durability = "durable"
+
+/** Caller-retained identity for a repeatable mutation; reuse only with the exact original input. */
+export interface CommandIdentity {
+  readonly commandId: string
+}
 
 export interface AdmitSendInput {
   readonly message: Message
@@ -35,7 +42,10 @@ export interface AdmitStartInput extends AdmitSendInput {
   readonly initialFanOuts: ReadonlyArray<
     Omit<InitialFanOutInput, "members"> & {
       readonly members: ReadonlyArray<
-        Omit<InitialFanOutInput["members"][number], "prompt"> & { readonly prompt: Prompt.Prompt }
+        Omit<InitialFanOutInput["members"][number], "prompt" | "inherit"> & {
+          readonly prompt: Prompt.Prompt
+          readonly inherit?: Inheritance
+        }
       >
     }
   >
@@ -65,8 +75,8 @@ export interface AdmitProgramChildAndSuspendInput extends ExecutionClaim {
 
 export interface StoreInfo {
   readonly durability: Durability
-  readonly backend: StoreBackend
-  readonly multiWorker: boolean
+  readonly backend: "object"
+  readonly multiWorker: true
 }
 
 export interface ForkRunInput extends ForkOptions {
@@ -141,6 +151,7 @@ export interface ExecutionRecord {
   readonly attempt: number
   readonly attemptFence: number
   readonly cancellationRequested: boolean
+  readonly operationNamespace?: string
   readonly checkpoint?: ExecutionCheckpoint
   readonly suspension?: ExecutionSuspension
   readonly resolutions: ReadonlyArray<WaitResponse>
@@ -174,6 +185,6 @@ export type WorkerMutationError =
   | RunNotFound
   | RunTerminal
   | RuntimeUnavailable
-  | import("../sql/errors.js").StaleClaim
-  | import("../sql/errors.js").StaleSessionClaim
-  | import("effect/unstable/sql/SqlError").SqlError
+  | StaleClaim
+  | StaleSessionClaim
+  | DurabilityFailure

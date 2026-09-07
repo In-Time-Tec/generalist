@@ -34,7 +34,10 @@ export const RunStartPayload = Schema.Struct({
 })
 export type RunStartPayload = typeof RunStartPayload.Type
 
-export const RunCancelPayload = Schema.Struct({ reason: Schema.optionalKey(Schema.String) })
+export const RunCancelPayload = Schema.Struct({
+  commandId: Schema.String,
+  reason: Schema.optionalKey(Schema.String),
+})
 export type RunCancelPayload = typeof RunCancelPayload.Type
 
 export interface EventStreamItem {
@@ -65,6 +68,7 @@ export const eventStream: HttpApiSchema.StreamSse<typeof EventStreamItem, typeof
 /** Browser-to-Host artifact edit command. @experimental */
 export const ArtifactClientCommand = Schema.Struct({
   _tag: Schema.tag("Edit"),
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   base: ArtifactVersion,
   operation: RangeOperation,
   attribution: HumanAttribution,
@@ -218,22 +222,27 @@ const explainRun = HttpApiEndpoint.get("explain", "/runs/:id/explain", {
 })
 const retryRun = HttpApiEndpoint.post("retry", "/runs/:id/retry", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ operator: Schema.String }),
+  payload: Schema.Struct({ commandId: Schema.String, operator: Schema.String }),
   error: apiErrors,
 })
 const wakeRun = HttpApiEndpoint.post("wake", "/runs/:id/wake", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ operator: Schema.String }),
+  payload: Schema.Struct({ commandId: Schema.String, operator: Schema.String }),
   error: apiErrors,
 })
 const resolveUnknown = HttpApiEndpoint.post("resolveUnknown", "/runs/:id/resolve-unknown", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ operationId: Schema.String, resolution: UnknownResolution, operator: Schema.String }),
+  payload: Schema.Struct({
+    commandId: Schema.String,
+    operationId: Schema.String,
+    resolution: UnknownResolution,
+    operator: Schema.String,
+  }),
   error: apiErrors,
 })
 const extendBudget = HttpApiEndpoint.post("extendBudget", "/runs/:id/extend-budget", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ delta: BudgetLimits, operator: Schema.String }),
+  payload: Schema.Struct({ commandId: Schema.String, delta: BudgetLimits, operator: Schema.String }),
   error: apiErrors,
 })
 const operator: HttpApiGroup.HttpApiGroup<

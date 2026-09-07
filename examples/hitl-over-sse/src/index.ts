@@ -1,8 +1,11 @@
-import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
-import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream } from "effect"
+import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
+import * as Durability from "generalist/durability"
+import * as S3 from "generalist/durability/s3"
 import { Generalist } from "generalist/host"
+import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { Server } from "generalist/server"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -25,6 +28,29 @@ const deployTool = Tool.make("deploy", {
 
 const toolkit = Toolkit.make(deployTool)
 const agent = Agent.make({ name: "release-agent", toolkit })
+const address = Address.make("agent:release-agent")
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ example: "hitl-over-sse", revision: "1" }),
+  tools: [{ name: deployTool.name, pin: Pins.makeCapability({ example: "hitl-over-sse", tool: deployTool.name, revision: "1" }) }],
+  skills: [],
+  services: [],
+  policy:
+    agent.policy.snapshot === undefined
+      ? { _tag: "Pinned", pin: Pins.makeCapability({ example: "hitl-over-sse", policy: "1" }) }
+      : { _tag: "Portable", policy: agent.policy.snapshot },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({
+  root: pinnedAgent.pin,
+  entries: [{ _tag: "Agent", ...pinnedAgent }],
+})
+const registrations = [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
+  pin,
+  codec: "hitl-over-sse-example",
+  version: "1",
+  payload: { agent: agent.name },
+}))
 const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.die("approval should suspend before execution") })
 const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -59,11 +85,53 @@ const agentServices = Layer.mergeAll(
   ModelMiddleware.layerIdentity,
 )
 
-const runtimeLayer = Layer.merge(
-  Runtime.layerMemory({
-    addresses: [],
-  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie))),
-  agentServices,
+const resolver = ExecutableResolver.layerStatic([
+  {
+    executable,
+    agent: Agent.close(agent, agentServices),
+  },
+]).pipe(Layer.orDie)
+const runtimeLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    const reconstructed = Durability.layer({
+      environment,
+      tenant,
+      partition,
+      addresses: [{ address, executable, registrations }],
+    }).pipe(
+      Layer.provide(resolver),
+      Layer.provide(
+        S3.layer({
+          bucket,
+          region,
+          credentials: { accessKeyId, secretAccessKey, ...(sessionToken === undefined ? {} : { sessionToken }) },
+          ...(endpoint === undefined
+            ? {}
+            : {
+                endpoint,
+                forcePathStyle: true,
+                capabilities: {
+                  conditionalCreate: confirmed,
+                  strongReadAfterWrite: confirmed,
+                  consistentListing: confirmed,
+                },
+              }),
+        }),
+      ),
+      Layer.provide(BunCrypto.layer),
+    )
+    return Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(reconstructed))
+  }),
 )
 
 const program = Effect.gen(function* () {
@@ -83,6 +151,9 @@ const program = Effect.gen(function* () {
   )
 })
 
-const runtime = ManagedRuntime.make(runtimeLayer)
-await runtime.runPromise(program)
-await runtime.dispose()
+const runtime = ManagedRuntime.make(Layer.merge(runtimeLayer, agentServices))
+try {
+  await runtime.runPromise(program)
+} finally {
+  await runtime.dispose()
+}

@@ -160,8 +160,10 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
     it.live("refuses a message to a terminal target", () =>
       Effect.gen(function* () {
         const { runtime, store, parent, first } = yield* familyFor(session("terminal"))
-        const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "terminal-test" })
-        yield* store.complete({ ...claim, result: completedResult("done") })
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-messaging-suites-mailbox-ts-claim-1", runId: first.runId, ownerId: "terminal-test" })
+        yield* store.complete({
+          commandId: "runtime-messaging-suites-mailbox-ts-complete-1", ...claim, result: completedResult("done") })
 
         const error = yield* runtime
           .sendMessage({

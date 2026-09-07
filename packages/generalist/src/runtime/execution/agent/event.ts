@@ -72,6 +72,15 @@ export const isInspectionEvent = (event: DurableAgentLoopEvent): event is Inspec
 export const durableEvent = (
   event: Exclude<AgentLoopEvent, { readonly _tag: "ModelPart" | "ModelResponseCommitted" }>,
 ): DurableAgentLoopEvent => {
+  if (event._tag === "ToolExecutionCompleted") {
+    return {
+      ...event,
+      result: {
+        ...event.result,
+        result: event.result.encodedResult,
+      },
+    }
+  }
   if (event._tag !== "TurnCompleted") return event
   const completed: TurnCompleted = {
     _tag: "TurnCompleted",

@@ -1,4 +1,3 @@
-import { messagingDurabilitySuite } from "./durability.js"
-import { sqliteLayer, tempDbPath } from "../../../sql/scenario.js"
+import { objectLayer } from "../../../execution/fixtures.js"
 
-messagingDurabilitySuite({ name: "sqlite", storeLayer: sqliteLayer(tempDbPath("messaging-durability")) })
+messagingDurabilitySuite({ name: "object", storeLayer: objectLayer })

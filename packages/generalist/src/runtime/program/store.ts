@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import {
+  CapabilityFailure,
   type ProgramBudgetExhausted,
   type ProgramOperationUnknown,
   ProgramOperationName,
@@ -25,6 +26,22 @@ export const ProgramOperationStatus = Schema.Literals([
   "unknown",
 ])
 export type ProgramOperationStatus = typeof ProgramOperationStatus.Type
+const ProgramOperationFailure = CapabilityFailure.pipe(Schema.toTaggedUnion("_tag"))
+const programOperationFailureCases = ProgramOperationFailure.cases
+
+/** Known Program failures use their domain codec; malformed tagged failures cannot fall through as opaque data. */
+const ProgramOperationError = Schema.Union([
+  ProgramOperationFailure,
+  Schema.Unknown.check(Schema.makeFilter(
+    (value) =>
+      value === null ||
+      typeof value !== "object" ||
+      !("_tag" in value) ||
+      typeof value._tag !== "string" ||
+      !Object.hasOwn(programOperationFailureCases, value._tag),
+    { message: "Program operation failures must match their domain schema" },
+  )),
+])
 
 /** Persisted counters and the fixed deadline for one Program Run. */
 export const ProgramRunState = Schema.Struct({
@@ -32,6 +49,8 @@ export const ProgramRunState = Schema.Struct({
   programPin: Schema.String,
   budget: ProgramBudget,
   deadlineMillis: Schema.Finite,
+  /** All forks share the original concurrency pool; additive allocations are reserved separately. */
+  concurrencyRoot: Schema.optionalKey(Schema.String),
   toolCalls: Schema.Int,
   agentRuns: Schema.Int,
   tokens: Schema.Int,
@@ -44,6 +63,7 @@ export type ProgramRunState = typeof ProgramRunState.Type
 export const ProgramOperationRecord = Schema.Struct({
   runId: Schema.String,
   operation: ProgramOperationName,
+  authoredOperation: ProgramOperationName,
   kind: ProgramOperationKind,
   capability: Schema.String,
   inputDigest: Schema.String,
@@ -51,12 +71,13 @@ export const ProgramOperationRecord = Schema.Struct({
   replay: ProgramReplayPolicy,
   status: ProgramOperationStatus,
   result: Schema.optionalKey(Schema.Unknown),
-  error: Schema.optionalKey(Schema.Unknown),
+  error: Schema.optionalKey(ProgramOperationError),
   waitId: Schema.optionalKey(Schema.String),
   fanOutId: Schema.optionalKey(Schema.String),
   childRunIds: Schema.Array(Schema.String),
   resolutionIdempotencyKey: Schema.optionalKey(Schema.String),
   resolution: Schema.optionalKey(OperationResolution),
+  completedSequence: Schema.optionalKey(Schema.Int),
 })
 export type ProgramOperationRecord = typeof ProgramOperationRecord.Type
 
@@ -70,8 +91,8 @@ export interface ProgramReservation {
 export interface ReserveProgramOperationInput extends ExecutionClaim {
   readonly programPin: string
   readonly budget: ProgramBudget
-  readonly nowMillis: number
   readonly operation: ProgramOperationName
+  readonly authoredOperation: ProgramOperationName
   readonly kind: ProgramOperationKind
   readonly capability: string
   readonly inputDigest: string

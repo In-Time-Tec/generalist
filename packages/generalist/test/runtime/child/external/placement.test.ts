@@ -1,26 +1,20 @@
-import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "../../../../src/index.js"
 import { executableDigest } from "../../../../src/runtime/child/external/placement.js"
 import { ExternalChildStore } from "../../../../src/runtime/child/external/store.js"
-import { Address, Message, Runtime, RunStore, ExecutableResolver } from "../../../../src/runtime/index.js"
-import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
+import { Address, Message, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import type { ExecutionClaim } from "../../../../src/runtime/run/store.js"
 import {
-  assistant,
   assistantAddress,
   assistantRef,
   completedResult,
-  memoryLayer,
+  objectLayer,
   registrationsFor,
   textPrompt,
 } from "../../execution/fixtures.js"
-import { closedTestAgent } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
-import { sqliteLayer, tempDbPath } from "../../sql/scenario.js"
-
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
+import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
 const externalRoot = (id: string) => ({
   placementId: `placement:${id}`,
   parent: { partition: "openwork:parent", runId: `parent:${id}` },
@@ -88,7 +82,8 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
             depth: 0,
           })
           expect(
-            (yield* store.claimExecution({ runId: input.ref.runId, ownerId: "too-early" }).pipe(Effect.flip))._tag,
+            (yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-1", runId: input.ref.runId, ownerId: objectWorkerId }).pipe(Effect.flip))._tag,
           ).toBe("generalist/runtime/RuntimeUnavailable")
           expect(yield* external.admitRoot(input)).toMatchObject({ activated: false })
           expect(
@@ -104,8 +99,10 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           expect(yield* external.activateRoot(input.placementId)).toMatchObject({ activated: true })
           const history = yield* store.history({ runId: input.ref.runId, cursor: -1, limit: 20 })
           expect(history.filter((event) => event._tag === "RunAttemptStarted")).toHaveLength(1)
-          const claim = yield* store.claimExecution({ runId: input.ref.runId, ownerId: "child-worker" })
-          yield* store.complete({ ...claim, result: completedResult("delegated result") })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-2", runId: input.ref.runId, ownerId: objectWorkerId })
+          yield* store.complete({
+          commandId: "runtime-child-external-placement-test-ts-complete-1", ...claim, result: completedResult("delegated result") })
           expect(yield* external.rootSettlement(input.placementId)).toMatchObject({
             value: {
               placementId: input.placementId,
@@ -162,7 +159,8 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const store = yield* RunStore.RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
-          const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-3", runId: parent.runId, ownerId: objectWorkerId })
           const input = placement(claim, "placement:1")
           expect(yield* external.reserve(input)).toMatchObject({
             placementId: input.placementId,
@@ -203,7 +201,8 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const store = yield* RunStore.RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
-          const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-4", runId: parent.runId, ownerId: objectWorkerId })
           yield* external.reserve(placement(claim, "placement:race"))
           const outcome = {
             _tag: "Succeeded" as const,
@@ -263,7 +262,8 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const store = yield* RunStore.RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
-          const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-5", runId: parent.runId, ownerId: objectWorkerId })
           const input = {
             ...placement(claim, "placement:wait"),
             parentSuspension: {
@@ -309,9 +309,11 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const store = yield* RunStore.RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
-          const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-test" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-6", runId: parent.runId, ownerId: objectWorkerId })
           yield* external.reserve(placement(claim, "placement:parent-cancel"))
-          yield* store.cancel({ runId: parent.runId, reason: "caller cancelled" })
+          yield* store.cancel({
+          commandId: "runtime-child-external-placement-test-ts-cancel-2", runId: parent.runId, reason: "caller cancelled" })
           expect(yield* external.cancel("placement:parent-cancel")).toMatchObject({
             cancelRequested: true,
             settled: false,
@@ -339,10 +341,12 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
           const store = yield* RunStore.RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
-          const first = yield* store.claimExecution({ runId: parent.runId, ownerId: "old-owner" })
+          const first = yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-7", runId: parent.runId, ownerId: objectWorkerId })
           const reserved = placement(first, "placement:existing")
           yield* external.reserve(reserved)
-          yield* store.claimExecution({ runId: parent.runId, ownerId: "new-owner" })
+          yield* store.claimExecution({
+          commandId: "runtime-child-external-placement-test-ts-claim-8", runId: parent.runId, ownerId: objectWorkerId })
           expect(yield* external.reserve(reserved)).toMatchObject({ placementId: reserved.placementId })
           expect((yield* external.reserve(placement(first, "placement:stale")).pipe(Effect.flip))._tag).toBe(
             "generalist/runtime/StaleClaim",
@@ -356,15 +360,17 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
   })
 }
 
-suite("memory", memoryLayer)
-suite("sqlite", sqliteLayer(tempDbPath("external-child-placement")))
+suite("object", objectLayer)
 
-it.live("recovers external root identity and unacknowledged terminal delivery after SQLite reopen", () => {
-  const filename = tempDbPath("external-root-reopen")
-  const input = externalRoot("sqlite:reopen")
+it.live("recovers external root identity and unacknowledged terminal delivery after object-host reopen", () => {
+  const storage = makeObjectStorage()
+  const options = {
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+  }
+  const input = externalRoot("object:reopen")
   return Effect.gen(function* () {
     const settlementId = yield* provideScoped(
-      sqliteLayer(filename),
+      objectRuntimeLayer(options, storage),
       Effect.gen(function* () {
         const external = yield* ExternalChildStore
         yield* external.admitRoot(input)
@@ -375,7 +381,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
       }),
     )
     yield* provideScoped(
-      sqliteLayer(filename),
+      objectRuntimeLayer(options, storage),
       Effect.gen(function* () {
         const external = yield* ExternalChildStore
         expect(yield* external.inspectRoot(input.placementId)).toMatchObject({
@@ -393,121 +399,3 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
   })
 })
 
-it.live("rolls back reservation and projects settlement-driven cancellation in SQLite transactions", () => {
-  let rejectProjection = false
-  const projected: Array<{ readonly runId: string; readonly intent: string }> = []
-  const layer = SqliteRuntime.layerSqlite({
-    filename: tempDbPath("external-child-rollback"),
-    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
-    subscriberQueueCapacity: 8,
-    activationProjection: {
-      applyInTransaction: (changes) =>
-        rejectProjection
-          ? RuntimeUnavailable.make({ message: "forced projection rollback" })
-          : Effect.sync(() => void projected.push(...changes)),
-    },
-  }).pipe(
-    Layer.provide(
-      ExecutableResolver.layerStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]).pipe(
-        Layer.orDie,
-      ),
-    ),
-  )
-  return provideScoped(
-    layer,
-    Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const external = yield* ExternalChildStore
-      const parent = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "external-rollback",
-        idempotencyKey: "external-rollback",
-        prompt: textPrompt("rollback parent"),
-      })
-      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-rollback" })
-      const input = {
-        ...claim,
-        placementId: "placement:rollback",
-        ref: { partition: "openwork:west", runId: "remote:rollback" },
-        invocationId: "invoke:rollback",
-        requestDigest: "request:rollback",
-        executableDigest: "executable:v1",
-        parentSuspension: {
-          wait: {
-            waitId: "wait:rollback",
-            reason: { _tag: "External" as const },
-            status: "open" as const,
-            openedAt: "2026-08-19T00:00:00.000Z",
-          },
-          suspension: ProgramCapabilities.ProgramSuspended.make({
-            operation: "externalChild",
-            reason: "agent",
-            token: "placement:rollback",
-          }),
-        },
-      }
-      rejectProjection = true
-      expect((yield* external.reserve(input).pipe(Effect.flip))._tag).toBe("generalist/runtime/RuntimeUnavailable")
-      rejectProjection = false
-      expect((yield* external.acknowledge(input.placementId).pipe(Effect.flip))._tag).toBe(
-        "generalist/runtime/ExternalChildPlacementNotFound",
-      )
-      expect((yield* store.loadExecution(parent.runId)).suspension).toBeUndefined()
-      expect(yield* external.reserve(input)).toMatchObject({
-        placementId: input.placementId,
-        waitId: input.parentSuspension.wait.waitId,
-      })
-      yield* store.cancel({ runId: parent.runId, reason: "cancel external parent" })
-      yield* store.releaseExecution(claim)
-      projected.length = 0
-      yield* external.settle({
-        placementId: input.placementId,
-        settlementId: "settlement:rollback",
-        outcome: {
-          _tag: "Succeeded",
-          result: completedResult("late authoritative result"),
-          eventId: "remote:event:rollback",
-          occurredAt: "2026-08-19T00:00:00.000Z",
-        },
-      })
-      expect(yield* store.inspect(parent.runId)).toMatchObject({ status: "cancelled" })
-      expect(projected).toContainEqual({ runId: parent.runId, intent: "inactive" })
-    }),
-  )
-})
-
-it.live("decodes legacy TEXT true external-child cancellation rows in SQLite", () => {
-  const filename = tempDbPath("external-child-legacy-cancellation")
-  return provideScoped(
-    sqliteLayer(filename),
-    Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const external = yield* ExternalChildStore
-      const parent = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "external-legacy-cancellation",
-        idempotencyKey: "external-legacy-cancellation",
-        prompt: textPrompt("external legacy cancellation"),
-        treePolicy: { maxDepth: 2, maxSubagents: 1 },
-      })
-      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "external-legacy-cancellation" })
-      const input = {
-        ...claim,
-        placementId: "placement:legacy-cancellation",
-        ref: { partition: "openwork:west", runId: "remote:legacy-cancellation" },
-        invocationId: "invoke:legacy-cancellation",
-        requestDigest: "request:legacy-cancellation",
-        executableDigest: "executable:v1",
-      }
-      yield* external.reserve(input)
-      const db = new Database(filename)
-      db.run("UPDATE generalist_external_child_placements SET cancel_requested = 'true' WHERE placement_id = ?", [
-        input.placementId,
-      ])
-      db.close()
-      expect(yield* external.reserve(input)).toMatchObject({ cancelRequested: true })
-    }),
-  )
-})

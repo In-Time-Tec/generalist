@@ -1,119 +1,187 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- This adapter test is the Layer composition root. */
 import { BunCrypto } from "@effect/platform-bun"
-import { layer as sqliteClientLayer } from "@effect/sql-sqlite-bun/SqliteClient"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Option, Path, PlatformError, Schema } from "effect"
-import {
-  BlobStore,
-  layerFileSystem,
-  layerMemory,
-  layerS3,
-  layerSql,
-  type S3Client,
-  type S3Object,
-} from "../../src/blob-store/index.js"
-import { Testing } from "../../src/testing/index.js"
-import fixtureData from "./s3.fixture.json" with { type: "json" }
+import { Effect, Fiber, Layer } from "effect"
+import { BlobNotFound, BlobStore, BlobStoreError, layer, type LayerOptions } from "../../src/blob-store/index.js"
+import { ObjectStore } from "../../src/durability/object-store.js"
+import { blobStore } from "../../src/testing/blob-store.js"
+import { make, type Client } from "../../src/testing/durability/index.js"
 
 const maxBytes = 4
-const withCrypto = <A, E, R>(layer: Layer.Layer<A, E, R | import("effect/Crypto").Crypto>) =>
-  layer.pipe(Layer.provide(BunCrypto.layer))
+const options = { environment: "test/environment", tenant: "tenant/one", maxBytes }
+const prefix = "environments/test%2Fenvironment/v1/tenants/tenant%2Fone/blobs/sha256/"
+const input = { data: new TextEncoder().encode("blob"), mediaType: "image/png", filename: "image.png" }
+const digest = "fa2c8cc4f28176bbeed4b736df569a34c79cd3723e9ec42f9674b4d46ac6b8b8"
+const key = `${prefix}fa/${digest}`
+const simulatorLayer = Layer.effect(ObjectStore, make().pipe(Effect.map((simulator) => simulator.store)))
 
-Testing.blobStore({ layer: withCrypto(layerMemory({ maxBytes })), maxBytes })
-
-const notFound = (method: string, path: string) =>
-  PlatformError.systemError({
-    _tag: "NotFound",
-    module: "BlobStoreTest",
-    method,
-    pathOrDescriptor: path,
-    description: "not found",
-  })
-
-const files = new Map<string, Uint8Array>()
-const encoder = new TextEncoder()
-const decoder = new TextDecoder()
-const fileSystem = Layer.succeed(
-  FileSystem.FileSystem,
-  FileSystem.makeNoop({
-    exists: (path) => Effect.succeed(files.has(path)),
-    makeDirectory: () => Effect.void,
-    readFile: (path) => {
-      const value = files.get(path)
-      return value === undefined ? Effect.fail(notFound("readFile", path)) : Effect.succeed(value.slice())
-    },
-    readFileString: (path) => {
-      const value = files.get(path)
-      return value === undefined ? Effect.fail(notFound("readFileString", path)) : Effect.succeed(decoder.decode(value))
-    },
-    writeFile: (path, data) => Effect.sync(() => files.set(path, data.slice())).pipe(Effect.asVoid),
-    writeFileString: (path, data) => Effect.sync(() => files.set(path, encoder.encode(data))).pipe(Effect.asVoid),
-  }),
-)
-const fileLayer = layerFileSystem({ dir: "/blobs", maxBytes }).pipe(
-  Layer.provide(Layer.mergeAll(BunCrypto.layer, fileSystem, Path.layer)),
-)
-Testing.blobStore({ layer: fileLayer, maxBytes, persistent: true })
-
-const sqliteFilename = `/tmp/generalist-blob-store-${process.pid}.sqlite`
-const sqlLayer = layerSql({ maxBytes }).pipe(
-  Layer.provide(Layer.merge(BunCrypto.layer, sqliteClientLayer({ filename: sqliteFilename }))),
-)
-Testing.blobStore({ layer: sqlLayer, maxBytes, persistent: true })
-
-const fixture = Schema.decodeSync(
-  Schema.Struct({
-    bucket: Schema.String,
-    keyPrefix: Schema.String,
-    publicBaseUrl: Schema.String,
-    body: Schema.String,
-    mediaType: Schema.String,
-    sha256: Schema.String,
-  }),
-)(fixtureData)
-
-const makeS3 = () => {
-  const objects = new Map<string, S3Object>()
-  let puts = 0
-  const client: S3Client = {
-    head: (_bucket, key) => Effect.succeed(objects.has(key)),
-    put: (_bucket, key, object) =>
-      Effect.sync(() => {
-        puts += 1
-        objects.set(key, { ...object, data: object.data.slice(), url: new URL(`${fixture.publicBaseUrl}${key}`) })
-      }),
-    get: (_bucket, key) => Effect.succeed(Option.fromUndefinedOr(objects.get(key))),
-  }
-  return { client, puts: () => puts }
-}
-
-const s3Conformance = makeS3()
-Testing.blobStore({
-  layer: layerS3({ bucket: fixture.bucket, client: s3Conformance.client, maxBytes }).pipe(
-    Layer.provide(BunCrypto.layer),
-  ),
+blobStore({
+  layer: layer(options).pipe(Layer.provide(Layer.merge(BunCrypto.layer, simulatorLayer))),
   maxBytes,
-  persistent: true,
 })
 
-describe("S3 BlobStore adapter", () => {
-  it.effect("uses the recorded key contract, deduplicates, and resolves provider URLs", () => {
-    const fake = makeS3()
-    const layer = layerS3({ bucket: fixture.bucket, client: fake.client, maxBytes }).pipe(
-      Layer.provide(BunCrypto.layer),
-    )
-    return Effect.gen(function* () {
-      const store = yield* BlobStore
-      const input = { data: new TextEncoder().encode(fixture.body), mediaType: fixture.mediaType }
-      const refs = yield* Effect.all([store.put(input), store.put(input)], { concurrency: "unbounded" })
-      const ref = refs[0]
-      expect(refs[1]).toEqual(ref)
-      expect(fake.puts()).toBe(1)
-      expect(ref.sha256).toBe(fixture.sha256)
-      expect((yield* store.resolve(ref, { prefer: "url" })).data).toEqual(
-        new URL(`${fixture.publicBaseUrl}${fixture.keyPrefix}${ref.sha256}`),
-      )
+const storeFor = (client: Client, settings: Partial<LayerOptions> = {}) =>
+  BlobStore.pipe(
+    Effect.provide(
+      layer({ ...options, ...settings }).pipe(
+        Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, client.store))),
+      ),
+    ),
+  )
+
+describe("Object-backed BlobStore", () => {
+  it.effect("publishes one canonical reference when independent writers race with different metadata", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const first = yield* storeFor(simulator)
+      const second = yield* storeFor(yield* simulator.connect)
+      const pause = yield* simulator.faults.pauseNextCreate(key)
+      const pending = yield* first.put(input).pipe(Effect.forkChild({ startImmediately: true }))
+      yield* pause.entered
+      expect(yield* Effect.flip(second.get(digest))).toBeInstanceOf(BlobNotFound)
+      const winner = yield* second.put({ ...input, mediaType: "application/octet-stream", filename: "winner.bin" })
+      yield* pause.release
+      expect(yield* Fiber.join(pending)).toEqual(winner)
+      expect(winner).toEqual({ sha256: digest, bytes: 4, mediaType: "application/octet-stream", filename: "winner.bin" })
+      const reopened = yield* storeFor(yield* simulator.connect)
+      expect(yield* reopened.get(digest)).toEqual({ ref: winner, data: input.data })
+      expect(yield* reopened.put(input)).toEqual(winner)
+      expect((yield* simulator.store.list(prefix)).keys).toEqual([key])
+    }),
+  )
+
+  it.effect("reconciles a lost upload acknowledgement through a verified read", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      yield* simulator.faults.failNextCreate({ key, phase: "after" })
+      const ref = yield* store.put(input)
+      const reopened = yield* storeFor(yield* simulator.connect)
+      expect(yield* reopened.get(ref.sha256)).toEqual({ ref, data: input.data })
+      expect(yield* reopened.resolve(ref, { prefer: "url" })).toEqual({ ref, data: input.data })
+    }),
+  )
+
+  it.effect("fails without publishing a reference when the uncertain upload cannot be read", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      yield* simulator.faults.failNextCreate({ key, phase: "after" })
+      yield* simulator.faults.failNextRead({ key })
+      expect(yield* Effect.flip(store.put(input))).toBeInstanceOf(BlobStoreError)
+      const reopened = yield* storeFor(yield* simulator.connect)
+      const ref = yield* reopened.put(input)
+      expect(yield* reopened.get(ref.sha256)).toEqual({ ref, data: input.data })
+    }),
+  )
+
+  it.effect("distinguishes an upload rejected before publication from a committed object", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      yield* simulator.faults.failNextCreate({ key, phase: "before", reason: "authentication" })
+      expect(yield* Effect.flip(store.put(input))).toBeInstanceOf(BlobStoreError)
+      expect(yield* Effect.flip(store.get(digest))).toBeInstanceOf(BlobNotFound)
+      const ref = yield* store.put(input)
+      expect(yield* store.get(digest)).toEqual({ ref, data: input.data })
+    }),
+  )
+
+  it.effect("rejects corrupted payloads on get, resolve, and deduplication without overwriting them", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      const ref = yield* store.put(input)
+      const object = (yield* simulator.store.read(key, { maxBytes: 1024 }))!
+      const corrupted = object.bytes.slice()
+      corrupted[corrupted.length - 1] = corrupted[corrupted.length - 1]! ^ 0xff
+      yield* simulator.faults.corrupt(key, corrupted)
+      const failures = yield* Effect.all([
+        Effect.flip(store.get(digest)),
+        Effect.flip(store.resolve(ref, { prefer: "bytes" })),
+        Effect.flip(store.put(input)),
+      ])
+      for (const failure of failures) {
+        expect(failure).toBeInstanceOf(BlobStoreError)
+        expect(failure).toMatchObject({ operation: "integrity" })
+      }
+      expect((yield* simulator.store.read(key, { maxBytes: corrupted.byteLength }))?.bytes).toEqual(corrupted)
+    }),
+  )
+
+  it.effect("rejects a valid envelope stored at the wrong digest address", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      yield* store.put(input)
+      const original = (yield* simulator.store.read(key, { maxBytes: 1024 }))!
+      const wrongDigest = "0".repeat(64)
+      yield* simulator.store.create(`${prefix}00/${wrongDigest}`, original.bytes)
+      const failure = yield* Effect.flip(store.get(wrongDigest))
+      expect(failure).toBeInstanceOf(BlobStoreError)
+      expect(failure).toMatchObject({ operation: "integrity" })
+    }),
+  )
+
+  it.effect("keeps environment and tenant identities separate even when they contain encoded separators", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      const ref = yield* store.put(input)
+      const otherTenant = yield* storeFor(yield* simulator.connect, { tenant: "tenant%2Fone" })
+      const otherEnvironment = yield* storeFor(yield* simulator.connect, { environment: "test%2Fenvironment" })
+      expect(yield* Effect.flip(otherTenant.get(ref.sha256))).toBeInstanceOf(BlobNotFound)
+      expect(yield* Effect.flip(otherEnvironment.get(ref.sha256))).toBeInstanceOf(BlobNotFound)
+      const otherRef = yield* otherTenant.put({ ...input, filename: "other-tenant.png" })
+      expect(otherRef.filename).toBe("other-tenant.png")
+      expect((yield* store.get(ref.sha256)).ref).toEqual(ref)
+    }),
+  )
+
+  it.effect("stores a snapshot of caller bytes rather than a mutable upload buffer", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator)
+      const data = input.data.slice()
+      const pause = yield* simulator.faults.pauseNextCreate(key)
+      const pending = yield* store.put({ ...input, data }).pipe(Effect.forkChild({ startImmediately: true }))
+      yield* pause.entered
+      data.fill(0)
+      yield* pause.release
+      const ref = yield* Fiber.join(pending)
+      expect(ref.sha256).toBe(digest)
+      const blob = yield* store.get(ref.sha256)
+      expect(blob.data).toEqual(input.data)
+      blob.data.fill(0)
       expect((yield* store.get(ref.sha256)).data).toEqual(input.data)
-    }).pipe(Effect.provide(layer))
-  })
+    }),
+  )
+
+  it.effect("round-trips large binary content and enforces the exact configured byte boundary", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const data = new Uint8Array(1024 * 1024 + 17)
+      for (let index = 0; index < data.length; index += 1) data[index] = index % 256
+      const store = yield* storeFor(simulator, { maxBytes: data.byteLength })
+      const ref = yield* store.put({ data, mediaType: "application/octet-stream" })
+      const reopened = yield* storeFor(yield* simulator.connect, { maxBytes: data.byteLength })
+      expect((yield* reopened.get(ref.sha256)).data).toEqual(data)
+      const smaller = yield* storeFor(yield* simulator.connect, { maxBytes: data.byteLength - 1 })
+      expect(yield* Effect.flip(smaller.get(ref.sha256))).toMatchObject({ _tag: "generalist/blob-store/BlobStoreError", operation: "integrity" })
+      const tooLarge = yield* Effect.flip(store.put({ data: new Uint8Array(data.byteLength + 1), mediaType: "application/octet-stream" }))
+      expect(tooLarge).toMatchObject({ _tag: "generalist/blob-store/BlobTooLarge", bytes: data.byteLength + 1, maxBytes: data.byteLength })
+    }),
+  )
+
+  it.effect("stores empty content at its SHA-256 address with a zero-byte limit", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make()
+      const store = yield* storeFor(simulator, { maxBytes: 0 })
+      const data = new Uint8Array()
+      const ref = yield* store.put({ data, mediaType: "application/octet-stream" })
+      expect(ref.sha256).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+      const reopened = yield* storeFor(yield* simulator.connect, { maxBytes: 0 })
+      expect(yield* reopened.get(ref.sha256)).toEqual({ ref, data })
+    }),
+  )
 })

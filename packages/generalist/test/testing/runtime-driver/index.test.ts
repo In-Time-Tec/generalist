@@ -1,94 +1,106 @@
-import { Database } from "bun:sqlite"
+import { beforeEach } from "@effect/vitest"
+import { Context, Deferred, Effect, Layer } from "effect"
 import {
   modelResponseFaultConformance,
   type ClaimExecution,
   type ModelResponseFaultBoundary,
+  type AtomicCommitCapability,
+  type Services,
 } from "generalist/testing/runtime-driver"
 import { Testing } from "generalist/testing"
-import { Effect } from "effect"
-import { assistantAddress, memoryLayer, scheduleDefinition } from "../../runtime/execution/fixtures.js"
-import { sqliteManualClaimLayer, tempDbPath } from "../../runtime/sql/scenario.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import type { Service as ObjectStoreService } from "../../../src/durability/object-store.js"
+import {
+  assistantAddress,
+  assistantRef,
+  registrationsFor,
+  resolverLayer,
+  scheduleDefinition,
+} from "../../runtime/execution/fixtures.js"
+import { makeObjectStorage, objectRuntimeLayer } from "../../runtime/execution/object.js"
+import type { CreatePause, Simulator } from "../../../src/testing/durability/index.js"
 
-const claim: ClaimExecution = ({ store }, { runId, workerId }) =>
-  store.claimExecution({ runId, ownerId: workerId }).pipe(Effect.orDie)
+let storage: Simulator
+const hosts = new WeakMap<Services["store"], {
+  readonly workerId: string
+  readonly arm: (boundary: ModelResponseFaultBoundary) => void
+  readonly pause: Effect.Effect<{ readonly entered: Effect.Effect<void>; readonly release: Effect.Effect<void> }>
+}>()
+let hostSequence = 0
+beforeEach(() => {
+  storage = makeObjectStorage()
+  hostSequence = 0
+})
 
-const sqlitePath = tempDbPath("runtime-driver-conformance")
-const sqliteTestLayer = sqliteManualClaimLayer(sqlitePath)
-const triggerName = (boundary: ModelResponseFaultBoundary) => `generalist_fault_${boundary.replaceAll("-", "_")}`
-const quote = (value: string): string => value.replaceAll("'", "''")
-
-const sqliteFaultTrigger = (boundary: ModelResponseFaultBoundary, runId: string, sessionId: string): string => {
-  const name = triggerName(boundary)
-  switch (boundary) {
-    case "after-claim-validation":
-      return `CREATE TRIGGER ${name} BEFORE INSERT ON generalist_session_entries
-        WHEN NEW.session_id = '${quote(sessionId)}' AND NEW.tag = 'ModelResponse'
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-session-entry":
-      return `CREATE TRIGGER ${name} BEFORE UPDATE ON generalist_sessions
-        WHEN NEW.session_id = '${quote(sessionId)}' AND NEW.leaf_id <> OLD.leaf_id
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-session-leaf":
-      return `CREATE TRIGGER ${name} BEFORE UPDATE ON generalist_run_operations
-        WHEN NEW.run_id = '${quote(runId)}' AND NEW.status = 'succeeded'
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-operation":
-      return `CREATE TRIGGER ${name} BEFORE UPDATE ON generalist_runs
-        WHEN NEW.run_id = '${quote(runId)}' AND NEW.driver_checkpoint_json IS NOT OLD.driver_checkpoint_json
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-checkpoint":
-      return `CREATE TRIGGER ${name} BEFORE INSERT ON generalist_run_events
-        WHEN NEW.run_id = '${quote(runId)}' AND NEW.event_json LIKE '%ModelResponseCommitted%'
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-event":
-      return `CREATE TRIGGER ${name} BEFORE UPDATE ON generalist_tree_roots
-        WHEN NEW.root_run_id = '${quote(runId)}'
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-tree-position":
-      return `CREATE TRIGGER ${name} BEFORE INSERT ON generalist_tree_event_index
-        WHEN NEW.run_id = '${quote(runId)}'
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "after-tree-index":
-      return `CREATE TRIGGER ${name} BEFORE UPDATE ON generalist_runs
-        WHEN NEW.run_id = '${quote(runId)}' AND NEW.last_sequence > OLD.last_sequence
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
-    case "before-commit":
-      return `CREATE TRIGGER ${name} AFTER UPDATE ON generalist_runs
-        WHEN NEW.run_id = '${quote(runId)}' AND NEW.last_sequence > OLD.last_sequence
-        BEGIN SELECT RAISE(ABORT, '${boundary}'); END`
+/** New Layers share only immutable bucket objects, never a Runtime, RunStore, client faults or ownership. */
+const freshLayer = (activate: boolean) => Layer.effectContext(Effect.gen(function* () {
+  const client = yield* storage.connect
+  const workerId = `conformance-host:${++hostSequence}`
+  let boundary: ModelResponseFaultBoundary | undefined
+  let paused: Deferred.Deferred<CreatePause> | undefined
+  const store: ObjectStoreService = {
+    ...client.store,
+    create: (key, bytes) => Effect.gen(function* () {
+      if (paused !== undefined && key.includes("/commits/")) {
+        const pending = paused
+        paused = undefined
+        yield* Deferred.succeed(pending, yield* client.faults.pauseNextCreate(key))
+      }
+      if (boundary !== undefined && key.includes("/commits/")) {
+        const current = boundary
+        boundary = undefined
+        yield* client.faults.failNextCreate({ key, phase: current.startsWith("before-") ? "before" : "after" })
+        if (current.endsWith("-unreadable")) yield* client.faults.failNextRead({ key })
+      }
+      return yield* client.store.create(key, bytes)
+    }),
   }
-}
+  const context = yield* Layer.build(objectRuntimeLayer({
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+    workerId,
+    subscriberQueueCapacity: 8,
+  }, { ...client, store }, activate).pipe(Layer.provide(resolverLayer)))
+  hosts.set(Context.get(context, RunStore), {
+    workerId,
+    arm: (next) => { boundary = next },
+    pause: Effect.gen(function* () {
+      const pending = yield* Deferred.make<CreatePause>()
+      paused = pending
+      return {
+        entered: Deferred.await(pending).pipe(Effect.flatMap((pause) => pause.entered), Effect.asVoid),
+        release: Deferred.await(pending).pipe(Effect.flatMap((pause) => pause.release)),
+      }
+    }),
+  })
+  return context
+}))
 
-Testing.runtimeDriver({
-  name: "memory",
-  address: assistantAddress,
-  layer: memoryLayer,
-  capabilities: {
-    admission: true,
-    runtime: { claim },
-    "host-sessions": { claim },
-    "start-by-agent": { claim },
-    "idempotent-start": { claim },
-    "unknown-agent-on-recovery": { claim },
-    "approval-suspend": { claim, recovery: "reclaim" },
-    "await-event": { claim, recovery: "reclaim" },
-    schedules: { definition: scheduleDefinition, recovery: "reclaim" },
-    "child-runs": { claim, recovery: "reclaim" },
-    "operator-explain": true,
-    "operator-retry": { claim },
-    "operator-resolve-unknown": { claim },
-    "operator-scan": { claim },
-    runTree: { claim },
-    "fork-rewind": { claim },
-    artifacts: true,
-    steering: { claim, recovery: "reclaim" },
-  },
+const layer = freshLayer(true)
+const readLayer = freshLayer(false)
+const claim: ClaimExecution = (services, { runId, commandId: action }) => Effect.gen(function* () {
+  const host = hosts.get(services.store)
+  if (host === undefined) return yield* Effect.die("claim requires this fixture's activated host")
+  return yield* services.store.claimExecution({
+    runId,
+    ownerId: host.workerId,
+    commandId: `${runId}:claim:${action}`,
+  }).pipe(Effect.orDie)
+})
+const install = (services: Services, boundary: ModelResponseFaultBoundary) => Effect.sync(() => {
+  const host = hosts.get(services.store)
+  if (host === undefined) throw new Error("fault requires this fixture's journal client")
+  host.arm(boundary)
+})
+const pauseNextCommit: AtomicCommitCapability["pauseNextCommit"] = (services) => Effect.gen(function* () {
+  const host = hosts.get(services.store)
+  if (host === undefined) return yield* Effect.die("pause requires this fixture's journal client")
+  return yield* host.pause
 })
 
 Testing.runtimeDriver({
-  name: "sqlite",
+  name: "object-native",
   address: assistantAddress,
-  layer: sqliteTestLayer,
+  layer,
   capabilities: {
     admission: true,
     runtime: { claim },
@@ -96,10 +108,10 @@ Testing.runtimeDriver({
     "start-by-agent": { claim },
     "idempotent-start": { claim },
     "unknown-agent-on-recovery": { claim },
-    "approval-suspend": { claim, recovery: "rebuild" },
-    "await-event": { claim, recovery: "rebuild" },
-    schedules: { definition: scheduleDefinition, recovery: "rebuild" },
-    "child-runs": { claim, recovery: "rebuild" },
+    "approval-suspend": { claim },
+    "await-event": { claim },
+    schedules: { definition: scheduleDefinition },
+    "child-runs": { claim },
     "operator-explain": true,
     "operator-retry": { claim },
     "operator-resolve-unknown": { claim },
@@ -107,25 +119,18 @@ Testing.runtimeDriver({
     runTree: { claim },
     "fork-rewind": { claim },
     artifacts: true,
-    steering: { claim, recovery: "rebuild" },
+    steering: { claim },
+    atomicCommits: { claim, failNextCommit: (services) => install(services, "before-publication"), pauseNextCommit },
+    multiWorkerClaims: { layer, claim },
+    notificationRecovery: { claim },
   },
 })
 
 modelResponseFaultConformance({
-  name: "SQLite",
+  name: "object-native",
   address: assistantAddress,
-  layer: sqliteTestLayer,
-  claim: ({ store, runId, workerId }) => store.claimExecution({ runId, ownerId: workerId }).pipe(Effect.orDie),
-  install: ({ boundary, runId, sessionId }) =>
-    Effect.sync(() => {
-      const database = new Database(sqlitePath)
-      database.run(sqliteFaultTrigger(boundary, runId, sessionId))
-      database.close()
-    }),
-  remove: (boundary) =>
-    Effect.sync(() => {
-      const database = new Database(sqlitePath)
-      database.run(`DROP TRIGGER IF EXISTS ${triggerName(boundary)}`)
-      database.close()
-    }),
+  layer,
+  readLayer,
+  claim,
+  install,
 })

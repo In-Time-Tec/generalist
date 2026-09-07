@@ -9,11 +9,13 @@ const entries = [
   ["core", "packages/generalist/src/index.ts"],
   ["foldkit", "packages/generalist/src/unstable/foldkit/index.ts"],
   ["server client", "packages/generalist/src/server/client.ts"],
-  ["injected SQL store", "packages/generalist/src/runtime/sql/store.ts"],
+  ["object durability", "packages/generalist/src/durability/index.ts"],
 ] as const
 const forbidden = [
   "bun:sqlite",
-  "@effect/sql-sqlite-bun",
+  "@effect/sql-",
+  "effect/unstable/sql",
+  "runtime/sql",
   "@effect/platform-bun",
   "@aws-sdk/credential-provider-node",
 ] as const

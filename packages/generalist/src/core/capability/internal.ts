@@ -1,6 +1,7 @@
 import { Clock, Duration, Effect, Equal, Function, Option, Predicate, Schema } from "effect"
 import { IdGenerator, type Tool } from "effect/unstable/ai"
 import { DriverInterpreter } from "../durable/driver/interpreter.js"
+import { digest } from "../durable/canonical-json.js"
 import { AttenuationWidened, Denied, Invalid } from "./errors.js"
 import {
   Attenuation,
@@ -328,61 +329,13 @@ export type CallDecision =
   | { readonly _tag: "Allowed" }
   | { readonly _tag: "Denied"; readonly error: Denied; readonly taint: ReadonlyArray<Source> }
 
-const useKey = (turn: number, descriptor: Descriptor | undefined, tool: string, toolCallId: string): string =>
-  JSON.stringify([turn, descriptor?.id ?? null, toolCallId, tool])
-
 /** #354 replaces this one conservative whole-batch propagation rule with structural argument provenance. */
 const taintForArguments = (
   checkpoint: Checkpoint,
   toolBatch: { readonly argumentTaint?: ReadonlyArray<Source> } | undefined,
 ): ReadonlyArray<Source> => toolBatch?.argumentTaint ?? checkpoint.taint
 
-const decisionFromUse = (use: Use, descriptor: Descriptor | undefined): CallDecision =>
-  use.decision === "allow"
-    ? { _tag: "Allowed" }
-    : {
-        _tag: "Denied",
-        error: denial(use.reason ?? "invalid-scope", descriptor, use.argumentTaint),
-        taint: use.argumentTaint,
-      }
-
-interface UpdatedDecision {
-  readonly checkpoint: Checkpoint
-  readonly value: CallDecision
-}
-
-const decideWithoutDescriptor = (
-  input: {
-    readonly descriptors: ReadonlyArray<Descriptor> | undefined
-    readonly tool: string
-    readonly toolCallId: string
-    readonly turn: number
-    readonly untaintedArguments: ReadonlyArray<string>
-  },
-  checkpoint: Checkpoint,
-  argumentTaint: ReadonlyArray<Source>,
-  key: string,
-): UpdatedDecision => {
-  let reason: DenialReason | undefined = input.descriptors === undefined ? undefined : "missing"
-  if (input.untaintedArguments.length > 0 && argumentTaint.length > 0) reason = "tainted"
-  const use: Use = {
-    _tag: "Use",
-    key,
-    tool: input.tool,
-    toolCallId: input.toolCallId,
-    turn: input.turn,
-    decision: reason === undefined ? "allow" : "deny",
-    ...(reason === undefined ? undefined : { reason }),
-    argumentTaint,
-  }
-  const value: CallDecision =
-    reason === undefined
-      ? { _tag: "Allowed" }
-      : { _tag: "Denied", error: denial(reason, undefined, argumentTaint), taint: argumentTaint }
-  return { checkpoint: append(checkpoint, use), value }
-}
-
-/** @internal Check and journal one model-authored call before hooks and coarse permissions. */
+/** @internal Check current authority and journal authored/effective call evidence before dispatch. */
 export const checkCall = Effect.fn("Capability.checkCall")(function* (input: {
   readonly descriptors: ReadonlyArray<Descriptor> | undefined
   readonly tool: string
@@ -390,6 +343,7 @@ export const checkCall = Effect.fn("Capability.checkCall")(function* (input: {
   readonly turn: number
   readonly arguments: unknown
   readonly untaintedArguments: ReadonlyArray<string>
+  readonly phase: "authored" | "effective"
 }) {
   if (input.descriptors === undefined && input.untaintedArguments.length === 0) return { _tag: "Allowed" } as const
   const descriptor = input.descriptors?.find((candidate) => candidate.tool === input.tool)
@@ -397,35 +351,48 @@ export const checkCall = Effect.fn("Capability.checkCall")(function* (input: {
   const toolBatch = yield* interpreter.toolBatchCheckpoint
   const now = yield* Clock.currentTimeMillis
   const decodedArguments = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Json))(input.arguments)
+  const arguments_ = Option.getOrUndefined(decodedArguments)
+  const argumentsDigest = digest(arguments_ ?? null)
   return yield* interpreter.updateCapabilityCheckpoint((checkpoint) => {
     const initialized = initialize(checkpoint, input.descriptors ?? [])
-    const authoredTaint = taintForArguments(initialized, toolBatch)
-    const key = useKey(input.turn, descriptor, input.tool, input.toolCallId)
-    const replayed = initialized.events.find((event): event is Use => event._tag === "Use" && event.key === key)
-    if (replayed !== undefined) return { checkpoint: initialized, value: decisionFromUse(replayed, descriptor) }
-    if (descriptor === undefined) {
-      return decideWithoutDescriptor(input, initialized, authoredTaint, key)
-    }
-    const revokedAuthority = descriptor.lineage.find((authority) => revoked.has(authority.id))
+    const argumentTaint = taintForArguments(initialized, toolBatch)
+    const revokedAuthority = descriptor?.lineage.find((authority) => revoked.has(authority.id))
     const withRevocation =
       revokedAuthority === undefined
         ? initialized
         : append(initialized, { _tag: "Revocation", id: revokedAuthority.id, revokedAt: now })
-    const argumentTaint = authoredTaint
     const reason =
       input.untaintedArguments.length > 0 && argumentTaint.length > 0
         ? ("tainted" as const)
-        : denialReason(descriptor, withRevocation, now, Option.getOrUndefined(decodedArguments))
-    const source: Source = { capabilityId: descriptor.id, tool: descriptor.tool, toolCallId: input.toolCallId }
+        : descriptor === undefined
+          ? input.descriptors === undefined
+            ? undefined
+            : "missing"
+          : denialReason(descriptor, withRevocation, now, arguments_)
+    // Receipts describe checked inputs and outcomes; they never substitute for current authority.
+    const key = JSON.stringify([
+      input.turn,
+      descriptor?.id ?? null,
+      input.toolCallId,
+      input.tool,
+      input.phase,
+      argumentsDigest,
+      reason ?? null,
+      argumentTaint,
+    ])
+    const source: Source | undefined =
+      descriptor === undefined
+        ? undefined
+        : { capabilityId: descriptor.id, tool: descriptor.tool, toolCallId: input.toolCallId }
     const use: Use = {
       _tag: "Use",
       key,
-      id: descriptor.id,
-      tool: descriptor.tool,
+      ...(descriptor === undefined ? undefined : { id: descriptor.id }),
+      tool: input.tool,
       toolCallId: input.toolCallId,
       turn: input.turn,
       decision: reason === undefined ? "allow" : "deny",
-      ...(reason === undefined ? { source } : { reason }),
+      ...(reason === undefined ? (source === undefined ? undefined : { source }) : { reason }),
       argumentTaint,
     }
     const value: CallDecision =

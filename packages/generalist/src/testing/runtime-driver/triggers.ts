@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { DateTime, Effect } from "effect"
+import { Clock, DateTime, Effect } from "effect"
 import { AgentSuspended } from "../../core/agent/event.js"
 import type { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import type { ScheduleRecord } from "../../runtime/execution/trigger/schedule.js"
@@ -70,7 +70,7 @@ const registerAwaitEvent = <LayerError, ClaimsLayerError>(input: {
           idempotencyKey: prefix,
           prompt: "wait for one environmental event",
         })
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "await-before" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "await-before" })
         yield* services.store.suspend({
           ...claim,
           waits: [
@@ -89,34 +89,42 @@ const registerAwaitEvent = <LayerError, ClaimsLayerError>(input: {
         })
         return receipt.runId
       })
-    const resume = (services: Services, runId: string) =>
+    const wake = (services: Services, runId: string) =>
       Effect.gen(function* () {
         expect((yield* services.runtime.inspect(runId)).status).toBe("waiting")
-        expect(yield* services.runtime.wake(runId, event)).toEqual({ _tag: "Resumed", waitId })
-        expect(yield* services.runtime.wake(runId, event)).toEqual({ _tag: "Duplicate" })
-        const claim = yield* capability.claim(services, { runId, workerId: "await-after" })
-        yield* services.store.complete({
-          ...claim,
-          result: { text: "resumed", turns: 1, session: { sessionId: `session:${prefix}`, leafId: null } },
-        })
-        const history = yield* services.runtime.history({ runId, limit: 100 })
-        expect(history.filter((item) => item._tag === "Awaiting")).toHaveLength(1)
-        expect(history.filter((item) => item._tag === "WakeReceived")).toHaveLength(1)
-        expect(history.filter((item) => item._tag === "Duplicate")).toHaveLength(1)
-        expect(history.filter((item) => item._tag === "RunResumed")).toHaveLength(1)
-        expect(history.filter((item) => item._tag === "RunCompleted")).toHaveLength(1)
+        const first = yield* services.runtime.wake(runId, event)
+        expect(first).toEqual({ _tag: "Resumed", waitId })
+        return first
       })
 
-    if (capability.recovery === "rebuild") {
-      return prepare(
-        Effect.gen(function* () {
-          const runId = yield* open(start)
-          yield* open((services) => resume(services, runId))
-        }).pipe(Effect.orDie),
-      )
-    }
     return prepare(
-      open((services) => Effect.flatMap(start(services), (runId) => resume(services, runId))).pipe(Effect.orDie),
+      Effect.gen(function* () {
+        const runId = yield* open(start)
+        const first = yield* open((services) => wake(services, runId))
+        yield* open((services) =>
+          Effect.gen(function* () {
+            // A retry after host recovery returns the durable receipt, not a synthetic duplicate.
+            expect(yield* services.runtime.wake(runId, event)).toEqual(first)
+            const claim = yield* capability.claim(services, { runId, commandId: "await-after" })
+            yield* services.store.complete({
+              ...claim,
+              commandId: `${claim.runId}:complete:${claim.attemptFence}`,
+              result: {
+                text: "resumed",
+                output: "resumed",
+                turns: 1,
+                session: { sessionId: `session:${prefix}`, leafId: null },
+              },
+            })
+            const history = yield* services.runtime.history({ runId, limit: 100 })
+            expect(history.filter((item) => item._tag === "Awaiting")).toHaveLength(1)
+            expect(history.filter((item) => item._tag === "WakeReceived")).toHaveLength(1)
+            expect(history.filter((item) => item._tag === "Duplicate")).toHaveLength(0)
+            expect(history.filter((item) => item._tag === "RunResumed")).toHaveLength(1)
+            expect(history.filter((item) => item._tag === "RunCompleted")).toHaveLength(1)
+          }),
+        )
+      }).pipe(Effect.orDie),
     )
   })
 }
@@ -132,28 +140,39 @@ export const registerSchedules = <LayerError, ClaimsLayerError>(input: {
   const { capability, open, openPair, options, prepare } = input
   it.effect("persists a schedule and admits one occurrence across two competing scheduler owners", () => {
     const prefix = `conformance:${slug(options.name)}:schedules`
-    const now = DateTime.toEpochMillis(DateTime.makeUnsafe("2030-01-01T00:00:00.000Z"))
-    const record: ScheduleRecord = {
-      scheduleId: `schedule:${prefix}`,
-      rrule: "FREQ=SECONDLY",
-      rule: { frequency: "SECONDLY", interval: 1 },
-      definition: { ...capability.definition, sessionId: `session:${prefix}` },
-      nextAt: "2030-01-01T00:00:00.000Z",
-      occurrence: 0,
-      status: "active",
-      createdAt: "2029-12-31T23:59:59.000Z",
-    }
     const register = (services: Services) =>
       Effect.gen(function* () {
-        const first = yield* services.store.registerSchedule(record)
-        expect(yield* services.store.registerSchedule(record)).toEqual(first)
+        const now = yield* Clock.currentTimeMillis
+        const record: ScheduleRecord = {
+          scheduleId: `schedule:${prefix}`,
+          rrule: "FREQ=SECONDLY",
+          rule: { frequency: "SECONDLY", interval: 1 },
+          definition: { ...capability.definition, sessionId: `session:${prefix}` },
+          nextAt: DateTime.formatIso(DateTime.makeUnsafe(now)),
+          occurrence: 0,
+          status: "active",
+          createdAt: DateTime.formatIso(DateTime.makeUnsafe(now)),
+        }
+        const receipt = yield* services.store.registerSchedule(record)
+        expect(yield* services.store.registerSchedule(record)).toEqual(receipt)
+        return { record, receipt }
       })
     const compete = (left: Services, right: Services) =>
       Effect.gen(function* () {
         const [leftClaims, rightClaims] = yield* Effect.all(
           [
-            left.store.claimSchedules({ ownerId: "scheduler-left", now, leaseMillis: 30_000, limit: 1 }),
-            right.store.claimSchedules({ ownerId: "scheduler-right", now, leaseMillis: 30_000, limit: 1 }),
+            left.store.claimSchedules({
+              commandId: `${prefix}:left:poll:0`,
+              ownerId: "scheduler-left",
+              leaseMillis: 30_000,
+              limit: 1,
+            }),
+            right.store.claimSchedules({
+              commandId: `${prefix}:right:poll:0`,
+              ownerId: "scheduler-right",
+              leaseMillis: 30_000,
+              limit: 1,
+            }),
           ],
           { concurrency: "unbounded" },
         )
@@ -171,11 +190,13 @@ export const registerSchedules = <LayerError, ClaimsLayerError>(input: {
           budget: claimed.definition.budget,
         })
         yield* owner.store.advanceSchedule({
+          commandId: `${prefix}:advance:${claimed.occurrence}`,
           scheduleId: claimed.scheduleId,
           ownerId: claimed.ownerId,
           occurrence: claimed.occurrence,
-          nextAt: "2030-01-01T00:00:01.000Z",
-          now,
+          nextAt: DateTime.formatIso(
+            DateTime.makeUnsafe(DateTime.toEpochMillis(DateTime.makeUnsafe(claimed.nextAt)) + 1_000),
+          ),
         })
         const duplicate = yield* owner.runtime.startExecution({
           executable: claimed.definition.executable,
@@ -186,27 +207,55 @@ export const registerSchedules = <LayerError, ClaimsLayerError>(input: {
           prompt: claimed.definition.prompt,
           budget: claimed.definition.budget,
         })
-        expect(duplicate).toEqual({ ...first, duplicate: true })
+        expect(duplicate).toEqual(first)
         const [leftRetry, rightRetry] = yield* Effect.all(
           [
-            left.store.claimSchedules({ ownerId: "scheduler-left", now, leaseMillis: 30_000, limit: 1 }),
-            right.store.claimSchedules({ ownerId: "scheduler-right", now, leaseMillis: 30_000, limit: 1 }),
+            left.store.claimSchedules({
+              commandId: `${prefix}:left:poll:1`,
+              ownerId: "scheduler-left",
+              leaseMillis: 30_000,
+              limit: 1,
+            }),
+            right.store.claimSchedules({
+              commandId: `${prefix}:right:poll:1`,
+              ownerId: "scheduler-right",
+              leaseMillis: 30_000,
+              limit: 1,
+            }),
           ],
           { concurrency: "unbounded" },
         )
         expect([...leftRetry, ...rightRetry]).toHaveLength(0)
+        return { claimed, first }
       })
 
-    if (capability.recovery === "rebuild") {
-      return prepare(
-        Effect.gen(function* () {
-          yield* open(register)
-          yield* openPair(compete)
-        }).pipe(Effect.orDie),
-      )
-    }
     return prepare(
-      open((services) => Effect.andThen(register(services), compete(services, services))).pipe(Effect.orDie),
+      Effect.gen(function* () {
+        const registered = yield* open(register)
+        yield* open((services) =>
+          Effect.gen(function* () {
+            // Registration is also an exact command receipt across host retirement.
+            expect(yield* services.store.registerSchedule(registered.record)).toEqual(registered.receipt)
+          }),
+        )
+        const competed = yield* openPair(compete)
+        yield* open((services) =>
+          Effect.gen(function* () {
+            const duplicate = yield* services.runtime.startExecution({
+              executable: competed.claimed.definition.executable,
+              registrations: competed.claimed.definition.registrations,
+              sessionId: competed.claimed.definition.sessionId,
+              idempotencyKey: `schedule:${competed.claimed.scheduleId}:${competed.claimed.occurrence}`,
+              messageId: `schedule:${competed.claimed.scheduleId}:${competed.claimed.occurrence}`,
+              prompt: competed.claimed.definition.prompt,
+              budget: competed.claimed.definition.budget,
+            })
+            expect(duplicate).toEqual(competed.first)
+            const history = yield* services.runtime.history({ runId: competed.first.runId, limit: 100 })
+            expect(history.filter((item) => item._tag === "RunAccepted")).toHaveLength(1)
+          }),
+        )
+      }).pipe(Effect.orDie),
     )
   })
 }

@@ -1,11 +1,10 @@
-import { expect, it } from "@effect/vitest"
+import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/object.js"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Permissions } from "../../src/index.js"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
 import type { RunSnapshot } from "../../src/runtime/run.js"
 import type { RunEvent } from "../../src/runtime/run/event.js"
-import { Runtime as SqliteRuntime } from "../../src/runtime/sqlite-bun.js"
 import {
   JsonlRecord,
   encode,
@@ -15,7 +14,6 @@ import {
 } from "../../src/trajectory/index.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
 import { pinnedTestExecutable } from "../runtime/run/identity.js"
-import { tempDbPath } from "../runtime/sql/scenario.js"
 
 const runId = "run:trajectory:golden"
 const sessionId = "session:trajectory:golden"
@@ -246,8 +244,7 @@ it.effect("exports one documented JSONL record as bytes", () =>
   }),
 )
 
-it.live("exports usage from a reopened SQLite journal as one decodable JSONL line", () => {
-  const filename = tempDbPath("trajectory-jsonl-reopen")
+it.live("exports usage from a reopened object journal as one decodable JSONL line", () => {
   const recordedUsage = Response.Usage.make({
     inputTokens: { total: 23, uncached: 11, cacheRead: 7, cacheWrite: 5 },
     outputTokens: { total: 13, text: 8, reasoning: 5 },
@@ -265,15 +262,17 @@ it.live("exports usage from a reopened SQLite journal as one decodable JSONL lin
     }),
   )
   const recordedAgent = Agent.make({ name: "trajectory-jsonl-reopen" })
-  const runtimeLayer = SqliteRuntime.layerSqlite({
-    filename,
-    addresses: [],
-    scheduler: { pollInterval: "1 hour" },
-  }).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)))
+  const storage = makeObjectStorage()
+  const firstRuntimeLayer = objectRuntimeLayer({ addresses: [], workerId: "trajectory-before-reopen" }, storage).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+  )
+  const secondRuntimeLayer = objectRuntimeLayer({ addresses: [], workerId: "trajectory-after-reopen" }, storage).pipe(
+    Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+  )
 
   return Effect.gen(function* () {
     const recordedRunId = yield* provideScoped(
-      runtimeLayer,
+      firstRuntimeLayer,
       Effect.gen(function* () {
         const durableRuntime = yield* Runtime.Runtime
         const executor = yield* RunExecutor.RunExecutor
@@ -284,14 +283,20 @@ it.live("exports usage from a reopened SQLite journal as one decodable JSONL lin
           sessionId: "session:trajectory-jsonl-reopen",
           idempotencyKey: "trajectory-jsonl-reopen",
         })
-        yield* executor.execute(yield* store.claimExecution({ runId: handle.runId, ownerId: "trajectory-test" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            runId: handle.runId,
+            ownerId: "trajectory-before-reopen",
+            commandId: "trajectory:reopen:before",
+          }),
+        )
         expect(yield* handle.await).toBe("journaled answer")
         return handle.runId
       }),
     )
 
     yield* provideScoped(
-      runtimeLayer,
+      secondRuntimeLayer,
       Effect.gen(function* () {
         const reopenedRuntime = yield* Runtime.Runtime
         const trajectory = yield* fromJournal(reopenedRuntime, recordedRunId)

@@ -2,8 +2,7 @@
 import { layer } from "@effect/platform-bun/BunServices"
 import { Console, Effect, FileSystem, Schema } from "effect"
 import { Command, Flag } from "effect/unstable/cli"
-import { Certification } from "../packages/generalist/src/testing/report.js"
-import { certificationReportPath } from "./runtime-driver-report.js"
+import { HostReport, certificationReportPath, objectNativeSuiteName } from "./runtime-driver-report.js"
 
 class HostDocumentationFailed extends Schema.TaggedError<HostDocumentationFailed>()(
   "generalist/scripts/HostDocumentationFailed",
@@ -11,53 +10,6 @@ class HostDocumentationFailed extends Schema.TaggedError<HostDocumentationFailed
 ) {}
 
 const documentationPath = "docs/features/hosts.md"
-const hostRows = [
-  {
-    host: "Node/Bun process",
-    driver: "`Runtime.layerMemory`",
-    tier: "stable",
-    suite: "runtimeDriver:memory",
-    notes: "not durable across restarts",
-  },
-  {
-    host: "Node/Bun process",
-    driver: "`Runtime.layerSqlite`",
-    tier: "stable",
-    suite: "runtimeDriver:sqlite",
-    notes: "single writer",
-  },
-  {
-    host: "Node/Bun + PostgreSQL",
-    driver: "`generalist/pg`",
-    tier: "stable",
-    suite: "runtimeDriver:PostgreSQL",
-    notes: "multi-writer with advisory locks",
-  },
-  {
-    host: "Node/Bun + MySQL",
-    driver: "`generalist/mysql`",
-    tier: "stable",
-    suite: "runtimeDriver:MySQL",
-    notes: "",
-  },
-] as const
-
-const unregisteredRows = [
-  {
-    host: "Cloudflare Worker + Durable Object",
-    driver: "`generalist/unstable/cloudflare/*`",
-    tier: "unstable",
-    capabilities: "not registered",
-    notes: "runtime-driver suite not registered; promote when all pass",
-  },
-  {
-    host: "Rivet actor",
-    driver: "`generalist/unstable/rivet`",
-    tier: "unstable",
-    capabilities: "not registered",
-    notes: "runtime-driver suite not registered; `@rivetkit/effect` is beta",
-  },
-] as const
 
 const table = (rows: ReadonlyArray<ReadonlyArray<string>>): string => {
   const widths = rows[0].map((_, column) => Math.max(...rows.map((row) => row[column].length)))
@@ -67,41 +19,79 @@ const table = (rows: ReadonlyArray<ReadonlyArray<string>>): string => {
   return [line(rows[0]), separator, ...rows.slice(1).map(line)].join("\n")
 }
 
-export const renderHosts = (report: Certification): string => {
-  const suites = new Map(report.suites.map((suite) => [suite.name, suite]))
-  const rows = hostRows.map((host) => {
-    const suite = suites.get(host.suite)
-    if (suite === undefined) {
-      throw HostDocumentationFailed.make({ message: `${certificationReportPath} has no ${host.suite} result` })
-    }
-    return [host.host, host.driver, host.tier, suite.capabilities.join(", "), host.notes]
-  })
-  rows.push(
-    ...unregisteredRows.map((host) => [host.host, host.driver, host.tier, host.capabilities, host.notes] as const),
-  )
+export const renderHosts = (report: HostReport): string => {
+  const suite = report.suites.find((entry) => entry.name === objectNativeSuiteName)
+  const localCapabilities = suite === undefined ? "unmet: no passing object-native shared suite" : suite.capabilities.join(", ")
+  const rows = [
+    [
+      "Node/Bun, test-only object simulator",
+      "`generalist/durability` + `generalist/testing/durability`",
+      localCapabilities,
+      "Local runtime evidence only; not a production backend or provider qualification.",
+    ],
+    [
+      "Node/Bun + AWS S3",
+      "`generalist/durability/s3`",
+      report.qualification["aws-s3"].status,
+      report.qualification["aws-s3"].reason,
+    ],
+    [
+      "Node/Bun + R2 S3 API",
+      "`generalist/durability/s3`",
+      report.qualification["r2-s3"].status,
+      report.qualification["r2-s3"].reason,
+    ],
+    [
+      "Cloudflare native R2 + S3 API",
+      "`generalist/durability/r2`",
+      report.qualification["r2-native-s3-interoperability"].status,
+      report.qualification["r2-native-s3-interoperability"].reason,
+    ],
+    [
+      "Cloudflare Worker / Durable Object",
+      "`generalist/unstable/cloudflare/*`",
+      "unmet: host shared suite not registered",
+      "Native R2 transport and host-specific local checks do not certify remote recovery.",
+    ],
+    [
+      "Rivet actor",
+      "`generalist/unstable/rivet`",
+      "unmet: host shared suite not registered",
+      "Host placement does not introduce a different durability engine.",
+    ],
+  ]
   return `# Runtime hosts
 
-The certification report records the capability names advertised by each runtime driver whose complete shared suite passed. Cloudflare and Rivet have host-specific tests, but do not register the shared runtime-driver suite, so this matrix does not present them as certified.
+One object-native durability engine serves every host. Public transport entrypoints exist, but availability is not qualification: this report does not claim AWS S3, R2, or native/S3 interoperability support without accepted remote evidence. SQL drivers and the alternate memory Runtime are not supported.
+
+${table([["Host / transport", "Entrypoint", "Evidence / gate", "Notes"], ...rows])}
+
+## Local evidence
+
+The shared object-native runtime suite records its advertised capability names only when the complete suite passes. The test-only simulator is not restart-safe production storage. Transport unit tests, signed local HTTP fixtures, Worker bundles, and workerd tests provide local evidence, not remote-provider certification.
 
 \`\`\`sh
 bun --bun vitest run packages/generalist/test/testing/runtime-driver/index.test.ts --no-file-parallelism
+bun scripts/render-hosts.ts
 \`\`\`
 
 Test: [\`testing/runtime-driver/index.test.ts\`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/testing/runtime-driver/index.test.ts)
 
-${table([["Host", "Driver", "Tier", "Capabilities passed", "Notes"], ...rows])}
+## Remote qualification
+
+All remote gates above remain unmet. The remote provider runner requires explicit authorization, scoped identities, credentials, and bucket configuration before making requests. Passing its S3 API checks does not establish native R2/S3 interoperability, which requires separate native endpoint and cross-transport evidence. No remote qualification runs as part of package smoke.
 
 ## Report lifecycle
 
-The committed [\`hosts-report.json\`](./hosts-report.json) is the last passing evidence for each registered driver. \`bun run test\` refreshes a row only when that driver's complete runtime-driver suite ran and passed, then checks this generated page for drift. A failed suite fails the test run and does not replace prior passing evidence.
+The committed [\`hosts-report.json\`](./hosts-report.json) uses schema version 1 for the current object-native contract, with no legacy report reader or migration path. Its producer accepts only the object-native shared suite. A registered suite that fails clears its local passing evidence. Runs that do not include the registered object-native suite leave the report unchanged.
 
-PostgreSQL and MySQL are skipped when their database URL is unset. A skip is represented by no result for that driver in the current run, not by a failure or an empty capability list; the reporter therefore preserves its committed result. CI provides both databases and refreshes both rows. Capability names come from the registered suite dynamically rather than from a list in the renderer.
+The reporter cannot promote remote gates from local tests. Remote evidence must be reviewed and integrated explicitly. After the shared suite runs, regenerate this page with \`bun scripts/render-hosts.ts\`; \`bun scripts/render-hosts.ts --check\` rejects drift.
 `
 }
 
 const program = Effect.fn("RenderHosts.program")(function* (check: boolean) {
   const fileSystem = yield* FileSystem.FileSystem
-  const report = yield* Schema.decodeEffect(Schema.fromJsonString(Certification))(
+  const report = yield* Schema.decodeEffect(Schema.fromJsonString(HostReport))(
     yield* fileSystem.readFileString(certificationReportPath),
   )
   const rendered = renderHosts(report)

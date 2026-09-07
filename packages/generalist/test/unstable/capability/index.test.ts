@@ -199,6 +199,156 @@ it.effect("denies a child's widened operation before hooks and permissions while
   }),
 )
 
+it.effect("checks hook-replaced arguments before approval and retains authored and effective evidence", () =>
+  Effect.gen(function* () {
+    const handle = yield* grant(fileTool, { scope: { paths: ["src/auth/**"], ops: ["read"] }, expires: "1 hour" })
+    const toolkit = Toolkit.make(fileTool)
+    const base = Agent.make({ name: "capability-hook-replacement", toolkit })
+    const constrained = yield* applyInheritance(base, base, inheritance({ tools: [handle] }))
+    const executed: Array<string> = []
+    const approved: Array<string> = []
+    const checkpoints: Array<DriverCheckpoint> = []
+    const handlers = toolkit.toLayer({
+      capability_file: ({ path, op }) =>
+        Effect.sync(() => {
+          executed.push(`${op}:${path}`)
+          return path
+        }),
+    })
+    const hooks = Hooks.layer([
+      Hooks.onToolCall(({ call }) =>
+        Effect.succeed(
+          Hooks.Replace({
+            path: call.id === "restricted-replacement" ? "secrets/token.ts" : "src/auth/normalized.ts",
+            op: "read",
+          }),
+        ),
+      ),
+      Hooks.onToolCall(() => Effect.succeed(Hooks.Ask())),
+      Hooks.onApprovalRequest(({ call }) =>
+        Effect.sync(() => {
+          approved.push(call.id)
+          return Hooks.Continue()
+        }),
+      ),
+    ])
+    const journal = Layer.succeed(DurableDriver.DriverJournal, {
+      onScheduled: () => Effect.void,
+      onCompleted: (_operation, _outcome, checkpoint) =>
+        Effect.sync(() => {
+          checkpoints.push(checkpoint)
+        }),
+      onCheckpoint: (checkpoint) =>
+        Effect.sync(() => {
+          checkpoints.push(checkpoint)
+        }),
+    })
+    const events = yield* Agent.streamToolCalls(constrained, {
+      _tag: "Start",
+      calls: [
+        {
+          id: "restricted-replacement",
+          name: fileTool.name,
+          params: { path: "src/auth/original.ts", op: "read" },
+          type: "tool-call",
+        },
+        {
+          id: "allowed-replacement",
+          name: fileTool.name,
+          params: { path: "src/auth/original.ts", op: "read" },
+          type: "tool-call",
+        },
+      ],
+      activeTools: [fileTool.name],
+      messages: Prompt.make("read within the granted scope").content,
+      sessionId: "capability-hook-replacement",
+      logicalOperationId: "capability-hook-replacement",
+      turn: 0,
+    }).pipe(Stream.runCollect, Effect.provide(Layer.mergeAll(authorization, handlers, hooks, journal)))
+
+    expect(executed).toEqual(["read:src/auth/normalized.ts"])
+    expect(approved).toEqual(["allowed-replacement"])
+    expect(events.filter((event) => event._tag === "ToolExecutionCompleted")).toMatchObject([
+      {
+        call: { id: "restricted-replacement", params: { path: "secrets/token.ts", op: "read" } },
+        result: { isFailure: true, result: { _tag: "generalist/capability/Denied", reason: "invalid-scope" } },
+      },
+      {
+        call: { id: "allowed-replacement", params: { path: "src/auth/normalized.ts", op: "read" } },
+        result: { isFailure: false, result: "src/auth/normalized.ts" },
+      },
+    ])
+    const states = checkpoints.map((checkpoint) => Schema.decodeUnknownSync(LoopDriverState)(checkpoint.state))
+    const completed = states
+      .flatMap((state) => state.toolBatch?.calls ?? [])
+      .find((entry) => entry.call.id === "restricted-replacement" && entry.state._tag === "Completed")
+    expect(completed).toMatchObject({
+      call: { id: "restricted-replacement", params: { path: "src/auth/original.ts", op: "read" } },
+      effectiveCall: { id: "restricted-replacement", params: { path: "secrets/token.ts", op: "read" } },
+      state: {
+        _tag: "Completed",
+        result: { isFailure: true, result: { _tag: "generalist/capability/Denied", reason: "invalid-scope" } },
+      },
+    })
+    const evidence = states.flatMap((state) => state.capabilities?.events ?? [])
+    expect(evidence).toContainEqual(
+      expect.objectContaining({ _tag: "Use", toolCallId: "restricted-replacement", decision: "allow" }),
+    )
+    expect(evidence).toContainEqual(
+      expect.objectContaining({
+        _tag: "Use",
+        toolCallId: "restricted-replacement",
+        decision: "deny",
+        reason: "invalid-scope",
+      }),
+    )
+    expect(evidence).toContainEqual(
+      expect.objectContaining({ _tag: "Use", toolCallId: "allowed-replacement", decision: "allow" }),
+    )
+  }),
+)
+
+it.effect("denies a capability revoked by a ToolCall hook before approval or dispatch", () =>
+  Effect.gen(function* () {
+    const handle = yield* grant(fileTool, { scope: fileScope, expires: "1 hour" })
+    const toolkit = Toolkit.make(fileTool)
+    const base = Agent.make({ name: "capability-hook-revocation", toolkit })
+    const constrained = yield* applyInheritance(base, base, inheritance({ tools: [handle] }))
+    const hooks = Hooks.layer([
+      Hooks.onToolCall(() =>
+        revoke(handle).pipe(Effect.as(Hooks.Replace({ path: "src/normalized.ts", op: "read" }))),
+      ),
+      Hooks.onToolCall(() => Effect.succeed(Hooks.Ask())),
+      Hooks.onApprovalRequest(() => Effect.die("Revoked effective calls must not request approval")),
+    ])
+    const handlers = toolkit.toLayer({
+      capability_file: () => Effect.die("Revoked effective calls must not execute"),
+    })
+    const events = yield* Agent.streamToolCalls(constrained, {
+      _tag: "Start",
+      calls: [
+        {
+          id: "hook-revoked-read",
+          name: fileTool.name,
+          params: { path: "src/original.ts", op: "read" },
+          type: "tool-call",
+        },
+      ],
+      activeTools: [fileTool.name],
+      messages: Prompt.make("read once").content,
+      sessionId: "capability-hook-revocation",
+      logicalOperationId: "capability-hook-revocation",
+      turn: 0,
+    }).pipe(Stream.runCollect, Effect.provide(Layer.mergeAll(authorization, handlers, hooks)))
+    expect(Array.from(events)).toMatchObject([
+      {
+        _tag: "ToolExecutionCompleted",
+        result: { isFailure: true, result: { _tag: "generalist/capability/Denied", reason: "revoked" } },
+      },
+    ])
+  }),
+)
+
 it.effect("journals a transitive revocation when a descendant is next used", () =>
   Effect.gen(function* () {
     const root = yield* grant(fileTool, { scope: fileScope, expires: "1 hour" })
@@ -347,7 +497,7 @@ it.effect("propagates a protected result's taint and rejects a declared untainte
   }),
 )
 
-it.effect("replays a journaled check after expiry in a fresh interpreter but denies a new call", () =>
+it.effect("denies expired authority when resuming a checked but undispatched call", () =>
   Effect.gen(function* () {
     const handle = yield* grant(fileTool, { scope: fileScope, expires: "1 hour" })
     const toolkit = Toolkit.make(fileTool)
@@ -406,8 +556,13 @@ it.effect("replays a journaled check after expiry in a fresh interpreter but den
       executableRef,
       messages,
     }).pipe(Stream.runCollect, Effect.provide(Layer.merge(authorization, handlers)))
-    expect(Array.from(replayed).map((event) => event._tag)).toEqual(["ToolExecutionStarted", "ToolExecutionCompleted"])
-    expect(handlerCalls).toBe(1)
+    expect(Array.from(replayed)).toMatchObject([
+      {
+        _tag: "ToolExecutionCompleted",
+        result: { isFailure: true, result: { _tag: "generalist/capability/Denied", reason: "expired" } },
+      },
+    ])
+    expect(handlerCalls).toBe(0)
 
     const denied = yield* Agent.streamToolCalls(constrained, {
       _tag: "Start",
@@ -428,6 +583,6 @@ it.effect("replays a journaled check after expiry in a fresh interpreter but den
     ])
     const deniedEvent = Array.from(denied)[0]
     expect(deniedEvent?._tag === "ToolExecutionCompleted" && Schema.is(Denied)(deniedEvent.result.result)).toBe(true)
-    expect(handlerCalls).toBe(1)
+    expect(handlerCalls).toBe(0)
   }),
 )

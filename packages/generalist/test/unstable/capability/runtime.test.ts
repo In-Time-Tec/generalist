@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "../../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -83,7 +84,7 @@ it.effect("serializes capability lineage and recovers a hosted child denial with
       Permissions.layerAllowAll,
       Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
     )
-    const runtime = Runtime.layerMemory({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+    const runtime = objectRuntimeLayer({ addresses: [] }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     )
 
@@ -95,7 +96,13 @@ it.effect("serializes capability lineage and recovers a hosted child denial with
         const store = yield* RunStore.RunStore
         yield* service.register(parent)
         const parentRun = yield* service.start(parent, "delegate to the reviewer")
-        yield* executor.execute(yield* store.claimExecution({ runId: parentRun.runId, ownerId: "capability-parent" }))
+        yield* executor.execute(
+          yield* store.claimExecution({
+            runId: parentRun.runId,
+            ownerId: objectWorkerId,
+            commandId: "capability:parent:initial",
+          }),
+        )
 
         const parentHistory = yield* service.history({ runId: parentRun.runId, limit: 100 })
         const linked = parentHistory.find((event) => event._tag === "ChildLinked")
@@ -131,7 +138,11 @@ it.effect("serializes capability lineage and recovers a hosted child denial with
         expect(policy.tools).toEqual(descriptors)
 
         yield* executor.execute(
-          yield* store.claimExecution({ runId: childRunId, ownerId: "capability-child-before-recovery" }),
+          yield* store.claimExecution({
+            runId: childRunId,
+            ownerId: objectWorkerId,
+            commandId: "capability:child:before-recovery",
+          }),
         )
         expect(dispatched).toEqual([])
         expect(childModelCalls).toBe(2)
@@ -173,7 +184,11 @@ it.effect("serializes capability lineage and recovers a hosted child denial with
           resolution: { _tag: "Approved" },
         })
         yield* executor.execute(
-          yield* store.claimExecution({ runId: childRunId, ownerId: "capability-child-after-recovery" }),
+          yield* store.claimExecution({
+            runId: childRunId,
+            ownerId: objectWorkerId,
+            commandId: "capability:child:after-recovery",
+          }),
         )
 
         expect((yield* service.inspect(childRunId)).status).toBe("succeeded")
@@ -192,7 +207,11 @@ it.effect("serializes capability lineage and recovers a hosted child denial with
         ).toHaveLength(0)
 
         yield* executor.execute(
-          yield* store.claimExecution({ runId: parentRun.runId, ownerId: "capability-parent-resume" }),
+          yield* store.claimExecution({
+            runId: parentRun.runId,
+            ownerId: objectWorkerId,
+            commandId: "capability:parent:resume",
+          }),
         )
         expect(yield* parentRun.await).toBe("parent complete")
       }),

@@ -44,7 +44,10 @@ export const make = (initialAttempt: number) =>
         const checkpoint =
           latest.checkpoint !== undefined && "driverVersion" in latest.checkpoint ? latest.checkpoint : undefined
         if (latest.attempt >= maxExecutionAttempts || checkpoint === undefined) return undefined
-        const retried = yield* store.retryExecution(claim)
+        const retried = yield* store.retryExecution({
+          ...claim,
+          commandId: JSON.stringify(["retry-execution", claim.runId, claim.attemptFence, failure.modelCallId]),
+        })
         yield* Ref.set(attempt, retried.attempt)
         const nextRetry: Retry = {
           attempt: retried.attempt,

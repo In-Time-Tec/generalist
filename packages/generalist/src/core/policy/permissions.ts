@@ -14,7 +14,6 @@ export {
   type RuleStoreError,
 } from "./rule-store.js"
 export { layerRuleStoreFile, type RuleStoreFileOptions } from "./rule-store-file.js"
-export { layerRuleStoreSql, type RuleStoreSqlOptions } from "./rule-store-sql.js"
 
 /** Ordered permission ruleset. */
 export interface Ruleset {

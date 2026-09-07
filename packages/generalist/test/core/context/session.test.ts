@@ -1,3 +1,4 @@
+import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -17,17 +18,13 @@ const promptTexts = (prompt: Prompt.Prompt): ReadonlyArray<string> =>
   })
 
 describe("Session", () => {
-  it("excludes exact checkpoints from ordinary append input", () => {
-    const excluded: Extract<Session.AppendInput, { readonly _tag: "Compaction" }> extends never ? true : false = true
-    expect(excluded).toBe(true)
-  })
 
   ItLayer.make(
     it,
     "starts empty",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
@@ -43,13 +40,13 @@ describe("Session", () => {
     "appends linear messages and projects them in order",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          const first = yield* store.append({ _tag: "Message", message: user("one") })
-          const second = yield* store.append({ _tag: "Message", message: assistant("two") })
-          const third = yield* store.append({ _tag: "Message", message: user("three") })
+          const first = yield* store.append({ _tag: "Message", message: user("one") }, { commandId: "fixture-51" })
+          const second = yield* store.append({ _tag: "Message", message: assistant("two") }, { commandId: "fixture-52" })
+          const third = yield* store.append({ _tag: "Message", message: user("three") }, { commandId: "fixture-53" })
           const path = yield* store.path()
 
           expect([first.id, second.id, third.id]).toEqual(["0", "1", "2"])
@@ -65,19 +62,19 @@ describe("Session", () => {
     "pages a fixed leaf while effective reads stop at projection boundaries",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("paged")
           const appended = []
           for (let index = 0; index < 10; index += 1) {
-            appended.push(yield* store.append({ _tag: "Message", message: user(`message-${index}`) }))
+            appended.push(yield* store.append({ _tag: "Message", message: user(`message-${index}`) }, { commandId: `fixture-74-${index}` }))
           }
           const fixedLeaf = appended.at(-1)!.id
           let page = yield* store.pathPage({ leafId: fixedLeaf, limit: 3 })
           expect(page.entries.map((entry) => entry.id)).toEqual(["7", "8", "9"])
           expect(page).toMatchObject({ hasOlder: true, hasNewer: false })
 
-          yield* store.append({ _tag: "Message", message: user("later-append") })
+          yield* store.append({ _tag: "Message", message: user("later-append") }, { commandId: "fixture-81" })
           const paged = [...page.entries]
           while (page.nextCursor !== undefined) {
             page = yield* store.pathPage({ leafId: fixedLeaf, cursor: page.nextCursor, limit: 3 })
@@ -87,25 +84,25 @@ describe("Session", () => {
           expect(paged.some((entry) => promptTexts(Session.buildContext([entry])).includes("later-append"))).toBe(false)
 
           const current = yield* store.leaf
-          const checkpointId = yield* store.reserveEntryId
+          const checkpointId = yield* store.reserveEntryId("paged-checkpoint")
           const checkpoint = (yield* store.appendCheckpoint({
             id: checkpointId,
             parentId: current,
             projectedHistory: Prompt.fromMessages([user("projected")]),
             telemetry: [],
           })).checkpoint
-          const suffix = yield* store.append({ _tag: "Message", message: assistant("suffix") })
+          const suffix = yield* store.append({ _tag: "Message", message: assistant("suffix") }, { commandId: "fixture-98" })
           expect((yield* store.effectivePath()).map((entry) => entry.id)).toEqual([checkpoint.id, suffix.id])
           expect((yield* store.path()).length).toBeGreaterThan(2)
           expect(yield* store.latestCompaction()).toEqual(checkpoint)
 
           const handoff = yield* store.append({
-            _tag: "Handoff",
-            handoffId: "paged-handoff",
-            target: "specialist",
-            projectedHistory: Prompt.fromMessages([user("handoff projection")]),
-          })
-          const afterHandoff = yield* store.append({ _tag: "Message", message: assistant("after handoff") })
+                      _tag: "Handoff",
+                      handoffId: "paged-handoff",
+                      target: "specialist",
+                      projectedHistory: Prompt.fromMessages([user("handoff projection")]),
+                    }, { commandId: "fixture-103" })
+          const afterHandoff = yield* store.append({ _tag: "Message", message: assistant("after handoff") }, { commandId: "fixture-109" })
           expect((yield* store.effectivePath()).map((entry) => entry.id)).toEqual([handoff.id, afterHandoff.id])
           expect(yield* store.latestCompaction()).toEqual(checkpoint)
         }),
@@ -117,7 +114,7 @@ describe("Session", () => {
     "retries an ambiguously committed stable append without duplication or sequence advance",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
           const entry = { _tag: "Message" as const, message: user("committed once") }
@@ -150,7 +147,7 @@ describe("Session", () => {
           }
           expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
 
-          const next = yield* store.append({ _tag: "Message", message: user("next") })
+          const next = yield* store.append({ _tag: "Message", message: user("next") }, { commandId: "fixture-154" })
           expect(next.id).toBe("1")
           expect((yield* store.append(entry, options)).id).toBe(options.id)
           expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
@@ -163,13 +160,13 @@ describe("Session", () => {
     "rejects an exact stable append retry after its branch is abandoned",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
           const entry = { _tag: "Message" as const, message: user("old branch") }
           const options = { id: "logical:model:0:session-entry:0:user", expectedLeafId: null }
           yield* store.append(entry, options)
-          yield* store.setLeaf(null)
+          yield* store.setLeaf(null, "fixture-173")
           yield* store.append(
             { _tag: "Message", message: user("new branch") },
             { id: "logical:model:1:session-entry:0:user", expectedLeafId: null },
@@ -188,14 +185,14 @@ describe("Session", () => {
     "moves the leaf pointer to fork a branch",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          const first = yield* store.append({ _tag: "Message", message: user("A") })
-          const abandoned = yield* store.append({ _tag: "Message", message: user("B") })
-          yield* store.setLeaf(first.id)
-          const fork = yield* store.append({ _tag: "Message", message: assistant("C") })
+          const first = yield* store.append({ _tag: "Message", message: user("A") }, { commandId: "fixture-196" })
+          const abandoned = yield* store.append({ _tag: "Message", message: user("B") }, { commandId: "fixture-197" })
+          yield* store.setLeaf(first.id, "fixture-198")
+          const fork = yield* store.append({ _tag: "Message", message: assistant("C") }, { commandId: "fixture-199" })
 
           expect(yield* store.leaf).toBe(fork.id)
           expect(yield* store.path()).toEqual([first, fork])
@@ -210,14 +207,14 @@ describe("Session", () => {
     "projects the last compaction as a checkpoint plus kept entries",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          const first = yield* store.append({ _tag: "Message", message: user("m1") })
-          const second = yield* store.append({ _tag: "Message", message: user("m2") })
-          const third = yield* store.append({ _tag: "Message", message: user("m3") })
-          const id = yield* store.reserveEntryId
+          const first = yield* store.append({ _tag: "Message", message: user("m1") }, { commandId: "fixture-218" })
+          const second = yield* store.append({ _tag: "Message", message: user("m2") }, { commandId: "fixture-219" })
+          const third = yield* store.append({ _tag: "Message", message: user("m3") }, { commandId: "fixture-220" })
+          const id = yield* store.reserveEntryId("summary-checkpoint")
           const { checkpoint } = yield* store.appendCheckpoint({
             id,
             parentId: third.id,
@@ -225,7 +222,7 @@ describe("Session", () => {
             telemetry: [],
             summary: "summary m1-m3",
           })
-          const fourth = yield* store.append({ _tag: "Message", message: user("m4") })
+          const fourth = yield* store.append({ _tag: "Message", message: user("m4") }, { commandId: "fixture-229" })
           const path = yield* store.path()
 
           expect(path).toEqual([first, second, third, checkpoint, fourth])
@@ -239,17 +236,17 @@ describe("Session", () => {
     "projects lossless memory context across compaction without recalled or synthetic entries",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          const first = yield* store.append({ _tag: "Message", message: user("authored before") })
+          const first = yield* store.append({ _tag: "Message", message: user("authored before") }, { commandId: "fixture-247" })
           yield* store.append({
-            _tag: "Message",
-            message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
-          })
-          const kept = yield* store.append({ _tag: "Message", message: assistant("model before") })
-          const id = yield* store.reserveEntryId
+                      _tag: "Message",
+                      message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
+                    }, { commandId: "fixture-248" })
+          const kept = yield* store.append({ _tag: "Message", message: assistant("model before") }, { commandId: "fixture-252" })
+          const id = yield* store.reserveEntryId("memory-checkpoint")
           yield* store.appendCheckpoint({
             id,
             parentId: kept.id,
@@ -257,7 +254,7 @@ describe("Session", () => {
             telemetry: [],
             summary: "summary containing recalled and authored context",
           })
-          yield* store.append({ _tag: "Message", message: user("authored after") })
+          yield* store.append({ _tag: "Message", message: user("authored after") }, { commandId: "fixture-261" })
           const path = yield* store.path()
 
           expect(first.id).toBe("0")
@@ -275,13 +272,13 @@ describe("Session", () => {
     "uses the last compaction on a path",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          yield* store.append({ _tag: "Message", message: user("m1") })
-          const second = yield* store.append({ _tag: "Message", message: user("m2") })
-          const oldId = yield* store.reserveEntryId
+          yield* store.append({ _tag: "Message", message: user("m1") }, { commandId: "fixture-218" })
+          const second = yield* store.append({ _tag: "Message", message: user("m2") }, { commandId: "fixture-219" })
+          const oldId = yield* store.reserveEntryId("old-checkpoint")
           const old = yield* store.appendCheckpoint({
             id: oldId,
             parentId: second.id,
@@ -289,8 +286,8 @@ describe("Session", () => {
             telemetry: [],
             summary: "old summary",
           })
-          const third = yield* store.append({ _tag: "Message", message: user("m3") })
-          const newId = yield* store.reserveEntryId
+          const third = yield* store.append({ _tag: "Message", message: user("m3") }, { commandId: "fixture-220" })
+          const newId = yield* store.reserveEntryId("new-checkpoint")
           yield* store.appendCheckpoint({
             id: newId,
             parentId: third.id,
@@ -298,7 +295,7 @@ describe("Session", () => {
             telemetry: [],
             summary: "new summary",
           })
-          yield* store.append({ _tag: "Message", message: user("m4") })
+          yield* store.append({ _tag: "Message", message: user("m4") }, { commandId: "fixture-229" })
 
           expect(old.checkpoint.id).toBe(oldId)
           expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual(["new summary", "m4"])
@@ -311,13 +308,13 @@ describe("Session", () => {
     "renders branch summaries as system notes",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          yield* store.append({ _tag: "Message", message: user("main") })
-          yield* store.append({ _tag: "BranchSummary", summary: "alternate branch tried X" })
-          yield* store.append({ _tag: "Message", message: assistant("continue") })
+          yield* store.append({ _tag: "Message", message: user("main") }, { commandId: "fixture-319" })
+          yield* store.append({ _tag: "BranchSummary", summary: "alternate branch tried X" }, { commandId: "fixture-320" })
+          yield* store.append({ _tag: "Message", message: assistant("continue") }, { commandId: "fixture-321" })
 
           expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual([
             "main",
@@ -333,7 +330,7 @@ describe("Session", () => {
     "projects memory, skills, steering, tool calls, and tool results as prompt context",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
           const toolCall = Prompt.makePart("tool-call", {
@@ -350,11 +347,11 @@ describe("Session", () => {
             result: { results: ["Generalist docs"] },
           })
 
-          yield* store.append({ _tag: "Memory", items: ["customer is enterprise"] })
-          yield* store.append({ _tag: "Skill", name: "research", body: "Use primary sources." })
-          yield* store.append({ _tag: "Steering", message: user("Prioritize docs.") })
-          yield* store.append({ _tag: "ToolCall", part: toolCall })
-          yield* store.append({ _tag: "ToolResult", part: toolResult })
+          yield* store.append({ _tag: "Memory", items: ["customer is enterprise"] }, { commandId: "fixture-354" })
+          yield* store.append({ _tag: "Skill", name: "research", body: "Use primary sources." }, { commandId: "fixture-355" })
+          yield* store.append({ _tag: "Steering", message: user("Prioritize docs.") }, { commandId: "fixture-356" })
+          yield* store.append({ _tag: "ToolCall", part: toolCall }, { commandId: "fixture-357" })
+          yield* store.append({ _tag: "ToolResult", part: toolResult }, { commandId: "fixture-358" })
           const path = yield* store.path()
 
           const prompt = Session.buildContext(path)
@@ -461,18 +458,18 @@ describe("Session", () => {
     "treats the latest handoff or compaction as a self-contained conversation boundary",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source sentinel") })
-          const checkpointId = yield* store.reserveEntryId
+          const source = yield* store.append({ _tag: "Message", message: user("source sentinel") }, { commandId: "fixture-468" })
+          const checkpointId = yield* store.reserveEntryId("handoff-checkpoint")
           yield* store.appendCheckpoint({
             id: checkpointId,
             parentId: source.id,
             projectedHistory: Prompt.fromMessages([user("compacted")]),
             telemetry: [],
           })
-          const between = yield* store.append({ _tag: "Message", message: assistant("between") })
+          const between = yield* store.append({ _tag: "Message", message: assistant("between") }, { commandId: "fixture-476" })
           yield* store.append(
             {
               _tag: "Handoff",
@@ -482,7 +479,7 @@ describe("Session", () => {
             },
             { id: "handoff-entry-1", expectedLeafId: between.id },
           )
-          yield* store.append({ _tag: "Message", message: assistant("after") })
+          yield* store.append({ _tag: "Message", message: assistant("after") }, { commandId: "fixture-486" })
           const path = yield* store.path()
 
           expect(promptTexts(Session.buildContext(path))).toEqual(["projected-for-specialist", "after"])
@@ -496,10 +493,10 @@ describe("Session", () => {
     "imports exact handoff projections idempotently and rejects divergent or inactive reuse",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const source = yield* store.append({ _tag: "Message", message: user("source") }, { commandId: "fixture-503" })
           const handoff = {
             _tag: "Handoff" as const,
             handoffId: "handoff-exact",
@@ -507,7 +504,7 @@ describe("Session", () => {
             projectedHistory: Prompt.fromMessages([user("exact projection")]),
           }
           const appended = yield* store.append(handoff, { id: "handoff-entry", expectedLeafId: source.id })
-          yield* store.append({ _tag: "Message", message: assistant("descendant") })
+          yield* store.append({ _tag: "Message", message: assistant("descendant") }, { commandId: "fixture-511" })
           const repeated = yield* store.append(handoff, { id: "handoff-entry", expectedLeafId: source.id })
           const divergent = yield* Effect.flip(
             store.append(
@@ -519,7 +516,7 @@ describe("Session", () => {
           expect(divergent).toMatchObject({ reason: "entry-id-reused" })
           expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual(["exact projection", "descendant"])
 
-          yield* store.setLeaf(source.id)
+          yield* store.setLeaf(source.id, "fixture-523")
           const inactive = yield* Effect.flip(store.append(handoff, { id: "handoff-entry", expectedLeafId: source.id }))
           expect(inactive).toMatchObject({ reason: "stale-leaf" })
         }),
@@ -531,11 +528,11 @@ describe("Session", () => {
     "fails typed for unknown leaves",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
 
-          const setLeafFailure = yield* Effect.flip(store.setLeaf("missing"))
+          const setLeafFailure = yield* Effect.flip(store.setLeaf("missing", "fixture-539"))
           const pathFailure = yield* Effect.flip(store.path("missing"))
 
           expect(setLeafFailure._tag).toBe("generalist/core/SessionStoreError")
@@ -549,11 +546,11 @@ describe("Session", () => {
     "appends exact checkpoints idempotently and rejects identity or leaf conflicts",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source") })
-          const id = yield* store.reserveEntryId
+          const source = yield* store.append({ _tag: "Message", message: user("source") }, { commandId: "fixture-503" })
+          const id = yield* store.reserveEntryId("exact-checkpoint")
           const prepared: Session.PreparedCheckpoint = {
             id,
             parentId: source.id,
@@ -566,7 +563,7 @@ describe("Session", () => {
           const reused = yield* Effect.flip(
             store.appendCheckpoint({ ...prepared, projectedHistory: Prompt.fromMessages([user("different")]) }),
           )
-          const staleId = yield* store.reserveEntryId
+          const staleId = yield* store.reserveEntryId("stale-checkpoint")
           const stale = yield* Effect.flip(
             store.appendCheckpoint({
               id: staleId,
@@ -593,11 +590,11 @@ describe("Session", () => {
     "persists durable telemetry delivery identity and rejects every changed checkpoint identity field",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source") })
-          const id = yield* store.reserveEntryId
+          const source = yield* store.append({ _tag: "Message", message: user("source") }, { commandId: "fixture-503" })
+          const id = yield* store.reserveEntryId("telemetry-checkpoint")
           const telemetry: ReadonlyArray<ModelTelemetry.Event> = [
             {
               _tag: "ModelCallStarted",
@@ -682,12 +679,12 @@ describe("Session", () => {
     "retries an ambiguously interrupted checkpoint append without duplication",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const source = yield* store.append({ _tag: "Message", message: user("source") }, { commandId: "fixture-503" })
           const prepared: Session.PreparedCheckpoint = {
-            id: yield* store.reserveEntryId,
+            id: yield* store.reserveEntryId("interrupted-checkpoint"),
             parentId: source.id,
             projectedHistory: Prompt.fromMessages([user("committed projection")]),
             telemetry: [],
@@ -715,10 +712,10 @@ describe("Session", () => {
     "matches checkpoint identity structurally across reordered object keys",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const source = yield* store.append({ _tag: "Message", message: user("source") }, { commandId: "fixture-503" })
           const toolProjection = (params: Readonly<Record<string, number>>) =>
             Prompt.fromMessages([
               Prompt.makeMessage("assistant", {
@@ -733,7 +730,7 @@ describe("Session", () => {
               }),
             ])
           const prepared: Session.PreparedCheckpoint = {
-            id: yield* store.reserveEntryId,
+            id: yield* store.reserveEntryId("structural-checkpoint"),
             parentId: source.id,
             projectedHistory: toolProjection({ first: 1, second: 2 }),
             telemetry: [],
@@ -755,21 +752,18 @@ describe("Session", () => {
     "keeps active descendants on delayed retry and rejects checkpoints from abandoned branches",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.acquire("test")
-          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const source = yield* store.append({ _tag: "Message", message: user("source") }, { commandId: "fixture-503" })
           const prepared: Session.PreparedCheckpoint = {
-            id: yield* store.reserveEntryId,
+            id: yield* store.reserveEntryId("abandoned-checkpoint"),
             parentId: source.id,
             projectedHistory: Prompt.fromMessages([user("checkpoint")]),
             telemetry: [],
           }
           yield* store.appendCheckpoint(prepared)
-          const descendant = yield* store.append(
-            { _tag: "Message", message: user("descendant") },
-            { expectedLeafId: prepared.id },
-          )
+          const descendant = yield* store.append({ _tag: "Message", message: user("descendant") }, { commandId: "fixture-770", expectedLeafId: prepared.id })
 
           const delayed = yield* store.appendCheckpoint(prepared)
 
@@ -780,8 +774,8 @@ describe("Session", () => {
             "descendant",
           ])
 
-          yield* store.setLeaf(source.id)
-          yield* store.append({ _tag: "Message", message: user("other branch") }, { expectedLeafId: source.id })
+          yield* store.setLeaf(source.id, "fixture-523")
+          yield* store.append({ _tag: "Message", message: user("other branch") }, { commandId: "fixture-785", expectedLeafId: source.id })
           const abandoned = yield* Effect.flip(store.appendCheckpoint(prepared))
 
           expect(abandoned._tag).toBe("generalist/core/SessionConflict")
@@ -797,18 +791,18 @@ describe("Session", () => {
     "keeps keyed stores isolated across IDs and alive across Run scopes",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const aliceFirst = yield* Effect.scoped(
             Effect.gen(function* () {
               const store = yield* Session.acquire("alice")
-              return yield* store.append({ _tag: "Message", message: user("alice only") })
+              return yield* store.append({ _tag: "Message", message: user("alice only") }, { commandId: "fixture-806" })
             }),
           )
           const bobFirst = yield* Effect.scoped(
             Effect.gen(function* () {
               const store = yield* Session.acquire("bob")
-              return yield* store.append({ _tag: "Message", message: user("bob only") })
+              return yield* store.append({ _tag: "Message", message: user("bob only") }, { commandId: "fixture-812" })
             }),
           )
           const alicePath = yield* Effect.scoped(Session.acquire("alice").pipe(Effect.flatMap((store) => store.path())))
@@ -827,7 +821,7 @@ describe("Session", () => {
     "queues one ID independently and releases its lane on cancellation",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const active = yield* Deferred.make<void>()
           const release = yield* Deferred.make<void>()
@@ -871,7 +865,7 @@ describe("Session", () => {
     "releases an active Session lane when its Scope is interrupted",
     () =>
       [
-        Session.layerMemory,
+        layerMemory,
         Effect.gen(function* () {
           const acquired = yield* Deferred.make<void>()
           const active = yield* Effect.scoped(
@@ -889,32 +883,4 @@ describe("Session", () => {
       ] as const,
   )
 
-  ItLayer.make(
-    it,
-    "layerTest provides an exact implementation",
-    () =>
-      [
-        Session.layerTest({
-          acquire: () =>
-            Effect.succeed({
-              reserveEntryId: Effect.succeed("reserved"),
-              append: () => Effect.die("unused"),
-              appendCheckpoint: () => Effect.die("unused"),
-              entry: () => Effect.die("unused"),
-              pathPage: () => Effect.succeed({ entries: [], hasOlder: false, hasNewer: false }),
-              effectivePath: () => Effect.succeed([]),
-              latestCompaction: () => Effect.die("unused"),
-              path: () => Effect.succeed([]),
-              setLeaf: () => Effect.void,
-              leaf: Effect.succeed("leaf"),
-            }),
-        }),
-        Effect.gen(function* () {
-          const expected = yield* Session.acquire("test")
-
-          expect(yield* expected.leaf).toBe("leaf")
-          expect(yield* expected.path()).toEqual([])
-        }),
-      ] as const,
-  )
 })

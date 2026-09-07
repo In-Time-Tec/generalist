@@ -67,10 +67,14 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
           runBelongsTo(options.host, options.sessionId, command.runId).pipe(
             Effect.flatMap((allowed) => {
               if (!allowed) return close(1008, "run-not-in-session")
-              return options.host.runs.cancel(command.runId, command.reason).pipe(
+              return options.host.runs.cancel(command.runId, command.commandId, command.reason).pipe(
                 Effect.catchTags({
                   "generalist/runtime/RunNotFound": () => close(4004, "run-not-found"),
                   "generalist/runtime/RuntimeUnavailable": () => close(1011, "runtime-unavailable"),
+                  "generalist/durability/DurabilityFailure": (error) =>
+                    error.reason === "input-conflict"
+                      ? close(4009, "command-input-conflict")
+                      : close(1011, "durability-failed"),
                 }),
               )
             }),

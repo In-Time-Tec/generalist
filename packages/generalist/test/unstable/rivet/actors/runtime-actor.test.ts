@@ -1,4 +1,5 @@
 /* oxlint-disable effecttsgo/async-function -- These integration tests exercise Rivet's Promise-only actor API. */
+import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import { setup, type Registry } from "rivetkit"
 import { setupTest } from "rivetkit/test"
 import { expect, test } from "vitest"
@@ -7,6 +8,8 @@ import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, AgentManifest, Pins } from "generalist"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
 import { makeRuntimeActor, type RuntimeActorDefinition } from "../../../../src/unstable/rivet/actors/index.js"
+import { ObjectStore } from "../../../../src/durability/object-store.js"
+import { make as makeBucket, type Client } from "../../../../src/testing/durability/index.js"
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
@@ -56,8 +59,17 @@ const registrations = [...ExecutableRegistration.requiredPins(executable)].map((
   payload: {},
 }))
 
-const makeDefinition = (modelLayer: Layer.Layer<LanguageModel.LanguageModel>, sleepTimeout = 100) =>
+const makeDefinition = (
+  modelLayer: Layer.Layer<LanguageModel.LanguageModel>,
+  client: Client,
+  partition: string,
+  sleepTimeout = 100,
+) =>
   makeRuntimeActor({
+    environment: "test",
+    tenant: "rivet",
+    partition,
+    storage: Layer.merge(Layer.succeed(ObjectStore, client.store), cryptoLayer),
     addresses: [{ address, executable, registrations }],
     resolver: ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, modelLayer) }]).pipe(Layer.orDie),
     actorOptions: { sleepTimeout },
@@ -114,26 +126,9 @@ type CrashWindowPartition = {
   }
 }
 
-const addOwnerAction = (definition: RuntimeActorDefinition) => {
-  const actions = definition.config.actions
-  if (actions === undefined) throw new Error("Runtime actor actions are required")
-  const owner = async (c: Parameters<typeof actions.runtime.send>[0]): Promise<string> => {
-    if (c.vars.host === undefined) throw new Error("Runtime host is not awake")
-    return c.vars.host.ownerId
-  }
-  Object.assign(actions, { test: { owner } })
-}
-
-type OwnerPartition = {
-  readonly test: {
-    readonly owner: () => Promise<string>
-  }
-}
-
-const incarnation = (ownerId: string) => Number(ownerId.slice(ownerId.lastIndexOf(":") + 1))
-
-test("executes one Runtime partition through actor-local SQLite", async (context) => {
-  const runtime = makeDefinition(model)
+test("executes a Runtime partition through canonical objects", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  const runtime = makeDefinition(model, bucket, "execution")
   const registry = registerShutdown(context, setup({ use: { runtimePartition: runtime } }))
   const { client } = await setupTest(context, registry)
   const partition = client.runtimePartition.getOrCreate(partitionKey("tenant-7"))
@@ -159,7 +154,8 @@ test("executes one Runtime partition through actor-local SQLite", async (context
   expect(duplicate.duplicate).toBe(true)
 })
 
-test("startup drain closes the committed-activation/doorbell crash window exactly once", async (context) => {
+test("fresh actor discovers committed work without the admission doorbell", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
   let executions = 0
   const countingModel = Layer.effect(
     LanguageModel.LanguageModel,
@@ -175,7 +171,7 @@ test("startup drain closes the committed-activation/doorbell crash window exactl
     }),
   )
   const key = partitionKey("crash-window")
-  const firstDefinition = makeDefinition(countingModel, 60_000)
+  const firstDefinition = makeDefinition(countingModel, bucket, "crash-window", 60_000)
   addCrashWindowAction(firstDefinition)
   const firstSleepCount = observeSleepCleanup(firstDefinition)
   const firstRegistry = registerShutdown(context, setup({ use: { runtimeCrashWindow: firstDefinition } }))
@@ -196,7 +192,9 @@ test("startup drain closes the committed-activation/doorbell crash window exactl
   await firstRegistry.shutdown()
   expect(firstSleepCount()).toBeGreaterThanOrEqual(1)
 
-  const secondDefinition = makeDefinition(countingModel, 60_000)
+  const secondDefinition = makeDefinition(
+    countingModel, await Effect.runPromise(bucket.connect), "crash-window", 60_000,
+  )
   const secondRegistry = registerShutdown(context, setup({ use: { runtimeCrashWindow: secondDefinition } }))
   const { client: secondClient } = await setupTest(context, secondRegistry)
   const partition = secondClient.runtimeCrashWindow.getOrCreate(key)
@@ -211,6 +209,7 @@ test("startup drain closes the committed-activation/doorbell crash window exactl
 }, 20_000)
 
 test("registry reset makes interrupted never-replay work unknown without redispatch", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
   const signalListeners = process.listenerCount("SIGINT")
   const terminationListeners = process.listenerCount("SIGTERM")
   let firstCalls = 0
@@ -227,16 +226,11 @@ test("registry reset makes interrupted never-replay work unknown without redispa
     }),
   )
   const key = partitionKey("unknown-operation")
-  const firstDefinition = makeDefinition(blockingModel, 60_000)
-  addOwnerAction(firstDefinition)
+  const firstDefinition = makeDefinition(blockingModel, bucket, "unknown-operation", 60_000)
   const firstSleepCount = observeSleepCleanup(firstDefinition)
   const firstRegistry = registerShutdown(context, setup({ use: { runtimeUnknown: firstDefinition } }))
   const { client: firstClient } = await setupTest(context, firstRegistry)
-  const firstHandle = firstClient.runtimeUnknown.getOrCreate(key)
-  // SAFETY: addOwnerAction installed this exact test-only action on both definitions registered below.
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const firstPartition = firstHandle as typeof firstHandle & OwnerPartition
-  const firstOwner = await firstPartition.test.owner()
+  const firstPartition = firstClient.runtimeUnknown.getOrCreate(key)
   const receipt = await firstPartition.runtime.send({
     to: address,
     sessionId: "session:unknown-operation",
@@ -259,18 +253,12 @@ test("registry reset makes interrupted never-replay work unknown without redispa
       },
     }),
   )
-  const secondDefinition = makeDefinition(recoveredModel)
-  addOwnerAction(secondDefinition)
+  const secondDefinition = makeDefinition(
+    recoveredModel, await Effect.runPromise(bucket.connect), "unknown-operation",
+  )
   const secondRegistry = registerShutdown(context, setup({ use: { runtimeUnknown: secondDefinition } }))
   const { client: secondClient } = await setupTest(context, secondRegistry)
-  const secondHandle = secondClient.runtimeUnknown.getOrCreate(key)
-  // SAFETY: addOwnerAction installed this exact test-only action on both definitions registered above.
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const secondPartition = secondHandle as typeof secondHandle & OwnerPartition
-  const secondOwner = await secondPartition.test.owner()
-
-  expect(secondOwner).not.toBe(firstOwner)
-  expect(incarnation(secondOwner)).toBe(incarnation(firstOwner) + 1)
+  const secondPartition = secondClient.runtimeUnknown.getOrCreate(key)
   expect((await secondPartition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
   await secondPartition.runtime.drain()
   expect((await secondPartition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")

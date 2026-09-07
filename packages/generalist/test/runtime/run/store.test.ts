@@ -1,45 +1,15 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
+import { DurabilityFailure } from "../../../src/durability/errors.js"
 import { Errors, Runtime } from "../../../src/runtime/index.js"
 import {
-  alternateAssistantRef,
   assistantAddress,
-  assistantRef,
-  memoryLayer,
-  registrationsFor,
+  objectLayer,
   textPrompt,
 } from "../execution/fixtures.js"
-import { make as makeMessage } from "../../../src/runtime/messaging/message.js"
-import { admitSend } from "../../../src/runtime/memory/store/admit.js"
-import { emptyState } from "../../../src/runtime/memory/state.js"
-import { childDigest, messageDigest } from "../../../src/runtime/memory/digest.js"
 
-layer(memoryLayer)("Runtime idempotency", (it) => {
-  it("uses canonical SHA-256 digests without changing root and child identity inputs", () => {
-    const first = makeMessage({
-      id: "message:first",
-      to: assistantAddress,
-      sessionId: "session:digest",
-      idempotencyKey: "first",
-      correlationId: "correlation:digest",
-      prompt: textPrompt("digest"),
-      metadata: { outer: { second: 2, first: 1 } },
-    })
-    const replay = makeMessage({
-      ...first,
-      id: "message:replay",
-      idempotencyKey: "replay",
-      metadata: { outer: { first: 1, second: 2 } },
-    })
-
-    expect(messageDigest(first)).toMatch(/^[a-f0-9]{64}$/)
-    expect(messageDigest(replay)).toBe(messageDigest(first))
-    expect(childDigest(first, assistantRef.ref)).toMatch(/^[a-f0-9]{64}$/)
-    expect(childDigest(first, alternateAssistantRef.ref)).not.toBe(childDigest(first, assistantRef.ref))
-    expect(() => messageDigest({ ...first, metadata: { invalid: undefined } })).toThrow(/Expected JSON value/)
-  })
-
-  it.effect("returns the same receipt for an exact duplicate", () =>
+layer(objectLayer)("Runtime idempotency", (it) => {
+  it.effect("returns the original receipt for an exact duplicate", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const first = yield* runtime.send({
@@ -54,14 +24,11 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
         idempotencyKey: "same",
         prompt: textPrompt("hello"),
       })
-      expect(second.runId).toBe(first.runId)
-      expect(second.messageId).toBe(first.messageId)
-      expect(second.acceptedSequence).toBe(first.acceptedSequence)
-      expect(second.duplicate).toBe(true)
+      expect(second).toEqual(first)
     }),
   )
 
-  it.effect("conflicts when the payload changes under one key", () =>
+  it.effect("rejects changed input under one command identity", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const first = yield* runtime.send({
@@ -78,37 +45,13 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
           prompt: textPrompt("changed"),
         })
         .pipe(Effect.flip)
-      expect(error).toBeInstanceOf(Errors.IdempotencyConflict)
-      if (Schema.is(Errors.IdempotencyConflict)(error)) {
-        expect(error.existingRunId).toBe(first.runId)
-      }
-    }),
-  )
-
-  it.effect("conflicts when an exact payload is replayed under changed executable authority", () =>
-    Effect.gen(function* () {
-      const message = makeMessage({
-        id: "message:authority",
-        to: assistantAddress,
-        sessionId: "session:authority",
-        idempotencyKey: "same",
-        correlationId: "message:authority",
-        prompt: textPrompt("hello"),
-      })
-      const initial = emptyState({ addressBindings: new Map(), subscriberQueueCapacity: 8 })
-      const [, admitted] = yield* admitSend(initial, {
-        message,
-        executableRef: assistantRef.ref,
-        executableManifest: assistantRef.manifest,
-        registrations: registrationsFor(assistantRef),
-      })
-      const conflict = yield* admitSend(admitted, {
-        message,
-        executableRef: alternateAssistantRef.ref,
-        executableManifest: alternateAssistantRef.manifest,
-        registrations: registrationsFor(alternateAssistantRef),
-      }).pipe(Effect.flip)
-      expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(error).toBeInstanceOf(DurabilityFailure)
+      expect(error).toMatchObject({ reason: "input-conflict" })
+      expect(
+        (yield* runtime.history({ runId: first.runId, cursor: -1, limit: 20 })).filter(
+          (event) => event._tag === "RunAccepted",
+        ),
+      ).toHaveLength(1)
     }),
   )
 
@@ -149,7 +92,7 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
         idempotencyKey: "first",
         prompt: textPrompt("hello"),
       })
-      expect(replay.duplicate).toBe(true)
+      expect(replay).toEqual(first)
       const keyConflict = yield* runtime
         .send({
           runId: "run:caller:2",
@@ -159,7 +102,8 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
           prompt: textPrompt("hello"),
         })
         .pipe(Effect.flip)
-      expect(keyConflict).toBeInstanceOf(Errors.RunIdConflict)
+      expect(keyConflict).toBeInstanceOf(DurabilityFailure)
+      expect(keyConflict).toMatchObject({ reason: "input-conflict" })
       const idConflict = yield* runtime
         .send({
           runId: "run:caller:1",

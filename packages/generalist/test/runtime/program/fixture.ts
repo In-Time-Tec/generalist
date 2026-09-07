@@ -12,6 +12,7 @@ import {
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { pinnedTestAgent } from "../run/identity.js"
 import { allowAllAuthorization } from "../../authorization.js"
+import { objectWorkerId } from "../execution/object.js"
 
 export const program: ReturnType<typeof AgentProgram.make> = AgentProgram.make({
   name: "durable-program",
@@ -243,6 +244,7 @@ export const executeProgramFixture = Effect.gen(function* () {
     idempotencyKey: "program-run",
     prompt: "run",
   })
-  yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-worker" }))
+  yield* host.execute(yield* store.claimExecution({
+          commandId: "runtime-program-fixture-ts-claim-1", runId: receipt.runId, ownerId: objectWorkerId }))
   return receipt.runId
 })

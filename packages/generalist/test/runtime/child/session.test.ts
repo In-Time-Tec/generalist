@@ -3,7 +3,7 @@ import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { DurableDriver, ToolContext } from "../../../src/index.js"
 import { ChildAdmission, Runtime, RunStore } from "../../../src/runtime/index.js"
-import { assistantAddress, memoryLayer, textPrompt } from "../execution/fixtures.js"
+import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 import { provideScoped } from "../execution/scoped-provide.js"
 
 const sessionId = "session:child-origin"
@@ -116,7 +116,7 @@ describe("child origin encoding", () => {
   })
 })
 
-layer(memoryLayer)("child origin from the in-execution cell seam", (it) => {
+layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
   it.effect("assigns ordinals 0 and 1 to two children admitted from one cell, in admission order", () =>
     Effect.gen(function* () {
       const { children, operations, parentRunId } = yield* parentRun("two-children")

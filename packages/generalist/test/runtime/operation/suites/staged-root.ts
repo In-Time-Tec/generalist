@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
+import { objectWorkerId } from "../../execution/object.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface StagedRootSuiteOptions<StoreError, Extra = never> {
@@ -41,14 +42,23 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "queued" })
           expect(yield* tags(receipt.runId)).toEqual(["RunAccepted"])
           expect(
-            yield* store.claimExecution({ runId: receipt.runId, ownerId: "premature" }).pipe(Effect.flip),
+            yield* store.claimExecution({
+              commandId: "runtime-operation-suites-staged-root-ts-claim-1",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }).pipe(Effect.flip),
           ).toBeInstanceOf(Errors.RuntimeUnavailable)
           expect(yield* tags(receipt.runId)).toEqual(["RunAccepted"])
 
-          const activated = yield* runtime.activate({ runId: receipt.runId })
+          const activated = yield* runtime.activate({
+          commandId: "runtime-operation-suites-staged-root-ts-activate-1", runId: receipt.runId })
           expect(activated).toMatchObject({ runId: receipt.runId, status: "running" })
-          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "activated" })
-          expect(claim).toMatchObject({ runId: receipt.runId, ownerId: "activated", attempt: 1 })
+          const claim = yield* store.claimExecution({
+            commandId: "runtime-operation-suites-staged-root-ts-claim-2",
+            runId: receipt.runId,
+            ownerId: objectWorkerId,
+          })
+          expect(claim).toMatchObject({ runId: receipt.runId, ownerId: objectWorkerId, attempt: 1 })
           yield* store.releaseExecution(claim)
         }),
       ),
@@ -84,10 +94,11 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
           const runtime = yield* Runtime.Runtime
           const admittedInput = input("receipt")
           const first = yield* runtime.admit(admittedInput)
-          expect(yield* runtime.admit(admittedInput)).toEqual(Object.assign({}, first, { duplicate: true }))
+          expect(yield* runtime.admit(admittedInput)).toEqual(first)
 
-          yield* runtime.activate({ runId: first.runId })
-          expect(yield* runtime.admit(admittedInput)).toEqual(Object.assign({}, first, { duplicate: true }))
+          yield* runtime.activate({
+          commandId: "runtime-operation-suites-staged-root-ts-activate-2", runId: first.runId })
+          expect(yield* runtime.admit(admittedInput)).toEqual(first)
           expect(yield* runtime.inspect(first.runId)).toMatchObject({ status: "running" })
 
           expect(
@@ -113,15 +124,23 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.admit(input("cancel-first"))
 
-          yield* runtime.cancel({ runId: receipt.runId, reason: "cancel won" })
+          yield* runtime.cancel({
+          commandId: "runtime-operation-suites-staged-root-ts-cancel-1", runId: receipt.runId, reason: "cancel won" })
           const activations = yield* Effect.all(
-            Array.from({ length: 8 }, () => runtime.activate({ runId: receipt.runId })),
+            Array.from({ length: 8 }, () => runtime.activate({
+              commandId: "runtime-operation-suites-staged-root-ts-activate-3",
+              runId: receipt.runId,
+            })),
             { concurrency: "unbounded" },
           )
           expect(activations.every((run) => run.status === "cancelled")).toBe(true)
           expect(yield* tags(receipt.runId)).toEqual(["RunAccepted", "RunCancellationRequested", "RunCancelled"])
           expect(
-            yield* store.claimExecution({ runId: receipt.runId, ownerId: "too-late" }).pipe(Effect.flip),
+            yield* store.claimExecution({
+              commandId: "runtime-operation-suites-staged-root-ts-claim-3",
+              runId: receipt.runId,
+              ownerId: objectWorkerId,
+            }).pipe(Effect.flip),
           ).toBeInstanceOf(Errors.RunTerminal)
         }),
       ),
@@ -133,8 +152,10 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
           const runtime = yield* Runtime.Runtime
           const receipt = yield* runtime.admit(input("activate-first"))
 
-          expect(yield* runtime.activate({ runId: receipt.runId })).toMatchObject({ status: "running" })
-          yield* runtime.cancel({ runId: receipt.runId, reason: "cancel after activation" })
+          expect(yield* runtime.activate({
+          commandId: "runtime-operation-suites-staged-root-ts-activate-4", runId: receipt.runId })).toMatchObject({ status: "running" })
+          yield* runtime.cancel({
+          commandId: "runtime-operation-suites-staged-root-ts-cancel-2", runId: receipt.runId, reason: "cancel after activation" })
           expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "cancelled" })
           expect(yield* tags(receipt.runId)).toEqual([
             "RunAccepted",
@@ -152,7 +173,8 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
           const runtime = yield* Runtime.Runtime
           const receipt = yield* runtime.admit(input("concurrent-activation"))
           const activations = yield* Effect.all(
-            Array.from({ length: 16 }, () => runtime.activate({ runId: receipt.runId })),
+            Array.from({ length: 16 }, () => runtime.activate({
+          commandId: "runtime-operation-suites-staged-root-ts-activate-5", runId: receipt.runId })),
             { concurrency: "unbounded" },
           )
 
@@ -171,7 +193,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
 
           expect(yield* runtime.inspect(first.runId)).toMatchObject({ status: "running" })
           expect(yield* tags(first.runId)).toEqual(["RunAccepted", "RunAttemptStarted"])
-          expect(yield* runtime.startExecution(startInput)).toEqual({ ...first, duplicate: true })
+          expect(yield* runtime.startExecution(startInput)).toEqual(first)
         }),
       ),
     )

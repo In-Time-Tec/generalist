@@ -195,7 +195,7 @@ export const afterTurnFor = <
     Effect.gen(function* () {
       const pending = alreadyProjectedPending ?? pendingResults()
       const transcript = yield* checkpointPending(turn, alreadyProjectedPending === undefined ? pending : [])
-      const path = yield* syncSession(turn, transcript)
+      const path = yield* syncSession(turn, transcript, "after-turn")
       const current = yield* checkpoint
       const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
         Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),

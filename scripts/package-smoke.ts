@@ -10,6 +10,7 @@ import {
   type ConsumerRuntime,
   exactPackageExports,
   forbiddenPackageExports,
+  isSqlGraphEntry,
   type MinimumConsumerProfile,
   minimumConsumerProfiles,
   packageDirectory,
@@ -52,11 +53,16 @@ const PackageManifest = Schema.Struct({
   dependencies: Schema.optionalKey(Dependencies),
   optionalDependencies: Schema.optionalKey(Dependencies),
   peerDependencies: Schema.optionalKey(Dependencies),
+  peerDependenciesMeta: Schema.optionalKey(Schema.Record(Schema.String, Schema.Struct({ optional: Schema.Boolean }))),
+  devDependencies: Schema.optionalKey(Dependencies),
   bundledDependencies: Schema.optionalKey(Schema.Array(Schema.String)),
   bundleDependencies: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 const RootManifest = Schema.Struct({
   version: Schema.String,
+  dependencies: Schema.optionalKey(Dependencies),
+  devDependencies: Schema.optionalKey(Dependencies),
+  optionalDependencies: Schema.optionalKey(Dependencies),
   workspaces: Schema.Struct({
     catalog: Schema.Record(Schema.String, Schema.String),
     catalogs: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))),
@@ -182,6 +188,16 @@ for (const probe of probes) {
     }
   }
 }
+${profile.name === "durability-s3" ? `// Package-loading boundary: this dependency exists only in the signed transport profile.
+const { Effect } = await import("effect")
+const { make } = await import("generalist/durability/s3")
+const transport = await Effect.runPromise(make({
+  bucket: "generalist-package-smoke",
+  region: "us-east-1",
+  credentials: { accessKeyId: "package-smoke", secretAccessKey: "package-smoke" },
+}))
+console.log("constructed signed S3 transport without requests", transport.capabilities)
+` : ""}
 console.log(\`[consumer profile \${profile}] [runtime \${runtime}] imported \${probes.length} specifiers\`)
 `
 }
@@ -199,18 +215,24 @@ const verifyLocalRuntimeGraph = Effect.fn("PackageSmoke.verifyLocalRuntimeGraph"
   const path = yield* Path.Path
   const files = yield* emittedFiles(directory, ".js")
   const nodes = new Set(files.map((file) => path.resolve(file)))
+  const sqlImports: Array<string> = []
   const graph = new Map<string, Array<string>>(Array.from(nodes, (file) => [file, []]))
   const transpiler = new Bun.Transpiler({ loader: "js" })
   let edges = 0
   for (const file of nodes) {
     const imports = transpiler.scanImports(yield* fileSystem.readFileString(file))
     for (const item of imports) {
+      if (isSqlGraphEntry(item.path)) sqlImports.push(`${path.relative(directory, file)} -> ${item.path}`)
       if (item.kind !== "import-statement" || !item.path.startsWith(".")) continue
       const target = path.resolve(path.dirname(file), item.path)
       if (!nodes.has(target)) continue
       graph.get(file)!.push(target)
       edges += 1
     }
+  }
+  const sqlFiles = files.filter(isSqlGraphEntry)
+  if (sqlFiles.length > 0 || sqlImports.length > 0) {
+    return yield* smokeError(`Generalist emitted graph contains SQL:\n${[...sqlFiles, ...sqlImports].join("\n")}`)
   }
 
   let nextIndex = 0
@@ -265,6 +287,7 @@ const verifyDeclarationSpecifiers = Effect.fn("PackageSmoke.verifyDeclarationSpe
   const directory = path.join(root, packageDirectory, "dist")
   for (const file of yield* emittedFiles(directory, ".d.ts")) {
     for (const item of transpiler.scanImports(yield* fileSystem.readFileString(file))) {
+      if (isSqlGraphEntry(item.path)) blocked.push(`${path.relative(root, file)} -> ${item.path}`)
       if (item.path !== packageName && !item.path.startsWith(`${packageName}/`)) {
         continue
       }
@@ -291,23 +314,13 @@ const verifyWorkerEntrypoints = Effect.fn("PackageSmoke.verifyWorkerEntrypoints"
   const workerGroups = [
     {
       name: "neutral",
-      specifiers: workerSafePackageExports.filter(
-        (specifier) => specifier !== "generalist/providers/openrouter" && specifier !== "generalist/runtime/sql-driver",
-      ),
+      specifiers: workerSafePackageExports.filter((specifier) => specifier !== "generalist/providers/openrouter"),
       forbidProviders: true,
-      allowSqlRuntime: false,
-    },
-    {
-      name: "sql-driver",
-      specifiers: workerSafePackageExports.filter((specifier) => specifier === "generalist/runtime/sql-driver"),
-      forbidProviders: true,
-      allowSqlRuntime: true,
     },
     {
       name: "openrouter",
       specifiers: workerSafePackageExports.filter((specifier) => specifier === "generalist/providers/openrouter"),
       forbidProviders: false,
-      allowSqlRuntime: false,
     },
   ] as const
   const nodeBuiltins = new Set(builtinModules.map((specifier) => specifier.replace(/^node:/, "").split("/")[0]))
@@ -353,12 +366,11 @@ export default { test: () => void loaded }
         const normalized = item.replaceAll("\\", "/").toLowerCase()
         const bare = normalized.replace(/^node:/, "").split("/")[0] ?? normalized
         if (normalized.startsWith("node:") || normalized.startsWith("bun:") || nodeBuiltins.has(bare)) return true
+        if (isSqlGraphEntry(normalized)) return true
         if (
           [
             "node-built-in-modules:",
             "unenv/runtime/node/",
-            "@effect/sql-",
-            "@effect+sql-",
             "@aws-sdk",
             "@smithy",
             "bedrock",
@@ -366,18 +378,10 @@ export default { test: () => void loaded }
             "/shared/stdio.",
             "cross-spawn",
             "path-key",
-            "/runtime/sqlite-bun.",
             "/repl/bun/",
           ].some((marker) => normalized.includes(marker))
         ) {
           return true
-        }
-        if (!group.allowSqlRuntime && normalized.includes("/generalist/dist/runtime/sql/")) {
-          return (
-            !normalized.endsWith("/errors.js") &&
-            !normalized.endsWith("/operations.js") &&
-            !normalized.endsWith("/codec/codecs.js")
-          )
         }
         return group.forbidProviders && (normalized.includes("@effect/ai-") || normalized.includes("@effect+ai-"))
       }),
@@ -490,6 +494,9 @@ export default { test: () => void checks }
         normalized.startsWith("bun:") ||
         nodeBuiltins.has(bare) ||
         normalized.includes("node-built-in-modules:") ||
+        isSqlGraphEntry(normalized) ||
+        normalized.includes("@aws-sdk") ||
+        normalized.includes("@smithy") ||
         normalized.includes("unenv/runtime/node/")
       )
     }),
@@ -528,6 +535,11 @@ const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumC
   readonly manifest: typeof PackageManifest.Type
   readonly packageExports: ReadonlyArray<string>
 }) {
+  for (const dependency of Object.keys(input.manifest.peerDependencies ?? {})) {
+    if (dependency !== "effect" && input.manifest.peerDependenciesMeta?.[dependency]?.optional !== true) {
+      return yield* smokeError(`${packageName} must mark ${dependency} as an optional peer`)
+    }
+  }
   const optionalPeers = Object.keys(input.manifest.peerDependencies ?? {}).filter(
     (dependency) => dependency !== "effect",
   )
@@ -550,6 +562,75 @@ const validateMinimumConsumerProfiles = Effect.fn("PackageSmoke.validateMinimumC
     }
   }
   return optionalPeers
+})
+
+const verifyInstalledDependencyGraph = Effect.fn("PackageSmoke.verifyInstalledDependencyGraph")(function* (
+  directory: string,
+  forbidAws = false,
+) {
+  const manifests = yield* run("find", ["node_modules", "-type", "f", "-name", "package.json", "-print"], directory)
+  const forbidden = manifests.split("\n").filter((entry) =>
+    isSqlGraphEntry(entry) || (forbidAws && (entry.includes("@aws-sdk") || entry.includes("@smithy"))),
+  )
+  if (forbidden.length > 0) {
+    return yield* smokeError(`consumer installed a forbidden dependency graph:\n${forbidden.join("\n")}`)
+  }
+})
+
+const verifyTransportBundle = Effect.fn("PackageSmoke.verifyTransportBundle")(function* (input: {
+  readonly root: string
+  readonly directory: string
+  readonly profile: MinimumConsumerProfile
+  readonly runtime: ConsumerRuntime
+}) {
+  if (!["core-runtime", "durability-s3", "durability-r2"].includes(input.profile.name)) return
+  if (input.runtime === "worker") return
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const imports = input.profile.imports.filter((item) => item.runtimes.includes(input.runtime))
+  yield* fileSystem.writeFileString(
+    path.join(input.directory, "transport-bundle.mjs"),
+    `${imports.map((item, index) => `import * as Entry${index} from ${JSON.stringify(item.specifier)}`).join("\n")}
+console.log(${imports.map((_, index) => `Entry${index}`).join(", ")})
+`,
+  )
+  yield* runProfileCommand({
+    profile: input.profile,
+    runtime: input.runtime,
+    specifiers: imports.map((item) => item.specifier),
+    command: "bun",
+    args: [
+      path.join(input.root, packageDirectory, "node_modules/esbuild/bin/esbuild"),
+      "transport-bundle.mjs",
+      "--bundle",
+      "--platform=node",
+      "--format=esm",
+      "--external:bun:*",
+      "--outfile=transport-bundle.js",
+      "--metafile=transport-bundle.meta.json",
+    ],
+    cwd: input.directory,
+  })
+  const metadata = parseWranglerMetafile(
+    yield* fileSystem.readFileString(path.join(input.directory, "transport-bundle.meta.json")),
+  )
+  const graph = [
+    ...Object.keys(metadata.inputs),
+    ...Object.values(metadata.outputs).flatMap((item) => (item.imports ?? []).map((entry) => entry.path)),
+  ]
+  const forbidden = graph.filter((item) => {
+    const normalized = item.replaceAll("\\", "/").toLowerCase()
+    if (isSqlGraphEntry(normalized)) return true
+    if (input.profile.name === "durability-s3") return false
+    if (normalized.includes("@aws-sdk") || normalized.includes("@smithy")) return true
+    return input.profile.name === "core-runtime" && /\/durability\/(?:s3|r2)\.js$/.test(normalized)
+  })
+  if (forbidden.length > 0) {
+    return yield* smokeError(`${input.profile.name} consumer bundle contains forbidden dependencies:\n${forbidden.join("\n")}`)
+  }
+  yield* Console.log(
+    `${input.profile.name} ${input.runtime} consumer bundle: ${graph.length} graph entries, 0 forbidden; no remote qualification performed`,
+  )
 })
 
 const program = Effect.gen(function* () {
@@ -584,6 +665,20 @@ const program = Effect.gen(function* () {
     ) {
       return yield* smokeError(`${manifestPath} does not match the public MIT-licensed ESM package contract`)
     }
+    const sqlDependencies = [
+      ...Object.keys(rootManifest.dependencies ?? {}),
+      ...Object.keys(rootManifest.devDependencies ?? {}),
+      ...Object.keys(rootManifest.optionalDependencies ?? {}),
+      ...Object.keys(rootManifest.workspaces.catalog),
+      ...Object.values(rootManifest.workspaces.catalogs ?? {}).flatMap(Object.keys),
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.optionalDependencies ?? {}),
+      ...Object.keys(manifest.peerDependencies ?? {}),
+      ...Object.keys(manifest.devDependencies ?? {}),
+    ].filter(isSqlGraphEntry)
+    if (sqlDependencies.length > 0) {
+      return yield* smokeError(`package manifests/catalogs contain SQL dependencies: ${sqlDependencies.join(", ")}`)
+    }
     return { effectVersion, manifestPath, sourceManifest }
   })
   const { effectVersion, manifestPath, sourceManifest } = yield* validateSourcePackage
@@ -612,6 +707,10 @@ const program = Effect.gen(function* () {
       }
       const listing = yield* run("tar", ["-tzf", tarball], root)
       const entries = listing.split("\n").filter((entry) => entry.length > 0)
+      const sqlEntries = entries.filter(isSqlGraphEntry)
+      if (sqlEntries.length > 0) {
+        return yield* smokeError(`${packageName} archive contains SQL modules:\n${sqlEntries.join("\n")}`)
+      }
       const unexpected = entries.filter(
         (entry) =>
           entry !== "package/" &&
@@ -682,6 +781,7 @@ const program = Effect.gen(function* () {
         "repository",
         "homepage",
         "bugs",
+        "peerDependenciesMeta",
       ] as const) {
         if (!Equal.equals(manifest[field], source[field])) {
           return yield* smokeError(`${packageName} changed its packed ${field} metadata`)
@@ -722,6 +822,10 @@ const program = Effect.gen(function* () {
     yield* validateManifestExports
     const validateManifestDependencies = Effect.gen(function* () {
       for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
+        const sqlDependencies = Object.keys(manifest[section] ?? {}).filter(isSqlGraphEntry)
+        if (sqlDependencies.length > 0) {
+          return yield* smokeError(`${packageName} ${section} contains SQL dependencies: ${sqlDependencies.join(", ")}`)
+        }
         const expected = Object.fromEntries(
           Object.entries(source[section] ?? {}).map(([dependency, dependencyVersion]) => {
             if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
@@ -750,8 +854,9 @@ const program = Effect.gen(function* () {
           )
         }
       }
-      for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
-        if (manifest.peerDependencies?.[dependency] !== dependencyVersion) {
+      for (const dependency of packedProviderDependencies) {
+        const dependencyVersion = catalogVersion({ rootManifest, dependency, reference: "catalog:" })
+        if (dependencyVersion === undefined || manifest.peerDependencies?.[dependency] !== dependencyVersion) {
           return yield* smokeError(
             `${packageName} must pin optional peer ${dependency}@${dependencyVersion}; packed ${manifest.peerDependencies?.[dependency]}`,
           )
@@ -832,7 +937,7 @@ console.log(ExternalChildPlacement, ExternalChildStore)
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${encodeJson(packageExports)}
 const runtimeSpecifiers = process.versions.bun === undefined
-  ? specifiers.filter((specifier) => specifier !== "generalist/runtime/sqlite-bun")
+  ? specifiers.filter((specifier) => specifier !== "generalist/repl/bun")
   : specifiers
 for (const specifier of runtimeSpecifiers) await import(specifier)
 const forbidden = ${encodeJson(forbiddenPackageExports)}
@@ -856,7 +961,8 @@ const ModelCatalog = await import("generalist/providers/model-catalog")
 const OpenAI = await import("generalist/providers/openai")
 const skills = await import("generalist/instructions/skills")
 const { TestModel, Testing } = await import("generalist/testing")
-const { Runtime, RunEvent } = await import("generalist/runtime")
+const { RunEvent } = await import("generalist/runtime")
+const Durability = await import("generalist/durability")
 const { Server } = await import("generalist/server")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
@@ -867,7 +973,9 @@ for (const value of [
   State.empty,
   Store.layerMemory,
   Testing.runtimeDriver,
-  Runtime.layerMemory,
+  Durability.layer,
+  Durability.layerRunStore,
+  Durability.activate,
   RunEvent.RunEvent,
   Server.api,
   Server.layer,
@@ -915,6 +1023,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
       `consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`,
     )
   }
+  yield* verifyInstalledDependencyGraph(consumerDirectory)
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
   yield* run(
     "bun",
@@ -955,6 +1064,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
   if (npmEffects.length !== 1) {
     return yield* smokeError(`npm consumer installed ${npmEffects.length} Effect copies`)
   }
+  yield* verifyInstalledDependencyGraph(npmConsumerDirectory)
   yield* run("npx", ["tsc", "--noEmit"], npmConsumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
@@ -1089,6 +1199,10 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
         env: { BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache") },
       })
     }
+    yield* verifyInstalledDependencyGraph(
+      profileDirectory,
+      profile.name === "core-runtime" || profile.name === "durability-r2" || profile.name === "cloudflare",
+    )
 
     for (const dependency of ["effect", packageName, ...profile.peers]) {
       if ((yield* installedPackages(profileDirectory, [dependency])).length === 0) {
@@ -1126,6 +1240,7 @@ if (!blocked) throw new Error("generalist/unstable/rivet must remain ESM-only")
       yield* Console.log(output.trim())
     }
     yield* verifyRivetCommonJsBoundary(profile, runtime, specifiers, profileDirectory)
+    yield* verifyTransportBundle({ root, directory: profileDirectory, profile, runtime })
 
     const lockfile = path.join(profileDirectory, runtime === "node" ? "package-lock.json" : "bun.lock")
     if ((yield* fileSystem.readFileString(lockfile)).includes("npmjs.org/generalist/-/")) {

@@ -36,7 +36,8 @@ const runsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>
       },
       list: ({ params }) => host.runs.list(params.sessionId).pipe(mapError("runs.list")),
       inspect: ({ params }) => host.runs.inspect(params.id).pipe(mapError("runs.inspect")),
-      cancel: ({ params, payload }) => host.runs.cancel(params.id, payload.reason).pipe(mapError("runs.cancel")),
+      cancel: ({ params, payload }) =>
+        host.runs.cancel(params.id, payload.commandId, payload.reason).pipe(mapError("runs.cancel")),
     }),
   )
 
@@ -123,18 +124,27 @@ const operatorHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Age
     handlers.handleAll({
       explain: ({ params }) => host.operator.explain(params.id).pipe(mapError("operator.explain")),
       retry: ({ params, payload }) =>
-        write("retry", host.operator.retry(params.id, payload.operator)).pipe(mapError("operator.retry")),
+        write("retry", host.operator.retry(params.id, payload.operator, payload.commandId)).pipe(
+          mapError("operator.retry"),
+        ),
       wake: ({ params, payload }) =>
-        write("wake", host.operator.wake(params.id, payload.operator)).pipe(mapError("operator.wake")),
+        write("wake", host.operator.wake(params.id, payload.operator, payload.commandId)).pipe(mapError("operator.wake")),
       resolveUnknown: ({ params, payload }) =>
         write(
           "resolveUnknown",
-          host.operator.resolveUnknown(params.id, payload.operationId, payload.resolution, payload.operator),
+          host.operator.resolveUnknown(
+            params.id,
+            payload.operationId,
+            payload.resolution,
+            payload.operator,
+            payload.commandId,
+          ),
         ).pipe(mapError("operator.resolveUnknown")),
       extendBudget: ({ params, payload }) =>
-        write("extendBudget", host.operator.extendBudget(params.id, payload.delta, payload.operator)).pipe(
-          mapError("operator.extendBudget"),
-        ),
+        write(
+          "extendBudget",
+          host.operator.extendBudget(params.id, payload.delta, payload.operator, payload.commandId),
+        ).pipe(mapError("operator.extendBudget")),
     }),
   )
 }

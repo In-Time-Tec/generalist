@@ -3,7 +3,7 @@ import { Effect, Schema, Stream } from "effect"
 import { LanguageModel, Prompt } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
 import { make as makeAddress } from "../../runtime/address.js"
-import { DuplicateAgent, IdempotencyConflict, RunIdConflict, UnknownAgent } from "../../runtime/errors.js"
+import { DuplicateAgent, RunIdConflict, UnknownAgent } from "../../runtime/errors.js"
 import { durableIdentity } from "../../runtime/executable/registered-agent.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { make as makeMessage } from "../../runtime/messaging/message.js"
@@ -29,11 +29,7 @@ const identity = (name: string, test: string) => {
   }
 }
 
-const completedResult = (sessionId: string, text: string): ExecutionResult => ({
-  text,
-  turns: 1,
-  session: { sessionId, leafId: null },
-})
+const completedResult = (sessionId: string, text: string): ExecutionResult => ({ text, output: text, turns: 1, session: { sessionId, leafId: null } })
 
 /** Admission conformance: exact idempotent replay and caller-supplied Run identity. */
 export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
@@ -57,7 +53,7 @@ export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
           idempotencyKey: id.idempotencyKey,
           prompt: "same payload",
         })
-        expect(duplicate).toEqual({ ...first, duplicate: true })
+        expect(duplicate).toEqual(first)
         const conflict = yield* runtime
           .send({
             to: options.address,
@@ -66,8 +62,7 @@ export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
             prompt: "changed payload",
           })
           .pipe(Effect.flip)
-        expect(conflict).toBeInstanceOf(IdempotencyConflict)
-        if (Schema.is(IdempotencyConflict)(conflict)) expect(conflict.existingRunId).toBe(first.runId)
+        expect(conflict).toMatchObject({ _tag: "generalist/durability/DurabilityFailure", reason: "input-conflict" })
       }),
     ),
   )
@@ -86,10 +81,10 @@ export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
         expect(first.runId).toBe(id.runId)
         const conflict = yield* runtime
           .send({
-            runId: `${id.runId}:other`,
+            runId: id.runId,
             to: options.address,
             sessionId: id.sessionId,
-            idempotencyKey: id.idempotencyKey,
+            idempotencyKey: `${id.idempotencyKey}:other`,
             prompt: "caller identity",
           })
           .pipe(Effect.flip)
@@ -125,16 +120,13 @@ const registerStartByAgent = <LayerError, ClaimsLayerError>(
           { question: "What is durable?" },
           { sessionId: id.sessionId, idempotencyKey: id.idempotencyKey },
         )
-        const claim = yield* capability.claim(services, { runId: handle.runId, workerId: "start-by-agent" })
-        yield* services.store.complete({
-          ...claim,
-          result: {
-            text: "typed answer",
-            output: { answer: "typed answer" },
-            turns: 1,
-            session: { sessionId: id.sessionId, leafId: null },
-          },
-        })
+        const claim = yield* capability.claim(services, { runId: handle.runId, commandId: "start-by-agent" })
+        yield* services.store.complete({ ...claim, commandId: `${claim.runId}:complete:${claim.attemptFence}`, result: {
+          text: "typed answer",
+          output: { answer: "typed answer" },
+          turns: 1,
+          session: { sessionId: id.sessionId, leafId: null },
+        }, })
 
         expect(yield* handle.await).toEqual({ answer: "typed answer" })
         const events = yield* Stream.runCollect(handle.events)
@@ -196,8 +188,8 @@ const registerIdempotentStart = <LayerError, ClaimsLayerError>(
           (event) => event._tag === "RunAccepted",
         )
         expect(accepted).toHaveLength(1)
-        const claim = yield* capability.claim(services, { runId: first.runId, workerId: "idempotent-start" })
-        yield* services.store.complete({ ...claim, result: completedResult(id.sessionId, "completed") })
+        const claim = yield* capability.claim(services, { runId: first.runId, commandId: "idempotent-start" })
+        yield* services.store.complete({ ...claim, commandId: `${claim.runId}:complete:${claim.attemptFence}`, result: completedResult(id.sessionId, "completed") })
       }),
     ),
   )
@@ -237,7 +229,7 @@ const registerUnknownAgentOnRecovery = <LayerError, ClaimsLayerError>(
           },
           { activate: true },
         )
-        const claim = yield* capability.claim(services, { runId: receipt.runId, workerId: "unknown-agent" })
+        const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "unknown-agent" })
         yield* services.executor.execute(claim)
 
         const inspection = yield* services.runtime.inspect(receipt.runId)

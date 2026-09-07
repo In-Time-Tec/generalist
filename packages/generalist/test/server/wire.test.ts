@@ -23,9 +23,18 @@ describe("Server event wire contract", () => {
     expect(Schema.decodeSync(Server.CursorFromString)("7")).toBe(7)
   })
 
-  it.effect("encodes explicit cancellation commands", () =>
+  it.effect("requires caller identity on cancellation commands", () =>
     Effect.gen(function* () {
-      const command = Server.ClientCommand.make({ _tag: "Cancel", runId: "run-1", reason: "user" })
+      const missingIdentity = yield* Schema.decodeEffect(Schema.fromJsonString(Server.ClientCommand))(
+        JSON.stringify({ _tag: "Cancel", runId: "run-1", reason: "user" }),
+      ).pipe(Effect.flip)
+      expect(missingIdentity._tag).toBe("SchemaError")
+      const command = Server.ClientCommand.make({
+        _tag: "Cancel",
+        runId: "run-1",
+        commandId: "cancel:run-1",
+        reason: "user",
+      })
       const decoded = yield* Schema.decodeEffect(Schema.fromJsonString(Server.ClientCommand))(
         yield* Schema.encodeEffect(Schema.fromJsonString(Server.ClientCommand))(command),
       )

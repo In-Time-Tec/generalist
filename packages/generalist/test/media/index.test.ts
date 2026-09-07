@@ -1,3 +1,4 @@
+import { layerMemory as layerSessionMemory } from "../../src/core/context/session-memory.js"
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each test is a test-host Layer composition root. */
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
@@ -82,7 +83,7 @@ describe("Media", () => {
       expect(Schema.is(Schema.String)(journalFile?.data)).toBe(true)
       expect(String(journalFile?.data)).toContain("generalist:blob-ref:")
       expect(String(journalFile?.data)).not.toContain("AQID")
-    }).pipe(Effect.provide(Layer.mergeAll(mediaLayer, model, Session.layerMemory)))
+    }).pipe(Effect.provide(Layer.mergeAll(mediaLayer, model, layerSessionMemory)))
   })
 
   it.effect("uses the ModelCatalog provider transport preference", () => {
@@ -165,6 +166,6 @@ describe("Media", () => {
         assistant?._tag === "Message" ? promptFile(Prompt.fromMessages([assistant.message])) : undefined
       expect(Schema.is(Schema.String)(journalFile?.data)).toBe(true)
       expect(String(journalFile?.data)).toContain("generalist:blob-ref:")
-    }).pipe(Effect.provide(Layer.mergeAll(mediaLayer, model, Session.layerMemory)))
+    }).pipe(Effect.provide(Layer.mergeAll(mediaLayer, model, layerSessionMemory)))
   })
 })

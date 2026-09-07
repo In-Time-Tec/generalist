@@ -1,5 +1,5 @@
-import { Clock, DateTime, Duration, Effect, Layer, Schedule } from "effect"
-import { generateId } from "../../../core/model/telemetry/events.js"
+import { Clock, DateTime, Effect } from "effect"
+import { RuntimeUnavailable } from "../../errors.js"
 import { RunStore, type Service as RunStoreService } from "../../run/store.js"
 import { Runtime, type Service as RuntimeService } from "../../service.js"
 import { nextAt, type ClaimedSchedule } from "./schedule.js"
@@ -8,77 +8,69 @@ const timeoutBatch = 64
 const scheduleBatch = 16
 const leaseMillis = 30_000
 
-const resumeTimeouts = (store: RunStoreService, now: number) =>
-  Effect.gen(function* () {
-    const due = yield* store.dueAwaitEvents({ now, limit: timeoutBatch })
-    yield* Effect.forEach(
-      due,
-      (wait) =>
-        store.timeoutAwaitEvent({ ...wait, now }).pipe(
-          Effect.catchTags({
-            "generalist/runtime/RunNotFound": () => Effect.succeed(false),
-            "generalist/runtime/RunTerminal": () => Effect.succeed(false),
-          }),
-        ),
-      { discard: true },
-    )
-  })
-
 const fire = (
   store: RunStoreService,
   runtime: RuntimeService,
   ownerId: string,
-  now: number,
   schedule: ClaimedSchedule,
-) =>
-  runtime
-    .startExecution({
-      executable: schedule.definition.executable,
-      registrations: schedule.definition.registrations,
-      sessionId: schedule.definition.sessionId,
-      idempotencyKey: `schedule:${schedule.scheduleId}:${schedule.occurrence}`,
-      messageId: `schedule:${schedule.scheduleId}:${schedule.occurrence}`,
-      prompt: schedule.definition.prompt,
-      budget: schedule.definition.budget,
-    })
-    .pipe(
-      Effect.andThen(
-        store.advanceSchedule({
-          scheduleId: schedule.scheduleId,
-          ownerId,
-          occurrence: schedule.occurrence,
-          nextAt: nextAt(schedule.rule, DateTime.toEpochMillis(DateTime.makeUnsafe(schedule.nextAt))),
-          now,
-        }),
-      ),
-    )
+) => runtime.startExecution({
+  executable: schedule.definition.executable,
+  registrations: schedule.definition.registrations,
+  sessionId: schedule.definition.sessionId,
+  idempotencyKey: `schedule:${schedule.scheduleId}:${schedule.occurrence}`,
+  messageId: `schedule:${schedule.scheduleId}:${schedule.occurrence}`,
+  prompt: schedule.definition.prompt,
+  budget: schedule.definition.budget,
+}).pipe(Effect.andThen(store.advanceSchedule({
+  commandId: `schedule-advance:${JSON.stringify([ownerId, schedule.scheduleId, schedule.occurrence])}`,
+  scheduleId: schedule.scheduleId,
+  ownerId,
+  occurrence: schedule.occurrence,
+  nextAt: nextAt(schedule.rule, DateTime.toEpochMillis(DateTime.makeUnsafe(schedule.nextAt))),
+})))
 
-const tick = (ownerId: string) =>
-  Effect.gen(function* () {
-    const store = yield* RunStore
-    const runtime = yield* Runtime
+/** Construct inert trigger control; only an activated host invokes its bounded drain. */
+export const make = (ownerId: string) => Effect.gen(function* () {
+  const store = yield* RunStore
+  const runtime = yield* Runtime
+  let commandCounter = 0
+  let schedulesFirst = false
+  const drain = (fuel = timeoutBatch + scheduleBatch) => {
+    const commandId = `${ownerId}:schedule-claim:${++commandCounter}`
+    // Preparation belongs to this logical drain invocation, including Effect retries.
+    schedulesFirst = !schedulesFirst
+    const timeoutLimit = fuel === 1 ? (schedulesFirst ? 0 : 1) : Math.min(timeoutBatch, Math.ceil(fuel / 2))
+    const claimLimit = Math.min(scheduleBatch, fuel - timeoutLimit)
+    return Effect.gen(function* () {
+    if (!Number.isSafeInteger(fuel) || fuel <= 0) {
+      return yield* RuntimeUnavailable.make({ message: "trigger fuel must be a positive safe integer" })
+    }
     const now = yield* Clock.currentTimeMillis
-    yield* resumeTimeouts(store, now)
-    const claimed = yield* store.claimSchedules({ ownerId, now, leaseMillis, limit: scheduleBatch })
-    yield* Effect.forEach(claimed, (record) => fire(store, runtime, ownerId, now, record), {
+    const due = timeoutLimit === 0 ? [] : yield* store.dueAwaitEvents({ now, limit: timeoutLimit })
+    yield* Effect.forEach(due, (wait) => store.timeoutAwaitEvent({
+      ...wait,
+      commandId: `await-timeout:${JSON.stringify([wait.runId, wait.waitId, wait.deadline])}`,
+    }).pipe(Effect.catchTags({
+      "generalist/runtime/RunNotFound": () => Effect.succeed(false),
+      "generalist/runtime/RunTerminal": () => Effect.succeed(false),
+    })), { discard: true })
+    const claimed = claimLimit === 0 ? [] : yield* store.claimSchedules({
+      commandId,
+      ownerId,
+      leaseMillis,
+      limit: claimLimit,
+    })
+    yield* Effect.forEach(claimed, (record) => fire(store, runtime, ownerId, record), {
       concurrency: 1,
       discard: true,
     })
+    return {
+      processed: due.length + claimed.length,
+      hasMore: (timeoutLimit > 0 && due.length === timeoutLimit) ||
+        (claimLimit > 0 && claimed.length === claimLimit),
+    }
   })
+  }
+  return { drain, tick: Effect.suspend(() => drain()).pipe(Effect.asVoid) }
+})
 
-/** @internal Runtime-scoped environmental timeout and recurrence scheduler. */
-export const layer = (options?: {
-  readonly pollInterval?: Duration.Input
-}): Layer.Layer<never, never, RunStore | Runtime> =>
-  Layer.effectDiscard(
-    Effect.gen(function* () {
-      const ownerId = `trigger:${yield* generateId}`
-      const pollInterval = options?.pollInterval ?? "250 millis"
-      const guardedTick = tick(ownerId).pipe(
-        Effect.catchCause((cause) => Effect.logError("runtime-trigger-scheduler.tick-failed", cause)),
-      )
-      yield* Effect.forkScoped(
-        Effect.sleep(pollInterval).pipe(Effect.andThen(guardedTick), Effect.repeat(Schedule.spaced(pollInterval))),
-      )
-    }),
-  )

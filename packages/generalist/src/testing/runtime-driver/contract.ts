@@ -4,33 +4,23 @@ import type {
   ExecutionClaim,
   RunStore,
   Service as RunStoreService,
-  SessionWriteClaim,
 } from "../../runtime/run/store.js"
 import type { Runtime, Service as RuntimeService } from "../../runtime/service.js"
 import type { Service as RunExecutorService } from "../../runtime/execution/run-executor.js"
-import type { RunClaims } from "../../runtime/sql/run/claims.js"
 import type { ScheduleDefinition } from "../../runtime/execution/trigger/schedule.js"
 
-/** A multi-worker claim without the driver's decoded persisted Run representation. */
-export interface WorkerClaim {
-  readonly runId: string
-  readonly workerId: string
-  readonly attemptFence: number
-  readonly session: SessionWriteClaim
-}
 
 /** Runtime services passed to driver-specific conformance operations. */
 export interface Services {
   readonly runtime: RuntimeService
   readonly store: RunStoreService
   readonly executor?: RunExecutorService
-  readonly claims?: RunClaims["Service"]
 }
 
-/** Driver-specific activation or worker claim needed before a fenced mutation. */
+/** Claim through the fixture's activated host using a stable logical action identity, not a fabricated worker. */
 export type ClaimExecution = (
   services: Services,
-  input: { readonly runId: string; readonly workerId: string },
+  input: { readonly runId: string; readonly commandId: string },
 ) => Effect.Effect<ExecutionClaim>
 
 /** Runtime control and durable-event conformance capability. */
@@ -74,14 +64,16 @@ export type ArtifactsCapability = true
 /** Inbox persistence and exactly-once delivery capability. */
 export interface SteeringCapability {
   readonly claim: ClaimExecution
-  /** Persistent drivers rebuild their Runtime; process-memory drivers retain one open store. */
-  readonly recovery: "rebuild" | "reclaim"
 }
 
-/** SQL transaction conformance capability. */
-export interface SqlTransactionCapability {
+/** Atomic journal publication conformance capability. */
+export interface AtomicCommitCapability {
   readonly claim: ClaimExecution
-  readonly forceRollback: <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<A, E>
+  readonly failNextCommit: (services: Services) => Effect.Effect<void>
+  readonly pauseNextCommit: (services: Services) => Effect.Effect<{
+    readonly entered: Effect.Effect<void>
+    readonly release: Effect.Effect<void>
+  }>
 }
 
 /** Durable notification recovery conformance capability. */
@@ -92,27 +84,21 @@ export interface NotificationRecoveryCapability {
 /** Durable approval suspension and recovery capability. */
 export interface ApprovalSuspendCapability {
   readonly claim: ClaimExecution
-  /** Persistent drivers rebuild their Runtime; process-memory drivers reclaim through a fresh owner. */
-  readonly recovery: "rebuild" | "reclaim"
 }
 
 /** Durable environmental wait conformance, including reopen where the driver persists. */
 export interface AwaitEventCapability {
   readonly claim: ClaimExecution
-  readonly recovery: "rebuild" | "reclaim"
 }
 
 /** Durable recurring admission and per-occurrence claim conformance. */
 export interface SchedulesCapability {
   readonly definition: ScheduleDefinition
-  readonly recovery: "rebuild" | "reclaim"
 }
 
 /** Durable Agent fan-out recovery and journal-budget conformance capability. */
 export interface ChildRunsCapability {
   readonly claim: ClaimExecution
-  /** Persistent drivers rebuild their Runtime; process-memory drivers reclaim through a fresh owner. */
-  readonly recovery: "rebuild" | "reclaim"
 }
 
 /** Read-only recovery projection conformance capability. */
@@ -135,8 +121,8 @@ export interface OperatorScanCapability {
 
 /** Multi-worker claim and fencing conformance capability. */
 export interface MultiWorkerClaimCapability<E = never> {
-  readonly layer: Layer.Layer<Runtime | RunStore | RunClaims, E, never>
-  readonly expire: (claim: WorkerClaim) => Effect.Effect<void>
+  readonly layer: Layer.Layer<Runtime | RunStore, E, never>
+  readonly claim: ClaimExecution
 }
 
 /** Independently selectable Runtime driver conformance capabilities. */
@@ -151,7 +137,7 @@ export interface Capabilities<ClaimsLayerError = never> {
   readonly "fork-rewind"?: ForkRewindCapability
   readonly artifacts?: ArtifactsCapability
   readonly steering?: SteeringCapability
-  readonly sqlTransactions?: SqlTransactionCapability
+  readonly atomicCommits?: AtomicCommitCapability
   readonly multiWorkerClaims?: MultiWorkerClaimCapability<ClaimsLayerError>
   readonly notificationRecovery?: NotificationRecoveryCapability
   readonly "approval-suspend"?: ApprovalSuspendCapability

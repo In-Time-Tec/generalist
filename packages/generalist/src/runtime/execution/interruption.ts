@@ -1,3 +1,4 @@
+import type { DurabilityFailure } from "../../durability/errors.js"
 import {
   ActiveModelResponse,
   type Service as ActiveModelResponseService,
@@ -77,11 +78,18 @@ export const settleInterruptedExecution = (input: {
     const operationIds = yield* Ref.get(input.activeOperationIds)
     const completingRetrySafe = yield* Ref.get(input.completingRetrySafeOperationIds)
     const requiresRecovery = [...operationIds].filter((operationId) => !completingRetrySafe.has(operationId))
-    yield* Effect.forEach(
-      requiresRecovery,
-      (operationId) => input.store.expireRunningOperation({ ...input.claim, operationId }),
-      { discard: true },
-    )
+    if (requiresRecovery.length > 0) {
+      const executionAttempt = (yield* input.store.loadExecution(input.runId)).attempt
+      yield* Effect.forEach(
+        requiresRecovery,
+        (operationId) => input.store.expireRunningOperation({
+          ...input.claim,
+          operationId,
+          commandId: JSON.stringify(["expire-operation", input.claim.runId, input.claim.attemptFence, operationId, executionAttempt]),
+        }),
+        { discard: true },
+      )
+    }
     if (input.settleRun === false) return
     const inspected = requiresRecovery.length > 0 ? yield* input.store.inspect(input.runId) : undefined
     if (inspected?.status === "needs-resolution") return
@@ -107,7 +115,7 @@ export interface ExecutionInterruption {
   readonly retry: <A, E, R>(
     blocked: boolean,
     effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A | undefined, E | RunNotFound | RuntimeUnavailable, R>
+  ) => Effect.Effect<A | undefined, E | RunNotFound | RuntimeUnavailable | DurabilityFailure, R>
   readonly onInterrupt: (cancellationRequested: Effect.Effect<boolean>) => Effect.Effect<void>
 }
 

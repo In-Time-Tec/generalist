@@ -1,3 +1,4 @@
+import { objectRuntimeLayer, objectWorkerId } from "./object.js"
 import "./suites/fifo-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Layer, Stream } from "effect"
@@ -25,9 +26,6 @@ import { Agent } from "../../../src/index.js"
 import { closedTestAgent } from "../run/identity.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
 import { make as makeLocalScheduler } from "../../../src/runtime/execution/local-scheduler-internal.js"
-import { tempDbPath } from "../sql/scenario.js"
-
-import { Runtime as SqliteRuntime } from "../../../src/runtime/sqlite-bun.js"
 import { allowAllAuthorization } from "../../authorization.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -41,7 +39,8 @@ const finish = Response.makePart("finish", {
 const childSuspension = (childRunId: string, waitId: string) =>
   suspension({ waitId, token: childRunId, toolName: ChildRuns.toolName })
 
-for (const backend of ["memory", "sqlite"] as const) {
+const backend = "object" as const
+{
   {
     const model = Layer.effect(
       LanguageModel.LanguageModel,
@@ -64,14 +63,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} local scheduler executes admitted roots and children`, (it) => {
+    layer(runtimeLayer)(`object local scheduler executes admitted roots and children`, (it) => {
       it.effect("executes admitted roots and children", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -79,7 +73,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const root = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler:${backend}`,
+            sessionId: `scheduler:object`,
             idempotencyKey: "root",
             prompt: "root",
           })
@@ -90,11 +84,12 @@ for (const backend of ["memory", "sqlite"] as const) {
           expect(rootSnapshot.run.status).toBe("succeeded")
           const parent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-child:${backend}`,
+            sessionId: `scheduler-child:object`,
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          yield* store.claimExecution({ runId: parent.runId, ownerId: "manual-parent" })
+          yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-1", runId: parent.runId, ownerId: objectWorkerId })
           const child = yield* runtime.spawn({
             parentRunId: parent.runId,
             invocationId: "research",
@@ -111,7 +106,8 @@ for (const backend of ["memory", "sqlite"] as const) {
             selection: "researcher",
             prompt: "recovered child",
           })
-          yield* store.claimExecution({ runId: recovered.runId, ownerId: backend })
+          yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-2", runId: recovered.runId, ownerId: objectWorkerId })
           expect((yield* runtime.inspect(recovered.runId)).status).toBe("running")
           yield* scheduler.tick
           yield* scheduler.idle
@@ -147,14 +143,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-external-claim") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} local scheduler preserves an external execution claim`, (it) => {
+    layer(runtimeLayer)(`object local scheduler preserves an external execution claim`, (it) => {
       it.effect("does not fence an external execution claim", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -162,11 +153,12 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-external-claim:${backend}`,
+            sessionId: `scheduler-external-claim:object`,
             idempotencyKey: "run",
             prompt: "run",
           })
-          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "external" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-3", runId: receipt.runId, ownerId: objectWorkerId })
 
           yield* scheduler.tick
 
@@ -176,7 +168,8 @@ for (const backend of ["memory", "sqlite"] as const) {
           })
           yield* store.releaseExecution(claim)
           expect((yield* store.loadExecution(receipt.runId)).ownerId).toBeUndefined()
-          const replacement = yield* store.claimExecution({ runId: receipt.runId, ownerId: "replacement" })
+          const replacement = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-4", runId: receipt.runId, ownerId: objectWorkerId })
           yield* store.releaseExecution(claim)
           expect(yield* store.loadExecution(receipt.runId)).toMatchObject({
             ownerId: replacement.ownerId,
@@ -206,14 +199,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-cancel") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} local scheduler reconciles an orphaned cancelling tree root last`, (it) => {
+    layer(runtimeLayer)(`object local scheduler reconciles an orphaned cancelling tree root last`, (it) => {
       it.effect("reconciles an orphaned cancelling tree root last", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -221,11 +209,12 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const parent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-cancel:${backend}`,
+            sessionId: `scheduler-cancel:object`,
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "orphan-parent" })
+          const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-5", runId: parent.runId, ownerId: objectWorkerId })
           const childOutcome = yield* ChildRuns.make(store).invoke({
             parentRunId: parent.runId,
             toolCallId: "child-tool",
@@ -239,7 +228,9 @@ for (const backend of ["memory", "sqlite"] as const) {
             suspension: childSuspension(childOutcome.token, "child-tool"),
           })
           yield* store.complete({
-            ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "finished-child" })),
+            commandId: "runtime-execution-local-scheduler-test-ts-complete-1",
+            ...(yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-6", runId: childOutcome.token, ownerId: objectWorkerId })),
             result: completedResult("done"),
           })
           const blocker = yield* runtime.spawn({
@@ -248,9 +239,11 @@ for (const backend of ["memory", "sqlite"] as const) {
             selection: "researcher",
             prompt: "block",
           })
-          yield* store.claimExecution({ runId: blocker.runId, ownerId: "orphan-child" })
+          yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-7", runId: blocker.runId, ownerId: objectWorkerId })
 
-          yield* runtime.cancel({ runId: parent.runId, reason: "stop" })
+          yield* runtime.cancel({
+          commandId: "runtime-execution-local-scheduler-test-ts-cancel-2", runId: parent.runId, reason: "stop" })
           expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
           yield* scheduler.tick
           yield* scheduler.tick
@@ -269,19 +262,22 @@ for (const backend of ["memory", "sqlite"] as const) {
 
           const activeParent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-active-cancel:${backend}`,
+            sessionId: `scheduler-active-cancel:object`,
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          yield* store.claimExecution({ runId: activeParent.runId, ownerId: "orphan-active-parent" })
+          yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-8", runId: activeParent.runId, ownerId: objectWorkerId })
           const activeChild = yield* runtime.spawn({
             parentRunId: activeParent.runId,
             invocationId: "child",
             selection: "researcher",
             prompt: "child",
           })
-          yield* store.claimExecution({ runId: activeChild.runId, ownerId: "orphan-active-child" })
-          yield* runtime.cancel({ runId: activeParent.runId, reason: "stop" })
+          yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-9", runId: activeChild.runId, ownerId: objectWorkerId })
+          yield* runtime.cancel({
+          commandId: "runtime-execution-local-scheduler-test-ts-cancel-3", runId: activeParent.runId, reason: "stop" })
           expect((yield* runtime.inspect(activeParent.runId)).status).toBe("cancelling")
 
           yield* scheduler.tick
@@ -324,14 +320,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-active") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} overlapping scheduler ticks do not reclaim an active local Run`, (it) => {
+    layer(runtimeLayer)(`object overlapping scheduler ticks do not reclaim an active local Run`, (it) => {
       it.effect("does not reclaim an active local Run", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -339,7 +330,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-active:${backend}`,
+            sessionId: `scheduler-active:object`,
             idempotencyKey: "run",
             prompt: "run",
           })
@@ -369,41 +360,40 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-claim-window") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
     layer(runtimeLayer)(
-      `${backend} the cancelling sweep fences an owner absent from this process incarnation`,
+      `object the cancelling sweep fences an owner absent from this process incarnation`,
       (it) => {
         it.effect("settles an owner absent from this process incarnation", () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
             const scheduler = yield* LocalScheduler.LocalScheduler
             const store = yield* RunStore.RunStore
-            const workerId = backend === "memory" ? "memory" : "sqlite"
+            const workerId = objectWorkerId
 
             const owned = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-claim-window:${backend}`,
+              sessionId: `scheduler-claim-window:object`,
               idempotencyKey: "owned",
               prompt: "owned",
             })
-            yield* store.claimExecution({ runId: owned.runId, ownerId: workerId })
-            yield* runtime.cancel({ runId: owned.runId, reason: "stop" })
+            yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-10", runId: owned.runId, ownerId: workerId })
+            yield* runtime.cancel({
+          commandId: "runtime-execution-local-scheduler-test-ts-cancel-4", runId: owned.runId, reason: "stop" })
             expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelling")
 
             const orphaned = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-claim-window-ghost:${backend}`,
+              sessionId: `scheduler-claim-window-ghost:object`,
               idempotencyKey: "ghost",
               prompt: "ghost",
             })
-            yield* store.claimExecution({ runId: orphaned.runId, ownerId: "ghost-owner" })
-            yield* runtime.cancel({ runId: orphaned.runId, reason: "stop" })
+            yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-11", runId: orphaned.runId, ownerId: objectWorkerId })
+            yield* runtime.cancel({
+          commandId: "runtime-execution-local-scheduler-test-ts-cancel-5", runId: orphaned.runId, reason: "stop" })
 
             yield* scheduler.tick
 
@@ -429,24 +419,20 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const, concurrency: 4 },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-fifo") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} scheduler selection claims the oldest ready Runs beyond the window`, (it) => {
+    layer(runtimeLayer)(`object scheduler selection claims the oldest ready Runs beyond the window`, (it) => {
       it.effect("claims the oldest ready Runs beyond the window", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
           const host = RunExecutor.RunExecutor.of({
             execute: (claim) =>
-              store.complete({ ...claim, result: completedResult("done") }).pipe(Effect.asVoid, Effect.orDie),
+              store.complete({
+          commandId: `runtime-execution-local-scheduler-test-ts-complete-6:${claim.runId}`, ...claim, result: completedResult("done") }).pipe(Effect.asVoid, Effect.orDie),
             interrupt: () => Effect.void,
           })
-          const scheduler = yield* makeLocalScheduler({ workerId: backend, concurrency: 4 }).pipe(
+          const scheduler = yield* makeLocalScheduler({ workerId: objectWorkerId, concurrency: 4 }).pipe(
             Effect.provideService(RunStore.RunStore, store),
             Effect.provideService(RunExecutor.RunExecutor, host),
             Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
@@ -456,7 +442,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             receipts.push(
               yield* runtime.send({
                 to: assistantAddress,
-                sessionId: `scheduler-fifo:${backend}:${index}`,
+                sessionId: `scheduler-fifo:object:${index}`,
                 idempotencyKey: `fifo-${index}`,
                 prompt: `run-${index}`,
               }),
@@ -471,7 +457,7 @@ for (const backend of ["memory", "sqlite"] as const) {
               { concurrency: "unbounded" },
             )
             const expected = Math.min(4 * (tickIndex + 1), 17)
-            if (backend === "memory") {
+            if (true) {
               expect(completed).toEqual([
                 ...Array<boolean>(expected).fill(true),
                 ...Array<boolean>(17 - expected).fill(false),
@@ -498,14 +484,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} scheduler never scans terminal or waiting Runs for child settlement`, (it) => {
+    layer(runtimeLayer)(`object scheduler never scans terminal or waiting Runs for child settlement`, (it) => {
       it.effect(
         "stays bounded past the query window",
         () =>
@@ -513,20 +494,22 @@ for (const backend of ["memory", "sqlite"] as const) {
             const runtime = yield* Runtime.Runtime
             const scheduler = yield* LocalScheduler.LocalScheduler
             const store = yield* RunStore.RunStore
-            const runCount = backend === "memory" ? 1000 : 400
+            const runCount = true ? 1000 : 400
             const receipts: Array<{ readonly runId: string }> = []
             for (let index = 0; index < runCount; index += 1) {
               const receipt = yield* runtime.send({
                 to: assistantAddress,
-                sessionId: `scheduler-bounded:${backend}:${index}`,
+                sessionId: `scheduler-bounded:object:${index}`,
                 idempotencyKey: `bounded-${index}`,
                 prompt: `run-${index}`,
               })
               receipts.push(receipt)
             }
             for (const receipt of receipts) {
-              const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "bounded-worker" })
-              yield* store.complete({ ...claim, result: completedResult("done") })
+              const claim = yield* store.claimExecution({
+          commandId: `runtime-execution-local-scheduler-test-ts-claim-12:${receipt.runId}`, runId: receipt.runId, ownerId: objectWorkerId })
+              yield* store.complete({
+          commandId: `runtime-execution-local-scheduler-test-ts-complete-7:${claim.runId}`, ...claim, result: completedResult("done") })
             }
             const calls: Array<{
               readonly method: string
@@ -571,7 +554,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       )
     })
 
-    layer(runtimeLayer)(`${backend} out-of-order terminal settlement still resumes the parent`, (it) => {
+    layer(runtimeLayer)(`object out-of-order terminal settlement still resumes the parent`, (it) => {
       it.effect(
         "resumes a parent whose child settles after a later-created run",
         () =>
@@ -581,11 +564,12 @@ for (const backend of ["memory", "sqlite"] as const) {
             const store = yield* RunStore.RunStore
             const parent = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-order:${backend}`,
+              sessionId: `scheduler-order:object`,
               idempotencyKey: "order-parent",
               prompt: "parent",
             })
-            const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "order-parent" })
+            const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-13", runId: parent.runId, ownerId: objectWorkerId })
             const childOutcome = yield* ChildRuns.make(store).invoke({
               parentRunId: parent.runId,
               toolCallId: "order-child",
@@ -600,17 +584,21 @@ for (const backend of ["memory", "sqlite"] as const) {
             })
             const later = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-order-later:${backend}`,
+              sessionId: `scheduler-order-later:object`,
               idempotencyKey: "order-later",
               prompt: "later",
             })
             yield* store.complete({
-              ...(yield* store.claimExecution({ runId: later.runId, ownerId: "order-later" })),
+              commandId: "runtime-execution-local-scheduler-test-ts-complete-2",
+              ...(yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-14", runId: later.runId, ownerId: objectWorkerId })),
               result: completedResult("later"),
             })
             yield* scheduler.tick
             yield* store.complete({
-              ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "order-child-worker" })),
+              commandId: "runtime-execution-local-scheduler-test-ts-complete-3",
+              ...(yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-15", runId: childOutcome.token, ownerId: objectWorkerId })),
               result: completedResult("child"),
             })
             yield* scheduler.tick
@@ -621,7 +609,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       )
     })
 
-    layer(runtimeLayer)(`${backend} a backlog larger than the reconcile window still drains`, (it) => {
+    layer(runtimeLayer)(`object a backlog larger than the reconcile window still drains`, (it) => {
       it.effect(
         "resumes a parent whose child sits beyond the reconcile window",
         () =>
@@ -632,23 +620,26 @@ for (const backend of ["memory", "sqlite"] as const) {
             const filler = Effect.fn("backlog.filler")(function* (label: string) {
               const receipt = yield* runtime.send({
                 to: assistantAddress,
-                sessionId: `scheduler-backlog-filler:${backend}:${label}`,
+                sessionId: `scheduler-backlog-filler:object:${label}`,
                 idempotencyKey: `backlog-filler-${label}`,
                 prompt: `filler-${label}`,
               })
               yield* store.complete({
-                ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "backlog-filler-worker" })),
+                commandId: `runtime-execution-local-scheduler-test-ts-complete-4:${receipt.runId}`,
+                ...(yield* store.claimExecution({
+          commandId: `runtime-execution-local-scheduler-test-ts-claim-16:${receipt.runId}`, runId: receipt.runId, ownerId: objectWorkerId })),
                 result: completedResult("done"),
               })
             })
             for (let index = 0; index < 100; index += 1) yield* filler(`before-${index}`)
             const parent = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-backlog:${backend}`,
+              sessionId: `scheduler-backlog:object`,
               idempotencyKey: "backlog-parent",
               prompt: "parent",
             })
-            const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "backlog-parent-worker" })
+            const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-17", runId: parent.runId, ownerId: objectWorkerId })
             const childOutcome = yield* ChildRuns.make(store).invoke({
               parentRunId: parent.runId,
               toolCallId: "backlog-child",
@@ -662,7 +653,9 @@ for (const backend of ["memory", "sqlite"] as const) {
               suspension: childSuspension(childOutcome.token, "backlog-child"),
             })
             yield* store.complete({
-              ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "backlog-child-worker" })),
+              commandId: "runtime-execution-local-scheduler-test-ts-complete-5",
+              ...(yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-18", runId: childOutcome.token, ownerId: objectWorkerId })),
               result: completedResult("done"),
             })
             for (let index = 0; index < 100; index += 1) yield* filler(`after-${index}`)
@@ -679,7 +672,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       )
     })
 
-    layer(runtimeLayer)(`${backend} a waiting page wider than the reconcile window starves nobody`, (it) => {
+    layer(runtimeLayer)(`object a waiting page wider than the reconcile window starves nobody`, (it) => {
       it.effect(
         "resumes a resolvable parent queued behind a full page of unresolvable ones",
         () =>
@@ -692,13 +685,14 @@ for (const backend of ["memory", "sqlite"] as const) {
             for (let index = 0; index < 34; index += 1) {
               const blocked = yield* runtime.send({
                 to: assistantAddress,
-                sessionId: `scheduler-starve-blocked:${backend}:${index}`,
+                sessionId: `scheduler-starve-blocked:object:${index}`,
                 idempotencyKey: `starve-blocked-${index}`,
                 prompt: "blocked",
               })
               const blockedClaim = yield* store.claimExecution({
+          commandId: `runtime-execution-local-scheduler-test-ts-claim-19:${blocked.runId}`,
                 runId: blocked.runId,
-                ownerId: `starve-blocked-worker-${index}`,
+                ownerId: objectWorkerId,
               })
               yield* store.suspend({
                 ...blockedClaim,
@@ -708,11 +702,12 @@ for (const backend of ["memory", "sqlite"] as const) {
             }
             const parent = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-starve:${backend}`,
+              sessionId: `scheduler-starve:object`,
               idempotencyKey: "starve-parent",
               prompt: "parent",
             })
-            const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "starve-parent-worker" })
+            const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-20", runId: parent.runId, ownerId: objectWorkerId })
             const childOutcome = yield* ChildRuns.make(store).invoke({
               parentRunId: parent.runId,
               toolCallId: "starve-child",
@@ -726,7 +721,9 @@ for (const backend of ["memory", "sqlite"] as const) {
               suspension: childSuspension(childOutcome.token, "starve-child"),
             })
             yield* store.complete({
-              ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "starve-child-worker" })),
+              commandId: "runtime-execution-local-scheduler-test-ts-complete-8",
+              ...(yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-21", runId: childOutcome.token, ownerId: objectWorkerId })),
               result: completedResult("done"),
             })
             const tickBudget = 40
@@ -742,7 +739,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       )
     })
 
-    layer(runtimeLayer)(`${backend} idle scheduler performs no child-settlement polling`, (it) => {
+    layer(runtimeLayer)(`object idle scheduler performs no child-settlement polling`, (it) => {
       it.effect("does no child-settlement work while nothing changes", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -750,12 +747,14 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-idle:${backend}`,
+            sessionId: `scheduler-idle:object`,
             idempotencyKey: "idle-0",
             prompt: "run-idle",
           })
-          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "idle-worker" })
-          yield* store.complete({ ...claim, result: completedResult("done") })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-22", runId: receipt.runId, ownerId: objectWorkerId })
+          yield* store.complete({
+          commandId: "runtime-execution-local-scheduler-test-ts-complete-13", ...claim, result: completedResult("done") })
           const calls: Array<{ readonly method: string; readonly status?: string }> = []
           const spy = RunStore.RunStore.of({
             ...store,
@@ -814,14 +813,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-resume") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} scheduler resumes a waiting parent once its child settles`, (it) => {
+    layer(runtimeLayer)(`object scheduler resumes a waiting parent once its child settles`, (it) => {
       it.effect("resumes a waiting parent once its child settles", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -829,11 +823,12 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const parent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-resume:${backend}`,
+            sessionId: `scheduler-resume:object`,
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "manual-parent" })
+          const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-23", runId: parent.runId, ownerId: objectWorkerId })
           const outcome = yield* ChildRuns.make(store).invoke({
             parentRunId: parent.runId,
             toolCallId: "child-tool",
@@ -885,14 +880,9 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-nonblocking") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
-    layer(runtimeLayer)(`${backend} a tick admits a long-running Run without blocking on it`, (it) => {
+    layer(runtimeLayer)(`object a tick admits a long-running Run without blocking on it`, (it) => {
       it.effect("admits a long-running Run without blocking on it", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -900,7 +890,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           const store = yield* RunStore.RunStore
           const blocking = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-nonblocking:${backend}`,
+            sessionId: `scheduler-nonblocking:object`,
             idempotencyKey: "blocking",
             prompt: "blocking",
           })
@@ -912,11 +902,12 @@ for (const backend of ["memory", "sqlite"] as const) {
           // A later tick still makes progress while the earlier execution is in flight.
           const parent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: `scheduler-nonblocking-second:${backend}`,
+            sessionId: `scheduler-nonblocking-second:object`,
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "manual-parent" })
+          const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-24", runId: parent.runId, ownerId: objectWorkerId })
           const outcome = yield* ChildRuns.make(store).invoke({
             parentRunId: parent.runId,
             toolCallId: "child-tool",
@@ -930,7 +921,9 @@ for (const backend of ["memory", "sqlite"] as const) {
             suspension: childSuspension(outcome.token, "child-tool"),
           })
           yield* store.complete({
-            ...(yield* store.claimExecution({ runId: outcome.token, ownerId: "manual-child" })),
+            commandId: "runtime-execution-local-scheduler-test-ts-complete-9",
+            ...(yield* store.claimExecution({
+          commandId: "runtime-execution-local-scheduler-test-ts-claim-25", runId: outcome.token, ownerId: objectWorkerId })),
             result: completedResult("done"),
           })
           yield* scheduler.tick
@@ -968,15 +961,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-sweep-interrupt") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
     layer(runtimeLayer)(
-      `${backend} the sweep interrupts an executing Run that a durable cancellation marked cancelling`,
+      `object the sweep interrupts an executing Run that a durable cancellation marked cancelling`,
       (it) => {
         it.effect("interrupts an executing Run on cancellation", () =>
           Effect.gen(function* () {
@@ -985,7 +973,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             const store = yield* RunStore.RunStore
             const receipt = yield* runtime.send({
               to: assistantAddress,
-              sessionId: `scheduler-sweep-interrupt:${backend}`,
+              sessionId: `scheduler-sweep-interrupt:object`,
               idempotencyKey: "run",
               prompt: "run",
             })
@@ -994,7 +982,8 @@ for (const backend of ["memory", "sqlite"] as const) {
 
             // store.cancel only records the request; delivering the interrupt to the owning
             // worker is the scheduler sweep's job, so the run must not settle without a tick.
-            yield* store.cancel({ runId: receipt.runId, reason: "stop" })
+            yield* store.cancel({
+          commandId: "runtime-execution-local-scheduler-test-ts-cancel-15", runId: receipt.runId, reason: "stop" })
             expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
 
             yield* scheduler.tick
@@ -1038,15 +1027,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const, concurrency: 2 },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded-concurrency") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
     layer(runtimeLayer, { excludeTestServices: true })(
-      `${backend} concurrency still bounds simultaneously executing Runs across ticks`,
+      `object concurrency still bounds simultaneously executing Runs across ticks`,
       (it) => {
         it.effect("bounds simultaneously executing Runs across ticks", () =>
           Effect.gen(function* () {
@@ -1055,7 +1039,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             for (let index = 0; index < 6; index += 1) {
               yield* runtime.send({
                 to: assistantAddress,
-                sessionId: `scheduler-bounded-concurrency:${backend}:${index}`,
+                sessionId: `scheduler-bounded-concurrency:object:${index}`,
                 idempotencyKey: `bounded-concurrency-${index}`,
                 prompt: `run-${index}`,
               })
@@ -1103,15 +1087,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       ],
       scheduler: { pollInterval: "1 day" as const },
     }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options).pipe(Layer.provide(options.resolverLayer))
-        : SqliteRuntime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-unbounded-concurrency") }).pipe(
-            Layer.provide(options.resolverLayer),
-          )
+    const runtimeLayer = objectRuntimeLayer(options).pipe(Layer.provide(options.resolverLayer))
 
     layer(runtimeLayer, { excludeTestServices: true })(
-      `${backend} default concurrency starts every selected Run without a bound`,
+      `object default concurrency starts every selected Run without a bound`,
       (it) => {
         it.effect("starts more than the former default bound", () =>
           Effect.gen(function* () {
@@ -1120,7 +1099,7 @@ for (const backend of ["memory", "sqlite"] as const) {
             for (let index = 0; index < 6; index += 1) {
               yield* runtime.send({
                 to: assistantAddress,
-                sessionId: `scheduler-unbounded-concurrency:${backend}:${index}`,
+                sessionId: `scheduler-unbounded-concurrency:object:${index}`,
                 idempotencyKey: `unbounded-concurrency-${index}`,
                 prompt: `run-${index}`,
               })

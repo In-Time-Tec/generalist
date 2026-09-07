@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
@@ -131,7 +132,7 @@ it.live("runs a bounded suite through Runtime and prints its schema result", () 
   Effect.gen(function* () {
     const fixture = yield* TestModel.make([TestModel.text("high")])
     const agent = Agent.make({ name: "eval-suite" })
-    const runtime = Runtime.layerMemory({ addresses: [] }).pipe(
+    const runtime = objectRuntimeLayer({ addresses: [] }).pipe(
       Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
     )
     const suite = yield* runSuite(agent, ["classify"], [outputMatches(Schema.String)], {

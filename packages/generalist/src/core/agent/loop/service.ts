@@ -211,7 +211,7 @@ export const make = <
         yield* applyCompactionResult(
           structuredTurn,
           { _tag: "Microcompact", history: transcript, prompt: Prompt.empty },
-          (yield* syncSession(structuredTurn, history)).at(-1)?.id ?? null,
+          (yield* syncSession(structuredTurn, history, "structured-output")).at(-1)?.id ?? null,
           "structured-output",
         )
         const completion = yield* inbox.complete
@@ -446,7 +446,6 @@ export const make = <
         return Stream.unwrap(
           Effect.gen(function* () {
             const checkpoint = yield* checkpointSuspended(state.turn, pendingResults(), suspension)
-            yield* syncSession(state.turn, checkpoint)
             return Stream.concat(
               Stream.fromIterable<Event>([turnCompletedEvent(state, state.turn, checkpoint)]),
               Stream.failCause<RunError>(cause),

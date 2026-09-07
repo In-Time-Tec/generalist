@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../../execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
@@ -10,14 +11,13 @@ import {
   resolverLayer,
   suspension,
 } from "../../execution/fixtures.js"
-import { tempDbPath } from "../../sql/scenario.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
+import { makeObjectStorage } from "../../execution/object.js"
 
-import { Runtime as SqliteRuntime } from "../../../../src/runtime/sqlite-bun.js"
 const scheduler = { pollInterval: "1 day" as const }
-const memoryGroupLayer = Runtime.layerMemory({ ...parentRelativeOptions, scheduler }).pipe(Layer.provide(resolverLayer))
-const sqliteGroupLayer = (filename: string) =>
-  SqliteRuntime.layerSqlite({ ...parentRelativeOptions, scheduler, filename }).pipe(Layer.provide(resolverLayer))
+const memoryGroupLayer = objectRuntimeLayer({ ...parentRelativeOptions, scheduler }).pipe(Layer.provide(resolverLayer))
+const objectGroupLayer = (storage = makeObjectStorage()) =>
+  objectRuntimeLayer({ ...parentRelativeOptions, scheduler }, storage).pipe(Layer.provide(resolverLayer))
 
 const ToolParams = Schema.Record(Schema.String, Schema.Unknown)
 const toolRequest = (name: string, params: typeof ToolParams.Type): ToolExecutor.Request => {
@@ -172,7 +172,8 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+      const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-1", runId: parent.runId, ownerId: "parent" })
       const receipt = yield* startGroup(parent.runId)
       expect(receipt.children.map((child) => child.key)).toEqual(["first", "second", "third"])
       expect((yield* startGroup(parent.runId)).children).toEqual(receipt.children)
@@ -195,16 +196,19 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       })
 
       yield* store.complete({
-        ...(yield* store.claimExecution({ runId: receipt.children[2]!.childRunId, ownerId: "third" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-2", runId: receipt.children[2]!.childRunId, ownerId: "third" })),
         result: completedResult("third result"),
       })
       yield* store.fail({
-        ...(yield* store.claimExecution({ runId: receipt.children[1]!.childRunId, ownerId: "second" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-3", runId: receipt.children[1]!.childRunId, ownerId: "second" })),
         error: Errors.AgentExecutionFailure.make({ message: "second failed" }),
       })
       expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
       yield* store.complete({
-        ...(yield* store.claimExecution({ runId: receipt.children[0]!.childRunId, ownerId: "first" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-4", runId: receipt.children[0]!.childRunId, ownerId: "first" })),
         result: completedResult("first result"),
       })
 
@@ -246,7 +250,8 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+      const claim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-5", runId: parent.runId, ownerId: "parent" })
       const input = {
         parentRunId: parent.runId,
         toolCallId: "run-group",
@@ -302,15 +307,18 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       ])
       const childRunIds = inspection.members.map((member) => member.childRunId)
       yield* store.complete({
-        ...(yield* store.claimExecution({ runId: childRunIds[2]!, ownerId: "third" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-6", runId: childRunIds[2]!, ownerId: "third" })),
         result: completedResult("third result"),
       })
       yield* store.fail({
-        ...(yield* store.claimExecution({ runId: childRunIds[1]!, ownerId: "second" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-7", runId: childRunIds[1]!, ownerId: "second" })),
         error: Errors.AgentExecutionFailure.make({ message: "second failed" }),
       })
       yield* store.complete({
-        ...(yield* store.claimExecution({ runId: childRunIds[0]!, ownerId: "first" })),
+        ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-8", runId: childRunIds[0]!, ownerId: "first" })),
         result: completedResult("first result"),
       })
       const resumed = yield* runtime.inspect(parent.runId)
@@ -343,7 +351,8 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+      const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-9", runId: parent.runId, ownerId: "parent" })
       const receipt = yield* startGroup(parent.runId, "cancel-group")
       expect(
         yield* children.awaitGroup({
@@ -357,7 +366,8 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
         waits: [openGroupWait("cancel-await")],
         suspension: groupSuspension("cancel-await", receipt.groupId),
       })
-      yield* runtime.cancel({ runId: parent.runId, reason: "stop group" })
+      yield* runtime.cancel({
+          commandId: "runtime-child-suites-groups-suite-ts-cancel-5", runId: parent.runId, reason: "stop group" })
       expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
       expect((yield* runtime.inspectFanOut(receipt.groupId)).status).toBe("cancelled")
       expect(
@@ -372,26 +382,27 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
   )
 })
 
-it.live("persists one ordered child-group suspension and result across SQLite reopen", () =>
+it.live("persists one ordered child-group suspension and result across object storage reopen", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("child-group")
+    const storage = makeObjectStorage()
     const admitted = yield* Effect.scoped(
-      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+      Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
           const children = ChildRuns.make(store)
           const parent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: "child-group:sqlite",
+            sessionId: "child-group:object",
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+          const parentClaim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-10", runId: parent.runId, ownerId: "parent" })
           const singleton = yield* children.invoke({
             parentRunId: parent.runId,
-            toolCallId: "sqlite-run-child",
-            operationKey: "turn:0:sqlite-run-child",
+            toolCallId: "object-run-child",
+            operationKey: "turn:0:object-run-child",
             selection: "researcher",
             label: "Singleton researcher",
             prompt: "singleton",
@@ -400,8 +411,8 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           const singletonRunId = singleton._tag === "Suspend" ? singleton.token : ""
           const input = {
             parentRunId: parent.runId,
-            toolCallId: "sqlite-run-group",
-            operationKey: "turn:0:sqlite-run-group",
+            toolCallId: "object-run-group",
+            operationKey: "turn:0:object-run-group",
             concurrency: 3,
             members: groupMembers,
           }
@@ -415,11 +426,11 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           }
           yield* store.suspend({
             ...parentClaim,
-            waits: [openGroupWait("sqlite-run-group")],
+            waits: [openGroupWait("object-run-group")],
             suspension: suspension({
-              waitId: "sqlite-run-group",
+              waitId: "object-run-group",
               token: groupId,
-              toolCallId: "sqlite-run-group",
+              toolCallId: "object-run-group",
               toolName: ChildRuns.runGroupToolName,
               toolParams: { concurrency: 3, members: groupMembers },
             }),
@@ -430,13 +441,13 @@ it.live("persists one ordered child-group suspension and result across SQLite re
     )
 
     yield* Effect.scoped(
-      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+      Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
           expect(yield* runtime.inspect(admitted.parentRunId)).toMatchObject({
             status: "waiting",
-            waits: [{ waitId: "sqlite-run-group", status: "open" }],
+            waits: [{ waitId: "object-run-group", status: "open" }],
           })
           const recursive = yield* runtime.spawn({
             parentRunId: admitted.singletonRunId,
@@ -449,15 +460,18 @@ it.live("persists one ordered child-group suspension and result across SQLite re
             depth: 2,
           })
           yield* store.complete({
-            ...(yield* store.claimExecution({ runId: admitted.receipt.children[2]!.childRunId, ownerId: "third" })),
+            ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-11", runId: admitted.receipt.children[2]!.childRunId, ownerId: "third" })),
             result: completedResult("third persisted"),
           })
           yield* store.complete({
-            ...(yield* store.claimExecution({ runId: admitted.receipt.children[0]!.childRunId, ownerId: "first" })),
+            ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-12", runId: admitted.receipt.children[0]!.childRunId, ownerId: "first" })),
             result: completedResult("first persisted"),
           })
           yield* store.fail({
-            ...(yield* store.claimExecution({ runId: admitted.receipt.children[1]!.childRunId, ownerId: "second" })),
+            ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-13", runId: admitted.receipt.children[1]!.childRunId, ownerId: "second" })),
             error: Errors.AgentExecutionFailure.make({ message: "persisted failure" }),
           })
           const parent = yield* runtime.inspect(admitted.parentRunId)
@@ -468,7 +482,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
     )
 
     yield* Effect.scoped(
-      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+      Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -489,8 +503,8 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           expect(replay._tag).toBe("Success")
           const singletonReplay = yield* children.invoke({
             parentRunId: admitted.parentRunId,
-            toolCallId: "sqlite-run-child",
-            operationKey: "turn:0:sqlite-run-child",
+            toolCallId: "object-run-child",
+            operationKey: "turn:0:object-run-child",
             selection: "researcher",
             label: "Singleton researcher",
             prompt: "singleton",
@@ -498,8 +512,8 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           expect(singletonReplay).toEqual({ _tag: "Suspend", token: admitted.singletonRunId })
           const singletonConflict = yield* children.invoke({
             parentRunId: admitted.parentRunId,
-            toolCallId: "sqlite-run-child",
-            operationKey: "turn:0:sqlite-run-child",
+            toolCallId: "object-run-child",
+            operationKey: "turn:0:object-run-child",
             selection: "researcher",
             label: "Changed singleton label",
             prompt: "singleton",
@@ -515,8 +529,8 @@ it.live("persists one ordered child-group suspension and result across SQLite re
             label: "Singleton researcher",
             childDepth: 1,
             origin: {
-              parentToolCallId: "sqlite-run-child",
-              operationKey: "turn:0:sqlite-run-child",
+              parentToolCallId: "object-run-child",
+              operationKey: "turn:0:object-run-child",
             },
           })
           expect(
@@ -531,7 +545,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
             ),
           ).toMatchObject({
             runId: admitted.parentRunId,
-            toolCallId: "sqlite-run-child",
+            toolCallId: "object-run-child",
             event: {
               _tag: "ChildLinked",
               childRunId: admitted.singletonRunId,
@@ -546,25 +560,26 @@ it.live("persists one ordered child-group suspension and result across SQLite re
   }),
 )
 
-it.live("resumes one labelled singleton from canonical child settlement across SQLite reopens", () =>
+it.live("resumes one labelled singleton from canonical child settlement across object storage reopens", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("child-singleton")
+    const storage = makeObjectStorage()
     const admitted = yield* Effect.scoped(
-      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+      Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
           const parent = yield* runtime.send({
             to: assistantAddress,
-            sessionId: "child-singleton:sqlite",
+            sessionId: "child-singleton:object",
             idempotencyKey: "parent",
             prompt: "parent",
           })
-          const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-14", runId: parent.runId, ownerId: "parent" })
           const input = {
             parentRunId: parent.runId,
-            toolCallId: "sqlite-child-call",
-            operationKey: "turn:4:sqlite-child-call",
+            toolCallId: "object-child-call",
+            operationKey: "turn:4:object-child-call",
             selection: "researcher",
             label: "Persisted singleton 🚀",
             prompt: "persist me",
@@ -589,7 +604,7 @@ it.live("resumes one labelled singleton from canonical child settlement across S
     )
 
     yield* Effect.scoped(
-      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+      Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -598,7 +613,8 @@ it.live("resumes one labelled singleton from canonical child settlement across S
             waits: [{ waitId: admitted.input.toolCallId, status: "open" }],
           })
           yield* store.complete({
-            ...(yield* store.claimExecution({ runId: admitted.childRunId, ownerId: "child" })),
+            ...(yield* store.claimExecution({
+          commandId: "runtime-child-suites-groups-suite-ts-claim-15", runId: admitted.childRunId, ownerId: "child" })),
             result: completedResult("persisted singleton result"),
           })
           expect(yield* runtime.inspect(admitted.input.parentRunId)).toMatchObject({
@@ -622,7 +638,7 @@ it.live("resumes one labelled singleton from canonical child settlement across S
     )
 
     yield* Effect.scoped(
-      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+      Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore

@@ -5,6 +5,7 @@ import { DriverCheckpoint } from "../../core/durable/driver.js"
 import { UnknownAgent } from "../errors.js"
 import { BudgetExhausted } from "../../core/durable/run-budget.js"
 import { Suspended as NestedOperationSuspended } from "../../core/tools/nested-operation.js"
+import { ProgramOperationName } from "../../core/program/capabilities.js"
 
 export const SessionCursor = Schema.Struct({
   sessionId: Schema.String,
@@ -15,8 +16,7 @@ export type SessionCursor = typeof SessionCursor.Type
 /** Terminal value produced by an Agent execution. */
 export const AgentExecutionResult = Schema.Struct({
   text: Schema.String,
-  // Results persisted before Agent-owned output schemas have text only; every new hosted Agent completion writes output.
-  output: Schema.optionalKey(Schema.Unknown),
+  output: Schema.Unknown,
   turns: Schema.Finite,
   session: SessionCursor,
 })
@@ -35,6 +35,12 @@ export type ExecutionResult = typeof ExecutionResult.Type
 /** Fresh-sandbox replay frontier for an Agent Program. */
 export const ProgramCheckpoint = Schema.TaggedStruct("Program", {
   version: Schema.Literal("1"),
+  branch: Schema.optionalKey(Schema.Struct({
+    namespace: Schema.String,
+    replay: Schema.Record(ProgramOperationName, ProgramOperationName).check(
+      Schema.makeFilter((value) => Object.keys(value).length <= 4096),
+    ),
+  })),
 })
 export type ProgramCheckpoint = typeof ProgramCheckpoint.Type
 

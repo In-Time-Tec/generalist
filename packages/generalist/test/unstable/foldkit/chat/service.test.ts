@@ -87,7 +87,12 @@ describe("Chat HostEvent projection", () => {
         "Completed",
         runtimeEvent(2, {
           _tag: "RunCompleted",
-          result: { text: "done", turns: 1, session: { sessionId: "session-1", leafId: "entry-1" } },
+          result: {
+            text: "done",
+            output: "done",
+            turns: 1,
+            session: { sessionId: "session-1", leafId: "entry-1" },
+          },
         }),
       ),
     )

@@ -46,3 +46,25 @@ it.effect("persists the model fallback the agent loop emits when a candidate is 
     expect(decoded._tag).toBe("ModelFallbackScheduled")
   }),
 )
+
+it.effect("strictly roundtrips both event halves without admitting unknown fields", () =>
+  Effect.gen(function* () {
+    const options = { onExcessProperty: "error" } as const
+    const decoded = yield* Schema.decodeEffect(RunEvent.RunEvent)(fallbackScheduled, options)
+    const encoded = yield* Schema.encodeEffect(RunEvent.RunEvent)(decoded, options)
+    expect(encoded).toEqual(fallbackScheduled)
+    const excess = yield* Schema.decodeUnknownEffect(RunEvent.RunEvent)(
+      { ...fallbackScheduled, unexpected: true },
+      options,
+    ).pipe(Effect.flip)
+    expect(excess._tag).toBe("SchemaError")
+    const nestedExcess = yield* Schema.decodeUnknownEffect(RunEvent.RunEvent)(
+      {
+        ...fallbackScheduled,
+        executableRef: { ...fallbackScheduled.executableRef, unexpected: true },
+      },
+      options,
+    ).pipe(Effect.flip)
+    expect(nestedExcess._tag).toBe("SchemaError")
+  }),
+)

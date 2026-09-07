@@ -6,16 +6,24 @@ export const packedEffectDependencies = [
   "@effect/ai-openai",
   "@effect/ai-openai-compat",
   "@effect/ai-openrouter",
-  "@effect/sql-mysql2",
-  "@effect/sql-pg",
-  "@effect/sql-sqlite-bun",
-  "@effect/sql-sqlite-do",
 ] as const
-export const packedProviderDependencies = {
-  "@aws-sdk/client-bedrock-runtime": "3.859.0",
-  "@aws-sdk/credential-provider-node": "3.859.0",
-  "@smithy/types": "4.3.1",
-} as const
+export const packedProviderDependencies = [
+  "@aws-sdk/client-bedrock-runtime",
+  "@aws-sdk/client-s3",
+  "@aws-sdk/credential-provider-node",
+  "@smithy/fetch-http-handler",
+  "@smithy/types",
+] as const
+
+/** Applies to bare specifiers, dependency names, emitted paths and bundled graph entries. */
+export const isSqlGraphEntry = (value: string): boolean => {
+  const normalized = value.replaceAll("\\", "/").toLowerCase()
+  return (
+    /@effect[+/]sql(?:[-/@]|$)/.test(normalized) ||
+    /(?:^|[/+])(?:sql|sqlite3?|better-sqlite3|postgres(?:ql)?|mysql2?|pg|pgpass|@libsql|libsql|pglite|drizzle-orm|kysely)(?:[-/@+.]|$)/.test(normalized) ||
+    normalized.startsWith("bun:sqlite")
+  )
+}
 
 export type ConsumerRuntime = "bun" | "node" | "worker"
 export interface ConsumerImport {
@@ -44,7 +52,12 @@ export const minimumConsumerProfiles = [
       {
         specifier: "generalist/blob-store",
         runtimes: ["bun", "node", "worker"],
-        exports: ["BlobStore", "layerFileSystem", "layerMemory", "layerS3", "layerSql"],
+        exports: ["BlobStore", "layer"],
+      },
+      {
+        specifier: "generalist/durability",
+        runtimes: ["bun", "node", "worker"],
+        exports: ["layer", "layerRunStore", "activate", "Activation", "DurabilityFailure"],
       },
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
       { specifier: "generalist/hooks", runtimes: nodeAndBun, exports: ["Hooks", "onToolCall"] },
@@ -83,16 +96,25 @@ export const minimumConsumerProfiles = [
       },
       { specifier: "generalist/unstable/runtime/external-child-placement", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/runtime/external-child-store", runtimes: nodeAndBun },
-      { specifier: "generalist/runtime/sql-driver", runtimes: nodeAndBun },
       { specifier: "generalist/instructions", runtimes: nodeAndBun, exports: ["load"] },
       { specifier: "generalist/instructions/skills", runtimes: nodeAndBun },
-      { specifier: "generalist/memo", runtimes: nodeAndBun, exports: ["pure", "layerMemory", "layerSql"] },
+      { specifier: "generalist/memo", runtimes: nodeAndBun, exports: ["pure", "layerMemory"] },
     ],
   },
   {
-    name: "sqlite-bun",
-    peers: ["@effect/sql-sqlite-bun"],
-    imports: [{ specifier: "generalist/runtime/sqlite-bun", runtimes: bunOnly, exports: ["Runtime", "RunStore"] }],
+    name: "durability-s3",
+    peers: ["@aws-sdk/client-s3", "@smithy/fetch-http-handler"],
+    imports: [{ specifier: "generalist/durability/s3", runtimes: nodeAndBun, exports: ["make", "layer"] }],
+  },
+  {
+    name: "durability-r2",
+    peers: [],
+    imports: [{ specifier: "generalist/durability/r2", runtimes: ["bun", "node", "worker"], exports: ["make", "layer"] }],
+  },
+  {
+    name: "test-durability",
+    peers: [],
+    imports: [{ specifier: "generalist/testing/durability", runtimes: nodeAndBun, exports: ["make", "atomicCreates", "freshReads", "listing", "byteIntegrity"] }],
   },
   {
     name: "sandbox",
@@ -210,16 +232,8 @@ export const minimumConsumerProfiles = [
     imports: [{ specifier: "generalist/providers/amazon-bedrock", runtimes: nodeOnly, exports: ["layer"] }],
   },
   {
-    name: "sql-adapters",
-    peers: ["@effect/sql-pg", "@effect/sql-mysql2", "pg", "pg-cursor"],
-    imports: [
-      { specifier: "generalist/pg", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema", "layerClientPool"] },
-      { specifier: "generalist/mysql", runtimes: nodeAndBun, exports: ["layer", "RuntimeSchema"] },
-    ],
-  },
-  {
     name: "cloudflare",
-    peers: ["@effect/sql-sqlite-do", "es-module-lexer"],
+    peers: ["es-module-lexer"],
     imports: [
       {
         specifier: "generalist/unstable/cloudflare/durable-objects",
@@ -250,6 +264,8 @@ export const minimumConsumerProfiles = [
 export const workerSafePackageExports = [
   "generalist",
   "generalist/blob-store",
+  "generalist/durability",
+  "generalist/durability/r2",
   "generalist/hooks",
   "generalist/host",
   "generalist/server",
@@ -261,7 +277,6 @@ export const workerSafePackageExports = [
   "generalist/unstable/learning",
   "generalist/providers/openrouter",
   "generalist/runtime",
-  "generalist/runtime/sql-driver",
   "generalist/sandbox",
   "generalist/eval",
   "generalist/memo",
@@ -273,6 +288,11 @@ export const workerSafePackageExports = [
 
 export const wildcardExportExamples = [] as const
 export const forbiddenPackageExports = [
+  "generalist/durability/auxiliary",
+  "generalist/pg",
+  "generalist/mysql",
+  "generalist/runtime/sql-driver",
+  "generalist/runtime/sqlite-bun",
   "generalist/a2a",
   "generalist/ag-ui",
   "generalist/cloudflare",
@@ -297,6 +317,9 @@ export const exactPackageExports = [
   "./approvals",
   "./blob-store",
   "./compaction",
+  "./durability",
+  "./durability/r2",
+  "./durability/s3",
   "./eval",
   "./hooks",
   "./host",
@@ -305,9 +328,7 @@ export const exactPackageExports = [
   "./media",
   "./memo",
   "./memory",
-  "./mysql",
   "./permissions",
-  "./pg",
   "./providers/amazon-bedrock",
   "./providers/anthropic",
   "./providers/deterministic",
@@ -322,12 +343,11 @@ export const exactPackageExports = [
   "./repl",
   "./repl/bun",
   "./runtime",
-  "./runtime/sql-driver",
-  "./runtime/sqlite-bun",
   "./sandbox",
   "./server",
   "./tasks",
   "./testing",
+  "./testing/durability",
   "./testing/model",
   "./testing/runtime-driver",
   "./trajectory",

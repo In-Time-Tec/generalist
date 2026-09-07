@@ -33,7 +33,7 @@ export const make = (input: {
   const options: HostedRunOptions = {
     prompt: input.prompt,
     sessionId: input.execution.message.sessionId,
-    logicalOperationId: input.execution.runId,
+    logicalOperationId: input.execution.operationNamespace ?? input.execution.runId,
     invocation: {
       runId: input.execution.runId,
       rootRunId: input.execution.rootRunId,

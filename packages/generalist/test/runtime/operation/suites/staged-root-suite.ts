@@ -1,3 +1,4 @@
+import { objectRuntimeLayer } from "../../execution/object.js"
 import { ExecutableResolver, Runtime } from "../../../../src/runtime/index.js"
 import { Layer } from "effect"
 import { assistant, assistantRef } from "../../execution/fixtures.js"
@@ -6,7 +7,7 @@ import { stagedRootSuite } from "./staged-root.js"
 
 stagedRootSuite({
   name: "memory",
-  storeLayer: Runtime.layerMemory({
+  storeLayer: objectRuntimeLayer({
     addresses: [],
   }).pipe(
     Layer.provide(

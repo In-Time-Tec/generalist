@@ -1,8 +1,12 @@
 /* oxlint-disable effecttsgo/async-function -- Rivet actor hooks and actions are Promise-only host boundaries. */
-/* oxlint-disable anti-slop-effect/no-service-constructor-imports -- the actor is the composition root that owns its SQL client, projection, and exclusive recovery. */
-import { Clock, Context as EffectContext, Effect, Layer, ManagedRuntime, Schema } from "effect"
+/* oxlint-disable anti-slop-effect/no-service-constructor-imports -- the actor is the scoped object-runtime composition root. */
+import { Clock, Crypto, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { SqlClient, SqlError } from "effect/unstable/sql"
+import * as Durability from "../../../durability/index.js"
+import type { ObjectStore } from "../../../durability/object-store.js"
+import { LocalScheduler, type DrainResult } from "../../../runtime/execution/local-scheduler.js"
+import type { DurabilityFailure } from "../../../durability/errors.js"
+import type { RuntimeUnavailable } from "../../../runtime/errors.js"
 import {
   actor,
   type ActionContext,
@@ -11,9 +15,7 @@ import {
   type InstanceActorOptionsInput,
   type ScheduledFireInfo,
 } from "rivetkit"
-import { db } from "rivetkit/db"
 import { Address } from "../../../runtime/address.js"
-import { RuntimeUnavailable } from "../../../runtime/errors.js"
 import { ExecutableResolver } from "../../../runtime/executable/resolver.js"
 import { Metadata } from "../../../runtime/messaging/message.js"
 import { ResolveOperationInput } from "../../../runtime/operation/resolution.js"
@@ -26,15 +28,6 @@ import {
   type SignalInput as RuntimeSignalInput,
 } from "../../../runtime/service.js"
 import { TreePolicy } from "../../../runtime/tree/policy.js"
-import {
-  layerSqliteRuntime,
-  makeExclusiveExecutionRecovery,
-  SqliteRunActivation,
-  type SqliteRuntimeServices,
-  type SqliteStoreError,
-  type SqliteStoreOptions,
-} from "../../../runtime/sql-driver.js"
-import { layerSqlClient } from "./raw-sql.js"
 
 const SendInput = Schema.Struct({
   runId: Schema.optionalKey(Schema.String),
@@ -53,6 +46,7 @@ const SendInput = Schema.Struct({
 
 const SignalInput = Schema.Struct({
   runId: Schema.String,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   name: Schema.String,
   payload: Schema.optionalKey(Schema.Unknown),
 })
@@ -69,6 +63,7 @@ const RespondInput = Schema.Struct({
 
 const CancelInput = Schema.Struct({
   runId: Schema.String,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   reason: Schema.optionalKey(Schema.String),
 })
 
@@ -83,26 +78,18 @@ const actionInputSchemas = {
   },
 }
 
-class RuntimeOwner extends EffectContext.Service<RuntimeOwner, { readonly ownerId: string }>()(
-  "generalist/unstable/rivet/actors/runtime-actor/RuntimeOwner",
-) {}
-
-type RuntimeHost = ManagedRuntime.ManagedRuntime<
-  SqliteRuntimeServices | SqlClient.SqlClient | RuntimeOwner,
-  SqliteStoreError | SqlError.SqlError | RuntimeUnavailable
->
+type RuntimeHost = ManagedRuntime.ManagedRuntime<Durability.RuntimeServices, DurabilityFailure | RuntimeUnavailable>
 
 interface Host {
   readonly runtime: RuntimeHost
-  readonly ownerId: string
 }
 
 interface Vars {
   host: Host | undefined
 }
 
-type Context = ActorContext<undefined, undefined, undefined, Vars, undefined, ReturnType<typeof db>>
-type RuntimeActionContext = ActionContext<undefined, undefined, undefined, Vars, undefined, ReturnType<typeof db>>
+type Context = ActorContext<undefined, undefined, undefined, Vars, undefined, undefined>
+type RuntimeActionContext = ActionContext<undefined, undefined, undefined, Vars, undefined, undefined>
 
 type RuntimeActions = {
   readonly runtime: {
@@ -118,7 +105,7 @@ type RuntimeActions = {
       c: RuntimeActionContext,
       runId: string,
     ) => Promise<Effect.Success<ReturnType<RuntimeService["inspect"]>>>
-    readonly drain: (c: RuntimeActionContext, fire?: ScheduledFireInfo) => Promise<SqliteRunActivation.DrainResult>
+    readonly drain: (c: RuntimeActionContext, fire?: ScheduledFireInfo) => Promise<DrainResult>
   }
 }
 
@@ -129,20 +116,20 @@ export type RuntimeActorDefinition = ActorDefinition<
   undefined,
   Vars,
   undefined,
-  ReturnType<typeof db>,
+  undefined,
   Record<never, never>,
   Record<never, never>,
   RuntimeActions
 >
 
 /** @experimental */
-export interface RuntimeActorOptions extends Omit<SqliteStoreOptions, "activationProjection" | "source"> {
+export interface RuntimeActorOptions extends Omit<Durability.Options, "schedulerMode"> {
+  /** Application-owned transport and cryptography; never actor-local durability. */
+  readonly storage: Layer.Layer<ObjectStore | Crypto.Crypto>
   /** Application-owned executable reconstruction composed into each actor incarnation. */
   readonly resolver: Layer.Layer<ExecutableResolver>
   /** Bounded authoritative candidates processed per wake. */
   readonly drainFuel?: number
-  /** Bounded stale claims recovered per startup transaction. */
-  readonly recoveryPageSize?: number
   /** Durable fallback doorbell interval. Rivet requires at least 5 seconds. */
   readonly recoveryIntervalMillis?: number
   /** Rivet process-lifecycle tuning; it never carries Runtime authority. */
@@ -171,11 +158,7 @@ const arm = async (c: Context, delayMillis = 0): Promise<void> => {
 const runDrain = async (c: Context, fuel: number) => {
   const host = requireHost(c)
   const result = await host.runtime.runPromise(
-    SqliteRunActivation.drain({
-      ownerId: host.ownerId,
-      fuel,
-      rearm: Effect.void,
-    }),
+    Effect.flatMap(LocalScheduler, (scheduler) => scheduler.drain({ fuel })),
     { signal: c.abortSignal },
   )
   if (result.nextDueAt !== undefined) {
@@ -198,50 +181,26 @@ const dispose = async (c: Context): Promise<void> => {
   if (host !== undefined) await host.runtime.dispose()
 }
 
-const makeRuntimeOwner = (actorId: string) =>
-  Effect.gen(function* () {
-    const sqlClient = yield* SqlClient.SqlClient
-    const rows = yield* sqlClient.withTransaction(
-      Effect.gen(function* () {
-        yield* sqlClient`CREATE TABLE IF NOT EXISTS generalist_rivet_host (
-          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-          incarnation INTEGER NOT NULL
-        )`
-        return yield* sqlClient<{ incarnation: number }>`INSERT INTO generalist_rivet_host (singleton, incarnation)
-          VALUES (1, 1)
-          ON CONFLICT(singleton) DO UPDATE SET incarnation = incarnation + 1
-          RETURNING incarnation`
-      }),
-    )
-    const incarnation = rows[0]?.incarnation
-    if (incarnation === undefined) {
-      return yield* RuntimeUnavailable.make({ message: "Rivet actor incarnation allocation returned no row" })
-    }
-    return RuntimeOwner.of({ ownerId: `${actorId}:${incarnation}` })
-  })
-
 /**
  * @experimental Build one Rivet Actor per Runtime partition.
  *
- * Actor SQLite is the only mutable Runtime authority. Schedules and cron are lossy doorbells.
+ * The object journal is the only Runtime authority. Schedules and cron are wake hints.
  */
 export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefinition => {
   const {
     actorOptions,
     drainFuel,
     recoveryIntervalMillis,
-    recoveryPageSize: pageSize,
     resolver,
+    storage,
     ...storeOptions
   } = options
   const fuel = Math.max(1, Math.floor(drainFuel ?? 64))
-  const recoveryPageSize = Math.max(1, Math.min(1000, Math.floor(pageSize ?? 100)))
   const recoveryInterval = Math.max(5_000, Math.floor(recoveryIntervalMillis ?? 5_000))
   const configuredOptions: ConfiguredActorOptions = {}
   if (actorOptions !== undefined) configuredOptions.options = actorOptions
 
   return actor({
-    db: db({ warnOnManualTransactions: false }),
     createVars: (): Vars => ({ host: undefined }),
     ...configuredOptions,
     actionInputSchemas,
@@ -253,53 +212,20 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
         maxHistory: 0,
       })
 
-      const ownerLayer = Layer.effect(RuntimeOwner, makeRuntimeOwner(c.actorId))
       const runtime = ManagedRuntime.make(
-        Layer.unwrap(
-          Effect.gen(function* () {
-            const sqlClient = yield* SqlClient.SqlClient
-            const owner = yield* RuntimeOwner
-            return layerSqliteRuntime({
-              options: {
-                ...storeOptions,
-                source: "rivet-actor",
-                activationProjection: SqliteRunActivation.makeProjection(sqlClient, Effect.void),
-              },
-              workerId: owner.ownerId,
-              schedulerMode: "external",
-            })
-          }),
-        ).pipe(Layer.provide(resolver), Layer.provideMerge(ownerLayer), Layer.provideMerge(layerSqlClient(c.db))),
+        Layer.effectDiscard(Durability.activate).pipe(
+          Layer.provideMerge(Durability.layer({
+            ...storeOptions,
+            schedulerMode: "external",
+          })),
+          Layer.provide(resolver),
+          Layer.provide(storage),
+        ),
       )
       try {
-        const { ownerId } = await runtime.runPromise(RuntimeOwner, { signal: c.abortSignal })
-        const sql = await runtime.runPromise(SqlClient.SqlClient, { signal: c.abortSignal })
-        const projection = SqliteRunActivation.makeProjection(sql, Effect.void)
-        const host: Host = { runtime, ownerId }
-        c.vars.host = host
-        const result = await runtime.runPromise(
-          Effect.gen(function* () {
-            yield* Runtime
-            yield* sql.withTransaction(SqliteRunActivation.initialize(Effect.void))
-            const recovery = makeExclusiveExecutionRecovery(sql, projection)
-            let afterRunId: string | undefined
-            do {
-              const input: Parameters<typeof recovery.recoverClaims>[0] = {
-                newOwnerId: ownerId,
-                limit: recoveryPageSize,
-              }
-              if (afterRunId !== undefined) Object.assign(input, { afterRunId })
-              const recovered = yield* recovery.recoverClaims(input)
-              afterRunId = recovered.continuation
-            } while (afterRunId !== undefined)
-            return yield* SqliteRunActivation.drain({
-              ownerId,
-              fuel,
-              rearm: Effect.void,
-            })
-          }),
-          { signal: c.abortSignal },
-        )
+        await runtime.runPromise(Runtime, { signal: c.abortSignal })
+        c.vars.host = { runtime }
+        const result = await runDrain(c, fuel)
         if (result.nextDueAt !== undefined) await arm(c)
       } catch (cause) {
         c.vars.host = undefined

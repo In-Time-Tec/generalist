@@ -70,7 +70,12 @@ const attempt = (runId: string): RunEvent.RunAttemptStarted => ({
 const completed = (runId: string, sequence: number): RunEvent.RunCompleted => ({
   ...base(runId, sequence),
   _tag: "RunCompleted",
-  result: { text: "complete", turns: 1, session: { sessionId: `session:${runId}`, leafId: null } },
+  result: {
+    text: "complete",
+    output: "complete",
+    turns: 1,
+    session: { sessionId: `session:${runId}`, leafId: null },
+  },
 })
 
 const completedProgram = (runId: string, sequence: number): RunEvent.RunCompleted => ({

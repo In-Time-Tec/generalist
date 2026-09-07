@@ -47,6 +47,7 @@ import { Prompt } from "effect/unstable/ai"
 import { programWait } from "./approval.js"
 import { OperationOutcome } from "./operation-outcome.js"
 import { Authorization } from "./authorization.js"
+import { digest as identityDigest } from "../../core/durable/canonical-json.js"
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
@@ -57,6 +58,21 @@ export const make = (input: {
   const tools = new Map(input.handlers.tools.map((handler) => [handler.name, handler] as const))
   const steps = new Map(input.handlers.steps.map((handler) => [handler.name, handler] as const))
   const agents = new Map(input.handlers.agents.map((handler) => [handler.selection, handler] as const))
+  const branch = input.claimed.checkpoint !== undefined && "_tag" in input.claimed.checkpoint
+    ? input.claimed.checkpoint.branch
+    : undefined
+  const operationIdentity = (authoredOperation: string): string =>
+    branch === undefined
+      ? authoredOperation
+      : branch.replay[authoredOperation] ?? `b${identityDigest({ namespace: branch.namespace, authoredOperation }).slice(0, 63)}`
+  // Immutable command receipts are not the current dispatch state.
+  const acceptedOperation = (operation: string) =>
+    input.store.getProgramOperation({ runId: input.claim.runId, operation }).pipe(
+      Effect.mapError(storeFailure),
+      Effect.flatMap((record) => record === undefined
+        ? ProgramCancelled.make({ reason: `Accepted Program operation ${operation} is missing` })
+        : Effect.succeed(record)),
+    )
   const settleOperation = (
     operation: string,
     outcome: Parameters<RunStore["settleProgramOperation"]>[0]["outcome"],
@@ -69,6 +85,7 @@ export const make = (input: {
     program: PinnedProgram,
     options: {
       readonly operation: string
+      readonly authoredOperation: string
       readonly kind: Exclude<ProgramOperationKind, "log">
       readonly capability: string
       readonly request: unknown
@@ -91,8 +108,8 @@ export const make = (input: {
         ...input.claim,
         programPin: program.pin,
         budget: program.manifest.budget,
-        nowMillis,
         operation: options.operation,
+        authoredOperation: options.authoredOperation,
         kind: options.kind,
         capability: options.capability,
         inputDigest,
@@ -100,7 +117,8 @@ export const make = (input: {
         replay: options.replay,
         reservation: options.reservation ?? {},
       }
-      const record = yield* input.store.reserveProgramOperation(reservation).pipe(Effect.mapError(storeFailure))
+      yield* input.store.reserveProgramOperation(reservation).pipe(Effect.mapError(storeFailure))
+      const record = yield* acceptedOperation(options.operation)
       if (record.status === "succeeded") return yield* options.validateResult(record.result)
       if (record.status === "failed") return yield* storeFailure(record.error)
       if (record.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: options.operation })
@@ -124,7 +142,7 @@ export const make = (input: {
                 ...reservation,
                 suspension: failure,
                 wait: { ...wait, status: "open", openedAt },
-                checkpoint: { _tag: "Program", version: "1" },
+                checkpoint: { _tag: "Program", version: "1", ...(branch === undefined ? {} : { branch }) },
               })
               .pipe(Effect.mapError(storeFailure))
             return yield* failure
@@ -148,6 +166,11 @@ export const make = (input: {
         return yield* ProgramOperationUnknown.make({ operation: options.operation })
       }
       const dispatch = Effect.gen(function* () {
+        const execution = yield* input.store.loadExecution(input.claim.runId).pipe(Effect.mapError(storeFailure))
+        if (execution.ownerId !== input.claim.ownerId || execution.attemptFence !== input.claim.attemptFence) {
+          return yield* ProgramCancelled.make({ reason: "Program execution ownership changed before dispatch" })
+        }
+        if (execution.cancellationRequested) return yield* ProgramCancelled.make({ reason: "Program execution was cancelled" })
         const exit = yield* Effect.exit(options.dispatch)
         if (exit._tag === "Success") {
           const value = yield* options.validateResult(exit.value)
@@ -200,13 +223,15 @@ export const make = (input: {
     )
   const runAgentMembers = (
     program: PinnedProgram,
-    request: {
+    authoredRequest: {
       readonly operation: string
       readonly kind: "agent" | "agent-map" | "agent-fan-out"
       readonly members: ReadonlyArray<{ readonly member: string; readonly selection: string; readonly input: unknown }>
     },
   ) =>
     Effect.gen(function* () {
+      const authoredOperation = authoredRequest.operation
+      const request = { ...authoredRequest, operation: operationIdentity(authoredOperation) }
       if (request.members.length === 0) return []
       if (new Set(request.members.map((member) => member.member)).size !== request.members.length) {
         return yield* ProgramAgentFailure.make({
@@ -214,6 +239,28 @@ export const make = (input: {
           operation: request.operation,
           cause: "Agent member keys must be unique",
         })
+      }
+      const prior = yield* input.store.getProgramOperation({
+        runId: input.claim.runId, operation: request.operation,
+      }).pipe(Effect.mapError(storeFailure))
+      if (prior?.status === "succeeded" || prior?.status === "failed" || prior?.status === "unknown") {
+        yield* input.store.reserveProgramOperation({
+          ...input.claim,
+          programPin: program.pin,
+          budget: program.manifest.budget,
+          operation: request.operation,
+          authoredOperation,
+          kind: request.kind,
+          capability: request.kind === "agent-fan-out" ? "fan-out" : request.members[0]!.selection,
+          inputDigest: yield* digest({ kind: request.kind, members: request.members }, "agent-input", request.kind),
+          input: request.members,
+          replay: "recorded",
+          reservation: {},
+        }).pipe(Effect.mapError(storeFailure))
+        const retained = yield* acceptedOperation(request.operation)
+        if (retained.status === "failed") return yield* storeFailure(retained.error)
+        if (retained.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: request.operation })
+        return yield* strictDecode(AgentMemberResults, "agent-output", request.kind)(retained.result)
       }
       const decoded: Array<{
         readonly member: string
@@ -243,13 +290,13 @@ export const make = (input: {
         reason: "agent",
         token: `program-children:${request.operation}`,
       })
-      const record = yield* input.store
+      yield* input.store
         .admitProgramAgents({
           ...input.claim,
           programPin: program.pin,
           budget: program.manifest.budget,
-          nowMillis,
           operation: request.operation,
+          authoredOperation,
           kind: request.kind,
           capability: request.kind === "agent-fan-out" ? "fan-out" : decoded[0]!.selection,
           inputDigest: yield* digest({ kind: request.kind, members: request.members }, "agent-input", request.kind),
@@ -284,9 +331,11 @@ export const make = (input: {
           },
         })
         .pipe(Effect.mapError(storeFailure))
+      const record = yield* acceptedOperation(request.operation)
       if (record.status === "succeeded")
         return yield* strictDecode(AgentMemberResults, "agent-output", request.kind)(record.result)
       if (record.status === "failed") return yield* storeFailure(record.error)
+      if (record.status === "unknown") return yield* ProgramOperationUnknown.make({ operation: request.operation })
       if (record.status === "waiting") return yield* suspension
       const aggregate = yield* input.store.inspectFanOut(record.fanOutId!).pipe(Effect.mapError(storeFailure))
       if (aggregate.status === "running") return yield* suspension
@@ -330,9 +379,10 @@ export const make = (input: {
           Effect.flatMap((encoded) => Schema.decodeUnknownEffect(Schema.Json)(encoded)),
           Effect.mapError(schemaFailure(outputBoundary, capability)),
         )
-      const operation = request.operation
+      const operation = operationIdentity(request.operation)
       return yield* executeOperation(program, {
         operation,
+        authoredOperation: request.operation,
         kind,
         capability,
         request,
@@ -422,14 +472,13 @@ export const make = (input: {
                 }
               : { level: request.level, message: request.message, data: request.data }
           const bytes = yield* encodedBytes(logEntry)
-          const nowMillis = yield* Clock.currentTimeMillis
           const inputDigest = yield* digest({ kind: "log", capability: "log", input: request }, "program-output", "log")
           const logRecord: CommitProgramLogInput = {
             ...input.claim,
             programPin: program.pin,
             budget: program.manifest.budget,
-            nowMillis,
-            operation: request.operation,
+            operation: operationIdentity(request.operation),
+            authoredOperation: request.operation,
             kind: "log",
             capability: "log",
             inputDigest,
@@ -458,7 +507,9 @@ export const make = (input: {
         const capabilities = makeCapabilities(request.program)
         const signal = yield* Effect.abortSignal
         const now = yield* Clock.currentTimeMillis
-        const budget = request.program.manifest.budget
+        const state = yield* input.store.loadProgramState(input.claim.runId).pipe(Effect.mapError(storeFailure))
+        const budget = state?.budget ?? request.program.manifest.budget
+        const wallTimeMillis = state === undefined ? budget.wallClockMillis : Math.max(0, state.deadlineMillis - now)
         const execution = input.executor
           .execute(
             makeRequest({
@@ -469,7 +520,7 @@ export const make = (input: {
               encodedInput: request.input,
               signal,
               nowMillis: now,
-              wallTimeMillis: budget.wallClockMillis,
+              wallTimeMillis,
               outputBytes: budget.outputBytes,
               toolCalls: budget.toolCalls,
               agentRuns: budget.agentRuns,
@@ -481,18 +532,18 @@ export const make = (input: {
           .pipe(Effect.provideService(ProgramCapabilities, capabilities))
         const output = yield* execution.pipe(
           Effect.timeoutOrElse({
-            duration: request.program.manifest.budget.wallClockMillis,
+            duration: wallTimeMillis,
             orElse: () =>
               Effect.fail(
                 ProgramBudgetExhausted.make({
                   dimension: "wallClockMillis",
-                  limit: request.program.manifest.budget.wallClockMillis,
+                  limit: budget.wallClockMillis,
                 }),
               ),
           }),
         )
         const outputBytes = yield* encodedBytes(output.output)
-        if (outputBytes > request.program.manifest.budget.outputBytes)
+        if (outputBytes > budget.outputBytes)
           return yield* ProgramBudgetExhausted.make({ dimension: "outputBytes", limit: budget.outputBytes })
         return output.output
       }),

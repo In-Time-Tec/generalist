@@ -203,8 +203,10 @@ export const childAdmissionSuite = <StoreError, Extra = never>(
             prompt: "a",
             key: "first",
           })
-          const claim = yield* store.claimExecution({ runId: child.childRunId, ownerId: "child" })
-          yield* store.complete({ ...claim, result: completedResult("done") })
+          const claim = yield* store.claimExecution({
+          commandId: "runtime-child-suites-admission-ts-claim-1", runId: child.childRunId, ownerId: "child" })
+          yield* store.complete({
+          commandId: "runtime-child-suites-admission-ts-complete-1", ...claim, result: completedResult("done") })
           const joined = yield* children.join({ parentRunId, childRunId: child.childRunId })
           expect(joined.childRunId).toBe(child.childRunId)
           expect(joined.status).toBe("succeeded")

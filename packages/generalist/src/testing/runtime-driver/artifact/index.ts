@@ -18,7 +18,7 @@ export const registerArtifacts = <LayerError, ClaimsLayerError>(input: {
 }): void => {
   const { options, provide } = input
 
-  it.effect("orders Artifact operations, replays without a gap, and isolates branches", () =>
+  it.effect("orders Artifact operations, preserves append receipts, and isolates branches", () =>
     provide((services) =>
       Effect.scoped(
         Effect.gen(function* () {
@@ -30,15 +30,47 @@ export const registerArtifacts = <LayerError, ClaimsLayerError>(input: {
             snapshot: initial,
           })
 
-          const first = yield* services.store.appendArtifact({
+          const firstInput = {
             artifact,
+            commandId: "human:0",
             crdt: "test-v1",
             expected: 0,
             base: 0,
-            operation: { _tag: "Insert", at: 0, text: "human" },
-            attribution: { _tag: "Human", actor: "alice" },
+            operation: { _tag: "Insert", at: 0, text: "human" } as const,
+            attribution: { _tag: "Human", actor: "alice" } as const,
             update: Uint8Array.of(1),
             snapshot: snapshot(1),
+          }
+          const first = yield* services.store.appendArtifact(firstInput)
+          expect(yield* services.store.appendArtifact(firstInput)).toEqual(first)
+
+          const divergentRetry = yield* services.store
+            .appendArtifact({
+              ...firstInput,
+              operation: { _tag: "Insert", at: 0, text: "different" },
+              update: Uint8Array.of(9),
+              snapshot: snapshot(9),
+            })
+            .pipe(Effect.flip)
+          expect(divergentRetry).toMatchObject({
+            _tag: "generalist/durability/DurabilityFailure",
+            reason: "input-conflict",
+          })
+
+          const competing = yield* services.store
+            .appendArtifact({
+              ...firstInput,
+              commandId: "agent:0",
+              operation: { _tag: "Insert", at: 0, text: "agent" },
+              attribution: { _tag: "Agent", actor: "writer", runId: "run:artifact" },
+              update: Uint8Array.of(2),
+              snapshot: snapshot(2),
+            })
+            .pipe(Effect.flip)
+          expect(competing).toMatchObject({
+            _tag: "generalist/artifact/ArtifactVersionConflict",
+            expected: 0,
+            actual: 1,
           })
           const followed = yield* services.store
             .artifactUpdates({ artifact, version: 0 })
@@ -46,6 +78,7 @@ export const registerArtifacts = <LayerError, ClaimsLayerError>(input: {
           yield* Effect.yieldNow
           const second = yield* services.store.appendArtifact({
             artifact,
+            commandId: "agent:1",
             crdt: "test-v1",
             expected: 1,
             base: 0,
@@ -66,6 +99,7 @@ export const registerArtifacts = <LayerError, ClaimsLayerError>(input: {
           const conflict = yield* services.store
             .appendArtifact({
               artifact,
+              commandId: "human:stale",
               crdt: "test-v1",
               expected: 1,
               base: 1,
@@ -90,6 +124,7 @@ export const registerArtifacts = <LayerError, ClaimsLayerError>(input: {
           })
           yield* services.store.appendArtifact({
             artifact,
+            commandId: "agent:branch",
             crdt: "test-v1",
             branch,
             expected: 1,

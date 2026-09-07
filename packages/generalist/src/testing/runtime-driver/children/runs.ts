@@ -91,9 +91,19 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
           budget: makeBudget({ tokens: 100, children: 4 }),
         })
         yield* services.executor.execute(
-          yield* capability.claim(services, { runId: handle.runId, workerId: "child-runs-before" }),
+          yield* capability.claim(services, { runId: handle.runId, commandId: "child-runs-before" }),
         )
         const inspection = yield* services.runtime.inspect(handle.runId)
+        if (inspection.status === "failed") {
+          const failure = (yield* services.runtime.history({ runId: handle.runId, limit: 100 })).find(
+            (event) => event._tag === "RunFailed",
+          )
+          if (failure?._tag === "RunFailed") {
+            throw new Error(
+              `child suspension RunFailed: ${failure.error._tag}: ${failure.error.message}`,
+            )
+          }
+        }
         expect(inspection.status).toBe("waiting")
         expect(inspection.children).toHaveLength(2)
         return { runId: handle.runId, childRunIds: inspection.children.map((entry) => entry.childRunId) }
@@ -101,11 +111,10 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
     const recover = (
       services: Services,
       suspended: { readonly runId: string; readonly childRunIds: ReadonlyArray<string> },
-      rebuilt: boolean,
     ) =>
       Effect.gen(function* () {
         if (services.executor === undefined) return yield* Effect.die(`${options.name} child-runs requires RunExecutor`)
-        if (rebuilt) yield* register(services.runtime)
+        yield* register(services.runtime)
         expect(yield* services.runtime.inspect(suspended.runId)).toMatchObject({
           status: "waiting",
           children: [{ status: "queued" }, { status: "queued" }],
@@ -132,16 +141,13 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
           },
         ])
         for (const [index, runId] of suspended.childRunIds.entries()) {
-          const claim = yield* capability.claim(services, { runId, workerId: `child-runs-child-${index}` })
-          yield* services.store.complete({
-            ...claim,
-            result: {
-              text: `child-${index}`,
-              output: `child-${index}`,
-              turns: 1,
-              session: { sessionId: `session:${name}:child:${index}`, leafId: null },
-            },
-          })
+          const claim = yield* capability.claim(services, { runId, commandId: `child-runs-child-${index}` })
+          yield* services.store.complete({ ...claim, commandId: `${claim.runId}:complete:${claim.attemptFence}`, result: {
+            text: `child-${index}`,
+            output: `child-${index}`,
+            turns: 1,
+            session: { sessionId: `session:${name}:child:${index}`, leafId: null },
+          }, })
         }
         expect(yield* services.runtime.inspect(suspended.runId)).toMatchObject({
           status: "running",
@@ -153,31 +159,43 @@ export const registerChildRuns = <LayerError, ClaimsLayerError>(input: {
           beforeResume.filter((event) => event._tag === "ChildLinked").map((event) => event.budget?.tokens),
         ).toEqual([24, 24])
         yield* services.executor.execute(
-          yield* capability.claim(services, { runId: suspended.runId, workerId: "child-runs-after" }),
+          yield* capability.claim(services, { runId: suspended.runId, commandId: "child-runs-after" }),
         )
         const finalInspection = yield* services.runtime.inspect(suspended.runId)
+        const finalHistory = yield* services.runtime.history({ runId: suspended.runId, limit: 100 })
+        if (finalInspection.status === "failed") {
+          const failure = finalHistory.find((event) => event._tag === "RunFailed")
+          if (failure?._tag === "RunFailed") {
+            const serialized = (() => {
+              try {
+                return JSON.stringify(failure.error) ?? String(failure.error)
+              } catch {
+                return String(failure.error)
+              }
+            })()
+            const details = serialized.length > 512 ? `${serialized.slice(0, 512)}...` : serialized
+            const cause =
+              "cause" in failure.error && failure.error.cause !== undefined
+                ? ` cause=${String(failure.error.cause).slice(0, 256)}`
+                : ""
+            throw new Error(`child resume RunFailed: ${failure.error._tag}: ${details}${cause}`)
+          }
+        }
         expect(finalInspection).toMatchObject({
           status: "succeeded",
           budget: { tokens: 96, children: 2 },
         })
-        const history = yield* services.runtime.history({ runId: suspended.runId, limit: 100 })
+        const history = finalHistory
         expect(history.filter((event) => event._tag === "FanOutAdmitted")).toHaveLength(1)
         expect(history.filter((event) => event._tag === "FanOutJoined")).toHaveLength(1)
         expect(history.filter((event) => event._tag === "ToolExecutionCompleted")).toHaveLength(1)
       })
 
-    if (capability.recovery === "rebuild") {
-      return prepare(
-        Effect.gen(function* () {
-          const suspended = yield* open(start)
-          yield* open((services) => recover(services, suspended, true))
-        }).pipe(Effect.orDie),
-      )
-    }
     return prepare(
-      open((services) => Effect.flatMap(start(services), (suspended) => recover(services, suspended, false))).pipe(
-        Effect.orDie,
-      ),
+      Effect.gen(function* () {
+        const suspended = yield* open(start)
+        yield* open((services) => recover(services, suspended))
+      }).pipe(Effect.orDie),
     )
   })
 }

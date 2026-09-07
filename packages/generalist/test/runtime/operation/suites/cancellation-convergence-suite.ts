@@ -4,6 +4,7 @@ import { Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { assistantAddress, textPrompt } from "../../execution/fixtures.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
+import { objectWorkerId } from "../../execution/object.js"
 
 export interface CancellationConvergenceSuiteOptions<StoreError, Extra = never> {
   readonly name: string
@@ -21,7 +22,11 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claimExecution = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({ runId, ownerId }))
+      ? Effect.flatMap(RunStore.RunStore, (store) => store.claimExecution({
+          commandId: `runtime-operation-suites-cancellation-convergence-suite-ts-claim-${ownerId}`,
+          runId,
+          ownerId: objectWorkerId,
+        }))
       : options.claim(runId, ownerId)
   const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
@@ -47,7 +52,8 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
           replayPolicy: "never",
           attempt: 1,
         })
-        yield* store.startOperation({ ...executionClaim, operationId: operation.operationId })
+        yield* store.startOperation({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-startOperation-1", ...executionClaim, operationId: operation.operationId })
         return { runtime, store, receipt, claim: executionClaim, operation }
       })
 
@@ -55,8 +61,10 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { runtime, store, receipt, claim, operation } = yield* runningOperation("cancel-first")
-          yield* runtime.cancel({ runId: receipt.runId, reason: "cancel first" })
-          const expired = yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+          yield* runtime.cancel({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-cancel-2", runId: receipt.runId, reason: "cancel first" })
+          const expired = yield* store.expireRunningOperation({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-expireRunningOperation-3", ...claim, operationId: operation.operationId })
           expect(expired.outcome).toBe("unknown")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
           yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
@@ -75,7 +83,8 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { runtime, store, receipt, claim, operation } = yield* runningOperation("complete-cancel-first")
-          yield* runtime.cancel({ runId: receipt.runId, reason: "cancel first" })
+          yield* runtime.cancel({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-cancel-4", runId: receipt.runId, reason: "cancel first" })
           const completed = yield* store.completeOperation({
             ...claim,
             operationId: operation.operationId,
@@ -100,7 +109,8 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
           })
           expect(completed.status).toBe("unknown")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
-          yield* runtime.cancel({ runId: receipt.runId, reason: "cancel unknown" })
+          yield* runtime.cancel({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-cancel-5", runId: receipt.runId, reason: "cancel unknown" })
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
         }),
       ),
@@ -110,10 +120,12 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const { runtime, store, receipt, claim, operation } = yield* runningOperation("unknown-first")
-          const expired = yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+          const expired = yield* store.expireRunningOperation({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-expireRunningOperation-6", ...claim, operationId: operation.operationId })
           expect(expired.outcome).toBe("unknown")
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
-          yield* runtime.cancel({ runId: receipt.runId, reason: "cancel unknown" })
+          yield* runtime.cancel({
+          commandId: "runtime-operation-suites-cancellation-convergence-suite-ts-cancel-7", runId: receipt.runId, reason: "cancel unknown" })
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
           yield* runtime.resolveOperation({
             runId: receipt.runId,

@@ -151,7 +151,11 @@ export const make = (input: {
           }
           if (record.status === "unknown") return yield* unknown()
           const expired = yield* input.store
-            .expireRunningOperation({ ...input.claim, operationId: record.operationId })
+            .expireRunningOperation({
+              ...input.claim,
+              operationId: record.operationId,
+              commandId: JSON.stringify(["expire-operation", input.claim.runId, input.claim.attemptFence, record.operationId, context.attempt ?? input.claimed.attempt]),
+            })
             .pipe(Effect.orDie)
           if (expired.outcome === "unknown") return yield* unknown()
           if (expired.outcome === "failed") return yield* replayFailure(expired.record)
@@ -247,7 +251,11 @@ export const make = (input: {
           yield* authorize
         }
 
-        yield* input.store.startOperation({ ...input.claim, operationId: record.operationId }).pipe(Effect.orDie)
+        yield* input.store.startOperation({
+          ...input.claim,
+          operationId: record.operationId,
+          commandId: JSON.stringify(["start-operation", input.claim.runId, input.claim.attemptFence, record.operationId, context.attempt ?? input.claimed.attempt]),
+        }).pipe(Effect.orDie)
         yield* emit("running")
         const exit = yield* Effect.exit(effect)
         if (exit._tag === "Success") {
