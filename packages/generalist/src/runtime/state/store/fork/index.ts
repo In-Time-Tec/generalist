@@ -169,7 +169,14 @@ const forkEffect = (state: RuntimeState, input: ForkRunInput) =>
     const sessions = new Map(state.sessions)
     const sourceSession = sessions.get(source.message.sessionId)
     const initialSession =
-      sourceSession === undefined ? undefined : copiedSession({ session: sourceSession, leaf: leafAt(events) })
+      sourceSession === undefined
+        ? undefined
+        : copiedSession({
+            session: sourceSession,
+            leaf: leafAt(events),
+            checkpoint: run.checkpoint,
+            initialComponents: source.initialSessionComponents,
+          })
     const { operations, session: targetSession } = yield* replaceOperations({
       operations: state.operations,
       sourceRunId: input.runId,
@@ -338,9 +345,24 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
     const sessions = new Map(state.sessions)
     const sourceSession = sessions.get(source.message.sessionId)
     const initialBranchSession =
-      sourceSession === undefined ? undefined : copiedSession({ session: sourceSession, leaf: leafAt(branchEvents) })
+      sourceSession === undefined
+        ? undefined
+        : copiedSession({
+            session: sourceSession,
+            leaf: leafAt(branchEvents),
+            checkpoint: branch.checkpoint,
+            initialComponents: source.initialSessionComponents,
+          })
     if (sourceSession !== undefined) {
-      sessions.set(source.message.sessionId, yield* rewoundSession({ session: sourceSession, leaf: leafAt(events) }))
+      sessions.set(
+        source.message.sessionId,
+        yield* rewoundSession({
+          session: sourceSession,
+          leaf: leafAt(events),
+          checkpoint: rewound.checkpoint,
+          initialComponents: source.initialSessionComponents,
+        }),
+      )
     }
     const { operations: branchOperations, session: branchSession } = yield* replaceOperations({
       operations: state.operations,

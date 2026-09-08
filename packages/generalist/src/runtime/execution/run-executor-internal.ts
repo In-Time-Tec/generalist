@@ -6,6 +6,7 @@ import { AgentError, type Event } from "../../core/agent/event.js"
 import { HostedRun } from "../../core/agent/lifecycle/run-handle.js"
 import { applyInheritance, Inheritance } from "../../core/agent/lifecycle/fan-out.js"
 import { trustJournaled } from "../../core/capability/internal.js"
+import { SessionState } from "../../core/durable/component/services.js"
 import { type DriverCheckpoint, DriverJournal, type DriverOperation, type Journal } from "../../core/durable/driver.js"
 import { externalRunInbox } from "../../core/turn/steering-inbox.js"
 import { RunStore, type ExecutionClaim, type Service as RunStoreService } from "../run/store.js"
@@ -432,7 +433,15 @@ const makeFor = (
                             commandId,
                           }),
                       }
-                      const context = Context.merge(baseContext, Context.make(DriverJournal, journal))
+                      const sessionState = yield* store.loadExecution(runId).pipe(
+                        Effect.map((execution) => ({
+                          sessionId: execution.message.sessionId,
+                          components: execution.sessionComponents ?? [],
+                        })),
+                      )
+                      const context = Context.merge(baseContext, Context.make(DriverJournal, journal)).pipe(
+                        Context.add(SessionState, sessionState),
+                      )
                       if (
                         !matchesActiveRunOptions(claimed.executableRef, claimed.executableManifest, resolved.runOptions)
                       ) {

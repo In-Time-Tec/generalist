@@ -556,6 +556,28 @@ A new client must see acknowledged writes and distinguish absence.
 
 ***
 
+<a id="layer"></a>
+
+### layer
+
+> `const` **layer**: (`client`) => `Layer.Layer`\<`ObjectStore`\>
+
+**`Experimental`**
+
+Provide a simulator client to the production object Runtime in a test scope.
+
+#### Parameters
+
+##### client
+
+[`Client`](#client)
+
+#### Returns
+
+`Layer.Layer`\<`ObjectStore`\>
+
+***
+
 <a id="listing"></a>
 
 ### listing

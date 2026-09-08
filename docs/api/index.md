@@ -9,6 +9,7 @@
 - [approvals](./approvals.md)
 - [blob-store](./blob-store.md)
 - [compaction](./compaction.md)
+- [components](./components.md)
 - [durability](./durability.md)
 - [durability.discovery](./durability.discovery.md)
 - [durability.host](./durability.host.md)
