@@ -27,7 +27,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
     Layer.mergeAll(
       objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([]))),
       Toolkit.make(tool).toLayer({ count: () => Effect.succeed(1) }),
-    layer([]),
+      layer([]),
       layerAutoApprove,
       layerAllowAll,
     )
