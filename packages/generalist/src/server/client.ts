@@ -19,12 +19,13 @@ import { Retry as SseRetry, type SseError } from "effect/unstable/encoding/Sse"
 import { Socket } from "effect/unstable/socket"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
 import type { Put as BlobPut } from "../blob-store/index.js"
-import type { EncodedAgentInput, SessionCreateOptions } from "../host/index.js"
+import type { EncodedAgentInput } from "../host/index.js"
 import { HostEvent } from "../host/event.js"
 import type { Decision } from "../runtime/operation/approval.js"
 import type { UnknownResolution } from "../runtime/execution/recovery/operator.js"
 import type { Cursor } from "../runtime/cursor.js"
 import type { HostSessionSnapshot } from "../runtime/session/host.js"
+import { make as makeSessionClient, type SessionClient } from "./session-client.js"
 import { api, type RunCancelPayload, type RunStartPayload } from "./api.js"
 import { ApiError, InvalidConnectOptions, ReconnectExhausted, TransportError, Unauthorized } from "./errors.js"
 import { encodeCommand, eventCodec, type ClientCommand, type ServerEvent } from "./wire.js"
@@ -80,10 +81,7 @@ export interface Client {
     readonly put: (input: BlobPut) => ReturnType<RawClient["attachments"]["put"]>
     readonly get: (options: { readonly sha256: string }) => ReturnType<RawClient["attachments"]["get"]>
   }
-  readonly sessions: {
-    readonly create: (options?: SessionCreateOptions) => ReturnType<RawClient["sessions"]["create"]>
-    readonly get: (options: { readonly sessionId: string }) => ReturnType<RawClient["sessions"]["get"]>
-    readonly snapshot: (options: { readonly sessionId: string }) => ReturnType<RawClient["sessions"]["snapshot"]>
+  readonly sessions: SessionClient & {
     readonly list: () => ReturnType<RawClient["sessions"]["list"]>
   }
   readonly runs: {
@@ -428,17 +426,7 @@ export const client = (options: {
           }),
         get: ({ sha256 }) => raw.attachments.get({ params: { sha256 } }),
       },
-      sessions: {
-        create: (sessionOptions = {}) => {
-          const payload: Types.Mutable<SessionCreateOptions> = {}
-          if (sessionOptions.id !== undefined) payload.id = sessionOptions.id
-          if (sessionOptions.title !== undefined) payload.title = sessionOptions.title
-          return raw.sessions.create({ payload })
-        },
-        get: ({ sessionId }) => raw.sessions.get({ params: { id: sessionId } }),
-        snapshot: ({ sessionId }) => raw.sessions.snapshot({ params: { id: sessionId } }),
-        list: () => raw.sessions.list({}),
-      },
+      sessions: { ...makeSessionClient(raw.sessions), list: () => raw.sessions.list({}) },
       runs: {
         start: (startOptions) => {
           const payload: Types.Mutable<RunStartPayload> = { agent: startOptions.agent, input: startOptions.input }

@@ -336,7 +336,7 @@ Fork the provider request into the current fixture scope before awaiting it.
 
 ###### reason?
 
-`"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"limit"` \| `"unavailable"` \| `"invalid-response"`
+`"limit"` \| `"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"unavailable"` \| `"invalid-response"`
 
 ###### Returns
 
@@ -360,7 +360,7 @@ Fork the provider request into the current fixture scope before awaiting it.
 
 ###### reason?
 
-`"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"limit"` \| `"unavailable"` \| `"invalid-response"`
+`"limit"` \| `"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"unavailable"` \| `"invalid-response"`
 
 ###### Returns
 
@@ -553,6 +553,28 @@ A new client must see acknowledged writes and distinguish absence.
 #### Returns
 
 `Effect.Effect`\<`void`, `E` \| [`ObjectStoreConformanceFailure`](#objectstoreconformancefailure) \| `ObjectStoreFailure`, `R`\>
+
+***
+
+<a id="layer"></a>
+
+### layer
+
+> `const` **layer**: (`client`) => `Layer.Layer`\<`ObjectStore`\>
+
+**`Experimental`**
+
+Provide a simulator client to the production object Runtime in a test scope.
+
+#### Parameters
+
+##### client
+
+[`Client`](#client)
+
+#### Returns
+
+`Layer.Layer`\<`ObjectStore`\>
 
 ***
 

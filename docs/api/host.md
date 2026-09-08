@@ -450,6 +450,70 @@ A requested host Session does not exist.
 
 ***
 
+<a id="sessionpageinvalid"></a>
+
+### SessionPageInvalid
+
+**`Experimental`**
+
+A page selector does not name retained evidence in the authorized Session.
+
+#### Extends
+
+- `SessionPageInvalid_base`
+
+#### Constructors
+
+<a id="constructor-7"></a>
+
+##### Constructor
+
+> **new SessionPageInvalid**(...`args`): [`SessionPageInvalid`](#sessionpageinvalid)
+
+**`Experimental`**
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`SessionPageInvalid`](#sessionpageinvalid)
+
+###### Inherited from
+
+`SessionPageInvalid_base.constructor`
+
+#### Properties
+
+<a id="hint-7"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+**`Experimental`**
+
+###### Inherited from
+
+`SessionPageInvalid_base.hint`
+
+<a id="sessionid-3"></a>
+
+##### sessionId
+
+> `readonly` **sessionId**: `string`
+
+**`Experimental`**
+
+###### Inherited from
+
+`SessionPageInvalid_base.sessionId`
+
+***
+
 <a id="sessionsubscriberlagged"></a>
 
 ### SessionSubscriberLagged
@@ -462,7 +526,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 #### Constructors
 
-<a id="constructor-7"></a>
+<a id="constructor-8"></a>
 
 ##### Constructor
 
@@ -484,7 +548,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 #### Properties
 
-<a id="hint-7"></a>
+<a id="hint-8"></a>
 
 ##### hint
 
@@ -504,7 +568,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `SessionSubscriberLagged_base.lastDeliveredCursor`
 
-<a id="sessionid-3"></a>
+<a id="sessionid-4"></a>
 
 ##### sessionId
 
@@ -515,6 +579,46 @@ A Session event subscriber could not keep up with its bounded live queue.
 `SessionSubscriberLagged_base.sessionId`
 
 ## Interfaces
+
+<a id="childhandle"></a>
+
+### ChildHandle
+
+#### Properties
+
+<a id="run"></a>
+
+##### run
+
+> `readonly` **run**: [`HostRun`](#hostrun)\<`unknown`\>
+
+<a id="session"></a>
+
+##### session
+
+> `readonly` **session**: [`SessionHandle`](#sessionhandle)
+
+***
+
+<a id="childspawnoptions"></a>
+
+### ChildSpawnOptions
+
+#### Properties
+
+<a id="commandid"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+<a id="label"></a>
+
+##### label?
+
+> `readonly` `optional` **label?**: `string`
+
+***
 
 <a id="createoptions"></a>
 
@@ -537,6 +641,12 @@ A Session event subscriber could not keep up with its bounded live queue.
 ##### agents
 
 > `readonly` **agents**: `Agents`
+
+<a id="limits"></a>
+
+##### limits?
+
+> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
 
 <a id="plugins-1"></a>
 
@@ -628,7 +738,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### subscribe
 
-> `readonly` **subscribe**: (`sessionId`, `cursor?`) => `Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+> `readonly` **subscribe**: (`sessionId`, `cursor?`) => `Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 ###### Parameters
 
@@ -642,7 +752,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+`Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="operator"></a>
 
@@ -810,6 +920,20 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `Effect`\<`void`, [`CancelError`](./runtime/namespaces/Runtime.md#cancelerror)\>
 
+###### get
+
+> `readonly` **get**: (`runId`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+
 ###### inspect
 
 > `readonly` **inspect**: (`runId`) => `Effect`\<[`RuntimeInspection`](./runtime/namespaces/Runtime.md#runtimeinspection), [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
@@ -862,7 +986,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### start
 
-> `readonly` **start**: \<`Selected`\>(`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentNotRegistered`](#agentnotregistered)\>
+> `readonly` **start**: \<`Selected`\>(`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror)\>
 
 ###### Type Parameters
 
@@ -890,11 +1014,11 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentNotRegistered`](#agentnotregistered)\>
+`Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror)\>
 
 ###### startByName
 
-> `readonly` **startByName**: (`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`AgentInputInvalid`](#agentinputinvalid)\>
+> `readonly` **startByName**: (`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentInputInvalid`](#agentinputinvalid)\>
 
 ###### Parameters
 
@@ -916,17 +1040,19 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`AgentInputInvalid`](#agentinputinvalid)\>
+`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentInputInvalid`](#agentinputinvalid)\>
 
 <a id="sessions"></a>
 
 ##### sessions
 
-> `readonly` **sessions**: `object`
+> `readonly` **sessions**: `SessionReads` & `object`
+
+###### Type Declaration
 
 ###### create
 
-> `readonly` **create**: (`options?`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`CreateSessionError`](./runtime/namespaces/HostSession.md#createsessionerror)\>
+> `readonly` **create**: (`options?`) => `Effect`\<[`SessionHandle`](#sessionhandle), [`CreateSessionError`](./runtime/namespaces/HostSession.md#createsessionerror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent)\>
 
 ###### Parameters
 
@@ -936,7 +1062,35 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`CreateSessionError`](./runtime/namespaces/HostSession.md#createsessionerror)\>
+`Effect`\<[`SessionHandle`](#sessionhandle), [`CreateSessionError`](./runtime/namespaces/HostSession.md#createsessionerror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent)\>
+
+###### family
+
+> `readonly` **family**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| [`SessionPageInvalid`](#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| [`SessionPageInvalid`](#sessionpageinvalid)\>
 
 ###### fork
 
@@ -958,7 +1112,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### get
 
-> `readonly` **get**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+> `readonly` **get**: (`sessionId`) => `Effect`\<[`SessionHandle`](#sessionhandle), [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 ###### Parameters
 
@@ -968,29 +1122,159 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+`Effect`\<[`SessionHandle`](#sessionhandle), [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 ###### list
 
-> `readonly` **list**: () => `Effect`\<readonly `object`[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable)\>
+> `readonly` **list**: () => `Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `never`\>
 
 ###### Returns
 
-`Effect`\<readonly `object`[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable)\>
+`Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `never`\>
 
-###### snapshot
+***
 
-> `readonly` **snapshot**: (`sessionId`) => `Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+<a id="hostsession"></a>
 
-###### Parameters
+### HostSession
 
-###### sessionId
+Durable product-facing Session metadata owned by a Runtime driver.
 
-`string`
+#### Properties
 
-###### Returns
+<a id="activerunid"></a>
 
-`Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+##### activeRunId?
+
+> `readonly` `optional` **activeRunId?**: `string`
+
+<a id="createdat"></a>
+
+##### createdAt
+
+> `readonly` **createdAt**: `string`
+
+<a id="id"></a>
+
+##### id
+
+> `readonly` **id**: `string`
+
+<a id="queue"></a>
+
+##### queue
+
+> `readonly` **queue**: readonly `object`[]
+
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+<a id="selection"></a>
+
+##### selection?
+
+> `readonly` `optional` **selection?**: `object`
+
+###### budget?
+
+> `readonly` `optional` **budget?**: `object`
+
+###### budget.children?
+
+> `readonly` `optional` **children?**: `number`
+
+###### budget.duration?
+
+> `readonly` `optional` **duration?**: `number`
+
+###### budget.tokens?
+
+> `readonly` `optional` **tokens?**: `number`
+
+###### budget.toolCalls?
+
+> `readonly` `optional` **toolCalls?**: `number`
+
+###### budget.usd?
+
+> `readonly` `optional` **usd?**: `number`
+
+###### executableManifest
+
+> `readonly` **executableManifest**: [`ExecutableManifest`](./generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### executableRef
+
+> `readonly` **executableRef**: `object`
+
+###### executableRef.active
+
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### executableRef.executable
+
+> `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### registrations
+
+> `readonly` **registrations**: readonly `object`[]
+
+###### treePolicy?
+
+> `readonly` `optional` **treePolicy?**: `object`
+
+###### treePolicy.concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### treePolicy.concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### treePolicy.concurrency.tools
+
+> `readonly` **tools**: `number`
+
+###### treePolicy.maxDepth
+
+> `readonly` **maxDepth**: `number`
+
+###### treePolicy.maxSessions
+
+> `readonly` **maxSessions**: `number`
+
+<a id="title"></a>
+
+##### title?
+
+> `readonly` `optional` **title?**: `string`
 
 ***
 
@@ -1084,17 +1368,55 @@ One deterministic collection of host-owned Agent contributions.
 
 ***
 
-<a id="runstartoptions"></a>
+<a id="queuecommandoptions"></a>
 
-### RunStartOptions
+### QueueCommandOptions
+
+#### Extended by
+
+- [`QueueEditOptions`](#queueeditoptions)
 
 #### Properties
 
-<a id="idempotencykey"></a>
+<a id="commandid-1"></a>
 
-##### idempotencyKey?
+##### commandId
 
-> `readonly` `optional` **idempotencyKey?**: `string`
+> `readonly` **commandId**: `string`
+
+***
+
+<a id="queueeditoptions"></a>
+
+### QueueEditOptions
+
+#### Extends
+
+- [`QueueCommandOptions`](#queuecommandoptions)
+
+#### Properties
+
+<a id="agent"></a>
+
+##### agent?
+
+> `readonly` `optional` **agent?**: `string`
+
+<a id="commandid-2"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+###### Inherited from
+
+[`QueueCommandOptions`](#queuecommandoptions).[`commandId`](#commandid-1)
+
+<a id="expectedrevision"></a>
+
+##### expectedRevision
+
+> `readonly` **expectedRevision**: `number`
 
 ***
 
@@ -1104,17 +1426,429 @@ One deterministic collection of host-owned Agent contributions.
 
 #### Properties
 
-<a id="id"></a>
+<a id="agent-1"></a>
+
+##### agent?
+
+> `readonly` `optional` **agent?**: `string`
+
+<a id="id-1"></a>
 
 ##### id?
 
 > `readonly` `optional` **id?**: `string`
 
-<a id="title"></a>
+<a id="title-1"></a>
 
 ##### title?
 
 > `readonly` `optional` **title?**: `string`
+
+***
+
+<a id="sessionhandle"></a>
+
+### SessionHandle
+
+#### Extends
+
+- `Omit`\<[`HostSession`](#hostsession-1), `"queue"`\>
+
+#### Properties
+
+<a id="activerunid-1"></a>
+
+##### activeRunId?
+
+> `readonly` `optional` **activeRunId?**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`activeRunId`](#activerunid)
+
+<a id="createdat-1"></a>
+
+##### createdAt
+
+> `readonly` **createdAt**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`createdAt`](#createdat)
+
+<a id="id-2"></a>
+
+##### id
+
+> `readonly` **id**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`id`](#id)
+
+<a id="inspect"></a>
+
+##### inspect
+
+> `readonly` **inspect**: `Effect`\<[`HostSession`](#hostsession-1), [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+<a id="queue-1"></a>
+
+##### queue
+
+> `readonly` **queue**: `object`
+
+###### list
+
+> `readonly` **list**: () => `Effect`\<readonly `object`[], [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Returns
+
+`Effect`\<readonly `object`[], [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### remove
+
+> `readonly` **remove**: (`id`, `options`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+###### Parameters
+
+###### id
+
+`string`
+
+###### options
+
+`Omit`\<[`QueueEditOptions`](#queueeditoptions), `"agent"`\>
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+###### update
+
+> `readonly` **update**: (`id`, `input`, `options`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+###### Parameters
+
+###### id
+
+`string`
+
+###### input
+
+`string` \| `Prompt`
+
+###### options
+
+[`QueueEditOptions`](#queueeditoptions)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="retainedsession-1"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`retainedSession`](#retainedsession)
+
+<a id="selection-1"></a>
+
+##### selection?
+
+> `readonly` `optional` **selection?**: `object`
+
+###### budget?
+
+> `readonly` `optional` **budget?**: `object`
+
+###### budget.children?
+
+> `readonly` `optional` **children?**: `number`
+
+###### budget.duration?
+
+> `readonly` `optional` **duration?**: `number`
+
+###### budget.tokens?
+
+> `readonly` `optional` **tokens?**: `number`
+
+###### budget.toolCalls?
+
+> `readonly` `optional` **toolCalls?**: `number`
+
+###### budget.usd?
+
+> `readonly` `optional` **usd?**: `number`
+
+###### executableManifest
+
+> `readonly` **executableManifest**: [`ExecutableManifest`](./generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### executableRef
+
+> `readonly` **executableRef**: `object`
+
+###### executableRef.active
+
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### executableRef.executable
+
+> `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### registrations
+
+> `readonly` **registrations**: readonly `object`[]
+
+###### treePolicy?
+
+> `readonly` `optional` **treePolicy?**: `object`
+
+###### treePolicy.concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### treePolicy.concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### treePolicy.concurrency.tools
+
+> `readonly` **tools**: `number`
+
+###### treePolicy.maxDepth
+
+> `readonly` **maxDepth**: `number`
+
+###### treePolicy.maxSessions
+
+> `readonly` **maxSessions**: `number`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`selection`](#selection)
+
+<a id="snapshot"></a>
+
+##### snapshot
+
+> `readonly` **snapshot**: `Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+
+<a id="submit"></a>
+
+##### submit
+
+> `readonly` **submit**: (`input`, `options`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+###### Parameters
+
+###### input
+
+`string` \| `Prompt`
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="title-2"></a>
+
+##### title?
+
+> `readonly` `optional` **title?**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`title`](#title)
+
+***
+
+<a id="sessionhistorypage"></a>
+
+### SessionHistoryPage
+
+**`Experimental`**
+
+Follow nextLeafId until null; pages contain chronological entries.
+
+#### Properties
+
+<a id="entries"></a>
+
+##### entries
+
+> `readonly` **entries**: readonly `ConversationEntry`[]
+
+**`Experimental`**
+
+<a id="leafid"></a>
+
+##### leafId
+
+> `readonly` **leafId**: `string` \| `null`
+
+**`Experimental`**
+
+<a id="nextleafid"></a>
+
+##### nextLeafId
+
+> `readonly` **nextLeafId**: `string` \| `null`
+
+**`Experimental`**
+
+***
+
+<a id="sessionrunspage"></a>
+
+### SessionRunsPage
+
+**`Experimental`**
+
+Scan at most 256 events, including empty filtered pages with a continuation.
+
+#### Properties
+
+<a id="at"></a>
+
+##### at
+
+> `readonly` **at**: `number`
+
+**`Experimental`**
+
+<a id="nextbefore"></a>
+
+##### nextBefore
+
+> `readonly` **nextBefore**: `number` \| `null`
+
+**`Experimental`**
+
+<a id="runs-1"></a>
+
+##### runs
+
+> `readonly` **runs**: readonly [`SessionRunSummary`](#sessionrunsummary)[]
+
+**`Experimental`**
+
+***
+
+<a id="sessionrunsummary"></a>
+
+### SessionRunSummary
+
+**`Experimental`**
+
+Run metadata without retained manifests, results, or event history.
+
+#### Properties
+
+<a id="approval"></a>
+
+##### approval?
+
+> `readonly` `optional` **approval?**: `object`
+
+**`Experimental`**
+
+###### approvalId
+
+> `readonly` **approvalId**: `string`
+
+###### capability
+
+> `readonly` **capability**: `string`
+
+###### input
+
+> `readonly` **input**: `unknown`
+
+###### operation
+
+> `readonly` **operation**: `string`
+
+<a id="cursor-1"></a>
+
+##### cursor
+
+> `readonly` **cursor**: `number`
+
+**`Experimental`**
+
+<a id="parentrunid"></a>
+
+##### parentRunId?
+
+> `readonly` `optional` **parentRunId?**: `string`
+
+**`Experimental`**
+
+<a id="rootrunid"></a>
+
+##### rootRunId
+
+> `readonly` **rootRunId**: `string`
+
+**`Experimental`**
+
+<a id="runid"></a>
+
+##### runId
+
+> `readonly` **runId**: `string`
+
+**`Experimental`**
+
+<a id="status"></a>
+
+##### status
+
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+
+**`Experimental`**
+
+<a id="turn"></a>
+
+##### turn
+
+> `readonly` **turn**: `number`
+
+**`Experimental`**
 
 ## Type Aliases
 
@@ -1156,7 +1890,7 @@ One Agent-authored shared artifact edit committed by this Run.
 
 ### CreateError
 
-> **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict)
+> **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
 
 ***
 
@@ -1208,6 +1942,28 @@ One product-facing event at its exclusive Session cursor.
 
 > `readonly` **id**: [`RunHandle`](./runtime/namespaces/Runtime.md#runhandle)\<`Output`\>\[`"runId"`\]
 
+##### spawn
+
+> `readonly` **spawn**: (`selection`, `prompt`, `options`) => `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### selection
+
+`string`
+
+###### prompt
+
+`Prompt.Prompt` \| `string`
+
+###### options
+
+[`ChildSpawnOptions`](#childspawnoptions)
+
+###### Returns
+
+`Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
 #### Type Parameters
 
 ##### Output
@@ -1216,23 +1972,11 @@ One product-facing event at its exclusive Session cursor.
 
 ***
 
-<a id="hostsession"></a>
-
-### HostSession
-
-> **HostSession** = `Struct`\<\{ `createdAt`: `String`; `id`: `String`; `title`: `optionalKey`\<`String`\>; \}\>
-
-Durable product-facing Session metadata owned by a Runtime driver.
-
-***
-
 <a id="hostsession-1"></a>
 
 ### HostSession
 
-> **HostSession** = *typeof* `HostSession.Type`
-
-Durable product-facing Session metadata owned by a Runtime driver.
+> **HostSession** = `Codec`\<[`HostSession`](#hostsession-1), `unknown`, `never`, `never`\>
 
 ***
 
@@ -1246,11 +1990,75 @@ One memory-only preview admitted by the Host against current storage authority.
 
 ***
 
+<a id="queueerror"></a>
+
+### QueueError
+
+> **QueueError** = [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| [`SessionQueueConflict`](./runtime/namespaces/SessionQueue.md#sessionqueueconflict) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent)
+
+***
+
 <a id="runstarted"></a>
 
 ### RunStarted
 
 > **RunStarted** = *typeof* `RunStarted.Type`
+
+***
+
+<a id="runstartoptions"></a>
+
+### RunStartOptions
+
+> **RunStartOptions** = `Pick`\<[`StartOptions`](./generalist/namespaces/Agent.md#startoptions), `"idempotencyKey"`\>
+
+***
+
+<a id="sessionfamilyinput"></a>
+
+### SessionFamilyInput
+
+> **SessionFamilyInput** = *typeof* `SessionFamilyInput.Type`
+
+**`Experimental`**
+
+Omit at on the first page; retain it on every continuation.
+
+***
+
+<a id="sessionfamilypage"></a>
+
+### SessionFamilyPage
+
+> **SessionFamilyPage** = *typeof* `SessionFamilyPage.Type`
+
+**`Experimental`**
+
+First-admission membership with at most 64 members per 256-event scan.
+
+***
+
+<a id="sessionhistoryinput"></a>
+
+### SessionHistoryInput
+
+> **SessionHistoryInput** = *typeof* `SessionHistoryInput.Type`
+
+**`Experimental`**
+
+A bounded selector over one immutable conversation path.
+
+***
+
+<a id="sessionrunsinput"></a>
+
+### SessionRunsInput
+
+> **SessionRunsInput** = *typeof* `SessionRunsInput.Type`
+
+**`Experimental`**
+
+Membership is pinned to at; summaries report current committed status.
 
 ***
 
@@ -1272,7 +2080,7 @@ The authoritative journaled task list changed.
 
 ***
 
-<a id="turn"></a>
+<a id="turn-1"></a>
 
 ### Turn
 
@@ -1331,6 +2139,78 @@ One product-facing event at its exclusive Session cursor.
 > `const` **PreviewDelivery**: `Schema.TaggedStruct`\<`"PreviewDelivery"`, \{ `authorityAttemptFence`: `Schema.Int`; `event`: `Schema.Union`\<readonly \[`Schema.refine`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: ... \| ...; `delta`: `string`; `offset`: `number`; \}, `...(...)[]`\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \}, `Schema.TaggedStruct`\<`"ModelPreview"`, \{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `changes`: `Schema.NonEmptyArray`\<`Schema.Struct`\<\{ `channel`: ...; `delta`: ...; `offset`: ...; \}\>\>; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `turn`: `Schema.Int`; \}\>\>, `Schema.TaggedStruct`\<`"ModelPreviewCleared"`, \{ `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `runId`: `Schema.String`; \}\>\]\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
 
 One memory-only preview admitted by the Host against current storage authority.
+
+***
+
+<a id="sessionfamilyinput-1"></a>
+
+### SessionFamilyInput
+
+> `const` **SessionFamilyInput**: `Schema.Struct`\<\{ `at`: `Schema.optionalKey`\<`Schema.Int`\>; `before`: `Schema.optionalKey`\<`Schema.Int`\>; `limit`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+Omit at on the first page; retain it on every continuation.
+
+***
+
+<a id="sessionfamilypage-1"></a>
+
+### SessionFamilyPage
+
+> `const` **SessionFamilyPage**: `Schema.Struct`\<\{ `at`: `Schema.Int`; `nextBefore`: `Schema.NullOr`\<`Schema.Int`\>; `rootSessionId`: `Schema.String`; `sessions`: `Schema.$Array`\<`Schema.Struct`\<\{ `depth`: `Schema.Int`; `id`: `Schema.String`; `initialRunId`: `Schema.String`; `parentRunId`: `Schema.NullOr`\<`Schema.String`\>; `parentSessionId`: `Schema.NullOr`\<`Schema.String`\>; `rootSessionId`: `Schema.String`; \}\>\>; \}\>
+
+**`Experimental`**
+
+First-admission membership with at most 64 members per 256-event scan.
+
+***
+
+<a id="sessionhistoryinput-1"></a>
+
+### SessionHistoryInput
+
+> `const` **SessionHistoryInput**: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `limit`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+A bounded selector over one immutable conversation path.
+
+***
+
+<a id="sessionhistorypage-1"></a>
+
+### SessionHistoryPage
+
+> **SessionHistoryPage**: `Codec`\<[`SessionHistoryPage`](#sessionhistorypage), `unknown`, `never`, `never`\>
+
+***
+
+<a id="sessionrunsinput-1"></a>
+
+### SessionRunsInput
+
+> `const` **SessionRunsInput**: `Schema.Struct`\<\{ `at`: `Schema.Int`; `before`: `Schema.optionalKey`\<`Schema.Int`\>; `limit`: `Schema.Int`; `rootRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
+
+**`Experimental`**
+
+Membership is pinned to at; summaries report current committed status.
+
+***
+
+<a id="sessionrunspage-1"></a>
+
+### SessionRunsPage
+
+> **SessionRunsPage**: `Codec`\<[`SessionRunsPage`](#sessionrunspage), `unknown`, `never`, `never`\>
+
+***
+
+<a id="sessionrunsummary-1"></a>
+
+### SessionRunSummary
+
+> **SessionRunSummary**: `Codec`\<[`SessionRunSummary`](#sessionrunsummary), `unknown`, `never`, `never`\>
 
 ***
 

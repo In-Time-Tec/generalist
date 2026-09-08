@@ -166,13 +166,25 @@ RunStore public contract and canonical object-backed layer.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 
@@ -336,13 +348,25 @@ RunStore public contract and canonical object-backed layer.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -428,7 +452,7 @@ RunStore public contract and canonical object-backed layer.
 
 ##### policy
 
-> `readonly` **policy**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+> `readonly` **policy**: `"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 <a id="prompt"></a>
 
@@ -480,7 +504,7 @@ RunStore public contract and canonical object-backed layer.
 
 ##### continuation?
 
-> `readonly` `optional` **continuation?**: \{ `nextTurn`: `number`; `prompt`: `Prompt`; `queue?`: `"steering"` \| `"followUp"`; `schemaVersion`: `1`; `steeringEntryIds`: readonly `string`[]; \} \| `null`
+> `readonly` `optional` **continuation?**: \{ `nextTurn`: `number`; `prompt`: `Prompt`; `queue?`: `"steering"`; `schemaVersion`: `1`; `steeringEntryIds`: readonly `string`[]; \} \| `null`
 
 <a id="input"></a>
 
@@ -1126,11 +1150,45 @@ Session writer bound to one storage-issued execution claim.
 
 `Effect`\<[`CompletionOutcome`](#completionoutcome), [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities.md#programbudgetexhausted) \| `WorkerMutationError`\>
 
+<a id="configuredelegationpolicy"></a>
+
+##### configureDelegationPolicy
+
+> `readonly` **configureDelegationPolicy**: (`policy`) => `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+###### Parameters
+
+###### policy
+
+###### concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### concurrency.agents
+
+`number`
+
+###### concurrency.tools
+
+`number`
+
+###### maxDepth
+
+`number`
+
+###### maxSessions
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
 <a id="createhostsession"></a>
 
 ##### createHostSession
 
-> `readonly` **createHostSession**: (`input`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionConflict`](../../host.md#sessionconflict)\>
+> `readonly` **createHostSession**: (`input`) => `Effect`\<[`HostSession`](../../host.md#hostsession-1), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionConflict`](../../host.md#sessionconflict)\>
 
 Persist one product-facing Session identity and metadata.
 
@@ -1142,13 +1200,85 @@ Persist one product-facing Session identity and metadata.
 
 `string`
 
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSessions
+
+`number`
+
 ###### title?
 
 `string`
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionConflict`](../../host.md#sessionconflict)\>
+`Effect`\<[`HostSession`](../../host.md#hostsession-1), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionConflict`](../../host.md#sessionconflict)\>
 
 <a id="directory"></a>
 
@@ -1495,7 +1625,7 @@ Lazily create a forked Run's private artifact branch from its copied checkpoint.
 
 ##### hostSession
 
-> `readonly` **hostSession**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+> `readonly` **hostSession**: (`sessionId`) => `Effect`\<[`HostSession`](../../host.md#hostsession-1), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
 
 Read one product-facing Session by identity.
 
@@ -1507,13 +1637,13 @@ Read one product-facing Session by identity.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+`Effect`\<[`HostSession`](../../host.md#hostsession-1), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
 
 <a id="hostsessionevents"></a>
 
 ##### hostSessionEvents
 
-> `readonly` **hostSessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
+> `readonly` **hostSessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
 
 Replay then follow one product-facing Session's authoritative event cursor.
 
@@ -1531,7 +1661,63 @@ Replay then follow one product-facing Session's authoritative event cursor.
 
 ###### Returns
 
-`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
+`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
+
+<a id="hostsessionfamily"></a>
+
+##### hostSessionFamily
+
+> `readonly` **hostSessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+<a id="hostsessionhistorypage"></a>
+
+##### hostSessionHistoryPage
+
+> `readonly` **hostSessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### leafId
+
+`string` \| `null`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
 
 <a id="hostsessionruns"></a>
 
@@ -1550,6 +1736,60 @@ List root Runs admitted through one product-facing Session.
 ###### Returns
 
 `Effect`\<readonly [`RunInspection`](./Run.md#runinspection)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+<a id="hostsessionrunspage"></a>
+
+##### hostSessionRunsPage
+
+> `readonly` **hostSessionRunsPage**: (`sessionId`, `input`) => `Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### rootRunId?
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+<a id="hostsessionrunsummary"></a>
+
+##### hostSessionRunSummary
+
+> `readonly` **hostSessionRunSummary**: (`sessionId`, `runId`) => `Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
 
 <a id="hostsessionsnapshot"></a>
 
@@ -1643,7 +1883,7 @@ Order of the returned Runs. Defaults to "newest".
 
 ##### listHostSessions
 
-> `readonly` **listHostSessions**: `Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
+> `readonly` **listHostSessions**: `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 List product-facing Sessions in creation order.
 
@@ -1878,6 +2118,36 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 ###### Returns
 
 `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
+
+<a id="removesessioninput"></a>
+
+##### removeSessionInput
+
+> `readonly` **removeSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### expectedRevision
+
+`number`
+
+###### id
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 <a id="reserveprogramoperation"></a>
 
@@ -2225,6 +2495,104 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 `Effect`\<\{ `authoredOperation`: `string`; `capability`: `string`; `childRunIds`: readonly `string`[]; `completedSequence?`: `number`; `error?`: `unknown`; `fanOutId?`: `string`; `input`: `unknown`; `inputDigest`: `string`; `kind`: `"agent"` \| `"tool"` \| `"step"` \| `"log"` \| `"agent-map"` \| `"agent-fan-out"`; `operation`: `string`; `replay`: `"recorded"` \| `"idempotent"` \| `"non-idempotent"`; `resolution?`: \{ \} \| \{ `value`: `unknown`; \} \| \{ `error`: `unknown`; \}; `resolutionIdempotencyKey?`: `string`; `result?`: `unknown`; `runId`: `string`; `status`: `"unknown"` \| `"succeeded"` \| `"failed"` \| `"running"` \| `"waiting"` \| `"reserved"`; `waitId?`: `string`; \}, `WorkerMutationError`\>
 
+<a id="submitsessioninput"></a>
+
+##### submitSessionInput
+
+> `readonly` **submitSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### prompt
+
+`Prompt`
+
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSessions
+
+`number`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
 <a id="suspend"></a>
 
 ##### suspend
@@ -2330,6 +2698,120 @@ Ordered durable child settlements addressed to one exact parent Run.
 ###### Returns
 
 `Effect`\<[`ReplayPage`](./RunTree.md#replaypage), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`TreeCursorExpired`](./Errors.md#treecursorexpired) \| [`TreeCursorFuture`](./Errors.md#treecursorfuture) \| [`TreeReplayLimitInvalid`](./Errors.md#treereplaylimitinvalid)\>
+
+<a id="updatesessioninput"></a>
+
+##### updateSessionInput
+
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### agent?
+
+`string`
+
+###### commandId
+
+`string`
+
+###### expectedRevision
+
+`number`
+
+###### id
+
+`string`
+
+###### prompt
+
+`Prompt`
+
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSessions
+
+`number`
+
+###### sessionId
+
+`string`
+
+###### resolveSelection?
+
+[`SelectionResolver`](./SessionQueue.md#selectionresolver)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 <a id="wake"></a>
 

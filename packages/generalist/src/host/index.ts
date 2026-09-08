@@ -2,12 +2,7 @@
 import { Clock, Effect, Filter, Option, Ref, Result, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
-import {
-  Hooks,
-  make as makeHooks,
-  type Declaration as HookDeclaration,
-  type Service as HooksService,
-} from "../hooks/index.js"
+import { Hooks, type Declaration as HookDeclaration } from "../hooks/index.js"
 import {
   withTools,
   type Agent,
@@ -16,7 +11,6 @@ import {
   type Input as AgentInput,
   type Output as AgentOutput,
 } from "../core/agent/service.js"
-import { generateId } from "../core/model/telemetry/events.js"
 import { Approvals } from "../core/policy/approvals.js"
 import { Permissions } from "../core/policy/permissions.js"
 import { ToolContext } from "../core/tools/tool-context.js"
@@ -32,8 +26,9 @@ import {
   type Service as InstructionsService,
 } from "../instructions/providers.js"
 import type { Cursor } from "../runtime/cursor.js"
-import type { CreateSessionError, HostSession, SessionError, SessionEventsError } from "../runtime/session/host.js"
+import type { CreateSessionError, SessionError, SessionEventsError } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
+import { make as makeSessionReads, type SessionReads } from "./session-reads.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
 import type { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
@@ -54,16 +49,42 @@ import {
 } from "../runtime/service.js"
 import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
 import { resolveApproval } from "./approval.js"
-import { make as preparePlugins, type Plugin } from "./plugins.js"
+import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
+import { make as makeHostRun, type HostRun } from "./run.js"
+export type { HostRun, ChildHandle, ChildSpawnOptions } from "./run.js"
 import { ArtifactRegistry } from "../core/artifact.js"
+import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
+import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
+import {
+  make as makeSessionHandle,
+  create as createSessionHandle,
+  type SessionHandle,
+  type SessionCreateOptions,
+} from "./session.js"
+export type {
+  SessionHandle,
+  SessionCreateOptions,
+  QueueCommandOptions,
+  QueueEditOptions,
+  QueueError,
+} from "./session.js"
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
+export { SessionFamilyInput, SessionFamilyPage } from "../runtime/session/retained.js"
+export {
+  SessionHistoryInput,
+  SessionHistoryPage,
+  SessionRunsInput,
+  SessionRunsPage,
+  SessionRunSummary,
+  SessionPageInvalid,
+} from "../runtime/session/page.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
   HostEvent,
@@ -97,35 +118,27 @@ export interface CreateOptions<
 > {
   readonly agents: Agents
   readonly plugins?: Plugins
+  readonly limits?: HostLimits
 }
-export interface SessionCreateOptions {
-  readonly id?: string
-  readonly title?: string
-}
-export interface RunStartOptions {
-  readonly idempotencyKey?: string
-}
+export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
-export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
-  readonly sessions: {
-    readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
-    readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
-    readonly snapshot: (
-      sessionId: string,
+  readonly sessions: SessionReads & {
+    readonly list: () => import("../runtime/session/host.js").RuntimeHostSessions["listSessions"]
+    readonly family: import("../runtime/session/host.js").RuntimeHostSessions["sessionFamily"]
+    readonly create: (
+      options?: SessionCreateOptions,
     ) => Effect.Effect<
-      import("../runtime/session/host.js").HostSessionSnapshot,
-      import("../runtime/session/host.js").SessionSnapshotError
+      SessionHandle,
+      CreateSessionError | AgentNotRegistered | import("../runtime/errors.js").UnknownAgent
     >
-    readonly list: () => Effect.Effect<
-      ReadonlyArray<HostSession>,
-      RuntimeUnavailable | import("../durability/errors.js").DurabilityFailure
-    >
+    readonly get: (sessionId: string) => Effect.Effect<SessionHandle, SessionError>
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
+    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, InspectError>
     readonly start: <Selected extends Agents[number]>(
       sessionId: string,
       agent: Selected,
@@ -224,7 +237,14 @@ export type CreateRequirements<
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
 
-export type CreateError = DuplicateAgent | PluginNameConflict | PluginToolConflict
+export type CreateError =
+  | DuplicateAgent
+  | PluginNameConflict
+  | PluginToolConflict
+  | import("../runtime/errors.js").ExecutableRegistrationInvalid
+  | import("../runtime/errors.js").TreePolicyInvalid
+  | RuntimeUnavailable
+  | import("../durability/errors.js").DurabilityFailure
 
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,
@@ -262,12 +282,6 @@ const startAgent = <Value extends AnyAgent>(
     return started as Effect.Effect<RunHandle<AgentOutput<Value>>, StartError>
   })
 
-const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
-  id: handle.runId,
-  await: handle.await,
-  events: handle.events,
-  send: handle.send,
-})
 const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService => {
   const all = [...skills]
   const byName = new Map(all.map((skill) => [skill.name, skill]))
@@ -297,15 +311,6 @@ const mergedSkills = (
   return Option.isSome(current) ? mergeSkillCatalogs(current.value, additions) : additions
 }
 
-const mergedHooks = (
-  current: Option.Option<HooksService>,
-  contributed: ReadonlyArray<HookDeclaration>,
-): HooksService | undefined => {
-  const existing = Option.getOrUndefined(current)
-  if (contributed.length === 0) return existing
-  return makeHooks({ declarations: [...(existing?.declarations ?? []), ...contributed] })
-}
-
 const create = <
   const Agents extends ReadonlyArray<AnyAgent>,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
@@ -332,9 +337,15 @@ const create = <
 
     const registered = new Map<AnyAgent, AnyAgent>()
     const registeredByName = new Map<string, AnyAgent>()
-    for (const agent of options.agents) {
-      const configured = configuredAgent(agent, contributions.tools)
-      let registration = registerAgent(runtime, configured)
+    const configuredAgents = options.agents.map((agent) => configuredAgent(agent, contributions.tools))
+    yield* validateProfiles(configuredAgents)
+    const treePolicy =
+      options.limits === undefined
+        ? undefined
+        : yield* runtime.configureDelegationPolicy(yield* fromHostLimits(options.limits))
+    for (const [index, agent] of options.agents.entries()) {
+      const configured = configuredAgents[index]!
+      let registration = registerAgent(runtime, configured).pipe(Effect.provideService(AgentProfiles, configuredAgents))
       if (instructions !== undefined) {
         registration = registration.pipe(Effect.provideService(Instructions, instructions))
       }
@@ -344,25 +355,21 @@ const create = <
       registered.set(agent, configured)
       registeredByName.set(agent.name, configured)
     }
-
+    const sessionHandle = makeSessionHandle({ runtime, registeredByName })
+    const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
       attachments,
       artifacts,
       sessions: {
-        create: (sessionOptions = {}) =>
-          Effect.gen(function* () {
-            const request: Types.Mutable<{ readonly id: string; readonly title?: string }> = {
-              id: sessionOptions.id ?? `session_${yield* generateId}`,
-            }
-            if (sessionOptions.title !== undefined) request.title = sessionOptions.title
-            return yield* runtime.createSession(request)
-          }),
-        get: runtime.session,
-        snapshot: runtime.sessionSnapshot,
+        ...makeSessionReads(runtime),
         list: () => runtime.listSessions,
+        family: runtime.sessionFamily,
+        create: createSessionHandle({ runtime, registeredByName }),
+        get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
       runs: {
+        get: (runId) => runtime.getRun(runId).pipe(Effect.map(hostRun)),
         start: (sessionId, agent, input, startOptions) =>
           Effect.gen(function* () {
             yield* runtime.session(sessionId)
@@ -374,6 +381,7 @@ const create = <
               })
             }
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
+            if (treePolicy !== undefined) runtimeOptions.treePolicy = treePolicy
             if (startOptions?.idempotencyKey !== undefined) {
               runtimeOptions.idempotencyKey = startOptions.idempotencyKey
             }
@@ -402,6 +410,7 @@ const create = <
             )
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
             if (startOptions?.idempotencyKey !== undefined) runtimeOptions.idempotencyKey = startOptions.idempotencyKey
+            if (treePolicy !== undefined) runtimeOptions.treePolicy = treePolicy
             return hostRun(yield* startAgent(runtime, configured, decoded, runtimeOptions))
           }),
         list: runtime.sessionRuns,
@@ -433,9 +442,10 @@ const create = <
             )
         },
         previews: (sessionId, runId) =>
-          runtime.sessionRuns(sessionId).pipe(
-            Effect.map((runs) => {
-              if (!runs.some((run) => run.runId === runId)) return Stream.fromIterable<PreviewDelivery>([])
+          runtime.sessionRunSummary(sessionId, runId).pipe(
+            Effect.catchTag("generalist/host/SessionPageInvalid", () => Effect.void),
+            Effect.map((run) => {
+              if (run === undefined || run.parentRunId !== undefined) return Stream.fromIterable<PreviewDelivery>([])
               return Stream.unwrap(
                 Effect.gen(function* () {
                   const initialFence = yield* runtime.previewAuthority(runId)

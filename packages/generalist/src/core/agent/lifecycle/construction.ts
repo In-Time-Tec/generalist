@@ -26,6 +26,14 @@ export const progressOverflowPolicySchema = Schema.Union([
 
 type StaticDeclaration = { readonly origin: import("../event.js").ToolOrigin; readonly tool: Tool.Any }
 
+export const childProfiles = (names: ReadonlyArray<string> = []): ReadonlyArray<string> => {
+  const children = Object.freeze([...names])
+  if (children.some((name) => name.trim().length === 0) || new Set(children).size !== children.length) {
+    throw new TypeError("Agent children must contain unique, non-empty profile names")
+  }
+  return children
+}
+
 /** @internal Validate and assemble the immutable tools declared by an Agent. */
 export const setupStaticTools = <T extends Record<string, Tool.Any>, R, P, A>(
   agent: Agent<T, R, P, A, Schema.Top, Schema.Top>,

@@ -199,6 +199,7 @@ export interface StartReceipt extends RunReceipt {
 
 /** Typed durable start identity. Budget admission is reserved for the RunBudget contract. */
 export interface StartOptions {
+  readonly treePolicy?: TreePolicy
   readonly sessionId?: string
   readonly idempotencyKey?: string
   readonly budget?: RunBudget
@@ -555,6 +556,11 @@ export interface OperatorService {
 }
 
 export interface Service extends RuntimeHostSessions {
+  readonly configureDelegationPolicy: import("./run/store.js").Service["configureDelegationPolicy"]
+  readonly sessionSelection: (
+    name: string,
+  ) => Effect.Effect<import("./session/queue.js").SessionSelection, UnknownAgent>
+
   readonly operator: OperatorService
   /** Register one Agent name and its exact environment for start and recovery. */
   readonly register: <
@@ -566,7 +572,11 @@ export interface Service extends RuntimeHostSessions {
     OutputCodec extends Schema.Top,
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-  ) => Effect.Effect<void, DuplicateAgent, ClosedServices<Tools, R, InputCodec, OutputCodec>>
+  ) => Effect.Effect<
+    void,
+    DuplicateAgent | import("./errors.js").ExecutableRegistrationInvalid,
+    ClosedServices<Tools, R, InputCodec, OutputCodec>
+  >
   /** Start one registered Agent with Schema-derived input and output. */
   readonly start: <
     Tools extends Record<string, Tool.Any>,
@@ -601,6 +611,7 @@ export interface Service extends RuntimeHostSessions {
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>
   readonly send: SendFunction
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
+  readonly getRun: (runId: string) => Effect.Effect<RunHandle<unknown>, InspectError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
   /** Observe the memory-only live preview lane for one Run.
    * Frames contain bounded UTF-16 appends with per-attempt sequences and per-channel offsets.

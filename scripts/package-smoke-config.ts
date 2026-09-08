@@ -86,6 +86,11 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/repl/bun", runtimes: bunOnly },
       { specifier: "generalist/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
       { specifier: "generalist/tasks", runtimes: nodeAndBun, exports: ["layer", "update"] },
+      {
+        specifier: "generalist/components",
+        runtimes: nodeAndBun,
+        exports: ["make", "layer", "command", "read", "CommandTool"],
+      },
       { specifier: "generalist/testing/model", runtimes: nodeAndBun, exports: ["layer", "object", "text"] },
       { specifier: "generalist/trajectory", runtimes: nodeAndBun, exports: ["fromJournal", "export"] },
       {
@@ -129,7 +134,7 @@ export const minimumConsumerProfiles = [
       {
         specifier: "generalist/testing/durability",
         runtimes: nodeAndBun,
-        exports: ["make", "atomicCreates", "freshReads", "listing", "byteIntegrity"],
+        exports: ["make", "layer", "atomicCreates", "freshReads", "listing", "byteIntegrity"],
       },
     ],
   },
@@ -289,6 +294,7 @@ export const minimumConsumerProfiles = [
 export const workerSafePackageExports = [
   "generalist",
   "generalist/blob-store",
+  "generalist/components",
   "generalist/durability",
   "generalist/durability/r2",
   "generalist/hooks",
@@ -343,6 +349,7 @@ export const exactPackageExports = [
   "./approvals",
   "./blob-store",
   "./compaction",
+  "./components",
   "./durability",
   "./durability/discovery",
   "./durability/host",

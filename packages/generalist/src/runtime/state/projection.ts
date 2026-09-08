@@ -48,7 +48,7 @@ export interface RuntimePublication {
   readonly lastDeliveredSequence: number
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly treeSubscribers: ReadonlyMap<number, TreeSubscriberQueue>
-  readonly hostSession?: HostSessionPublication
+  readonly hostSessions?: ReadonlyArray<HostSessionPublication>
 }
 
 export interface ArtifactPublication {
@@ -64,6 +64,7 @@ export interface IdempotencyEntry {
 }
 
 export interface StoredRun {
+  readonly initialSessionComponents?: ReadonlyArray<import("../../core/durable/component/state.js").Checkpoint>
   readonly runId: string
   readonly status: RunStatus
   readonly executableRef: ExecutableRef
@@ -107,6 +108,17 @@ export interface Lane {
 }
 
 export interface RuntimeSession {
+  readonly family?: {
+    readonly rootSessionId: string
+    readonly parentSessionId: string | null
+    readonly parentRunId: string | null
+    readonly depth: number
+    readonly treePolicy: TreePolicy
+    readonly budget: import("../../core/durable/run-budget.js").BudgetLimits
+    readonly runIds: ReadonlyArray<string>
+    readonly childSessionIds: ReadonlyArray<string>
+  }
+  readonly components?: ReadonlyArray<import("../../core/durable/component/state.js").Checkpoint>
   readonly entries: ReadonlyMap<string, SessionEntry>
   readonly order: ReadonlyArray<string>
   readonly leaf: string | null
@@ -143,6 +155,7 @@ export interface StoredArtifact {
 }
 
 export interface RuntimeState {
+  readonly delegationPolicy: TreePolicy | null
   readonly closed: boolean
   readonly nextRunCounter: number
   readonly nextSubscriberId: number
@@ -218,6 +231,7 @@ export const emptyState = (input: {
   waits: new Map(),
   sessions: new Map(),
   hostSessions: new Map(),
+  delegationPolicy: null,
   treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),

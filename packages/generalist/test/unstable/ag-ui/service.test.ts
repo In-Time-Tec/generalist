@@ -96,6 +96,13 @@ const rootSend = (
 
 const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
+    sessionSelection: () => unused(),
+    sessionFamily: () => Effect.die("not used"),
+    getRun: () => unused(),
+    configureDelegationPolicy: () => unused(),
+    submitSessionInput: () => unused(),
+    updateSessionInput: () => unused(),
+    removeSessionInput: () => unused(),
     operator: {
       explain: () => unused(),
       verify: () => unused(),
@@ -125,6 +132,9 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     session: () => unused(),
     listSessions: unused(),
     sessionSnapshot: () => Effect.die("unexpected Session snapshot"),
+    sessionHistoryPage: () => Effect.die("unexpected Session history page"),
+    sessionRunsPage: () => Effect.die("unexpected Session Runs page"),
+    sessionRunSummary: () => Effect.die("unexpected Session Run summary"),
     sessionRuns: () => unused(),
     sessionEvents: () => Stream.empty,
     acknowledge: () => unused(),

@@ -94,13 +94,25 @@
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 <a id="waits"></a>
 
@@ -176,6 +188,36 @@
 
 > `readonly` `optional` **parentRunId?**: `string`
 
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
 <a id="runid-1"></a>
 
 ##### runId
@@ -194,13 +236,25 @@
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 <a id="waits-1"></a>
 
@@ -302,6 +356,40 @@ Encoded durable Run inspection.
 
 [`RunInspection`](#runinspection).[`parentRunId`](#parentrunid-1)
 
+<a id="retainedsession-1"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`RunInspection`](#runinspection).[`retainedSession`](#retainedsession)
+
 <a id="runid-2"></a>
 
 ##### runId
@@ -324,13 +412,25 @@ Encoded durable Run inspection.
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -908,6 +1008,12 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 > `readonly` **parentRunId**: `Schema.optionalKey`\<`Schema.String`\>
 
+<a id="retainedsession-2"></a>
+
+##### retainedSession
+
+> `readonly` **retainedSession**: `Schema.optionalKey`\<`Schema.Struct`\<\{ `depth`: `Schema.Int`; `id`: `Schema.String`; `initialRunId`: `Schema.String`; `parentRunId`: `Schema.NullOr`\<`Schema.String`\>; `parentSessionId`: `Schema.NullOr`\<`Schema.String`\>; `rootSessionId`: `Schema.String`; \}\>\>
+
 <a id="runid-6"></a>
 
 ##### runId
@@ -924,7 +1030,7 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 ##### treePolicy
 
-> `readonly` **treePolicy**: `Schema.Struct`\<\{ `maxDepth`: `Schema.Int`; `maxSubagents`: `Schema.Int`; \}\>
+> `readonly` **treePolicy**: `Schema.Struct`\<\{ `concurrency`: `Schema.Struct`\<\{ `agents`: `Schema.Int`; `tools`: `Schema.Int`; \}\>; `maxDepth`: `Schema.Int`; `maxSessions`: `Schema.Int`; \}\>
 
 <a id="waits-3"></a>
 

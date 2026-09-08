@@ -23,6 +23,7 @@ import {
   ReceivedConnection,
   ResolveApproval,
   RunFailed,
+  Running,
   SendUserMessage,
 } from "./service.js"
 import { chatUpdateRuntime } from "./update.js"
@@ -156,32 +157,41 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
     if (action.event.epoch !== model.connectionEpoch) return [model, [], Option.none()]
     const event = action.event.event
     if (event.sessionId !== model.sessionId || event.cursor <= model.lastSeq) return [model, [], Option.none()]
-    const startsRoot = event._tag === "RunStarted" && event.event.parentRunId === undefined
+    const activeRunId = action.event.activeRunId
     const clearsPreview =
       event._tag !== "Conversation" &&
       model.previewAuthority?.runId === event.runId &&
       (event._tag === "Completed" || (event._tag === "Turn" && event.event._tag === "TurnCompleted"))
     let base = model
-    if (startsRoot) {
+    const previousRunId =
+      model.run._tag === "Idle" || model.run._tag === "Failed" ? null : (model.previewAuthority?.runId ?? null)
+    if (previousRunId !== activeRunId) {
       base = changeModel(model, {
+        run: activeRunId === null ? Idle() : Running({ turn: 0 }),
         preview: null,
-        previewAuthority: {
-          runId: event.runId,
-          attemptFence: -1,
-          generation: -1,
-          turn: -1,
-          attempt: -1,
-          modelCallId: null,
-          modelAttemptId: null,
-          sequence: -1,
-          tombstoned: false,
-        },
+        previewAuthority:
+          activeRunId === null
+            ? tombstonePreview(model).previewAuthority
+            : {
+                runId: activeRunId,
+                attemptFence: -1,
+                generation: -1,
+                turn: -1,
+                attempt: -1,
+                modelCallId: null,
+                modelAttemptId: null,
+                sequence: -1,
+                tombstoned: false,
+              },
       })
     } else if (clearsPreview) {
       base = tombstonePreview(model)
     }
+    const otherRoot = "event" in event && event.event.parentRunId === undefined && event.runId !== activeRunId
+    if (otherRoot && event._tag !== "Completed")
+      return [changeModel(base, { lastSeq: event.cursor }), [], Option.none()]
     const [next, output] = applyHostEvent(base, event)
-    return [next, [], output]
+    return [otherRoot && activeRunId !== null ? changeModel(next, { run: base.run }) : next, [], output]
   }
   if (action.event.sessionId !== model.sessionId || action.event.epoch < model.connectionEpoch)
     return [model, [], Option.none()]

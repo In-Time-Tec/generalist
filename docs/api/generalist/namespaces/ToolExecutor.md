@@ -130,7 +130,7 @@ A concrete executor could not definitively cancel one admitted operation.
 
 ##### stage
 
-> `readonly` **stage**: `"route"` \| `"authorization"` \| `"decode-input"` \| `"handler"` \| `"encode-success"` \| `"encode-domain-failure"` \| `"missing-handler"` \| `"placement"`
+> `readonly` **stage**: `"handler"` \| `"route"` \| `"authorization"` \| `"decode-input"` \| `"encode-success"` \| `"encode-domain-failure"` \| `"missing-handler"` \| `"placement"`
 
 ###### Inherited from
 

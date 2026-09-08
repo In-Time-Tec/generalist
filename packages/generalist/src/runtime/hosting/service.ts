@@ -47,7 +47,6 @@ type Registrations = ReadonlyArray<ExecutableRegistration>
 import { childSessionId } from "../child/session.js"
 import { Policy as MessagingPolicy, reachable } from "../messaging/service.js"
 import { deliveryPrompt, promptBytes, type MailboxEntry } from "../messaging/mailbox.js"
-import { defaultTreePolicy } from "../tree/policy.js"
 import type { RunInspection, RunReceipt } from "../run.js"
 import { explain as explainRecovery, verify as verifyRecovery } from "../execution/recovery/operator.js"
 import { resolveWith as resolveDurableApproval } from "../operation/approval.js"
@@ -294,11 +293,11 @@ const makeRuntimeWith = (
           executableRef: executable.ref,
           executableManifest: executable.manifest,
           registrations,
-          treePolicy: input.treePolicy ?? defaultTreePolicy,
           initialChildren: initialChildren.map(normalizeInitialChild),
           initialFanOuts: initialFanOuts.map(normalizeInitialFanOut),
         }
         if (input.budget !== undefined) admission.budget = input.budget.allocation
+        if (input.treePolicy !== undefined) admission.treePolicy = input.treePolicy
         if (input.runId !== undefined) admission.runId = input.runId
         return yield* store.admitStart(admission, { activate })
       })
@@ -401,9 +400,9 @@ const makeRuntimeWith = (
           executableRef: executable.ref,
           executableManifest: executable.manifest,
           registrations,
-          treePolicy: input.treePolicy ?? defaultTreePolicy,
         }
         if (input.runId !== undefined) admission.runId = input.runId
+        if (input.treePolicy !== undefined) admission.treePolicy = input.treePolicy
         return yield* store.admitSend(admission)
       })
 
@@ -450,6 +449,11 @@ const makeRuntimeWith = (
         ),
       activate: store.activate,
       send,
+      getRun: (runId) =>
+        Effect.gen(function* () {
+          const run = yield* store.inspect(runId)
+          return untypedHandle({ store, runId: run.runId, send: sendRun })
+        }),
       spawn: (input: SpawnInput) =>
         Effect.gen(function* () {
           const sessionId =
@@ -486,8 +490,17 @@ const makeRuntimeWith = (
           ? HistoryLimitInvalid.make({ received: String(input.limit), minimum: 1, maximum: 1000 })
           : store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
       createSession: store.createHostSession,
+      configureDelegationPolicy: store.configureDelegationPolicy,
+      sessionSelection: agentStart.sessionSelection,
+      submitSessionInput: store.submitSessionInput,
+      updateSessionInput: store.updateSessionInput,
+      removeSessionInput: store.removeSessionInput,
       session: store.hostSession,
       sessionSnapshot: store.hostSessionSnapshot,
+      sessionFamily: store.hostSessionFamily,
+      sessionHistoryPage: store.hostSessionHistoryPage,
+      sessionRunsPage: store.hostSessionRunsPage,
+      sessionRunSummary: store.hostSessionRunSummary,
       listSessions: store.listHostSessions,
       sessionRuns: store.hostSessionRuns,
       sessionEvents: (input) =>

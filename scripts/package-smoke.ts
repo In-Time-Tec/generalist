@@ -3,6 +3,7 @@ import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Pat
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CryptoHasher, version as bunVersion } from "bun"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
+import { componentConsumer } from "./package-smoke-components.js"
 import { auditInstalledDependencyGraph } from "./package-smoke-dependency-graph.js"
 import {
   isForbiddenTransportRuntime,
@@ -915,6 +916,7 @@ const program = Effect.gen(function* () {
     }),
   )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
+  yield* fileSystem.writeFileString(path.join(consumerDirectory, "components.mjs"), componentConsumer)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "external-child-bundle.ts"),
     `import * as ExternalChildPlacement from "generalist/unstable/runtime/external-child-placement"
@@ -941,7 +943,8 @@ for (const specifier of forbidden) {
 }
 const { A2A } = await import("generalist/unstable/a2a")
 const { AGUI } = await import("generalist/unstable/ag-ui")
-const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("generalist")
+const { Agent, Approvals, Memory, ModelMiddleware, ModelRegistry, Permissions, Session } = await import("generalist")
+const { Generalist } = await import("generalist/host")
 const { VectorStore } = await import("generalist/memory")
 const { State, Store } = await import("generalist/instructions")
 const { MCPClient } = await import("generalist/unstable/mcp")
@@ -950,10 +953,11 @@ const ModelCatalog = await import("generalist/providers/model-catalog")
 const OpenAI = await import("generalist/providers/openai")
 const skills = await import("generalist/instructions/skills")
 const { TestModel, Testing } = await import("generalist/testing")
-const { RunEvent } = await import("generalist/runtime")
+const { ExecutableResolver, RunEvent } = await import("generalist/runtime")
 const Durability = await import("generalist/durability")
+const TestDurability = await import("generalist/testing/durability")
 const { Server } = await import("generalist/server")
-const { Config, Effect, Layer, Schema } = await import("effect")
+const { Config, Crypto, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
 for (const value of [
@@ -992,6 +996,56 @@ if (!Layer.isLayer(OpenAI.layer({ model: "gpt-4o-mini", apiKey: Config.redacted(
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {
   throw new Error("TestModel does not use the root Effect identity")
 }
+await Effect.runPromise(Effect.gen(function* () {
+  const storage = yield* TestDurability.make()
+  const cryptoLayer = Layer.succeed(Crypto.Crypto, Crypto.make({
+    randomBytes: (size) => globalThis.crypto.getRandomValues(new Uint8Array(size)),
+    digest: (algorithm, data) => Effect.promise(async () => new Uint8Array(await globalThis.crypto.subtle.digest(algorithm, data))),
+  }))
+  const services = () => {
+    const runtime = Durability.layer({ environment: "package", tenant: "history", partition: "fresh", workerId: "packed-history", addresses: [], schedulerMode: "external" }).pipe(
+      Layer.provide(Layer.mergeAll(TestDurability.layer(storage), cryptoLayer, ExecutableResolver.layerStatic([]))),
+    )
+    return Layer.mergeAll(Layer.effectDiscard(Durability.activate).pipe(Layer.provideMerge(runtime)), TestModel.layer([]), Permissions.layerAllowAll, Approvals.layerAutoApprove)
+  }
+  const first = yield* Effect.scoped(Effect.gen(function* () {
+    const context = yield* Layer.build(services())
+    return yield* Effect.gen(function* () {
+      const agent = Agent.make({ name: "packed-history" })
+      const host = yield* Generalist.create({ agents: [agent] })
+      const session = yield* host.sessions.create({ id: "packed-history", agent: agent.name })
+      const ids = []
+      for (let index = 0; index < 129; index++) ids.push((yield* host.runs.start(session.id, agent, "input-" + index)).id)
+      const pending = yield* session.submit("pending", { commandId: "packed-history:pending" })
+      yield* session.queue.update(pending.id, "edited", { commandId: "packed-history:edit", expectedRevision: pending.revision, agent: agent.name })
+      const snapshot = yield* host.sessions.snapshot(session.id)
+      if (snapshot.runs.length !== 33 || snapshot.session.activeRunId !== ids[0] || snapshot.runs.filter((run) => run.runId === ids[0]).length !== 1) throw new Error("packed Session snapshot did not retain its canonical active Run")
+      if (snapshot.session.queue.length !== 1 || snapshot.session.selection === undefined) throw new Error("packed Session snapshot lost queue or selection metadata")
+      return { snapshot, ids, pending }
+    }).pipe(Effect.provideContext(context))
+  }))
+  yield* Effect.scoped(Effect.gen(function* () {
+    const context = yield* Layer.build(services())
+    yield* Effect.gen(function* () {
+      const host = yield* Generalist.create({ agents: [Agent.make({ name: "packed-history" })] })
+      const snapshot = yield* host.sessions.snapshot("packed-history")
+      if (snapshot.cursor !== first.snapshot.cursor) throw new Error("packed Session cursor changed after fresh Layer")
+      if (JSON.stringify(snapshot.session) !== JSON.stringify(first.snapshot.session)) throw new Error("packed Session canonical metadata changed after fresh Layer")
+      const session = yield* host.sessions.get("packed-history")
+      if (JSON.stringify(yield* session.submit("pending", { commandId: "packed-history:pending" })) !== JSON.stringify(first.pending)) throw new Error("packed Session queue retry lost its immutable receipt")
+      const ids = []
+      let before = snapshot.cursor + 1
+      while (true) {
+        const page = yield* host.sessions.runs("packed-history", { at: snapshot.cursor, limit: 19, before })
+        ids.unshift(...page.runs.map((run) => run.runId))
+        if (page.nextBefore === null) break
+        before = page.nextBefore
+      }
+      if (JSON.stringify(ids) !== JSON.stringify(first.ids) || new Set(ids).size !== 129) throw new Error("packed Session history lost or duplicated Runs")
+    }).pipe(Effect.provideContext(context))
+  }))
+}))
+await import("./components.mjs")
 console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
 `,
   )
@@ -1038,7 +1092,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
   yield* fileSystem.makeDirectory(npmConsumerDirectory)
-  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs"]) {
+  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs", "components.mjs"]) {
     yield* fileSystem.copyFile(path.join(consumerDirectory, filename), path.join(npmConsumerDirectory, filename))
   }
   yield* run("npm", ["install", "--ignore-scripts"], npmConsumerDirectory)

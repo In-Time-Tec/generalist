@@ -187,6 +187,9 @@ export interface Service {
     | TreePolicyInvalid
     | DurabilityFailure
   >
+  readonly configureDelegationPolicy: (
+    policy: import("../tree/policy.js").TreePolicy,
+  ) => Effect.Effect<import("../tree/policy.js").TreePolicy, TreePolicyInvalid | RuntimeUnavailable | DurabilityFailure>
   readonly admitStart: (
     input: AdmitStartInput,
     options?: { readonly activate?: boolean },
@@ -420,7 +423,31 @@ export interface Service {
   readonly createHostSession: (input: {
     readonly id: string
     readonly title?: string
+    readonly selection?: import("../session/queue.js").SessionSelection
   }) => Effect.Effect<HostSession, SessionConflict | RuntimeUnavailable | DurabilityFailure>
+  readonly submitSessionInput: (
+    input: import("../session/queue.js").SubmitInput,
+  ) => Effect.Effect<
+    import("../session/queue.js").QueueReceipt,
+    import("../session/queue.js").SessionQueueConflict | SessionNotFound | RuntimeUnavailable | DurabilityFailure
+  >
+  readonly updateSessionInput: (
+    input: import("../session/queue.js").UpdateInput,
+    resolveSelection?: import("../session/queue.js").SelectionResolver,
+  ) => Effect.Effect<
+    import("../session/queue.js").QueueReceipt,
+    | import("../session/queue.js").SessionQueueConflict
+    | import("../errors.js").UnknownAgent
+    | SessionNotFound
+    | RuntimeUnavailable
+    | DurabilityFailure
+  >
+  readonly removeSessionInput: (
+    input: import("../session/queue.js").RemoveInput,
+  ) => Effect.Effect<
+    import("../session/queue.js").QueueReceipt,
+    import("../session/queue.js").SessionQueueConflict | SessionNotFound | RuntimeUnavailable | DurabilityFailure
+  >
   /** Read one product-facing Session by identity. */
   readonly hostSession: (
     sessionId: string,
@@ -431,8 +458,12 @@ export interface Service {
     import("../session/host.js").HostSessionSnapshot,
     import("../session/host.js").SessionSnapshotError
   >
+  readonly hostSessionHistoryPage: import("../session/host.js").RuntimeHostSessions["sessionHistoryPage"]
+  readonly hostSessionRunsPage: import("../session/host.js").RuntimeHostSessions["sessionRunsPage"]
+  readonly hostSessionRunSummary: import("../session/host.js").RuntimeHostSessions["sessionRunSummary"]
   /** List product-facing Sessions in creation order. */
   readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
+  readonly hostSessionFamily: import("../session/host.js").RuntimeHostSessions["sessionFamily"]
   /** List root Runs admitted through one product-facing Session. */
   readonly hostSessionRuns: (
     sessionId: string,

@@ -69,10 +69,10 @@ const reserve = (state: RuntimeState, input: ReserveInput) =>
     const parent = state.runs.get(input.runId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.runId })
     if (isTerminal(parent.status)) return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
-    if (activeChildCount(state, parent) >= parent.treePolicy.maxSubagents) {
+    if (activeChildCount(state, parent) >= parent.treePolicy.concurrency.agents) {
       return yield* ExternalChildCapacityUnavailable.make({
         parentRunId: parent.runId,
-        limit: parent.treePolicy.maxSubagents,
+        limit: parent.treePolicy.concurrency.agents,
       })
     }
     const placement: Placement = {

@@ -3,46 +3,59 @@ import type { DurabilityFailure } from "../../durability/errors.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Cursor } from "../cursor.js"
 import type { RuntimeUnavailable } from "../errors.js"
-import { RunSnapshot, type RunInspection } from "../run.js"
+import type { RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
+import { PendingInput, SessionSelection } from "./queue.js"
+import { RetainedSession, type SessionFamilyInput, type SessionFamilyPage } from "./retained.js"
+export { SessionFamilyInput, SessionFamilyPage } from "./retained.js"
+import {
+  SessionHistoryPage,
+  SessionRunsPage,
+  SessionPageInvalid,
+  type SessionHistoryInput,
+  type SessionRunsInput,
+  SessionRunSummary,
+} from "./page.js"
 
 /** Durable product-facing Session metadata owned by a Runtime driver. */
-export const HostSession = Schema.Struct({
+export interface HostSession {
+  readonly retainedSession?: RetainedSession
+  readonly id: string
+  readonly title?: string
+  readonly createdAt: string
+  readonly selection?: SessionSelection
+  readonly queue: ReadonlyArray<PendingInput>
+  readonly activeRunId?: string
+}
+export const HostSession: Schema.Codec<HostSession, unknown> = Schema.Struct({
+  retainedSession: Schema.optionalKey(RetainedSession),
   id: Schema.String.check(Schema.isNonEmpty()),
   title: Schema.optionalKey(Schema.String),
   createdAt: Schema.String,
+  selection: Schema.optionalKey(SessionSelection),
+  queue: Schema.Array(PendingInput),
+  activeRunId: Schema.optionalKey(Schema.String),
 })
-export type HostSession = typeof HostSession.Type
 
 /** One bounded committed Session projection and its exact exclusive replay cursor. @experimental */
 export interface HostSessionSnapshot {
   readonly version: 1
   readonly session: HostSession
   readonly cursor: Cursor
-  readonly runs: ReadonlyArray<RunSnapshot>
+  readonly runs: ReadonlyArray<SessionRunSummary>
   readonly conversation: Conversation
 }
 export const HostSessionSnapshot: Schema.Codec<HostSessionSnapshot, unknown> = Schema.Struct({
   version: Schema.Literal(1),
   session: HostSession,
   cursor: Cursor,
-  runs: Schema.Array(RunSnapshot),
+  runs: Schema.Array(SessionRunSummary).check(Schema.isMaxLength(33)),
   conversation: Conversation,
 })
 
-/** A Session cannot be projected within the supported work or response budget. @experimental */
-export class SessionSnapshotTooLarge extends ActionableTaggedError<SessionSnapshotTooLarge>()(
-  "generalist/host/SessionSnapshotTooLarge",
-  {
-    sessionId: Schema.String,
-    limit: Schema.Literals(["scanned-runs", "runs", "events", "entries", "bytes"]),
-    maximum: Schema.Int,
-    hint: errorHint("Load a smaller Session; this snapshot was rejected without truncation."),
-  },
-) {}
-
-export type SessionSnapshotError = SessionError | SessionSnapshotTooLarge
+export type SessionSnapshotError = SessionError | SessionPageInvalid
+export type SessionPageError = SessionError | SessionPageInvalid
 
 /** One Runtime event at its exclusive Session replay cursor. */
 export const HostSessionEvent = Schema.Union([
@@ -54,6 +67,7 @@ export type HostSessionEvent = typeof HostSessionEvent.Type
 export interface CreateSessionInput {
   readonly id: string
   readonly title?: string
+  readonly selection?: SessionSelection
 }
 
 export interface SessionEventsInput {
@@ -106,9 +120,25 @@ export type SessionEventsError =
 
 /** Runtime operations that persist and observe product-facing Sessions. */
 export interface RuntimeHostSessions {
+  readonly sessionFamily: (
+    sessionId: string,
+    input: SessionFamilyInput,
+  ) => Effect.Effect<SessionFamilyPage, SessionError | SessionPageInvalid>
+  readonly submitSessionInput: import("../run/store.js").Service["submitSessionInput"]
+  readonly updateSessionInput: import("../run/store.js").Service["updateSessionInput"]
+  readonly removeSessionInput: import("../run/store.js").Service["removeSessionInput"]
   readonly createSession: (input: CreateSessionInput) => Effect.Effect<HostSession, CreateSessionError>
   readonly session: (sessionId: string) => Effect.Effect<HostSession, SessionError>
   readonly sessionSnapshot: (sessionId: string) => Effect.Effect<HostSessionSnapshot, SessionSnapshotError>
+  readonly sessionHistoryPage: (
+    sessionId: string,
+    input: SessionHistoryInput,
+  ) => Effect.Effect<SessionHistoryPage, SessionPageError>
+  readonly sessionRunsPage: (
+    sessionId: string,
+    input: SessionRunsInput,
+  ) => Effect.Effect<SessionRunsPage, SessionPageError>
+  readonly sessionRunSummary: (sessionId: string, runId: string) => Effect.Effect<SessionRunSummary, SessionPageError>
   readonly listSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
   readonly sessionRuns: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
   readonly sessionEvents: (input: SessionEventsInput) => Stream.Stream<HostSessionEvent, SessionEventsError>

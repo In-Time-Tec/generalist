@@ -1,7 +1,7 @@
 import type { PreparedObservation } from "../../observation.js"
 import { Effect, Function } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
-import { laneKey, type RuntimeState, type StoredRun } from "../../projection.js"
+import { laneKey, type RuntimeState } from "../../projection.js"
 import { appendLifecycle, attemptStartedEvent } from "../../append.js"
 
 interface EnqueueLaneResult {
@@ -9,6 +9,16 @@ interface EnqueueLaneResult {
   readonly acceptedSequence: number
   readonly isHead: boolean
 }
+
+export const retainHostedLane: {
+  (sessionId: string): (state: RuntimeState) => RuntimeState
+  (state: RuntimeState, sessionId: string): RuntimeState
+} = Function.dual(2, (state: RuntimeState, sessionId: string): RuntimeState => {
+  if (state.hostSessions.has(sessionId)) return state
+  const lanes = new Map(state.lanes)
+  lanes.delete(laneKey(sessionId))
+  return { ...state, lanes }
+})
 
 export const enqueueLane: {
   (sessionId: string, runId: string): (state: RuntimeState) => EnqueueLaneResult
@@ -56,16 +66,11 @@ export const promoteHead: {
     if (head.cancellationRequested) return state
     const attempt = head.attempt + 1
     const [, next] = yield* appendLifecycle(state, headId, attemptStartedEvent(attempt), "running")
-    return next
-  }),
-)
-
-export const afterTerminal: {
-  (run: StoredRun): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
-  (state: RuntimeState, run: StoredRun): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
-} = Function.dual(2, (state: RuntimeState, run: StoredRun) =>
-  Effect.gen(function* () {
-    const without = removeFromLane(state, run.message.sessionId, run.runId)
-    return yield* promoteHead(without, run.message.sessionId)
+    const session = next.hostSessions.get(sessionId)
+    const entry = head.executableManifest.entries.find((candidate) => candidate.pin === head.executableRef.active)
+    if (session === undefined || entry?._tag !== "Agent") return next
+    const hostSessions = new Map(next.hostSessions)
+    hostSessions.set(sessionId, { ...session, session: { ...session.session, activeRunId: headId } })
+    return { ...next, hostSessions }
   }),
 )

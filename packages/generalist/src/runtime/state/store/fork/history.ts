@@ -1,8 +1,12 @@
-import { Effect, Types } from "effect"
+import { Effect, Option, Schema, Types } from "effect"
 import { RuntimeUnavailable } from "../../../errors.js"
 import { eventIdFor, type RunEvent } from "../../../run/event.js"
 import { ForkCheckpoint } from "../../../execution/recovery/fork-checkpoint.js"
 import type { RuntimeSession, RuntimeState, StoredRun } from "../../projection.js"
+import { LoopDriverState } from "../../../../core/durable/loop-driver-state.js"
+import { namespace } from "../../../../core/durable/component/definition.js"
+import type { Checkpoint } from "../../../../core/durable/component/state.js"
+import type { ExecutionCheckpoint } from "../../../execution/state.js"
 
 const { forkCheckpoint, forkOperationKey } = ForkCheckpoint
 
@@ -52,9 +56,13 @@ export const leafAt = (events: ReadonlyArray<RunEvent>): string | null => {
 export const copiedSession = ({
   session,
   leaf,
+  checkpoint,
+  initialComponents = [],
 }: {
   readonly session: RuntimeSession
   readonly leaf: string | null
+  readonly checkpoint?: ExecutionCheckpoint | undefined
+  readonly initialComponents?: ReadonlyArray<Checkpoint> | undefined
 }): RuntimeSession => {
   const copy: Types.Mutable<RuntimeSession> = {
     entries: new Map(session.entries),
@@ -62,6 +70,7 @@ export const copiedSession = ({
     leaf,
     counter: session.counter,
     writerEpoch: 0n,
+    components: sessionComponents(checkpoint, initialComponents),
   }
   return copy
 }
@@ -69,9 +78,13 @@ export const copiedSession = ({
 export const rewoundSession = ({
   session,
   leaf,
+  checkpoint,
+  initialComponents = [],
 }: {
   readonly session: RuntimeSession
   readonly leaf: string | null
+  readonly checkpoint?: ExecutionCheckpoint | undefined
+  readonly initialComponents?: ReadonlyArray<Checkpoint> | undefined
 }) => {
   if (leaf !== null && !session.entries.has(leaf)) {
     return RuntimeUnavailable.make({ message: `Session entry ${leaf} could not be retained during rewind` })
@@ -82,8 +95,23 @@ export const rewoundSession = ({
     leaf,
     counter: session.counter,
     writerEpoch: session.writerEpoch + 1n,
+    components: (session.components ?? []).map((component) => {
+      const selected = sessionComponents(checkpoint, initialComponents).find(
+        (entry) => namespace(entry.descriptor) === namespace(component.descriptor),
+      )
+      return { ...component, state: selected === undefined ? component.initialState! : selected.state }
+    }),
   }
+  if (session.family !== undefined) copy.family = session.family
   return Effect.succeed(copy)
+}
+
+const sessionComponents = (checkpoint: ExecutionCheckpoint | undefined, initial: ReadonlyArray<Checkpoint>) => {
+  if (checkpoint === undefined || !("driverVersion" in checkpoint)) return initial
+  const decoded = Schema.decodeUnknownOption(LoopDriverState)(checkpoint.state)
+  return Option.isSome(decoded)
+    ? (decoded.value.components?.filter((component) => component.descriptor.scope === "session") ?? initial)
+    : initial
 }
 
 export const copiedRun = ({

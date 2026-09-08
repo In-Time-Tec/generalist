@@ -16,7 +16,8 @@ import { layer } from "./layer.js"
 import { ClientCommand, CursorFromString, eventCodec, ServerEvent } from "./wire.js"
 import { HostEvent } from "../host/event.js"
 import { PreviewDelivery } from "../host/preview.js"
-import { HostSessionSnapshot, SessionSnapshotTooLarge } from "../runtime/session/host.js"
+import { HostSessionSnapshot } from "../runtime/session/host.js"
+import { SessionHistoryPage, SessionRunsPage, SessionPageInvalid } from "../runtime/session/page.js"
 export type {
   Client,
   ClientStreamError,
@@ -46,7 +47,9 @@ export interface Server {
   readonly Principal: typeof Principal
   readonly Forbidden: typeof Forbidden
   readonly SessionSnapshot: typeof HostSessionSnapshot
-  readonly SessionSnapshotTooLarge: typeof SessionSnapshotTooLarge
+  readonly SessionHistoryPage: typeof SessionHistoryPage
+  readonly SessionRunsPage: typeof SessionRunsPage
+  readonly SessionPageInvalid: typeof SessionPageInvalid
   readonly HostEvent: typeof HostEvent
   readonly PreviewDelivery: typeof PreviewDelivery
   readonly ServerEvent: typeof ServerEvent
@@ -77,7 +80,9 @@ export const Server: Server = {
   Principal,
   Forbidden,
   SessionSnapshot: HostSessionSnapshot,
-  SessionSnapshotTooLarge,
+  SessionHistoryPage,
+  SessionRunsPage,
+  SessionPageInvalid,
   HostEvent,
   PreviewDelivery,
   ServerEvent,

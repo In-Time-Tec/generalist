@@ -4,8 +4,8 @@ import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Hooks, Instructions, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Agent, AgentTool, Approvals, Hooks, Instructions, Permissions } from "generalist"
+import { Generalist, type Host } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
@@ -52,6 +52,170 @@ const backend = "object" as const
       blobStore,
     ),
   )(`${backend} host`, (test) => {
+    test.effect("compiles named children and pins detached Host limits on both start routes", () =>
+      Effect.gen(function* () {
+        const root = Agent.make({ name: "host-profile-root", children: ["host-profile-child"] })
+        const child = Agent.make({ name: "host-profile-child", children: ["host-profile-child"] })
+        const limits = { tree: { maxDepth: 3, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
+        const host = yield* Generalist.create({ agents: [root, child], limits })
+        limits.concurrency.agents = 100
+        const store = yield* RunStore.RunStore
+        const typedSession = yield* host.sessions.create({ id: "host-profile-typed" })
+        const namedSession = yield* host.sessions.create({ id: "host-profile-named" })
+        const typed = yield* host.runs.start(typedSession.id, root, "root")
+        const named = yield* host.runs.startByName(namedSession.id, child.name, "child")
+        for (const run of [typed, named]) {
+          const record = yield* store.loadExecution(run.id)
+          expect(record.treePolicy).toEqual({ maxDepth: 3, maxSessions: 8, concurrency: { agents: 2, tools: 4 } })
+          expect(record.executableManifest.profiles.map((profile) => profile.selection)).toEqual([child.name])
+        }
+        yield* completeRun(typed.id, "host-profile-typed-complete")
+        yield* completeRun(named.id, "host-profile-named-complete")
+        expect(yield* typed.await).toBe(`${backend} complete`)
+        expect(yield* named.await).toBe(`${backend} complete`)
+      }),
+    )
+
+    test.effect("rejects recovering a missing Run handle", () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "missing-run-handle" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        expect(yield* host.runs.get("missing-host-run").pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/RunNotFound",
+          runId: "missing-host-run",
+        })
+      }),
+    )
+    test.effect("retains a named child profile and leaves rejected admission atomic", () =>
+      Effect.gen(function* () {
+        const reviewer = Agent.make({ name: "named-retained-reviewer" })
+        const agent = Agent.make({ name: "named-retained-parent", children: [reviewer.name] })
+        const host = yield* Generalist.create({ agents: [agent, reviewer] })
+        const session = yield* host.sessions.create({ id: "named-retained-session" })
+        const parent = yield* host.runs.start(session.id, agent, "Review")
+        const before = yield* host.sessions.family(session.id, { limit: 64 })
+        expect(
+          yield* parent.spawn("not-declared", "Review", { commandId: "rejected" }).pipe(Effect.flip),
+        ).toMatchObject({
+          _tag: "generalist/runtime/ChildSelectionMissing",
+        })
+        expect(yield* host.sessions.family(session.id, { limit: 64 })).toEqual(before)
+        const child = yield* parent.spawn(reviewer.name, "Review", { commandId: "accepted" })
+        expect((yield* child.session.inspect).selection?.executableRef).toEqual(
+          (yield* host.runs.inspect(child.run.id)).executableRef,
+        )
+        expect((yield* host.runs.inspect(parent.id)).children.map((entry) => entry.retainedSession?.id)).toEqual([
+          child.session.id,
+        ])
+      }),
+    )
+    test.effect("returns a retained child Session and initial Run before execution", () =>
+      Effect.gen(function* () {
+        const reviewer = Agent.make({ name: "retained-reviewer" })
+        const delegate = AgentTool.fanOut({
+          name: "retained_delegate",
+          description: "Review work in a retained conversation",
+          agents: { reviewer: { agent: reviewer } },
+          maxChildren: 2,
+        })
+        const agent = Agent.make({ name: "retained-parent", toolkit: Toolkit.make(delegate) })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const session = yield* host.sessions.create({ id: "retained-parent-session" })
+        const parent = yield* host.runs.start(session.id, agent, "Coordinate a review")
+        const child = yield* parent.spawn("reviewer", "Review authorization", {
+          commandId: "review-1",
+          label: "authorization",
+        })
+        expect(child.session.id).not.toBe(session.id)
+        expect(yield* child.session.inspect).toMatchObject({
+          retainedSession: {
+            id: child.session.id,
+            rootSessionId: session.id,
+            parentSessionId: session.id,
+            parentRunId: parent.id,
+            initialRunId: child.run.id,
+            depth: 1,
+          },
+        })
+        expect(
+          (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),
+        ).toEqual([session.id, child.session.id])
+        expect(yield* host.runs.inspect(child.run.id)).toMatchObject({ status: "queued", parentRunId: parent.id })
+        expect(yield* host.runs.list(child.session.id)).toEqual([expect.objectContaining({ runId: child.run.id })])
+        const retry = yield* (yield* host.runs.get(parent.id)).spawn("reviewer", "Review authorization", {
+          commandId: "review-1",
+          label: "authorization",
+        })
+        expect(retry.session.id).toBe(child.session.id)
+        expect(retry.run.id).toBe(child.run.id)
+        const admittedSnapshot = yield* child.session.snapshot
+        yield* completeRun(child.run.id, "retained-child-complete")
+        expect(yield* child.run.await).toBe(`${backend} complete`)
+        expect(yield* child.session.inspect).toMatchObject({ id: child.session.id })
+        expect(
+          (yield* child.session.snapshot).runs.map((entry) => ({ runId: entry.runId, status: entry.status })),
+        ).toEqual([{ runId: child.run.id, status: "succeeded" }])
+        const snapshot = yield* child.session.snapshot
+        const store = yield* RunStore.RunStore
+        const replay = yield* store
+          .hostSessionEvents({ sessionId: child.session.id, cursor: admittedSnapshot.cursor })
+          .pipe(Stream.take(snapshot.cursor - admittedSnapshot.cursor), Stream.runCollect)
+        expect(replay.length).toBe(snapshot.cursor - admittedSnapshot.cursor)
+        expect(replay.every((entry) => entry.cursor > admittedSnapshot.cursor)).toBe(true)
+        expect(yield* child.run.send("Do more", { idempotencyKey: "terminal-steer" }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/RunTerminal",
+        })
+      }),
+    )
+    test.effect("keeps direct root activation behind the active conversational Run", () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "host-active-conversation" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const session = yield* host.sessions.create({ id: "host-active-conversation", agent: agent.name })
+        yield* session.submit("active", { commandId: "active" })
+        const before = yield* session.inspect
+        const queued = yield* host.runs.start(session.id, agent, "explicit next")
+        const store = yield* RunStore.RunStore
+        expect(
+          yield* store.activate({ runId: queued.id, commandId: "cannot-overtake" }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
+        expect((yield* session.inspect).activeRunId).toBe(before.activeRunId)
+        expect(yield* host.runs.inspect(queued.id)).toMatchObject({ status: "queued" })
+        yield* completeRun(before.activeRunId!, "active-finished")
+        expect((yield* session.inspect).activeRunId).toBe(queued.id)
+      }),
+    )
+    test.effect("edits Session inputs before their distinct Runs start", () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "host-session-queue" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const session = yield* host.sessions.create({ id: "host-queue", agent: agent.name })
+        const first = yield* session.submit("first", { commandId: "first" })
+        const firstState = yield* session.inspect
+        expect(firstState.queue).toEqual([])
+        expect(firstState.activeRunId).toBeDefined()
+        const second = yield* session.submit("second", { commandId: "second" })
+        const edit = yield* session.queue.update(second.id, "edited", {
+          commandId: "edit",
+          expectedRevision: second.revision,
+        })
+        expect(yield* session.queue.list()).toEqual([expect.objectContaining({ id: second.id, revision: 2 })])
+        yield* completeRun(firstState.activeRunId!, "queue-first")
+        const next = yield* (yield* host.sessions.get(session.id)).inspect
+        expect(next.activeRunId).not.toBe(firstState.activeRunId)
+        expect(next.queue).toEqual([])
+        expect(yield* session.submit("first", { commandId: "first" })).toEqual(first)
+        expect(
+          yield* session.queue.update(second.id, "edited", { commandId: "edit", expectedRevision: second.revision }),
+        ).toEqual(edit)
+        expect(
+          yield* session.queue.remove(second.id, { commandId: "late-remove", expectedRevision: 2 }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/session/SessionQueueConflict", reason: "revision" })
+        yield* completeRun(next.activeRunId!, "queue-second")
+        expect((yield* session.inspect).activeRunId).toBeUndefined()
+        expect(yield* host.runs.list(session.id)).toHaveLength(2)
+      }),
+    )
     test.effect("creates Sessions, starts typed Runs, replays events, and lists state", () => {
       const agent = Agent.make({
         name: `host-${backend}`,
@@ -65,8 +229,8 @@ const backend = "object" as const
         yield* completeRun(run.id, "host:api")
 
         expect(yield* run.await).toBe(`${backend} complete`)
-        expect(yield* host.sessions.get(session.id)).toEqual(session)
-        expect(yield* host.sessions.list()).toContainEqual(session)
+        expect(yield* (yield* host.sessions.get(session.id)).inspect).toEqual(yield* session.inspect)
+        expect(yield* host.sessions.list()).toContainEqual(yield* session.inspect)
         expect(yield* host.runs.list(session.id)).toEqual([expect.objectContaining({ runId: run.id })])
         expect(yield* host.runs.inspect(run.id)).toMatchObject({ runId: run.id, status: "succeeded" })
 
@@ -223,6 +387,149 @@ layer(Layer.mergeAll(runtimeLayer, model, authorization, handlers))("host plugin
       expect(system).toContain("plugin-skill")
     }),
   )
+})
+
+it.effect("replays named Agent edits before resolving a changed or removed fresh Host registration", () =>
+  Effect.gen(function* () {
+    const storage = makeObjectStorage()
+    const writer = Agent.make({ name: "queue-retry-writer" })
+    const originalReviewer = Agent.make({ name: "queue-retry-reviewer", instructions: "Original reviewer" })
+    const changedReviewer = Agent.make({ name: "queue-retry-reviewer", instructions: "Replacement reviewer" })
+    const withHost = <A, E>(
+      reviewer: typeof writer | undefined,
+      use: (
+        host: Host<ReadonlyArray<typeof writer>>,
+      ) => Effect.Effect<A, E, RunExecutor.RunExecutor | RunStore.RunStore>,
+    ) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* Layer.build(
+            Layer.mergeAll(
+              objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolver)),
+              modelLayer(() => textResponse("done")),
+              authorization,
+            ),
+          )
+          return yield* Effect.gen(function* () {
+            const agents = reviewer === undefined ? [writer] : [writer, reviewer]
+            return yield* use(yield* Generalist.create({ agents }))
+          }).pipe(Effect.provideContext(context))
+        }),
+      )
+    const sessionId = "named-agent-retry"
+    const editOptions = { commandId: "edit-1", expectedRevision: 1, agent: originalReviewer.name }
+    const original = yield* withHost(originalReviewer, (host) =>
+      Effect.gen(function* () {
+        const session = yield* host.sessions.create({ id: sessionId, agent: writer.name })
+        yield* session.submit("active", { commandId: "first" })
+        const pending = yield* session.submit("draft", { commandId: "second" })
+        const receipt = yield* session.queue.update(pending.id, "review", editOptions)
+        const before = yield* session.inspect
+        const pin = before.queue[0]!.selection.executableRef.active
+        yield* completeRun(before.activeRunId!, "promote-review")
+        expect(yield* session.queue.list()).toEqual([])
+        return { id: pending.id, receipt, pin }
+      }),
+    )
+    const replacement = yield* withHost(changedReviewer, (host) =>
+      Effect.gen(function* () {
+        const session = yield* host.sessions.get(sessionId)
+        expect(yield* session.queue.update(original.id, "review", editOptions)).toEqual(original.receipt)
+        expect(
+          yield* session.queue.update(original.id, "changed content", editOptions).pipe(Effect.flip),
+        ).toMatchObject({ reason: "input-conflict" })
+        expect(
+          yield* session.queue.update(original.id, "review", { ...editOptions, agent: writer.name }).pipe(Effect.flip),
+        ).toMatchObject({ reason: "input-conflict" })
+        const pending = yield* session.submit("new draft", { commandId: "third" })
+        const options = { ...editOptions, commandId: "edit-2" }
+        const receipt = yield* session.queue.update(pending.id, "new review", options)
+        const queue = yield* session.queue.list()
+        expect(queue[0]!.selection.executableRef.active).not.toBe(original.pin)
+        return { id: pending.id, options, receipt, queue }
+      }),
+    )
+    yield* withHost(undefined, (host) =>
+      Effect.gen(function* () {
+        const session = yield* host.sessions.get(sessionId)
+        expect(yield* session.queue.update(original.id, "review", editOptions)).toEqual(original.receipt)
+        expect(yield* session.queue.update(replacement.id, "new review", replacement.options)).toEqual(
+          replacement.receipt,
+        )
+        expect(
+          yield* session.queue
+            .update(replacement.id, "not accepted", { ...editOptions, commandId: "revoked", expectedRevision: 2 })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/host/AgentNotRegistered", name: originalReviewer.name })
+        expect(yield* session.queue.list()).toEqual(replacement.queue)
+        expect(yield* host.runs.list(sessionId)).toHaveLength(2)
+      }),
+    )
+  }),
+)
+
+it.effect("recovers the same child conversation and admission after replacing the Host", () => {
+  const storage = makeObjectStorage()
+  const reviewer = Agent.make({ name: "reopened-reviewer" })
+  const agent = Agent.make({
+    name: "reopened-parent",
+    toolkit: Toolkit.make(
+      AgentTool.fanOut({
+        name: "reopened_delegate",
+        description: "Retain a reviewer across hosts",
+        agents: { reviewer: { agent: reviewer } },
+        maxChildren: 2,
+      }),
+    ),
+  })
+  const withHost = <A, E>(
+    body: (host: Host<readonly [typeof agent]>) => Effect.Effect<A, E, RunStore.RunStore | RunExecutor.RunExecutor>,
+  ) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const context = yield* Layer.build(
+          Layer.mergeAll(
+            objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolver)),
+            modelLayer(() => textResponse("reopened complete")),
+            authorization,
+          ),
+        )
+        return yield* Effect.gen(function* () {
+          const host = yield* Generalist.create({ agents: [agent] as const })
+          return yield* body(host)
+        }).pipe(Effect.provide(context))
+      }),
+    )
+  return Effect.gen(function* () {
+    const admitted = yield* withHost((host) =>
+      Effect.gen(function* () {
+        const session = yield* host.sessions.create({ id: "reopened-parent-session" })
+        const parent = yield* host.runs.start(session.id, agent, "Coordinate review")
+        const child = yield* parent.spawn("reviewer", "Review once", { commandId: "review" })
+        yield* completeRun(child.run.id, "reopened-child-complete")
+        expect(yield* child.run.await).toBe("reopened complete")
+        return { parentId: parent.id, sessionId: child.session.id, runId: child.run.id }
+      }),
+    )
+    yield* withHost((host) =>
+      Effect.gen(function* () {
+        const parent = yield* host.runs.get(admitted.parentId)
+        const child = yield* parent.spawn("reviewer", "Review once", { commandId: "review" })
+        expect(child.session.id).toBe(admitted.sessionId)
+        expect(child.run.id).toBe(admitted.runId)
+        expect(yield* child.run.await).toBe("reopened complete")
+        const snapshot = yield* child.session.snapshot
+        expect(snapshot.runs[0]?.status).toBe("succeeded")
+        expect(yield* host.runs.list(child.session.id)).toHaveLength(1)
+        expect(
+          (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),
+        ).toEqual(["reopened-parent-session", admitted.sessionId])
+        expect(yield* parent.spawn("reviewer", "Changed", { commandId: "review" }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/IdempotencyConflict",
+        })
+      }),
+    )
+  })
 })
 
 it.effect("object storage preserves Sessions and their root Run list across a fresh Layer", () => {

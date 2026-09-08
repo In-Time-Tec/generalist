@@ -1,3 +1,5 @@
+import { requireConversationalSlot } from "../admission/activation.js"
+import { recordFamilyRun } from "../child/capacity.js"
 import { withCurrentBudget, reserveForkAllocation, reserveRewindAllocation } from "./allocation.js"
 import {
   copiedEvents,
@@ -168,7 +170,14 @@ const forkEffect = (state: RuntimeState, input: ForkRunInput) =>
     const sessions = new Map(state.sessions)
     const sourceSession = sessions.get(source.message.sessionId)
     const initialSession =
-      sourceSession === undefined ? undefined : copiedSession({ session: sourceSession, leaf: leafAt(events) })
+      sourceSession === undefined
+        ? undefined
+        : copiedSession({
+            session: sourceSession,
+            leaf: leafAt(events),
+            checkpoint: run.checkpoint,
+            initialComponents: source.initialSessionComponents,
+          })
     const { operations, session: targetSession } = yield* replaceOperations({
       operations: state.operations,
       sourceRunId: input.runId,
@@ -205,6 +214,7 @@ const forkEffect = (state: RuntimeState, input: ForkRunInput) =>
       atSequence: input.atSequence,
       budget: allocation.child.allocation,
     }
+    next = recordFamilyRun({ state: next, run, budget: allocation.child.allocation })
     if (input.programBudget !== undefined) Object.assign(boundary, { programBudget: input.programBudget })
     const [, reserved] = yield* appendEvent(next, owner.runId, (base) => ({ ...base, ...boundary, role: "source" }))
     const [, allocated] = yield* appendEvent(reserved, input.newRunId, (base) => ({
@@ -236,6 +246,7 @@ export const fork: {
 const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
   Effect.gen(function* () {
     const { source, owner, reservation, available, baseline } = yield* reserveRewindAllocation({ state, input })
+    yield* requireConversationalSlot({ state, run: source })
     yield* validateSequence(source, input.toSequence)
     if (snapshotUnavailableAt(source, input.toSequence)) {
       return yield* NoSnapshot.make({ runId: input.runId, atSequence: input.toSequence })
@@ -336,9 +347,24 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
     const sessions = new Map(state.sessions)
     const sourceSession = sessions.get(source.message.sessionId)
     const initialBranchSession =
-      sourceSession === undefined ? undefined : copiedSession({ session: sourceSession, leaf: leafAt(branchEvents) })
+      sourceSession === undefined
+        ? undefined
+        : copiedSession({
+            session: sourceSession,
+            leaf: leafAt(branchEvents),
+            checkpoint: branch.checkpoint,
+            initialComponents: source.initialSessionComponents,
+          })
     if (sourceSession !== undefined) {
-      sessions.set(source.message.sessionId, yield* rewoundSession({ session: sourceSession, leaf: leafAt(events) }))
+      sessions.set(
+        source.message.sessionId,
+        yield* rewoundSession({
+          session: sourceSession,
+          leaf: leafAt(events),
+          checkpoint: rewound.checkpoint,
+          initialComponents: source.initialSessionComponents,
+        }),
+      )
     }
     const { operations: branchOperations, session: branchSession } = yield* replaceOperations({
       operations: state.operations,
@@ -378,6 +404,8 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
       }))
       next = allocated
     }
+    const archiveBudget = { tokens: 0, usd: 0, duration: 0, toolCalls: 0, children: 0 }
+    next = recordFamilyRun({ state: next, run: branch, budget: archiveBudget })
     const [, archived] = yield* appendEvent(next, input.branchRunId, (base) => ({
       ...base,
       _tag: "RunForked",
@@ -386,7 +414,7 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
       forkRunId: input.branchRunId,
       atSequence: input.toSequence,
       role: "archive",
-      budget: { tokens: 0, usd: 0, duration: 0, toolCalls: 0, children: 0 },
+      budget: archiveBudget,
     }))
     const [, closed] = yield* appendEvent(
       archived,

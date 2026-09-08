@@ -59,7 +59,7 @@ const boundedFailureEvidence = (events: ReadonlyArray<RunEvent>) =>
 
 const makeFourChildFixture = () => {
   const storage = makeObjectStorage()
-  const parent = Agent.make({ name: "linear-four-child-parent" })
+  const parent = Agent.make({ name: "linear-four-child-parent", toolkit: Toolkit.make(probe) })
   const child = Agent.make({
     name: "linear-four-child-worker",
     toolkit: Toolkit.make(probe),
@@ -181,7 +181,7 @@ const makeFourChildFixture = () => {
     linear_storage_probe: () => Effect.die("ToolExecutor test layer owns execution"),
   })
   const resolverLayer = ExecutableResolver.layerStatic([
-    { executable: parentRef, agent: Agent.close(parent, Layer.mergeAll(allowAllAuthorization, parentModel)) },
+    { executable: parentRef, agent: Agent.close(parent, Layer.mergeAll(allowAllAuthorization, parentModel, handlers)) },
     {
       executable: childRef,
       agent: Agent.close(child, Layer.mergeAll(allowAllAuthorization, childModel, executor, handlers)),
@@ -223,7 +223,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
             sessionId: "session:linear-four-child",
             idempotencyKey: "linear-four-child",
             prompt: "Run the four-child durable storage proof.",
-            treePolicy: { maxDepth: 1, maxSubagents: 4 },
+            treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 4, tools: 1024 } },
           })
           yield* host.execute(
             yield* store.claimExecution({

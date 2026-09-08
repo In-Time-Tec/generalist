@@ -2,7 +2,7 @@
 export const packageSmokeTypecheck = (
   exports: ReadonlyArray<string>,
 ): string => `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
-import { Agent, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, Session, Tasks, ToolOutput } from "generalist"
+import { Agent, DurableDriver, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, Session, Tasks, ToolOutput } from "generalist"
 import { LanguageModel } from "effect/unstable/ai"
 import { A2A } from "generalist/unstable/a2a"
 import { AGUI } from "generalist/unstable/ag-ui"
@@ -22,9 +22,10 @@ import * as R2 from "generalist/durability/r2"
 import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
 import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
+import * as Components from "generalist/components"
 import { Server } from "generalist/server"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
-import { Tool } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
@@ -54,6 +55,36 @@ type HostedCommandServices = Assert<Equal<EffectServices<typeof hostedCommand>, 
 type ActorNamespace = Assert<Equal<ReturnType<Rivet.RuntimeActorOptions["namespace"]>, Rivet.RuntimeActorNamespace>>
 type FactoryStaticPartitionRemoved = Assert<Equal<"partition" extends keyof Rivet.RuntimeActorOptions ? true : false, false>>
 type CustomActorPartition = Assert<Equal<Rivet.ActorRuntimeOptions["partition"], string>>
+type ComponentsRoot = typeof import("generalist/components")
+type ComponentRegistryInternal = Assert<Equal<"Registry" extends keyof ComponentsRoot ? true : false, false>>
+type ComponentSessionAuthorityInternal = Assert<Equal<"SessionState" extends keyof ComponentsRoot ? true : false, false>>
+type ComponentInternalsAbsent = Assert<Equal<Extract<keyof ComponentsRoot, "Checkpoint" | "bounded" | "namespace" | "validate" | "toolReplayPolicy">, never>>
+const component = Components.make({
+  descriptor: {
+    version: "1", key: "counter", instance: "default", schemaVersion: "1", handler: "increment", handlerVersion: "1",
+    scope: "session", access: "session-owner", inheritance: "none", branch: "restore", redaction: "visible",
+    maxStateBytes: 64, maxCommandBytes: 64, maxReceiptBytes: 4096,
+  },
+  state: Schema.Int, command: Schema.Int, initial: 0, transition: (state, command) => state + command,
+})
+const componentRead = Components.read(component)
+const componentCommand = Components.command(component, { command: 1 })
+type ComponentReadState = Assert<Equal<Effect.Success<typeof componentRead>, number>>
+type ComponentCommandState = Assert<Equal<Effect.Success<typeof componentCommand>, number>>
+type ComponentReadServices = Assert<Equal<EffectServices<typeof componentRead>, never>>
+type ComponentCommandServices = Assert<Equal<EffectServices<typeof componentCommand>, never>>
+const componentTool = Tool.make("counter_add", {
+  parameters: Schema.Struct({ amount: Schema.Int }), success: Schema.Int,
+  failure: Schema.Union([DurableDriver.DriverError, DurableDriver.DriverStateInvalid]),
+}).annotate(Components.CommandTool, component.registration)
+const componentToolkit = Toolkit.make(componentTool)
+const componentAgent = Agent.make({ name: "component-consumer", toolkit: componentToolkit })
+const componentRun = Agent.run(componentAgent, "increment").pipe(Effect.provide(Layer.mergeAll(
+  Components.layer([component.registration]),
+  componentToolkit.toLayer({ counter_add: ({ amount }) => Components.command(component, { command: amount }) }),
+  TestModel.layer([TestModel.toolCall("counter_add", { amount: 1 }), TestModel.text("done")]),
+)))
+type ComponentAgentServices = Assert<Equal<EffectServices<typeof componentRun>, never>>
 type TestingRuntimeDriver = Assert<Equal<typeof Testing.runtimeDriver, typeof import("generalist/testing/runtime-driver").runtimeDriver>>
 type TasksCanonical = Assert<Equal<typeof Tasks, typeof import("generalist/tasks")>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
@@ -120,6 +151,22 @@ void deterministicLayer
 void makeModelRoute
 const cursor: Cursor.Cursor = Cursor.origin
 const serverClient = Server.client({ baseUrl: "https://generalist.test" })
+const sessionPages = Effect.gen(function* () {
+  const client = yield* serverClient
+  const snapshot = yield* client.sessions.snapshot({ sessionId: "package-history" })
+  yield* client.sessions.list()
+  const created = yield* client.sessions.create({ id: "package-queue", agent: "package-agent" })
+  const pending = yield* client.sessions.submit({ sessionId: created.id, input: "pending", commandId: "package-submit" })
+  const edited = yield* client.sessions.updateInput({ sessionId: created.id, id: pending.id, input: "edited", commandId: "package-edit", expectedRevision: pending.revision, agent: "package-agent" })
+  yield* client.sessions.removeInput({ sessionId: created.id, id: pending.id, commandId: "package-remove", expectedRevision: edited.revision })
+  const history = yield* client.sessions.history({ sessionId: snapshot.session.id, leafId: snapshot.conversation.leafId, limit: 64 })
+  const runs = yield* client.sessions.runs({ sessionId: snapshot.session.id, at: snapshot.cursor, limit: 32 })
+  if (history.nextLeafId !== null) yield* client.sessions.history({ sessionId: snapshot.session.id, leafId: history.nextLeafId, limit: 64 })
+  if (runs.nextBefore !== null) yield* client.sessions.runs({ sessionId: snapshot.session.id, at: runs.at, before: runs.nextBefore, limit: 32 })
+  for (const entry of history.entries) if (entry.contentDeferred === true) yield* client.sessions.entry({ sessionId: snapshot.session.id, entryId: entry.id })
+  for (const run of runs.runs) yield* client.sessions.run({ sessionId: snapshot.session.id, runId: run.runId })
+})
+void sessionPages
 type ServerClientRequirements = Assert<Equal<EffectServices<typeof serverClient>, HttpClient.HttpClient>>
 void cursor
 void serverClient

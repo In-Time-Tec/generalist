@@ -10,6 +10,12 @@ import { LoopDriverState } from "../../core/durable/loop-driver-state.js"
 import type { DriverCheckpoint } from "../../core/durable/driver.js"
 import type { RunEvent } from "../run/event.js"
 import type { Service as RunStore } from "../run/store.js"
+import type { PinnedExecutable } from "../executable/manifest.js"
+
+export const profileBudget = (executable: PinnedExecutable): BudgetLimits => {
+  const active = executable.manifest.entries.find((entry) => entry.pin === executable.ref.active)
+  return active?._tag === "Agent" ? active.manifest.budget : {}
+}
 
 const Integer = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
@@ -40,6 +46,18 @@ export const narrowGrant: {
     if (limit !== undefined && value !== undefined && value > limit) return undefined
   }
   return Schema.decodeSync(BudgetLimits)({ ...grant, ...requested })
+})
+
+export const capGrant: {
+  (ceiling: BudgetLimits): (grant: BudgetLimits) => BudgetLimits
+  (grant: BudgetLimits, ceiling: BudgetLimits): BudgetLimits
+} = Function.dual(2, (grant: BudgetLimits, ceiling: BudgetLimits): BudgetLimits => {
+  const bounded: Types.Mutable<BudgetLimits> = { ...grant }
+  for (const dimension of ["tokens", "usd", "duration", "toolCalls", "children"] as const) {
+    const limit = ceiling[dimension]
+    if (limit !== undefined) bounded[dimension] = Math.min(bounded[dimension] ?? limit, limit)
+  }
+  return bounded
 })
 
 export const firstExhausted = (remaining: Remaining): Dimension | undefined => {

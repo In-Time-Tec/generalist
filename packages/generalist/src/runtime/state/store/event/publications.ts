@@ -32,8 +32,8 @@ export const publish = (input: {
         runs.set(run.runId, { ...run, subscribers })
         state = Object.assign({}, state, { runs })
       }
-      if (publication.hostSession !== undefined) {
-        state = yield* publishHostSession({ state, publication: publication.hostSession })
+      for (const hostSession of publication.hostSessions ?? []) {
+        state = yield* publishHostSession({ state, publication: hostSession })
       }
     }
     return state

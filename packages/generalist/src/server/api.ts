@@ -3,7 +3,7 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "
 import { Ref as MediaRef } from "../media/ref.js"
 import { BudgetLimits } from "../core/durable/run-budget.js"
 import { HostEvent } from "../host/event.js"
-import { HostSession, HostSessionSnapshot } from "../runtime/session/host.js"
+import { sessions } from "./session-api.js"
 import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
 import { RunInspection } from "../runtime/run.js"
@@ -81,30 +81,6 @@ export type ArtifactServerEvent = typeof ArtifactServerEvent.Type
 const ArtifactVersionFromString = Schema.String.pipe(
   Schema.decodeTo(ArtifactVersion, SchemaTransformation.numberFromString),
 )
-
-const createSession = HttpApiEndpoint.post("create", "/sessions", {
-  payload: Schema.Struct({ id: Schema.optionalKey(Schema.String), title: Schema.optionalKey(Schema.String) }),
-  success: HostSession,
-  error: apiErrors,
-})
-const getSession = HttpApiEndpoint.get("get", "/sessions/:id", {
-  params: { id: Schema.String },
-  success: HostSession,
-  error: apiErrors,
-})
-const listSessions = HttpApiEndpoint.get("list", "/sessions", {
-  success: Schema.Array(HostSession),
-  error: apiErrors,
-})
-const snapshotSession = HttpApiEndpoint.get("snapshot", "/sessions/:id/snapshot", {
-  params: { id: Schema.String },
-  success: HostSessionSnapshot,
-  error: apiErrors,
-})
-const sessions: HttpApiGroup.HttpApiGroup<
-  "sessions",
-  typeof createSession | typeof getSession | typeof listSessions | typeof snapshotSession
-> = HttpApiGroup.make("sessions").add(createSession, getSession, listSessions, snapshotSession)
 
 const startRun = HttpApiEndpoint.post("start", "/sessions/:sessionId/runs", {
   params: { sessionId: Schema.String },

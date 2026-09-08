@@ -1,10 +1,11 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Layer, Option, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream, type Types } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Generalist, type SessionRunsInput, type SessionRunsPage } from "generalist/host"
 import { ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
 import { HostSessionSnapshot } from "../../src/runtime/session/host.js"
+import { applyConversationUpdate } from "../../src/runtime/session/conversation.js"
 import { TestModel } from "generalist/testing"
 import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 
@@ -93,7 +94,7 @@ export const register = ({
                 { commandId: "conversation:answer" },
               )
               const beforeCompletion = yield* host.sessions.snapshot(session.id)
-              expect(beforeCompletion.runs[0]?.outcome).toBeUndefined()
+              expect(beforeCompletion.runs[0]?.status).toBe("running")
               expect(beforeCompletion.conversation.entries.map((entry) => entry.id)).toEqual([
                 user.id,
                 call.id,
@@ -125,7 +126,7 @@ export const register = ({
               })
               const completed = yield* host.sessions.snapshot(session.id)
               expect(completed.conversation).toEqual(beforeCompletion.conversation)
-              expect(completed.runs[0]?.outcome?._tag).toBe("Succeeded")
+              expect(completed.runs[0]?.status).toBe("succeeded")
               return { snapshot: completed, userId: user.id }
             }).pipe(Effect.provideContext(context))
           }),
@@ -163,14 +164,171 @@ export const register = ({
                 update: {
                   previousLeafId: before.conversation.leafId,
                   leafId: original.userId,
-                  afterEntryId: original.userId,
-                  entries: [],
+                  afterEntryId: null,
+                  entries: after.conversation.entries,
+                  reset: true,
                 },
               })
             }).pipe(Effect.provideContext(context))
           }),
         )
       }),
+  )
+
+  it.effect(
+    "reconstructs and pages long immutable history after subscriber lag and branch replacement",
+    () =>
+      Effect.gen(function* () {
+        const storage = makeObjectStorage()
+        const services = () =>
+          Layer.mergeAll(
+            objectRuntimeLayer({ addresses: [], subscriberQueueCapacity: 2 }, storage).pipe(
+              Layer.provide(ExecutableResolver.layerStatic([])),
+            ),
+            TestModel.layer([]),
+            Permissions.layerAllowAll,
+            Approvals.layerAutoApprove,
+          )
+        const original = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const context = yield* Layer.build(services())
+            return yield* Effect.gen(function* () {
+              const agent = Agent.make({ name: "history-recovery" })
+              const host = yield* Generalist.create({ agents: [agent] })
+              const session = yield* host.sessions.create({ id: "history-recovery" })
+              const runIds: Array<string> = []
+              for (let index = 0; index < 129; index++)
+                runIds.push((yield* host.runs.start(session.id, agent, `input-${index}`)).id)
+              const store = yield* RunStore.RunStore
+              const runId = runIds[0]!
+              const claim = yield* store.claimExecution({
+                runId,
+                ownerId: objectWorkerId,
+                commandId: "history-recovery:claim",
+              })
+              const writer = Option.getOrThrow(yield* store.claimedSessionStore(claim))
+              const entryIds: Array<string> = []
+              for (let index = 0; index < 150; index++)
+                entryIds.push(
+                  (yield* writer.append(
+                    {
+                      _tag: "Message",
+                      message: Prompt.makeMessage("user", {
+                        content: [Prompt.makePart("text", { text: `entry-${index}` })],
+                      }),
+                    },
+                    { commandId: `history-recovery:entry:${index}` },
+                  )).id,
+                )
+              for (let turn = 0; turn < 270; turn++)
+                yield* store.emitAgentEvent({
+                  ...claim,
+                  commandId: `history-recovery:turn:${turn}`,
+                  event: { _tag: "TurnStarted", turn },
+                })
+              const snapshot = yield* host.sessions.snapshot(session.id)
+              expect(snapshot.runs.map((run) => run.runId)).toEqual([runId])
+              return { runId, runIds, entryIds, snapshot }
+            }).pipe(Effect.provideContext(context))
+          }),
+        )
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const context = yield* Layer.build(services())
+            yield* Effect.gen(function* () {
+              const agent = Agent.make({ name: "history-recovery" })
+              const host = yield* Generalist.create({ agents: [agent] })
+              const sessionId = original.snapshot.session.id
+              const reopened = yield* host.sessions.snapshot(sessionId)
+              expect(reopened).toEqual(original.snapshot)
+              expect(reopened.conversation.entries).toHaveLength(64)
+              const ids: Array<string> = []
+              let before: number | undefined
+              while (true) {
+                const request: Types.Mutable<SessionRunsInput> = {
+                  at: reopened.cursor,
+                  limit: 17,
+                }
+                if (before !== undefined) request.before = before
+                const page = yield* host.sessions.runs(sessionId, request)
+                ids.unshift(...page.runs.map((run) => run.runId))
+                if (page.nextBefore === null) break
+                before = page.nextBefore
+              }
+              expect(ids).toEqual(original.runIds)
+              expect(new Set(ids).size).toBe(129)
+              const store = yield* RunStore.RunStore
+              const runtime = yield* Runtime.Runtime
+              const claim = yield* store.claimExecution({
+                runId: original.runId,
+                ownerId: objectWorkerId,
+                commandId: "history-recovery:reclaim",
+              })
+              const writer = Option.getOrThrow(yield* store.claimedSessionStore(claim))
+              const current = yield* host.sessions.snapshot(sessionId)
+              const entered = yield* Deferred.make<void>()
+              const release = yield* Deferred.make<void>()
+              const lagging = yield* runtime.sessionEvents({ sessionId, cursor: current.cursor }).pipe(
+                Stream.tap(() => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release)))),
+                Stream.runDrain,
+                Effect.flip,
+                Effect.forkChild({ startImmediately: true }),
+              )
+              yield* writer.append(
+                {
+                  _tag: "Message",
+                  message: Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "lag-start" })] }),
+                },
+                { commandId: "history-recovery:lag-start" },
+              )
+              yield* Deferred.await(entered)
+              for (let index = 0; index < 5; index++)
+                yield* writer.append(
+                  {
+                    _tag: "Message",
+                    message: Prompt.makeMessage("user", {
+                      content: [Prompt.makePart("text", { text: `lag-${index}` })],
+                    }),
+                  },
+                  { commandId: `history-recovery:lag:${index}` },
+                )
+              yield* Deferred.succeed(release, undefined)
+              expect(yield* Fiber.join(lagging)).toMatchObject({ _tag: "generalist/host/SessionSubscriberLagged" })
+              const beforeBranch = yield* host.sessions.snapshot(sessionId)
+              yield* writer.setLeaf(original.entryIds[74]!, "history-recovery:branch")
+              const branch = yield* host.sessions.snapshot(sessionId)
+              const updates = yield* runtime
+                .sessionEvents({ sessionId, cursor: beforeBranch.cursor })
+                .pipe(Stream.take(1), Stream.runCollect)
+              const update = updates[0]!
+              expect(update._tag).toBe("Conversation")
+              if (update._tag !== "Conversation") return
+              expect(
+                Option.getOrThrow(
+                  applyConversationUpdate({ conversation: beforeBranch.conversation, update: update.update }),
+                ),
+              ).toEqual(branch.conversation)
+              for (const view of [original.snapshot.conversation, branch.conversation]) {
+                const entries: Array<string> = []
+                let leafId = view.leafId
+                while (leafId !== null) {
+                  const page = yield* host.sessions.history(sessionId, { leafId, limit: 13 })
+                  entries.unshift(...page.entries.map((entry) => entry.id))
+                  leafId = page.nextLeafId
+                }
+                const expected =
+                  view.leafId === original.snapshot.conversation.leafId
+                    ? original.entryIds
+                    : original.entryIds.slice(0, 75)
+                expect(entries).toEqual(expected)
+                expect(new Set(entries).size).toBe(entries.length)
+              }
+              expect(yield* writer.path(original.snapshot.conversation.leafId!)).toHaveLength(150)
+            }).pipe(Effect.provideContext(context))
+          }),
+        )
+      }),
+    120000,
   )
 
   it.effect("reopens a committed Session snapshot and replays a racing admission strictly after its cursor", () =>
@@ -192,7 +350,11 @@ export const register = ({
             const session = yield* host.sessions.create({ id: "snapshot-session", title: "Existing work" })
             const run = yield* host.runs.start(session.id, agent, "existing input")
             const snapshot = yield* host.sessions.snapshot(session.id)
-            expect(snapshot).toMatchObject({ version: 1, session, runs: [{ run: { runId: run.id } }] })
+            expect(snapshot).toMatchObject({
+              version: 1,
+              session: yield* session.inspect,
+              runs: [{ runId: run.id }],
+            })
             return snapshot
           }).pipe(Effect.provideContext(context))
         }),
@@ -212,22 +374,21 @@ export const register = ({
             expect(next[0]).toMatchObject({ _tag: "RunStarted", runId: raced.id })
             expect(next[0]?.cursor).not.toBe(reopened.cursor)
             const fresh = yield* host.sessions.snapshot(original.session.id)
-            expect(fresh.runs.map((run) => run.run.runId)).toEqual([
-              ...original.runs.map((run) => run.run.runId),
-              raced.id,
-            ])
+            expect(fresh.runs.map((run) => run.runId)).toEqual([...original.runs.map((run) => run.runId), raced.id])
             const canonical = yield* (yield* Runtime.Runtime)
               .sessionEvents({ sessionId: original.session.id, cursor: reopened.cursor })
-              .pipe(Stream.take(2), Stream.runCollect)
-            expect(fresh.cursor).toBe(canonical[1]?.cursor)
-            expect(fresh.cursor).toBeGreaterThan(next[0]!.cursor)
+              .pipe(Stream.take(1), Stream.runCollect)
+            expect(fresh.cursor).toBe(canonical[0]?.cursor)
+            expect(fresh.cursor).toBe(next[0]!.cursor)
+            expect(fresh.session.activeRunId).toBe(original.session.activeRunId)
+            expect(fresh.runs.find((run) => run.runId === raced.id)?.status).toBe("queued")
           }).pipe(Effect.provideContext(context))
         }),
       )
     }),
   )
 
-  it.effect("rejects aggregate conversation bytes without truncating committed native entries", () =>
+  it.effect("defers large conversation content without truncating committed native entries", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const storage = makeObjectStorage()
@@ -260,11 +421,18 @@ export const register = ({
               },
               { commandId: `conversation-bytes:${index}` },
             )
-          expect(yield* host.sessions.snapshot(session.id).pipe(Effect.flip)).toMatchObject({
-            _tag: "generalist/host/SessionSnapshotTooLarge",
-            limit: "bytes",
-            maximum: 1048576,
-          })
+          const snapshot = yield* host.sessions.snapshot(session.id)
+          expect(snapshot.conversation.entries).toHaveLength(12)
+          expect(
+            snapshot.conversation.entries.every(
+              (entry) => entry.contentDeferred === true && entry.messages.length === 0,
+            ),
+          ).toBe(true)
+          for (const reference of snapshot.conversation.entries) {
+            const entry = yield* host.sessions.entry(session.id, reference.id)
+            expect(entry.contentDeferred).toBeUndefined()
+            expect(entry.messages[0]?.content[0]).toMatchObject({ type: "text", text: "x".repeat(100000) })
+          }
           const path = yield* writer.path()
           expect(path).toHaveLength(12)
           expect(
@@ -281,7 +449,7 @@ export const register = ({
   )
 
   it.effect(
-    "rejects oversized Session snapshots instead of truncating admitted Runs",
+    "pages beyond the former Session snapshot limit without missing or duplicating admitted Runs",
     () =>
       Effect.gen(function* () {
         const storage = makeObjectStorage()
@@ -297,11 +465,22 @@ export const register = ({
           const host = yield* Generalist.create({ agents: [agent] })
           const session = yield* host.sessions.create({ id: "snapshot-bounded" })
           for (let index = 0; index < 129; index++) yield* host.runs.start(session.id, agent, `input-${index}`)
-          expect(yield* host.sessions.snapshot(session.id).pipe(Effect.flip)).toMatchObject({
-            _tag: "generalist/host/SessionSnapshotTooLarge",
-            limit: "runs",
-            maximum: 128,
-          })
+          const snapshot = yield* host.sessions.snapshot(session.id)
+          expect(snapshot.runs).toHaveLength(33)
+          const ids: Array<string> = []
+          let before: number | null = snapshot.cursor + 1
+          while (before !== null) {
+            const page: SessionRunsPage = yield* host.sessions.runs(session.id, {
+              at: snapshot.cursor,
+              before,
+              limit: 32,
+            })
+            ids.unshift(...page.runs.map((run) => run.runId))
+            before = page.nextBefore
+          }
+          expect(ids).toHaveLength(129)
+          expect(new Set(ids).size).toBe(129)
+          expect(ids).toEqual((yield* host.runs.list(session.id)).map((run) => run.runId))
           expect(yield* host.runs.list(session.id)).toHaveLength(129)
         }).pipe(Effect.provideContext(context))
       }),

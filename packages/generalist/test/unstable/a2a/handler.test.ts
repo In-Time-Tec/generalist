@@ -152,6 +152,13 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
+    sessionFamily: () => Effect.die("not used"),
+    getRun: () => Effect.die("not used"),
+    sessionSelection: () => Effect.die("not used"),
+    configureDelegationPolicy: () => Effect.die("not used"),
+    submitSessionInput: () => Effect.die("not used"),
+    updateSessionInput: () => Effect.die("not used"),
+    removeSessionInput: () => Effect.die("not used"),
     operator: {
       explain: () => Effect.die("not used"),
       verify: () => Effect.die("not used"),
@@ -230,6 +237,9 @@ const makeRuntime = (acceptedSequence = 0) => {
     session: () => Effect.die("not used"),
     listSessions: Effect.die("not used"),
     sessionSnapshot: () => Effect.die("unexpected Session snapshot"),
+    sessionHistoryPage: () => Effect.die("unexpected Session history page"),
+    sessionRunsPage: () => Effect.die("unexpected Session Runs page"),
+    sessionRunSummary: () => Effect.die("unexpected Session Run summary"),
     sessionRuns: () => Effect.die("not used"),
     sessionEvents: () => Stream.die("not used"),
     acknowledge: () => Effect.die("not used"),

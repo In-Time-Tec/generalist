@@ -121,7 +121,7 @@ const storedRun = (): StoredRun => ({
   },
   rootRunId: runId,
   depth: 0,
-  treePolicy: { maxDepth: 3, maxSubagents: 4 },
+  treePolicy: { maxDepth: 3, maxSessions: 1024, concurrency: { agents: 4, tools: 1024 } },
   lastSequence: 1,
   lastTurnCompletedSequence: 0,
   attempt: 2,
@@ -142,7 +142,7 @@ const storedRun = (): StoredRun => ({
       idempotencyKey: "steer",
       digest: "steer-digest",
       prompt,
-      policy: "enqueue",
+      policy: "steer",
       from: { user: "operator" },
       consumedOperationId: "operation-codec",
     },
@@ -239,7 +239,7 @@ const fixture = (): RuntimeState => {
       [
         "session-codec",
         {
-          session: { id: "session-codec", createdAt: instant },
+          session: { id: "session-codec", createdAt: instant, queue: [] },
           lastCursor: 1,
           events: [{ _tag: "Run", cursor: Cursor.make(1), event: event(1) }],
           subscribers: new Map(),
@@ -407,7 +407,7 @@ describe("canonical runtime state", () => {
               [
                 "conversation-only",
                 {
-                  session: { id: "conversation-only", createdAt: instant },
+                  session: { id: "conversation-only", createdAt: instant, queue: [] },
                   lastCursor: 0,
                   events: [conversation],
                   subscribers: new Map(),
@@ -1114,7 +1114,7 @@ describe("canonical runtime state", () => {
           [
             "empty",
             {
-              session: { id: "empty", createdAt: instant },
+              session: { id: "empty", createdAt: instant, queue: [] },
               lastCursor: -1,
               events: [],
               subscribers: new Map(),

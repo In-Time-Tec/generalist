@@ -996,7 +996,7 @@ Admission options for a message sent to one existing Run.
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+> `readonly` `optional` **policy?**: `"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 ***
 
@@ -1156,6 +1156,40 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run.md#runinspection).[`parentRunId`](./Run.md#parentrunid-1)
 
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`RunInspection`](./Run.md#runinspection).[`retainedSession`](./Run.md#retainedsession)
+
 <a id="runid-9"></a>
 
 ##### runId
@@ -1188,13 +1222,25 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -1404,13 +1450,25 @@ Stable identity for idempotent registration across Runtime restarts.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 
@@ -1475,7 +1533,7 @@ durable Run record, so callers cannot forge a sender by supplying an Address.
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+> `readonly` `optional` **policy?**: `"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 <a id="prompt-3"></a>
 
@@ -1703,11 +1761,45 @@ Read ordered durable child settlements for one exact parent Run.
 
 `Effect`\<readonly `object`[], [`ChildSettlementError`](#childsettlementerror)\>
 
+<a id="configuredelegationpolicy"></a>
+
+##### configureDelegationPolicy
+
+> `readonly` **configureDelegationPolicy**: (`policy`) => `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+###### Parameters
+
+###### policy
+
+###### concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### concurrency.agents
+
+`number`
+
+###### concurrency.tools
+
+`number`
+
+###### maxDepth
+
+`number`
+
+###### maxSessions
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
 <a id="createsession"></a>
 
 ##### createSession
 
-> `readonly` **createSession**: (`input`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`CreateSessionError`](./HostSession.md#createsessionerror)\>
+> `readonly` **createSession**: (`input`) => `Effect`\<[`HostSession`](../../host.md#hostsession-1), [`CreateSessionError`](./HostSession.md#createsessionerror)\>
 
 ###### Parameters
 
@@ -1717,7 +1809,7 @@ Read ordered durable child settlements for one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`CreateSessionError`](./HostSession.md#createsessionerror)\>
+`Effect`\<[`HostSession`](../../host.md#hostsession-1), [`CreateSessionError`](./HostSession.md#createsessionerror)\>
 
 ###### Inherited from
 
@@ -1813,6 +1905,22 @@ Start a new Run from one committed journal prefix.
 
 `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, `ForkError`\>
 
+<a id="getrun"></a>
+
+##### getRun
+
+> `readonly` **getRun**: (`runId`) => `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+
 <a id="history"></a>
 
 ##### history
@@ -1881,7 +1989,7 @@ Start a new Run from one committed journal prefix.
 
 ##### listSessions
 
-> `readonly` **listSessions**: `Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
+> `readonly` **listSessions**: `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Inherited from
 
@@ -1976,7 +2084,7 @@ Journal one scalar reward assigned by an export policy.
 
 ##### register
 
-> `readonly` **register**: \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputCodec`, `OutputCodec`\>(`agent`) => `Effect`\<`void`, [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
+> `readonly` **register**: \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputCodec`, `OutputCodec`\>(`agent`) => `Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
 Register one Agent name and its exact environment for start and recovery.
 
@@ -2014,7 +2122,7 @@ Register one Agent name and its exact environment for start and recovery.
 
 ###### Returns
 
-`Effect`\<`void`, [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
+`Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
 <a id="registeragentname"></a>
 
@@ -2033,6 +2141,40 @@ Bind one host-assigned name, unique within the Run's naming scope.
 ###### Returns
 
 `Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`RegisterAgentNameError`](#registeragentnameerror)\>
+
+<a id="removesessioninput"></a>
+
+##### removeSessionInput
+
+> `readonly` **removeSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### expectedRevision
+
+`number`
+
+###### id
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`removeSessionInput`](./HostSession.md#removesessioninput)
 
 <a id="resolvemodelresponse"></a>
 
@@ -2231,7 +2373,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### session
 
-> `readonly` **session**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./HostSession.md#sessionerror)\>
+> `readonly` **session**: (`sessionId`) => `Effect`\<[`HostSession`](../../host.md#hostsession-1), [`SessionError`](./HostSession.md#sessionerror)\>
 
 ###### Parameters
 
@@ -2241,7 +2383,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./HostSession.md#sessionerror)\>
+`Effect`\<[`HostSession`](../../host.md#hostsession-1), [`SessionError`](./HostSession.md#sessionerror)\>
 
 ###### Inherited from
 
@@ -2267,7 +2409,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### sessionEvents
 
-> `readonly` **sessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
+> `readonly` **sessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
 
 ###### Parameters
 
@@ -2277,11 +2419,75 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
+`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
 
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionEvents`](./HostSession.md#sessionevents)
+
+<a id="sessionfamily"></a>
+
+##### sessionFamily
+
+> `readonly` **sessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionFamily`](./HostSession.md#sessionfamily)
+
+<a id="sessionhistorypage"></a>
+
+##### sessionHistoryPage
+
+> `readonly` **sessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### leafId
+
+`string` \| `null`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionHistoryPage`](./HostSession.md#sessionhistorypage)
 
 <a id="sessionruns"></a>
 
@@ -2302,6 +2508,84 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRuns`](./HostSession.md#sessionruns)
+
+<a id="sessionrunspage"></a>
+
+##### sessionRunsPage
+
+> `readonly` **sessionRunsPage**: (`sessionId`, `input`) => `Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### rootRunId?
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRunsPage`](./HostSession.md#sessionrunspage)
+
+<a id="sessionrunsummary"></a>
+
+##### sessionRunSummary
+
+> `readonly` **sessionRunSummary**: (`sessionId`, `runId`) => `Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRunSummary`](./HostSession.md#sessionrunsummary)
+
+<a id="sessionselection"></a>
+
+##### sessionSelection
+
+> `readonly` **sessionSelection**: (`name`) => `Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
+
+###### Parameters
+
+###### name
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
 
 <a id="sessionsnapshot"></a>
 
@@ -2443,6 +2727,108 @@ Begin one already-normalized pinned execution.
 
 `Effect`\<[`StartReceipt`](#startreceipt), [`StartExecutionError`](#startexecutionerror)\>
 
+<a id="submitsessioninput"></a>
+
+##### submitSessionInput
+
+> `readonly` **submitSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### prompt
+
+`Prompt`
+
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSessions
+
+`number`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`submitSessionInput`](./HostSession.md#submitsessioninput)
+
 <a id="treechanges"></a>
 
 ##### treeChanges
@@ -2494,6 +2880,124 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 ###### Returns
 
 `Effect`\<[`ReplayPage`](./RunTree.md#replaypage), [`TreeReplayError`](#treereplayerror)\>
+
+<a id="updatesessioninput"></a>
+
+##### updateSessionInput
+
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### agent?
+
+`string`
+
+###### commandId
+
+`string`
+
+###### expectedRevision
+
+`number`
+
+###### id
+
+`string`
+
+###### prompt
+
+`Prompt`
+
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSessions
+
+`number`
+
+###### sessionId
+
+`string`
+
+###### resolveSelection?
+
+[`SelectionResolver`](./SessionQueue.md#selectionresolver)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`updateSessionInput`](./HostSession.md#updatesessioninput)
 
 <a id="wake-1"></a>
 
@@ -2807,13 +3311,25 @@ Exact root execution admission used below the typed Agent API.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 
@@ -3227,7 +3743,7 @@ Re-exports [CreateSessionInput](./HostSession.md#createsessioninput)
 
 ### HostSession
 
-Re-exports [HostSession](../../host.md#hostsession)
+Re-exports [HostSession](../../host.md#hostsession-1)
 
 ***
 

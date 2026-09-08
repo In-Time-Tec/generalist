@@ -23,6 +23,7 @@ import {
   TreeCursorExpired,
   TreeCursorFuture,
   TreeReplayLimitInvalid,
+  TreePolicyInvalid,
 } from "../errors.js"
 import { RunStore, type CompletionOutcome, type ExecutionClaim } from "../run/store.js"
 import { Cursor } from "../cursor.js"
@@ -33,7 +34,7 @@ import { commands as operationCommands } from "../../durability/internal/runtime
 import { commands as controlCommands, externalCommands } from "../../durability/internal/runtime-command-control.js"
 import { idempotencyKey, waitMapKey, type RuntimeState } from "./projection.js"
 import { admitSend, admitSpawn, admitStart } from "./store/admission/accept.js"
-import { normalize as normalizeTreePolicy } from "../tree/policy.js"
+import { normalize as normalizeTreePolicy, TreePolicy } from "../tree/policy.js"
 import { activateRoot } from "./store/admission/activation.js"
 import { extendBudget } from "./store/control/budget.js"
 import { admitProgramChild, admitProgramChildrenAndSuspend } from "./store/child/admit-program-child.js"
@@ -158,6 +159,22 @@ const makeStoreServices = (options: Options) =>
         ),
       )
     const runStore = RunStore.of({
+      configureDelegationPolicy: (policy) =>
+        modifyState(commands.configureDelegationPolicy, [policy], (state, [prepared]) =>
+          Effect.gen(function* () {
+            const normalized = yield* normalizeTreePolicy(prepared)
+            if (state.delegationPolicy !== null) {
+              if (Schema.toEquivalence(TreePolicy)(state.delegationPolicy, normalized))
+                return [state.delegationPolicy, state] as const
+              return yield* TreePolicyInvalid.make({ message: "The namespace delegation policy is already pinned" })
+            }
+            if (state.runs.size > 0)
+              return yield* TreePolicyInvalid.make({
+                message: "Configure namespace delegation limits before admitting Runs",
+              })
+            return [normalized, { ...state, delegationPolicy: normalized }] as const
+          }),
+        ),
       info: Effect.succeed({ durability: "durable", backend: "object", multiWorker: true }),
       sessionReader: (sessionId) => Effect.succeed(Option.some(sessionReader({ readState, sessionId }))),
       claimedSessionStore: (claim) =>
@@ -540,12 +557,10 @@ const makeStoreServices = (options: Options) =>
                     (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
                   )
                   if (!run.cancellationRequested && pending.length > 0 && "session" in preparedInput.result) {
-                    const followUp = pending.filter((entry) => entry.policy === "enqueue")
-                    const selected =
-                      followUp.length > 0 ? followUp : pending.filter((entry) => entry.policy !== "enqueue")
+                    const selected = pending
                     const continuation = {
                       schemaVersion: 1 as const,
-                      queue: followUp.length > 0 ? ("followUp" as const) : ("steering" as const),
+                      queue: "steering" as const,
                       prompt: selected.reduce<Prompt.Prompt>(
                         (prompt, entry) => Prompt.concat(prompt, entry.prompt),
                         Prompt.empty,

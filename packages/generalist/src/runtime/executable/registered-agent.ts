@@ -22,7 +22,8 @@ import type { Input as ResolverInput, Resolution, Service as ResolverService } f
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
-import { CommandTool, namespace } from "../../core/durable/component.js"
+import { CommandTool } from "../../core/durable/component.js"
+import { namespace } from "../../core/durable/component/definition.js"
 import { Hooks } from "../../hooks/index.js"
 
 const codec = "generalist/runtime/registered-agent"
@@ -81,12 +82,21 @@ interface AgentGraph {
   readonly children: ReadonlyMap<AnyAgent, ReadonlyArray<{ readonly selection: string; readonly agent: AnyAgent }>>
 }
 
-const graphFor = (root: AnyAgent): AgentGraph => {
+export class AgentProfiles extends Context.Service<AgentProfiles, ReadonlyArray<AnyAgent>>()(
+  "generalist/runtime/executable/registered-agent/AgentProfiles",
+) {}
+
+const graphFor = (root: AnyAgent, available: ReadonlyArray<AnyAgent> = [root]): AgentGraph => {
   const agents: Array<AnyAgent> = []
   const children = new Map<AnyAgent, ReadonlyArray<{ readonly selection: string; readonly agent: AnyAgent }>>()
   const names = new Map<string, AnyAgent>()
   const profiles = new Map<string, AnyAgent>()
   const visited = new Set<AnyAgent>()
+  const availableByName = new Map<string, AnyAgent>()
+  for (const agent of available) {
+    if (availableByName.has(agent.name)) throw new TypeError(`Duplicate Agent profile: ${agent.name}`)
+    availableByName.set(agent.name, agent)
+  }
   const visit = (agent: AnyAgent): void => {
     if (visited.has(agent)) return
     const named = names.get(agent.name)
@@ -97,6 +107,16 @@ const graphFor = (root: AnyAgent): AgentGraph => {
     agents.push(agent)
     const declared: Array<{ readonly selection: string; readonly agent: AnyAgent }> = []
     const selections = new Set<string>()
+    for (const selection of agent.children) {
+      const child = availableByName.get(selection)
+      if (child === undefined) throw new TypeError(`Unknown child profile '${selection}' declared by ${agent.name}`)
+      const profiled = profiles.get(selection)
+      if (profiled !== undefined && profiled !== child) throw new TypeError(`Conflicting child profile '${selection}'`)
+      profiles.set(selection, child)
+      declared.push({ selection, agent: child })
+      selections.add(selection)
+      visit(child)
+    }
     for (const tool of Object.values(agent.toolkit.tools)) {
       const fanOut = fanOutDefinition(tool)
       if (fanOut === undefined) continue
@@ -118,6 +138,14 @@ const graphFor = (root: AnyAgent): AgentGraph => {
   visit(root)
   return { agents, children }
 }
+
+export const validateProfiles = (agents: ReadonlyArray<AnyAgent>): Effect.Effect<void, ExecutableRegistrationInvalid> =>
+  Effect.try({
+    try: () => {
+      for (const agent of agents) graphFor(agent, agents)
+    },
+    catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
+  })
 
 const pinnedAgent = (
   agent: AnyAgent,
@@ -158,8 +186,13 @@ const pinnedAgent = (
   })
 }
 
-const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any> = [], hooks?: CapabilityPin) => {
-  const graph = graphFor(root)
+const graphIdentities = (
+  root: AnyAgent,
+  additionalTools: ReadonlyArray<Tool.Any> = [],
+  hooks?: CapabilityPin,
+  available?: ReadonlyArray<AnyAgent>,
+) => {
+  const graph = graphFor(root, available)
   const implementations = new Map(
     graph.agents.map((agent) => {
       if (additionalTools.length === 0) return [agent, agent] as const
@@ -195,7 +228,7 @@ const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any
     pin,
     codec,
     version,
-    payload: { agent: root.name },
+    payload: { pin },
   }))
   return {
     graph,
@@ -216,16 +249,15 @@ const graphIdentities = (root: AnyAgent, additionalTools: ReadonlyArray<Tool.Any
 }
 
 /** @internal Derive the persisted identity used for typed Agent admission and recovery tests. */
-export const durableIdentity = <
-  Tools extends Record<string, Tool.Any>,
-  R,
-  PolicyServices extends R,
-  AuthorizationServices extends R,
-  InputCodec extends Schema.Top,
-  OutputCodec extends Schema.Top,
->(
-  agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-) => graphIdentities(agent).identities.get(agent)!
+export const durableIdentity: {
+  (profiles: ReadonlyArray<AnyAgent>): (agent: AnyAgent) => Pick<RegisteredAgent, "executable" | "registrations">
+  (agent: AnyAgent): Pick<RegisteredAgent, "executable" | "registrations">
+  (agent: AnyAgent, profiles: ReadonlyArray<AnyAgent>): Pick<RegisteredAgent, "executable" | "registrations">
+} = Function.dual(
+  (args) => !Array.isArray(args[0]),
+  (agent: AnyAgent, profiles?: ReadonlyArray<AnyAgent>) =>
+    graphIdentities(agent, [], undefined, profiles).identities.get(agent)!,
+)
 
 /** @internal Close an Agent over the registration call's exact environment and derive its durable admission identity. */
 const registered = (
@@ -263,20 +295,32 @@ export const capture = <
   OutputCodec extends Schema.Top,
 >(
   agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-): Effect.Effect<ReadonlyArray<RegisteredAgent>, never, ClosedServices<Tools, R, InputCodec, OutputCodec>> =>
+): Effect.Effect<
+  ReadonlyArray<RegisteredAgent>,
+  ExecutableRegistrationInvalid,
+  ClosedServices<Tools, R, InputCodec, OutputCodec>
+> =>
   Effect.gen(function* () {
     const context = yield* Effect.context<ClosedServices<Tools, R, InputCodec, OutputCodec>>()
     const tasks = yield* Effect.serviceOption(Tasks)
     const hooks = yield* Effect.serviceOption(Hooks)
-    const graph = graphIdentities(
-      agent,
-      Option.isSome(tasks) ? tasks.value.tools : [],
-      Option.isSome(hooks) && hooks.value.declarations.length > 0 ? hooks.value.pin : undefined,
-    )
+    const profiles = yield* Effect.serviceOption(AgentProfiles)
+    const graph = yield* Effect.try({
+      try: () =>
+        graphIdentities(
+          agent,
+          Option.isSome(tasks) ? tasks.value.tools : [],
+          Option.isSome(hooks) && hooks.value.declarations.length > 0 ? hooks.value.pin : undefined,
+          Option.getOrUndefined(profiles),
+        ),
+      catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
+    })
     const erasedContext = Context.makeUnsafe<unknown>(context.mapUnsafe)
-    return graph.graph.agents.map((member) =>
-      registered(member, graph.implementations.get(member)!, erasedContext, graph.identities.get(member)!),
-    )
+    return graph.graph.agents
+      .filter((member) => Option.isNone(profiles) || member === agent || !profiles.value.includes(member))
+      .map((member) =>
+        registered(member, graph.implementations.get(member)!, erasedContext, graph.identities.get(member)!),
+      )
   })
 
 const registeredName = (input: ResolverInput): Effect.Effect<string, ExecutablePinMissing> => {
@@ -307,10 +351,17 @@ export const resolve: {
     const name = yield* registeredName(input)
     const registration = yield* agents.get(name)
     if (Option.isNone(registration)) return yield* UnknownAgent.make({ name, runId: input.runId })
+    const root = input.manifest.entries.find((entry) => entry.pin === input.manifest.root)
+    const rootRegistration = root?._tag === "Agent" ? yield* agents.get(root.manifest.name) : Option.none()
+    const executable = Option.isSome(rootRegistration)
+      ? rootRegistration.value.executable
+      : registration.value.executable
+    const active = executable.manifest.entries.find((entry) => entry._tag === "Agent" && entry.manifest.name === name)
+    if (active === undefined) return yield* ExecutablePinMissing.make({ runId: input.runId, ref: input.ref })
     return {
       _tag: "Agent" as const,
       agent: registration.value.agent,
-      attestation: registration.value.executable,
+      attestation: makeExecutable({ ...executable.manifest, active: active.pin }),
     }
   })
 })

@@ -25,16 +25,60 @@ const sessionsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Age
           const options: Types.Mutable<SessionCreateOptions> = {}
           if (payload.id !== undefined) options.id = payload.id
           if (payload.title !== undefined) options.title = payload.title
-          return host.sessions.create(options).pipe(mapError("sessions.create"))
+          if (payload.agent !== undefined) options.agent = payload.agent
+          return host.sessions.create(options).pipe(
+            Effect.flatMap((session) => session.inspect),
+            mapError("sessions.create"),
+          )
         })
       },
       get: ({ params }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
-          host.sessions.get(params.id).pipe(mapError("sessions.get")),
+          host.sessions.get(params.id).pipe(
+            Effect.flatMap((session) => session.inspect),
+            mapError("sessions.get"),
+          ),
+        ),
+      submit: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "mutate", () =>
+          host.sessions.get(params.id).pipe(
+            Effect.flatMap((session) => session.submit(payload.input, payload)),
+            mapError("sessions.submit"),
+          ),
+        ),
+      updateInput: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "mutate", () =>
+          host.sessions.get(params.id).pipe(
+            Effect.flatMap((session) => session.queue.update(params.inputId, payload.input, payload)),
+            mapError("sessions.updateInput"),
+          ),
+        ),
+      removeInput: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "mutate", () =>
+          host.sessions.get(params.id).pipe(
+            Effect.flatMap((session) => session.queue.remove(params.inputId, payload)),
+            mapError("sessions.removeInput"),
+          ),
         ),
       snapshot: ({ params }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
           host.sessions.snapshot(params.id).pipe(mapError("sessions.snapshot")),
+        ),
+      history: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.history(params.id, payload).pipe(mapError("sessions.history")),
+        ),
+      runs: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.runs(params.id, payload).pipe(mapError("sessions.runs")),
+        ),
+      entry: ({ params }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.entry(params.id, params.entryId).pipe(mapError("sessions.entry")),
+        ),
+      run: ({ params }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.run(params.id, params.runId).pipe(mapError("sessions.run")),
         ),
       list: () =>
         protect(policy)({ type: "session" }, "read", () => host.sessions.list().pipe(mapError("sessions.list"))),
