@@ -159,7 +159,7 @@ export const verifyCommittedModelEvent = (input: {
         message: `committed model operation ${input.event.operationKey} operation identity diverges`,
       })
     }
-    if (reference.sessionId !== input.claim.session.sessionId) {
+    if (reference.sessionId !== input.claim.session?.sessionId) {
       return yield* RuntimeUnavailable.make({
         message: `committed model operation ${input.event.operationKey} session identity diverges`,
       })

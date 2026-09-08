@@ -353,7 +353,9 @@ export const appendTerminalToolResults = (input: {
     }).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })))
   })
 
-const claimedUpdate = <Input extends readonly [ExecutionClaim, ...ReadonlyArray<unknown>], A, E>(
+type SessionClaim = ExecutionClaim & { readonly session: NonNullable<ExecutionClaim["session"]> }
+
+const claimedUpdate = <Input extends readonly [SessionClaim, ...ReadonlyArray<unknown>], A, E>(
   modifyState: ModifyState,
   definition: Definition<Input, A>,
   input: Input,
@@ -383,7 +385,7 @@ const claimedUpdate = <Input extends readonly [ExecutionClaim, ...ReadonlyArray<
 export const claimedStore = (config: {
   readonly readState: Effect.Effect<RuntimeState, DurabilityFailure | RuntimeUnavailable>
   readonly modifyState: ModifyState
-  readonly claim: ExecutionClaim
+  readonly claim: SessionClaim
 }): SessionStore => {
   const { readState, modifyState, claim } = config
   const sessionId = claim.session.sessionId

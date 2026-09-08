@@ -106,6 +106,7 @@ export const revokeSession: {
   (claim: ExecutionClaim): (state: RuntimeState) => RuntimeState
   (state: RuntimeState, claim: ExecutionClaim): RuntimeState
 } = Function.dual(2, (state: RuntimeState, claim: ExecutionClaim): RuntimeState => {
+  if (claim.session === undefined) return state
   if (state.runs.get(claim.runId)?.ownerId !== undefined) return state
   const current = state.sessions.get(claim.session.sessionId)
   if (
@@ -229,6 +230,12 @@ export const claimExecution: {
         ? (yield* appendLifecycle(claimedState, run.runId, attemptStartedEvent(claimed.attempt), "running"))[1]
         : claimedState
     const loaded = started.runs.get(run.runId)!
+    if (
+      loaded.executableManifest.entries.some(
+        (entry) => entry.pin === loaded.executableRef.active && entry._tag === "Tool",
+      )
+    )
+      return [{ ...executionRecord(started, loaded), ownerId: input.ownerId }, started] as const
     const [session, withSession] = acquireSession(started, {
       sessionId: loaded.message.sessionId,
       runId: loaded.runId,
@@ -339,7 +346,7 @@ export const saveExecution: {
       )
       if (
         checkpoint.sessionId !== run.message.sessionId ||
-        input.session.sessionId !== run.message.sessionId ||
+        input.session?.sessionId !== run.message.sessionId ||
         (run.parentRunId !== undefined && state.runs.get(run.parentRunId)?.message.sessionId === run.message.sessionId)
       ) {
         return yield* RuntimeUnavailable.make({ message: "Session component ownership mismatch" })

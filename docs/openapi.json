@@ -33,7 +33,8 @@
                             "active": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             }
                           },
@@ -47,7 +48,8 @@
                             "root": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             },
                             "profiles": {
@@ -566,6 +568,45 @@
                                     },
                                     "required": ["_tag", "pin", "manifest"],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": { "type": "string", "enum": ["Tool"] },
+                                      "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      "manifest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "version": { "type": "string", "enum": ["1"] },
+                                          "name": { "type": "string", "minLength": 1 },
+                                          "tool": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "input": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "output": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "failure": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                          "policy": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          }
+                                        },
+                                        "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["_tag", "pin", "manifest"],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -642,7 +683,8 @@
                                   "active": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   }
                                 },
@@ -656,7 +698,8 @@
                                   "root": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   },
                                   "profiles": {
@@ -1249,6 +1292,56 @@
                                           },
                                           "required": ["_tag", "pin", "manifest"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Tool"] },
+                                            "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string", "minLength": 1 },
+                                                "tool": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "output": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "failure": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "replay": {
+                                                  "type": "string",
+                                                  "enum": ["never", "provider-idempotent"]
+                                                },
+                                                "policy": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "tool",
+                                                "input",
+                                                "output",
+                                                "failure",
+                                                "replay"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -1467,7 +1560,8 @@
                               "active": {
                                 "anyOf": [
                                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                 ]
                               }
                             },
@@ -1481,7 +1575,8 @@
                               "root": {
                                 "anyOf": [
                                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                 ]
                               },
                               "profiles": {
@@ -2020,6 +2115,53 @@
                                       },
                                       "required": ["_tag", "pin", "manifest"],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Tool"] },
+                                        "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        "manifest": {
+                                          "type": "object",
+                                          "properties": {
+                                            "version": { "type": "string", "enum": ["1"] },
+                                            "name": { "type": "string", "minLength": 1 },
+                                            "tool": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "input": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "output": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "failure": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                            "policy": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            }
+                                          },
+                                          "required": [
+                                            "version",
+                                            "name",
+                                            "tool",
+                                            "input",
+                                            "output",
+                                            "failure",
+                                            "replay"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["_tag", "pin", "manifest"],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
@@ -2101,7 +2243,8 @@
                                     "active": {
                                       "anyOf": [
                                         { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                       ]
                                     }
                                   },
@@ -2115,7 +2258,8 @@
                                     "root": {
                                       "anyOf": [
                                         { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                       ]
                                     },
                                     "profiles": {
@@ -2708,6 +2852,59 @@
                                             },
                                             "required": ["_tag", "pin", "manifest"],
                                             "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": { "type": "string", "enum": ["Tool"] },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "manifest": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "version": { "type": "string", "enum": ["1"] },
+                                                  "name": { "type": "string", "minLength": 1 },
+                                                  "tool": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "input": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "output": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "failure": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "replay": {
+                                                    "type": "string",
+                                                    "enum": ["never", "provider-idempotent"]
+                                                  },
+                                                  "policy": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "version",
+                                                  "name",
+                                                  "tool",
+                                                  "input",
+                                                  "output",
+                                                  "failure",
+                                                  "replay"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": ["_tag", "pin", "manifest"],
+                                            "additionalProperties": false
                                           }
                                         ]
                                       }
@@ -2911,7 +3108,8 @@
                             "active": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             }
                           },
@@ -2925,7 +3123,8 @@
                             "root": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             },
                             "profiles": {
@@ -3444,6 +3643,45 @@
                                     },
                                     "required": ["_tag", "pin", "manifest"],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": { "type": "string", "enum": ["Tool"] },
+                                      "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      "manifest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "version": { "type": "string", "enum": ["1"] },
+                                          "name": { "type": "string", "minLength": 1 },
+                                          "tool": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "input": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "output": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "failure": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                          "policy": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          }
+                                        },
+                                        "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["_tag", "pin", "manifest"],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -3520,7 +3758,8 @@
                                   "active": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   }
                                 },
@@ -3534,7 +3773,8 @@
                                   "root": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   },
                                   "profiles": {
@@ -4127,6 +4367,56 @@
                                           },
                                           "required": ["_tag", "pin", "manifest"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Tool"] },
+                                            "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string", "minLength": 1 },
+                                                "tool": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "output": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "failure": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "replay": {
+                                                  "type": "string",
+                                                  "enum": ["never", "provider-idempotent"]
+                                                },
+                                                "policy": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "tool",
+                                                "input",
+                                                "output",
+                                                "failure",
+                                                "replay"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -4336,7 +4626,8 @@
                                 "active": {
                                   "anyOf": [
                                     { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                   ]
                                 }
                               },
@@ -4350,7 +4641,8 @@
                                 "root": {
                                   "anyOf": [
                                     { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                   ]
                                 },
                                 "profiles": {
@@ -4908,6 +5200,53 @@
                                         },
                                         "required": ["_tag", "pin", "manifest"],
                                         "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Tool"] },
+                                          "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                          "manifest": {
+                                            "type": "object",
+                                            "properties": {
+                                              "version": { "type": "string", "enum": ["1"] },
+                                              "name": { "type": "string", "minLength": 1 },
+                                              "tool": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "input": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "output": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "failure": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                              "policy": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              }
+                                            },
+                                            "required": [
+                                              "version",
+                                              "name",
+                                              "tool",
+                                              "input",
+                                              "output",
+                                              "failure",
+                                              "replay"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["_tag", "pin", "manifest"],
+                                        "additionalProperties": false
                                       }
                                     ]
                                   }
@@ -4989,7 +5328,8 @@
                                       "active": {
                                         "anyOf": [
                                           { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                          { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                         ]
                                       }
                                     },
@@ -5003,7 +5343,8 @@
                                       "root": {
                                         "anyOf": [
                                           { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                          { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                         ]
                                       },
                                       "profiles": {
@@ -5611,6 +5952,59 @@
                                               },
                                               "required": ["_tag", "pin", "manifest"],
                                               "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": { "type": "string", "enum": ["Tool"] },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "manifest": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "version": { "type": "string", "enum": ["1"] },
+                                                    "name": { "type": "string", "minLength": 1 },
+                                                    "tool": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "input": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "output": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "failure": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "replay": {
+                                                      "type": "string",
+                                                      "enum": ["never", "provider-idempotent"]
+                                                    },
+                                                    "policy": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "version",
+                                                    "name",
+                                                    "tool",
+                                                    "input",
+                                                    "output",
+                                                    "failure",
+                                                    "replay"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["_tag", "pin", "manifest"],
+                                              "additionalProperties": false
                                             }
                                           ]
                                         }
@@ -5714,7 +6108,8 @@
                                   "active": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   }
                                 },
@@ -5728,7 +6123,8 @@
                                   "root": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   },
                                   "profiles": {
@@ -6321,6 +6717,56 @@
                                           },
                                           "required": ["_tag", "pin", "manifest"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Tool"] },
+                                            "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string", "minLength": 1 },
+                                                "tool": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "output": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "failure": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "replay": {
+                                                  "type": "string",
+                                                  "enum": ["never", "provider-idempotent"]
+                                                },
+                                                "policy": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "tool",
+                                                "input",
+                                                "output",
+                                                "failure",
+                                                "replay"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -6591,6 +7037,16 @@
                                           "value": {}
                                         },
                                         "required": ["_tag", "value"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Tool"] },
+                                          "isFailure": { "type": "boolean" },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "isFailure", "value"],
                                         "additionalProperties": false
                                       }
                                     ]
@@ -7506,7 +7962,8 @@
                           "active": {
                             "anyOf": [
                               { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                              { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                             ]
                           }
                         },
@@ -7520,7 +7977,8 @@
                           "root": {
                             "anyOf": [
                               { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                              { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                             ]
                           },
                           "profiles": {
@@ -8004,6 +8462,45 @@
                                   },
                                   "required": ["_tag", "pin", "manifest"],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Tool"] },
+                                    "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    "manifest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "version": { "type": "string", "enum": ["1"] },
+                                        "name": { "type": "string", "minLength": 1 },
+                                        "tool": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "input": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "output": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "failure": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                        "policy": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        }
+                                      },
+                                      "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["_tag", "pin", "manifest"],
+                                  "additionalProperties": false
                                 }
                               ]
                             }
@@ -8371,7 +8868,8 @@
                         "active": {
                           "anyOf": [
                             { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                           ]
                         }
                       },
@@ -8385,7 +8883,8 @@
                         "root": {
                           "anyOf": [
                             { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                           ]
                         },
                         "profiles": {
@@ -8860,6 +9359,45 @@
                                       "capabilities",
                                       "budget"
                                     ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Tool"] },
+                                  "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["1"] },
+                                      "name": { "type": "string", "minLength": 1 },
+                                      "tool": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "input": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "output": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "failure": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                      "policy": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      }
+                                    },
+                                    "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
                                     "additionalProperties": false
                                   }
                                 },
@@ -10231,6 +10769,16 @@
                                         },
                                         "required": ["_tag", "value"],
                                         "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Tool"] },
+                                          "isFailure": { "type": "boolean" },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "isFailure", "value"],
+                                        "additionalProperties": false
                                       }
                                     ]
                                   },
@@ -10386,7 +10934,8 @@
                           "required": ["_tag", "budget"],
                           "additionalProperties": false
                         },
-                        { "$ref": "#/components/schemas/generalist_core_NestedOperationSuspendedEncoded" }
+                        { "$ref": "#/components/schemas/generalist_core_NestedOperationSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_runtime_ToolSuspendedEncoded" }
                       ]
                     }
                   },
@@ -13535,7 +14084,8 @@
               "active": {
                 "anyOf": [
                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                 ]
               }
             },
@@ -13559,7 +14109,8 @@
               "active": {
                 "anyOf": [
                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                 ]
               }
             },
@@ -13573,7 +14124,8 @@
               "active": {
                 "anyOf": [
                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                 ]
               }
             },
@@ -14215,6 +14767,16 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "token", "operationKey", "ordinal", "capability", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ToolSuspendedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ToolSuspended"] },
+          "token": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "token", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactAlreadyOpenEncoded": {

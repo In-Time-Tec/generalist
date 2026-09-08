@@ -214,7 +214,7 @@ export const admitProgramChildrenAndSuspend: {
         runId: input.runId,
         ownerId: input.ownerId,
         attemptFence: input.attemptFence,
-        session: input.session,
+        ...(input.session === undefined ? undefined : { session: input.session }),
         ...child,
       })
       receipts.push(receipt)
