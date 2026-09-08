@@ -1,12 +1,13 @@
 import { availableParallelism } from "node:os"
 import { fileURLToPath } from "node:url"
-import { defineConfig } from "vitest/config"
+import { configDefaults, defineConfig } from "vitest/config"
 import generalistManifest from "./packages/generalist/package.json" with { type: "json" }
 import { RuntimeDriverReport } from "./scripts/runtime-driver-report"
 
 const repositoryRoot = fileURLToPath(new URL(".", import.meta.url))
 const generalistRoot = new URL("./packages/generalist/", import.meta.url)
 const generalistExports: Readonly<Record<string, { readonly import: string }>> = generalistManifest.exports
+const localSchedulerTest = "packages/generalist/test/runtime/execution/local-scheduler.test.ts"
 
 /**
  * `generalist/pg` and `generalist/mysql` import the published `generalist` entrypoints while the shared
@@ -56,11 +57,29 @@ export default defineConfig({
     maxWorkers: Math.min(4, availableParallelism()),
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    include: [
-      "packages/**/test/**/*.test.ts",
-      "examples/**/test/**/*.test.ts",
-      "examples/**/src/**/*.test.ts",
-      "test/**/*.test.ts",
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "local-scheduler",
+          include: [localSchedulerTest],
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "parallel",
+          include: [
+            "packages/**/test/**/*.test.ts",
+            "examples/**/test/**/*.test.ts",
+            "examples/**/src/**/*.test.ts",
+            "test/**/*.test.ts",
+          ],
+          exclude: [...configDefaults.exclude, localSchedulerTest],
+          sequence: { groupOrder: 1 },
+        },
+      },
     ],
     coverage: {
       enabled: false,
