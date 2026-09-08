@@ -3,7 +3,7 @@ title: "How to gate tools with permission rules"
 description: "Write allow, deny, and ask rulesets, resolve asks with Approvals, and remember decisions with a RuleStore."
 ---
 
-The `Permissions` service is host policy for tool calls: before every call, the loop asks it to `allow`, `deny`, or `ask`. Allow continues into the normal approval path, deny fails the run with a typed authorization framework error, and ask enters the approval resolution flow. Permissions runs before [Approvals](/guides/approvals); there is one resolution vocabulary and one resume path.
+Decide which actions an agent may take before its tools run. Before every call, the loop asks your `Permissions` service to `allow`, `deny`, or `ask`. Allow continues into the normal approval path, deny fails the run with a typed authorization framework error, and ask enters the approval resolution flow. Permissions runs before [Approvals](/guides/approvals); there is one resolution vocabulary and one resume path. Your host still owns user authentication and resource authorization.
 
 ## 1. Write an ordered ruleset
 

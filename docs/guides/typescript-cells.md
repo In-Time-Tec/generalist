@@ -3,7 +3,7 @@ title: "How to give an agent a TypeScript cell"
 description: "Advertise the one typescript tool, compose the Bun kernel pool, mount host modules into the cell namespace, and test a host without a worker process."
 ---
 
-A cell is one model-authored TypeScript source executed in the persistent kernel a Session owns. `generalist/repl` gives an agent exactly one tool for it, named `typescript`, whose parameters are exactly one bounded string field named `code`. The root export is contracts only; `generalist/repl/bun` is the only module with process dependencies.
+Let an agent write TypeScript against host-provided modules and reuse a namespace across cells. A cell is one model-authored source executed in the persistent kernel a Session owns. `generalist/repl` exposes one tool, `typescript`, with one bounded string parameter, `code`. The root export is contracts only; `generalist/repl/bun` is the only module with process dependencies. A kernel is not by itself a durable Runtime or a security sandbox.
 
 ## 1. Advertise the one tool
 

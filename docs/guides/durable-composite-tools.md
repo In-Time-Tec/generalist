@@ -3,7 +3,7 @@ title: "How to build a durable composite tool"
 description: "Journal each boundary a composite tool crosses, spawn children that return at admission, and page the exact entry log a compaction rewrote."
 ---
 
-A composite tool call — a cell, an agent program step — is not one boundary crossing. It writes files, spawns children, and calls out, and a crash can land between any two of them. Generalist journals each crossing under the outer operation's identity so the run recovers without repeating side effects.
+A tool that writes files, spawns children, and calls an external service can crash between any two actions. Generalist journals each boundary crossing under the outer operation's identity so recovery can reuse recorded outcomes. If an external action may have happened without a recorded result, recovery requires resolution; the journal alone cannot guarantee that an external side effect happens exactly once.
 
 ## 1. Journal each crossing
 

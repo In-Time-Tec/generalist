@@ -3,7 +3,7 @@ title: "How to coordinate multiple agents"
 description: "Fan out typed child Agents, delegate durable work from a parent model, route through a supervisor, and expose one Agent as a tool."
 ---
 
-`Agent.fanOut` runs typed children in the current process. `AgentTool.fanOut` gives the parent model the same fan-out shape and, under generalist/runtime, admits addressable child Runs through the existing durable child-group journal. See [Core and Runtime](/learn/native-runtime).
+Split a task among child agents and collect typed results. `Agent.fanOut` runs children in the current process. `AgentTool.fanOut` gives the parent model the same fan-out shape and, under generalist/runtime, admits addressable child Runs through the existing durable child-group journal. Choose the Runtime path when those children need durable execution; see [Core and Runtime](/learn/native-runtime).
 
 ## Context services and run identity are separate channels
 

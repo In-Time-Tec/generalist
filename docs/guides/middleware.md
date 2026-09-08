@@ -3,7 +3,7 @@ title: "How to add guardrails, middleware, and retries"
 description: "Transform prompts and stream parts with ModelMiddleware, enforce policies with Guardrail combinators, and retry transient model failures with ModelResilience."
 ---
 
-`ModelMiddleware` is optional. When absent, Generalist uses the same identity behavior as `ModelMiddleware.layerIdentity`. A middleware has two optional hooks: `transformPrompt` rewrites the composed prompt before each model call, and `transformPart` rewrites or drops each provider stream part before the loop normalizes the response. Guardrails are middleware combinators, not a separate subsystem.
+Apply prompt and response rules at the model boundary without rewriting the agent loop. Optional `ModelMiddleware` exposes two hooks: `transformPrompt` rewrites the composed prompt before each model call, and `transformPart` rewrites or drops each provider stream part before the loop normalizes the response. Without middleware, behavior matches `ModelMiddleware.layerIdentity`. Guardrails are middleware combinators, not a separate subsystem.
 
 ## 1. Write a middleware
 

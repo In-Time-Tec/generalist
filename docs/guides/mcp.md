@@ -3,7 +3,7 @@ title: "How to connect MCP servers"
 description: "Connect to an MCP server with MCPClient, expose its discovered tools as a Generalist toolkit, and proxy tool calls through the MCP executor."
 ---
 
-`generalist/unstable/mcp` connects to an MCP server, discovers its tools, and exposes one scoped `connect` containing the toolkit the model sees and the executor layer that proxies calls to the same connection. The bridge keeps MCP SDK dependencies out of `generalist`.
+Give an agent tools from an existing MCP server instead of writing a handler for each one. `generalist/unstable/mcp` discovers the tools and exposes one scoped `connect` containing the toolkit the model sees and the executor layer that proxies calls to the same connection. The bridge keeps MCP SDK dependencies out of `generalist`.
 
 **Terminal**
 

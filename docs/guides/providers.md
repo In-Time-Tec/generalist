@@ -3,7 +3,7 @@ title: "How to provide model providers"
 description: "Provide a model layer directly to a run with layerModel, combine provider clients, and keep a deterministic layer for keyless environments."
 ---
 
-`generalist` is provider-agnostic. The default wiring is two layers: a provider client layer (`layerConfig`) and a thin model layer over it (`layerModel`). Provide the model layer to a run with `Effect.provide` — no registry, no selection strings. `generalist/providers/*` leaves wrap the upstream `@effect/ai-*` packages with failure classification, image-source handling, and tool-schema compilation baked in.
+Change the model provider without rewriting the agent or its tools. Supply a provider client layer (`layerConfig`) and a model layer (`layerModel`), then provide the model layer to a run with `Effect.provide`. The `generalist/providers/*` leaves wrap upstream `@effect/ai-*` packages with failure classification, image-source handling, and tool-schema compilation.
 
 **OpenAI profile**
 

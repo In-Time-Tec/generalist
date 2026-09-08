@@ -2,13 +2,15 @@
 
 # Generalist
 
-Build AI agents in TypeScript with [Effect](https://effect.website). Generalist runs the conversation loop: call a model, execute its tools, and continue until it has an answer. You choose the model, tools, and where the agent runs.
+An agent handling a support case or waiting for approval shouldn't lose its work when a server restarts. Generalist turns disposable agent sessions into durable workers in TypeScript, built on [Effect](https://effect.website).
 
-Start with a normal function call. Add streaming, typed output, approvals, or memory when you need them. For work that must survive a restart, run the same agent with the optional durable Runtime.
+The optional Runtime records accepted work in object storage so another host can recover it. One engine supports S3 and native R2; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition, not across the whole application. If an external action's outcome is uncertain, recovery surfaces it for resolution rather than assuming it is safe to repeat.
+
+Don't need recovery yet? Use the process-local Effect agent loop on its own: call a model, execute tools, and continue to an answer. It needs no storage or Runtime.
 
 ## Run your first agent
 
-This example uses OpenAI. You will need an API key and Bun 1.4+.
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. The checkout targets unreleased 0.64.0, so the registry install below is not a way to test this revision. Use the [repository examples](docs/start/examples.md) for the current workspace.
 
 ```bash
 bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
@@ -44,8 +46,6 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 
 **No API key?** The [offline quickstart](docs/start/quickstart.md) runs a tool-calling agent with a scripted model.
 
-Durability and compute placement are independent: local/server, Cloudflare Durable Objects, and Rivet actors use the same S3/native R2 engine. The clean v1 cutover uses fresh namespaces with no SQL backend, compatibility reader, or migration fallback. Local MinIO/Miniflare/workerd qualification does not certify AWS or deployed R2, and this in-flight work is not a release-readiness claim.
-
 ## Build from here
 
 | I want to…                            | Read                                                  |
@@ -62,6 +62,7 @@ Durable execution uses one object-storage engine through `generalist/durability`
 
 ## Documentation and examples
 
+- [Architecture: from system boundaries to commits and recovery](docs/learn/architecture.md)
 - [Getting started](docs/getting-started.md)
 - [Example projects](docs/start/examples.md)
 - [API reference](docs/api/index.md)
@@ -70,6 +71,8 @@ Durable execution uses one object-storage engine through `generalist/durability`
 ## Status
 
 Generalist is pre-1.0: APIs can change between releases. It currently requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are marked `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
+
+Version 0.64.0 is not published. Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Performance gates remain pending. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 
 Everything ships in the `generalist` package. Imports such as `generalist/runtime` and `generalist/durability/s3` are subpaths, not separate packages. The durability contract is intended to be the long-term storage boundary, but remains `@experimental`; that intent is not provider certification or a performance claim.
 

@@ -3,7 +3,7 @@ title: "How to steer and interrupt a running agent"
 description: "Inject prompts into one live Run through its scoped handle, and cancel process-local work with Effect interruption."
 ---
 
-`Agent.allocateRun` allocates one scoped process-local RunHandle with two finite FIFO lanes: `steer` inputs are seen before the next model turn after tool results, and `followUp` inputs are seen only when the Run would otherwise complete. The handle exposes offers and events; only that Run's loop can dequeue input.
+Correct a running agent without starting a second conversation, or queue a follow-up for when it finishes. `Agent.allocateRun` allocates one scoped process-local RunHandle with two finite FIFO lanes: `steer` inputs are seen before the next model turn after tool results, and `followUp` inputs are seen only when the Run would otherwise complete. The handle exposes offers and events; only that Run's loop can dequeue input. These queues live in the process, not in durable storage.
 
 ## 1. Make a Run and queue inputs
 

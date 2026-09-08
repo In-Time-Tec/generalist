@@ -3,7 +3,9 @@ title: "Operate an agent service"
 description: "Choose who owns access, limits, shutdown, and recovery before accepting user work."
 ---
 
-Use this guide before exposing a Host through `generalist/server`. First run the [transport guide](/guides/serve-transport) and [object recovery example](/start/examples#local-and-object-recovery-in-five-minutes). You need a persistent store if accepted work must survive a restart, plus application-owned authentication, authorization, and operational access.
+An HTTP response is not enough to operate an agent service: accepted work needs a recovery path, and unresolved external actions need an operator. Use this guide before exposing a Host through `generalist/server`. First run the [transport guide](/guides/serve-transport) and [object recovery example](/start/examples#local-and-object-recovery-in-five-minutes). You need object storage if accepted work must survive a restart, plus application-owned authentication, authorization, and operational access.
+
+This is an operational checklist, not a production-readiness claim. Version 0.64.0 is unpublished, performance gates remain pending, and local MinIO/Miniflare/workerd qualification does not certify live AWS S3 or deployed R2.
 
 ## Authenticate and authorize at the host boundary
 

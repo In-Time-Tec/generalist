@@ -1,13 +1,19 @@
 ---
 title: "Run an agent in your application"
-description: "Start with a local agent, then add tools or durable execution when you need them."
+description: "Run the Effect agent loop locally, then give accepted work a recovery path with the optional object-backed Runtime."
 ---
 
-Generalist adds a tool-calling agent loop to Effect AI. It runs inside your TypeScript application; you own the model, tools, and service Layers. Use Effect AI directly for a single generation. Add Generalist for multiple turns, policies, approvals, and run events.
+When an agent is working through a support case or waiting for approval, a server restart shouldn't mean starting over. Generalist turns disposable agent sessions into durable workers: its optional object-backed Runtime records accepted work for recovery on another compute host.
+
+Start here with the process-local Effect agent loop. You own the model, tools, and service Layers; no Runtime or storage is required. This first program makes a model call, not a durable worker. Use Effect AI directly if a single generation is all your application needs.
 
 You can start without a database, server, or API key. The [offline quickstart](/start/quickstart) walks through a tool-calling agent with a scripted model. To use a real model, follow the example below.
 
 ## Run an agent with OpenAI
+
+<Warning>
+This checkout targets unreleased 0.64.0. The install command below documents that target, not an available registry release. To try the current code now, use the [repository examples](/start/examples).
+</Warning>
 
 You will need Bun 1.4+ and an OpenAI API key. Generalist also supports Node 22+; see [Installation](/start/installation) for other setups.
 

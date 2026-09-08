@@ -3,13 +3,15 @@ title: "Tutorial: a research agent with approvals and a live UI"
 description: "Build an approval and chat transport demo with canned search; optionally connect a live model."
 ---
 
-Build a research-shaped agent with human approval and a FoldKit chat UI. Search results are canned, not fetched from the web. With no model credentials the model is scripted too. Durable hosting still requires object-service configuration; use local MinIO for local-only development. `OPENROUTER_API_KEY` enables a live model with provider costs but does not enable live search in this tutorial.
+Let a user approve a search request and watch the answer arrive in a chat UI. This tutorial builds that round trip with a Bun server, a durable Runtime, and FoldKit. Search results are canned, not fetched from the web. With no model credentials the model is scripted too. Durable hosting still requires object-service configuration; use local MinIO for local-only development. `OPENROUTER_API_KEY` enables a live model with provider costs but does not enable live search in this tutorial.
 
 Three parts: a Bun server that streams agent runs over SSE and WebSocket, an approval resolved over the wire, and a browser chat UI. If you have not done [the quickstart](/start/quickstart), start there. The finished, styled version of this app lives in the repository at [examples/deep-research-agent](https://github.com/In-Time-Tec/generalist/tree/main/examples/deep-research-agent).
 
 ## Part 1: The server
 
 ### Scaffold the server
+
+The install command targets unpublished 0.64.0. To run current code before release, use the [repository example](/start/examples) rather than installing an older version with different APIs.
 
 **Terminal**
 

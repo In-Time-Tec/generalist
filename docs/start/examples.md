@@ -1,9 +1,11 @@
 ---
 title: "Examples"
-description: "Choose a runnable example to build on."
+description: "Try a local tool-calling agent, recover object-backed work, or connect an approval flow to a browser."
 ---
 
-These examples cover common starting points. They use scripted models by default; the research agent can also connect to live providers, which require credentials and incur costs. Durable examples additionally need an object service. Local acceptance provisions MinIO and Miniflare/workerd without external service credentials; it does not certify AWS or deployed R2.
+Choose the behavior you need to prove: a tool call in the current process, recovery after closing a Runtime, or an approval round trip through a browser. These examples run from the workspace, so you can try the current code without waiting for the unpublished 0.64.0 release.
+
+They use scripted models by default; the research agent can also connect to live providers, which require credentials and incur costs. Durable examples additionally need an object service. Use pinned Bun 1.4.0 for this checkout. Local acceptance provisions MinIO and Miniflare/workerd without external service credentials; it does not certify AWS or deployed R2.
 
 **Terminal**
 

@@ -3,7 +3,9 @@ title: "How to send durable messages between agents"
 description: "Resolve a Run, Session, or scoped name and submit through the unified durable Run inbox."
 ---
 
-`Runtime.sendMessage` resolves an address and submits through the same durable Run inbox as `Runtime.send`. Addressing adds name resolution and family authorization, not another admission or journal contract. The example uses `Durability.layer` over `S3.layer`; provide `BunCrypto` and an `ExecutableResolver`, then let the layer scope own `Durability.activate`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. This documents the object contract without claiming an independently qualified provider deployment.
+Send a follow-up to a specific execution, a Session's newest Run, or a host-assigned name. `Runtime.sendMessage` resolves the address and submits through the same durable Run inbox as `Runtime.send`. Addressing adds name resolution and family authorization, not another admission or journal contract.
+
+The example uses `Durability.layer` over `S3.layer`; provide `BunCrypto` and an `ExecutableResolver`, then let the layer scope own `Durability.activate`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. This documents the object contract without claiming an independently qualified provider deployment.
 
 ## 1. Choose an address
 

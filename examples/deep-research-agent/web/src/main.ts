@@ -202,15 +202,15 @@ const connectionLabel = (connection: Chat.Model["connection"]): string => {
 const headerView = (model: Model): Html => {
   const h = html<Message>()
   return h.header(
-    [h.Class("flex items-center justify-between border-b px-6 py-4")],
+    [h.Class("flex items-center justify-between gap-3 border-b px-6 py-4")],
     [
       h.div(
-        [h.Class("flex flex-col gap-0.5")],
+        [h.Class("flex min-w-0 flex-col gap-0.5")],
         [
           h.h1([h.Class("text-lg font-semibold")], ["Deep Research Agent"]),
           h.p(
             [h.Class("text-xs text-muted-foreground")],
-            ["A Generalist agent: plans, calls web_search, and synthesizes a cited answer — streamed live."],
+            ["Inspect sources and approve searches before they run. Scripted model and canned search by default."],
           ),
         ],
       ),
@@ -445,7 +445,8 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
         [
           conversationEmptyState({
             title: "Ask a research question",
-            description: "The agent plans briefly, calls web_search, and synthesizes a cited answer.",
+            description:
+              "Try “What is Effect for TypeScript?” Follow the search call, inspect its results, and compare the cited answer. Defaults are scripted, not live research.",
           }),
         ],
       ),

@@ -3,7 +3,7 @@ title: "How to test agents and run evals in CI"
 description: "Pin loop behavior with scripted models and layerTests, then gate CI on a deterministic eval, with no API keys anywhere."
 ---
 
-Every behavior-bearing seam in Generalist is an Effect service with an in-memory `layerTest`, so a full tool-calling loop runs in CI with zero credentials ([Seams as services](/learn/seams-as-services)). Keep the primary pass/fail deterministic; add LLM-judge jobs outside the default CI path if you want them.
+Catch broken tool wiring and loop behavior in CI without paying for model calls. Script model responses and provide test service Layers so the checks run without credentials ([Seams as services](/learn/seams-as-services)). Keep the primary pass/fail deterministic; evaluate live model quality separately. Scripted success proves the wiring, not the quality of a provider's answers.
 
 ## 1. Script the model and pin the loop
 

@@ -16,7 +16,9 @@ description: "How the process-local generalist agent loop composes with the nati
 
 ## Live previews are outside durability
 
-`Runtime.previews({ runId })` observes bounded append frames for text and reasoning from the live Runtime process. Contiguous per-attempt sequences and per-channel UTF-16 offsets let consumers detect a dropped frame. This lane is intentionally lossy, droppable, and non-authoritative: it is not stored, cursor-addressed, checkpointed, durably replayed, transported, or folded into FoldKit Chat.Model. Losing every preview does not change execution or the eventual semantic response event.
+`Runtime.previews({ runId })` observes bounded append frames for text and reasoning from the live Runtime process. The Host checks current attempt authority before admitting a `PreviewDelivery` over WebSocket; these deliveries never advance the durable Session cursor. SSE carries canonical events only.
+
+FoldKit renders previews as an ephemeral overlay rather than conversation entries. It checks connection epochs, attempt authority, contiguous per-attempt sequences, and per-channel UTF-16 offsets; gaps clear and tombstone the preview. This lane is intentionally lossy and non-authoritative: it is not stored, checkpointed, or durably replayed. Losing every preview does not change execution or the eventual semantic response event. See [recovery and client truth](/learn/architecture-recovery#two-snapshot-meanings-two-output-lanes).
 
 ## Choose a transport, not another state machine
 

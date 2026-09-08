@@ -1,9 +1,11 @@
 ---
 title: "What is Generalist"
-description: "Learn what Generalist adds to Effect AI, when to use the local loop or durable Runtime, and where to go next."
+description: "Turn disposable agent sessions into durable workers, or use the Effect agent loop without storage."
 ---
 
-Generalist helps you build AI agents as part of an Effect application. It builds on `effect/unstable/ai` and adds the loop around a model call: run tools, continue for another turn, ask for approval, and emit events your application can consume.
+An agent can take several turns, wait for a person, and call a service before its task is done. If that work lives only in a process, a restart loses the session. Generalist turns disposable agent sessions into durable workers by recording accepted work in an optional object-backed Runtime.
+
+The same agent can also run locally without storage. Built on `effect/unstable/ai`, the core calls models, runs tools, asks for approval, and emits events your application can consume. Start there when a script or request doesn't need restart recovery.
 
 An agent is a plain value containing a name, instructions, a toolkit, and a turn policy. The model and tool handlers are Effect layers, so production providers and deterministic test providers can run the same agent program.
 
@@ -46,11 +48,15 @@ eval passed
 
 ## Non-goals
 
-Generalist is not a general-purpose workflow engine, project scaffold, or hosted platform. generalist/runtime owns agent-run durability and storage adapters; wider application orchestration and deployment remain yours.
+Generalist is not a general-purpose workflow engine, project scaffold, or hosted platform. The Runtime owns agent-run recovery; wider application orchestration, authentication, authorization, and deployment remain yours.
 
 ## Where generalist/runtime fits
 
 The core package runs an agent in the current process. generalist/runtime adds persisted events, waits and signals, cancellation, inspection, and recovery. Use the shared object-storage engine through S3 or native R2 when work must survive restart. Local processes, servers, Cloudflare Durable Objects, and Rivet actors host that same engine; there is no production memory, filesystem, or SQL Runtime. [Core and Runtime: where durability lives](/learn/native-runtime) covers the package boundary in depth.
+
+Commands serialize within a partition, not globally. Recovery uses recorded outcomes; when an external action may have happened but its result is unknown, it requires resolution instead of blindly repeating the action. This is not an exactly-once guarantee for external services.
+
+This checkout targets unreleased 0.64.0. Local MinIO and Miniflare/workerd qualification is not live AWS S3 or deployed R2 certification, and performance gates remain pending.
 
 ## Next steps
 

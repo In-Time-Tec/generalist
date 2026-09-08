@@ -3,7 +3,7 @@ title: "Let an agent refine its own guidance"
 description: "Accept a model-authored refinement, apply it atomically, roll it back exactly, persist it durably, and pin one exact state into a durable Execution."
 ---
 
-`generalist/instructions` is the engine for versioned instructions an agent may refine and a host may pin: prompt notes, memories, skills, and subagent specs, each versioned and audited. Store locations, scope policy, and the refine flow itself stay host-owned.
+Let an agent propose better instructions without silently changing the version your host runs. `generalist/instructions` versions and audits prompt notes, memories, skills, and subagent specs so a host can pin them. Store locations, scope policy, and the refine flow itself stay host-owned.
 
 ## 1. Accept a refinement from the model
 

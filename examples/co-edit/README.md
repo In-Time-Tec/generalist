@@ -1,6 +1,6 @@
 # Co-edit
 
-This example serves one browser editor and a Generalist Host from the same Bun server. The page joins `plan.md` over WebSocket as a human peer. A scripted `TestModel` agent reads the resulting version, edits it through `Artifact.tool`, and streams its attributed update back to the page.
+Let a person and an agent work on the same document without copying edits between chat and an editor. This example serves a browser editor and a Generalist Host from one Bun server. The page joins `plan.md` over WebSocket as a human peer; a scripted `TestModel` agent reads the resulting version, edits it through `Artifact.tool`, and streams its attributed update back to the page.
 
 The Runtime and `BlobStore` both use the same real S3-compatible object transport. There is no SQL, simulator, or in-memory durability fallback. Before running, provide a dedicated bucket and credentials that can read, conditionally create, and list objects:
 

@@ -1,6 +1,19 @@
 # Generalist
 
-Generalist is an Effect-native agent framework over `effect/unstable/ai`. The `generalist` package provides the process-local agent loop and optional durable Runtime. `generalist/durability` is the sole production durability engine, with S3 and native R2 transports. Local processes, servers, Cloudflare Durable Objects, and Rivet actors are independent compute hosts, not storage backends. Core stays usable without storage, Relay, or another durable runtime.
+Generalist turns agents from disposable chat sessions into durable workers. It is an Effect-native framework over `effect/unstable/ai`: the `generalist` package provides the process-local loop and optional durable Runtime. `generalist/durability` is the sole production durability engine, with S3 and native R2 transports. Local processes, servers, Cloudflare Durable Objects, and Rivet actors are independent compute hosts, not storage backends. Core stays usable without storage, Relay, or another durable runtime.
+
+## Product and writing standard
+
+Write for the developer deciding whether Generalist solves a real problem. Lead with the task or failure they face, explain the mechanism, and show the outcome. Use direct, concrete language: short openings, useful examples, and clear next steps. Keep technical references precise; do not turn every API description into a pitch.
+
+- Frame the product around work that crosses tool calls, human decisions, and host lifetimes. Preserve the simple process-local entry point instead of implying every agent needs storage.
+- Explain architectural advantages with their limits. Independent partitions enable separate progress, but mutations within a partition serialize. Replaceable compute does not imply automatic scaling, portable credentials, or arbitrary executable compatibility.
+- Separate shipped behavior, design intent, measured performance, and release acceptance. Never describe uncertain external effects as exactly-once, local emulator results as live-provider certification, or another product's numbers as Generalist evidence.
+- Demos and code examples must demonstrate a concrete reader outcome. State whether models and tools are scripted or live, which credentials and services are required, what persists, and what the example does not prove. Keep runnable code complete and verified.
+- Architecture documentation should progress from the system view to ownership boundaries, data flow, and failure/recovery details. Diagrams must distinguish canonical storage, replaceable compute, derived caches, and provisional client output.
+- Cite first-party sources when drawing comparisons. Identify each system's actual category and the relevant design pattern; do not imply an integration, endorsement, or equivalent performance. Keep historical decisions and generated API output under their existing authorities.
+
+`PRODUCT.md` owns the product thesis and audience. The writing skills own the documentation workflow. This positioning never relaxes the correctness, safety, testing, or release requirements below.
 
 ## Commands
 

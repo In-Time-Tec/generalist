@@ -3,7 +3,7 @@ title: "Memoize declared-pure operations"
 description: "Reuse successful pure tool calls across Runs without weakening durable replay."
 ---
 
-Declare purity explicitly, key reuse by host-owned isolation and dependency versions, and keep replay on the journal.
+Reuse a successful pure tool result across Runs instead of computing it again. Declare purity explicitly and key reuse by host-owned isolation and dependency versions. Durable replay still reads the journal, not the cache.
 
 ## Declare a pure tool
 

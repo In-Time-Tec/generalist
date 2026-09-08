@@ -3,7 +3,7 @@ title: "How to add memory"
 description: "Recall and remember across runs with Memory.Key, WorkingMemory, and SemanticRecall over a VectorStore, including an offline-safe local composition."
 ---
 
-Memory is an optional recall/remember seam: before turn 0 the loop asks the `Memory` service for items to inject, and after turns it hands back the transcript to remember. You opt in per run with `RunOptions.memory` and a `Memory.Key` of `{ agent, subject }` that you choose. Generalist never derives memory identity from session ids or users.
+Carry useful context into a later conversation without putting the full transcript in every prompt. Before turn 0, the optional `Memory` service supplies items to recall; after turns, it receives the transcript to remember. Opt in per run with `RunOptions.memory` and a `Memory.Key` of `{ agent, subject }` that you choose. Generalist never derives memory identity from session ids or users. Memory recall is not Runtime recovery: restart safety depends on the storage you provide.
 
 Injected recall carries structural provenance in the Chat transcript. Before `Memory.remember`, core removes recall-origin entries without comparing text, so recalled context cannot recursively grow working memory while identical user-authored text is retained. Compacted runs project from the lossless Session path rather than remembering a synthetic checkpoint.
 

@@ -1,6 +1,8 @@
 # Five minutes
 
-See an agent run admitted into a real S3-compatible object Runtime, close that Runtime, then reopen the same namespace and recover the Run. The reopened scope explicitly activates durability and drains its external scheduler; the example uses a scripted model, so no model API key is needed.
+Keep accepted agent work recoverable when its Runtime closes. This example admits a Run into a real S3-compatible object Runtime, closes it, then reopens the same namespace and recovers the Run. The reopened scope explicitly activates durability and drains its external scheduler, showing the storage-backed recovery path rather than merely running the agent again.
+
+Generalist's core agent loop does not require storage. This example adds the optional durable Runtime and uses a scripted model, so no model API key is needed.
 
 Configure a dedicated general-purpose S3 bucket and credentials that can read, conditionally create, and list objects:
 

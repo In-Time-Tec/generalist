@@ -3,7 +3,7 @@ title: "How to stay inside the context window"
 description: "Provide Compaction.layer to microcompact tool outputs and summarize old history into checkpoints, or truncate with a Tokenizer."
 ---
 
-Compaction is optional: when a `Compaction` layer is present, the loop consults it before model turns and once more after a context-overflow failure. The default strategy works in two stages: first it microcompacts oversized tool outputs, and only if that is not enough does it summarize older history into a checkpoint while keeping a recent suffix verbatim.
+Keep a long conversation within the model's context window without discarding all recent detail. When an optional `Compaction` layer is present, the loop consults it before model turns and once more after a context-overflow failure. The default strategy first microcompacts oversized tool outputs, then, if needed, summarizes older history into a checkpoint while keeping a recent suffix verbatim.
 
 ## 1. Provide the layer
 

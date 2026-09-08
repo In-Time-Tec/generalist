@@ -3,7 +3,7 @@ title: "How to compose instructions and instruction providers"
 description: "Register ordered instruction providers with Instructions.layer and load AGENTS.md files as providers."
 ---
 
-The `Instructions` service replaces a single instruction string with an ordered registry of `Provider` values. At run start the loop renders instruction providers once into the system message. Persona, house style, and repository files compose as providers instead of string concatenation.
+Combine a persona, house style, and repository guidance without assembling one instruction string by hand. The `Instructions` service keeps an ordered registry of `Provider` values and renders them once into the system message at run start.
 
 ## 1. Register ordered providers
 

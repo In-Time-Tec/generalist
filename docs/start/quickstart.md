@@ -5,9 +5,13 @@ description: "Run a tool-calling agent without an API key, then connect it to a 
 
 Build a weather assistant that calls a tool and returns an answer. This example uses scripted model responses and a stub weather function, so you can run it without credentials or network access after installation.
 
+This is the process-local loop, not restart-safe execution. Once the tool path works, add the [object-backed Runtime](/features/runtime) if accepted work must outlive the process.
+
 ## Install
 
 You will need Bun 1.4+.
+
+Version 0.64.0 is not published yet. The command below documents the target release; use the [repository examples](/start/examples) to try the current workspace now.
 
 ```bash
 mkdir generalist-quickstart && cd generalist-quickstart

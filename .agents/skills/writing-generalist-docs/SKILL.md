@@ -5,7 +5,9 @@ description: Writes concise Generalist tutorials and guides with verified exampl
 
 # Write for one reader goal
 
-Read the owning implementation and current examples before writing. Give the reader a goal, prerequisites, one working example and expected output, a likely failure and remedy, and one next step. Use plain language, active voice, and short sections. Cut marketing claims and explanations that repeat the code.
+Read the owning implementation and current examples before writing. Lead with the reader's problem, explain why the mechanism helps, and show a concrete outcome. Give tutorials a goal, prerequisites, one working example and expected output, a likely failure and remedy, and one next step. Use plain language, active voice, and short sections. Keep product claims evidence-backed; cut hype and explanations that repeat the code.
+
+Product introductions should make the case for durable agent work without making Runtime a prerequisite for the process-local loop. Architecture guides should descend from the whole system into ownership, data flow, and recovery, using diagrams that distinguish durable authority from compute, caches, and provisional output. Comparisons need first-party sources and explicit differences; another system's scale or cost numbers are not Generalist benchmarks. Reference pages should remain concise technical references, not repeated pitches.
 
 - Use Effect AI's actual Prompt, Response, Tool, and Toolkit types. Do not invent a parallel contract.
 - Separate scripted models, canned tool data, live model calls, and live external services. Name required credentials and costs.

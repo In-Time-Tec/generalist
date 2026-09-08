@@ -27,7 +27,7 @@
           },
           {
             "group": "Choose the right approach",
-            "pages": ["learn/comparisons", "learn/native-runtime"]
+            "pages": ["learn/comparisons", "learn/architecture", "learn/native-runtime"]
           }
         ]
       },
@@ -90,6 +90,10 @@
       {
         "tab": "Operate",
         "groups": [
+          {
+            "group": "Understand durable execution",
+            "pages": ["learn/architecture-commits", "learn/architecture-recovery"]
+          },
           {
             "group": "Host a service",
             "pages": [

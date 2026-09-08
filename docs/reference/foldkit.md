@@ -28,6 +28,6 @@ bun add effect@4.0.0-rc.112 generalist foldkit@0.148.2
 
 `Chat.update(model, action)` restores user messages, assistant text/reasoning, and tool calls/results from the snapshot's bounded active-path conversation. Conversation updates retain a visible prefix and replace its suffix, including on rewind or branch change. Run-derived HostEvents update turns, tool progress, approvals, and terminal state without synthesizing transcript entries from Run summaries. Instruction, memory, and skill bodies are omitted from the display projection; [snapshot limits](/features/server#snapshot-limits) reject rather than truncate.
 
-`Chat.subscriptions` owns scoped durable observation; command failures return through typed Chat actions. `Chat.Model` has no authoritative streaming-text field. A host that explicitly consumes `Runtime.previews` must keep that disposable state outside Chat.
+`Chat.subscriptions` owns scoped observation; command failures return through typed Chat actions. `Chat.Model` keeps disposable previews separate from its canonical conversation. Authority-checked WebSocket deliveries populate an ephemeral overlay; epoch, attempt, sequence, and offset checks reject stale or incomplete output. Previews never advance the durable cursor or become conversation entries. See [recovery and client truth](/learn/architecture-recovery#two-snapshot-meanings-two-output-lanes).
 
 See [generalist/runtime](/reference/runtime) and [generalist/server](/reference/transport).

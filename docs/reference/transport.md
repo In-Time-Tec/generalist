@@ -29,6 +29,8 @@ bun add effect@4.0.0-rc.112 generalist
 
 Both routes resolve the Session before committing the response, so an unknown Session returns the typed `SessionNotFound` body with HTTP 404 instead of opening a stream. After SSE headers are committed, a cursor, lag, or Runtime failure is sent as one terminal `effect/httpapi/stream/failure` event containing the encoded `ApiError`; the generated client exposes it as the stream failure.
 
+WebSocket also carries authority-checked `PreviewDelivery` frames for provisional model output. This separate, lossy lane never advances the durable Session cursor and is not replayed; SSE carries canonical HostEvents only. FoldKit displays previews as an ephemeral overlay outside the canonical conversation. Each replacement WebSocket loads a fresh committed snapshot before delivering subsequent events. See [recovery and client truth](/learn/architecture-recovery#two-snapshot-meanings-two-output-lanes).
+
 ## Commands and inspection
 
 The client creates and lists Sessions, starts named configured Agents, lists, inspects, and cancels Runs, resolves durable approvals, and calls the Runtime operator surface. Operator mutations return a typed 403 unless the host opts in with `operator: true`. Closing a stream never cancels execution.

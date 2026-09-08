@@ -1,19 +1,19 @@
 # Generalist
 
-Build AI agents in TypeScript with [Effect](https://effect.website). Generalist calls a model, runs its tools, and continues until it has an answer. You choose the model, tools, and deployment.
+An agent handling a support case or waiting for approval shouldn't lose its work when a server restarts. Generalist turns disposable agent sessions into durable workers in TypeScript, built on [Effect](https://effect.website).
 
-Use the agent loop on its own, or add the optional durable Runtime for work that must survive a restart.
+The optional Runtime records accepted work in object storage so another host can recover it. S3 and native R2 use one engine; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition. Uncertain external outcomes require resolution, not blind retries.
+
+For scripts and request-local work, use the Effect agent loop without storage or Runtime. It calls a model, runs its tools, and continues to an answer.
 
 ## Install
 
-This example uses OpenAI. You will need an API key and Bun 1.4+.
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. This checkout targets unreleased 0.64.0. Registry installation does not verify this revision; use the [repository examples](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/examples.md) for the current workspace.
 
 ```bash
 bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
 export OPENAI_API_KEY="your-api-key"
 ```
-
-Durability and compute placement are independent: local/server, Cloudflare Durable Objects, and Rivet actors use the same S3/native R2 engine. The clean v1 cutover uses fresh namespaces with no SQL backend, compatibility reader, or migration fallback. Local MinIO/Miniflare/workerd qualification does not certify AWS or deployed R2, and this in-flight work is not a release-readiness claim.
 
 ## Run an agent
 
@@ -46,6 +46,7 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 
 ## Next steps
 
+- [Architecture](https://github.com/In-Time-Tec/generalist/blob/main/docs/learn/architecture.md): follow system boundaries, object commits, and recovery from the top down.
 - [Offline quickstart](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/quickstart.md): run a tool-calling agent without credentials.
 - [Tools](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/define-tools.md): give an agent functions it can call.
 - [Structured output](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/structured-output.md): return schema-validated objects.
@@ -55,6 +56,8 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 ## Status
 
 Generalist is pre-1.0: APIs can change between releases. Requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
+
+Version 0.64.0 is not published. Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Performance gates remain pending. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 
 Everything ships in this package. Imports such as `generalist/runtime`, `generalist/durability/s3`, and `generalist/testing/model` are subpaths, not separate installs. You only need the optional dependencies for adapters you use. Object storage is the only production execution authority; ordinary process-local agents need no persistence. The durability contract's long-term intent is not provider certification or a verified performance claim.
 

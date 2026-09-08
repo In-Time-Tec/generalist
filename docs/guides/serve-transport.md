@@ -3,7 +3,7 @@ title: "How to serve an agent over SSE and WebSocket"
 description: "Expose a Generalist Host through one typed HttpApi with HTTP, SSE, and WebSocket."
 ---
 
-`generalist/server` mounts one schema-first HttpApi over a `generalist/host`. The Host delegates execution and persistence to Runtime while Server owns only HTTP translation, authentication, SSE and WebSocket framing, and its generated client.
+Let a client submit work, observe progress, and reconnect to a hosted agent. `generalist/server` mounts one schema-first HttpApi over a `generalist/host`. The Host delegates execution and persistence to Runtime while Server owns HTTP translation, authentication, SSE and WebSocket framing, and its generated client. Keeping the connection open is not what makes the work durable; the object-backed Runtime is.
 
 **Terminal**
 

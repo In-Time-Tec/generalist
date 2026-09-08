@@ -1,6 +1,8 @@
 # Generalist documentation
 
-New to Generalist? Start with [Getting started](getting-started.md), or run the [offline quickstart](start/quickstart.md) without an API key.
+Keep an agent's accepted work when its host restarts. Generalist pairs an optional object-backed Runtime with a process-local Effect agent loop, so you can start with a script and add recovery when the work needs it.
+
+Start with [Getting started](getting-started.md), or run the [offline quickstart](start/quickstart.md) without an API key. This checkout targets unreleased 0.64.0; use the [repository examples](start/examples.md) to try the current workspace.
 
 ## Find what you need
 

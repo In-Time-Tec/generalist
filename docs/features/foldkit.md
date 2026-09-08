@@ -76,7 +76,7 @@ Run lifecycle events still drive turns, tool progress, approvals, and terminal s
 
 - One scoped `Connection.session` acquisition owns one Server connection and one command route for its Session ID.
 - Each overlapping acquisition keeps its own scoped route; the global route points to the latest owner, and releasing an older owner cannot remove its successor.
-- A fresh connection or resynchronization starts from a committed snapshot; live reconnect resumes after its last admitted Host cursor. Advancing `lastSeq` alone does not recreate the subscription.
+- A fresh connection, replacement WebSocket, or resynchronization starts from a committed snapshot and observes strictly after its cursor. Advancing `lastSeq` alone does not recreate the subscription.
 - Host events whose cursor is at or below `lastSeq` are ignored.
 - Conversation and Run-derived events share that cursor; snapshot restore replaces the model's conversation and establishes the current epoch.
 - Connection statuses project to `open`, `reconnecting`, or `disconnected`; a connect failure also produces `RunFailed` output.

@@ -3,7 +3,7 @@ title: "How to control turn budgets"
 description: "Bound follow-up turns with recurs and untilToolCall, compose policies with both, and apply per-turn overrides from decision.continue."
 ---
 
-A `Policy` is a plain value on the agent that decides, after each turn with pending tool results, whether the loop runs again. Turn 0 always runs; the policy only gates follow-ups. The default is `Policy.forever`: no framework-imposed follow-up cap, so a finite cap like `Policy.recurs(8)` is an explicit choice. [The agent loop](/learn/agent-loop) explains where the decision point sits.
+Stop an agent from taking unbounded follow-up turns, or stop after a particular tool returns. A `Policy` decides, after each turn with pending tool results, whether the loop runs again. Turn 0 always runs; the policy only gates follow-ups. The default is `Policy.forever`: no framework-imposed follow-up cap, so a finite cap like `Policy.recurs(8)` is an explicit choice. This bounds turns, not total spend. [The agent loop](/learn/agent-loop) explains where the decision point sits.
 
 ## 1. Pick a policy and compose constraints
 

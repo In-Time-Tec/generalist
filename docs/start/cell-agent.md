@@ -3,7 +3,7 @@ title: "Tutorial: an agent that writes TypeScript"
 description: "Give an agent one persistent TypeScript cell, watch its lifecycle events, mount a host module into its namespace, and swap the test kernel for the real Bun kernel."
 ---
 
-In this tutorial we give an agent one persistent TypeScript cell, run cells against a kernel that evaluates nothing, then swap in the real Bun kernel. No API keys, no worker process until the last step.
+Let an agent write TypeScript that uses host-provided modules and keeps a namespace between cells. Start with a test kernel that evaluates nothing, inspect the cell lifecycle, then swap in the real Bun kernel. No API keys, no worker process until the last step. A persistent kernel namespace alone is not restart-safe Runtime execution or a security sandbox.
 
 You will learn how to:
 
@@ -13,6 +13,8 @@ You will learn how to:
 - Compose the real Bun kernel pool
 
 ## Step 1: Create the project
+
+The install command targets unpublished 0.64.0; see [Installation](/start/installation) before using the registry. The [repository examples](/start/examples) run against the current workspace.
 
 **Terminal**
 
