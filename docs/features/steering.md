@@ -1,6 +1,6 @@
 # Steering and Run messaging
 
-`Runtime.send` is the durable admission primitive for user steering and Run-to-Run messages. Every accepted message is appended to the target Run journal as `Inbox { message, policy, from }` before it can be delivered.
+Use `Runtime.send(runId, ...)` to change one exact Run, and the [Session queue](./host.md#conversational-queue) to submit a new conversational instruction that needs its own Run. Every accepted exact-Run message is appended to the target Run journal as `Inbox { message, policy, from }` before it can be delivered.
 
 ## Durable usage
 
@@ -24,7 +24,6 @@ The default policy is `steer`; the default source is `{ system: true }`. A calle
 | Policy      | Admission behavior                                                                                                                  |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `steer`     | Deliver at the next safe model boundary, after all current tool results are journaled.                                              |
-| `enqueue`   | Deliver only after the current turn would otherwise complete.                                                                       |
 | `interrupt` | Journal first, interrupt active work, and leave ambiguous in-flight tools as `Unknown` operator obligations before the Run resumes. |
 | `rollback`  | Rewind to the last completed-turn boundary, activate the Run, then deliver as the first input of the replacement turn.              |
 | `reject`    | Fail with `RunBusy` and append no `Inbox` event while an execution owns the Run.                                                    |
@@ -39,13 +38,13 @@ runtime.send(runId, message, options)
 ├── enforce Run-family policy when source is { runId }
 ├── apply reject or rollback admission policy
 ├── append Inbox and the pending inbox row atomically
-└── deliver by policy
-    ├── steer/interrupt/rollback → next safe model boundary
-    └── enqueue                  → completion boundary
-        └── commit SteeringConsumed with the model operation
+└── deliver at the next safe model boundary
+    └── commit SteeringConsumed with the model operation
 ```
 
 Safe-boundary consumption is the acknowledgement. Reading the inbox does not remove entries. A close/reopen reconstructs policy, source, addressed metadata, and FIFO sequence from the journal; committed entries are not redispatched.
+
+Durable `enqueue` is retired. `session.submit(input, { commandId })` instead accepts an editable FIFO item with pinned Agent selection; it is atomically promoted into a fresh Run when the Session becomes idle. Its immutable `{ id, revision }` receipt acknowledges queue admission, not inbox consumption. Pending edits and removals require the observed revision. See [Host](./host.md#conversational-queue) for bounds, retry semantics, and selection limits.
 
 ## Addressed Run messaging
 
@@ -77,7 +76,7 @@ Each process-local lane defaults to 64 entries and both share a 1 MiB prompt bou
 - `onSteer` runs when any accepted message drains, including addressed messages.
 - Steering never cuts ahead of unjournaled tool results.
 - Interruptions do not turn unknown external outcomes into silent failures.
-- `enqueue` and immediate policies retain independent pending prefixes while sharing one FIFO sequence.
+- Exact-Run steering and the Session queue are separate authorities: steering affects an existing Run; pending Session input creates a new Run on promotion.
 - Terminalization records a disposition for every remaining durable entry.
 - Session identity does not replace exact Run identity for direct `Runtime.send`.
 - A same-Run handoff keeps the original process-local inbox.

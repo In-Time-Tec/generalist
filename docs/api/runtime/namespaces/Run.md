@@ -94,13 +94,25 @@
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 <a id="waits"></a>
 
@@ -194,13 +206,25 @@
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 <a id="waits-1"></a>
 
@@ -324,13 +348,25 @@ Encoded durable Run inspection.
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -924,7 +960,7 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 ##### treePolicy
 
-> `readonly` **treePolicy**: `Schema.Struct`\<\{ `maxDepth`: `Schema.Int`; `maxSubagents`: `Schema.Int`; \}\>
+> `readonly` **treePolicy**: `Schema.Struct`\<\{ `concurrency`: `Schema.Struct`\<\{ `agents`: `Schema.Int`; `tools`: `Schema.Int`; \}\>; `maxDepth`: `Schema.Int`; `maxSessions`: `Schema.Int`; \}\>
 
 <a id="waits-3"></a>
 

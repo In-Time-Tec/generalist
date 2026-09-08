@@ -5,6 +5,8 @@ import { validateRef as validateCoreRef } from "../../core/durable/manifest/exec
 import { Function, Schema } from "effect"
 import type { ExecutionCheckpoint } from "../execution/state.js"
 import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
+import type { ProgramAuthority } from "../../core/durable/manifest/agent-manifest.js"
+import type { ProgramManifest } from "../../core/durable/manifest/program-manifest.js"
 
 type PinnedExecutableEncoded = typeof PinnedExecutable.Encoded
 
@@ -66,7 +68,15 @@ export const resolveChild: {
       child = active.manifest.capabilities.agents.find((binding) => binding.selection === selection)?.agent
     }
     const childEntry = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === child)
-    return childEntry === undefined ? undefined : { executable: ref.executable, active: childEntry.pin }
+    if (childEntry?._tag !== "Agent") return undefined
+    if (
+      active?._tag === "Agent" &&
+      !childEntry.manifest.tools.every((tool) =>
+        active.manifest.tools.some((parentTool) => parentTool.name === tool.name),
+      )
+    )
+      return undefined
+    return { executable: ref.executable, active: childEntry.pin }
   },
 )
 
@@ -111,3 +121,61 @@ export const validateStaticTool = ({
     throw new TypeError(`Live Tool does not match static executable reference: ${entry.executable.ref.active}`)
   }
 }
+const containsProgram = (authority: ProgramAuthority | undefined, program: ProgramManifest): boolean => {
+  if (authority === undefined) return false
+  if (program.sandbox !== authority.sandbox || program.input !== authority.input || program.output !== authority.output)
+    return false
+  if (new TextEncoder().encode(program.source.text).byteLength > authority.maxSourceBytes) return false
+  for (const dimension of [
+    "agentRuns",
+    "concurrency",
+    "toolCalls",
+    "tokens",
+    "wallClockMillis",
+    "logBytes",
+    "outputBytes",
+  ] as const) {
+    if (program.budget[dimension] > authority.budget[dimension]) return false
+  }
+  return (
+    program.capabilities.tools.every((tool) =>
+      authority.tools.some((allowed) => allowed.name === tool.name && allowed.pin === tool.pin),
+    ) &&
+    program.capabilities.steps.every((step) =>
+      authority.steps.some((allowed) => allowed.name === step.name && allowed.pin === step.pin),
+    ) &&
+    program.capabilities.agents.every((agent) =>
+      authority.agents.some(
+        (allowed) =>
+          allowed.selection === agent.selection && allowed.agent === agent.agent && allowed.input === agent.input,
+      ),
+    )
+  )
+}
+
+export const containsChild: {
+  (child: PinnedExecutable): (parent: PinnedExecutable) => boolean
+  (parent: PinnedExecutable, child: PinnedExecutable): boolean
+} = Function.dual(2, (parent: PinnedExecutable, child: PinnedExecutable): boolean => {
+  const active = parent.manifest.entries.find((entry) => entry.pin === parent.ref.active)
+  const target = child.manifest.entries.find((entry) => entry.pin === child.ref.active)
+  if (active === undefined || target === undefined || active._tag === "Tool" || target._tag === "Tool") return false
+  const selections = active._tag === "Agent" ? active.manifest.children : active.manifest.capabilities.agents
+  const granted =
+    target._tag === "Program"
+      ? active._tag === "Agent" && containsProgram(active.manifest.programAuthority, target.manifest)
+      : selections.some(
+          ({ selection }) => resolveChild(parent.ref, parent.manifest, selection)?.active === child.ref.active,
+        )
+  return (
+    granted &&
+    child.manifest.entries.every(
+      (entry) => entry.pin === target.pin || parent.manifest.entries.some((allowed) => allowed.pin === entry.pin),
+    ) &&
+    child.manifest.profiles.every((profile) =>
+      parent.manifest.profiles.some(
+        (allowed) => allowed.selection === profile.selection && allowed.agent === profile.agent,
+      ),
+    )
+  )
+})

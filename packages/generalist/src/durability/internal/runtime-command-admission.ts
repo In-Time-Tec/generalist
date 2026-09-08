@@ -17,6 +17,7 @@ import { AdmissionPolicy, ExecutionContinuation, MessageSource, SteeringReceipt 
 import type { Service } from "../../runtime/run/store.js"
 import { RunWait } from "../../runtime/run/wait.js"
 import { HostSession } from "../../runtime/session/host.js"
+import { SubmitInput, UpdateInput, RemoveInput, QueueReceipt, SessionSelection } from "../../runtime/session/queue.js"
 import { TreePolicy } from "../../runtime/tree/policy.js"
 import { ExecutionClaim } from "./runtime-state/schema.js"
 
@@ -192,6 +193,10 @@ export const artifactAppendCommandId = (input: {
 }): string => `appendArtifact:${artifactAppendIdentity(input)}`
 
 type Method =
+  | "configureDelegationPolicy"
+  | "submitSessionInput"
+  | "updateSessionInput"
+  | "removeSessionInput"
   | "admitSend"
   | "admitStart"
   | "activate"
@@ -216,16 +221,44 @@ type CommandReceipt<K extends Method> = K extends "appendArtifact"
   ? ArtifactAppendReceipt
   : Effect.Success<ReturnType<Service[K]>>
 
+type CommandInput<K extends Method> = K extends "updateSessionInput"
+  ? readonly [Parameters<Service[K]>[0]]
+  : Readonly<Parameters<Service[K]>>
+
 type Commands = {
   readonly [K in Method]: {
     readonly tag: K
-    readonly input: Schema.Codec<Readonly<Parameters<Service[K]>>, unknown>
+    readonly input: Schema.Codec<CommandInput<K>, unknown>
     readonly receipt: Schema.Codec<CommandReceipt<K>, unknown>
-    readonly identity: (input: Readonly<Parameters<Service[K]>>) => string
+    readonly identity: (input: CommandInput<K>) => string
   }
 }
 
 export const commands: Commands = {
+  configureDelegationPolicy: {
+    tag: "configureDelegationPolicy",
+    input: Schema.Tuple([TreePolicy]),
+    receipt: TreePolicy,
+    identity: ([policy]) => JSON.stringify(policy),
+  },
+  submitSessionInput: {
+    tag: "submitSessionInput",
+    input: Schema.Tuple([SubmitInput]),
+    receipt: QueueReceipt,
+    identity: ([input]) => JSON.stringify([input.sessionId, input.commandId]),
+  },
+  updateSessionInput: {
+    tag: "updateSessionInput",
+    input: Schema.Tuple([UpdateInput]),
+    receipt: QueueReceipt,
+    identity: ([input]) => JSON.stringify([input.sessionId, input.commandId]),
+  },
+  removeSessionInput: {
+    tag: "removeSessionInput",
+    input: Schema.Tuple([RemoveInput]),
+    receipt: QueueReceipt,
+    identity: ([input]) => JSON.stringify([input.sessionId, input.commandId]),
+  },
   admitSend: {
     tag: "admitSend" as const,
     input: Schema.Tuple([AdmitSendInput]),
@@ -348,7 +381,13 @@ export const commands: Commands = {
   },
   createHostSession: {
     tag: "createHostSession" as const,
-    input: Schema.Tuple([Schema.Struct({ id: Schema.String, title: Schema.optionalKey(Schema.String) })]),
+    input: Schema.Tuple([
+      Schema.Struct({
+        id: Schema.String,
+        title: Schema.optionalKey(Schema.String),
+        selection: Schema.optionalKey(SessionSelection),
+      }),
+    ]),
     receipt: HostSession,
     identity: ([input]) => input.id,
   },

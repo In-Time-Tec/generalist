@@ -91,6 +91,17 @@ export const make = (options: {
   ) => Effect.Effect<StartReceipt, StartExecutionError>
   readonly send: Parameters<typeof makeUntypedHandle>[2]
 }) => {
+  const sessionSelection: RuntimeService["sessionSelection"] = (name) =>
+    Effect.gen(function* () {
+      const registration = yield* options.agents.get(name)
+      if (Option.isNone(registration)) return yield* UnknownAgent.make({ name, runId: "session-selection" })
+      return {
+        executableRef: registration.value.executable.ref,
+        executableManifest: registration.value.executable.manifest,
+        registrations: registration.value.registrations,
+        budget: makeBudget(registration.value.source.budget ?? {}).allocation,
+      }
+    })
   const register: RuntimeService["register"] = (agent) =>
     capture(agent).pipe(Effect.flatMap(options.agents.registerAll))
   const schedule: RuntimeService["schedule"] = (agent, input, scheduleOptions) =>
@@ -137,17 +148,16 @@ export const make = (options: {
       const sessionId =
         startOptions?.sessionId ??
         (startOptions?.idempotencyKey === undefined ? `session_${identity}` : `agent:${agent.name}`)
-      const receipt = yield* options.admitStart(
-        {
-          executable: registration.value.executable,
-          registrations: registration.value.registrations,
-          sessionId,
-          idempotencyKey: startKey,
-          prompt: initialPrompt,
-          budget: startOptions?.budget ?? makeBudget(agent.budget ?? {}),
-        },
-        true,
-      )
+      const admission: import("effect").Types.Mutable<StartExecutionInput> = {
+        executable: registration.value.executable,
+        registrations: registration.value.registrations,
+        sessionId,
+        idempotencyKey: startKey,
+        prompt: initialPrompt,
+      }
+      if (startOptions?.treePolicy !== undefined) admission.treePolicy = startOptions.treePolicy
+      if (startOptions?.budget !== undefined) admission.budget = startOptions.budget
+      const receipt = yield* options.admitStart(admission, true)
       const events = options.store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
         Stream.mapEffect((event) => decodeEvent(agent.output, event)),
         Stream.takeUntil(
@@ -163,5 +173,5 @@ export const make = (options: {
           options.send(receipt.runId, message, sendOptions),
       }
     })
-  return { register, schedule, start }
+  return { register, schedule, start, sessionSelection }
 }

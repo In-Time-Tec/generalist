@@ -19,7 +19,7 @@ import {
   resumedEvent,
   rejectIfTerminal,
 } from "../append.js"
-import { afterTerminal } from "./admission/lanes.js"
+import { afterTerminal } from "./admission/terminal.js"
 import { openRunWaits, waitMapKey, type RuntimeState, type StoredRun } from "../projection.js"
 import { reconcileFanOut } from "./fan-out/service.js"
 import { ProgramCancelled } from "../../../core/program/capabilities.js"

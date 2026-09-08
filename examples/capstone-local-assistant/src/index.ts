@@ -124,7 +124,7 @@ const [chatModel] = Chat.update(
       epoch: 0,
       snapshot: {
         version: 1,
-        session: { id: "capstone-session", createdAt: "2026-09-02T00:00:00.000Z" },
+        session: { id: "capstone-session", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
         cursor: -1,
         runs: [],
         conversation: { leafId: null, entries: [] },

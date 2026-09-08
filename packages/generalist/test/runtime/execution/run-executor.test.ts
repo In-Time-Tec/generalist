@@ -1513,7 +1513,7 @@ describe("RunExecutor", () => {
             sessionId: "session:hosted-child-group",
             idempotencyKey: "hosted-child-group",
             prompt: "delegate",
-            treePolicy: { maxDepth: 1, maxSubagents: 2 },
+            treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 2, tools: 1024 } },
           })
           yield* host.execute(
             yield* store.claimExecution({
@@ -1656,7 +1656,7 @@ describe("RunExecutor", () => {
         sessionId: "automatic-background",
         idempotencyKey: "root",
         prompt: "start work",
-        treePolicy: { maxDepth: 1, maxSubagents: 1 },
+        treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
       })
       yield* host.execute(
         yield* store.claimExecution({
@@ -1756,7 +1756,11 @@ describe("RunExecutor", () => {
       const host = yield* RunExecutor.RunExecutor
       let sequence = 0
       let claimSequence = 0
-      const root = (treePolicy: { readonly maxDepth: number; readonly maxSubagents: number }) =>
+      const root = (treePolicy: {
+        readonly maxDepth: number
+        readonly maxSessions: number
+        readonly concurrency: { readonly agents: number; readonly tools: number }
+      }) =>
         runtime.startExecution({
           executable,
           registrations: registrationsFor(executable),
@@ -1775,7 +1779,7 @@ describe("RunExecutor", () => {
           host.execute,
         )
 
-      const allowed = yield* root({ maxDepth: 2, maxSubagents: 2 })
+      const allowed = yield* root({ maxDepth: 2, maxSessions: 1024, concurrency: { agents: 3, tools: 1024 } })
       const child = yield* runtime.spawn({
         parentRunId: allowed.runId,
         invocationId: "depth-1",
@@ -1801,10 +1805,10 @@ describe("RunExecutor", () => {
       yield* execute(child.runId)
       yield* execute(grandchild.runId)
 
-      const disabled = yield* root({ maxDepth: 2, maxSubagents: 0 })
+      const disabled = yield* root({ maxDepth: 0, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } })
       yield* execute(disabled.runId)
 
-      const exhausted = yield* root({ maxDepth: 2, maxSubagents: 1 })
+      const exhausted = yield* root({ maxDepth: 2, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } })
       const admission = yield* ChildRuns.make(store).startGroup({
         parentRunId: exhausted.runId,
         toolCallId: "quota",

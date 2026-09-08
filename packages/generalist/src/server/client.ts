@@ -1,3 +1,4 @@
+import type { Prompt } from "effect/unstable/ai"
 import {
   Cause,
   Deferred,
@@ -19,7 +20,7 @@ import { Retry as SseRetry, type SseError } from "effect/unstable/encoding/Sse"
 import { Socket } from "effect/unstable/socket"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
 import type { Put as BlobPut } from "../blob-store/index.js"
-import type { EncodedAgentInput, SessionCreateOptions } from "../host/index.js"
+import type { EncodedAgentInput, SessionCreateOptions, QueueCommandOptions, QueueEditOptions } from "../host/index.js"
 import { HostEvent } from "../host/event.js"
 import type { Decision } from "../runtime/operation/approval.js"
 import type { UnknownResolution } from "../runtime/execution/recovery/operator.js"
@@ -81,6 +82,19 @@ export interface Client {
     readonly get: (options: { readonly sha256: string }) => ReturnType<RawClient["attachments"]["get"]>
   }
   readonly sessions: {
+    readonly submit: (
+      options: QueueCommandOptions & { readonly sessionId: string; readonly input: Prompt.Prompt | string },
+    ) => ReturnType<RawClient["sessions"]["submit"]>
+    readonly updateInput: (
+      options: QueueEditOptions & {
+        readonly sessionId: string
+        readonly id: string
+        readonly input: Prompt.Prompt | string
+      },
+    ) => ReturnType<RawClient["sessions"]["updateInput"]>
+    readonly removeInput: (
+      options: Omit<QueueEditOptions, "agent"> & { readonly sessionId: string; readonly id: string },
+    ) => ReturnType<RawClient["sessions"]["removeInput"]>
     readonly create: (options?: SessionCreateOptions) => ReturnType<RawClient["sessions"]["create"]>
     readonly get: (options: { readonly sessionId: string }) => ReturnType<RawClient["sessions"]["get"]>
     readonly snapshot: (options: { readonly sessionId: string }) => ReturnType<RawClient["sessions"]["snapshot"]>
@@ -429,12 +443,12 @@ export const client = (options: {
         get: ({ sha256 }) => raw.attachments.get({ params: { sha256 } }),
       },
       sessions: {
-        create: (sessionOptions = {}) => {
-          const payload: Types.Mutable<SessionCreateOptions> = {}
-          if (sessionOptions.id !== undefined) payload.id = sessionOptions.id
-          if (sessionOptions.title !== undefined) payload.title = sessionOptions.title
-          return raw.sessions.create({ payload })
-        },
+        submit: ({ sessionId, ...payload }) => raw.sessions.submit({ params: { id: sessionId }, payload }),
+        updateInput: ({ sessionId, id, ...payload }) =>
+          raw.sessions.updateInput({ params: { id: sessionId, inputId: id }, payload }),
+        removeInput: ({ sessionId, id, ...payload }) =>
+          raw.sessions.removeInput({ params: { id: sessionId, inputId: id }, payload }),
+        create: (sessionOptions = {}) => raw.sessions.create({ payload: sessionOptions }),
         get: ({ sessionId }) => raw.sessions.get({ params: { id: sessionId } }),
         snapshot: ({ sessionId }) => raw.sessions.snapshot({ params: { id: sessionId } }),
         list: () => raw.sessions.list({}),

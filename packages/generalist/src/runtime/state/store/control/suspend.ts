@@ -8,6 +8,7 @@ import { waitMapKey, type RuntimeState, type StoredRun } from "../../projection.
 import { groupWaitsFromSuspension, resultFromInspection } from "../../../child/group.js"
 import { reconcileChildWait } from "../child/settlement.js"
 import { closeWait } from "./wait.js"
+import { promoteChildCapacity } from "../child/capacity.js"
 
 type SuspendInput = import("../../../run/store.js").ExecutionClaim & {
   readonly waits: ReadonlyArray<RunWait>
@@ -166,6 +167,6 @@ export const suspend: {
       )
     }
     const withChildren = yield* reconcileChildren(waiting, run.runId, suspensionTokens(input.suspension))
-    return yield* reconcileGroups(withChildren, run.runId, input.suspension)
+    return yield* promoteChildCapacity(yield* reconcileGroups(withChildren, run.runId, input.suspension), run.runId)
   }),
 )

@@ -13,6 +13,25 @@ type ActivateResult = Effect.Effect<
   PreparedObservation
 >
 
+export const requireConversationalSlot = ({
+  state,
+  run,
+}: {
+  readonly state: RuntimeState
+  readonly run: StoredRun
+}) => {
+  const activeRunId = state.hostSessions.get(run.message.sessionId)?.session.activeRunId
+  if (run.parentRunId !== undefined || activeRunId === undefined || activeRunId === run.runId) return Effect.void
+  const executable = run.executableManifest.entries.find((entry) => entry.pin === run.executableRef.active)
+  return executable?._tag !== "Agent"
+    ? Effect.void
+    : Effect.fail(
+        RuntimeUnavailable.make({
+          message: `Session ${run.message.sessionId} already has active conversational Run ${activeRunId}`,
+        }),
+      )
+}
+
 export const activationOf = (run: StoredRun): RunActivation => {
   let intent: RunActivation["intent"] = "inactive"
   if (run.status === "cancelling") intent = "cancel"
@@ -42,7 +61,16 @@ export const activateRoot: {
     if (run.children.length > 0) {
       return yield* RuntimeUnavailable.make({ message: `run ${runId} has initial children` })
     }
+    const session = state.hostSessions.get(run.message.sessionId)
+    const executable = run.executableManifest.entries.find((entry) => entry.pin === run.executableRef.active)
+    yield* requireConversationalSlot({ state, run })
     const [, activated] = yield* appendLifecycle(state, runId, attemptStartedEvent(run.attempt + 1), "running")
-    return [toInspection(activated, activated.runs.get(runId)!), activated] as const
+    if (session === undefined || executable?._tag !== "Agent")
+      return [toInspection(activated, activated.runs.get(runId)!), activated] as const
+    const hostSessions = new Map(activated.hostSessions)
+    const current = hostSessions.get(run.message.sessionId)!
+    hostSessions.set(run.message.sessionId, { ...current, session: { ...current.session, activeRunId: runId } })
+    const next = { ...activated, hostSessions }
+    return [toInspection(next, next.runs.get(runId)!), next] as const
   }),
 )

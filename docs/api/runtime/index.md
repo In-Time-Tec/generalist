@@ -39,5 +39,6 @@
 - [Runtime](./namespaces/Runtime.md)
 - [RunTree](./namespaces/RunTree.md)
 - [RunWait](./namespaces/RunWait.md)
+- [SessionQueue](./namespaces/SessionQueue.md)
 - [Steering](./namespaces/Steering.md)
 - [TreePolicy](./namespaces/TreePolicy.md)

@@ -13,7 +13,7 @@ import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../run/errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
 import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
-import type { ExecutionContinuation, SteeringEntry } from "../run/steering.js"
+import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
@@ -68,9 +68,6 @@ type SteeringQueue = NonNullable<ExecutionContinuation["queue"]>
 
 const continuationQueue = (continuation: ExecutionContinuation | undefined): SteeringQueue | undefined =>
   continuation === undefined ? undefined : (continuation.queue ?? "steering")
-
-const belongsToQueue = (queue: SteeringQueue, policy: SteeringEntry["policy"]): boolean =>
-  queue === "followUp" ? policy === "enqueue" : policy !== "enqueue"
 
 const makeFor = (
   agents: RegisteredAgents,
@@ -159,7 +156,7 @@ const makeFor = (
               activeEntry?._tag === "Agent" &&
               activeEntry.manifest.children.length > 0 &&
               claimed.depth < claimed.treePolicy.maxDepth &&
-              claimed.treePolicy.maxSubagents > 0
+              claimed.treePolicy.concurrency.agents > 0
                 ? ChildRunTools.make({ children: activeEntry.manifest.children })
                 : undefined
             const programAuthority = activeEntry?._tag === "Agent" ? activeEntry.manifest.programAuthority : undefined
@@ -239,31 +236,29 @@ const makeFor = (
                               },
                             ],
                       )
-                      const take = (queue: "steering" | "followUp") =>
-                        Effect.gen(function* () {
-                          const current = yield* Ref.get(observed)
-                          if (current.length > 0) return []
-                          const pending = yield* store.readSteering(claim)
-                          const entries = pending.filter((entry) => belongsToQueue(queue, entry.policy))
-                          if (entries.length === 0) return []
-                          yield* Ref.set(
-                            observed,
-                            entries.map((entry) => entry.entryId),
-                          )
-                          yield* Ref.set(
-                            observedPrompt,
-                            entries.reduce<Prompt.Prompt>(
-                              (accumulated, entry) => Prompt.concat(accumulated, entry.prompt),
-                              Prompt.empty,
-                            ),
-                          )
-                          yield* Ref.set(observedQueue, queue)
-                          return entries.map((entry) => ({ prompt: entry.prompt }))
-                        }).pipe(Effect.orDie)
+                      const takeSteering = Effect.gen(function* () {
+                        const current = yield* Ref.get(observed)
+                        if (current.length > 0) return []
+                        const entries = yield* store.readSteering(claim)
+                        if (entries.length === 0) return []
+                        yield* Ref.set(
+                          observed,
+                          entries.map((entry) => entry.entryId),
+                        )
+                        yield* Ref.set(
+                          observedPrompt,
+                          entries.reduce<Prompt.Prompt>(
+                            (accumulated, entry) => Prompt.concat(accumulated, entry.prompt),
+                            Prompt.empty,
+                          ),
+                        )
+                        yield* Ref.set(observedQueue, "steering")
+                        return entries.map((entry) => ({ prompt: entry.prompt }))
+                      }).pipe(Effect.orDie)
                       const inbox = externalRunInbox({
                         runId,
-                        takeSteering: take("steering"),
-                        takeFollowUp: take("followUp"),
+                        takeSteering,
+                        takeFollowUp: Effect.succeed([]),
                       })
                       const pendingCompletion = yield* Ref.make<ExecutionContinuation | undefined>(undefined)
                       const preparedCompletions = yield* Ref.make(
@@ -593,7 +588,7 @@ const makeFor = (
                     ? agent
                     : withTools(agent, [
                         childRunTools.awaitChildGroup,
-                        ...(claimed.activeChildCount < claimed.treePolicy.maxSubagents
+                        ...(claimed.activeChildCount < claimed.treePolicy.concurrency.agents
                           ? [childRunTools.runChild, childRunTools.runChildGroup, childRunTools.startChildGroup]
                           : []),
                       ])

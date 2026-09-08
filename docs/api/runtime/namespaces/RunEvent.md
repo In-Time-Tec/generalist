@@ -330,7 +330,7 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 
 ##### policy
 
-> `readonly` **policy**: [`AdmissionPolicy`](../../generalist/namespaces/Steering.md#admissionpolicy)
+> `readonly` **policy**: [`AdmissionPolicy`](./Steering.md#admissionpolicy)
 
 ***
 

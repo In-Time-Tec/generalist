@@ -57,6 +57,75 @@ const runScheduler = (runId: string, commandId: string) =>
   })
 
 layer(services)("Server", (it) => {
+  it.effect("commits editable Session instructions through the authenticated client", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "server-queue" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            host,
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const client = yield* makeClient(makeTransport(app.handler), "secret")
+        const session = yield* client.sessions.create({ id: "server-queue-session", agent: agent.name })
+        const first = yield* client.sessions.submit({ sessionId: session.id, input: "first", commandId: "first" })
+        const pending = yield* client.sessions.submit({ sessionId: session.id, input: "draft", commandId: "second" })
+        const edit = {
+          sessionId: session.id,
+          id: pending.id,
+          input: "edited",
+          commandId: "edit",
+          expectedRevision: pending.revision,
+        }
+        const edited = yield* client.sessions.updateInput(edit)
+        const current = yield* client.sessions.get({ sessionId: session.id })
+        expect(current.queue).toEqual([expect.objectContaining({ id: pending.id, revision: 2 })])
+        expect(current.activeRunId).toBeDefined()
+        yield* runScheduler(current.activeRunId!, "server-queue-first")
+        expect(yield* client.sessions.submit({ sessionId: session.id, input: "first", commandId: "first" })).toEqual(
+          first,
+        )
+        expect(yield* client.sessions.updateInput(edit)).toEqual(edited)
+        expect(
+          yield* client.sessions
+            .removeInput({ sessionId: session.id, id: pending.id, commandId: "stale", expectedRevision: 2 })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/session/SessionQueueConflict", reason: "revision" })
+        const removable = yield* client.sessions.submit({
+          sessionId: session.id,
+          input: "remove me",
+          commandId: "third",
+        })
+        const remove = {
+          sessionId: session.id,
+          id: removable.id,
+          commandId: "remove",
+          expectedRevision: removable.revision,
+        }
+        const removed = yield* client.sessions.removeInput(remove)
+        expect(yield* client.sessions.removeInput(remove)).toEqual(removed)
+        expect((yield* client.sessions.get({ sessionId: session.id })).queue).toEqual([])
+        expect(yield* host.runs.list(session.id)).toHaveLength(2)
+        const denied = yield* makeClient(makeTransport(app.handler), "wrong")
+        expect(
+          yield* denied.sessions
+            .submit({ sessionId: session.id, input: "not accepted", commandId: "denied" })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/server/Unauthorized" })
+        expect(yield* denied.sessions.updateInput(edit).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/server/Unauthorized",
+        })
+      }),
+    ),
+  )
   it.effect("rejects unknown Session streams and Run inspection before committing a success response", () =>
     Effect.scoped(
       Effect.gen(function* () {

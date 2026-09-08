@@ -260,6 +260,12 @@ An Agent definition carrying its tools, requirements, input, and output contract
 
 Capability descriptors attached only by child inheritance.
 
+<a id="children"></a>
+
+##### children
+
+> `readonly` **children**: readonly `string`[]
+
 <a id="gates"></a>
 
 ##### gates
@@ -442,6 +448,12 @@ One Agent observed where its tool and requirement types are hidden.
 
 Capability descriptors attached only by child inheritance.
 
+<a id="children-1"></a>
+
+##### children
+
+> `readonly` **children**: readonly `string`[]
+
 <a id="gates-1"></a>
 
 ##### gates
@@ -613,6 +625,16 @@ Capability descriptors attached only by child inheritance.
 ###### Inherited from
 
 [`Any`](#any).[`capabilities`](#capabilities-1)
+
+<a id="children-2"></a>
+
+##### children
+
+> `readonly` **children**: readonly `string`[]
+
+###### Inherited from
+
+[`Any`](#any).[`children`](#children-1)
 
 <a id="gates-2"></a>
 
@@ -1136,6 +1158,12 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **usd?**: `number`
 
+<a id="children-3"></a>
+
+##### children?
+
+> `readonly` `optional` **children?**: readonly `string`[]
+
 <a id="gates-3"></a>
 
 ##### gates?
@@ -1301,6 +1329,16 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.budget`
+
+<a id="children-4"></a>
+
+##### children?
+
+> `readonly` `optional` **children?**: readonly `string`[]
+
+###### Inherited from
+
+`Omit.children`
 
 <a id="gates-4"></a>
 
@@ -2065,6 +2103,32 @@ Typed durable start identity. Budget admission is reserved for the RunBudget con
 ##### sessionId?
 
 > `readonly` `optional` **sessionId?**: `string`
+
+<a id="treepolicy"></a>
+
+##### treePolicy?
+
+> `readonly` `optional` **treePolicy?**: `object`
+
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
+###### maxDepth
+
+> `readonly` **maxDepth**: `number`
+
+###### maxSessions
+
+> `readonly` **maxSessions**: `number`
 
 ***
 
@@ -3106,7 +3170,7 @@ Admit one message to a process-local Run under an explicit policy.
 
 ###### policy
 
-`"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+`"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"` \| `"enqueue"`
 
 ##### Returns
 
@@ -3142,7 +3206,7 @@ Admit one message to a process-local Run under an explicit policy.
 
 ###### policy
 
-`"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+`"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"` \| `"enqueue"`
 
 ##### Returns
 

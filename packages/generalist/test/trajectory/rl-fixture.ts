@@ -188,7 +188,7 @@ const inspection = (runId: string, rootRunId: string, lastSequence: number, dept
     executableRef: executable.ref,
     executableManifest: executable.manifest,
     depth,
-    treePolicy: { maxDepth: 8, maxSubagents: 32 },
+    treePolicy: { maxDepth: 8, maxSessions: 1024, concurrency: { agents: 32, tools: 1024 } },
     waits: [],
     lastSequence,
     durability: "durable" as const,

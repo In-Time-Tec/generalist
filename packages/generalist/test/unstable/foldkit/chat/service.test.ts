@@ -15,7 +15,7 @@ const previewRun = {
     executableRef,
     executableManifest: executable.manifest,
     depth: 0,
-    treePolicy: { maxDepth: 1, maxSubagents: 1 },
+    treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
     waits: [],
     lastSequence: -1,
     durability: "durable" as const,
@@ -61,7 +61,7 @@ const connectedModel = () =>
         epoch: 0,
         snapshot: {
           version: 1,
-          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
           cursor: -1,
           runs: [],
           conversation: { leafId: null, entries: [] },
@@ -78,7 +78,7 @@ const connectedPreviewModel = () =>
         epoch: 0,
         snapshot: {
           version: 1,
-          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
           cursor: -1,
           runs: [previewRun],
           conversation: { leafId: null, entries: [] },
@@ -142,7 +142,7 @@ describe("Chat HostEvent projection", () => {
           epoch: 1,
           snapshot: {
             version: 1,
-            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
             cursor: 4,
             runs: [previewRun],
             conversation: { leafId: null, entries: [] },
@@ -285,7 +285,7 @@ describe("Chat HostEvent projection", () => {
     const restoredExecutable = ExecutableManifest.makeTest("assistant", "1")
     const snapshot = Schema.decodeSync(Server.SessionSnapshot)({
       version: 1,
-      session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+      session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
       cursor: 12,
       conversation: {
         leafId: "entry-1",
@@ -307,7 +307,7 @@ describe("Chat HostEvent projection", () => {
             executableRef: restoredExecutable.ref,
             executableManifest: restoredExecutable.manifest,
             depth: 0,
-            treePolicy: { maxDepth: 1, maxSubagents: 1 },
+            treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
             waits: [],
             lastSequence: 8,
             durability: "durable",
@@ -377,7 +377,7 @@ describe("Chat HostEvent projection", () => {
     const restoredExecutable = ExecutableManifest.makeTest("assistant", "1")
     const snapshot = Schema.decodeSync(Server.SessionSnapshot)({
       version: 1,
-      session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+      session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
       cursor: 8,
       conversation: {
         leafId: "entry-1",
@@ -401,7 +401,7 @@ describe("Chat HostEvent projection", () => {
             executableRef: restoredExecutable.ref,
             executableManifest: restoredExecutable.manifest,
             depth: 0,
-            treePolicy: { maxDepth: 1, maxSubagents: 1 },
+            treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
             waits: [],
             lastSequence: 4,
             durability: "durable",
@@ -597,7 +597,7 @@ describe("Chat HostEvent projection", () => {
           epoch: 0,
           snapshot: {
             version: 1,
-            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
             cursor: 8,
             runs: [],
             conversation: {

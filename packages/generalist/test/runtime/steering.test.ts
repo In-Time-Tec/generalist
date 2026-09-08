@@ -1,7 +1,7 @@
 import { objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Hooks, ToolExecutor } from "../../src/index.js"
 import {
   Address,
@@ -16,7 +16,7 @@ import {
 import type { Service as ActiveExecutionsService } from "../../src/runtime/execution/active-executions.js"
 import { make as makeSteeringAdmission } from "../../src/runtime/run/steering.js"
 import { allowAllAuthorization } from "../authorization.js"
-import { assistantAddress, completedResult, objectLayer, registrationsFor } from "./execution/fixtures.js"
+import { assistantAddress, assistantRef, completedResult, objectLayer, registrationsFor } from "./execution/fixtures.js"
 import { provideScoped } from "./execution/scoped-provide.js"
 import { testExecutable } from "./run/identity.js"
 import { messagingBackend, messagingLayer } from "./messaging/scenario.js"
@@ -30,7 +30,7 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
-const toolPolicy = (policy: "steer" | "enqueue") =>
+const toolPolicy = (policy: "steer" | "session") =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
@@ -100,6 +100,7 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const host = yield* RunExecutor.RunExecutor
+        yield* store.createHostSession({ id: `session:${policy}-admission` })
         const run = yield* runtime.send({
           to: address,
           sessionId: `session:${policy}-admission`,
@@ -123,25 +124,52 @@ const toolPolicy = (policy: "steer" | "enqueue") =>
           return yield* Effect.die(`execution exited before tool dispatch: ${String(start.exit)}`)
         }
 
-        yield* runtime.send(run.runId, `${policy} message`, { policy, idempotencyKey: policy })
+        if (policy === "steer") {
+          yield* runtime.send(run.runId, "steer message", { policy, idempotencyKey: policy })
+        } else {
+          yield* store.submitSessionInput({
+            sessionId: `session:${policy}-admission`,
+            commandId: "next-input",
+            prompt: Prompt.make("session message"),
+            selection: {
+              executableRef: executable.ref,
+              executableManifest: executable.manifest,
+              registrations: registrationsFor(executable),
+            },
+          })
+          expect((yield* store.hostSession(`session:${policy}-admission`)).queue).toHaveLength(1)
+        }
         yield* Deferred.succeed(release, undefined)
         yield* Fiber.join(execution)
 
+        if (policy === "session") {
+          expect(requests.some((request) => request.includes("session message"))).toBe(false)
+          const next = (yield* store.hostSession("session:session-admission")).activeRunId!
+          expect(next).not.toBe(run.runId)
+          yield* host.execute(
+            yield* store.claimExecution({ runId: next, ownerId: objectWorkerId, commandId: "next-claim" }),
+          )
+        }
+
         const deliveredAt = requests.findIndex((request) => request.includes(`${policy} message`))
         expect(deliveredAt).toBe(policy === "steer" ? 1 : 2)
-        expect(requests[deliveredAt]).toContain(`${policy === "enqueue" ? "followUp" : "steering"}:1:hooked admission`)
+        if (policy === "steer") expect(requests[deliveredAt]).toContain("steering:1:hooked admission")
+        else expect(requests[deliveredAt]).not.toContain("followUp:1:hooked admission")
         const history = yield* runtime.history({ runId: run.runId, limit: 100 })
         const inbox = history.find((event) => event._tag === "Inbox")
-        expect(inbox).toMatchObject({ _tag: "Inbox", policy })
+        if (policy === "steer") expect(inbox).toMatchObject({ _tag: "Inbox", policy })
+        else expect(inbox).toBeUndefined()
         const drained = history.find((event) => event._tag === "SteeringDrained" && event.queue === "followUp")
-        expect(drained === undefined).toBe(policy === "steer")
+        expect(drained).toBeUndefined()
       }),
     )
   })
 
 it.effect("steer waits for current tool results and enters the next safe model boundary", () => toolPolicy("steer"))
 
-it.effect("enqueue waits until the Run would otherwise finish its current work", () => toolPolicy("enqueue"))
+it.effect("Session input waits for the current tool and starts a separate Run after completion", () =>
+  toolPolicy("session"),
+)
 
 it.effect("interrupt journals first, stops an in-flight tool, and creates an Unknown obligation", () =>
   Effect.gen(function* () {
@@ -300,6 +328,7 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
 const completionLaneSelection = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
   const store = yield* RunStore.RunStore
+  yield* store.createHostSession({ id: "session:mixed-completion-lanes" })
   const run = yield* runtime.send({
     to: assistantAddress,
     sessionId: "session:mixed-completion-lanes",
@@ -315,9 +344,15 @@ const completionLaneSelection = Effect.gen(function* () {
     policy: "steer",
     idempotencyKey: "steer",
   })
-  const enqueue = yield* runtime.send(run.runId, "enqueue first", {
-    policy: "enqueue",
-    idempotencyKey: "enqueue",
+  const pending = yield* store.submitSessionInput({
+    sessionId: "session:mixed-completion-lanes",
+    commandId: "next-session-input",
+    prompt: Prompt.make("next Run"),
+    selection: {
+      executableRef: assistantRef.ref,
+      executableManifest: assistantRef.manifest,
+      registrations: registrationsFor(assistantRef),
+    },
   })
 
   const first = yield* store.complete({
@@ -327,31 +362,35 @@ const completionLaneSelection = Effect.gen(function* () {
   })
   expect(first).toMatchObject({
     _tag: "SteeringPending",
-    continuation: { steeringEntryIds: [enqueue.entryId] },
+    continuation: { steeringEntryIds: [steering.entryId] },
   })
+  expect((yield* store.hostSession("session:mixed-completion-lanes")).queue).toMatchObject([{ id: pending.id }])
+  expect(yield* store.hostSessionRuns("session:mixed-completion-lanes")).toHaveLength(1)
   yield* store.recordOperation({
     ...claim,
-    operationKey: "model:enqueue",
+    operationKey: "model:steering",
     kind: "model",
-    inputDigest: "model:enqueue",
+    inputDigest: "model:steering",
     input: {},
     replayPolicy: "provider-idempotent",
     attempt: claim.attemptFence,
-    steeringEntryIds: [enqueue.entryId],
+    steeringEntryIds: [steering.entryId],
   })
   const second = yield* store.complete({
     commandId: "runtime-steering-test-ts-complete-2",
     ...claim,
     result: completedResult("second"),
   })
-  expect(second).toMatchObject({
-    _tag: "SteeringPending",
-    continuation: { steeringEntryIds: [steering.entryId] },
-  })
+  expect(second._tag).toBe("Completed")
+  const session = yield* store.hostSession("session:mixed-completion-lanes")
+  expect(session.queue).toEqual([])
+  expect(session.activeRunId).toBeDefined()
+  expect(session.activeRunId).not.toBe(run.runId)
+  expect(yield* store.hostSessionRuns("session:mixed-completion-lanes")).toHaveLength(2)
 })
 
 layer(objectLayer)("object completion admission lanes", (test) => {
-  test.effect("continues one admission lane at a time with enqueue first", () => completionLaneSelection)
+  test.effect("consumes exact-Run steering before promoting the next Session input", () => completionLaneSelection)
 })
 
 it.effect("completion continuations retain their lane and pass through onSteer", () =>
@@ -409,7 +448,7 @@ it.effect("completion continuations retain their lane and pass through onSteer",
           ownerId: objectWorkerId,
         })
         const receipt = yield* runtime.send(run.runId, "queued continuation", {
-          policy: "enqueue",
+          policy: "steer",
           idempotencyKey: "queued",
         })
         const outcome = yield* store.complete({
@@ -419,13 +458,13 @@ it.effect("completion continuations retain their lane and pass through onSteer",
         })
         expect(outcome).toMatchObject({
           _tag: "SteeringPending",
-          continuation: { queue: "followUp", steeringEntryIds: [receipt.entryId] },
+          continuation: { queue: "steering", steeringEntryIds: [receipt.entryId] },
         })
 
         yield* host.execute(claim)
 
         expect(modelPrompt).toContain("queued continuation")
-        expect(modelPrompt).toContain("followUp:1:completion hook")
+        expect(modelPrompt).toContain("steering:1:completion hook")
       }),
     )
   }),
