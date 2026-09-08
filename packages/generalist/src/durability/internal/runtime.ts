@@ -450,10 +450,9 @@ export const make = (options: Options) =>
           next = next === undefined ? value : Math.min(next, value)
         }
         for (const run of state.runs.values()) {
-          if (run.ownerId === undefined && activationOf(run).intent !== "inactive") {
-            include(0)
-            break
-          }
+          const { ownerId, ...unowned } = run
+          if (activationOf(unowned).intent === "inactive") continue
+          include(ownerId === undefined ? 0 : (state.workers.get(ownerId)?.expiresAt ?? 0))
         }
         for (const wait of state.waits.values()) {
           if (wait.status === "open" && wait.reason._tag === "AwaitEvent" && wait.reason.deadline !== undefined) {
@@ -469,7 +468,6 @@ export const make = (options: Options) =>
             ),
           )
         }
-        for (const lease of state.workers.values()) include(lease.expiresAt)
         return next
       }),
     )

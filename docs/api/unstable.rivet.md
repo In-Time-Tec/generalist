@@ -116,7 +116,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`admissionReserveBytes`](./unstable.cloudflare.durable-objects.md#admissionreservebytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`admissionReserveBytes`](./unstable.cloudflare.durable-objects.md#admissionreservebytes-1)
 
 <a id="drainaction"></a>
 
@@ -144,7 +144,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`environment`](./unstable.cloudflare.durable-objects.md#environment)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`environment`](./unstable.cloudflare.durable-objects.md#environment-1)
 
 <a id="initialize"></a>
 
@@ -174,7 +174,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxCommitBytes`](./unstable.cloudflare.durable-objects.md#maxcommitbytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxCommitBytes`](./unstable.cloudflare.durable-objects.md#maxcommitbytes-1)
 
 <a id="maxconflictretries"></a>
 
@@ -188,7 +188,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxConflictRetries`](./unstable.cloudflare.durable-objects.md#maxconflictretries)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxConflictRetries`](./unstable.cloudflare.durable-objects.md#maxconflictretries-1)
 
 <a id="maxreplaybytes"></a>
 
@@ -200,7 +200,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxReplayBytes`](./unstable.cloudflare.durable-objects.md#maxreplaybytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxReplayBytes`](./unstable.cloudflare.durable-objects.md#maxreplaybytes-1)
 
 <a id="maxstatebytes"></a>
 
@@ -212,7 +212,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxStateBytes`](./unstable.cloudflare.durable-objects.md#maxstatebytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxStateBytes`](./unstable.cloudflare.durable-objects.md#maxstatebytes-1)
 
 <a id="messagingpolicy"></a>
 
@@ -238,7 +238,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`ownershipLeaseMillis`](./unstable.cloudflare.durable-objects.md#ownershipleasemillis)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`ownershipLeaseMillis`](./unstable.cloudflare.durable-objects.md#ownershipleasemillis-1)
 
 <a id="partition"></a>
 
@@ -250,7 +250,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`partition`](./unstable.cloudflare.durable-objects.md#partition)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`partition`](./unstable.cloudflare.durable-objects.md#partition-1)
 
 <a id="reconcile"></a>
 
@@ -280,7 +280,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`reconcileInterval`](./unstable.cloudflare.durable-objects.md#reconcileinterval)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`reconcileInterval`](./unstable.cloudflare.durable-objects.md#reconcileinterval-1)
 
 <a id="recoveryintervalmillis"></a>
 
@@ -320,7 +320,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`snapshotEvery`](./unstable.cloudflare.durable-objects.md#snapshotevery)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`snapshotEvery`](./unstable.cloudflare.durable-objects.md#snapshotevery-1)
 
 <a id="subscriberqueuecapacity"></a>
 
@@ -344,7 +344,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`tenant`](./unstable.cloudflare.durable-objects.md#tenant)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`tenant`](./unstable.cloudflare.durable-objects.md#tenant-1)
 
 <a id="workerid"></a>
 
@@ -356,7 +356,35 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid-1)
+
+***
+
+<a id="runtimeactoridentity"></a>
+
+### RuntimeActorIdentity
+
+**`Experimental`**
+
+Stable actor identity available before Runtime construction.
+
+#### Properties
+
+<a id="actorid"></a>
+
+##### actorId
+
+> `readonly` **actorId**: `string`
+
+**`Experimental`**
+
+<a id="key"></a>
+
+##### key
+
+> `readonly` **key**: readonly `string`[]
+
+**`Experimental`**
 
 ***
 
@@ -368,7 +396,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 #### Extends
 
-- `Omit`\<[`ActorRuntimeOptions`](#actorruntimeoptions), `"drainAction"`\>
+- `Omit`\<[`ActorRuntimeOptions`](#actorruntimeoptions), `"drainAction"` \| `"environment"` \| `"tenant"` \| `"partition"`\>
 
 #### Properties
 
@@ -418,7 +446,7 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`admissionReserveBytes`](./unstable.cloudflare.durable-objects.md#admissionreservebytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`admissionReserveBytes`](./unstable.cloudflare.durable-objects.md#admissionreservebytes-1)
 
 <a id="drainfuel-1"></a>
 
@@ -431,18 +459,6 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 ###### Inherited from
 
 [`ActorRuntimeOptions`](#actorruntimeoptions).[`drainFuel`](#drainfuel)
-
-<a id="environment-1"></a>
-
-##### environment
-
-> `readonly` **environment**: `string`
-
-**`Experimental`**
-
-###### Inherited from
-
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`environment`](./unstable.cloudflare.durable-objects.md#environment)
 
 <a id="initialize-1"></a>
 
@@ -476,7 +492,7 @@ Rivet process-lifecycle tuning; it never carries Runtime authority.
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxCommitBytes`](./unstable.cloudflare.durable-objects.md#maxcommitbytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxCommitBytes`](./unstable.cloudflare.durable-objects.md#maxcommitbytes-1)
 
 <a id="maxconflictretries-1"></a>
 
@@ -490,7 +506,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxConflictRetries`](./unstable.cloudflare.durable-objects.md#maxconflictretries)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxConflictRetries`](./unstable.cloudflare.durable-objects.md#maxconflictretries-1)
 
 <a id="maxreplaybytes-1"></a>
 
@@ -502,7 +518,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxReplayBytes`](./unstable.cloudflare.durable-objects.md#maxreplaybytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxReplayBytes`](./unstable.cloudflare.durable-objects.md#maxreplaybytes-1)
 
 <a id="maxstatebytes-1"></a>
 
@@ -514,7 +530,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxStateBytes`](./unstable.cloudflare.durable-objects.md#maxstatebytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxStateBytes`](./unstable.cloudflare.durable-objects.md#maxstatebytes-1)
 
 <a id="messagingpolicy-1"></a>
 
@@ -530,6 +546,38 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`messagingPolicy`](./runtime/namespaces/Runtime.md#messagingpolicy)
 
+<a id="namespace"></a>
+
+##### namespace
+
+> `readonly` **namespace**: (`identity`) => `object`
+
+**`Experimental`**
+
+Cached for this incarnation; applications must preserve key-to-namespace routing across incarnations.
+
+###### Parameters
+
+###### identity
+
+[`RuntimeActorIdentity`](#runtimeactoridentity)
+
+###### Returns
+
+`object`
+
+###### environment
+
+> `readonly` **environment**: `string`
+
+###### partition
+
+> `readonly` **partition**: `string`
+
+###### tenant
+
+> `readonly` **tenant**: `string`
+
 <a id="ownershipleasemillis-1"></a>
 
 ##### ownershipLeaseMillis?
@@ -540,19 +588,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`ownershipLeaseMillis`](./unstable.cloudflare.durable-objects.md#ownershipleasemillis)
-
-<a id="partition-1"></a>
-
-##### partition
-
-> `readonly` **partition**: `string`
-
-**`Experimental`**
-
-###### Inherited from
-
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`partition`](./unstable.cloudflare.durable-objects.md#partition)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`ownershipLeaseMillis`](./unstable.cloudflare.durable-objects.md#ownershipleasemillis-1)
 
 <a id="reconcile-1"></a>
 
@@ -586,7 +622,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`reconcileInterval`](./unstable.cloudflare.durable-objects.md#reconcileinterval)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`reconcileInterval`](./unstable.cloudflare.durable-objects.md#reconcileinterval-1)
 
 <a id="recoveryintervalmillis-1"></a>
 
@@ -640,7 +676,7 @@ Application-owned executable reconstruction composed into each actor incarnation
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`snapshotEvery`](./unstable.cloudflare.durable-objects.md#snapshotevery)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`snapshotEvery`](./unstable.cloudflare.durable-objects.md#snapshotevery-1)
 
 <a id="storage"></a>
 
@@ -664,18 +700,6 @@ Application-owned transport and cryptography; never actor-local durability.
 
 [`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`subscriberQueueCapacity`](./runtime/namespaces/Runtime.md#subscriberqueuecapacity)
 
-<a id="tenant-1"></a>
-
-##### tenant
-
-> `readonly` **tenant**: `string`
-
-**`Experimental`**
-
-###### Inherited from
-
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`tenant`](./unstable.cloudflare.durable-objects.md#tenant)
-
 <a id="workerid-1"></a>
 
 ##### workerId?
@@ -686,7 +710,7 @@ Application-owned transport and cryptography; never actor-local durability.
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid-1)
 
 ## Type Aliases
 
@@ -724,6 +748,16 @@ Rivet capabilities used only as wake hints.
 
 One typed Rivet Actor definition owning one Runtime partition.
 
+***
+
+<a id="runtimeactornamespace"></a>
+
+### RuntimeActorNamespace
+
+> **RuntimeActorNamespace** = *typeof* `RuntimeActorNamespace.Type`
+
+**`Experimental`**
+
 ## Variables
 
 <a id="layeractorruntime"></a>
@@ -734,7 +768,7 @@ One typed Rivet Actor definition owning one Runtime partition.
 
 **`Experimental`**
 
-Build once in onWake and dispose the owning ManagedRuntime in onSleep/onDestroy.
+Build in onWake, drain after readiness, observe failure, and dispose the owning ManagedRuntime on shutdown.
 
 #### Call Signature
 
@@ -791,3 +825,15 @@ The object journal is the only Runtime authority. Schedules and cron are wake hi
 #### Returns
 
 [`RuntimeActorDefinition`](#runtimeactordefinition)
+
+***
+
+<a id="runtimeactornamespace-1"></a>
+
+### RuntimeActorNamespace
+
+> `const` **RuntimeActorNamespace**: `Schema.Struct`\<\{ `environment`: `Schema.String`; `partition`: `Schema.String`; `tenant`: `Schema.String`; \}\>
+
+**`Experimental`**
+
+Canonical object namespace resolved for one actor instance.

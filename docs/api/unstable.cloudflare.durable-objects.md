@@ -8,17 +8,115 @@
 
 ## Interfaces
 
-<a id="options"></a>
+<a id="alarmstorage"></a>
 
-### Options
+### AlarmStorage
 
 **`Experimental`**
 
-A partition's canonical R2 binding and explicit namespace.
+The one native alarm slot is a wake hint, never canonical Runtime state.
+
+#### Properties
+
+<a id="getalarm"></a>
+
+##### getAlarm
+
+> `readonly` **getAlarm**: () => `Promise`\<`number` \| `null`\>
+
+**`Experimental`**
+
+###### Returns
+
+`Promise`\<`number` \| `null`\>
+
+<a id="setalarm"></a>
+
+##### setAlarm
+
+> `readonly` **setAlarm**: (`time`) => `Promise`\<`void`\>
+
+**`Experimental`**
+
+###### Parameters
+
+###### time
+
+`number`
+
+###### Returns
+
+`Promise`\<`void`\>
+
+***
+
+<a id="host"></a>
+
+### Host
+
+**`Experimental`**
+
+Concurrent commands and alarms share authority until their last call completes.
+
+#### Properties
+
+<a id="alarm"></a>
+
+##### alarm
+
+> `readonly` **alarm**: `Effect`\<[`DrainResult`](./runtime/namespaces/LocalScheduler.md#drainresult), `ActivationFailure`\>
+
+**`Experimental`**
+
+Install as the application's native alarm handler; duplicate delivery is safe.
+
+<a id="run"></a>
+
+##### run
+
+> `readonly` **run**: \<`A`, `E`, `R`\>(`effect`) => `Effect`\<`A`, `ActivationFailure` \| `E`, `Exclude`\<`R`, `Scope` \| [`RuntimeServices`](./durability.md#runtimeservices)\>\>
+
+**`Experimental`**
+
+Supplies Runtime services and a command scope, preserving other requirements and each receipt.
+
+###### Type Parameters
+
+###### A
+
+`A`
+
+###### E
+
+`E`
+
+###### R
+
+`R`
+
+###### Parameters
+
+###### effect
+
+`Effect`\<`A`, `E`, `R`\>
+
+###### Returns
+
+`Effect`\<`A`, `ActivationFailure` \| `E`, `Exclude`\<`R`, `Scope` \| [`RuntimeServices`](./durability.md#runtimeservices)\>\>
+
+***
+
+<a id="hostoptions"></a>
+
+### HostOptions
+
+**`Experimental`**
+
+Configuration for an application-owned Durable Object host.
 
 #### Extends
 
-- [`Options`](./durability.md#options)
+- `Omit`\<[`Options`](#options), `"schedulerMode"`\>
 
 #### Properties
 
@@ -34,7 +132,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`activationProjection`](./durability.md#activationprojection)
+[`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`activationProjection`](./runtime/namespaces/Runtime.md#activationprojection)
 
 <a id="addresses"></a>
 
@@ -46,7 +144,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`addresses`](./durability.md#addresses)
+[`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`addresses`](./runtime/namespaces/Runtime.md#addresses)
 
 <a id="admissionreservebytes"></a>
 
@@ -58,7 +156,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`admissionReserveBytes`](./durability.md#admissionreservebytes)
+[`Options`](#options).[`admissionReserveBytes`](#admissionreservebytes-1)
 
 <a id="bucket"></a>
 
@@ -67,6 +165,10 @@ Final-state callback executed synchronously inside each authoritative store tran
 > `readonly` **bucket**: [`Bucket`](./durability.r2.md#bucket)
 
 **`Experimental`**
+
+###### Inherited from
+
+[`Options`](#options).[`bucket`](#bucket-1)
 
 <a id="environment"></a>
 
@@ -78,7 +180,17 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`environment`](./durability.md#environment)
+[`Options`](#options).[`environment`](#environment-1)
+
+<a id="fuel"></a>
+
+##### fuel?
+
+> `readonly` `optional` **fuel?**: `number`
+
+**`Experimental`**
+
+Bounds candidates examined by an alarm, not the duration of admitted execution.
 
 <a id="maxcommitbytes"></a>
 
@@ -90,7 +202,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`maxCommitBytes`](./durability.md#maxcommitbytes)
+[`Options`](#options).[`maxCommitBytes`](#maxcommitbytes-1)
 
 <a id="maxconflictretries"></a>
 
@@ -104,7 +216,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`maxConflictRetries`](./durability.md#maxconflictretries)
+[`Options`](#options).[`maxConflictRetries`](#maxconflictretries-1)
 
 <a id="maxreplaybytes"></a>
 
@@ -116,7 +228,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`maxReplayBytes`](./durability.md#maxreplaybytes)
+[`Options`](#options).[`maxReplayBytes`](#maxreplaybytes-1)
 
 <a id="maxstatebytes"></a>
 
@@ -128,7 +240,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`maxStateBytes`](./durability.md#maxstatebytes)
+[`Options`](#options).[`maxStateBytes`](#maxstatebytes-1)
 
 <a id="messagingpolicy"></a>
 
@@ -142,7 +254,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`messagingPolicy`](./durability.md#messagingpolicy)
+[`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`messagingPolicy`](./runtime/namespaces/Runtime.md#messagingpolicy)
 
 <a id="ownershipleasemillis"></a>
 
@@ -154,7 +266,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`ownershipLeaseMillis`](./durability.md#ownershipleasemillis)
+[`Options`](#options).[`ownershipLeaseMillis`](#ownershipleasemillis-1)
 
 <a id="partition"></a>
 
@@ -166,7 +278,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`partition`](./durability.md#partition)
+[`Options`](#options).[`partition`](#partition-1)
 
 <a id="reconcileinterval"></a>
 
@@ -178,9 +290,259 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./durability.md#options).[`reconcileInterval`](./durability.md#reconcileinterval)
+[`Options`](#options).[`reconcileInterval`](#reconcileinterval-1)
 
 <a id="scheduler"></a>
+
+##### scheduler?
+
+> `readonly` `optional` **scheduler?**: `object`
+
+**`Experimental`**
+
+###### concurrency?
+
+> `readonly` `optional` **concurrency?**: `number`
+
+###### pollInterval?
+
+> `readonly` `optional` **pollInterval?**: `Input`
+
+###### Inherited from
+
+[`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`scheduler`](./runtime/namespaces/Runtime.md#scheduler)
+
+<a id="snapshotevery"></a>
+
+##### snapshotEvery?
+
+> `readonly` `optional` **snapshotEvery?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](#options).[`snapshotEvery`](#snapshotevery-1)
+
+<a id="storage"></a>
+
+##### storage
+
+> `readonly` **storage**: [`AlarmStorage`](#alarmstorage)
+
+**`Experimental`**
+
+<a id="subscriberqueuecapacity"></a>
+
+##### subscriberQueueCapacity?
+
+> `readonly` `optional` **subscriberQueueCapacity?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`subscriberQueueCapacity`](./runtime/namespaces/Runtime.md#subscriberqueuecapacity)
+
+<a id="tenant"></a>
+
+##### tenant
+
+> `readonly` **tenant**: `string`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](#options).[`tenant`](#tenant-1)
+
+<a id="workerid"></a>
+
+##### workerId?
+
+> `readonly` `optional` **workerId?**: `string`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](#options).[`workerId`](#workerid-1)
+
+***
+
+<a id="options"></a>
+
+### Options
+
+**`Experimental`**
+
+A partition's canonical R2 binding and explicit namespace.
+
+#### Extends
+
+- [`Options`](./durability.md#options)
+
+#### Properties
+
+<a id="activationprojection-1"></a>
+
+##### activationProjection?
+
+> `readonly` `optional` **activationProjection?**: `RunActivationProjection`
+
+**`Experimental`**
+
+Final-state callback executed synchronously inside each authoritative store transaction.
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`activationProjection`](./durability.md#activationprojection)
+
+<a id="addresses-1"></a>
+
+##### addresses
+
+> `readonly` **addresses**: readonly [`AddressBinding`](./runtime/namespaces/Runtime.md#addressbinding)[]
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`addresses`](./durability.md#addresses)
+
+<a id="admissionreservebytes-1"></a>
+
+##### admissionReserveBytes?
+
+> `readonly` `optional` **admissionReserveBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`admissionReserveBytes`](./durability.md#admissionreservebytes)
+
+<a id="bucket-1"></a>
+
+##### bucket
+
+> `readonly` **bucket**: [`Bucket`](./durability.r2.md#bucket)
+
+**`Experimental`**
+
+<a id="environment-1"></a>
+
+##### environment
+
+> `readonly` **environment**: `string`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`environment`](./durability.md#environment)
+
+<a id="maxcommitbytes-1"></a>
+
+##### maxCommitBytes?
+
+> `readonly` `optional` **maxCommitBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`maxCommitBytes`](./durability.md#maxcommitbytes)
+
+<a id="maxconflictretries-1"></a>
+
+##### maxConflictRetries?
+
+> `readonly` `optional` **maxConflictRetries?**: `number`
+
+**`Experimental`**
+
+Number of deterministic reevaluations after a competing command wins; zero disables retries.
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`maxConflictRetries`](./durability.md#maxconflictretries)
+
+<a id="maxreplaybytes-1"></a>
+
+##### maxReplayBytes?
+
+> `readonly` `optional` **maxReplayBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`maxReplayBytes`](./durability.md#maxreplaybytes)
+
+<a id="maxstatebytes-1"></a>
+
+##### maxStateBytes?
+
+> `readonly` `optional` **maxStateBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`maxStateBytes`](./durability.md#maxstatebytes)
+
+<a id="messagingpolicy-1"></a>
+
+##### messagingPolicy?
+
+> `readonly` `optional` **messagingPolicy?**: [`Service`](./runtime/namespaces/Messaging/namespaces/MessagingPolicy.md#service)
+
+**`Experimental`**
+
+Host policy for addressing beyond Generalist's derived relationships. Absent means relationships only.
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`messagingPolicy`](./durability.md#messagingpolicy)
+
+<a id="ownershipleasemillis-1"></a>
+
+##### ownershipLeaseMillis?
+
+> `readonly` `optional` **ownershipLeaseMillis?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`ownershipLeaseMillis`](./durability.md#ownershipleasemillis)
+
+<a id="partition-1"></a>
+
+##### partition
+
+> `readonly` **partition**: `string`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`partition`](./durability.md#partition)
+
+<a id="reconcileinterval-1"></a>
+
+##### reconcileInterval?
+
+> `readonly` `optional` **reconcileInterval?**: `Input`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`reconcileInterval`](./durability.md#reconcileinterval)
+
+<a id="scheduler-1"></a>
 
 ##### scheduler?
 
@@ -212,7 +574,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`Options`](./durability.md#options).[`schedulerMode`](./durability.md#schedulermode)
 
-<a id="snapshotevery"></a>
+<a id="snapshotevery-1"></a>
 
 ##### snapshotEvery?
 
@@ -224,7 +586,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`Options`](./durability.md#options).[`snapshotEvery`](./durability.md#snapshotevery)
 
-<a id="subscriberqueuecapacity"></a>
+<a id="subscriberqueuecapacity-1"></a>
 
 ##### subscriberQueueCapacity?
 
@@ -236,7 +598,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`Options`](./durability.md#options).[`subscriberQueueCapacity`](./durability.md#subscriberqueuecapacity)
 
-<a id="tenant"></a>
+<a id="tenant-1"></a>
 
 ##### tenant
 
@@ -248,7 +610,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 [`Options`](./durability.md#options).[`tenant`](./durability.md#tenant)
 
-<a id="workerid"></a>
+<a id="workerid-1"></a>
 
 ##### workerId?
 
@@ -266,7 +628,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ### layer
 
-> `const` **layer**: (`{ bucket, ...options }`) => `Layer.Layer`\<[`RuntimeServices`](./durability.md#runtimeservices), `ActivationFailure`, `Crypto` \| [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver.md#executableresolver)\>
+> `const` **layer**: (`{ bucket, ...options }`) => `Layer.Layer`\<[`RuntimeServices`](./durability.md#runtimeservices), `ActivationFailure`, `Crypto.Crypto` \| [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver.md#executableresolver)\>
 
 **`Experimental`**
 
@@ -280,7 +642,7 @@ Scoped execution host. Alarm-driven hosts use schedulerMode: "external".
 
 #### Returns
 
-`Layer.Layer`\<[`RuntimeServices`](./durability.md#runtimeservices), `ActivationFailure`, `Crypto` \| [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver.md#executableresolver)\>
+`Layer.Layer`\<[`RuntimeServices`](./durability.md#runtimeservices), `ActivationFailure`, `Crypto.Crypto` \| [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver.md#executableresolver)\>
 
 ***
 
@@ -288,7 +650,7 @@ Scoped execution host. Alarm-driven hosts use schedulerMode: "external".
 
 ### layerRunStore
 
-> `const` **layerRunStore**: (`{ bucket, ...options }`) => `Layer.Layer`\<[`Activation`](./durability.md#activation) \| [`ExternalChildStore`](./unstable.runtime.external-child-store.md#externalchildstore) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore) \| `StoreActivation`, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `Crypto`\>
+> `const` **layerRunStore**: (`{ bucket, ...options }`) => `Layer.Layer`\<[`Activation`](./durability.md#activation) \| [`ExternalChildStore`](./unstable.runtime.external-child-store.md#externalchildstore) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore) \| `StoreActivation`, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `Crypto.Crypto`\>
 
 **`Experimental`**
 
@@ -302,7 +664,31 @@ Native R2 persistence; Durable Object storage is never runtime authority.
 
 #### Returns
 
-`Layer.Layer`\<[`Activation`](./durability.md#activation) \| [`ExternalChildStore`](./unstable.runtime.external-child-store.md#externalchildstore) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore) \| `StoreActivation`, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `Crypto`\>
+`Layer.Layer`\<[`Activation`](./durability.md#activation) \| [`ExternalChildStore`](./unstable.runtime.external-child-store.md#externalchildstore) \| [`RunStore`](./runtime/namespaces/RunStore.md#runstore) \| `StoreActivation`, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `Crypto.Crypto`\>
+
+***
+
+<a id="make"></a>
+
+### make
+
+> `const` **make**: (`{ storage, fuel, bucket, ...options }`) => `Effect.Effect`\<[`Host`](#host), [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `Scope.Scope` \| `Crypto.Crypto` \| [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver.md#executableresolver)\>
+
+**`Experimental`**
+
+Construct once in the application's scope; no Runtime work starts in construction.
+Calls initialize single-flight, observe ownership failure, and release idle execution scopes.
+The application supplies Crypto and its exact persisted executable resolver.
+
+#### Parameters
+
+##### \{ storage, fuel, bucket, ...options \}
+
+[`HostOptions`](#hostoptions)
+
+#### Returns
+
+`Effect.Effect`\<[`Host`](#host), [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `Scope.Scope` \| `Crypto.Crypto` \| [`ExecutableResolver`](./runtime/namespaces/ExecutableResolver.md#executableresolver)\>
 
 ***
 
