@@ -208,6 +208,7 @@
                                             "required": ["maxConcurrency", "parallelSafe"],
                                             "additionalProperties": false
                                           },
+                                          "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                           "compaction": {
                                             "type": "object",
                                             "properties": {
@@ -421,6 +422,7 @@
                                           "services",
                                           "policy",
                                           "toolScheduling",
+                                          "toolExecution",
                                           "budget",
                                           "children"
                                         ],
@@ -907,6 +909,7 @@
                                                   "required": ["maxConcurrency", "parallelSafe"],
                                                   "additionalProperties": false
                                                 },
+                                                "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                                 "compaction": {
                                                   "type": "object",
                                                   "properties": {
@@ -1150,6 +1153,7 @@
                                                 "services",
                                                 "policy",
                                                 "toolScheduling",
+                                                "toolExecution",
                                                 "budget",
                                                 "children"
                                               ],
@@ -1768,6 +1772,7 @@
                                               "required": ["maxConcurrency", "parallelSafe"],
                                               "additionalProperties": false
                                             },
+                                            "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                             "compaction": {
                                               "type": "object",
                                               "properties": {
@@ -1993,6 +1998,7 @@
                                             "services",
                                             "policy",
                                             "toolScheduling",
+                                            "toolExecution",
                                             "budget",
                                             "children"
                                           ],
@@ -2500,6 +2506,10 @@
                                                     "required": ["maxConcurrency", "parallelSafe"],
                                                     "additionalProperties": false
                                                   },
+                                                  "toolExecution": {
+                                                    "type": "string",
+                                                    "enum": ["inline", "background"]
+                                                  },
                                                   "compaction": {
                                                     "type": "object",
                                                     "properties": {
@@ -2743,6 +2753,7 @@
                                                   "services",
                                                   "policy",
                                                   "toolScheduling",
+                                                  "toolExecution",
                                                   "budget",
                                                   "children"
                                                 ],
@@ -3349,6 +3360,7 @@
                                             "required": ["maxConcurrency", "parallelSafe"],
                                             "additionalProperties": false
                                           },
+                                          "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                           "compaction": {
                                             "type": "object",
                                             "properties": {
@@ -3562,6 +3574,7 @@
                                           "services",
                                           "policy",
                                           "toolScheduling",
+                                          "toolExecution",
                                           "budget",
                                           "children"
                                         ],
@@ -4048,6 +4061,7 @@
                                                   "required": ["maxConcurrency", "parallelSafe"],
                                                   "additionalProperties": false
                                                 },
+                                                "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                                 "compaction": {
                                                   "type": "object",
                                                   "properties": {
@@ -4291,6 +4305,7 @@
                                                 "services",
                                                 "policy",
                                                 "toolScheduling",
+                                                "toolExecution",
                                                 "budget",
                                                 "children"
                                               ],
@@ -4919,6 +4934,7 @@
                                                 "required": ["maxConcurrency", "parallelSafe"],
                                                 "additionalProperties": false
                                               },
+                                              "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                               "compaction": {
                                                 "type": "object",
                                                 "properties": {
@@ -5148,6 +5164,7 @@
                                               "services",
                                               "policy",
                                               "toolScheduling",
+                                              "toolExecution",
                                               "budget",
                                               "children"
                                             ],
@@ -5673,6 +5690,10 @@
                                                       "required": ["maxConcurrency", "parallelSafe"],
                                                       "additionalProperties": false
                                                     },
+                                                    "toolExecution": {
+                                                      "type": "string",
+                                                      "enum": ["inline", "background"]
+                                                    },
                                                     "compaction": {
                                                       "type": "object",
                                                       "properties": {
@@ -5916,6 +5937,7 @@
                                                     "services",
                                                     "policy",
                                                     "toolScheduling",
+                                                    "toolExecution",
                                                     "budget",
                                                     "children"
                                                   ],
@@ -7619,6 +7641,7 @@
                                           "required": ["maxConcurrency", "parallelSafe"],
                                           "additionalProperties": false
                                         },
+                                        "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                         "compaction": {
                                           "type": "object",
                                           "properties": {
@@ -7808,6 +7831,7 @@
                                         "services",
                                         "policy",
                                         "toolScheduling",
+                                        "toolExecution",
                                         "budget",
                                         "children"
                                       ],
@@ -8534,6 +8558,7 @@
                                         "required": ["maxConcurrency", "parallelSafe"],
                                         "additionalProperties": false
                                       },
+                                      "toolExecution": { "type": "string", "enum": ["inline", "background"] },
                                       "compaction": {
                                         "type": "object",
                                         "properties": {
@@ -8719,6 +8744,7 @@
                                       "services",
                                       "policy",
                                       "toolScheduling",
+                                      "toolExecution",
                                       "budget",
                                       "children"
                                     ],

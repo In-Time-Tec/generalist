@@ -52,6 +52,18 @@ The Agent fragment above admits work and returns a receipt, not the Agent's answ
 
 ## Independent Tool Runs
 
+Set `Agent.make({ name: "coder", toolkit: workspaceTools, toolExecution: "background" })` when the Agent should continue after admitting work instead of waiting for each handler. Register those same Effect AI Tools with `Generalist.create({ agents: [coder], tools: [...] })`. This is a definition fragment: the application supplies the Toolkit handlers, model, authorization Layers, activated Runtime, and scheduler.
+
+The model-visible success schema describes `{ _tag: "ToolRunAdmitted", runId, tool }`, not file contents or a command's final output. The execution registry retains the original parameter, success, and failure codecs, including MCP handler types. The parent can make another model step while the admitted Tool Run remains running. Tool admission has its own durable command identity; it is not memoized as the tool's final answer. Messaging, skill activation, and child/Program admission and observation controls stay inline.
+
+Process-local Core defaults to inline execution. Explicit background mode without a durable Runtime fails before the first model call rather than falling back to local fibers. Unregistered work tools fail closed, including tools discovered after Agent construction.
+
+Background admission applies to framework-executed handlers. Provider-executed built-ins keep their provider result contract; Generalist does not claim to admit a Tool Run for an effect executed inside a model provider.
+
+The Agent's existing authorization runs before admission. A pending admission-time approval still suspends that Agent; the registered Tool Run authorizes its actual execution independently. Background mode does not bypass a custom Agent authorizer or transfer its approval decision to a different policy.
+
+The shared Tool Run executor applies a 60-second deadline to each execution attempt, retains at most 256 KiB per outcome, accepts at most 64 progress events of at most 16 KiB each, and accepts at most 16 artifact references of at most 2 KiB each. These limits enter registered Tool policy identity. Progress over its bound is declined; typed outcomes and admission receipts are never replaced with truncated previews. An unretained outcome or expired external operation remains actionable through the existing unknown-outcome resolution path, not an invented success or automatic redispatch. Deadline expiry requests Effect interruption; it is not proof that an external process stopped, and cannot forcibly terminate an uninterruptible handler. Artifact references do not grant storage access or enlarge the artifact store's own payload limits. Canonical family Tool concurrency and durable storage capacity bound execution and retained admission state.
+
 Use a Tool Run when work must keep its own execution claim after the Run that requested it settles. Register ordinary Effect AI Tool declarations in `tools`, provide their Toolkit handlers when creating the Host, and start them without creating a conversational Session.
 
 This Effect generator fragment assumes an activated durable Runtime and a host scheduler. The `checks` handler is scripted arithmetic: it invokes no model or external service and needs no credentials.

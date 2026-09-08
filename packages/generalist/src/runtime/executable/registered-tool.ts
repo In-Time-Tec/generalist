@@ -12,6 +12,7 @@ import { make as makeExecutable } from "./manifest.js"
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import type { ToolResolution } from "./resolver.js"
 import { Identity, ToolIdentity } from "./tool-identity.js"
+import { limits } from "../execution/tool/limits.js"
 
 export type ToolServices<T extends Tool.Any> =
   | Tool.HandlersFor<Toolkit.ToolsByName<readonly [T]>>
@@ -74,6 +75,7 @@ export const capture = <T extends Tool.Any>(
           policy: makeCapability({
             runtime: codec,
             policy: identity.policy,
+            limits,
             needsApproval: Schema.is(Schema.Boolean)(approval) ? approval : "predicate",
           }),
         }),

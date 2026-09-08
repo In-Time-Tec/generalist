@@ -184,7 +184,12 @@ const streamInternalImpl = <
       const handoffStateRef = yield* initializeHandoff()
       const skillError = (turn: number, error: SkillCatalogError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
-      const restoreSkill = makeSkillActivation({ skillRuntime, toolState, skillError })
+      const restoreSkill = makeSkillActivation({
+        skillRuntime,
+        toolState,
+        skillError,
+        toolExecution: agent.toolExecution,
+      })
       const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>
         Effect.gen(function* () {
           const completed = new Set<string>()
