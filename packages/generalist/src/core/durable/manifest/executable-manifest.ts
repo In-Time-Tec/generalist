@@ -2,8 +2,9 @@ import { Effect, Function, Schema } from "effect"
 import type { ParseOptions } from "effect/SchemaAST"
 import { AgentManifest, make as makeManifest, type PinnedAgent } from "./agent-manifest.js"
 import { ProgramManifest, make as makeProgramManifest, type PinnedProgram } from "./program-manifest.js"
+import { ToolManifest, make as makeToolManifest, type PinnedTool } from "./tool-manifest.js"
 import { makeExecutable } from "./pin-internal.js"
-import { AgentPin, ExecutablePin, ProgramPin, makeCapability, makeModel } from "../pin.js"
+import { AgentPin, ExecutablePin, ProgramPin, ToolPin, makeCapability, makeModel } from "../pin.js"
 
 const compareText = (left: string, right: string): number => {
   if (left < right) return -1
@@ -26,7 +27,13 @@ export interface ProgramEntry {
 }
 
 /** One exact executable definition in a closed closure. */
-export type ExecutableEntry = AgentEntry | ProgramEntry
+export interface ToolEntry {
+  readonly _tag: "Tool"
+  readonly pin: ToolPin
+  readonly manifest: ToolManifest
+}
+
+export type ExecutableEntry = AgentEntry | ProgramEntry | ToolEntry
 
 /** One globally pinned child profile available by selection name. */
 export interface ProfileBinding {
@@ -35,7 +42,7 @@ export interface ProfileBinding {
 }
 
 /** Exact active executable within one closed closure. */
-export const ExecutableTarget = Schema.Union([AgentPin, ProgramPin])
+export const ExecutableTarget = Schema.Union([AgentPin, ProgramPin, ToolPin])
 export type ExecutableTarget = typeof ExecutableTarget.Type
 
 /** Complete closed executable profile registry and entry closure. */
@@ -66,7 +73,12 @@ interface ProgramEntryEncoded extends Omit<ProgramEntry, "pin" | "manifest"> {
   readonly manifest: typeof ProgramManifest.Encoded
 }
 
-type ExecutableEntryEncoded = AgentEntryEncoded | ProgramEntryEncoded
+interface ToolEntryEncoded extends Omit<ToolEntry, "pin" | "manifest"> {
+  readonly pin: string
+  readonly manifest: typeof ToolManifest.Encoded
+}
+
+type ExecutableEntryEncoded = AgentEntryEncoded | ProgramEntryEncoded | ToolEntryEncoded
 
 interface ProfileBindingEncoded extends Omit<ProfileBinding, "agent"> {
   readonly agent: string
@@ -97,9 +109,15 @@ export const ProgramEntry: Schema.Codec<ProgramEntry, ProgramEntryEncoded> = Sch
 })
 
 /** One exact executable definition in a closed closure. */
+export const ToolEntry: Schema.Codec<ToolEntry, ToolEntryEncoded> = Schema.TaggedStruct("Tool", {
+  pin: ToolPin,
+  manifest: ToolManifest,
+})
+
 export const ExecutableEntry: Schema.Codec<ExecutableEntry, ExecutableEntryEncoded> = Schema.Union([
   AgentEntry,
   ProgramEntry,
+  ToolEntry,
 ])
 
 /** One globally pinned child profile available by selection name. */
@@ -157,8 +175,9 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
     const entry = byPin.get(pin)
     if (entry === undefined) throw new TypeError(`Dangling executable: ${pin}`)
     visiting.add(pin)
-    const children =
-      entry._tag === "Agent" ? (entry.manifest.programAuthority?.agents ?? []) : entry.manifest.capabilities.agents
+    let children: ReadonlyArray<{ readonly agent: AgentPin }> = []
+    if (entry._tag === "Agent") children = entry.manifest.programAuthority?.agents ?? []
+    if (entry._tag === "Program") children = entry.manifest.capabilities.agents
     for (const child of children) {
       const target = byPin.get(child.agent)
       if (target?._tag !== "Agent") throw new TypeError(`Agent reference does not resolve to an Agent: ${child.agent}`)
@@ -173,7 +192,18 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
     throw new TypeError("Executable closure contains a disconnected executable")
   if (!reachable.has(ref.active)) throw new TypeError(`Active executable is not reachable: ${ref.active}`)
   for (const entry of manifest.entries) {
-    const pin = entry._tag === "Agent" ? makeManifest(entry.manifest).pin : makeProgramManifest(entry.manifest).pin
+    let pin: ExecutableTarget
+    switch (entry._tag) {
+      case "Agent":
+        pin = makeManifest(entry.manifest).pin
+        break
+      case "Program":
+        pin = makeProgramManifest(entry.manifest).pin
+        break
+      case "Tool":
+        pin = makeToolManifest(entry.manifest).pin
+        break
+    }
     if (pin !== entry.pin) throw new TypeError(`${entry._tag} manifest digest mismatch: ${entry.pin}`)
   }
   if (ref.executable !== makeExecutable(manifest)) throw new TypeError("Executable manifest digest mismatch")
@@ -186,15 +216,13 @@ export const make = (input: {
   readonly active?: ExecutableTarget
   readonly profiles?: ReadonlyArray<ProfileBinding>
   readonly entries: ReadonlyArray<
-    ({ readonly _tag: "Agent" } & PinnedAgent) | ({ readonly _tag: "Program" } & PinnedProgram)
+    | ({ readonly _tag: "Agent" } & PinnedAgent)
+    | ({ readonly _tag: "Program" } & PinnedProgram)
+    | ({ readonly _tag: "Tool" } & PinnedTool)
   >
 }): PinnedExecutable => {
   const active = input.active ?? input.root
-  const entries: Array<ExecutableEntry> = input.entries.map((entry) =>
-    entry._tag === "Agent"
-      ? { _tag: "Agent", pin: entry.pin, manifest: entry.manifest }
-      : { _tag: "Program", pin: entry.pin, manifest: entry.manifest },
-  )
+  const entries: Array<ExecutableEntry> = input.entries.map((entry) => ({ ...entry }))
   entries.sort((left, right) => compareText(left.pin, right.pin))
   const profiles = [...(input.profiles ?? [])].toSorted((left, right) => compareText(left.selection, right.selection))
   const manifest = Schema.decodeSync(ExecutableManifest, { onExcessProperty: "error" })({

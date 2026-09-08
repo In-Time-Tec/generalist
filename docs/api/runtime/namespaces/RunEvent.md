@@ -928,7 +928,7 @@ Terminal disposition category for accepted steering.
 
 ### RunEventBase
 
-> `const` **RunEventBase**: `Schema.Struct`\<\{ `attemptId`: `Schema.optionalKey`\<`Schema.String`\>; `causationId`: `Schema.optionalKey`\<`Schema.String`\>; `correlationId`: `Schema.optionalKey`\<`Schema.String`\>; `depth`: `Schema.Int`; `eventId`: `Schema.String`; `executableRef`: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>; `occurredAt`: `Schema.String`; `parentRunId`: `Schema.optionalKey`\<`Schema.String`\>; `rootRunId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `specVersion`: `Schema.Literals`\<readonly \[`"1"`\]\>; \}\>
+> `const` **RunEventBase**: `Schema.Struct`\<\{ `attemptId`: `Schema.optionalKey`\<`Schema.String`\>; `causationId`: `Schema.optionalKey`\<`Schema.String`\>; `correlationId`: `Schema.optionalKey`\<`Schema.String`\>; `depth`: `Schema.Int`; `eventId`: `Schema.String`; `executableRef`: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>; `occurredAt`: `Schema.String`; `parentRunId`: `Schema.optionalKey`\<`Schema.String`\>; `rootRunId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `specVersion`: `Schema.Literals`\<readonly \[`"1"`\]\>; \}\>
 
 ***
 

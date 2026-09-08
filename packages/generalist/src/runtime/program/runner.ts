@@ -53,7 +53,9 @@ export const make = (input: {
   const tools = new Map(input.handlers.tools.map((handler) => [handler.name, handler] as const))
   const steps = new Map(input.handlers.steps.map((handler) => [handler.name, handler] as const))
   const branch =
-    input.claimed.checkpoint !== undefined && "_tag" in input.claimed.checkpoint
+    input.claimed.checkpoint !== undefined &&
+    "_tag" in input.claimed.checkpoint &&
+    input.claimed.checkpoint._tag === "Program"
       ? input.claimed.checkpoint.branch
       : undefined
   const operationIdentity = (authoredOperation: string): string =>

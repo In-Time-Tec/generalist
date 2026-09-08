@@ -24,6 +24,7 @@ import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js
 import { Configuration as Tasks } from "../../tasks/internal.js"
 import { CommandTool, namespace } from "../../core/durable/component.js"
 import { Hooks } from "../../hooks/index.js"
+import { codec as toolCodec, type RegisteredTool } from "./registered-tool.js"
 
 const codec = "generalist/runtime/registered-agent"
 const version = "1"
@@ -41,6 +42,9 @@ export interface RegisteredAgent {
 
 /** @internal Process-local authority shared by one Runtime service and its executor. */
 export interface RegisteredAgents {
+  readonly registerTool: (registration: RegisteredTool) => Effect.Effect<void, ExecutableRegistrationInvalid>
+  readonly getTool: (tool: Tool.Any) => Effect.Effect<Option.Option<RegisteredTool>>
+  readonly resolveTool: (pin: string) => Effect.Effect<Option.Option<RegisteredTool>>
   readonly register: (registration: RegisteredAgent) => Effect.Effect<void, DuplicateAgent>
   readonly registerAll: (registrations: ReadonlyArray<RegisteredAgent>) => Effect.Effect<void, DuplicateAgent>
   readonly get: (name: string) => Effect.Effect<Option.Option<RegisteredAgent>>
@@ -50,6 +54,7 @@ export interface RegisteredAgents {
 /** @internal Construct one registry synchronously so host Layers can share it without exposing another service. */
 export const make = (): RegisteredAgents => {
   const entries = new Map<string, RegisteredAgent>()
+  const tools = new Map<string, RegisteredTool>()
   const registerAll = (registrations: ReadonlyArray<RegisteredAgent>) =>
     Effect.suspend(() => {
       const names = new Set<string>()
@@ -63,6 +68,21 @@ export const make = (): RegisteredAgents => {
       return Effect.void
     })
   return {
+    registerTool: (registration) =>
+      Effect.suspend(() => {
+        const pin = registration.resolution.pinned.pin
+        const existing = tools.get(pin)
+        if (existing !== undefined) {
+          return existing.source === registration.source
+            ? Effect.void
+            : ExecutableRegistrationInvalid.make({ message: `Tool identity is already registered: ${pin}` })
+        }
+        tools.set(pin, registration)
+        return Effect.void
+      }),
+    getTool: (tool) =>
+      Effect.sync(() => Option.fromUndefinedOr([...tools.values()].find((entry) => entry.source === tool))),
+    resolveTool: (pin) => Effect.sync(() => Option.fromUndefinedOr(tools.get(pin))),
     register: (registration) => registerAll([registration]),
     registerAll,
     get: (name) => Effect.sync(() => Option.fromUndefinedOr(entries.get(name))),
@@ -297,6 +317,17 @@ export const resolve: {
   (fallback: ResolverService, input: ResolverInput): (agents: RegisteredAgents) => ResolveEffect
   (agents: RegisteredAgents, fallback: ResolverService, input: ResolverInput): ResolveEffect
 } = Function.dual(3, (agents: RegisteredAgents, fallback: ResolverService, input: ResolverInput): ResolveEffect => {
+  if (input.registrations.some((registration) => registration.codec === toolCodec)) {
+    return Effect.gen(function* () {
+      if (input.registrations.some((registration) => registration.codec !== toolCodec || registration.version !== "1"))
+        return yield* ExecutableRegistrationInvalid.make({
+          message: "Tool declarations require one complete version-1 registration set.",
+        })
+      const registration = yield* agents.resolveTool(input.ref.active)
+      if (Option.isNone(registration)) return yield* fallback.resolve(input)
+      return registration.value.resolution
+    })
+  }
   if (!input.registrations.some((registration) => registration.codec === codec)) return fallback.resolve(input)
   if (input.registrations.some((registration) => registration.codec !== codec || registration.version !== version)) {
     return ExecutableRegistrationInvalid.make({

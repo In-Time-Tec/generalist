@@ -176,7 +176,8 @@ export const fromJournal = Effect.fn("Trajectory.fromJournal")(function* (
     turns,
     stopReason,
   }
-  if (Object.keys(agent.manifest.budget).length > 0) trajectory.budget = agent.manifest.budget
+  if ("budget" in agent.manifest && Object.keys(agent.manifest.budget).length > 0)
+    trajectory.budget = agent.manifest.budget
   return trajectory
 })
 

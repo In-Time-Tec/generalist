@@ -52,7 +52,16 @@ import {
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
-import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
+import type { ToolServices } from "../runtime/executable/registered-tool.js"
+import {
+  DuplicateAgent,
+  IllegalOperatorAction,
+  type RuntimeUnavailable,
+  type ExecutableRegistrationInvalid,
+} from "../runtime/errors.js"
+import { make as makeTools, type Tools as HostTools } from "./tools.js"
+export type { HostToolRun } from "./tools.js"
+export { ToolIdentity } from "../runtime/executable/tool-identity.js"
 import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
@@ -94,9 +103,11 @@ export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyA
 export interface CreateOptions<
   Agents extends ReadonlyArray<AnyAgent>,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
+  Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > {
   readonly agents: Agents
   readonly plugins?: Plugins
+  readonly tools?: Tools
 }
 export interface SessionCreateOptions {
   readonly id?: string
@@ -108,6 +119,7 @@ export interface RunStartOptions {
 export type EncodedAgentInput = Schema.Json
 export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
+  readonly tools: HostTools
   readonly attachments: Attachments
   readonly artifacts: Artifacts
   readonly sessions: {
@@ -216,20 +228,19 @@ type PluginServices<Plugins> =
 export type CreateRequirements<
   Agents extends ReadonlyArray<AnyAgent>,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>>,
+  Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > =
   | Runtime
-  | LanguageModel.LanguageModel
+  | (Agents[number] extends never ? never : LanguageModel.LanguageModel)
   | Approvals
   | Permissions
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
-
-export type CreateError = DuplicateAgent | PluginNameConflict | PluginToolConflict
-
+  | ToolServices<Tools[number]>
+export type CreateError = DuplicateAgent | PluginNameConflict | PluginToolConflict | ExecutableRegistrationInvalid
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,
 ): Plugin<Tools> => options
-
 const configuredAgent = <Value extends AnyAgent>(agent: Value, tools: ReadonlyArray<Tool.Any>): Value => {
   const hidden: unknown = agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; it is produced by Agent.make.
@@ -309,13 +320,13 @@ const mergedHooks = (
 const create = <
   const Agents extends ReadonlyArray<AnyAgent>,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
+  const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 >(
-  options: CreateOptions<Agents, Plugins>,
-): Effect.Effect<Host<Agents>, CreateError, CreateRequirements<Agents, Plugins>> =>
+  options: CreateOptions<Agents, Plugins, Tools>,
+): Effect.Effect<Host<Agents>, CreateError, CreateRequirements<Agents, Plugins, Tools>> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime
-    const environment = yield* Effect.context<CreateRequirements<Agents, Plugins>>()
-    yield* LanguageModel.LanguageModel
+    const environment = yield* Effect.context<CreateRequirements<Agents, Plugins, Tools>>()
     yield* Approvals
     yield* Permissions
 
@@ -345,7 +356,9 @@ const create = <
       registeredByName.set(agent.name, configured)
     }
 
+    for (const tool of options.tools ?? []) yield* runtime.registerTool(tool)
     const host: Host<Agents> = {
+      tools: makeTools(runtime),
       attachments,
       artifacts,
       sessions: {

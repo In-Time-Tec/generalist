@@ -152,6 +152,8 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
+    registerTool: () => Effect.die("not used"),
+    startTool: () => Effect.die("not used"),
     operator: {
       explain: () => Effect.die("not used"),
       verify: () => Effect.die("not used"),

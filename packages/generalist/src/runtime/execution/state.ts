@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { AgentSuspended } from "../../core/agent/event.js"
 import { ProgramOperationName, ProgramSuspended } from "../../core/program/capabilities.js"
 import { DriverCheckpoint } from "../../core/durable/driver.js"
@@ -27,8 +28,20 @@ export const ProgramExecutionResult = Schema.TaggedStruct("Program", {
 })
 export type ProgramExecutionResult = typeof ProgramExecutionResult.Type
 
+export const ToolExecutionResult = Schema.TaggedStruct("Tool", {
+  isFailure: Schema.Boolean,
+  value: Schema.Unknown,
+})
+export type ToolExecutionResult = typeof ToolExecutionResult.Type
+
+export const ToolCheckpoint = Schema.TaggedStruct("Tool", { version: Schema.Literal("1") })
+export class ToolSuspended extends ActionableTaggedError<ToolSuspended>()("generalist/runtime/ToolSuspended", {
+  token: Schema.String,
+  hint: errorHint("Resolve the retained Tool wait before resuming this Run."),
+}) {}
+
 /** Executable-neutral terminal result. */
-export const ExecutionResult = Schema.Union([AgentExecutionResult, ProgramExecutionResult])
+export const ExecutionResult = Schema.Union([AgentExecutionResult, ProgramExecutionResult, ToolExecutionResult])
 export type ExecutionResult = typeof ExecutionResult.Type
 
 /** Fresh-sandbox replay frontier for an Agent Program. */
@@ -46,7 +59,7 @@ export const ProgramCheckpoint = Schema.TaggedStruct("Program", {
 export type ProgramCheckpoint = typeof ProgramCheckpoint.Type
 
 /** Executable-neutral persisted continuation state. */
-export const ExecutionCheckpoint = Schema.Union([DriverCheckpoint, ProgramCheckpoint])
+export const ExecutionCheckpoint = Schema.Union([DriverCheckpoint, ProgramCheckpoint, ToolCheckpoint])
 export type ExecutionCheckpoint = typeof ExecutionCheckpoint.Type
 
 /** Executable-neutral persisted suspension state. */
@@ -56,10 +69,12 @@ export type ExecutionSuspension =
   | UnknownAgent
   | BudgetExhausted
   | NestedOperationSuspended
+  | ToolSuspended
 export const ExecutionSuspension: Schema.Codec<ExecutionSuspension, unknown> = Schema.Union([
   AgentSuspended,
   ProgramSuspended,
   UnknownAgent,
   BudgetExhausted,
   NestedOperationSuspended,
+  ToolSuspended,
 ])

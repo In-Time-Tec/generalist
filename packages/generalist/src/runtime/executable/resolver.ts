@@ -1,4 +1,10 @@
-import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
+import { Context, Effect, Layer, Schema, Scope } from "effect"
+import type { Tool } from "effect/unstable/ai"
+import type { Service as ToolExecutorService } from "../../core/tools/tool-executor.js"
+import type { ToolContext } from "../../core/tools/tool-context.js"
+import type { Authorizer } from "../../core/tools/tool-authorization.js"
+import type { Service as ApprovalsService } from "../../core/policy/approvals.js"
+import type { PinnedTool } from "../../core/durable/manifest/tool-manifest.js"
 import type { Program } from "../../core/program/agent-program.js"
 import { type AgentManifest, fromLiveAgent } from "../../core/durable/manifest/agent-manifest.js"
 import type { Service as CodeExecutorService } from "../../core/program/code-executor.js"
@@ -13,7 +19,8 @@ import {
 import { type PinnedProgram, make as makeProgramManifest } from "../../core/durable/manifest/program-manifest.js"
 import { validateHandlers } from "../../core/program/runner.js"
 import type { Closed } from "../../core/agent/service.js"
-import { decodePinned } from "./manifest-internal.js"
+import { decodePinned, matchesActiveRunOptions, validateStaticTool } from "./manifest-internal.js"
+export { matchesActiveRunOptions } from "./manifest-internal.js"
 import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
 import { ExecutablePinMissing, ExecutableRegistrationInvalid, ExecutableRegistrationMissing } from "../errors.js"
 import { RunId } from "../run.js"
@@ -79,30 +86,6 @@ export interface StaticRunOptions {
   }
 }
 
-const matchesRunOptions = (manifest: AgentManifest, options: StaticRunOptions | undefined): boolean => {
-  const expected = manifest.compaction
-  const actual = options?.compaction
-  return (
-    (expected === undefined && actual === undefined) ||
-    (expected !== undefined &&
-      actual !== undefined &&
-      expected.contextWindow === actual.contextWindow &&
-      expected.reserveTokens === actual.reserveTokens)
-  )
-}
-
-/** Verify resolver-owned static options against the persisted active Agent. */
-export const matchesActiveRunOptions: {
-  (manifest: ExecutableManifest, options: StaticRunOptions | undefined): (ref: ExecutableRef) => boolean
-  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean
-} = Function.dual(
-  3,
-  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean => {
-    const active = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === ref.active)
-    return active?._tag === "Agent" && matchesRunOptions(active.manifest, options)
-  },
-)
-
 /** Live Agent Program resources owned by the caller's scope. */
 export interface ProgramResolution {
   readonly _tag: "Program"
@@ -114,7 +97,19 @@ export interface ProgramResolution {
 }
 
 /** Exactly one reconstructed executable kind. */
-export type Resolution = AgentResolution | ProgramResolution
+export interface ToolResolution {
+  readonly _tag: "Tool"
+  readonly pinned: PinnedTool
+  readonly tool: Tool.Any
+  readonly input: Schema.Codec<unknown, unknown>
+  readonly output: Schema.Codec<unknown, unknown>
+  readonly failure: Schema.Codec<unknown, unknown>
+  readonly executor: ToolExecutorService<ToolContext>
+  readonly authorizer: (approvals: ApprovalsService) => Authorizer
+  readonly attestation: Attestation
+}
+
+export type Resolution = AgentResolution | ProgramResolution | ToolResolution
 
 /** Typed failures allowed while resolving one executable. */
 export type ResolveError = ExecutablePinMissing | ExecutableRegistrationInvalid | ExecutableRegistrationMissing
@@ -145,7 +140,11 @@ export interface StaticProgramExecutable {
 }
 
 /** One exact static executable used by tests and process-local hosts. */
-export type StaticExecutable = StaticAgentExecutable | StaticProgramExecutable
+export interface StaticToolExecutable extends Omit<ToolResolution, "attestation"> {
+  readonly executable: PinnedExecutable
+}
+
+export type StaticExecutable = StaticAgentExecutable | StaticProgramExecutable | StaticToolExecutable
 
 const invalidRegistration = (message: string): ExecutableRegistrationInvalid =>
   ExecutableRegistrationInvalid.make({ message })
@@ -173,7 +172,9 @@ const registerStatic = (
       if (active === undefined) {
         return yield* invalidRegistration(`Active executable is missing: ${executable.ref.active}`)
       }
-      if (entry._tag === "Program") {
+      if (entry._tag === "Tool") {
+        yield* tryRegistration(() => validateStaticTool({ entry, active }), "Live Tool is invalid")
+      } else if (entry._tag === "Program") {
         const attested = yield* tryRegistration(
           () => makeProgramManifest(entry.program.pinned.manifest),
           `Live Program is invalid: ${executable.ref.active}`,
@@ -226,7 +227,7 @@ const registerStatic = (
             `Live Agent does not match static executable reference: ${executable.ref.active}`,
           )
         }
-        if (!matchesRunOptions(active.manifest, entry.runOptions)) {
+        if (!matchesActiveRunOptions(executable.ref, executable.manifest, entry.runOptions)) {
           return yield* invalidRegistration(
             `Static compaction options do not match Agent manifest: ${executable.ref.active}`,
           )
@@ -238,6 +239,19 @@ const registerStatic = (
   })
 
 const staticResolution = (entry: StaticExecutable, attestation: Attestation): Resolution => {
+  if (entry._tag === "Tool") {
+    return {
+      _tag: "Tool",
+      pinned: entry.pinned,
+      tool: entry.tool,
+      input: entry.input,
+      output: entry.output,
+      failure: entry.failure,
+      executor: entry.executor,
+      authorizer: entry.authorizer,
+      attestation,
+    }
+  }
   if (entry._tag === "Program") {
     return {
       _tag: "Program",
@@ -434,11 +448,21 @@ const resolveProgram = (
  * Construct the canonical resolver: static Agents keyed by their exact persisted Agent pin, and
  * every admitted Agent Program reconstructed from its exact manifest and persisted registrations.
  */
+export interface ToolReconstructionRequest extends Input {
+  readonly pinned: PinnedTool
+}
+
+export type ToolReconstruction = (
+  request: ToolReconstructionRequest,
+) => Effect.Effect<Omit<ToolResolution, "_tag" | "pinned" | "attestation">, ReconstructionError, Scope.Scope>
+
 export const makeDynamic = (options: {
   readonly agents: ReadonlyArray<StaticAgentExecutable>
+  readonly tools?: ReadonlyArray<StaticToolExecutable>
+  readonly tool?: ToolReconstruction
   readonly program: ProgramReconstruction
 }): Effect.Effect<Service, ExecutableRegistrationInvalid> =>
-  registerStatic(options.agents).pipe(
+  registerStatic([...options.agents, ...(options.tools ?? [])]).pipe(
     Effect.map((entries) =>
       ExecutableResolver.of({
         resolve: (input) =>
@@ -446,6 +470,19 @@ export const makeDynamic = (options: {
             const pinned = yield* verifiedInput(input)
             const active = pinned.manifest.entries.find((candidate) => candidate.pin === pinned.ref.active)
             if (active === undefined) return yield* ExecutablePinMissing.make({ runId: input.runId, ref: input.ref })
+            if (active._tag === "Tool" && options.tool !== undefined) {
+              const registrations = yield* validateRegistrations(
+                pinned,
+                input.registrations,
+                requiredPinsForActiveExecutable(pinned),
+              )
+              const tool = { pin: active.pin, manifest: active.manifest }
+              const resources = yield* options.tool({ ...input, ...pinned, registrations, pinned: tool })
+              const reconstructed = yield* registerStatic([
+                { ...resources, _tag: "Tool", pinned: tool, executable: pinned },
+              ])
+              return yield* resolveStatic(reconstructed, input, pinned)
+            }
             return active._tag === "Program"
               ? yield* resolveProgram(options.program, input, pinned, active)
               : yield* resolveStatic(entries, input, pinned)
@@ -454,9 +491,10 @@ export const makeDynamic = (options: {
     ),
   )
 
-/** Canonical resolver Layer helper. */
 export const layerDynamic = (options: {
   readonly agents: ReadonlyArray<StaticAgentExecutable>
+  readonly tools?: ReadonlyArray<StaticToolExecutable>
+  readonly tool?: ToolReconstruction
   readonly program: ProgramReconstruction
 }): Layer.Layer<ExecutableResolver, ExecutableRegistrationInvalid> =>
   Layer.effect(ExecutableResolver, makeDynamic(options))

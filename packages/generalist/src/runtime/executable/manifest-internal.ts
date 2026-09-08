@@ -1,3 +1,6 @@
+import type { AgentManifest } from "../../core/durable/manifest/agent-manifest.js"
+import { make as makeToolManifest } from "../../core/durable/manifest/tool-manifest.js"
+import type { StaticRunOptions, StaticToolExecutable } from "./resolver.js"
 import { validateRef as validateCoreRef } from "../../core/durable/manifest/executable-manifest.js"
 import { Function, Schema } from "effect"
 import type { ExecutionCheckpoint } from "../execution/state.js"
@@ -66,3 +69,45 @@ export const resolveChild: {
     return childEntry === undefined ? undefined : { executable: ref.executable, active: childEntry.pin }
   },
 )
+
+const matchesRunOptions = (manifest: AgentManifest, options: StaticRunOptions | undefined): boolean => {
+  const expected = manifest.compaction
+  const actual = options?.compaction
+  return (
+    (expected === undefined && actual === undefined) ||
+    (expected !== undefined &&
+      actual !== undefined &&
+      expected.contextWindow === actual.contextWindow &&
+      expected.reserveTokens === actual.reserveTokens)
+  )
+}
+
+/** Verify resolver-owned static options against the persisted active Agent. */
+export const matchesActiveRunOptions: {
+  (manifest: ExecutableManifest, options: StaticRunOptions | undefined): (ref: ExecutableRef) => boolean
+  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean
+} = Function.dual(
+  3,
+  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean => {
+    const active = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === ref.active)
+    return active?._tag === "Agent" && matchesRunOptions(active.manifest, options)
+  },
+)
+
+export const validateStaticTool = ({
+  entry,
+  active,
+}: {
+  readonly entry: StaticToolExecutable
+  readonly active: ExecutableManifest["entries"][number]
+}): void => {
+  const attested = makeToolManifest(entry.pinned.manifest)
+  if (
+    active._tag !== "Tool" ||
+    entry.pinned.pin !== attested.pin ||
+    attested.pin !== active.pin ||
+    entry.tool.name !== active.manifest.name
+  ) {
+    throw new TypeError(`Live Tool does not match static executable reference: ${entry.executable.ref.active}`)
+  }
+}
