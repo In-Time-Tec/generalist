@@ -422,7 +422,7 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ##### apply
 
-> `readonly` **apply**: (`checkpoint`, `outcome`) => `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+> `readonly` **apply**: (`checkpoint`, `outcome`) => `Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ###### Parameters
 
@@ -510,13 +510,13 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ###### Returns
 
-`Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+`Effect`\<\{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 <a id="decide"></a>
 
 ##### decide
 
-> `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+> `readonly` **decide**: (`checkpoint`) => `Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ###### Parameters
 
@@ -600,7 +600,7 @@ Versioned durable agent driver shared by inline and runtime execution.
 
 ###### Returns
 
-`Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+`Effect`\<\{ `_tag`: `"Execute"`; `operation`: \{ `input`: `unknown`; `inputDigest`: `string`; `key`: `string`; `kind`: `"compaction"` \| `"tool"` \| `"hook"` \| `"send"` \| `"model"` \| `"structured-output"` \| `"wait"` \| `"memory"` \| `"handoff"`; `replayPolicy`: `"pure"` \| `"provider-idempotent"` \| `"never"`; \}; \} \| \{ `_tag`: `"Wait"`; `wait`: \{ `reason`: `string`; `replayToken?`: `string`; `waitId`: `string`; \}; \} \| \{ `_tag`: `"Continue"`; `checkpoint`: \{ `budget`: \{ `allocation`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `remaining`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; \}; `driverVersion`: `string`; `executable?`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `state`: `unknown`; `turn`: `number`; \}; \} \| \{ `_tag`: `"Complete"`; `result`: \{ `text`: `string`; `turns`: `number`; \}; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 <a id="initial"></a>
 
@@ -1590,13 +1590,13 @@ Wait the driver requests before the next decision.
 
 ### applyOperation
 
-> `const` **applyOperation**: \{(`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; \}
+> `const` **applyOperation**: \{(`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; \}
 
 Advance one Execute decision using a supplied outcome.
 
 #### Call Signature
 
-> (`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+> (`checkpoint`, `outcome`): (`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ##### Parameters
 
@@ -1628,11 +1628,11 @@ Advance one Execute decision using a supplied outcome.
 
 ##### Returns
 
-(`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+(`driver`) => `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>, `Schema.brand`\<..., ...\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 #### Call Signature
 
-> (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+> (`driver`, `checkpoint`, `outcome`): `Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ##### Parameters
 
@@ -1668,7 +1668,7 @@ Advance one Execute decision using a supplied outcome.
 
 ##### Returns
 
-`Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+`Effect`\<\{ `budget`: `Schema.Struct`\<\{ `allocation`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; `remaining`: `Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>; \}\>; `driverVersion`: `Schema.String`; `executable?`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>\>; `state`: `Schema.Unknown`; `turn`: `Schema.Finite`; \}, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ***
 
@@ -2164,11 +2164,11 @@ Version string for a durable driver implementation.
 
 ### intercept
 
-> `const` **intercept**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
+> `const` **intercept**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
 
 #### Call Signature
 
-> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`effect`) => `Effect`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 ##### Type Parameters
 
@@ -2204,11 +2204,11 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-\<`R`\>(`effect`) => `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+\<`R`\>(`effect`) => `Effect`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 #### Call Signature
 
-> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `effect`): `Effect`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ##### Type Parameters
 
@@ -2252,7 +2252,7 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-`Effect`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+`Effect`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ***
 
@@ -2260,11 +2260,11 @@ Version string for a durable driver implementation.
 
 ### interceptStream
 
-> `const` **interceptStream**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
+> `const` **interceptStream**: \{\<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>; \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>; \}
 
 #### Call Signature
 
-> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+> \<`A`, `E`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`): \<`R`\>(`stream`) => `Stream`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 ##### Type Parameters
 
@@ -2300,11 +2300,11 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-\<`R`\>(`stream`) => `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
+\<`R`\>(`stream`) => `Stream`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `SRD` \| `SRE` \| `FRD` \| `FRE` \| `R`\>
 
 #### Call Signature
 
-> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+> \<`A`, `E`, `R`, `SRD`, `SRE`, `FRD`, `FRE`\>(`spec`, `stream`): `Stream`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ##### Type Parameters
 
@@ -2348,7 +2348,7 @@ Version string for a durable driver implementation.
 
 ##### Returns
 
-`Stream`\<`A`, [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
+`Stream`\<`A`, [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror) \| [`Exhausted`](./RunBudget.md#exhausted) \| [`DriverUnknownReplay`](#driverunknownreplay) \| `E`, [`DriverInterpreter`](#driverinterpreter) \| `R` \| `SRD` \| `SRE` \| `FRD` \| `FRE`\>
 
 ***
 
@@ -2410,13 +2410,13 @@ Version string for a durable driver implementation.
 
 ### layerForRun
 
-> `const` **layerForRun**: \{\<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>; \}
+> `const` **layerForRun**: \{\<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>; \}
 
 Construct the inline driver Layer for one Agent run.
 
 #### Call Signature
 
-> \<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+> \<`Tools`, `R`, `P`, `A`\>(`options`, `prompt`, `budget?`): (`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ##### Type Parameters
 
@@ -2458,11 +2458,11 @@ Construct the inline driver Layer for one Agent run.
 
 ##### Returns
 
-(`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+(`agent`) => `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 #### Call Signature
 
-> \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+> \<`Tools`, `R`, `P`, `A`\>(`agent`, `options`, `prompt`, `budget?`): `Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ##### Type Parameters
 
@@ -2508,7 +2508,7 @@ Construct the inline driver Layer for one Agent run.
 
 ##### Returns
 
-`Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverError`](#drivererror) \| [`DriverStateInvalid`](#driverstateinvalid)\>
+`Layer`\<[`DriverInterpreter`](#driverinterpreter), [`DriverStateInvalid`](#driverstateinvalid) \| [`DriverError`](#drivererror)\>
 
 ***
 
@@ -2568,7 +2568,7 @@ Construct the inline driver Layer for one Agent run.
 
 ###### components?
 
-`ReadonlyArray`\<`Registration`\>
+`ReadonlyArray`\<[`Registration`](../../components.md#registration-1)\>
 
 ###### driver
 
@@ -2581,6 +2581,10 @@ Construct the inline driver Layer for one Agent run.
 ###### journal?
 
 [`Journal`](#journal)
+
+###### sessionState?
+
+*typeof* `SessionState.Service`
 
 #### Returns
 

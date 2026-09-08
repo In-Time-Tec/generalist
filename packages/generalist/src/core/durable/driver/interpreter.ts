@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Exit, Function, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Context, Effect, Exit, Function, Ref, Schema, Semaphore, Stream } from "effect"
 import type { DriverCheckpoint, DriverOperation, OperationOutcome } from "./contract.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
 import {
@@ -21,8 +21,15 @@ import { scheduleOperations } from "./schedule.js"
 import { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
 import type { Checkpoint as GateCheckpoint } from "../../agent/gates/definition.js"
 import { capabilityCheckpointMethods, type CapabilityCheckpointService } from "./capability-checkpoint.js"
-import { Registry, validate as validateComponents, type Registration } from "../component.js"
-import { componentCheckpointMethods, type ComponentCheckpointService } from "./component-checkpoint.js"
+import type { Registration } from "../component.js"
+import type { SessionState } from "../component/services.js"
+export { DriverInterpreter } from "./interpreter/service.js"
+import {
+  componentCheckpointMethods,
+  restoreSession,
+  validateState,
+  type ComponentCheckpointService,
+} from "./component-checkpoint.js"
 import type { StreamSuccessCodec } from "./stream-success.js"
 import { make as makeAcknowledgedJournal } from "./journal-acceptance.js"
 export type { OperationSpec } from "./operation.js"
@@ -96,9 +103,6 @@ export class DriverUnknownReplay extends ActionableTaggedError<DriverUnknownRepl
     hint: errorHint("Resolve the unknown never-replay operation from external evidence before resuming."),
   },
 ) {}
-export class DriverInterpreter extends Context.Service<DriverInterpreter, Service>()(
-  "generalist/core/durable/driver/interpreter/DriverInterpreter",
-) {}
 /** A process-local journal that records nothing; used when no host journal owns the operations. */
 export const journalNoop: Journal = {
   onScheduled: () => Effect.void,
@@ -120,16 +124,21 @@ export const make = (input: {
   readonly journal?: Journal
   readonly initial: DriverCheckpoint
   readonly components?: ReadonlyArray<Registration>
+  readonly sessionState?: typeof SessionState.Service | undefined
 }): Effect.Effect<Service> =>
   Effect.gen(function* () {
-    const checkpointRef = yield* Ref.make(input.initial)
+    const checkpointRef = yield* Ref.make(
+      restoreSession({ checkpoint: input.initial, sessionState: input.sessionState }),
+    )
     const recordedRef = yield* Ref.make<ReadonlyArray<RecordedOperation>>([])
     const commitSemaphore = yield* Semaphore.make(1)
     const journal = yield* makeAcknowledgedJournal(input.journal ?? journalNoop)
     const validateComponentState = Ref.get(checkpointRef).pipe(
       Effect.flatMap((checkpoint) => Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state)),
       Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid component checkpoint" })),
-      Effect.flatMap((state) => validateComponents(state.components ?? [], input.components ?? [])),
+      Effect.flatMap((state) =>
+        validateState({ state, registrations: input.components ?? [], sessionState: input.sessionState }),
+      ),
     )
     const schedule = scheduleOperations({ checkpointRef, driver: input.driver, journal, semaphore: commitSemaphore })
     const codecFailure = (spec: { readonly key: string }, branch: "success" | "failure", error: Schema.SchemaError) =>
@@ -370,6 +379,7 @@ export const make = (input: {
         ),
       ...capabilityCheckpointMethods({ checkpointRef, commitSemaphore, onCheckpoint: journal.onCheckpoint }),
       ...componentCheckpointMethods({
+        sessionState: input.sessionState,
         checkpointRef,
         commitSemaphore,
         registrations: input.components ?? [],
@@ -479,20 +489,5 @@ export const make = (input: {
     }
     return interpreter
   })
-export const layerInline = (input: {
-  readonly driver: DurableAgentDriver
-  readonly journal?: Journal
-  readonly initial: DriverCheckpoint
-}): Layer.Layer<DriverInterpreter> =>
-  Layer.effect(
-    DriverInterpreter,
-    Effect.gen(function* () {
-      const hostJournal = yield* Effect.serviceOption(DriverJournal)
-      const components = yield* Effect.serviceOption(Registry)
-      const journal = input.journal ?? Option.getOrElse(hostJournal, () => journalNoop)
-      return yield* make({ ...input, journal, components: Option.getOrElse(components, () => []) })
-    }),
-  )
-export const layerTest = layerInline
 export const operationKey = (logicalOperationId: string, ...parts: ReadonlyArray<string | number>): string =>
   [logicalOperationId, ...parts.map(String)].join(":")

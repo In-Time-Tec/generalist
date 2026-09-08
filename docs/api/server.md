@@ -784,7 +784,7 @@ The originating WebSocket attempt epoch, including attempts whose snapshot load 
 
 ##### type
 
-> `readonly` **type**: `"artifact"` \| `"session"` \| `"run"` \| `"attachment"`
+> `readonly` **type**: `"run"` \| `"session"` \| `"artifact"` \| `"attachment"`
 
 ***
 
