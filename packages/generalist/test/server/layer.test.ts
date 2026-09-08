@@ -6,7 +6,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter, HttpServer 
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Generalist } from "generalist/host"
-import { ExecutableResolver } from "generalist/runtime"
+import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
@@ -32,6 +32,45 @@ const services = Layer.mergeAll(
 )
 
 layer(services, { excludeTestServices: true })("Local server transports", (it) => {
+  it.effect("pins Host ceilings on serialized queued and direct admissions", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "server-policy" })
+      const limits = { tree: { maxDepth: 2, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
+      const host = yield* Generalist.create({ agents: [agent], limits })
+      const server = yield* Layer.build(
+        HttpRouter.serve(
+          Server.layer({
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("local-token")),
+              principal: { id: "controller", tenantId: "local", role: "controller" },
+            }),
+            authorization: { tenantId: "local", authorize: () => Effect.succeed(true) },
+          }),
+          { disableLogger: true },
+        ).pipe(Layer.provideMerge(BunHttpServer.layer({ hostname: "127.0.0.1", port: 0 }))),
+      )
+      const baseUrl = HttpServer.formatAddress(Context.get(server, HttpServer.HttpServer).address)
+      const http = (yield* HttpClient.HttpClient).pipe(
+        HttpClient.mapRequest(HttpClientRequest.bearerToken("local-token")),
+      )
+      const client = yield* Server.client({ baseUrl }).pipe(Effect.provideService(HttpClient.HttpClient, http))
+      const session = yield* client.sessions.create({ id: "server-policy-queue", agent: agent.name })
+      yield* client.sessions.submit({ sessionId: session.id, input: "bounded queued input", commandId: "queued" })
+      const queued = yield* client.sessions.get({ sessionId: session.id })
+      const direct = yield* client.runs.start({
+        sessionId: session.id,
+        agent: agent.name,
+        input: "bounded direct input",
+      })
+      const store = yield* RunStore.RunStore
+      for (const runId of [queued.activeRunId!, direct.id])
+        expect(yield* store.loadExecution(runId)).toMatchObject({
+          treePolicy: { ...limits.tree, concurrency: limits.concurrency },
+        })
+    }),
+  )
+
   it.effect("loads an existing Session before connecting and observes an admission racing the snapshot response", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "local-snapshot" })

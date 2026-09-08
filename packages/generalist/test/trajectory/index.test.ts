@@ -79,7 +79,7 @@ const snapshot: RunSnapshot = {
     executableRef: executable.ref,
     executableManifest: executable.manifest,
     depth: 0,
-    treePolicy: { maxDepth: 8, maxSubagents: 32 },
+    treePolicy: { maxDepth: 8, maxSessions: 1024, concurrency: { agents: 32, tools: 1024 } },
     waits: [],
     lastSequence: 2,
     durability: "durable",

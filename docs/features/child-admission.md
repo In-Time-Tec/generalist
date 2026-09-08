@@ -2,6 +2,42 @@
 
 Child admission durably creates a direct child Run and immediately returns its handle, never its outcome. The admission identity combines parent, tool call, optional origin, and key so retries recover the same child. `AgentTool.fanOut` uses the existing grouped admission and settlement journal rather than introducing another child representation.
 
+## Named profiles
+
+Declare permitted children on the Agent instead of installing a blocking tool to grant delegation. `Generalist.create` resolves names against its Agent registry before registration. Unknown or duplicate profile names fail with `ExecutableRegistrationInvalid`. The declaration is copied at construction, so mutating the caller's array cannot change a compiled profile.
+
+This composition fragment defines profiles and limits; it does not call a model or provision storage. Creating the Host requires the Runtime, model, permissions, and approval Layers described in [Runtime](./runtime.md).
+
+```ts
+import { Effect } from "effect"
+import { Agent } from "generalist"
+import { Generalist } from "generalist/host"
+
+const researcher = Agent.make({ name: "researcher", children: ["researcher"] })
+
+const hosted = Effect.gen(function* () {
+  return yield* Generalist.create({
+    agents: [researcher],
+    limits: {
+      tree: { maxDepth: 3, maxSessions: 32 },
+      concurrency: { agents: 4, tools: 8 },
+    },
+  })
+})
+```
+
+Profile references are pinned in the executable manifest. Self-reference and mutual recursion use names, not JavaScript object cycles; each admission still checks the parent's declared selections and pinned depth bound. Registering a profile does not let every other Agent delegate to it. Direct and grouped profile resolution rejects child tool names absent from the parent. Program child admission also requires the requested executable entries and profile bindings to remain within the parent's pinned closure.
+
+## Family bounds
+
+The root-pinned policy contains `maxDepth`, `maxSessions`, and separate `concurrency.agents` and `concurrency.tools` fields. Root depth is zero. Direct, grouped, and Program child admission reserve distinct retained Session IDs within the canonical Session family. The existing RuntimeSession records fixed parent/root Session identities, depth, policy, and spending grant; retained Run and child-Session references support family traversal. Settling or cancelling a child does not refund its retained Session reservation, and a queued root continuation does not start a new family. Retrying an accepted admission does not reserve another Session, and a rejected group leaves no partial children.
+
+Agent readiness is shared across the family rather than counted separately for each parent. Execution claims check live Agent ownership. A suspended parent releases its live slot, allowing a descendant to run when Agent concurrency is one. Tool-Run classification and Tool-capacity enforcement require the Tool-Run admission contract; the presence of `concurrency.tools` alone does not enforce Tool execution capacity.
+
+Explicit Host limits install one canonical namespace policy before any Run is admitted. Fresh Hosts may reinstall the same policy, but cannot replace it. Raw Runtime/store admissions and serialized server start/queue routes enforce that policy; Session selections and queue edits may narrow it, never widen it. Omitting limits inherits the admitted ceiling rather than substituting a larger default.
+
+Child spending allocations are capped by the parent's remaining grant, the selected profile's budget, and any retained Session grant. A root request that exceeds its admitted Session or profile budget is rejected. Submitting a new root directly into a child Session is also rejected: continuing that child requires a fresh parent-owned admission, so a continuation cannot reuse an allocation whose unused allowance was already returned to its ancestor.
+
 ## Usage
 
 ```ts
@@ -83,5 +119,6 @@ Exact retries are idempotent; changed immutable placement, root, executable, or 
 ## Related
 
 - Source: `packages/generalist/src/runtime/child/admission.ts`, `packages/generalist/src/runtime/child/external/placement.ts`, `packages/generalist/src/runtime/child/external/store.ts`
+- Tests: `packages/generalist/test/runtime/executable/registered-agent.test.ts`, `packages/generalist/test/runtime/child/admission.test.ts`, `packages/generalist/test/host/index.test.ts`
 - Site: `/docs/guides/tools/durable-composite-tools`
 - Decisions/tradeoffs: [Admission returns at admission](../decisions/child-admission-returns-at-admission.md)

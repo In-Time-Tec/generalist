@@ -495,7 +495,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
           sessionId: "object:fan-out",
           idempotencyKey: "parent",
           prompt: "parent",
-          treePolicy: { maxDepth: 1, maxSubagents: 1 },
+          treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
         })
         const input: Runtime.FanOutInput = {
           parentRunId: parent.runId,

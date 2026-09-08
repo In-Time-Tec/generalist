@@ -99,6 +99,30 @@ const backend = "object" as const
         })
       }),
     )
+    test.effect("compiles named children and pins detached Host limits on both start routes", () =>
+      Effect.gen(function* () {
+        const root = Agent.make({ name: "host-profile-root", children: ["host-profile-child"] })
+        const child = Agent.make({ name: "host-profile-child", children: ["host-profile-child"] })
+        const limits = { tree: { maxDepth: 3, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
+        const host = yield* Generalist.create({ agents: [root, child], limits })
+        limits.concurrency.agents = 100
+        const store = yield* RunStore.RunStore
+        const typedSession = yield* host.sessions.create({ id: "host-profile-typed" })
+        const namedSession = yield* host.sessions.create({ id: "host-profile-named" })
+        const typed = yield* host.runs.start(typedSession.id, root, "root")
+        const named = yield* host.runs.startByName(namedSession.id, child.name, "child")
+        for (const run of [typed, named]) {
+          const record = yield* store.loadExecution(run.id)
+          expect(record.treePolicy).toEqual({ maxDepth: 3, maxSessions: 8, concurrency: { agents: 2, tools: 4 } })
+          expect(record.executableManifest.profiles.map((profile) => profile.selection)).toEqual([child.name])
+        }
+        yield* completeRun(typed.id, "host-profile-typed-complete")
+        yield* completeRun(named.id, "host-profile-named-complete")
+        expect(yield* typed.await).toBe(`${backend} complete`)
+        expect(yield* named.await).toBe(`${backend} complete`)
+      }),
+    )
+
     test.effect("keeps direct root activation behind the active conversational Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "host-active-conversation" })

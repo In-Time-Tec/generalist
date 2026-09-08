@@ -73,7 +73,6 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/providers/deterministic", runtimes: nodeAndBun, exports: ["layer"] },
       { specifier: "generalist/providers/model-catalog", runtimes: nodeAndBun, exports: ["layer"] },
       { specifier: "generalist/unstable/providers/model-route", runtimes: nodeAndBun, exports: ["make"] },
-      { specifier: "generalist/unstable/rlm", runtimes: nodeAndBun, exports: ["layer", "rlmOffload"] },
       { specifier: "generalist/unstable/providers/openai-account-auth", runtimes: nodeAndBun },
       { specifier: "generalist/unstable/providers/openai-account-auth-http", runtimes: nodeAndBun },
       {
@@ -308,6 +307,7 @@ export const workerSafePackageExports = [
 
 export const wildcardExportExamples = [] as const
 export const forbiddenPackageExports = [
+  "generalist/unstable/rlm",
   "generalist/durability/auxiliary",
   "generalist/pg",
   "generalist/mysql",
@@ -393,7 +393,6 @@ export const exactPackageExports = [
   "./unstable/providers/openai-account-auth-http",
   "./unstable/rivet",
   "./unstable/rl-export",
-  "./unstable/rlm",
   "./unstable/runtime/external-child-placement",
   "./unstable/runtime/external-child-reconciliation",
   "./unstable/runtime/external-child-store",

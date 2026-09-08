@@ -10,6 +10,16 @@ interface EnqueueLaneResult {
   readonly isHead: boolean
 }
 
+export const retainHostedLane: {
+  (sessionId: string): (state: RuntimeState) => RuntimeState
+  (state: RuntimeState, sessionId: string): RuntimeState
+} = Function.dual(2, (state: RuntimeState, sessionId: string): RuntimeState => {
+  if (state.hostSessions.has(sessionId)) return state
+  const lanes = new Map(state.lanes)
+  lanes.delete(laneKey(sessionId))
+  return { ...state, lanes }
+})
+
 export const enqueueLane: {
   (sessionId: string, runId: string): (state: RuntimeState) => EnqueueLaneResult
   (state: RuntimeState, sessionId: string, runId: string): EnqueueLaneResult

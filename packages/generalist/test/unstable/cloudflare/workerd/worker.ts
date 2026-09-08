@@ -227,7 +227,7 @@ export class RuntimeObject {
             executableRef: cancellationExecutable.ref,
             executableManifest: cancellationExecutable.manifest,
             registrations: [],
-            treePolicy: { maxDepth: 4, maxSubagents: 4 },
+            treePolicy: { maxDepth: 4, maxSessions: 1024, concurrency: { agents: 4, tools: 1024 } },
             initialChildren: [],
             initialFanOuts: [],
           })
@@ -252,7 +252,7 @@ export class RuntimeObject {
             executableRef: cancellationExecutable.ref,
             executableManifest: cancellationExecutable.manifest,
             registrations: [],
-            treePolicy: { maxDepth: 4, maxSubagents: 4 },
+            treePolicy: { maxDepth: 4, maxSessions: 1024, concurrency: { agents: 4, tools: 1024 } },
             initialChildren: [],
             initialFanOuts: [],
           })
@@ -343,7 +343,7 @@ export class RuntimeObject {
             executableRef: cancellationExecutable.ref,
             executableManifest: cancellationExecutable.manifest,
             registrations: [],
-            treePolicy: { maxDepth: 4, maxSubagents: 4 },
+            treePolicy: { maxDepth: 4, maxSessions: 1024, concurrency: { agents: 4, tools: 1024 } },
             initialChildren: [],
             initialFanOuts: [],
           })

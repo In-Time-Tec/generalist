@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** remove `generalist/unstable/rlm`, including `layer` and `rlmOffload`, with no compatibility alias. Use the existing durable Runtime for delegation and background work. Agent and Program execution, Sandbox, compaction, budgets, and nested operations remain available. (#457)
+
 ## 0.64.0
 
 - **Breaking:** replace every production Runtime storage backend with the shared object-storage engine. Use `generalist/durability` with `generalist/durability/s3` or `generalist/durability/r2` and explicit environment, tenant, and partition identities. Remove SQL drivers, schemas, peers, production Runtime memory storage, and the optional pgvector integration; there are no compatibility exports or automatic legacy data conversion.

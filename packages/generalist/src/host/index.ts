@@ -2,12 +2,7 @@
 import { Clock, Effect, Filter, Option, Ref, Result, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
-import {
-  Hooks,
-  make as makeHooks,
-  type Declaration as HookDeclaration,
-  type Service as HooksService,
-} from "../hooks/index.js"
+import { Hooks, type Declaration as HookDeclaration } from "../hooks/index.js"
 import {
   withTools,
   type Agent,
@@ -16,7 +11,6 @@ import {
   type Input as AgentInput,
   type Output as AgentOutput,
 } from "../core/agent/service.js"
-import { generateId } from "../core/model/telemetry/events.js"
 import { Approvals } from "../core/policy/approvals.js"
 import { Permissions } from "../core/policy/permissions.js"
 import { ToolContext } from "../core/tools/tool-context.js"
@@ -54,15 +48,22 @@ import {
 } from "../runtime/service.js"
 import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
 import { resolveApproval } from "./approval.js"
-import { make as preparePlugins, type Plugin } from "./plugins.js"
+import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
-import { make as makeSessionHandle, type SessionHandle, type SessionCreateOptions } from "./session.js"
 import { childSessionId } from "../runtime/child/session.js"
+import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
+import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
+import {
+  make as makeSessionHandle,
+  create as createSessionHandle,
+  type SessionHandle,
+  type SessionCreateOptions,
+} from "./session.js"
 export type {
   SessionHandle,
   SessionCreateOptions,
@@ -106,6 +107,7 @@ export interface CreateOptions<
 > {
   readonly agents: Agents
   readonly plugins?: Plugins
+  readonly limits?: HostLimits
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
@@ -248,7 +250,14 @@ export type CreateRequirements<
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
 
-export type CreateError = DuplicateAgent | PluginNameConflict | PluginToolConflict
+export type CreateError =
+  | DuplicateAgent
+  | PluginNameConflict
+  | PluginToolConflict
+  | import("../runtime/errors.js").ExecutableRegistrationInvalid
+  | import("../runtime/errors.js").TreePolicyInvalid
+  | RuntimeUnavailable
+  | import("../durability/errors.js").DurabilityFailure
 
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,
@@ -315,15 +324,6 @@ const mergedSkills = (
   return Option.isSome(current) ? mergeSkillCatalogs(current.value, additions) : additions
 }
 
-const mergedHooks = (
-  current: Option.Option<HooksService>,
-  contributed: ReadonlyArray<HookDeclaration>,
-): HooksService | undefined => {
-  const existing = Option.getOrUndefined(current)
-  if (contributed.length === 0) return existing
-  return makeHooks({ declarations: [...(existing?.declarations ?? []), ...contributed] })
-}
-
 const create = <
   const Agents extends ReadonlyArray<AnyAgent>,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
@@ -350,9 +350,15 @@ const create = <
 
     const registered = new Map<AnyAgent, AnyAgent>()
     const registeredByName = new Map<string, AnyAgent>()
-    for (const agent of options.agents) {
-      const configured = configuredAgent(agent, contributions.tools)
-      let registration = registerAgent(runtime, configured)
+    const configuredAgents = options.agents.map((agent) => configuredAgent(agent, contributions.tools))
+    yield* validateProfiles(configuredAgents)
+    const treePolicy =
+      options.limits === undefined
+        ? undefined
+        : yield* runtime.configureDelegationPolicy(yield* fromHostLimits(options.limits))
+    for (const [index, agent] of options.agents.entries()) {
+      const configured = configuredAgents[index]!
+      let registration = registerAgent(runtime, configured).pipe(Effect.provideService(AgentProfiles, configuredAgents))
       if (instructions !== undefined) {
         registration = registration.pipe(Effect.provideService(Instructions, instructions))
       }
@@ -388,19 +394,7 @@ const create = <
       attachments,
       artifacts,
       sessions: {
-        create: (sessionOptions = {}) =>
-          Effect.gen(function* () {
-            const request: Types.Mutable<import("../runtime/session/host.js").CreateSessionInput> = {
-              id: sessionOptions.id ?? `session_${yield* generateId}`,
-            }
-            if (sessionOptions.title !== undefined) request.title = sessionOptions.title
-            if (sessionOptions.agent !== undefined) {
-              if (!registeredByName.has(sessionOptions.agent))
-                return yield* AgentNotRegistered.make({ name: sessionOptions.agent })
-              request.selection = yield* runtime.sessionSelection(sessionOptions.agent)
-            }
-            return sessionHandle(yield* runtime.createSession(request))
-          }),
+        create: createSessionHandle({ runtime, registeredByName }),
         get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
         snapshot: runtime.sessionSnapshot,
         list: () => runtime.listSessions,
@@ -419,6 +413,7 @@ const create = <
               })
             }
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
+            if (treePolicy !== undefined) runtimeOptions.treePolicy = treePolicy
             if (startOptions?.idempotencyKey !== undefined) {
               runtimeOptions.idempotencyKey = startOptions.idempotencyKey
             }
@@ -447,6 +442,7 @@ const create = <
             )
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
             if (startOptions?.idempotencyKey !== undefined) runtimeOptions.idempotencyKey = startOptions.idempotencyKey
+            if (treePolicy !== undefined) runtimeOptions.treePolicy = treePolicy
             return hostRun(yield* startAgent(runtime, configured, decoded, runtimeOptions))
           }),
         list: runtime.sessionRuns,

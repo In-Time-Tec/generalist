@@ -3,6 +3,7 @@ import { Effect, Result } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { make as makeAgent } from "../../../core/agent/service.js"
 import { durableIdentity } from "../../../runtime/executable/registered-agent.js"
+import { defaultTreePolicy } from "../../../runtime/tree/policy.js"
 import type { HostSessionsCapability, Options, Services } from "../contract.js"
 
 type Provide<E> = <A, Error>(use: (services: Services) => Effect.Effect<A, Error>) => Effect.Effect<A, Error | E>
@@ -18,6 +19,7 @@ export const registerSessionQueue = <E, ClaimsError>({
 }): void => {
   const { executable, registrations } = durableIdentity(makeAgent({ name: "session-queue" }))
   const selection = { executableRef: executable.ref, executableManifest: executable.manifest, registrations }
+  const admittedSelection = { ...selection, treePolicy: defaultTreePolicy, budget: {} }
 
   it.effect("promotes Session inputs FIFO with immutable receipts and retained selection", () =>
     provide((services) =>
@@ -29,7 +31,7 @@ export const registerSessionQueue = <E, ClaimsError>({
         const receipt = yield* store.submitSessionInput(first)
         const initial = yield* store.hostSession(sessionId)
         expect(initial.queue).toEqual([])
-        expect(initial.selection).toEqual(selection)
+        expect(initial.selection).toEqual(admittedSelection)
         expect(initial.activeRunId).toBeDefined()
         expect(yield* store.submitSessionInput(first)).toEqual(receipt)
         expect(
@@ -42,8 +44,8 @@ export const registerSessionQueue = <E, ClaimsError>({
         expect(
           (yield* store.hostSession(sessionId)).queue.map(({ id, selection: selected }) => ({ id, selected })),
         ).toEqual([
-          { id: second.commandId, selected: selection },
-          { id: third.commandId, selected: selection },
+          { id: second.commandId, selected: admittedSelection },
+          { id: third.commandId, selected: admittedSelection },
         ])
         const runIds = [initial.activeRunId!]
         for (const pending of [second, third]) {

@@ -83,6 +83,7 @@ export const rewoundSession = ({
     counter: session.counter,
     writerEpoch: session.writerEpoch + 1n,
   }
+  if (session.family !== undefined) copy.family = session.family
   return Effect.succeed(copy)
 }
 

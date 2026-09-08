@@ -33,7 +33,14 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
   const activate = options.activate ?? (() => Effect.void)
   let sequence = 0
 
-  const parent = (label: string, treePolicy?: { readonly maxDepth: number; readonly maxSubagents: number }) =>
+  const parent = (
+    label: string,
+    treePolicy?: {
+      readonly maxDepth: number
+      readonly maxSessions: number
+      readonly concurrency: { readonly agents: number; readonly tools: number }
+    },
+  ) =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -433,7 +440,11 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
     it.live("queues an exact group beyond active capacity and resumes once after automatic promotion", () =>
       provide(
         Effect.gen(function* () {
-          const context = yield* parent("active-capacity", { maxDepth: 1, maxSubagents: 2 })
+          const context = yield* parent("active-capacity", {
+            maxDepth: 1,
+            maxSessions: 1024,
+            concurrency: { agents: 2, tools: 1024 },
+          })
           const claim = yield* context.store.claimExecution({
             commandId: "runtime-child-suites-run-group-ts-claim-12",
             runId: context.runId,
@@ -742,7 +753,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
             sessionId: id,
             idempotencyKey: id,
             prompt: textPrompt("parent"),
-            treePolicy: { maxDepth: 0, maxSubagents: 3 },
+            treePolicy: { maxDepth: 0, maxSessions: 1024, concurrency: { agents: 3, tools: 1024 } },
           })
           const outcome = yield* ChildRuns.make(store).runGroup({
             parentRunId: parentRun.runId,

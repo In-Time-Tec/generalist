@@ -1188,13 +1188,25 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -1404,13 +1416,25 @@ Stable identity for idempotent registration across Runtime restarts.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 
@@ -1703,6 +1727,40 @@ Read ordered durable child settlements for one exact parent Run.
 
 `Effect`\<readonly `object`[], [`ChildSettlementError`](#childsettlementerror)\>
 
+<a id="configuredelegationpolicy"></a>
+
+##### configureDelegationPolicy
+
+> `readonly` **configureDelegationPolicy**: (`policy`) => `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+###### Parameters
+
+###### policy
+
+###### concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### concurrency.agents
+
+`number`
+
+###### concurrency.tools
+
+`number`
+
+###### maxDepth
+
+`number`
+
+###### maxSessions
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
 <a id="createsession"></a>
 
 ##### createSession
@@ -1976,7 +2034,7 @@ Journal one scalar reward assigned by an export policy.
 
 ##### register
 
-> `readonly` **register**: \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputCodec`, `OutputCodec`\>(`agent`) => `Effect`\<`void`, [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
+> `readonly` **register**: \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputCodec`, `OutputCodec`\>(`agent`) => `Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
 Register one Agent name and its exact environment for start and recovery.
 
@@ -2014,7 +2072,7 @@ Register one Agent name and its exact environment for start and recovery.
 
 ###### Returns
 
-`Effect`\<`void`, [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
+`Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
 <a id="registeragentname"></a>
 
@@ -2341,7 +2399,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### sessionSelection
 
-> `readonly` **sessionSelection**: (`name`) => `Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
+> `readonly` **sessionSelection**: (`name`) => `Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
 
 ###### Parameters
 
@@ -2351,7 +2409,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
+`Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
 
 <a id="sessionsnapshot"></a>
 
@@ -2513,7 +2571,7 @@ Begin one already-normalized pinned execution.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -2561,13 +2619,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 
@@ -2667,7 +2737,7 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -2715,13 +2785,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 
@@ -3053,13 +3135,25 @@ Exact root execution admission used below the typed Agent API.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 

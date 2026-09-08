@@ -28,6 +28,19 @@ import {
 } from "../execution/fixtures.js"
 import { closedTestAgent } from "../run/identity.js"
 import { provideScoped } from "../execution/scoped-provide.js"
+import { capGrant } from "../../../src/runtime/budget/state.js"
+
+it("caps child grants by both the available allocation and pinned profile budget", () => {
+  const available = { tokens: 100, usd: 2, children: 3 }
+  expect(capGrant(available, { tokens: 40, usd: 4, toolCalls: 2 })).toEqual({
+    tokens: 40,
+    usd: 2,
+    children: 3,
+    toolCalls: 2,
+  })
+  expect(available).toEqual({ tokens: 100, usd: 2, children: 3 })
+  expect(capGrant({}, { tokens: 0 })).toEqual({ tokens: 0 })
+})
 
 const usage = Response.Usage.make({
   inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -314,7 +327,7 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
         sessionId: "budget-child",
         idempotencyKey: "budget-child",
         prompt: "delegate",
-        treePolicy: { maxDepth: 1, maxSubagents: 1 },
+        treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
       })
       yield* runtime.extendBudget({ commandId: "budget:children:zero", runId: receipt.runId, delta: { children: 0 } })
       yield* executor.execute(
