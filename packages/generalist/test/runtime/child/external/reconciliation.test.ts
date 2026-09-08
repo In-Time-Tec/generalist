@@ -162,8 +162,10 @@ const makeFixture = Effect.gen(function* () {
             registrations,
           },
         }
+        expect(claim.session).toBeDefined()
         const input: ReserveInput = {
           ...claim,
+          session: claim.session!,
           placementId: id,
           invocationId: id,
           request,

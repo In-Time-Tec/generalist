@@ -106,17 +106,17 @@ export const sessionBinding = (input: {
         SessionDirectory,
         SessionDirectory.of({
           acquire: (sessionId) =>
-            sessionId !== input.claim.session.sessionId
+            sessionId !== input.claim.session?.sessionId
               ? Effect.fail(
                   SessionStoreError.make({
-                    message: `Hosted Run Session ${input.claim.session.sessionId} cannot acquire Session ${sessionId}`,
+                    message: `Hosted Run Session ${input.claim.session?.sessionId} cannot acquire Session ${sessionId}`,
                   }),
                 )
               : Option.match(session, {
                   onNone: () =>
                     Effect.fail(
                       SessionStoreError.make({
-                        message: `Runtime store does not provide Session ${input.claim.session.sessionId}`,
+                        message: `Runtime store does not provide Session ${input.claim.session?.sessionId}`,
                       }),
                     ),
                   onSome: Effect.succeed,

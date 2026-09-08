@@ -56,6 +56,14 @@ Exact opaque identity of a model implementation and configuration.
 
 Exact identity of one closed Agent Program manifest.
 
+***
+
+<a id="toolpin"></a>
+
+### ToolPin
+
+> **ToolPin** = *typeof* `ToolPin.Type`
+
 ## Variables
 
 <a id="agentpin-1"></a>
@@ -184,6 +192,28 @@ Construct the exact identity of one closed Agent Program manifest.
 
 ***
 
+<a id="maketool"></a>
+
+### makeTool
+
+> `const` **makeTool**: (`input`, `options?`) => `string` & `Brand`
+
+#### Parameters
+
+##### input
+
+`unknown`
+
+##### options?
+
+`ParseOptions`
+
+#### Returns
+
+`string` & `Brand`
+
+***
+
 <a id="modelpin-1"></a>
 
 ### ModelPin
@@ -201,3 +231,11 @@ Exact opaque identity of a model implementation and configuration.
 > `const` **ProgramPin**: `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>
 
 Exact identity of one closed Agent Program manifest.
+
+***
+
+<a id="toolpin-1"></a>
+
+### ToolPin
+
+> `const` **ToolPin**: `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>

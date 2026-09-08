@@ -23,6 +23,7 @@ import { make as makeOperations } from "../operation/nested-operations.js"
 import { JournalFault } from "../operation/journal-fault.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
+import { executeTool } from "./tool/execute.js"
 import { make as makeAgentExecutionFailure } from "./agent/failure.js"
 import { make as makeExecutionRetry } from "./recovery/retry.js"
 import { ExecutionResolution } from "./resolution/resolve.js"
@@ -141,6 +142,10 @@ const makeFor = (
               (error) => registered.suspendUnknown(claim, error),
             )
             if (resolved === undefined) return
+            if (resolved._tag === "Tool") {
+              yield* executeTool({ claim, claimed, store, resolution: resolved, activeOperationIds })
+              return
+            }
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
               return

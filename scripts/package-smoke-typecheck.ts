@@ -24,6 +24,7 @@ import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
 import { Server } from "generalist/server"
+import { Generalist, ToolIdentity, type HostToolRun } from "generalist/host"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -46,6 +47,23 @@ type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? 
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
+const independentTool = Tool.make("package-checks", {
+  parameters: Schema.Struct({ count: Schema.FiniteFromString }),
+  success: Schema.FiniteFromString,
+  failure: Schema.Struct({ reason: Schema.String }),
+}).annotate(ToolIdentity, { implementation: "checks-v1", policy: "checks-policy-v1" })
+const toolHost = Generalist.create({ agents: [], tools: [independentTool] })
+type ToolHostNeedsNoModel = Assert<Equal<Extract<EffectServices<typeof toolHost>, LanguageModel.LanguageModel>, never>>
+const toolAdmission = Effect.gen(function* () {
+  const host = yield* toolHost
+  return yield* host.tools.start(independentTool, { count: 1 }, { commandId: "package-checks" })
+})
+type TypedToolHandle = Assert<Equal<Effect.Success<typeof toolAdmission>, HostToolRun<number, { readonly reason: string }>>>
+const toolLookup = toolHost.pipe(Effect.flatMap((host) => host.tools.get(independentTool, "retained-tool")))
+type TypedToolLookup = Assert<Equal<Effect.Success<typeof toolLookup>, Effect.Success<typeof toolAdmission>>>
+type ToolControlsExcludeAgent = Assert<Equal<Extract<keyof Effect.Success<typeof toolAdmission>, "send" | "fork" | "rewind">, never>>
+type ToolAwaitOutput = Assert<Equal<Effect.Success<Effect.Success<typeof toolAdmission>["await"]>, number>>
+type ToolAwaitFailure = Assert<Equal<Extract<Effect.Error<Effect.Success<typeof toolAdmission>["await"]>, { readonly _tag: "ToolRunFailure" }>, { readonly _tag: "ToolRunFailure"; readonly failure: { readonly reason: string } }>>
 declare const actorHost: DurableObjects.Host
 const hostedCommand = actorHost.run(Effect.gen(function* () {
   yield* Scope.Scope

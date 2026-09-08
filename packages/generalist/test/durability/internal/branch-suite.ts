@@ -196,7 +196,7 @@ export const register = ({
         }
         yield* recovered.activate({ runId: run.runId, commandId: "activate-rewound-c" })
         const ownerC = yield* recovered.claimExecution({ runId: run.runId, ownerId: "c", commandId: "claim-c" })
-        expect(BigInt(ownerC.session.epoch)).toBeGreaterThan(BigInt(ownerB.session.epoch))
+        expect(BigInt(ownerC.session!.epoch)).toBeGreaterThan(BigInt(ownerB.session!.epoch))
         expect(ownerC.attemptFence).toBeGreaterThan(ownerB.attemptFence)
         const replay = yield* recovered.startOperation({
           ...ownerC,

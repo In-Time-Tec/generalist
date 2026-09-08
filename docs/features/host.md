@@ -46,9 +46,49 @@ Effect.runPromise(
 )
 ```
 
-`Generalist.create({ agents, plugins? })` requires Runtime, `LanguageModel`, Approvals, Permissions, every configured Agent service, and plugin tool handlers. It registers the configured Agents with Runtime and returns no global singleton.
+`Generalist.create({ agents, tools?, plugins? })` requires Runtime, Approvals, Permissions, every configured Agent service, and tool handlers. Hosts with Agents also require `LanguageModel`; a Tool-only Host does not. It registers the configured executables with Runtime and returns no global singleton.
 
-This fragment admits work and returns a receipt, not the Agent's answer. The declared model and Runtime Layers determine credentials and execution; no scripted or live provider is configured here. Keep the activated host scope alive while work executes.
+The Agent fragment above admits work and returns a receipt, not the Agent's answer. The declared model and Runtime Layers determine credentials and execution; no scripted or live provider is configured there. Keep the activated host scope alive while work executes.
+
+## Independent Tool Runs
+
+Use a Tool Run when work must keep its own execution claim after the Run that requested it settles. Register ordinary Effect AI Tool declarations in `tools`, provide their Toolkit handlers when creating the Host, and start them without creating a conversational Session.
+
+This Effect generator fragment assumes an activated durable Runtime and a host scheduler. The `checks` handler is scripted arithmetic: it invokes no model or external service and needs no credentials.
+
+```ts
+import { Effect, Schema } from "effect"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { Generalist, ToolIdentity } from "generalist/host"
+
+const checks = Tool.make("checks", {
+  parameters: Schema.Struct({ count: Schema.FiniteFromString }),
+  success: Schema.FiniteFromString,
+}).annotate(ToolIdentity, { implementation: "checks-v1", policy: "checks-policy-v1" })
+const handlers = Toolkit.make(checks).toLayer({
+  checks: ({ count }) => Effect.succeed(count + 1),
+})
+
+const program = Effect.gen(function* () {
+  const host = yield* Generalist.create({ agents: [], tools: [checks] })
+  const run = yield* host.tools.start(checks, { count: 4 }, { commandId: "checks-1" })
+  const inspection = yield* run.inspect
+  const result = yield* run.await
+  return { inspection, result }
+}).pipe(Effect.provide(handlers))
+```
+
+`ToolIdentity` is required for independent Tool registration. Change `implementation` when handler or executor behavior changes, and change `policy` when permission rules, approval services, or a function-valued approval predicate changes. Boolean `needsApproval` settings also enter the pinned identity automatically. These are deployment identities, not secrets or serialized closures; a new deployment must retain the code and policy for unfinished old pins.
+
+`start` returns after canonical admission, before the handler settles. `result` is the decoded number `5`; the retained input and result use the Tool's encoded schemas. Repeating an identical `commandId` returns the same Run and result without redispatch. Reusing it with different input fails with a canonical `input-conflict`. Keep the command identity after ambiguous admission outcomes.
+
+The handle exposes `id`, `inspect`, replay-then-live `events`, `await`, and `cancel(commandId, reason?)`. It has no Agent `send`, fork, or rewind controls. A declared Tool failure is decoded through its failure schema and returned by `await` as `{ _tag: "ToolRunFailure", failure }`. Approval decisions and unknown-effect resolution use the existing Host approval and operator methods.
+
+Retrieve a Tool Run after reopening the Host with `host.tools.get(tool, runId)`. The registered Tool pin must match the retained executable; lookup performs no admission or dispatch. Agent/Program lookup through `host.runs.get` rejects Tool IDs with `RunKindUnsupported`, as do steering, fork, and rewind. Those controls reject at canonical admission without retaining unusable input. Untyped Program lookup returns the retained Program value.
+
+An optional `parentRunId` sponsors the Tool in the parent's canonical family and inherits its admitted limits. Parent settlement does not release or cancel the Tool's claim. Tool claims use the family's `concurrency.tools` capacity, not Agent concurrency, recursion depth, or `maxSessions`. Running and unresolved tool operations retain capacity until their outcome is known. Sponsorship lives on Run records: a Tool's routing identity creates no Runtime Session row, Session family membership, or Session writer claim, and does not occupy the sponsor's conversational lane.
+
+On a fresh host, register matching Tool declarations, codecs, handlers, and policy again before resuming work. Executable pins identify these deployment dependencies; the journal does not serialize their closures or credentials. If an interrupted external effect has no accepted outcome and cannot safely retry, recovery requires explicit resolution rather than calling the handler again.
 
 ## Surface
 
@@ -172,12 +212,12 @@ Plugins load and log sequentially in caller order. Existing ambient instructions
 - `HostRun.send(message, options?)` and `host.runs.send(runId, prompt, options?)` delegate to Runtime's unified durable inbox admission.
 - `sessions.fork` and `runs.rewind` delegate to Runtime's atomic branch transitions. Future server routes can join at these Host methods without owning replay behavior.
 - The object engine persists Session metadata, selection, pending inputs, active Run identity, root membership, conversation entries, and Session event cursors in the canonical namespace. Snapshots project that committed state; host process memory is not recovery authority.
-- A Session identity is created explicitly before Host starts a Run in it. Omitted Session IDs use Generalist's Effect-based ID generator.
+- A Session identity is created explicitly before Host starts an Agent Run in it. Tool Runs do not require a public Session. Omitted Session IDs use Generalist's Effect-based ID generator.
 - Loading a plugin performs no module-level side effects.
 - Host imports only stable Generalist sources and is safe to import in Worker consumers.
 
 ## Related
 
 - Source: `packages/generalist/src/host/index.ts`, `packages/generalist/src/host/attachments.ts`, `packages/generalist/src/runtime/session/host.ts`
-- Test: [`host/index.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/host/index.test.ts)
+- Tests: [`host/index.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/host/index.test.ts), [`host/tools.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/host/tools.test.ts)
 - Sibling feature docs: [`media.md`](./media.md), [`server.md`](./server.md), [`runtime.md`](./runtime.md), [`durable-stores.md`](./durable-stores.md), [`testing.md`](./testing.md)

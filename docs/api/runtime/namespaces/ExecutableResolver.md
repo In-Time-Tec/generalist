@@ -102,7 +102,7 @@ Exact persisted authority for one reconstructed Program Agent handler.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -212,7 +212,7 @@ Resolver-owned proof of the reconstructed executable identity.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -260,7 +260,7 @@ Exact persisted authority for one reconstructed Program capability pin.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -352,7 +352,7 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -406,6 +406,10 @@ Exact persisted authority for one reconstructed Program boundary codec.
 
 Exact persisted identity supplied to executable reconstruction.
 
+#### Extended by
+
+- [`ToolReconstructionRequest`](#toolreconstructionrequest)
+
 #### Properties
 
 <a id="manifest-4"></a>
@@ -422,7 +426,7 @@ Exact persisted identity supplied to executable reconstruction.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -498,7 +502,7 @@ Exact persisted authority for one reconstructed Program tool or step handler.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -752,7 +756,7 @@ Exact persisted authority for the Run-scoped services of one reconstructed Progr
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -874,6 +878,259 @@ Resolver-owned static options attested by the persisted Agent manifest.
 
 > `readonly` **reserveTokens**: `number`
 
+***
+
+<a id="statictoolexecutable"></a>
+
+### StaticToolExecutable
+
+One exact static executable used by tests and process-local hosts.
+
+#### Extends
+
+- `Omit`\<[`ToolResolution`](#toolresolution), `"attestation"`\>
+
+#### Properties
+
+<a id="_tag-4"></a>
+
+##### \_tag
+
+> `readonly` **\_tag**: `"Tool"`
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`_tag`](#_tag-5)
+
+<a id="authorizer"></a>
+
+##### authorizer
+
+> `readonly` **authorizer**: (`approvals`) => [`Authorizer`](../../generalist/namespaces/ToolAuthorization.md#authorizer)
+
+###### Parameters
+
+###### approvals
+
+[`Service`](../../approvals.md#service)
+
+###### Returns
+
+[`Authorizer`](../../generalist/namespaces/ToolAuthorization.md#authorizer)
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`authorizer`](#authorizer-1)
+
+<a id="executable-2"></a>
+
+##### executable
+
+> `readonly` **executable**: [`PinnedExecutable`](../../generalist/namespaces/ExecutableManifest.md#pinnedexecutable)
+
+<a id="executor-3"></a>
+
+##### executor
+
+> `readonly` **executor**: [`Service`](../../generalist/namespaces/ToolExecutor.md#service)\<[`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`executor`](#executor-4)
+
+<a id="failure"></a>
+
+##### failure
+
+> `readonly` **failure**: `Codec`\<`unknown`, `unknown`\>
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`failure`](#failure-1)
+
+<a id="input-1"></a>
+
+##### input
+
+> `readonly` **input**: `Codec`\<`unknown`, `unknown`\>
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`input`](#input-2)
+
+<a id="output"></a>
+
+##### output
+
+> `readonly` **output**: `Codec`\<`unknown`, `unknown`\>
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`output`](#output-1)
+
+<a id="pinned"></a>
+
+##### pinned
+
+> `readonly` **pinned**: [`PinnedTool`](../../generalist/namespaces/ToolManifest.md#pinnedtool)
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`pinned`](#pinned-2)
+
+<a id="tool-1"></a>
+
+##### tool
+
+> `readonly` **tool**: `Any`
+
+###### Inherited from
+
+[`ToolResolution`](#toolresolution).[`tool`](#tool-2)
+
+***
+
+<a id="toolreconstructionrequest"></a>
+
+### ToolReconstructionRequest
+
+Construct the canonical resolver: static Agents keyed by their exact persisted Agent pin, and
+every admitted Agent Program reconstructed from its exact manifest and persisted registrations.
+
+#### Extends
+
+- [`Input`](#input)
+
+#### Properties
+
+<a id="manifest-7"></a>
+
+##### manifest
+
+> `readonly` **manifest**: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### Inherited from
+
+[`Input`](#input).[`manifest`](#manifest-4)
+
+<a id="pinned-1"></a>
+
+##### pinned
+
+> `readonly` **pinned**: [`PinnedTool`](../../generalist/namespaces/ToolManifest.md#pinnedtool)
+
+<a id="ref-7"></a>
+
+##### ref
+
+> `readonly` **ref**: `object`
+
+###### active
+
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
+
+###### executable
+
+> `readonly` **executable**: `string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### Inherited from
+
+[`Input`](#input).[`ref`](#ref-4)
+
+<a id="registrations-2"></a>
+
+##### registrations
+
+> `readonly` **registrations**: readonly `object`[]
+
+###### Inherited from
+
+[`Input`](#input).[`registrations`](#registrations)
+
+<a id="runid-6"></a>
+
+##### runId
+
+> `readonly` **runId**: `string`
+
+###### Inherited from
+
+[`Input`](#input).[`runId`](#runid-3)
+
+***
+
+<a id="toolresolution"></a>
+
+### ToolResolution
+
+Exactly one reconstructed executable kind.
+
+#### Properties
+
+<a id="_tag-5"></a>
+
+##### \_tag
+
+> `readonly` **\_tag**: `"Tool"`
+
+<a id="attestation-3"></a>
+
+##### attestation
+
+> `readonly` **attestation**: [`Attestation`](#attestation-1)
+
+<a id="authorizer-1"></a>
+
+##### authorizer
+
+> `readonly` **authorizer**: (`approvals`) => [`Authorizer`](../../generalist/namespaces/ToolAuthorization.md#authorizer)
+
+###### Parameters
+
+###### approvals
+
+[`Service`](../../approvals.md#service)
+
+###### Returns
+
+[`Authorizer`](../../generalist/namespaces/ToolAuthorization.md#authorizer)
+
+<a id="executor-4"></a>
+
+##### executor
+
+> `readonly` **executor**: [`Service`](../../generalist/namespaces/ToolExecutor.md#service)\<[`ToolContext`](../../generalist/namespaces/ToolContext.md#toolcontext)\>
+
+<a id="failure-1"></a>
+
+##### failure
+
+> `readonly` **failure**: `Codec`\<`unknown`, `unknown`\>
+
+<a id="input-2"></a>
+
+##### input
+
+> `readonly` **input**: `Codec`\<`unknown`, `unknown`\>
+
+<a id="output-1"></a>
+
+##### output
+
+> `readonly` **output**: `Codec`\<`unknown`, `unknown`\>
+
+<a id="pinned-2"></a>
+
+##### pinned
+
+> `readonly` **pinned**: [`PinnedTool`](../../generalist/namespaces/ToolManifest.md#pinnedtool)
+
+<a id="tool-2"></a>
+
+##### tool
+
+> `readonly` **tool**: `Any`
+
 ## Type Aliases
 
 <a id="reconstructionerror"></a>
@@ -890,9 +1147,7 @@ Typed failures allowed while reconstructing an admitted executable.
 
 ### Resolution
 
-> **Resolution** = [`AgentResolution`](#agentresolution) \| [`ProgramResolution`](#programresolution)
-
-Exactly one reconstructed executable kind.
+> **Resolution** = [`AgentResolution`](#agentresolution) \| [`ProgramResolution`](#programresolution) \| [`ToolResolution`](#toolresolution)
 
 ***
 
@@ -910,13 +1165,29 @@ Typed failures allowed while resolving one executable.
 
 ### StaticExecutable
 
-> **StaticExecutable** = [`StaticAgentExecutable`](#staticagentexecutable) \| [`StaticProgramExecutable`](#staticprogramexecutable)
+> **StaticExecutable** = [`StaticAgentExecutable`](#staticagentexecutable) \| [`StaticProgramExecutable`](#staticprogramexecutable) \| [`StaticToolExecutable`](#statictoolexecutable)
 
-One exact static executable used by tests and process-local hosts.
+***
+
+<a id="toolreconstruction"></a>
+
+### ToolReconstruction
+
+> **ToolReconstruction** = (`request`) => `Effect.Effect`\<`Omit`\<[`ToolResolution`](#toolresolution), `"_tag"` \| `"pinned"` \| `"attestation"`\>, [`ReconstructionError`](#reconstructionerror), `Scope.Scope`\>
+
+#### Parameters
+
+##### request
+
+[`ToolReconstructionRequest`](#toolreconstructionrequest)
+
+#### Returns
+
+`Effect.Effect`\<`Omit`\<[`ToolResolution`](#toolresolution), `"_tag"` \| `"pinned"` \| `"attestation"`\>, [`ReconstructionError`](#reconstructionerror), `Scope.Scope`\>
 
 ## Variables
 
-<a id="attestation-3"></a>
+<a id="attestation-4"></a>
 
 ### Attestation
 
@@ -924,7 +1195,7 @@ One exact static executable used by tests and process-local hosts.
 
 ***
 
-<a id="input-1"></a>
+<a id="input-3"></a>
 
 ### Input
 
@@ -938,8 +1209,6 @@ One exact static executable used by tests and process-local hosts.
 
 > `const` **layerDynamic**: (`options`) => `Layer.Layer`\<[`ExecutableResolver`](#executableresolver), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
-Canonical resolver Layer helper.
-
 #### Parameters
 
 ##### options
@@ -951,6 +1220,14 @@ Canonical resolver Layer helper.
 ###### program
 
 [`ProgramReconstruction`](#programreconstruction)
+
+###### tool?
+
+[`ToolReconstruction`](#toolreconstruction)
+
+###### tools?
+
+`ReadonlyArray`\<[`StaticToolExecutable`](#statictoolexecutable)\>
 
 #### Returns
 
@@ -984,9 +1261,6 @@ Exact static resolver Layer helper.
 
 > `const` **makeDynamic**: (`options`) => `Effect.Effect`\<[`Service`](#service), [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid)\>
 
-Construct the canonical resolver: static Agents keyed by their exact persisted Agent pin, and
-every admitted Agent Program reconstructed from its exact manifest and persisted registrations.
-
 #### Parameters
 
 ##### options
@@ -998,6 +1272,14 @@ every admitted Agent Program reconstructed from its exact manifest and persisted
 ###### program
 
 [`ProgramReconstruction`](#programreconstruction)
+
+###### tool?
+
+[`ToolReconstruction`](#toolreconstruction)
+
+###### tools?
+
+`ReadonlyArray`\<[`StaticToolExecutable`](#statictoolexecutable)\>
 
 #### Returns
 
@@ -1061,7 +1343,7 @@ Verify resolver-owned static options against the persisted active Agent.
 
 ###### active
 
-`Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>
+`Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>
 
 ###### executable
 

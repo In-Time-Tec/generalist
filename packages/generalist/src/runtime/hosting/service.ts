@@ -32,7 +32,7 @@ import { normalizeInitialChild, normalizeInitialFanOut } from "../state/start.js
 import { ActiveExecutions } from "../execution/active-executions.js"
 import { make as makeSteeringAdmission, type SteeringReceipt } from "../run/steering.js"
 import { parseCursor } from "../tree/cursor.js"
-import { decodePinned, equals, resolveChild } from "../executable/manifest-internal.js"
+import { decodePinned, equals, resolveChild, requireAgentOrProgram } from "../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../executable/manifest.js"
 import { ExecutableResolver, type Input as ResolverInput } from "../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../executable/registration.js"
@@ -52,6 +52,7 @@ import { explain as explainRecovery, verify as verifyRecovery } from "../executi
 import { resolveWith as resolveDurableApproval } from "../operation/approval.js"
 import { awaitSessionTerminal } from "../session/lifecycle.js"
 import { make as makeAgentStart, untypedHandle } from "./agent-start.js"
+import { make as makeToolStart } from "./tool-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
 import { messageDraft } from "./message.js"
 import { Invalid as BudgetInvalid, make as makeBudget } from "../../core/durable/run-budget.js"
@@ -432,7 +433,15 @@ const makeRuntimeWith = (
       return sendRun(input, prompt ?? "", sendOptions)
     }
 
+    const toolStart = makeToolStart({
+      agents,
+      store,
+      admitStart,
+      cancel: (input) => service.cancel(input),
+      inspect: (runId) => service.inspect(runId),
+    })
     const service: RuntimeService = {
+      ...toolStart,
       operator,
       register: agentStart.register,
       schedule: agentStart.schedule,
@@ -452,6 +461,7 @@ const makeRuntimeWith = (
       getRun: (runId) =>
         Effect.gen(function* () {
           const run = yield* store.inspect(runId)
+          yield* requireAgentOrProgram({ ...run, operation: "getRun" })
           return untypedHandle({ store, runId: run.runId, send: sendRun })
         }),
       spawn: (input: SpawnInput) =>
@@ -680,6 +690,9 @@ const makeRuntimeWith = (
         }),
       rewind: (runId, input) =>
         Effect.gen(function* () {
+          yield* store
+            .inspect(runId)
+            .pipe(Effect.flatMap((run) => requireAgentOrProgram({ ...run, operation: "rewind" })))
           yield* active.interrupt(runId)
           const branchRunId = `run_${digest(["rewind", runId, input.commandId])}`
           yield* store.rewind({ runId, branchRunId, ...input })

@@ -1,6 +1,11 @@
 import { Clock, Effect, Layer, Option, Schema } from "effect"
 import { ToolContext } from "../../core/tools/tool-context.js"
-import { CancellationFailure, type CancellationRequest, ToolExecutor } from "../../core/tools/tool-executor.js"
+import {
+  CancellationFailure,
+  type CancellationRequest,
+  type Service as ToolExecutorService,
+  ToolExecutor,
+} from "../../core/tools/tool-executor.js"
 import { decodeCancellableOperation, supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { AgentExecutionFailure, type UnknownAgent } from "../errors.js"
 import { selectToolExecutor } from "../execution/context.js"
@@ -44,20 +49,8 @@ export const make = (options: {
               (error) => options.suspendUnknown(claim, error),
             )
             if (resolution === undefined) return
-            if (resolution._tag !== "Agent") {
-              return yield* Effect.die(new Error(`Program Run ${claim.runId} has cancellable tool operations`))
-            }
-            yield* resolution.agent.open((_agent, environment) =>
+            const cancel = (executor: ToolExecutorService) =>
               Effect.gen(function* () {
-                const services = yield* Layer.build(environment)
-                const selected = selectToolExecutor(services, ambient)
-                if (Option.isNone(selected)) {
-                  return yield* CancellationFailure.make({
-                    tool: "unknown",
-                    message: `Run ${claim.runId} has no ToolExecutor for durable cancellation`,
-                  })
-                }
-                const executor = selected.value
                 for (const operation of operations) {
                   const envelope = Schema.decodeUnknownOption(CancellationEnvelope)(operation.input)
                   const execution = Option.isSome(envelope)
@@ -133,8 +126,29 @@ export const make = (options: {
                     outcome,
                   })
                 }
-              }),
-            )
+              })
+            if (resolution._tag === "Tool") {
+              yield* cancel(resolution.executor)
+            } else if (resolution._tag === "Agent") {
+              yield* resolution.agent.open((_agent, environment) =>
+                Effect.gen(function* () {
+                  const services = yield* Layer.build(environment)
+                  const selected = selectToolExecutor(services, ambient)
+                  if (Option.isNone(selected)) {
+                    return yield* CancellationFailure.make({
+                      tool: "unknown",
+                      message: `Run ${claim.runId} has no ToolExecutor for durable cancellation`,
+                    })
+                  }
+                  yield* cancel(selected.value)
+                }),
+              )
+            } else {
+              return yield* CancellationFailure.make({
+                tool: "unknown",
+                message: `Program Run ${claim.runId} has cancellable tool operations`,
+              })
+            }
           }
           yield* options.store.fail({
             ...claim,

@@ -1,11 +1,24 @@
+import type { AgentManifest, ProgramAuthority } from "../../core/durable/manifest/agent-manifest.js"
+import { make as makeToolManifest } from "../../core/durable/manifest/tool-manifest.js"
+import type { StaticRunOptions, StaticToolExecutable } from "./resolver.js"
 import { validateRef as validateCoreRef } from "../../core/durable/manifest/executable-manifest.js"
-import { Function, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
+import { RunKindUnsupported } from "../errors.js"
 import type { ExecutionCheckpoint } from "../execution/state.js"
 import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
-import type { ProgramAuthority } from "../../core/durable/manifest/agent-manifest.js"
 import type { ProgramManifest } from "../../core/durable/manifest/program-manifest.js"
 
 type PinnedExecutableEncoded = typeof PinnedExecutable.Encoded
+
+export const requireAgentOrProgram = (input: {
+  readonly runId: string
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
+  readonly operation: string
+}) =>
+  input.executableManifest.entries.some((entry) => entry.pin === input.executableRef.active && entry._tag === "Tool")
+    ? RunKindUnsupported.make({ runId: input.runId, operation: input.operation, kind: "Tool" })
+    : Effect.void
 
 export const validateRef: {
   (manifest: ExecutableManifest): (ref: ExecutableRef) => void
@@ -77,6 +90,47 @@ export const resolveChild: {
   },
 )
 
+const matchesRunOptions = (manifest: AgentManifest, options: StaticRunOptions | undefined): boolean => {
+  const expected = manifest.compaction
+  const actual = options?.compaction
+  return (
+    (expected === undefined && actual === undefined) ||
+    (expected !== undefined &&
+      actual !== undefined &&
+      expected.contextWindow === actual.contextWindow &&
+      expected.reserveTokens === actual.reserveTokens)
+  )
+}
+
+/** Verify resolver-owned static options against the persisted active Agent. */
+export const matchesActiveRunOptions: {
+  (manifest: ExecutableManifest, options: StaticRunOptions | undefined): (ref: ExecutableRef) => boolean
+  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean
+} = Function.dual(
+  3,
+  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean => {
+    const active = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === ref.active)
+    return active?._tag === "Agent" && matchesRunOptions(active.manifest, options)
+  },
+)
+
+export const validateStaticTool = ({
+  entry,
+  active,
+}: {
+  readonly entry: StaticToolExecutable
+  readonly active: ExecutableManifest["entries"][number]
+}): void => {
+  const attested = makeToolManifest(entry.pinned.manifest)
+  if (
+    active._tag !== "Tool" ||
+    entry.pinned.pin !== attested.pin ||
+    attested.pin !== active.pin ||
+    entry.tool.name !== active.manifest.name
+  ) {
+    throw new TypeError(`Live Tool does not match static executable reference: ${entry.executable.ref.active}`)
+  }
+}
 const containsProgram = (authority: ProgramAuthority | undefined, program: ProgramManifest): boolean => {
   if (authority === undefined) return false
   if (program.sandbox !== authority.sandbox || program.input !== authority.input || program.output !== authority.output)
@@ -115,7 +169,7 @@ export const containsChild: {
 } = Function.dual(2, (parent: PinnedExecutable, child: PinnedExecutable): boolean => {
   const active = parent.manifest.entries.find((entry) => entry.pin === parent.ref.active)
   const target = child.manifest.entries.find((entry) => entry.pin === child.ref.active)
-  if (active === undefined || target === undefined) return false
+  if (active === undefined || target === undefined || active._tag === "Tool" || target._tag === "Tool") return false
   const selections = active._tag === "Agent" ? active.manifest.children : active.manifest.capabilities.agents
   const granted =
     target._tag === "Program"

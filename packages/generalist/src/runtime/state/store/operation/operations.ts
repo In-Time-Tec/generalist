@@ -1,4 +1,4 @@
-import type { PreparedObservation } from "../../observation.js"
+import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
 import { Effect, Function, Option, Schema } from "effect"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../../errors.js"
 import type { OperationCompletionOutcome, RecordOperationInput } from "../../../run/store.js"
@@ -26,6 +26,7 @@ import {
   verifyInterruptedSessionEntry,
 } from "../../session-store.js"
 import { handoffSessionEntry, isCommit, sameHandoffCheckpoint, sameCommit } from "../../../session/handoff.js"
+import { requireToolCapacity } from "../child/capacity.js"
 
 const getRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -232,6 +233,7 @@ export const startOperation: {
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     if (current.status !== "requested") return [current, state] as const
+    if (current.kind === "tool") yield* requireToolCapacity({ state, run, now: yield* occurredAtMillis })
     const record: OperationRecord = { ...current, status: "running" }
     const operations = new Map(state.operations)
     operations.set(operationMapKey(input.runId, input.operationId), record)

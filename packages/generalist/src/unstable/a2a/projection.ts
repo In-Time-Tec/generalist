@@ -1,5 +1,4 @@
 import { Role, TaskState, type Artifact, type Message, type Part, type Task, type TaskStatus } from "@a2a-js/sdk"
-import { ProgramExecutionResult } from "../../runtime/execution/state.js"
 import type { RunInspection } from "../../runtime/run.js"
 import type { RunCompleted, RunEvent } from "../../runtime/run/event.js"
 import { collect as collectHistory } from "../../runtime/run/history/index.js"
@@ -80,7 +79,7 @@ const statusFrom = (run: RunInspection, events: ReadonlyArray<RunEvent>, context
 
 const artifactFrom = (event: RunCompleted): Artifact => {
   let parts: Array<Part>
-  if (Schema.is(ProgramExecutionResult)(event.result)) {
+  if ("_tag" in event.result) {
     parts = [dataPart(Schema.decodeUnknownSync(Schema.Json)(event.result.value))]
   } else {
     const output = event.result.output ?? event.result.text

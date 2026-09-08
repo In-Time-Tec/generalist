@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { runAddress } from "../execution/agent/directory.js"
-import { ProgramExecutionResult } from "../execution/state.js"
+import type { ProgramExecutionResult } from "../execution/state.js"
 import { promptBytes, type MailboxEntry } from "../messaging/mailbox.js"
 import type { Metadata } from "../messaging/message.js"
 import type { RunEvent } from "../run/event.js"
@@ -82,9 +82,7 @@ export const payloadFromEvent = (input: {
   let text: string
   if (input.event._tag === "RunCompleted") {
     status = "succeeded"
-    text = Schema.is(ProgramExecutionResult)(input.event.result)
-      ? stringify(input.event.result.value)
-      : input.event.result.text
+    text = "_tag" in input.event.result ? stringify(input.event.result.value) : input.event.result.text
   } else if (input.event._tag === "RunFailed") {
     status = "failed"
     text = `${input.event.error._tag}: ${input.event.error.message}`

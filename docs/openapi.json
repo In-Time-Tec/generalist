@@ -46,7 +46,8 @@
                             "active": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             }
                           },
@@ -60,7 +61,8 @@
                             "root": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             },
                             "profiles": {
@@ -579,6 +581,45 @@
                                     },
                                     "required": ["_tag", "pin", "manifest"],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": { "type": "string", "enum": ["Tool"] },
+                                      "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      "manifest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "version": { "type": "string", "enum": ["1"] },
+                                          "name": { "type": "string", "minLength": 1 },
+                                          "tool": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "input": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "output": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "failure": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                          "policy": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          }
+                                        },
+                                        "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["_tag", "pin", "manifest"],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -655,7 +696,8 @@
                                   "active": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   }
                                 },
@@ -669,7 +711,8 @@
                                   "root": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   },
                                   "profiles": {
@@ -1262,6 +1305,56 @@
                                           },
                                           "required": ["_tag", "pin", "manifest"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Tool"] },
+                                            "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string", "minLength": 1 },
+                                                "tool": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "output": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "failure": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "replay": {
+                                                  "type": "string",
+                                                  "enum": ["never", "provider-idempotent"]
+                                                },
+                                                "policy": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "tool",
+                                                "input",
+                                                "output",
+                                                "failure",
+                                                "replay"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -1336,13 +1429,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -1489,7 +1583,8 @@
                               "active": {
                                 "anyOf": [
                                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                 ]
                               }
                             },
@@ -1503,7 +1598,8 @@
                               "root": {
                                 "anyOf": [
                                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                 ]
                               },
                               "profiles": {
@@ -2042,6 +2138,53 @@
                                       },
                                       "required": ["_tag", "pin", "manifest"],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Tool"] },
+                                        "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        "manifest": {
+                                          "type": "object",
+                                          "properties": {
+                                            "version": { "type": "string", "enum": ["1"] },
+                                            "name": { "type": "string", "minLength": 1 },
+                                            "tool": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "input": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "output": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "failure": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                            "policy": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            }
+                                          },
+                                          "required": [
+                                            "version",
+                                            "name",
+                                            "tool",
+                                            "input",
+                                            "output",
+                                            "failure",
+                                            "replay"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["_tag", "pin", "manifest"],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
@@ -2123,7 +2266,8 @@
                                     "active": {
                                       "anyOf": [
                                         { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                       ]
                                     }
                                   },
@@ -2137,7 +2281,8 @@
                                     "root": {
                                       "anyOf": [
                                         { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                        { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                        { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                       ]
                                     },
                                     "profiles": {
@@ -2730,6 +2875,59 @@
                                             },
                                             "required": ["_tag", "pin", "manifest"],
                                             "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": { "type": "string", "enum": ["Tool"] },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "manifest": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "version": { "type": "string", "enum": ["1"] },
+                                                  "name": { "type": "string", "minLength": 1 },
+                                                  "tool": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "input": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "output": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "failure": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  },
+                                                  "replay": {
+                                                    "type": "string",
+                                                    "enum": ["never", "provider-idempotent"]
+                                                  },
+                                                  "policy": {
+                                                    "type": "string",
+                                                    "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "version",
+                                                  "name",
+                                                  "tool",
+                                                  "input",
+                                                  "output",
+                                                  "failure",
+                                                  "replay"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": ["_tag", "pin", "manifest"],
+                                            "additionalProperties": false
                                           }
                                         ]
                                       }
@@ -2805,13 +3003,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -2942,7 +3141,8 @@
                             "active": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             }
                           },
@@ -2956,7 +3156,8 @@
                             "root": {
                               "anyOf": [
                                 { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                               ]
                             },
                             "profiles": {
@@ -3475,6 +3676,45 @@
                                     },
                                     "required": ["_tag", "pin", "manifest"],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "_tag": { "type": "string", "enum": ["Tool"] },
+                                      "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      "manifest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "version": { "type": "string", "enum": ["1"] },
+                                          "name": { "type": "string", "minLength": 1 },
+                                          "tool": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "input": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "output": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "failure": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                          "policy": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          }
+                                        },
+                                        "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": ["_tag", "pin", "manifest"],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -3551,7 +3791,8 @@
                                   "active": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   }
                                 },
@@ -3565,7 +3806,8 @@
                                   "root": {
                                     "anyOf": [
                                       { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                      { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                     ]
                                   },
                                   "profiles": {
@@ -4158,6 +4400,56 @@
                                           },
                                           "required": ["_tag", "pin", "manifest"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "_tag": { "type": "string", "enum": ["Tool"] },
+                                            "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "version": { "type": "string", "enum": ["1"] },
+                                                "name": { "type": "string", "minLength": 1 },
+                                                "tool": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "output": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "failure": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "replay": {
+                                                  "type": "string",
+                                                  "enum": ["never", "provider-idempotent"]
+                                                },
+                                                "policy": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": [
+                                                "version",
+                                                "name",
+                                                "tool",
+                                                "input",
+                                                "output",
+                                                "failure",
+                                                "replay"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["_tag", "pin", "manifest"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -4232,13 +4524,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -4383,7 +4676,8 @@
                                 "active": {
                                   "anyOf": [
                                     { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                   ]
                                 }
                               },
@@ -4397,7 +4691,8 @@
                                 "root": {
                                   "anyOf": [
                                     { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                    { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                   ]
                                 },
                                 "profiles": {
@@ -4955,6 +5250,53 @@
                                         },
                                         "required": ["_tag", "pin", "manifest"],
                                         "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Tool"] },
+                                          "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                          "manifest": {
+                                            "type": "object",
+                                            "properties": {
+                                              "version": { "type": "string", "enum": ["1"] },
+                                              "name": { "type": "string", "minLength": 1 },
+                                              "tool": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "input": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "output": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "failure": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              },
+                                              "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                              "policy": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              }
+                                            },
+                                            "required": [
+                                              "version",
+                                              "name",
+                                              "tool",
+                                              "input",
+                                              "output",
+                                              "failure",
+                                              "replay"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["_tag", "pin", "manifest"],
+                                        "additionalProperties": false
                                       }
                                     ]
                                   }
@@ -5036,7 +5378,8 @@
                                       "active": {
                                         "anyOf": [
                                           { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                          { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                         ]
                                       }
                                     },
@@ -5050,7 +5393,8 @@
                                       "root": {
                                         "anyOf": [
                                           { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                                          { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                          { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                                         ]
                                       },
                                       "profiles": {
@@ -5658,6 +6002,59 @@
                                               },
                                               "required": ["_tag", "pin", "manifest"],
                                               "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "_tag": { "type": "string", "enum": ["Tool"] },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "manifest": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "version": { "type": "string", "enum": ["1"] },
+                                                    "name": { "type": "string", "minLength": 1 },
+                                                    "tool": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "input": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "output": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "failure": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    },
+                                                    "replay": {
+                                                      "type": "string",
+                                                      "enum": ["never", "provider-idempotent"]
+                                                    },
+                                                    "policy": {
+                                                      "type": "string",
+                                                      "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "version",
+                                                    "name",
+                                                    "tool",
+                                                    "input",
+                                                    "output",
+                                                    "failure",
+                                                    "replay"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["_tag", "pin", "manifest"],
+                                              "additionalProperties": false
                                             }
                                           ]
                                         }
@@ -5810,13 +6207,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -5956,13 +6354,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6135,13 +6534,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6294,13 +6694,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6450,13 +6851,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6597,6 +6999,7 @@
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -6680,6 +7083,7 @@
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -6763,6 +7167,7 @@
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -6814,13 +7219,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6972,7 +7378,8 @@
                           "active": {
                             "anyOf": [
                               { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                              { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                             ]
                           }
                         },
@@ -6986,7 +7393,8 @@
                           "root": {
                             "anyOf": [
                               { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                              { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                              { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                             ]
                           },
                           "profiles": {
@@ -7470,6 +7878,45 @@
                                   },
                                   "required": ["_tag", "pin", "manifest"],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "_tag": { "type": "string", "enum": ["Tool"] },
+                                    "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                    "manifest": {
+                                      "type": "object",
+                                      "properties": {
+                                        "version": { "type": "string", "enum": ["1"] },
+                                        "name": { "type": "string", "minLength": 1 },
+                                        "tool": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "input": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "output": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "failure": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        },
+                                        "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                        "policy": {
+                                          "type": "string",
+                                          "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                        }
+                                      },
+                                      "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["_tag", "pin", "manifest"],
+                                  "additionalProperties": false
                                 }
                               ]
                             }
@@ -7701,13 +8148,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -7846,7 +8294,8 @@
                         "active": {
                           "anyOf": [
                             { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                           ]
                         }
                       },
@@ -7860,7 +8309,8 @@
                         "root": {
                           "anyOf": [
                             { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                           ]
                         },
                         "profiles": {
@@ -8335,6 +8785,45 @@
                                       "capabilities",
                                       "budget"
                                     ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Tool"] },
+                                  "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["1"] },
+                                      "name": { "type": "string", "minLength": 1 },
+                                      "tool": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "input": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "output": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "failure": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                      "policy": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      }
+                                    },
+                                    "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
                                     "additionalProperties": false
                                   }
                                 },
@@ -9706,6 +10195,16 @@
                                         },
                                         "required": ["_tag", "value"],
                                         "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Tool"] },
+                                          "isFailure": { "type": "boolean" },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "isFailure", "value"],
+                                        "additionalProperties": false
                                       }
                                     ]
                                   },
@@ -9861,7 +10360,8 @@
                           "required": ["_tag", "budget"],
                           "additionalProperties": false
                         },
-                        { "$ref": "#/components/schemas/generalist_core_NestedOperationSuspendedEncoded" }
+                        { "$ref": "#/components/schemas/generalist_core_NestedOperationSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_runtime_ToolSuspendedEncoded" }
                       ]
                     }
                   },
@@ -9891,13 +10391,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -9997,13 +10498,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -10369,6 +10871,18 @@
                                 {
                                   "type": "object",
                                   "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/RunKindUnsupported"] },
+                                    "runId": { "type": "string" },
+                                    "operation": { "type": "string" },
+                                    "kind": { "type": "string", "enum": ["Agent", "Program", "Tool"] },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "runId", "operation", "kind", "hint"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/host/SessionConflict"] },
                                     "sessionId": { "type": "string" },
                                     "hint": { "type": "string" }
@@ -10472,6 +10986,7 @@
                       { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                       { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -10486,13 +11001,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -10595,13 +11111,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -10866,13 +11383,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11012,13 +11530,14 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GeneralistMediaRef" } } }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11137,13 +11656,14 @@
             "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11387,13 +11907,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11493,13 +12014,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11612,13 +12134,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11731,13 +12254,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11870,13 +12394,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -12326,6 +12851,18 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "message", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RunKindUnsupportedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RunKindUnsupported"] },
+          "runId": { "type": "string" },
+          "operation": { "type": "string" },
+          "kind": { "type": "string", "enum": ["Agent", "Program", "Tool"] },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "operation", "kind", "hint"],
         "additionalProperties": false
       },
       "generalist_host_SessionPageInvalidEncoded": {
@@ -13213,7 +13750,8 @@
               "active": {
                 "anyOf": [
                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                 ]
               }
             },
@@ -13237,7 +13775,8 @@
               "active": {
                 "anyOf": [
                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                 ]
               }
             },
@@ -13251,7 +13790,8 @@
               "active": {
                 "anyOf": [
                   { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
-                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" }
+                  { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                  { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
                 ]
               }
             },
@@ -13635,6 +14175,16 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "token", "operationKey", "ordinal", "capability", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_ToolSuspendedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/ToolSuspended"] },
+          "token": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "token", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactAlreadyOpenEncoded": {

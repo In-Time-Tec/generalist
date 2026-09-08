@@ -20,6 +20,9 @@ export type AgentPin = typeof AgentPin.Type
 export const ProgramPin = pinSchema("program-pin")
 export type ProgramPin = typeof ProgramPin.Type
 
+export const ToolPin = pinSchema("tool-pin")
+export type ToolPin = typeof ToolPin.Type
+
 /** Exact opaque identity of a model implementation and configuration. */
 export const ModelPin = pinSchema("model-pin")
 export type ModelPin = typeof ModelPin.Type
@@ -45,4 +48,8 @@ export const makeCapability = Function.flow(decodeIdentity, (identity) =>
 /** Construct the exact identity of one closed Agent Program manifest. */
 export const makeProgram = Function.flow(decodeIdentity, (identity) =>
   Schema.decodeSync(ProgramPin)(`program-pin:v1:sha256:${digest(identity)}`),
+)
+
+export const makeTool = Function.flow(decodeIdentity, (identity) =>
+  Schema.decodeSync(ToolPin)(`tool-pin:v1:sha256:${digest(identity)}`),
 )

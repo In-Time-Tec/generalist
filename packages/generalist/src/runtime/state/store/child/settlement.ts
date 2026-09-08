@@ -102,7 +102,13 @@ export const settleParentChild: {
   ): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
 } = Function.dual(3, (state: RuntimeState, child: StoredRun, terminalEventId: string) =>
   Effect.gen(function* () {
-    if (child.parentRunId === undefined) return state
+    if (
+      child.parentRunId === undefined ||
+      child.executableManifest.entries.some(
+        (entry) => entry.pin === child.executableRef.active && entry._tag === "Tool",
+      )
+    )
+      return state
     const parent = state.runs.get(child.parentRunId)
     if (parent === undefined) return state
     const runs = new Map(state.runs)
