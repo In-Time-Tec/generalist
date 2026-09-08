@@ -2,6 +2,7 @@
 /* oxlint-disable anti-slop-effect/no-service-constructor-imports -- the actor is the scoped object-runtime composition root. */
 import { Crypto, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { DurabilityFailure } from "../../../durability/errors.js"
 import type { ObjectStore } from "../../../durability/object-store.js"
 import type { DrainResult } from "../../../runtime/execution/local-scheduler.js"
 import type { ActivationFailure } from "../../../durability/internal/runtime.js"
@@ -14,6 +15,7 @@ import {
   type ScheduledFireInfo,
 } from "rivetkit"
 import { Address } from "../../../runtime/address.js"
+import { RuntimeUnavailable } from "../../../runtime/errors.js"
 import { ExecutableResolver } from "../../../runtime/executable/resolver.js"
 import { Metadata } from "../../../runtime/messaging/message.js"
 import { ResolveOperationInput } from "../../../runtime/operation/resolution.js"
@@ -82,10 +84,18 @@ type RuntimeHost = ManagedRuntime.ManagedRuntime<ActorRuntimeServices, Activatio
 
 interface Host {
   readonly runtime: RuntimeHost
+  readonly service: ActorRuntime["Service"]
+  requests: number
+  revision: number
+  idleRevision: number | undefined
+  released: (() => void) | undefined
 }
 
 interface Vars {
   host: Host | undefined
+  opening: Promise<Host> | undefined
+  closing: Promise<void> | undefined
+  namespace: RuntimeActorNamespace | undefined
 }
 
 type Context = ActorContext<undefined, undefined, undefined, Vars, undefined, undefined>
@@ -119,8 +129,27 @@ export type RuntimeActorDefinition = ActorDefinition<
   RuntimeActions
 >
 
+/** @experimental Canonical object namespace resolved for one actor instance. */
+export const RuntimeActorNamespace = Schema.Struct({
+  environment: Schema.String.check(Schema.isNonEmpty()),
+  tenant: Schema.String.check(Schema.isNonEmpty()),
+  partition: Schema.String.check(Schema.isNonEmpty()),
+})
+
 /** @experimental */
-export interface RuntimeActorOptions extends Omit<ActorRuntimeOptions, "drainAction"> {
+export type RuntimeActorNamespace = typeof RuntimeActorNamespace.Type
+
+/** @experimental Stable actor identity available before Runtime construction. */
+export interface RuntimeActorIdentity {
+  readonly actorId: string
+  readonly key: ReadonlyArray<string>
+}
+
+/** @experimental */
+export interface RuntimeActorOptions
+  extends Omit<ActorRuntimeOptions, "drainAction" | "environment" | "tenant" | "partition"> {
+  /** Cached for this incarnation; applications must preserve key-to-namespace routing across incarnations. */
+  readonly namespace: (identity: RuntimeActorIdentity) => RuntimeActorNamespace
   /** Application-owned transport and cryptography; never actor-local durability. */
   readonly storage: Layer.Layer<ObjectStore | Crypto.Crypto>
   /** Application-owned executable reconstruction composed into each actor incarnation. */
@@ -133,25 +162,21 @@ interface ConfiguredActorOptions {
   options?: InstanceActorOptionsInput
 }
 
-const requireHost = (c: Context): Host => {
-  if (c.vars.host === undefined) throw new Error("Generalist Runtime host is not awake")
-  return c.vars.host
-}
-
-const runAction = async <A, E>(c: Context, effect: (runtime: RuntimeService) => Effect.Effect<A, E>): Promise<A> => {
-  const host = requireHost(c)
-  return c.keepAwake(
-    host.runtime.runPromise(
-      Effect.flatMap(Runtime, effect).pipe(Effect.tap(() => Effect.flatMap(ActorRuntime, (runtime) => runtime.notify))),
-      { signal: c.abortSignal },
-    ),
-  )
-}
-
-const dispose = async (c: Context): Promise<void> => {
-  const host = c.vars.host
+const retire = (c: Context, host: Host): Promise<void> => {
+  if (c.vars.host !== host) return c.vars.closing ?? Promise.resolve()
   c.vars.host = undefined
-  if (host !== undefined) await host.runtime.dispose()
+  const closing = (async () => {
+    if (host.requests !== 0) {
+      const released = Promise.withResolvers<void>()
+      host.released = released.resolve
+      await released.promise
+    }
+    await host.runtime.dispose()
+  })().finally(() => {
+    if (c.vars.closing === closing) c.vars.closing = undefined
+  })
+  c.vars.closing = closing
+  return closing
 }
 
 /**
@@ -160,30 +185,129 @@ const dispose = async (c: Context): Promise<void> => {
  * The object journal is the only Runtime authority. Schedules and cron are wake hints.
  */
 export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefinition => {
-  const { actorOptions, resolver, storage, ...storeOptions } = options
+  const { actorOptions, namespace, resolver, storage, ...storeOptions } = options
   const configuredOptions: ConfiguredActorOptions = {}
   if (actorOptions !== undefined) configuredOptions.options = actorOptions
 
-  return actor({
-    createVars: (): Vars => ({ host: undefined }),
-    ...configuredOptions,
-    actionInputSchemas,
-    onWake: async (c) => {
+  const getHost = async (c: Context): Promise<Host> => {
+    if (c.vars.closing !== undefined) return c.vars.closing.then(() => getHost(c))
+    if (c.abortSignal.aborted) throw RuntimeUnavailable.make({ message: "Rivet Runtime actor is stopping" })
+    if (c.vars.host !== undefined) return c.vars.host
+    if (c.vars.opening !== undefined) return c.vars.opening
+    const opening = (async () => {
+      const resolved =
+        c.vars.namespace ??
+        (await Effect.runPromise(
+          Effect.try({
+            try: () => namespace({ actorId: c.actorId, key: [...c.key] }),
+            catch: () =>
+              DurabilityFailure.make({ reason: "configuration", message: "Rivet Runtime namespace resolver failed" }),
+          }).pipe(
+            Effect.flatMap((value) =>
+              Schema.decodeEffect(RuntimeActorNamespace)(value, { onExcessProperty: "error" }).pipe(
+                Effect.mapError(() =>
+                  DurabilityFailure.make({ reason: "configuration", message: "Invalid Rivet Runtime namespace" }),
+                ),
+              ),
+            ),
+          ),
+          { signal: c.abortSignal },
+        ))
+      c.vars.namespace = Object.freeze(resolved)
       const runtime = ManagedRuntime.make(
-        layerActorRuntime(c, { ...storeOptions, drainAction: "runtime.drain" }).pipe(
+        layerActorRuntime(c, { ...storeOptions, ...resolved, drainAction: "runtime.drain" }).pipe(
           Layer.provide(resolver),
           Layer.provide(storage),
         ),
       )
       try {
-        await runtime.runPromise(ActorRuntime, { signal: c.abortSignal })
-        c.vars.host = { runtime }
+        const service = await runtime.runPromise(ActorRuntime, { signal: c.abortSignal })
+        const host: Host = { runtime, service, requests: 0, revision: 0, idleRevision: undefined, released: undefined }
+        c.vars.host = host
+        void runtime.runPromise(service.failure, { signal: c.abortSignal }).catch(() => c.waitUntil(retire(c, host)))
+        return host
       } catch (cause) {
         c.vars.host = undefined
         await runtime.dispose()
         throw cause
       }
+    })().finally(() => {
+      if (c.vars.opening === opening) c.vars.opening = undefined
+    })
+    c.vars.opening = opening
+    return opening
+  }
+
+  const useHost = <A, E>(
+    c: Context,
+    recover: boolean,
+    effect: (host: Host) => Effect.Effect<A, E, ActorRuntimeServices>,
+  ): Promise<A> =>
+    c.keepAwake(
+      (async () => {
+        const host = await getHost(c)
+        if (c.vars.host !== host) return useHost(c, recover, effect)
+        host.requests++
+        try {
+          return await host.runtime.runPromise(
+            Effect.suspend(() => effect(host)).pipe(
+              Effect.raceFirst(host.service.failure),
+              Effect.ensuring(recover ? host.service.notify : Effect.void),
+            ),
+            {
+              signal: c.abortSignal,
+            },
+          )
+        } finally {
+          host.requests--
+          if (host.requests === 0) {
+            host.released?.()
+            if (host.idleRevision === host.revision) await retire(c, host)
+          }
+        }
+      })(),
+    )
+
+  const runAction = <A, E>(c: Context, effect: (runtime: RuntimeService) => Effect.Effect<A, E>): Promise<A> =>
+    useHost(c, true, (host) => {
+      host.revision++
+      host.idleRevision = undefined
+      return Effect.flatMap(Runtime, effect).pipe(
+        Effect.onExit(() =>
+          Effect.sync(() => {
+            host.revision++
+            host.idleRevision = undefined
+          }),
+        ),
+      )
+    })
+
+  const drain = (c: Context): Promise<DrainResult> =>
+    useHost(c, false, (host) => {
+      const revision = host.revision
+      return host.service.drain.pipe(
+        Effect.tap((result) =>
+          Effect.sync(() => {
+            if (!result.hasMore && host.revision === revision) host.idleRevision = revision
+          }),
+        ),
+      )
+    })
+
+  const dispose = async (c: Context): Promise<void> => {
+    await c.vars.opening?.catch(() => undefined)
+    if (c.vars.host !== undefined) await retire(c, c.vars.host)
+    await c.vars.closing
+  }
+
+  return actor({
+    createVars: (): Vars => ({ host: undefined, opening: undefined, closing: undefined, namespace: undefined }),
+    ...configuredOptions,
+    actionInputSchemas,
+    onWake: async (c) => {
+      await getHost(c)
     },
+    run: (c) => drain(c).then(() => undefined),
     onSleep: dispose,
     onDestroy: dispose,
     actions: {
@@ -194,26 +318,13 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
         cancel: (c, input: RuntimeCancelInput) => runAction(c, (runtime) => runtime.cancel(input)),
         resolveOperation: (c, input: ResolveOperationInput) =>
           runAction(c, (runtime) => runtime.resolveOperation(input)),
-        inspect: (c, runId: string) => {
-          const host = requireHost(c)
-          return c.keepAwake(
-            host.runtime.runPromise(
-              Effect.flatMap(Runtime, (runtime) => runtime.inspect(runId)).pipe(
-                Effect.flatMap(Schema.encodeEffect(RuntimeInspectionResponse)),
-              ),
-              {
-                signal: c.abortSignal,
-              },
-            ),
-          )
-        },
-        drain: (c, _fire?: ScheduledFireInfo) =>
-          c.keepAwake(
-            requireHost(c).runtime.runPromise(
-              Effect.flatMap(ActorRuntime, (runtime) => runtime.drain),
-              { signal: c.abortSignal },
+        inspect: (c, runId: string) =>
+          useHost(c, true, () =>
+            Effect.flatMap(Runtime, (runtime) => runtime.inspect(runId)).pipe(
+              Effect.flatMap(Schema.encodeEffect(RuntimeInspectionResponse)),
             ),
           ),
+        drain: (c, _fire?: ScheduledFireInfo) => drain(c),
       },
     },
   })

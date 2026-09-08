@@ -1,4 +1,4 @@
-import { Clock, Context, Crypto, Effect, Function, Layer, Semaphore } from "effect"
+import { Clock, Context, Crypto, Effect, Fiber, Function, Layer, Semaphore } from "effect"
 import type { ActorContext } from "rivetkit"
 import { activate } from "../../../durability/activation.js"
 import type { ActivationFailure, Options } from "../../../durability/internal/runtime.js"
@@ -35,6 +35,7 @@ export class ActorRuntime extends Context.Service<
   ActorRuntime,
   {
     readonly ownerId: string
+    readonly failure: Effect.Effect<never, ActivationFailure>
     readonly notify: Effect.Effect<void>
     readonly guarded: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
     readonly drain: Effect.Effect<DrainResult, ActivationFailure, RuntimeServices>
@@ -73,7 +74,7 @@ const makeHost = Effect.fn("RivetActorRuntime.makeHost")(function* (
     catch: () => RuntimeUnavailable.make({ message: "Rivet Runtime periodic recovery could not be armed" }),
   })
   yield* options.initialize?.(activationContext) ?? Effect.void
-  yield* activate
+  const activation = yield* activate
   const admission = yield* Semaphore.make(1)
   const execution = yield* Semaphore.make(1)
   const guarded = admission.withPermits(1)
@@ -99,8 +100,13 @@ const makeHost = Effect.fn("RivetActorRuntime.makeHost")(function* (
       return result
     }),
   )
-  yield* drain
-  return ActorRuntime.of({ ownerId, notify: notify(context, options.drainAction), guarded, drain })
+  return ActorRuntime.of({
+    ownerId,
+    failure: Fiber.join(activation),
+    notify: notify(context, options.drainAction),
+    guarded,
+    drain,
+  })
 })
 
 const layerActorRuntimeImpl = (context: RuntimeActorContext, options: ActorRuntimeOptions) => {
@@ -117,7 +123,7 @@ const layerActorRuntimeImpl = (context: RuntimeActorContext, options: ActorRunti
   )
 }
 
-/** @experimental Build once in onWake and dispose the owning ManagedRuntime in onSleep/onDestroy. */
+/** @experimental Build in onWake, drain after readiness, observe failure, and dispose the owning ManagedRuntime on shutdown. */
 export const layerActorRuntime: {
   (
     context: RuntimeActorContext,
