@@ -186,8 +186,30 @@ export const appendEvent: {
       }
       const hostSessions = new Map(terminalState.hostSessions)
       const rootRun = terminalState.runs.get(run.rootRunId)
-      const hostSession = rootRun === undefined ? undefined : hostSessions.get(rootRun.message.sessionId)
-      if (hostSession !== undefined) {
+      if (run.parentRunId !== undefined && !hostSessions.has(run.message.sessionId)) {
+        hostSessions.set(run.message.sessionId, {
+          session: {
+            id: run.message.sessionId,
+            createdAt: event.occurredAt,
+            queue: [],
+            selection: {
+              executableRef: run.executableRef,
+              executableManifest: run.executableManifest,
+              registrations: run.registrations,
+              treePolicy: run.treePolicy,
+              budget: terminalState.sessions.get(run.message.sessionId)!.family!.budget,
+            },
+          },
+          lastCursor: -1,
+          events: [],
+          subscribers: new Map(),
+        })
+      }
+      const hostPublications = []
+      const sessionIds = new Set([run.message.sessionId, ...(rootRun === undefined ? [] : [rootRun.message.sessionId])])
+      for (const sessionId of sessionIds) {
+        const hostSession = hostSessions.get(sessionId)
+        if (hostSession === undefined) continue
         const cursor = hostSession.lastCursor + 1
         const entry: HostSessionEvent = { _tag: "Run", cursor, event }
         hostSessions.set(hostSession.session.id, {
@@ -195,13 +217,14 @@ export const appendEvent: {
           lastCursor: cursor,
           events: [...hostSession.events, entry],
         })
-        publication.hostSession = {
+        hostPublications.push({
           sessionId: hostSession.session.id,
           entry,
           lastDeliveredCursor: hostSession.lastCursor,
           subscribers: hostSession.subscribers,
-        }
+        })
       }
+      publication.hostSessions = hostPublications
       return [
         event,
         {

@@ -97,6 +97,7 @@ const rootSend = (
 const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
     sessionSelection: () => unused(),
+    sessionFamily: () => Effect.die("not used"),
     getRun: () => unused(),
     configureDelegationPolicy: () => unused(),
     submitSessionInput: () => unused(),

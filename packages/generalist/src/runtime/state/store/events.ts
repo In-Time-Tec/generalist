@@ -13,6 +13,22 @@ import {
 
 type StoredRun = RuntimeState["runs"] extends ReadonlyMap<string, infer R> ? R : never
 
+export const retainedSession = (state: RuntimeState, sessionId: string) => {
+  const family = state.sessions.get(sessionId)?.family
+  return family === undefined
+    ? {}
+    : {
+        retainedSession: {
+          id: sessionId,
+          rootSessionId: family.rootSessionId,
+          parentSessionId: family.parentSessionId,
+          parentRunId: family.parentRunId,
+          initialRunId: family.runIds[0]!,
+          depth: family.depth,
+        },
+      }
+}
+
 export const toInspection: {
   (run: StoredRun): (state: RuntimeState) => RunInspection
   (state: RuntimeState, run: StoredRun): RunInspection
@@ -23,6 +39,7 @@ export const toInspection: {
     return readiness
   }
   return {
+    ...retainedSession(state, run.message.sessionId),
     runId: run.runId,
     status: run.status,
     executableRef: run.executableRef,

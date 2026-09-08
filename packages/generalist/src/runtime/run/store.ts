@@ -460,6 +460,9 @@ export interface Service {
   >
   /** List product-facing Sessions in creation order. */
   readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
+  readonly hostSessionFamily: (
+    sessionId: string,
+  ) => Effect.Effect<ReadonlyArray<HostSession>, import("../session/host.js").SessionSnapshotError>
   /** List root Runs admitted through one product-facing Session. */
   readonly hostSessionRuns: (
     sessionId: string,

@@ -7,9 +7,11 @@ import { RunSnapshot, type RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
 import { PendingInput, SessionSelection } from "./queue.js"
+import { RetainedSession } from "./retained.js"
 
 /** Durable product-facing Session metadata owned by a Runtime driver. */
 export interface HostSession {
+  readonly retainedSession?: RetainedSession
   readonly id: string
   readonly title?: string
   readonly createdAt: string
@@ -18,6 +20,7 @@ export interface HostSession {
   readonly activeRunId?: string
 }
 export const HostSession: Schema.Codec<HostSession, unknown> = Schema.Struct({
+  retainedSession: Schema.optionalKey(RetainedSession),
   id: Schema.String.check(Schema.isNonEmpty()),
   title: Schema.optionalKey(Schema.String),
   createdAt: Schema.String,
@@ -47,7 +50,7 @@ export class SessionSnapshotTooLarge extends ActionableTaggedError<SessionSnapsh
   "generalist/host/SessionSnapshotTooLarge",
   {
     sessionId: Schema.String,
-    limit: Schema.Literals(["scanned-runs", "runs", "events", "entries", "bytes"]),
+    limit: Schema.Literals(["scanned-runs", "sessions", "runs", "events", "entries", "bytes"]),
     maximum: Schema.Int,
     hint: errorHint("Load a smaller Session; this snapshot was rejected without truncation."),
   },
@@ -118,6 +121,7 @@ export type SessionEventsError =
 
 /** Runtime operations that persist and observe product-facing Sessions. */
 export interface RuntimeHostSessions {
+  readonly sessionFamily: (sessionId: string) => Effect.Effect<ReadonlyArray<HostSession>, SessionSnapshotError>
   readonly submitSessionInput: import("../run/store.js").Service["submitSessionInput"]
   readonly updateSessionInput: import("../run/store.js").Service["updateSessionInput"]
   readonly removeSessionInput: import("../run/store.js").Service["removeSessionInput"]

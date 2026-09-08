@@ -22,7 +22,7 @@ import {
   type HostSessionSubscriberQueue,
   type RuntimeState,
 } from "../../projection.js"
-import { toInspection } from "../events.js"
+import { toInspection, retainedSession } from "../events.js"
 import { projectRunSnapshot } from "../../../execution/inspection.js"
 import { projectConversation } from "./conversation.js"
 import { submit, update, validateSelection } from "./queue.js"
@@ -114,8 +114,30 @@ const getHostSession = (
 ): Effect.Effect<HostSession, SessionNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
   const stored = state.hostSessions.get(sessionId)
-  return stored === undefined ? Effect.fail(missing(sessionId)) : Effect.succeed(stored.session)
+  return stored === undefined
+    ? Effect.fail(missing(sessionId))
+    : Effect.succeed({ ...stored.session, ...retainedSession(state, sessionId) })
 }
+
+const hostSessionFamily = (state: RuntimeState, sessionId: string) =>
+  Effect.gen(function* () {
+    yield* getHostSession(state, sessionId)
+    const pending = [state.sessions.get(sessionId)?.family?.rootSessionId ?? sessionId]
+    const seen = new Set<string>()
+    const sessions: Array<HostSession> = []
+    for (let index = 0; index < pending.length; index++) {
+      const id = pending[index]!
+      if (seen.has(id)) continue
+      if (seen.size >= 128) return yield* SessionSnapshotTooLarge.make({ sessionId, limit: "sessions", maximum: 128 })
+      seen.add(id)
+      if (state.hostSessions.has(id)) sessions.push(yield* getHostSession(state, id))
+      const children = state.sessions.get(id)?.family?.childSessionIds ?? []
+      if (pending.length + children.length > 128)
+        return yield* SessionSnapshotTooLarge.make({ sessionId, limit: "sessions", maximum: 128 })
+      pending.push(...children)
+    }
+    return sessions
+  })
 
 const hostSessionRuns = (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {
@@ -243,6 +265,7 @@ export const make = (input: {
   | "removeSessionInput"
   | "hostSession"
   | "hostSessionSnapshot"
+  | "hostSessionFamily"
   | "listHostSessions"
   | "hostSessionRuns"
   | "hostSessionEvents"
@@ -275,11 +298,18 @@ export const make = (input: {
   hostSession: (sessionId) => input.readState.pipe(Effect.flatMap((state) => getHostSession(state, sessionId))),
   hostSessionSnapshot: (sessionId) =>
     input.readState.pipe(Effect.flatMap((state) => hostSessionSnapshot(state, sessionId))),
+  hostSessionFamily: (sessionId) =>
+    input.readState.pipe(Effect.flatMap((state) => hostSessionFamily(state, sessionId))),
   listHostSessions: input.readState.pipe(
     Effect.flatMap((state) =>
       state.closed
         ? RuntimeUnavailable.make({ message: "runtime store released" })
-        : Effect.succeed([...state.hostSessions.values()].map(({ session }) => session)),
+        : Effect.succeed(
+            [...state.hostSessions.values()].map(({ session }) => ({
+              ...session,
+              ...retainedSession(state, session.id),
+            })),
+          ),
     ),
   ),
   hostSessionRuns: (sessionId) => input.readState.pipe(Effect.flatMap((state) => hostSessionRuns(state, sessionId))),

@@ -57,6 +57,7 @@ export type AdmitReceipt = typeof AdmitReceipt.Type
 
 /** One direct child as the parent may observe it. */
 export interface ChildInspection {
+  readonly retainedSession?: import("../session/retained.js").RetainedSession
   readonly childRunId: string
   readonly status: RunStatus
   readonly readiness: ChildReadiness
@@ -208,10 +209,16 @@ export const make = (store: RunStoreService): Service => {
     })
 
   const inspection = (snapshot: {
-    readonly run: { readonly runId: string; readonly status: RunStatus; readonly childReadiness?: ChildReadiness }
+    readonly run: {
+      readonly runId: string
+      readonly status: RunStatus
+      readonly childReadiness?: ChildReadiness
+      readonly retainedSession?: import("../session/retained.js").RetainedSession
+    }
     readonly outcome?: RunOutcome
   }): ChildInspection => {
     const value = {
+      ...(snapshot.run.retainedSession === undefined ? {} : { retainedSession: snapshot.run.retainedSession }),
       childRunId: snapshot.run.runId,
       status: snapshot.run.status,
       readiness: snapshot.run.childReadiness ?? "settled",
@@ -266,6 +273,7 @@ export const make = (store: RunStoreService): Service => {
           .filter((entry) => entry.parentRunId === parentRunId)
           .map((entry) => {
             const value: ChildInspection = {
+              ...(entry.run.retainedSession === undefined ? {} : { retainedSession: entry.run.retainedSession }),
               childRunId: entry.run.runId,
               status: entry.run.status,
               readiness: entry.run.childReadiness ?? "settled",

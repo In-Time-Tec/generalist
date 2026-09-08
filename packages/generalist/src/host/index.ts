@@ -55,7 +55,6 @@ import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolCo
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
-import { childSessionId } from "../runtime/child/session.js"
 import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
 import {
@@ -131,6 +130,9 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
   readonly sessions: {
+    readonly family: (
+      sessionId: string,
+    ) => Effect.Effect<ReadonlyArray<HostSession>, import("../runtime/session/host.js").SessionSnapshotError>
     readonly create: (
       options?: SessionCreateOptions,
     ) => Effect.Effect<
@@ -384,9 +386,10 @@ const create = <
             prompt,
             ...(spawnOptions.label === undefined ? {} : { label: spawnOptions.label }),
           })
-          const session = sessionHandle(
-            yield* runtime.session(childSessionId({ parentRunId: handle.runId, invocationId: spawnOptions.commandId })),
-          )
+          const inspection = yield* runtime.inspect(receipt.runId)
+          if (inspection.retainedSession === undefined)
+            return yield* Effect.die("An admitted child must have a canonical retained Session")
+          const session = sessionHandle(yield* runtime.session(inspection.retainedSession.id))
           return { session, run: hostRun(yield* runtime.getRun(receipt.runId)) }
         }),
     })
@@ -394,6 +397,7 @@ const create = <
       attachments,
       artifacts,
       sessions: {
+        family: runtime.sessionFamily,
         create: createSessionHandle({ runtime, registeredByName }),
         get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
         snapshot: runtime.sessionSnapshot,
