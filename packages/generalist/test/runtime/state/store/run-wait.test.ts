@@ -122,4 +122,17 @@ layer(objectLayer)("Run-or-message wait", (it) => {
       expect((yield* f.wait("late"))?.resolution).toMatchObject({ result: { _tag: "RunSettled" } })
     }),
   )
+  it.effect("cancelling the waiting Run closes only its open wait without a wake", () =>
+    Effect.gen(function* () {
+      const f = yield* setup
+      yield* f.wait("cancel")
+      yield* f.runtime.cancel({ runId: f.parent.runId, commandId: "cancel-wait", reason: "stop" })
+      expect((yield* f.runtime.inspect(f.parent.runId)).waits).toEqual([])
+      expect((yield* f.runtime.inspect(f.parent.runId)).status).toBe("cancelled")
+      expect(yield* f.message("late-cancelled").pipe(Effect.flip)).toMatchObject({
+        _tag: "generalist/runtime/RunTerminal",
+      })
+      expect((yield* f.runtime.inspect(f.parent.runId)).waits).toEqual([])
+    }),
+  )
 })
