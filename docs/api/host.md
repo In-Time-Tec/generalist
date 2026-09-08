@@ -970,7 +970,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 ###### get
 
-> `readonly` **get**: (`runId`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+> `readonly` **get**: (`runId`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, `GetRunError`\>
 
 ###### Parameters
 
@@ -980,7 +980,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 ###### Returns
 
-`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, `GetRunError`\>
 
 ###### inspect
 
@@ -2002,7 +2002,7 @@ One product-facing event at its exclusive Session cursor.
 
 ##### spawn
 
-> `readonly` **spawn**: (`selection`, `prompt`, `options`) => `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+> `readonly` **spawn**: (`selection`, `prompt`, `options`) => `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| `GetRunError`\>
 
 ###### Parameters
 
@@ -2020,7 +2020,7 @@ One product-facing event at its exclusive Session cursor.
 
 ###### Returns
 
-`Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+`Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| `GetRunError`\>
 
 #### Type Parameters
 

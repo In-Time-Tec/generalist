@@ -1433,13 +1433,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -3013,13 +3014,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -4537,13 +4539,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6226,13 +6229,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6372,13 +6376,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6551,13 +6556,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6710,13 +6716,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -6866,13 +6873,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -7013,6 +7021,7 @@
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -7096,6 +7105,7 @@
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -7179,6 +7189,7 @@
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -7230,13 +7241,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -8160,13 +8172,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -10404,13 +10417,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -10510,13 +10524,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -10882,6 +10897,18 @@
                                 {
                                   "type": "object",
                                   "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/RunKindUnsupported"] },
+                                    "runId": { "type": "string" },
+                                    "operation": { "type": "string" },
+                                    "kind": { "type": "string", "enum": ["Agent", "Program", "Tool"] },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "runId", "operation", "kind", "hint"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/host/SessionConflict"] },
                                     "sessionId": { "type": "string" },
                                     "hint": { "type": "string" }
@@ -10985,6 +11012,7 @@
                       { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
                       { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
                       { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
@@ -10999,13 +11027,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11108,13 +11137,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11379,13 +11409,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11525,13 +11556,14 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GeneralistMediaRef" } } }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11650,13 +11682,14 @@
             "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -11900,13 +11933,14 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -12006,13 +12040,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -12125,13 +12160,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -12244,13 +12280,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -12383,13 +12420,14 @@
         "responses": {
           "204": { "description": "<No Content>" },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
                     { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
                   ]
                 }
@@ -12839,6 +12877,18 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "message", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RunKindUnsupportedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RunKindUnsupported"] },
+          "runId": { "type": "string" },
+          "operation": { "type": "string" },
+          "kind": { "type": "string", "enum": ["Agent", "Program", "Tool"] },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "runId", "operation", "kind", "hint"],
         "additionalProperties": false
       },
       "generalist_host_SessionPageInvalidEncoded": {
