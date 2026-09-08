@@ -48,6 +48,7 @@ import { taintForCall } from "../../capability/internal.js"
 import { make as makeToolProgress } from "../tool/progress.js"
 import { managedToolHandlers } from "../../artifact.js"
 import { toolReplayPolicy } from "../../durable/component/replay.js"
+import { BackgroundTools } from "../../tools/background/index.js"
 
 const provideManagedHandlers = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -139,7 +140,12 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       durableOperationKey,
       suspensionPropagation: options.suspensionPropagation,
     })
-  const activateSkillOutcome = makeActivateSkillOutcome({ skillRuntime, toolState, skillError })
+  const activateSkillOutcome = makeActivateSkillOutcome({
+    skillRuntime,
+    toolState,
+    skillError,
+    toolExecution: agent.toolExecution,
+  })
   const activeAgentName = (): Effect.Effect<string> =>
     handoffState === undefined
       ? Effect.succeed(agent.name)
@@ -193,6 +199,21 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
   ): Effect.Effect<Outcome, RunError, ClosedServices<T, never> | ToolContext | DriverInterpreter> => {
     if (skillActivation) return activateSkillOutcome(turn, call)
     if (handoffExecution !== undefined) return handoffExecution
+    const background = get(registry, call.name)
+    if (background?.modelTool !== undefined) {
+      return Effect.gen(function* () {
+        const admission = yield* Effect.serviceOption(BackgroundTools)
+        if (Option.isNone(admission)) {
+          return yield* AgentError.make({ message: "Background tool execution requires a durable Runtime", turn })
+        }
+        const context = yield* ToolContext
+        if (context.operationKey === undefined) {
+          return yield* AgentError.make({ message: "Background admission requires a durable operation identity", turn })
+        }
+        const receipt = yield* admission.value.admit(background.tool, call.params, context.operationKey)
+        return { _tag: "Success" as const, result: receipt, encodedResult: receipt }
+      })
+    }
     if (requestExecutor === undefined) return defaultExecute(request, registry)
     return requestExecutor
       .execute(request)
@@ -280,12 +301,15 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const executionRequest = yield* withParentTasks(request, registry)
         const requestExecutor =
           !skillActivation && handoffExecution === undefined && Option.isSome(executor) ? executor.value : undefined
-        const replayPolicy = toolReplayPolicy({
-          tool: registry.toolkit.tools[request.call.name],
-          fallback: requestExecutor?.replayPolicy?.(request),
-        })
+        const backgroundAdmission = get(registry, call.name)?.modelTool !== undefined
+        const replayPolicy = backgroundAdmission
+          ? "provider-idempotent"
+          : toolReplayPolicy({
+              tool: registry.toolkit.tools[request.call.name],
+              fallback: requestExecutor?.replayPolicy?.(request),
+            })
         const cancellation =
-          requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
+          !backgroundAdmission && requestExecutor !== undefined && supportsCancellation(requestExecutor, request)
             ? { cancellation: cancellableOperation(request) }
             : {}
         const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
@@ -309,7 +333,11 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
               handoffExecution,
               requestExecutor,
               skillActivation,
-            ).pipe(Effect.flatMap((outcome) => boundOutcome(call, outcome))),
+            ).pipe(
+              Effect.flatMap((outcome) =>
+                backgroundAdmission ? Effect.succeed(outcome) : boundOutcome(call, outcome),
+              ),
+            ),
           }),
         )
         const start = Queue.offer(startQueue, { _tag: "ToolExecutionStarted", turn, call }).pipe(

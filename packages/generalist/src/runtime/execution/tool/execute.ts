@@ -12,6 +12,7 @@ import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../..
 import { approvalReason, type WaitReason } from "../../run/wait.js"
 import type { Request as ApprovalRequest } from "../../operation/approval.js"
 import { ToolSuspended } from "../state.js"
+import { bytes, limits, ToolLimitExceeded } from "./limits.js"
 
 export const executeTool = (input: {
   readonly claim: ExecutionClaim
@@ -160,6 +161,11 @@ export const executeTool = (input: {
               emit: (progress) =>
                 Effect.gen(function* () {
                   const sequence = yield* Ref.updateAndGet(progressSequence, (value) => value + 1)
+                  if (
+                    sequence > limits.progressEvents ||
+                    (yield* bytes(progress).pipe(Effect.orElseSucceed(() => Infinity))) > limits.progressBytes
+                  )
+                    return false
                   yield* store.emitAgentEvent({
                     ...claim,
                     commandId: `tool-progress:${record.operationId}:${claim.attemptFence}:${sequence}`,
@@ -176,12 +182,30 @@ export const executeTool = (input: {
               attempt: claimed.attempt,
               admittedAt: claimed.admittedAt,
             }),
+            Effect.timeout(limits.deadlineMs),
           ),
         )
         const validated = yield* Schema.decodeEffect(Outcome)(outcome)
         let retained: Outcome = validated
-        if (validated._tag === "Success") retained = { ...validated, result: validated.encodedResult }
-        if (validated._tag === "DomainFailure") retained = { ...validated, failure: validated.encodedFailure }
+        if (validated._tag === "Success") {
+          yield* Schema.decodeEffect(resolution.output)(validated.encodedResult)
+          retained = { ...validated, result: validated.encodedResult }
+        }
+        if (validated._tag === "DomainFailure") {
+          yield* Schema.decodeEffect(resolution.failure)(validated.encodedFailure)
+          retained = { ...validated, failure: validated.encodedFailure }
+        }
+        if ((yield* bytes(retained)) > limits.outputBytes) {
+          return yield* ToolLimitExceeded.make({ message: "Tool outcome exceeds the retained output byte limit" })
+        }
+        if (
+          validated._tag === "Success" &&
+          validated.outputPaths !== undefined &&
+          (validated.outputPaths.length > limits.artifactReferences ||
+            (yield* Effect.forEach(validated.outputPaths, bytes)).some((size) => size > limits.artifactReferenceBytes))
+        ) {
+          return yield* ToolLimitExceeded.make({ message: "Tool outcome exceeds the artifact reference limit" })
+        }
         yield* store.completeOperation({
           ...claim,
           operationId: record.operationId,

@@ -35,7 +35,7 @@ import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner 
 import type { HandlersFor } from "./tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
 import type { ManagedArtifactTool } from "../artifact.js"
-import { childProfiles } from "./lifecycle/construction.js"
+import { definitionCapabilities } from "./lifecycle/construction.js"
 export {
   AgentTypeId,
   close,
@@ -87,6 +87,7 @@ export interface MakeOptions<
 > {
   readonly name: string
   readonly children?: ReadonlyArray<string>
+  readonly toolExecution?: "inline" | "background"
   readonly input?: InputSchema
   readonly output?: OutputSchema
   readonly instructions?: string
@@ -104,7 +105,6 @@ export interface MakeOptions<
   readonly onGateFailure?: GateFailureMode
   readonly sandbox?: SandboxService
 }
-
 /** Agent options with ordered static declarations instead of a pre-built toolkit. */
 export interface MakeToolsOptions<
   StaticTools extends ReadonlyArray<Tool.Any>,
@@ -230,7 +230,7 @@ export function make<
   }
   const definition = {
     name: options.name,
-    children: childProfiles(options.children),
+    ...definitionCapabilities(options),
     input: options.input ?? Schema.String,
     output: options.output ?? Schema.String,
     instructions: options.instructions,

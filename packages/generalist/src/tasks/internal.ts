@@ -7,6 +7,7 @@ import { LoopDriverState } from "../core/durable/loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../core/durable/service.js"
 import { Items, readToolName, writeToolName, type Items as TaskItems } from "./item.js"
 import { CommandTool, layer as componentLayer } from "../core/durable/component.js"
+import { Inline } from "../core/tools/background/index.js"
 import { bounded, namespace } from "../core/durable/component/definition.js"
 import { ToolContext } from "../core/tools/tool-context.js"
 import { declaration } from "./component.js"
@@ -18,7 +19,7 @@ const readTool = Tool.make(readToolName, {
   failure: DriverStateInvalid,
   failureMode: "return",
   dependencies: [DriverInterpreter],
-})
+}).annotate(Inline, true)
 const writeTool = Tool.make(writeToolName, {
   description: "Replace the complete journaled task list. Preserve every task that should remain on the list.",
   parameters: Schema.Struct({ items: Items }),
@@ -26,7 +27,9 @@ const writeTool = Tool.make(writeToolName, {
   failure: Schema.Union([DriverStateInvalid, DriverError]),
   failureMode: "return",
   dependencies: [DriverInterpreter, ToolContext],
-}).annotate(CommandTool, declaration.registration)
+})
+  .annotate(CommandTool, declaration.registration)
+  .annotate(Inline, true)
 const toolkit = Toolkit.make(readTool, writeTool)
 
 export interface Service {

@@ -380,6 +380,12 @@ Capability descriptors attached only by child inheritance.
 
 > `readonly` `optional` **toolDeclarations?**: readonly [`ToolDeclaration`](#tooldeclaration)[]
 
+<a id="toolexecution"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
+
 <a id="toolkit"></a>
 
 ##### toolkit
@@ -531,6 +537,12 @@ Capability descriptors attached only by child inheritance.
 ##### toolDeclarations?
 
 > `readonly` `optional` **toolDeclarations?**: readonly [`ToolDeclaration`](#tooldeclaration)[]
+
+<a id="toolexecution-1"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
 
 <a id="toolkit-1"></a>
 
@@ -787,6 +799,16 @@ Capability descriptors attached only by child inheritance.
 ###### Inherited from
 
 [`Any`](#any).[`toolDeclarations`](#tooldeclarations-1)
+
+<a id="toolexecution-2"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
+
+###### Inherited from
+
+[`Any`](#any).[`toolExecution`](#toolexecution-1)
 
 <a id="toolkit-2"></a>
 
@@ -1236,6 +1258,12 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **supplemental?**: `string`
 
+<a id="toolexecution-3"></a>
+
+##### toolExecution?
+
+> `readonly` `optional` **toolExecution?**: `"background"` \| `"inline"`
+
 <a id="toolkit-3"></a>
 
 ##### toolkit?
@@ -1459,6 +1487,16 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.supplemental`
+
+<a id="toolexecution-4"></a>
+
+##### toolExecution?
+
+> `readonly` `optional` **toolExecution?**: `"background"` \| `"inline"`
+
+###### Inherited from
+
+`Omit.toolExecution`
 
 <a id="toolkit-4"></a>
 
