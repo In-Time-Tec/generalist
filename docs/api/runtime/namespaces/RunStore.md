@@ -730,7 +730,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### admitRollback
 
-> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 ###### Parameters
 
@@ -740,7 +740,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 <a id="admitsend"></a>
 
@@ -1662,6 +1662,22 @@ Replay then follow one product-facing Session's authoritative event cursor.
 ###### Returns
 
 `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
+
+<a id="hostsessionfamily"></a>
+
+##### hostSessionFamily
+
+> `readonly` **hostSessionFamily**: (`sessionId`) => `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
 
 <a id="hostsessionruns"></a>
 
@@ -2593,7 +2609,7 @@ readonly `object`[]
 
 ##### updateSessionInput
 
-> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 ###### Parameters
 
@@ -2701,7 +2717,7 @@ readonly `object`[]
 
 ###### Returns
 
-`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 <a id="wake"></a>
 

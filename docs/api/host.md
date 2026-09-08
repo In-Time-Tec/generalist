@@ -516,6 +516,46 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ## Interfaces
 
+<a id="childhandle"></a>
+
+### ChildHandle
+
+#### Properties
+
+<a id="run"></a>
+
+##### run
+
+> `readonly` **run**: [`HostRun`](#hostrun)\<`unknown`\>
+
+<a id="session"></a>
+
+##### session
+
+> `readonly` **session**: [`SessionHandle`](#sessionhandle)
+
+***
+
+<a id="childspawnoptions"></a>
+
+### ChildSpawnOptions
+
+#### Properties
+
+<a id="commandid"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+<a id="label"></a>
+
+##### label?
+
+> `readonly` `optional` **label?**: `string`
+
+***
+
 <a id="createoptions"></a>
 
 ### CreateOptions
@@ -816,6 +856,20 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `Effect`\<`void`, [`CancelError`](./runtime/namespaces/Runtime.md#cancelerror)\>
 
+###### get
+
+> `readonly` **get**: (`runId`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+
 ###### inspect
 
 > `readonly` **inspect**: (`runId`) => `Effect`\<[`RuntimeInspection`](./runtime/namespaces/Runtime.md#runtimeinspection), [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
@@ -868,7 +922,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### start
 
-> `readonly` **start**: \<`Selected`\>(`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror)\>
+> `readonly` **start**: \<`Selected`\>(`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror)\>
 
 ###### Type Parameters
 
@@ -896,11 +950,11 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror)\>
+`Effect`\<[`HostRun`](#hostrun)\<[`Output`](./generalist/namespaces/Agent.md#output-5)\<`Selected`\>\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror)\>
 
 ###### startByName
 
-> `readonly` **startByName**: (`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentInputInvalid`](#agentinputinvalid)\>
+> `readonly` **startByName**: (`sessionId`, `agent`, `input`, `options?`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentInputInvalid`](#agentinputinvalid)\>
 
 ###### Parameters
 
@@ -922,7 +976,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentInputInvalid`](#agentinputinvalid)\>
+`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./runtime/namespaces/Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./runtime/namespaces/Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./runtime/namespaces/Errors.md#idempotencyconflict) \| [`RunIdConflict`](./runtime/namespaces/Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./runtime/namespaces/Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./runtime/namespaces/Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./runtime/namespaces/Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./runtime/namespaces/Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./runtime/namespaces/Errors.md#childselectionmissing) \| [`StartInvalid`](./runtime/namespaces/Errors.md#startinvalid) \| [`FanOutConflict`](./runtime/namespaces/Errors.md#fanoutconflict) \| [`FanOutInvalid`](./runtime/namespaces/Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./runtime/namespaces/Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`Exhausted`](./generalist/namespaces/RunBudget.md#exhausted) \| [`SessionNotFound`](#sessionnotfound) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent) \| [`AgentError`](./generalist/namespaces/AgentEvent.md#agenterror) \| [`AgentInputInvalid`](#agentinputinvalid)\>
 
 <a id="sessions"></a>
 
@@ -943,6 +997,20 @@ A Session event subscriber could not keep up with its bounded live queue.
 ###### Returns
 
 `Effect`\<[`SessionHandle`](#sessionhandle), [`CreateSessionError`](./runtime/namespaces/HostSession.md#createsessionerror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent)\>
+
+###### family
+
+> `readonly` **family**: (`sessionId`) => `Effect`\<readonly [`HostSession`](#hostsession-1)[], [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<readonly [`HostSession`](#hostsession-1)[], [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
 
 ###### fork
 
@@ -1031,6 +1099,36 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ##### queue
 
 > `readonly` **queue**: readonly `object`[]
+
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
 
 <a id="selection"></a>
 
@@ -1214,7 +1312,7 @@ One deterministic collection of host-owned Agent contributions.
 
 #### Properties
 
-<a id="commandid"></a>
+<a id="commandid-1"></a>
 
 ##### commandId
 
@@ -1238,7 +1336,7 @@ One deterministic collection of host-owned Agent contributions.
 
 > `readonly` `optional` **agent?**: `string`
 
-<a id="commandid-1"></a>
+<a id="commandid-2"></a>
 
 ##### commandId
 
@@ -1246,7 +1344,7 @@ One deterministic collection of host-owned Agent contributions.
 
 ###### Inherited from
 
-[`QueueCommandOptions`](#queuecommandoptions).[`commandId`](#commandid)
+[`QueueCommandOptions`](#queuecommandoptions).[`commandId`](#commandid-1)
 
 <a id="expectedrevision"></a>
 
@@ -1381,6 +1479,40 @@ One deterministic collection of host-owned Agent contributions.
 ###### Returns
 
 `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="retainedsession-1"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`retainedSession`](#retainedsession)
 
 <a id="selection-1"></a>
 
@@ -1587,6 +1719,28 @@ One product-facing event at its exclusive Session cursor.
 ##### id
 
 > `readonly` **id**: [`RunHandle`](./runtime/namespaces/Runtime.md#runhandle)\<`Output`\>\[`"runId"`\]
+
+##### spawn
+
+> `readonly` **spawn**: (`selection`, `prompt`, `options`) => `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### selection
+
+`string`
+
+###### prompt
+
+`Prompt` \| `string`
+
+###### options
+
+[`ChildSpawnOptions`](#childspawnoptions)
+
+###### Returns
+
+`Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 #### Type Parameters
 

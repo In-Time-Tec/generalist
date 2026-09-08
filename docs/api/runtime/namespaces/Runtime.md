@@ -1156,6 +1156,40 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run.md#runinspection).[`parentRunId`](./Run.md#parentrunid-1)
 
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`RunInspection`](./Run.md#runinspection).[`retainedSession`](./Run.md#retainedsession)
+
 <a id="runid-9"></a>
 
 ##### runId
@@ -1871,6 +1905,22 @@ Start a new Run from one committed journal prefix.
 
 `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, `ForkError`\>
 
+<a id="getrun"></a>
+
+##### getRun
+
+> `readonly` **getRun**: (`runId`) => `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+
 <a id="history"></a>
 
 ##### history
@@ -2375,6 +2425,26 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionEvents`](./HostSession.md#sessionevents)
 
+<a id="sessionfamily"></a>
+
+##### sessionFamily
+
+> `readonly` **sessionFamily**: (`sessionId`) => `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionFamily`](./HostSession.md#sessionfamily)
+
 <a id="sessionruns"></a>
 
 ##### sessionRuns
@@ -2709,7 +2779,7 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 
 ##### updateSessionInput
 
-> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 ###### Parameters
 
@@ -2817,7 +2887,7 @@ readonly `object`[]
 
 ###### Returns
 
-`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 ###### Inherited from
 

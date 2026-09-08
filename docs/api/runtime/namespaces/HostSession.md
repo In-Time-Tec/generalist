@@ -62,7 +62,7 @@ A Session cannot be projected within the supported work or response budget.
 
 ##### limit
 
-> `readonly` **limit**: `"bytes"` \| `"events"` \| `"entries"` \| `"runs"` \| `"scanned-runs"`
+> `readonly` **limit**: `"bytes"` \| `"events"` \| `"entries"` \| `"sessions"` \| `"runs"` \| `"scanned-runs"`
 
 **`Experimental`**
 
@@ -346,6 +346,22 @@ Runtime operations that persist and observe product-facing Sessions.
 
 `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
 
+<a id="sessionfamily"></a>
+
+##### sessionFamily
+
+> `readonly` **sessionFamily**: (`sessionId`) => `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](#sessionsnapshoterror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](#sessionsnapshoterror)\>
+
 <a id="sessionruns"></a>
 
 ##### sessionRuns
@@ -480,7 +496,7 @@ readonly `object`[]
 
 ##### updateSessionInput
 
-> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 ###### Parameters
 
@@ -588,7 +604,7 @@ readonly `object`[]
 
 ###### Returns
 
-`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 ***
 
