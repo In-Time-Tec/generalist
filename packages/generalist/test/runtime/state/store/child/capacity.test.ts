@@ -54,6 +54,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
       })
       const state = yield* runtime.readState
       expect([...state.sessions.keys()].toSorted()).toEqual(["agent-child", "agent-session"])
+      expect([...state.hostSessions.keys()].toSorted()).toEqual(["agent-child", "agent-session"])
       expect(state.sessions.get("agent-session")!.family!.childSessionIds).toEqual(["agent-child"])
       expect(state.sessions.get("agent-session")!.family!.runIds).toEqual([parentId])
       expect(
@@ -116,6 +117,9 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
           sessionId: "agent-child",
         }),
       )
+      expect(
+        (yield* host.sessions.family(session.id, { limit: 64 })).sessions.map((entry) => entry.id).toSorted(),
+      ).toEqual(["agent-child", "agent-session"])
       return {
         parentId: agent.id,
         rootToolId: root.id,
@@ -125,7 +129,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* canonical(ids.parentId, ids.rootToolId, ids.sponsored, ids.independent)
     yield* Effect.gen(function* () {
-      yield* Generalist.create(options)
+      const host = yield* Generalist.create(options)
       const store = yield* RunStore
       for (const runId of [ids.sponsored[1]!, ...ids.independent]) {
         const claim = yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId: `fresh:${runId}` })
@@ -137,6 +141,9 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
           result: { _tag: "Tool", isFailure: false, value: 1 },
         })
       }
+      expect(
+        (yield* host.sessions.family("agent-session", { limit: 64 })).sessions.map((entry) => entry.id).toSorted(),
+      ).toEqual(["agent-child", "agent-session"])
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* canonical(ids.parentId, ids.rootToolId, ids.sponsored, ids.independent)
   })
