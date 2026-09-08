@@ -1,3 +1,4 @@
+import { requireAgentOrProgram } from "../../../executable/manifest-internal.js"
 import { Effect, Function } from "effect"
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import type { RunEvent } from "../../../run/event.js"
@@ -96,6 +97,7 @@ export const reserveForkAllocation = ({
   Effect.gen(function* () {
     const source = state.runs.get(input.runId)
     if (source === undefined) return yield* RunNotFound.make({ runId: input.runId })
+    yield* requireAgentOrProgram({ ...source, operation: "fork" })
     if (state.runs.has(input.newRunId))
       return yield* RuntimeUnavailable.make({ message: `Fork target ${input.newRunId} already exists` })
     if (source.ownerId !== undefined)
@@ -121,6 +123,7 @@ export const reserveRewindAllocation = ({
   Effect.gen(function* () {
     const source = state.runs.get(input.runId)
     if (source === undefined) return yield* RunNotFound.make({ runId: input.runId })
+    yield* requireAgentOrProgram({ ...source, operation: "rewind" })
     if (state.runs.has(input.branchRunId))
       return yield* RuntimeUnavailable.make({ message: `Rewind archive ${input.branchRunId} already exists` })
     const nowMillis = yield* occurredAtMillis

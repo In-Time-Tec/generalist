@@ -12,6 +12,7 @@ import {
   IllegalOperatorAction,
   RunNotFound,
   RuntimeUnavailable,
+  RunKindUnsupported,
 } from "../runtime/errors.js"
 import {
   SessionConflict,
@@ -121,6 +122,7 @@ export const apiErrors = [
   RequestFailed,
   RunNotFound.pipe(notFound),
   RuntimeUnavailable.pipe(unavailable),
+  RunKindUnsupported.pipe(badRequest),
   SessionConflict.pipe(conflict),
   SessionQueueConflict.pipe(conflict),
   SessionCursorExpired.pipe(conflict),
@@ -164,6 +166,7 @@ const dedicatedErrors = Schema.Union([
   RequestFailed,
   RunNotFound,
   RuntimeUnavailable,
+  RunKindUnsupported,
   SessionConflict,
   SessionCursorExpired,
   SessionNotFound,

@@ -1909,7 +1909,7 @@ Start a new Run from one committed journal prefix.
 
 ##### getRun
 
-> `readonly` **getRun**: (`runId`) => `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+> `readonly` **getRun**: (`runId`) => `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, `GetRunError`\>
 
 ###### Parameters
 
@@ -1919,7 +1919,33 @@ Start a new Run from one committed journal prefix.
 
 ###### Returns
 
-`Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+`Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, `GetRunError`\>
+
+<a id="gettool"></a>
+
+##### getTool
+
+> `readonly` **getTool**: \<`T`\>(`tool`, `runId`) => `Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| `GetRunError`\>
+
+###### Type Parameters
+
+###### T
+
+`T` *extends* `Any`
+
+###### Parameters
+
+###### tool
+
+`T`
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| `GetRunError`\>
 
 <a id="history"></a>
 
@@ -3723,7 +3749,7 @@ One exact root admission held behind Generalist's durable execution gate.
 
 ### RunSendError
 
-> **RunSendError** = [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`RunBusy`](./Errors.md#runbusy) \| [`NotInFamily`](./Errors.md#notinfamily) \| [`SteeringConflict`](./Errors.md#steeringconflict) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`CursorExpired`](./Errors.md#cursorexpired) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../durability.md#durabilityfailure)
+> **RunSendError** = [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`RunBusy`](./Errors.md#runbusy) \| [`NotInFamily`](./Errors.md#notinfamily) \| [`SteeringConflict`](./Errors.md#steeringconflict) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`CursorExpired`](./Errors.md#cursorexpired) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../durability.md#durabilityfailure)
 
 ***
 
@@ -3757,7 +3783,7 @@ Durable identity and first firing instant of a registered recurrence.
 
 ### SendMessageError
 
-> **SendMessageError** = [`AddressNotFound`](./Errors.md#addressnotfound) \| [`AddressInvalid`](./AgentDirectory.md#addressinvalid) \| [`NotInFamily`](./Errors.md#notinfamily) \| [`RunTerminal`](./Errors.md#runterminal) \| [`RunBusy`](./Errors.md#runbusy) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`SteeringConflict`](./Errors.md#steeringconflict) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`CursorExpired`](./Errors.md#cursorexpired) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../durability.md#durabilityfailure)
+> **SendMessageError** = [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`AddressNotFound`](./Errors.md#addressnotfound) \| [`AddressInvalid`](./AgentDirectory.md#addressinvalid) \| [`NotInFamily`](./Errors.md#notinfamily) \| [`RunTerminal`](./Errors.md#runterminal) \| [`RunBusy`](./Errors.md#runbusy) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`SteeringConflict`](./Errors.md#steeringconflict) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`CursorExpired`](./Errors.md#cursorexpired) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../durability.md#durabilityfailure)
 
 ***
 
