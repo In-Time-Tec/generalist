@@ -125,6 +125,7 @@ const flush = (state: State, now: number): readonly [ModelPreviewFrame | undefin
     modelCallId: state.modelCallId,
     modelAttemptId: state.modelAttemptId,
     attempt: state.attempt,
+    generation: 0,
     sequence: state.nextSequence,
     changes: [first, ...rest],
   }
@@ -227,7 +228,7 @@ export const make: Effect.Effect<Service, never, Scope.Scope> = Effect.gen(funct
     SynchronizedRef.modify(lanes, (current): readonly [ReadonlyArray<Publication>, ReadonlyMap<string, LaneState>] => {
       const lane = current.get(runId)
       if (lane === undefined || lane.generation !== generation) return [[], current] as const
-      const published = { ...frame, runId }
+      const published = { ...frame, runId, generation }
       const next = new Map(current).set(runId, { ...lane, retained: published })
       return [[[published, [...lane.subscribers.values()]]], next]
     }).pipe(
@@ -244,7 +245,12 @@ export const make: Effect.Effect<Service, never, Scope.Scope> = Effect.gen(funct
     SynchronizedRef.modify(lanes, (current): readonly [ReadonlyArray<Publication>, ReadonlyMap<string, LaneState>] => {
       const lane = current.get(runId)
       if (lane === undefined || lane.generation !== expectedGeneration) return [[], current] as const
-      const discarded: ModelPreviewCleared = { _tag: "ModelPreviewCleared", runId, attemptFence, generation: 0 }
+      const discarded: ModelPreviewCleared = {
+        _tag: "ModelPreviewCleared",
+        runId,
+        attemptFence,
+        generation: expectedGeneration,
+      }
       const next = new Map(current).set(runId, { ...lane, retained: undefined })
       return [[[discarded, [...lane.subscribers.values()]]], next]
     }).pipe(

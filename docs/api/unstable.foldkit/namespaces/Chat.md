@@ -72,6 +72,22 @@
 
 **`Experimental`**
 
+<a id="preview"></a>
+
+##### preview
+
+> `readonly` **preview**: \{ `attempt`: `number`; `attemptFence`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `reasoning`: `string`; `runId`: `string`; `sequence`: `number`; `text`: `string`; `turn`: `number`; \} \| `null`
+
+**`Experimental`**
+
+<a id="previewauthority"></a>
+
+##### previewAuthority
+
+> `readonly` **previewAuthority**: \{ `attempt`: `number`; `attemptFence`: `number`; `generation`: `number`; `modelAttemptId`: `string` \| `null`; `modelCallId`: `string` \| `null`; `runId`: `string`; `sequence`: `number`; `tombstoned`: `boolean`; `turn`: `number`; \} \| `null`
+
+**`Experimental`**
+
 <a id="run"></a>
 
 ##### run
@@ -124,7 +140,7 @@
 
 ### ConversationItem
 
-> **ConversationItem** = *typeof* `UserConversationItem.Type` \| *typeof* `AssistantConversationItem.Type` \| *typeof* `ToolConversationItem.Type` \| *typeof* `WaitingConversationItem.Type` \| *typeof* `ApprovalConversationItem.Type` \| *typeof* `FailureConversationItem.Type`
+> **ConversationItem** = *typeof* `UserConversationItem.Type` \| *typeof* `AssistantConversationItem.Type` \| *typeof* `PreviewConversationItem.Type` \| *typeof* `ToolConversationItem.Type` \| *typeof* `WaitingConversationItem.Type` \| *typeof* `ApprovalConversationItem.Type` \| *typeof* `FailureConversationItem.Type`
 
 **`Experimental`**
 
@@ -140,6 +156,18 @@
 
 ***
 
+<a id="modelpreview-1"></a>
+
+### ModelPreview
+
+> **ModelPreview** = *typeof* `ModelPreview.Type`
+
+**`Experimental`**
+
+One bounded provisional model response, kept separate from committed conversation entries.
+
+***
+
 <a id="output"></a>
 
 ### Output
@@ -147,6 +175,18 @@
 > **Output** = *typeof* `RunCompleted.Type` \| *typeof* `ApprovalRequired.Type` \| *typeof* `RunFailed.Type`
 
 **`Experimental`**
+
+***
+
+<a id="previewauthority-1"></a>
+
+### PreviewAuthority
+
+> **PreviewAuthority** = *typeof* `PreviewAuthority.Type`
+
+**`Experimental`**
+
+Monotonic provisional authority retained even when visible preview text is cleared.
 
 ***
 
@@ -420,6 +460,18 @@
 
 ***
 
+<a id="maxpreviewstatecharacters"></a>
+
+### MaxPreviewStateCharacters
+
+> `const` **MaxPreviewStateCharacters**: `65536` = `65536`
+
+**`Experimental`**
+
+Maximum provisional text and reasoning retained by the client reducer.
+
+***
+
 <a id="messagealign-1"></a>
 
 ### MessageAlign
@@ -440,6 +492,18 @@
 
 ***
 
+<a id="modelpreview-2"></a>
+
+### ModelPreview
+
+> `const` **ModelPreview**: `Schema.Struct`\<\{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `reasoning`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `text`: `Schema.String`; `turn`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+One bounded provisional model response, kept separate from committed conversation entries.
+
+***
+
 <a id="openedsession"></a>
 
 ### OpenedSession
@@ -457,6 +521,30 @@
 > **Output**: `Schema`\<[`Output`](#output)\>
 
 **`Experimental`**
+
+***
+
+<a id="previewauthority-2"></a>
+
+### PreviewAuthority
+
+> `const` **PreviewAuthority**: `Schema.Struct`\<\{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.NullOr`\<`Schema.String`\>; `modelCallId`: `Schema.NullOr`\<`Schema.String`\>; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `tombstoned`: `Schema.Boolean`; `turn`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+Monotonic provisional authority retained even when visible preview text is cleared.
+
+***
+
+<a id="previewconversationitem"></a>
+
+### PreviewConversationItem
+
+> `const` **PreviewConversationItem**: `CallableTaggedStruct`\<`"PreviewConversationItem"`, \{ `align`: *typeof* [`MessageAlign`](#messagealign-1); `attemptFence`: *typeof* `Schema.Int`; `entry`: *typeof* [`AssistantEntry`](#assistantentry); `key`: *typeof* `Schema.String`; `sequence`: *typeof* `Schema.Int`; \}\>
+
+**`Experimental`**
+
+A provisional assistant item that is never part of committed conversation history.
 
 ***
 
@@ -730,7 +818,7 @@
 
 ##### entry
 
-*typeof* `ToolEntry.Type`
+`Extract`\<[`ChatEntry`](#chatentry), \{ `_tag`: `"ToolEntry"`; \}\>
 
 #### Returns
 

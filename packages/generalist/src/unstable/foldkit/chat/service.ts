@@ -41,6 +41,37 @@ const ClickedDenyFields = { reason: Schema.NullOr(Schema.String) }
 const ReceivedConnectionFields = { event: Incoming }
 const ModelConnection = Schema.Literals(["disconnected", "connecting", "open", "reconnecting"])
 
+/** Maximum provisional text and reasoning retained by the client reducer. @experimental */
+export const MaxPreviewStateCharacters = 65_536
+
+/** One bounded provisional model response, kept separate from committed conversation entries. @experimental */
+export const ModelPreview = Schema.Struct({
+  runId: Schema.String,
+  attemptFence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  modelCallId: Schema.String,
+  modelAttemptId: Schema.String,
+  attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  text: Schema.String.check(Schema.isMaxLength(MaxPreviewStateCharacters)),
+  reasoning: Schema.String.check(Schema.isMaxLength(MaxPreviewStateCharacters)),
+})
+export type ModelPreview = typeof ModelPreview.Type
+
+/** Monotonic provisional authority retained even when visible preview text is cleared. @experimental */
+export const PreviewAuthority = Schema.Struct({
+  runId: Schema.String,
+  attemptFence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
+  generation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
+  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
+  attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
+  modelCallId: Schema.NullOr(Schema.String),
+  modelAttemptId: Schema.NullOr(Schema.String),
+  sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
+  tombstoned: Schema.Boolean,
+})
+export type PreviewAuthority = typeof PreviewAuthority.Type
+
 /** @experimental */
 export type ToolOutcome = typeof Pending.Type | typeof Completed.Type
 
@@ -97,6 +128,8 @@ export interface Model {
   readonly run: RunState
   readonly entries: ReadonlyArray<ChatEntry>
   readonly conversation: Conversation
+  readonly preview: ModelPreview | null
+  readonly previewAuthority: PreviewAuthority | null
   readonly draft: string
 }
 
@@ -109,6 +142,8 @@ export const Model: Schema.Schema<Model> = Schema.Struct({
   run: RunState,
   entries: Schema.Array(ChatEntry),
   conversation: Conversation,
+  preview: Schema.NullOr(ModelPreview),
+  previewAuthority: Schema.NullOr(PreviewAuthority),
   draft: Schema.String,
 })
 
@@ -247,6 +282,24 @@ export const AssistantConversationItem: CallableTaggedStruct<
   { key: typeof Schema.String; align: typeof MessageAlign; entry: typeof AssistantEntry }
 > = m("AssistantConversationItem", { key: Schema.String, align: MessageAlign, entry: AssistantEntry })
 
+/** A provisional assistant item that is never part of committed conversation history. @experimental */
+export const PreviewConversationItem: CallableTaggedStruct<
+  "PreviewConversationItem",
+  {
+    key: typeof Schema.String
+    align: typeof MessageAlign
+    entry: typeof AssistantEntry
+    attemptFence: typeof Schema.Int
+    sequence: typeof Schema.Int
+  }
+> = m("PreviewConversationItem", {
+  key: Schema.String,
+  align: MessageAlign,
+  entry: AssistantEntry,
+  attemptFence: Schema.Int,
+  sequence: Schema.Int,
+})
+
 /** @experimental */
 export const ToolConversationItem: CallableTaggedStruct<
   "ToolConversationItem",
@@ -299,6 +352,7 @@ export const FailureConversationItem: CallableTaggedStruct<
 export type ConversationItem =
   | typeof UserConversationItem.Type
   | typeof AssistantConversationItem.Type
+  | typeof PreviewConversationItem.Type
   | typeof ToolConversationItem.Type
   | typeof WaitingConversationItem.Type
   | typeof ApprovalConversationItem.Type
@@ -308,6 +362,7 @@ export type ConversationItem =
 export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
   UserConversationItem,
   AssistantConversationItem,
+  PreviewConversationItem,
   ToolConversationItem,
   WaitingConversationItem,
   ApprovalConversationItem,
@@ -326,6 +381,8 @@ export const initialModel = (sessionId: string | null = null): Model => ({
   run: Idle(),
   entries: [],
   conversation: { leafId: null, entries: [] },
+  preview: null,
+  previewAuthority: null,
   draft: "",
 })
 
@@ -400,76 +457,4 @@ export const CancelRun = define("CancelRun", {
     ),
 })
 
-const jsonText = (value: typeof Schema.Unknown.Type): string => {
-  const decoded = Schema.decodeUnknownSync(Schema.Unknown)(value)
-  try {
-    return JSON.stringify(decoded, null, 2) ?? "undefined"
-  } catch {
-    return String(decoded)
-  }
-}
-
-/** @experimental */
-export const promptInputStatusOf = (run: RunState): PromptInputStatus => {
-  switch (run._tag) {
-    case "Idle":
-      return "idle"
-    case "Running":
-      return "streaming"
-    case "AwaitingApproval":
-      return "submitted"
-    case "Failed":
-      return "error"
-  }
-}
-
-/** @experimental */
-export const toolStatusOf = (entry: typeof ToolEntry.Type): ToolStatus => {
-  switch (entry.outcome._tag) {
-    case "Pending":
-      return "input-available"
-    case "Completed":
-      return entry.outcome.isFailure ? "output-error" : "output-available"
-  }
-}
-
-const conversationItemFor = (entry: ChatEntry, index: number): ConversationItem => {
-  switch (entry._tag) {
-    case "UserEntry":
-      return UserConversationItem({ key: `entry-${index}-user`, align: "end", entry })
-    case "AssistantEntry":
-      return AssistantConversationItem({ key: `entry-${index}-assistant`, align: "start", entry })
-    case "ToolEntry":
-      return ToolConversationItem({
-        key: `tool-${entry.callId}`,
-        align: "start",
-        entry,
-        status: toolStatusOf(entry),
-        input: jsonText(entry.params),
-      })
-  }
-}
-
-/** @experimental */
-export const conversationItems = (model: Model): ReadonlyArray<ConversationItem> => {
-  const entries = model.entries.map(conversationItemFor)
-  const waiting =
-    model.run._tag === "Running" ? [WaitingConversationItem({ key: "waiting-assistant", align: "start" })] : []
-  const approval =
-    model.run._tag === "AwaitingApproval"
-      ? [
-          ApprovalConversationItem({
-            key: `approval-${model.run.token}`,
-            align: "start",
-            token: model.run.token,
-            toolName: model.run.toolName,
-            params: model.run.params,
-          }),
-        ]
-      : []
-  const failure =
-    model.run._tag === "Failed"
-      ? [FailureConversationItem({ key: "run-failure", align: "start", message: model.run.message })]
-      : []
-  return [...entries, ...waiting, ...approval, ...failure]
-}
+export { conversationItems, promptInputStatusOf, toolStatusOf } from "./view.js"

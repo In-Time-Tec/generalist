@@ -139,6 +139,14 @@ A usable provider must preserve complete bytes, atomically create an absent key,
 
 S3 and native R2 are the transport targets. An S3-shaped API alone is insufficient. Current qualification is local-only MinIO and Miniflare/workerd; AWS and deployed R2 are not certified. Simulator or emulator results do not certify a live provider. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
 
+## Local workload baseline
+
+Run `bun scripts/durability-benchmark.ts` to collect a deterministic ObjectStore-simulator baseline. The checked-in report at `artifacts/durability-benchmark/local-simulator-58eba620-linux-x64.json` records the exact source commit, dirty status, benchmark-script SHA-256, Bun/runtime platform, seed, page size, concurrency, payload sizes, metric definitions, and raw request/byte deltas.
+
+The baseline exercises hot-partition contention, independent partitions, a long admission history with fresh-layer recovery, bounded 64 KiB BlobStore payloads, release-and-reclaim owner replacement, and no-due-work scans. It reports p50, p95, p99, and maximum latency for durable admission, Runtime terminal outcome commit, reward mutation, state read, cold recovery, artifact write, owner replacement, and idle scans. The program fails if request/byte counters are negative or inconsistent, or if a no-due-work scan creates an object or attempts to write bytes. The payload workload stays within the BlobStore byte cap.
+
+This is a reproducible local simulator baseline, not a latency promise or provider benchmark. Its scripted Runtime workloads persist await-event suspensions, reopen fresh hosts, and complete through both a direct wake and an expired deadline processed by `LocalScheduler.tick` and `idle`; dispatch counters assert that neither path reruns the waiting tool. A deterministic two-client CAS workload pauses the first exact commit create, lets the second writer win, and asserts one losing-reducer retry before both commits recover. The report also measures a divergent idempotency conflict followed by exact retry and samples RSS/heap through the local process host boundary. Its `ToolOutput` workload retains and rereads the full result from a process-memory test callback, then verifies the actual UTF-8 preview length returned by the production bound; this is projection evidence, not durable BlobStore output persistence.
+
 The S3 transport uses ordinary general-purpose buckets and single-object writes. Bucket versioning, Object Lock, multipart conditional completion, native sidecars, and bucket administration are not normal Runtime requirements. Custom endpoints and injected clients must satisfy the declared guarantees. Unsupported semantics fail initialization instead of weakening conditional writes.
 
 ## Authority, conflicts, and fencing

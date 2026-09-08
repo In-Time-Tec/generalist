@@ -1911,11 +1911,31 @@ Pending addressed-message projections for this exact Run.
 
 > `readonly` **operator**: [`OperatorService`](#operatorservice)
 
+<a id="previewauthority"></a>
+
+##### previewAuthority
+
+> `readonly` **previewAuthority**: (`runId`) => `Effect`\<`number` \| `undefined`\>
+
+**`Internal`**
+
+Read the storage-issued fence currently authorized to publish live previews.
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<`number` \| `undefined`\>
+
 <a id="previews"></a>
 
 ##### previews
 
-> `readonly` **previews**: (`input`) => `Stream`\<[`Event`](./ModelPreview.md#event)\>
+> `readonly` **previews**: (`input`) => `Stream`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: `"text"` \| `"reasoning"`; `delta`: `string`; `offset`: `number`; \}, \{ `channel`: `"text"` \| `"reasoning"`; `delta`: `string`; `offset`: `number`; \}\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \} \| \{ `attemptFence`: `number`; `generation`: `number`; `runId`: `string`; \}\>
 
 Observe the memory-only live preview lane for one Run.
 Frames contain bounded UTF-16 appends with per-attempt sequences and per-channel offsets.
@@ -1930,7 +1950,7 @@ frame. Preview events are memory-only and never durable RunEvents.
 
 ###### Returns
 
-`Stream`\<[`Event`](./ModelPreview.md#event)\>
+`Stream`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: `"text"` \| `"reasoning"`; `delta`: `string`; `offset`: `number`; \}, \{ `channel`: `"text"` \| `"reasoning"`; `delta`: `string`; `offset`: `number`; \}\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \} \| \{ `attemptFence`: `number`; `generation`: `number`; `runId`: `string`; \}\>
 
 <a id="recordreward"></a>
 
@@ -3231,7 +3251,7 @@ Re-exports [layer](../../durability.md#layer)
 
 ### ModelPreviewChange
 
-Renames and re-exports [Change](./ModelPreview.md#change)
+Renames and re-exports [Change](./ModelPreview.md#change-1)
 
 ***
 
@@ -3239,7 +3259,7 @@ Renames and re-exports [Change](./ModelPreview.md#change)
 
 ### ModelPreviewCleared
 
-Renames and re-exports [Cleared](./ModelPreview.md#cleared)
+Renames and re-exports [Cleared](./ModelPreview.md#cleared-1)
 
 ***
 
@@ -3247,7 +3267,7 @@ Renames and re-exports [Cleared](./ModelPreview.md#cleared)
 
 ### ModelPreviewEvent
 
-Renames and re-exports [Event](./ModelPreview.md#event)
+Renames and re-exports [Event](./ModelPreview.md#event-1)
 
 ***
 
@@ -3255,7 +3275,7 @@ Renames and re-exports [Event](./ModelPreview.md#event)
 
 ### ModelPreviewFrame
 
-Renames and re-exports [Frame](./ModelPreview.md#frame)
+Renames and re-exports [Frame](./ModelPreview.md#frame-1)
 
 ***
 

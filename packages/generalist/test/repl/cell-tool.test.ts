@@ -1,7 +1,7 @@
 import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import "./suites/bun-cell-isolation-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
+import { Context, Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { ToolContext, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
@@ -15,6 +15,7 @@ import {
   type SandboxProviderService,
   type SandboxService,
   SnapshotId,
+  SnapshotNotFound,
 } from "../../src/sandbox/index.js"
 import { registrationsFor } from "../runtime/execution/fixtures.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
@@ -254,6 +255,63 @@ layer(executorLayer)("cell tool route", (it) => {
     }),
   )
 })
+
+standalone.effect("rejects an unavailable inherited workspace instead of starting a fresh one", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const base = Context.get(yield* Layer.build(TestKernel.layerTestSandbox({ profile, script })), SandboxProvider)
+      const inheritedSandboxSnapshot = yield* Ref.make<string | undefined>("missing-workspace-snapshot")
+      let unkeyedAcquisitions = 0
+      let keyedAcquisitions = 0
+      let forks = 0
+      let starts = 0
+      const unavailableProvider = SandboxProvider.of({
+        ...base,
+        acquire: (options) => {
+          if (options?.key === undefined) unkeyedAcquisitions += 1
+          else keyedAcquisitions += 1
+          return base.acquire(options).pipe(
+            Effect.map((sandbox) => ({
+              ...sandbox,
+              start: (command) => {
+                starts += 1
+                return sandbox.start(command)
+              },
+              fork: (snapshotId) => {
+                forks += 1
+                return Effect.fail(SnapshotNotFound.make({ snapshotId }))
+              },
+            })),
+          )
+        },
+      })
+      const unavailableContext = ToolContext.ToolContext.of({
+        signal: yield* Effect.abortSignal,
+        emit: () => Effect.succeed(true),
+        sessionId,
+        toolCallId: "call-1",
+        operationKey: "operation-1",
+        inheritedSandboxSnapshot,
+      })
+      const unavailableExecutor = CellTool.layer.pipe(
+        Layer.provide(Layer.succeed(SandboxProvider, unavailableProvider)),
+      )
+      const executor = Context.get(yield* Layer.build(unavailableExecutor), ToolExecutor.ToolExecutor)
+      const outcome = yield* executor
+        .execute(request("must not run"))
+        .pipe(Effect.provideService(ToolContext.ToolContext, unavailableContext))
+
+      expect(outcome._tag).toBe("DomainFailure")
+      if (outcome._tag !== "DomainFailure") return
+      expect(Schema.is(Cell.KernelProtocolViolation)(outcome.failure)).toBe(true)
+      expect(unkeyedAcquisitions).toBe(1)
+      expect(keyedAcquisitions).toBe(0)
+      expect(forks).toBe(1)
+      expect(starts).toBe(0)
+      expect(yield* Ref.get(inheritedSandboxSnapshot)).toBe("missing-workspace-snapshot")
+    }),
+  ),
+)
 
 const oversizedCollected: Array<ToolContext.Progress> = []
 

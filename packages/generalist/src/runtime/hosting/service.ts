@@ -475,6 +475,11 @@ const makeRuntimeWith = (
         }),
       events: (input) => store.events({ runId: input.runId, cursor: input.cursor ?? cursorOrigin }),
       previews: (input) => modelPreviews(previewLane)(input.runId),
+      previewAuthority: (runId) =>
+        store.loadExecution(runId).pipe(
+          Effect.map((execution) => (execution.ownerId === undefined ? undefined : execution.attemptFence)),
+          Effect.orElseSucceed(() => undefined),
+        ),
       snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
         !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1000

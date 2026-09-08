@@ -40,6 +40,8 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
     run: changes.run ?? model.run,
     entries: changes.entries ?? model.entries,
     conversation: changes.conversation ?? model.conversation,
+    preview: changes.preview === undefined ? model.preview : changes.preview,
+    previewAuthority: changes.previewAuthority === undefined ? model.previewAuthority : changes.previewAuthority,
     draft: changes.draft ?? model.draft,
   })
 
@@ -263,6 +265,21 @@ const applySnapshot = (model: Model, snapshot: HostSessionSnapshot, epoch: numbe
     run,
     entries,
     conversation: snapshot.conversation,
+    preview: null,
+    previewAuthority:
+      current === undefined || current.outcome !== undefined
+        ? null
+        : {
+            runId: current.run.runId,
+            attemptFence: -1,
+            generation: -1,
+            turn: -1,
+            attempt: -1,
+            modelCallId: null,
+            modelAttemptId: null,
+            sequence: -1,
+            tombstoned: false,
+          },
   })
 }
 

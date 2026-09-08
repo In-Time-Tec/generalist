@@ -1,5 +1,6 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
 import { HostEvent } from "../host/event.js"
+import { PreviewDelivery } from "../host/preview.js"
 import { Cursor } from "../runtime/cursor.js"
 import { WireCodecFailed } from "./errors.js"
 
@@ -32,8 +33,12 @@ const makeCodec = <Type, Encoded>(schema: Schema.Codec<Type, Encoded, never, nev
   }
 }
 
-/** The one HostEvent codec shared by SSE and WebSocket. */
-export const eventCodec: EventCodec<HostEvent> = makeCodec(HostEvent)
+/** Events carried by the Session WebSocket. Previews are memory-only and have no committed cursor. */
+export const ServerEvent = Schema.Union([HostEvent, PreviewDelivery])
+export type ServerEvent = typeof ServerEvent.Type
+
+/** The Session WebSocket codec. SSE remains the committed HostEvent schema from the HTTP API. */
+export const eventCodec: EventCodec<ServerEvent> = makeCodec(ServerEvent)
 
 const ClientCommandJson = Schema.fromJsonString(ClientCommand)
 

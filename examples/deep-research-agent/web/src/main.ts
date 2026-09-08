@@ -435,7 +435,7 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
           ),
         ]
       : []
-  if (model.chat.entries.length === 0) {
+  if (model.chat.entries.length === 0 && model.chat.preview === null) {
     if (failure.length > 0) return failure
     if (approval.length > 0) return approval
     return [
@@ -452,8 +452,28 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
     ]
   }
   const entries = model.chat.entries.map((entry, index) => chatEntryView(model, entry, index))
+  const preview =
+    model.chat.preview === null
+      ? []
+      : [
+          h.keyed("div")(
+            `preview-${model.chat.preview.runId}`,
+            [],
+            [
+              assistantEntryView(
+                model,
+                `preview-reasoning-${model.chat.preview.runId}`,
+                Chat.AssistantEntry({
+                  text: model.chat.preview.text,
+                  reasoning: model.chat.preview.reasoning.length === 0 ? null : model.chat.preview.reasoning,
+                }),
+                [],
+              ),
+            ],
+          ),
+        ]
   const waiting =
-    model.chat.run._tag === "Running"
+    model.chat.run._tag === "Running" && model.chat.preview === null
       ? [
           h.keyed("div")(
             "waiting-row",
@@ -462,7 +482,7 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
           ),
         ]
       : []
-  return [...entries, ...waiting, ...approval, ...failure]
+  return [...entries, ...preview, ...waiting, ...approval, ...failure]
 }
 
 const sessionBannerView = (session: SessionState): Html => {

@@ -222,7 +222,7 @@
 
 ### Incoming
 
-> **Incoming** = *typeof* `SessionSnapshot.Type` \| *typeof* `HostDelivery.Type` \| *typeof* `ConnectionOpened.Type` \| *typeof* `ConnectionLost.Type` \| *typeof* `ConnectionFailed.Type`
+> **Incoming** = *typeof* `SessionSnapshot.Type` \| *typeof* `HostDelivery.Type` \| *typeof* `PreviewDelivery.Type` \| *typeof* `ConnectionOpened.Type` \| *typeof* `ConnectionLost.Type` \| *typeof* `ConnectionFailed.Type`
 
 **`Experimental`**
 
@@ -337,6 +337,18 @@ One committed Host event delivered within an established snapshot epoch.
 #### Returns
 
 `Layer.Layer`\<[`Connection`](#connection), `never`, `HttpClient.HttpClient` \| `Socket.WebSocketConstructor`\>
+
+***
+
+<a id="previewdelivery"></a>
+
+### PreviewDelivery
+
+> `const` **PreviewDelivery**: `CallableTaggedStruct`\<`"PreviewDelivery"`, \{ `delivery`: `Schema.TaggedStruct`\<`"PreviewDelivery"`, \{ `authorityAttemptFence`: `Schema.Int`; `event`: `Schema.Union`\<readonly \[`Schema.refine`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[..., ...\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \}, `Schema.TaggedStruct`\<`"ModelPreview"`, \{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `changes`: `Schema.NonEmptyArray`\<...\>; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `turn`: `Schema.Int`; \}\>\>, `Schema.TaggedStruct`\<`"ModelPreviewCleared"`, \{ `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `runId`: `Schema.String`; \}\>\]\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>; `epoch`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+One Host-authorized memory-only preview delivered within an established snapshot epoch.
 
 ***
 

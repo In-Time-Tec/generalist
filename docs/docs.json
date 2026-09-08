@@ -106,6 +106,7 @@
               "features/runtime",
               "features/durable-agent-driver",
               "features/durable-stores",
+              "features/durability-verification",
               "features/recovery",
               "features/budget"
             ]

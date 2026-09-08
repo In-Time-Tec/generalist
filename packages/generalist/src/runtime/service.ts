@@ -608,6 +608,8 @@ export interface Service extends RuntimeHostSessions {
    * frame. Preview events are memory-only and never durable RunEvents.
    */
   readonly previews: (input: PreviewsInput) => Stream.Stream<ModelPreviewEvent>
+  /** @internal Read the storage-issued fence currently authorized to publish live previews. */
+  readonly previewAuthority: (runId: string) => Effect.Effect<number | undefined>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
   /** Durably advance the host processed-through point to an exact committed model cycle. */

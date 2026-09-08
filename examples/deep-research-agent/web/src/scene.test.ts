@@ -90,6 +90,37 @@ describe("deep-research-agent web view", () => {
     )
   })
 
+  test("renders provisional model output instead of the waiting indicator", () => {
+    Scene.scene(
+      { update, view },
+      Scene.given({
+        ...baseModel(),
+        chat: {
+          ...baseModel().chat,
+          run: Chat.Running({ turn: 0 }),
+          preview: {
+            runId: "run-preview",
+            attemptFence: 3,
+            turn: 0,
+            modelCallId: "model-call-1",
+            modelAttemptId: "model-attempt-1",
+            attempt: 0,
+            sequence: 1,
+            text: "Provisional cited answer",
+            reasoning: "Checking sources",
+          },
+        },
+      }),
+      resolveViewportMount,
+      resolveContentMount,
+      resolveScrollerCommand,
+      Scene.expect(Scene.text("Provisional cited answer")).toExist(),
+      Scene.tap(({ html }) => {
+        expect(renderedText(html)).not.toContain("Thinking…")
+      }),
+    )
+  })
+
   test("running state renders a pending expanded tool card with the query", () => {
     Scene.scene(
       { update, view },

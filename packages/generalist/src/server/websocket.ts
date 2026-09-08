@@ -1,4 +1,4 @@
-import { Cause, Effect, Fiber, Stream } from "effect"
+import { Cause, Effect, Fiber, Ref, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { Any as AnyAgent } from "../core/agent/service.js"
@@ -48,13 +48,68 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
     const socket = yield* options.request.upgrade
     const writer = yield* socket.writer
     const close = (code: number, reason: string) => writer(new Socket.CloseEvent(code, reason))
+    const previewSubscription = yield* Ref.make<
+      { readonly runId: string; readonly fiber: Fiber.Fiber<void> } | undefined
+    >(undefined)
+    const writeEvent = (event: import("./wire.js").ServerEvent) =>
+      eventCodec.encode(event).pipe(
+        Effect.flatMap(writer),
+        Effect.catchTag("generalist/server/WireCodecFailed", () => close(1011, "wire-encoding-failed")),
+      )
+    const stopPreview = (runId?: string) =>
+      Ref.modify(previewSubscription, (current) =>
+        current === undefined || (runId !== undefined && current.runId !== runId)
+          ? [undefined, current]
+          : [current, undefined],
+      ).pipe(Effect.flatMap((current) => (current === undefined ? Effect.void : Fiber.interrupt(current.fiber))))
+    const startPreview = (runId: string) =>
+      Effect.gen(function* () {
+        yield* stopPreview()
+        const allowed = yield* authorize({
+          policy: options.authorization,
+          resource: { type: "run", id: runId },
+          action: "observe",
+        }).pipe(
+          Effect.as(true),
+          Effect.catchTags({
+            "generalist/server/Forbidden": () => close(1008, "forbidden").pipe(Effect.as(false)),
+            "generalist/server/Unauthorized": () => close(1008, "unauthorized").pipe(Effect.as(false)),
+          }),
+        )
+        if (!allowed) return
+        const previews = yield* options.host.events.previews(options.sessionId, runId)
+        const fiber = yield* previews.pipe(
+          Stream.runForEach(writeEvent),
+          Effect.catchTag("SocketError", () => Effect.void),
+          Effect.forkChild,
+        )
+        yield* Ref.set(previewSubscription, { runId, fiber })
+      })
+
+    const initial = yield* options.host.runs.list(options.sessionId)
+    const activeRoot = initial.findLast(
+      (run) =>
+        run.parentRunId === undefined &&
+        run.status !== "succeeded" &&
+        run.status !== "failed" &&
+        run.status !== "cancelled",
+    )
+    if (activeRoot !== undefined) yield* startPreview(activeRoot.runId)
 
     const eventFiber = yield* options.events.pipe(
       Stream.mapEffect((event) =>
-        eventCodec.encode(event).pipe(
-          Effect.flatMap(writer),
-          Effect.catchTag("generalist/server/WireCodecFailed", () => close(1011, "wire-encoding-failed")),
-        ),
+        Effect.gen(function* () {
+          if (event._tag === "RunStarted" && event.event.parentRunId === undefined) {
+            yield* stopPreview()
+            yield* writeEvent(event)
+            yield* startPreview(event.runId)
+            return
+          }
+          if (event._tag === "Completed" && event.event.parentRunId === undefined) {
+            yield* stopPreview(event.runId)
+          }
+          yield* writeEvent(event)
+        }),
       ),
       Stream.runDrain,
       Effect.catchTag("SocketError", () => Effect.void),
@@ -105,6 +160,6 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
 
     yield* socket
       .runRaw((data) => (data instanceof Uint8Array ? close(1003, "binary-command") : dispatch(data)))
-      .pipe(Effect.ensuring(Fiber.interrupt(eventFiber)))
+      .pipe(Effect.ensuring(Effect.all([Fiber.interrupt(eventFiber), stopPreview()], { discard: true })))
     return HttpServerResponse.empty()
   })

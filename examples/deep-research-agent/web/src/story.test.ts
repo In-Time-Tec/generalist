@@ -214,6 +214,61 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
 ]
 
 describe("deep-research-agent web update", () => {
+  test("projects provisional output and tombstones it when committed output arrives", () => {
+    const model = readyModel()
+    const preview = Connection.PreviewDelivery({
+      epoch: 0,
+      delivery: {
+        _tag: "PreviewDelivery",
+        sessionId,
+        runId: sessionId,
+        authorityAttemptFence: 2,
+        event: {
+          _tag: "ModelPreview",
+          runId: sessionId,
+          attemptFence: 2,
+          turn: 0,
+          modelCallId: "model-call-1",
+          modelAttemptId: "model-attempt-1",
+          attempt: 0,
+          generation: 1,
+          sequence: 0,
+          changes: [{ channel: "text", offset: 0, delta: "Provisional answer" }],
+        },
+      },
+    })
+    Story.story(
+      update,
+      Story.given({
+        ...model,
+        chat: {
+          ...model.chat,
+          run: Chat.Running({ turn: 0 }),
+          previewAuthority: {
+            runId: sessionId,
+            attemptFence: -1,
+            generation: -1,
+            turn: -1,
+            attempt: -1,
+            modelCallId: null,
+            modelAttemptId: null,
+            sequence: -1,
+            tombstoned: false,
+          },
+        },
+      }),
+      Story.message(agentAction(preview)),
+      Story.model((current) => {
+        expect(current.chat.preview?.text).toBe("Provisional answer")
+      }),
+      Story.message(agentAction(completionFrames.at(-1)!)),
+      Story.model((current) => {
+        expect(current.chat.preview).toBeNull()
+        expect(current.chat.previewAuthority?.tombstoned).toBe(true)
+      }),
+    )
+  })
+
   test("projects a successful Generalist transport event stream into the chat model", () => {
     Story.story(
       update,

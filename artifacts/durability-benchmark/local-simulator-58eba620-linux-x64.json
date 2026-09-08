@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 2,
+  "scope": "local deterministic ObjectStore simulator with scripted Runtime/model/tool execution; no S3/R2 provider",
+  "runtime": "Bun 1.4.0; linux/x64",
+  "provenance": {
+    "sourceCommit": "58eba62033e3668f86feb79c83addc97162929cf",
+    "sourceDirty": "true",
+    "scriptSha256": "d28dcfd75e47e3bce31d34119c1803b6ef2b9896ecc1021f07fb67b360477644"
+  },
+  "conditions": {
+    "pageSize": 32,
+    "seed": "deterministic scope/index payloads",
+    "concurrency": {
+      "hotPartition": 8,
+      "independentPartitions": 8,
+      "perPartition": 4
+    },
+    "workloads": {
+      "hotPartition": 64,
+      "independentPartitions": {
+        "partitions": 8,
+        "admissionsPerPartition": 8
+      },
+      "longHistory": 128,
+      "boundedArtifactPayload": {
+        "writes": 8,
+        "bytesPerWrite": 65536
+      },
+      "ownerReplacements": 8,
+      "idleScans": 16,
+      "runtimeWakeRecovery": 8,
+      "schedulerTimeoutWake": 1,
+      "idempotencyConflictRetries": 1,
+      "casContention": {
+        "writers": 2,
+        "losingReducerRetries": 1
+      },
+      "boundedToolOutput": {
+        "bytes": 65536,
+        "projectedBytes": 1024
+      }
+    },
+    "metrics": {
+      "admission": "RunStore.admitSend durable receipt",
+      "rewardMutation": "RunStore.recordReward durable domain mutation",
+      "runtimeOutcome": "RunExecutor execution through the succeeded terminal outcome commit",
+      "stateRead": "RunStore.inspect durable run projection",
+      "coldRecovery": "fresh-layer RunStore.list after long-history admission",
+      "artifact": "BlobStore.put bounded content-addressed payload",
+      "ownerReplacement": "claim after prior owner releases the same run",
+      "idle": "dueAwaitEvents scan with no due work",
+      "wakeRecovery": "persisted await-event suspension, fresh host, matching wake, and executor completion",
+      "schedulerTimeoutWake": "persisted await-event deadline, fresh host, LocalScheduler tick/idle, and terminal completion",
+      "conflictRetry": "divergent idempotency conflict followed by exact-receipt retry",
+      "casContention": "paused first slot create, independent second-client winner, then one losing reducer re-evaluation",
+      "toolOutput": "ToolOutput passes the full encoded result to a retaining test callback before emitting a bounded projection; this is not BlobStore durability"
+    }
+  },
+  "latencyMillis": {
+    "admissionHotPartition": {
+      "samples": 64,
+      "p50": 4.123118,
+      "p95": 278.446872,
+      "p99": 288.4614,
+      "max": 288.4614,
+      "total": 2204.62797
+    },
+    "admissionIndependentPartitions": {
+      "samples": 64,
+      "p50": 48.367156,
+      "p95": 251.471108,
+      "p99": 262.885537,
+      "max": 262.885537,
+      "total": 6636.638961999999
+    },
+    "admissionLongHistory": {
+      "samples": 128,
+      "p50": 5.269986,
+      "p95": 16.605555,
+      "p99": 22.447115,
+      "max": 23.266602,
+      "total": 784.542769
+    },
+    "rewardMutation": {
+      "samples": 32,
+      "p50": 2.519687,
+      "p95": 91.127745,
+      "p99": 93.342478,
+      "max": 93.342478,
+      "total": 687.2235300000002
+    },
+    "runtimeOutcomeCommit": {
+      "samples": 8,
+      "p50": 327.83087,
+      "p95": 631.471713,
+      "p99": 631.471713,
+      "max": 631.471713,
+      "total": 3217.293785
+    },
+    "stateRead": {
+      "samples": 64,
+      "p50": 0.226761,
+      "p95": 0.311202,
+      "p99": 2.715869,
+      "max": 2.715869,
+      "total": 17.354492999999994
+    },
+    "coldRecovery": {
+      "samples": 16,
+      "p50": 1.845732,
+      "p95": 18.285857,
+      "p99": 18.285857,
+      "max": 18.285857,
+      "total": 50.008182
+    },
+    "artifactWrite": {
+      "samples": 8,
+      "p50": 0.156821,
+      "p95": 0.697515,
+      "p99": 0.697515,
+      "max": 0.697515,
+      "total": 1.755183
+    },
+    "ownerReplacement": {
+      "samples": 8,
+      "p50": 4.931335,
+      "p95": 50.568783,
+      "p99": 50.568783,
+      "max": 50.568783,
+      "total": 86.06713300000001
+    },
+    "idleReconciliation": {
+      "samples": 16,
+      "p50": 0.343293,
+      "p95": 2.156556,
+      "p99": 2.156556,
+      "max": 2.156556,
+      "total": 7.747675999999999
+    },
+    "wakeRecovery": {
+      "samples": 8,
+      "p50": 539.469691,
+      "p95": 1020.664591,
+      "p99": 1020.664591,
+      "max": 1020.664591,
+      "total": 5208.239172
+    },
+    "schedulerTimeoutWake": {
+      "samples": 1,
+      "p50": 214.001276,
+      "p95": 214.001276,
+      "p99": 214.001276,
+      "max": 214.001276,
+      "total": 214.001276
+    },
+    "idempotencyConflictRetry": {
+      "samples": 1,
+      "p50": 0.884506,
+      "p95": 0.884506,
+      "p99": 0.884506,
+      "max": 0.884506,
+      "total": 0.884506
+    },
+    "casContention": {
+      "samples": 1,
+      "p50": 2.401628,
+      "p95": 2.401628,
+      "p99": 2.401628,
+      "max": 2.401628,
+      "total": 2.401628
+    },
+    "boundedToolOutput": {
+      "samples": 1,
+      "p50": 1.747852,
+      "p95": 1.747852,
+      "p99": 1.747852,
+      "max": 1.747852,
+      "total": 1.747852
+    }
+  },
+  "requestAndByteDeltas": {
+    "hotPartition": {
+      "read": 161,
+      "create": 99,
+      "list": 478,
+      "readBytes": 920654,
+      "attemptedWriteBytes": 510377
+    },
+    "independentPartitions": {
+      "read": 72,
+      "create": 88,
+      "list": 128,
+      "readBytes": 391280,
+      "attemptedWriteBytes": 445392
+    },
+    "longHistoryAndColdRecovery": {
+      "read": 179,
+      "create": 132,
+      "list": 530,
+      "readBytes": 13188112,
+      "attemptedWriteBytes": 1572048
+    },
+    "artifacts": {
+      "read": 0,
+      "create": 8,
+      "list": 0,
+      "readBytes": 0,
+      "attemptedWriteBytes": 525664
+    },
+    "ownerReplacement": {
+      "read": 65,
+      "create": 32,
+      "list": 67,
+      "readBytes": 235749,
+      "attemptedWriteBytes": 120178
+    },
+    "idleReconciliation": {
+      "read": 16,
+      "create": 0,
+      "list": 64,
+      "readBytes": 46912,
+      "attemptedWriteBytes": 0
+    },
+    "wakeRecovery": {
+      "read": 4371,
+      "create": 734,
+      "list": 2746,
+      "readBytes": 1372079942,
+      "attemptedWriteBytes": 9621784
+    },
+    "schedulerTimeoutWake": {
+      "read": 219,
+      "create": 93,
+      "list": 352,
+      "readBytes": 885860,
+      "attemptedWriteBytes": 388581
+    },
+    "idempotencyConflictRetry": {
+      "read": 5,
+      "create": 4,
+      "list": 8,
+      "readBytes": 27065,
+      "attemptedWriteBytes": 9141
+    },
+    "casContention": {
+      "read": 9,
+      "create": 9,
+      "list": 8,
+      "readBytes": 1817,
+      "attemptedWriteBytes": 1524
+    }
+  },
+  "derived": {
+    "artifactPayloadBytes": 524288,
+    "artifactPayloadBytesPerSecond": 298708453.76237124,
+    "zeroIdleWrites": true,
+    "casContention": {
+      "reducerEvaluations": 3,
+      "losingReducerRetries": 1
+    },
+    "replayWork": {
+      "reads": 179,
+      "lists": 530,
+      "readBytes": 13188112
+    },
+    "toolOutput": {
+      "retention": "process-memory test callback; not durable BlobStore persistence",
+      "retainedSerializedBytes": 65538,
+      "projectedPreviewBytes": 1024,
+      "projectedMaxBytes": 1024,
+      "outputPaths": ["memory:benchmark-large-output"]
+    },
+    "hostMemory": {
+      "before": {
+        "rss": 113102848,
+        "heapUsed": 26162346
+      },
+      "after": {
+        "rss": 396722176,
+        "heapUsed": 84661183
+      },
+      "delta": {
+        "rss": 283619328,
+        "heapUsed": 58498837
+      }
+    }
+  },
+  "contractBounds": {
+    "zeroRedispatch": "The fresh-host wake workload asserts one pre-wake model/tool dispatch and one post-wake model completion without rerunning the waiting tool.",
+    "zeroIdleWrites": "Required for this no-due-work scan and asserted by the report value.",
+    "byteLimits": "Artifact payloads are exactly 65536 bytes, at BlobStore's configured 65536-byte limit.",
+    "latency": "No latency SLO is asserted. These local simulator values establish a baseline only."
+  },
+  "limitations": {
+    "memoryCeiling": "RSS and heap are sampled through the explicit local process host boundary; no memory ceiling is asserted.",
+    "providerLatency": "Local S3/R2 service evidence is separate; this script makes no provider claim.",
+    "statisticalConfidence": "One committed local baseline run has no warmup study or confidence interval."
+  }
+}

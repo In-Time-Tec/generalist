@@ -13,13 +13,16 @@ import {
   WireCodecFailed,
 } from "./errors.js"
 import { layer } from "./layer.js"
-import { ClientCommand, CursorFromString, eventCodec } from "./wire.js"
+import { ClientCommand, CursorFromString, eventCodec, ServerEvent } from "./wire.js"
 import { HostEvent } from "../host/event.js"
+import { PreviewDelivery } from "../host/preview.js"
 import { HostSessionSnapshot, SessionSnapshotTooLarge } from "../runtime/session/host.js"
 export type {
   Client,
   ClientStreamError,
   Connection,
+  ConnectionEvent,
+  ConnectionSnapshot,
   ConnectionStatus,
   ConnectOptions,
   HttpError,
@@ -31,7 +34,7 @@ export type { Options as LayerOptions } from "./layer.js"
 export type { Principal, Authorization, Resource } from "./auth.js"
 export type { HostSessionSnapshot } from "../runtime/session/host.js"
 export type { ApiError } from "./errors.js"
-export type { ClientCommand, EventCodec } from "./wire.js"
+export type { ClientCommand, EventCodec, ServerEvent } from "./wire.js"
 
 export interface Server {
   readonly api: typeof api
@@ -45,6 +48,8 @@ export interface Server {
   readonly SessionSnapshot: typeof HostSessionSnapshot
   readonly SessionSnapshotTooLarge: typeof SessionSnapshotTooLarge
   readonly HostEvent: typeof HostEvent
+  readonly PreviewDelivery: typeof PreviewDelivery
+  readonly ServerEvent: typeof ServerEvent
   readonly ClientCommand: typeof ClientCommand
   readonly CursorFromString: typeof CursorFromString
   readonly eventCodec: typeof eventCodec
@@ -74,6 +79,8 @@ export const Server: Server = {
   SessionSnapshot: HostSessionSnapshot,
   SessionSnapshotTooLarge,
   HostEvent,
+  PreviewDelivery,
+  ServerEvent,
   ClientCommand,
   CursorFromString,
   eventCodec,

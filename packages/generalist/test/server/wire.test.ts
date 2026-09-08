@@ -12,6 +12,55 @@ describe("Server event wire contract", () => {
     }),
   )
 
+  it.effect("round-trips a memory-only preview with separate Host authority", () =>
+    Effect.gen(function* () {
+      const delivery = Server.PreviewDelivery.make({
+        _tag: "PreviewDelivery",
+        sessionId: "session-1",
+        runId: "run-1",
+        authorityAttemptFence: 7,
+        event: {
+          _tag: "ModelPreview",
+          runId: "run-1",
+          attemptFence: 7,
+          turn: 1,
+          modelCallId: "model-call-1",
+          modelAttemptId: "model-attempt-1",
+          attempt: 0,
+          generation: 1,
+          sequence: 0,
+          changes: [{ channel: "text", offset: 0, delta: "provisional" }],
+        },
+      })
+      expect(yield* Server.eventCodec.decode(yield* Server.eventCodec.encode(delivery))).toEqual(delivery)
+    }),
+  )
+
+  it("rejects a preview frame whose combined changes exceed the wire bound", () => {
+    const invalid = {
+      _tag: "PreviewDelivery",
+      sessionId: "session-1",
+      runId: "run-1",
+      authorityAttemptFence: 7,
+      event: {
+        _tag: "ModelPreview",
+        runId: "run-1",
+        attemptFence: 7,
+        turn: 1,
+        modelCallId: "model-call-1",
+        modelAttemptId: "model-attempt-1",
+        attempt: 0,
+        generation: 1,
+        sequence: 0,
+        changes: [
+          { channel: "text", offset: 0, delta: "x".repeat(4_096) },
+          { channel: "reasoning", offset: 0, delta: "y" },
+        ],
+      },
+    }
+    expect(Schema.decodeUnknownOption(Server.ServerEvent)(invalid)._tag).toBe("None")
+  })
+
   it("rejects a wrapper whose Runtime event belongs to another Host event category", () => {
     const event = hostEvent(4)
     const invalid = { ...event, _tag: "Completed" }

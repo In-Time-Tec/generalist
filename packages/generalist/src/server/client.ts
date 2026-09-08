@@ -27,9 +27,11 @@ import type { Cursor } from "../runtime/cursor.js"
 import type { HostSessionSnapshot } from "../runtime/session/host.js"
 import { api, type RunCancelPayload, type RunStartPayload } from "./api.js"
 import { ApiError, InvalidConnectOptions, ReconnectExhausted, TransportError, Unauthorized } from "./errors.js"
-import { encodeCommand, eventCodec, type ClientCommand } from "./wire.js"
+import { encodeCommand, eventCodec, type ClientCommand, type ServerEvent } from "./wire.js"
 
 type RawClient = HttpApiClient.ForApi<typeof api>
+type SnapshotError = Effect.Error<ReturnType<RawClient["sessions"]["snapshot"]>>
+type SocketClientError = HttpError | TransportError | SnapshotError
 
 export type ConnectionStatus =
   | { readonly _tag: "Connecting"; readonly epoch: number }
@@ -39,6 +41,17 @@ export type ConnectionStatus =
 
 export type ClientStreamError = ApiError | Unauthorized | TransportError
 export type ReconnectSchedule = Schedule.Schedule<unknown, ClientStreamError>
+/** Maximum lifecycle statuses retained while a consumer is backlogged. */
+export const ConnectionStatusCapacity = 8
+
+/** A committed snapshot loaded before a replacement WebSocket starts delivering events. */
+export interface ConnectionSnapshot {
+  readonly _tag: "ConnectionSnapshot"
+  /** The originating WebSocket attempt epoch, including attempts whose snapshot load failed. */
+  readonly epoch: number
+  readonly snapshot: HostSessionSnapshot
+}
+export type ConnectionEvent = ServerEvent | ConnectionSnapshot
 
 export interface ConnectOptions {
   readonly sessionId: string
@@ -48,7 +61,7 @@ export interface ConnectOptions {
 
 export interface Connection {
   readonly snapshot: HostSessionSnapshot
-  readonly events: Stream.Stream<HostEvent, TransportError>
+  readonly events: Stream.Stream<ConnectionEvent, TransportError>
   readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, TransportError>
   readonly status: Stream.Stream<ConnectionStatus>
   readonly exhausted: Effect.Effect<never, ReconnectExhausted>
@@ -161,11 +174,17 @@ const asWebSocketUrl = (url: string): string => {
   return parsed.toString()
 }
 
-const clientError = (error: HttpError | TransportError): ApiError | Unauthorized | TransportError => {
+const errorMessage = (error: SocketClientError): string =>
+  error instanceof Error ? error.message : "Server client transport failed"
+
+const clientError = (error: SocketClientError): ApiError | Unauthorized | TransportError => {
   if (Schema.is(ApiError)(error) || Schema.is(Unauthorized)(error)) return error
   if (SseRetry.is(error)) return transportError("server requested SSE reconnect", "socket")
-  return transportError(error.message, "socket")
+  return transportError(errorMessage(error), "socket")
 }
+
+const reconnectError = (error: SocketClientError): TransportError =>
+  Schema.is(TransportError)(error) ? error : transportError(errorMessage(error), "socket")
 
 const subscribe = (
   raw: RawClient,
@@ -240,8 +259,8 @@ const connect = (
     const snapshot = yield* loadSnapshot
     const constructor = yield* Socket.WebSocketConstructor
     const scope = yield* Effect.scope
-    const eventQueue = yield* Queue.bounded<HostEvent, TransportError>(capacity)
-    const statusQueue = yield* Queue.sliding<ConnectionStatus>(8)
+    const eventQueue = yield* Queue.bounded<ConnectionEvent, TransportError>(capacity)
+    const statusQueue = yield* Queue.sliding<ConnectionStatus>(ConnectionStatusCapacity)
     const writerRef = yield* Ref.make<Option.Option<(chunk: string) => Effect.Effect<void, TransportError>>>(
       Option.none(),
     )
@@ -252,6 +271,11 @@ const connect = (
     const runSocket = Effect.suspend(() =>
       Effect.gen(function* () {
         const attempt = yield* Ref.getAndUpdate(attemptRef, (current) => current + 1)
+        if (attempt > 0) {
+          const replacement = yield* loadSnapshot.pipe(Effect.mapError(clientError))
+          yield* Ref.set(cursorRef, replacement.cursor)
+          yield* Queue.offer(eventQueue, { _tag: "ConnectionSnapshot", epoch: attempt, snapshot: replacement })
+        }
         yield* Queue.offer(
           statusQueue,
           attempt === 0 ? { _tag: "Connecting", epoch: attempt } : { _tag: "Retrying", epoch: attempt, attempt },
@@ -294,6 +318,16 @@ const connect = (
                       if (!active) return
                       if (event.sessionId !== options.sessionId)
                         return yield* transportError("HostEvent belongs to another Session", "protocol")
+                      if (event._tag === "PreviewDelivery") {
+                        if (
+                          event.runId !== event.event.runId ||
+                          event.authorityAttemptFence !== event.event.attemptFence
+                        ) {
+                          return yield* transportError("preview delivery does not match Host authority", "protocol")
+                        }
+                        yield* Queue.offer(eventQueue, event)
+                        return
+                      }
                       const admittedCursor = yield* Ref.get(cursorRef)
                       if (event.cursor <= admittedCursor) return
                       yield* Queue.offer(eventQueue, event)
@@ -327,8 +361,9 @@ const connect = (
     const runClient = runSocket.pipe(
       Effect.retry(options.reconnect ?? defaultReconnectSchedule),
       Effect.catch((error) => {
-        const failure = ReconnectExhausted.make({ lastError: error })
-        return Deferred.fail(exhausted, failure).pipe(Effect.andThen(Queue.fail(eventQueue, error)), Effect.asVoid)
+        const lastError = reconnectError(error)
+        const failure = ReconnectExhausted.make({ lastError })
+        return Deferred.fail(exhausted, failure).pipe(Effect.andThen(Queue.fail(eventQueue, lastError)), Effect.asVoid)
       }),
     )
     const fiber = yield* runClient.pipe(Effect.forkIn(scope))

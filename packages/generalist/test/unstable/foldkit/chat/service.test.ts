@@ -2,11 +2,32 @@ import { describe, expect, it } from "vitest"
 import { Option, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { HostEvent } from "generalist/host"
-import { ExecutableManifest, RunEvent } from "generalist/runtime"
+import { Address, ExecutableManifest, RunEvent } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { Chat, Connection } from "../../../../src/unstable/foldkit/index.js"
 
-const executableRef = ExecutableManifest.makeTest("assistant", "1").ref
+const executable = ExecutableManifest.makeTest("assistant", "1")
+const executableRef = executable.ref
+const previewRun = {
+  run: {
+    runId: "run-1",
+    status: "running" as const,
+    executableRef,
+    executableManifest: executable.manifest,
+    depth: 0,
+    treePolicy: { maxDepth: 1, maxSubagents: 1 },
+    waits: [],
+    lastSequence: -1,
+    durability: "durable" as const,
+    branches: [],
+  },
+  cursor: -1,
+  turn: 0,
+  usageFacts: [],
+  budget: {},
+  compactions: [],
+  gates: [],
+}
 const runtimeEvent = <Fields extends object>(sequence: number, fields: Fields): RunEvent.RunEvent =>
   Schema.decodeUnknownSync(RunEvent.RunEvent)({
     specVersion: "1",
@@ -29,8 +50,8 @@ const hostEvent = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEv
     event,
   })
 
-const updateWith = (model: Chat.Model, event: HostEvent) =>
-  Chat.update(model, Chat.ReceivedConnection({ event: Connection.HostDelivery({ epoch: 0, event }) }))
+const updateWith = (model: Chat.Model, event: HostEvent, epoch = 0) =>
+  Chat.update(model, Chat.ReceivedConnection({ event: Connection.HostDelivery({ epoch, event }) }))
 
 const connectedModel = () =>
   Chat.update(
@@ -49,6 +70,53 @@ const connectedModel = () =>
     }),
   )[0]
 
+const connectedPreviewModel = () =>
+  Chat.update(
+    Chat.initialModel("session-1"),
+    Chat.ReceivedConnection({
+      event: Connection.SessionSnapshot({
+        epoch: 0,
+        snapshot: {
+          version: 1,
+          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+          cursor: -1,
+          runs: [previewRun],
+          conversation: { leafId: null, entries: [] },
+        },
+      }),
+    }),
+  )[0]
+
+const preview = (input: {
+  readonly epoch: number
+  readonly authority: number
+  readonly generation?: number
+  readonly sequence: number
+  readonly offset: number
+  readonly delta: string
+}) =>
+  Connection.PreviewDelivery({
+    epoch: input.epoch,
+    delivery: Server.PreviewDelivery.make({
+      _tag: "PreviewDelivery",
+      sessionId: "session-1",
+      runId: "run-1",
+      authorityAttemptFence: input.authority,
+      event: {
+        _tag: "ModelPreview",
+        runId: "run-1",
+        attemptFence: input.authority,
+        turn: 0,
+        modelCallId: `model-call:${input.authority}`,
+        modelAttemptId: `model-attempt:${input.authority}`,
+        attempt: 0,
+        generation: input.generation ?? 1,
+        sequence: input.sequence,
+        changes: [{ channel: "text", offset: input.offset, delta: input.delta }],
+      },
+    }),
+  })
+
 const searchCall = Response.makePart("tool-call", {
   id: "tool-1",
   name: "search",
@@ -57,8 +125,164 @@ const searchCall = Response.makePart("tool-call", {
 })
 
 describe("Chat HostEvent projection", () => {
+  it("rejects obsolete previews after snapshot rebuild and bounds provisional ordering", () => {
+    let model = connectedPreviewModel()
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 0, authority: 2, sequence: 0, offset: 0, delta: "old connection" }),
+      }),
+    )
+    expect(model.preview?.text).toBe("old connection")
+
+    const rebuilt = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: Connection.SessionSnapshot({
+          epoch: 1,
+          snapshot: {
+            version: 1,
+            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+            cursor: 4,
+            runs: [previewRun],
+            conversation: { leafId: null, entries: [] },
+          },
+        }),
+      }),
+    )[0]
+    expect(rebuilt.preview).toBeNull()
+    ;[model] = Chat.update(
+      rebuilt,
+      Chat.ReceivedConnection({ event: preview({ epoch: 0, authority: 2, sequence: 1, offset: 14, delta: " stale" }) }),
+    )
+    expect(model).toEqual(rebuilt)
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({ event: preview({ epoch: 1, authority: 3, sequence: 0, offset: 0, delta: "current" }) }),
+    )
+    expect(model.preview).toMatchObject({ attemptFence: 3, sequence: 0, text: "current" })
+    expect(Chat.conversationItems(model).at(-1)).toMatchObject({
+      _tag: "PreviewConversationItem",
+      attemptFence: 3,
+      sequence: 0,
+      entry: { _tag: "AssistantEntry", text: "current" },
+    })
+
+    const beforeHistoricalDelivery = model
+    ;[model] = updateWith(
+      model,
+      hostEvent(
+        4,
+        "RunStarted",
+        runtimeEvent(0, {
+          _tag: "RunAccepted",
+          messageId: "historical-message",
+          address: Address.make("agent:assistant"),
+        }),
+      ),
+      1,
+    )
+    expect(model).toEqual(beforeHistoricalDelivery)
+    ;[model] = updateWith(model, hostEvent(4, "Turn", runtimeEvent(1, { _tag: "TurnCompleted", turn: 0 })), 1)
+    expect(model).toEqual(beforeHistoricalDelivery)
+
+    const current = model
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 2, sequence: 0, offset: 0, delta: "obsolete" }),
+      }),
+    )
+    expect(model).toEqual(current)
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 3, sequence: 0, offset: 0, delta: "duplicate" }),
+      }),
+    )
+    expect(model).toEqual(current)
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({ event: preview({ epoch: 1, authority: 3, sequence: 2, offset: 7, delta: "gap" }) }),
+    )
+    expect(model.preview).toBeNull()
+    expect(model.entries).toEqual([])
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 3, sequence: 0, offset: 0, delta: "resurrected" }),
+      }),
+    )
+    expect(model.preview).toBeNull()
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 4, sequence: 0, offset: 0, delta: "new attempt" }),
+      }),
+    )
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 4, sequence: 1, offset: 0, delta: "bad offset" }),
+      }),
+    )
+    expect(model.preview).toBeNull()
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 5, sequence: 0, offset: 0, delta: "committing" }),
+      }),
+    )
+    ;[model] = updateWith(
+      model,
+      hostEvent(
+        5,
+        "Completed",
+        runtimeEvent(5, {
+          _tag: "RunCompleted",
+          result: {
+            text: "committed",
+            output: "committed",
+            turns: 1,
+            session: { sessionId: "session-1", leafId: "entry-1" },
+          },
+        }),
+      ),
+      1,
+    )
+    expect(model.preview).toBeNull()
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 5, sequence: 0, offset: 0, delta: "after commit" }),
+      }),
+    )
+    expect(model.preview).toBeNull()
+
+    const chunk = "x".repeat(4_096)
+    for (let sequence = 0; sequence <= 16; sequence += 1) {
+      ;[model] = Chat.update(
+        model,
+        Chat.ReceivedConnection({
+          event: preview({ epoch: 1, authority: 6, sequence, offset: sequence * chunk.length, delta: chunk }),
+        }),
+      )
+    }
+    expect(model.preview).toBeNull()
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 1, authority: 7, sequence: 0, offset: 0, delta: "disconnecting" }),
+      }),
+    )
+    ;[model] = Chat.update(
+      model,
+      Chat.ReceivedConnection({ event: Connection.ConnectionLost({ sessionId: "session-1", epoch: 1 }) }),
+    )
+    expect(model.preview).toBeNull()
+  })
   it("restores committed terminal summaries and ignores snapshots and events from older epochs", () => {
-    const executable = ExecutableManifest.makeTest("assistant", "1")
+    const restoredExecutable = ExecutableManifest.makeTest("assistant", "1")
     const snapshot = Schema.decodeSync(Server.SessionSnapshot)({
       version: 1,
       session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
@@ -80,8 +304,8 @@ describe("Chat HostEvent projection", () => {
           run: {
             runId: "run-1",
             status: "succeeded",
-            executableRef: executable.ref,
-            executableManifest: executable.manifest,
+            executableRef: restoredExecutable.ref,
+            executableManifest: restoredExecutable.manifest,
             depth: 0,
             treePolicy: { maxDepth: 1, maxSubagents: 1 },
             waits: [],
@@ -147,6 +371,91 @@ describe("Chat HostEvent projection", () => {
       lastSeq: 20,
       run: { _tag: "Running", turn: 2 },
     })
+  })
+
+  it("rebuilds a deleted client projection from the authoritative Session snapshot", () => {
+    const restoredExecutable = ExecutableManifest.makeTest("assistant", "1")
+    const snapshot = Schema.decodeSync(Server.SessionSnapshot)({
+      version: 1,
+      session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+      cursor: 8,
+      conversation: {
+        leafId: "entry-1",
+        entries: [
+          {
+            id: "entry-1",
+            parentId: null,
+            messages: [
+              Prompt.makeMessage("assistant", {
+                content: [Prompt.makePart("text", { text: "rebuilt answer" })],
+              }),
+            ],
+          },
+        ],
+      },
+      runs: [
+        {
+          run: {
+            runId: "run-1",
+            status: "succeeded",
+            executableRef: restoredExecutable.ref,
+            executableManifest: restoredExecutable.manifest,
+            depth: 0,
+            treePolicy: { maxDepth: 1, maxSubagents: 1 },
+            waits: [],
+            lastSequence: 4,
+            durability: "durable",
+            branches: [],
+          },
+          cursor: 4,
+          turn: 1,
+          usageFacts: [],
+          budget: {},
+          compactions: [],
+          gates: [],
+          outcome: {
+            _tag: "Succeeded",
+            eventId: "run-1:4",
+            occurredAt: "2026-09-02T00:00:00.000Z",
+            result: {
+              text: "rebuilt answer",
+              output: "rebuilt answer",
+              turns: 1,
+              session: { sessionId: "session-1", leafId: "entry-1" },
+            },
+          },
+        },
+      ],
+    })
+    const rebuild = (epoch: number) =>
+      Chat.update(
+        Chat.initialModel("session-1"),
+        Chat.ReceivedConnection({ event: Connection.SessionSnapshot({ epoch, snapshot }) }),
+      )
+    const [original, originalCommands] = rebuild(1)
+    const deleted = Chat.initialModel("session-1")
+    expect(deleted.entries).toEqual([])
+    const [rebuilt, rebuiltCommands] = rebuild(2)
+    expect(rebuilt).toMatchObject({
+      connectionEpoch: 2,
+      lastSeq: 8,
+      run: { _tag: "Idle" },
+      entries: [{ _tag: "AssistantEntry", text: "rebuilt answer" }],
+    })
+    expect(rebuilt.entries).toEqual(original.entries)
+    expect(originalCommands).toEqual([])
+    expect(rebuiltCommands).toEqual([])
+    expect(
+      Chat.update(
+        rebuilt,
+        Chat.ReceivedConnection({
+          event: Connection.HostDelivery({
+            epoch: 1,
+            event: hostEvent(99, "Turn", runtimeEvent(5, { _tag: "TurnStarted", turn: 99 })),
+          }),
+        }),
+      )[0],
+    ).toEqual(rebuilt)
   })
 
   it("tracks Session cursors and Runtime-owned tool state", () => {

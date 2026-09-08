@@ -6,33 +6,15 @@
 
 # ModelPreview
 
-## Interfaces
+## Type Aliases
 
 <a id="change"></a>
 
 ### Change
 
+> **Change** = *typeof* `Change.Type`
+
 One ordered append to a model output channel. Offsets and deltas use UTF-16 code units.
-
-#### Properties
-
-<a id="channel"></a>
-
-##### channel
-
-> `readonly` **channel**: `Channel`
-
-<a id="delta"></a>
-
-##### delta
-
-> `readonly` **delta**: `string`
-
-<a id="offset"></a>
-
-##### offset
-
-> `readonly` **offset**: `number`
 
 ***
 
@@ -40,33 +22,19 @@ One ordered append to a model output channel. Offsets and deltas use UTF-16 code
 
 ### Cleared
 
+> **Cleared** = *typeof* `Cleared.Type`
+
 Tombstone emitted when a Run's memory-only model preview lane is cleared.
 
-#### Properties
+***
 
-<a id="_tag"></a>
+<a id="event"></a>
 
-##### \_tag
+### Event
 
-> `readonly` **\_tag**: `"ModelPreviewCleared"`
+> **Event** = *typeof* `Event.Type`
 
-<a id="attemptfence"></a>
-
-##### attemptFence
-
-> `readonly` **attemptFence**: `number`
-
-<a id="generation"></a>
-
-##### generation
-
-> `readonly` **generation**: `number`
-
-<a id="runid"></a>
-
-##### runId
-
-> `readonly` **runId**: `string`
+One event from a Run's memory-only model preview lane.
 
 ***
 
@@ -74,75 +42,51 @@ Tombstone emitted when a Run's memory-only model preview lane is cleared.
 
 ### Frame
 
+> **Frame** = *typeof* `Frame.Type`
+
 A bounded append frame for one live provider attempt.
 
-#### Properties
+## Variables
 
-<a id="_tag-1"></a>
+<a id="change-1"></a>
 
-##### \_tag
+### Change
 
-> `readonly` **\_tag**: `"ModelPreview"`
+> `const` **Change**: `Schema.Struct`\<\{ `channel`: `Schema.Literals`\<readonly \[`"reasoning"`, `"text"`\]\>; `delta`: `Schema.String`; `offset`: `Schema.Int`; \}\>
 
-<a id="attempt"></a>
+One ordered append to a model output channel. Offsets and deltas use UTF-16 code units.
 
-##### attempt
+***
 
-> `readonly` **attempt**: `number`
+<a id="cleared-1"></a>
 
-<a id="attemptfence-1"></a>
+### Cleared
 
-##### attemptFence
+> `const` **Cleared**: `Schema.TaggedStruct`\<`"ModelPreviewCleared"`, \{ `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `runId`: `Schema.String`; \}\>
 
-> `readonly` **attemptFence**: `number`
+Tombstone emitted when a Run's memory-only model preview lane is cleared.
 
-<a id="changes"></a>
+***
 
-##### changes
-
-> `readonly` **changes**: readonly \[[`Change`](#change), [`Change`](#change)\]
-
-<a id="modelattemptid"></a>
-
-##### modelAttemptId
-
-> `readonly` **modelAttemptId**: `string`
-
-<a id="modelcallid"></a>
-
-##### modelCallId
-
-> `readonly` **modelCallId**: `string`
-
-<a id="runid-1"></a>
-
-##### runId
-
-> `readonly` **runId**: `string`
-
-<a id="sequence"></a>
-
-##### sequence
-
-> `readonly` **sequence**: `number`
-
-<a id="turn"></a>
-
-##### turn
-
-> `readonly` **turn**: `number`
-
-## Type Aliases
-
-<a id="event"></a>
+<a id="event-1"></a>
 
 ### Event
 
-> **Event** = [`Frame`](#frame) \| [`Cleared`](#cleared)
+> `const` **Event**: `Schema.Union`\<readonly \[`Schema.refine`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: `"reasoning"` \| `"text"`; `delta`: `string`; `offset`: `number`; \}, ...\{ channel: (...) \| (...); delta: string; offset: number \}\[\]\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \}, `Schema.TaggedStruct`\<`"ModelPreview"`, \{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `changes`: `Schema.NonEmptyArray`\<`Schema.Struct`\<\{ `channel`: `Schema.Literals`\<readonly ...\>; `delta`: `Schema.String`; `offset`: `Schema.Int`; \}\>\>; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `turn`: `Schema.Int`; \}\>\>, `Schema.TaggedStruct`\<`"ModelPreviewCleared"`, \{ `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `runId`: `Schema.String`; \}\>\]\>
 
 One event from a Run's memory-only model preview lane.
 
-## Variables
+***
+
+<a id="frame-1"></a>
+
+### Frame
+
+> `const` **Frame**: `Schema.refine`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: `"reasoning"` \| `"text"`; `delta`: `string`; `offset`: `number`; \}, ...\{ channel: "reasoning" \| "text"; delta: string; offset: number \}\[\]\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \}, `Schema.TaggedStruct`\<`"ModelPreview"`, \{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `changes`: `Schema.NonEmptyArray`\<`Schema.Struct`\<\{ `channel`: `Schema.Literals`\<readonly \[`"reasoning"`, `"text"`\]\>; `delta`: `Schema.String`; `offset`: `Schema.Int`; \}\>\>; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `turn`: `Schema.Int`; \}\>\>
+
+A bounded append frame for one live provider attempt.
+
+***
 
 <a id="maxcadencemillis"></a>
 

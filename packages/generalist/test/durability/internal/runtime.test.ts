@@ -1,4 +1,5 @@
 import { register as registerBranches } from "./branch-suite.js"
+import "./domain-model-suite.js"
 import { BunCrypto } from "@effect/platform-bun"
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each durability test owns its scoped BunCrypto test-host Layer. */
 import { describe, expect, it } from "@effect/vitest"

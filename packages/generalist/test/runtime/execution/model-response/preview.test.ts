@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Ref, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Ref, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
 import {
@@ -373,6 +373,37 @@ it.effect("closes offers and emits one clear tombstone with the execution scope"
         generation: 2,
       })
       yield* Fiber.interrupt(subscriber)
+    }),
+  ),
+)
+
+it.effect("a fresh process lane cannot replay or accept a prior attempt preview", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const oldScope = yield* Scope.make()
+      const oldLane = yield* make.pipe(Effect.provideService(Scope.Scope, oldScope))
+      const oldSink = yield* oldLane.open("run-restarted", 11).pipe(Effect.provideService(Scope.Scope, oldScope))
+      const oldFrame = yield* oldLane
+        .previews("run-restarted")
+        .pipe(Stream.filter(isFrame), Stream.take(1), Stream.runCollect, Effect.forkChild({ startImmediately: true }))
+      expect(yield* oldSink.offer(delta("text", "obsolete"))).toBe(true)
+      expect([...(yield* Fiber.join(oldFrame))]).toMatchObject([{ attemptFence: 11, sequence: 0 }])
+      yield* Scope.close(oldScope, Exit.void)
+      expect(yield* oldSink.offer(delta("text", "late-obsolete"))).toBe(false)
+
+      const restartedLane = yield* make
+      const restartedSink = yield* restartedLane.open("run-restarted", 12)
+      const rebuilt = yield* restartedLane
+        .previews("run-restarted")
+        .pipe(Stream.filter(isFrame), Stream.take(1), Stream.runCollect, Effect.forkChild({ startImmediately: true }))
+      expect(yield* restartedSink.offer(delta("text", "current"))).toBe(true)
+      expect([...(yield* Fiber.join(rebuilt))]).toMatchObject([
+        {
+          attemptFence: 12,
+          sequence: 0,
+          changes: [{ channel: "text", offset: 0, delta: "current" }],
+        },
+      ])
     }),
   ),
 )

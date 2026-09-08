@@ -116,6 +116,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     rewind: () => unused(),
     send: rootSend(() => unused()),
     previews: () => Stream.empty,
+    previewAuthority: () => Effect.succeed(0),
     spawn: () => unused(),
     events: () => Stream.empty,
     snapshot: () => unused(),

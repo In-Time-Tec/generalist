@@ -2,56 +2,25 @@ import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import { afterAll, beforeAll, expect, layer } from "@effect/vitest"
-import { localState, Stack } from "alchemy"
-import {
-  Container,
-  ContainerProvider,
-  DockerLive,
-  Providers,
-  RemoteImage,
-  RemoteImageProvider,
-  Volume,
-  VolumeProvider,
-} from "alchemy/Docker"
+import { localState } from "alchemy"
 import { make as makeTest } from "alchemy/Test/Vitest"
-import { collection } from "alchemy/Provider"
 import { Context, Crypto, Effect, FileSystem, Layer, Schedule, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
 import { type ConnectionOptions, make as makeS3 } from "../../src/durability/s3.js"
 import { Head, append, exercise, objectConformance, recover } from "./local-operations.js"
+import { makeMinioStack, providers } from "./local-minio.js"
 import { build } from "esbuild"
 import { vi } from "vitest"
 
 beforeAll(() => vi.stubEnv("ALCHEMY_TELEMETRY_DISABLED", "1"))
 afterAll(() => vi.unstubAllEnvs())
 
-const providers = Layer.effect(Providers, collection([Container, RemoteImage, Volume])).pipe(
-  Layer.provide(Layer.mergeAll(ContainerProvider(), RemoteImageProvider(), VolumeProvider())),
-  Layer.provideMerge(DockerLive),
-)
 const local = makeTest({ providers, state: localState(), dev: false, sidecar: false })
-const stack = Stack(
-  "generalist-local-minio",
-  { providers, state: localState() },
-  Effect.gen(function* () {
-    const image = yield* RemoteImage("Image", {
-      name: "minio/minio",
-      tag: "RELEASE.2025-04-22T22-12-26Z",
-      alwaysPull: false,
-    })
-    const volume = yield* Volume("Data", {})
-    const container = yield* Container("Server", {
-      image,
-      start: true,
-      command: ["server", "/data"],
-      environment: { MINIO_ROOT_USER: "local-integration-only", MINIO_ROOT_PASSWORD: "local-integration-not-a-secret" },
-      ports: [{ internal: 9000, external: "127.0.0.1:" }],
-      volumes: [{ hostPath: volume.name, containerPath: "/data" }],
-    })
-    return { id: container.id, ports: container.ports }
-  }),
-)
+const stack = makeMinioStack({
+  name: "generalist-local-minio",
+  credentials: { accessKeyId: "local-integration-only", secretAccessKey: "local-integration-not-a-secret" },
+})
 
 local.test(
   "local MinIO: production S3 conformance, client-injected lost acknowledgement, and server restart recovery",

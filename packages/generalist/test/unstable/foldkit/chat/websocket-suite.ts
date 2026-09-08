@@ -11,6 +11,7 @@ import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { SessionCursorExpired, SessionSubscriberLagged } from "../../../../src/runtime/session/host.js"
+import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
 import { Chat, Connection } from "../../../../src/unstable/foldkit/index.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
 
@@ -23,9 +24,17 @@ const services = Layer.mergeAll(
 )
 
 layer(services, { excludeTestServices: true })("Foldkit real Server client", (it) => {
-  for (const mode of ["cursor-expired", "lagged", "persistent-expiry", "conversation-gap"] as const) {
+  for (const mode of [
+    "cursor-expired",
+    "lagged",
+    "persistent-expiry",
+    "conversation-gap",
+    "socket-retry",
+    "status-backlog",
+  ] as const) {
     const reason = mode === "persistent-expiry" ? "cursor-expired" : mode
     const persistent = mode === "persistent-expiry"
+    const reconnects = persistent ? 3 : 1
     it.effect(`loads an existing snapshot and automatically replaces it after ${mode}`, () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: `foldkit-${mode}` })
@@ -40,13 +49,16 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
           Effect.gen(function* () {
             const events = yield* subscribe(sessionId, cursor)
             subscriptions++
-            if (subscriptions !== 1 && !persistent) return events
             if (subscriptions === 1)
               replacementRunId = (yield* host.runs.start(session.id, agent, "concurrent input").pipe(Effect.orDie)).id
+            if (subscriptions !== 1 && !persistent) return events
             if (mode === "conversation-gap") {
               return events.pipe(
                 Stream.filter((event) => event._tag !== "Conversation" || event.update.previousLeafId !== null),
               )
+            }
+            if (mode === "socket-retry" || mode === "status-backlog") {
+              return Stream.fail(RuntimeUnavailable.make({ message: "replacement host required" }))
             }
             const latest = yield* host.sessions.snapshot(session.id).pipe(Effect.orDie)
             return Stream.fail(
@@ -104,8 +116,17 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
         const models = yield* Effect.scoped(
           Effect.gen(function* () {
             const connected = yield* client.session({ sessionId: session.id })
-            return yield* connected.frames.pipe(
+            const oldStatusSeen = yield* Ref.make(false)
+            const projected = connected.frames.pipe(
               Stream.tap((event) => Ref.update(received, (events) => [...events, event])),
+              Stream.tap((event) =>
+                event._tag === "ConnectionLost" && event.epoch === 0 ? Ref.set(oldStatusSeen, true) : Effect.void,
+              ),
+              Stream.tap((event) =>
+                mode === "status-backlog" && event._tag === "SessionSnapshot" && event.epoch === 0
+                  ? Effect.sleep("250 millis")
+                  : Effect.void,
+              ),
               Stream.tap((event) =>
                 mode === "conversation-gap" && event._tag === "SessionSnapshot" && event.epoch === 0
                   ? Effect.gen(function* () {
@@ -131,15 +152,28 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
                 Chat.initialModel(session.id),
                 (model, event) => Chat.update(model, Chat.ReceivedConnection({ event }))[0],
               ),
-              Stream.takeUntil((model) =>
-                persistent ? model.run._tag === "Failed" : model.connectionEpoch === 1 && model.connection === "open",
-              ),
-              Stream.runCollect,
             )
+            return yield* (
+              mode === "status-backlog"
+                ? projected.pipe(
+                    Stream.mapEffect((model) => Ref.get(oldStatusSeen).pipe(Effect.map((seen) => ({ model, seen })))),
+                    Stream.takeUntil(
+                      ({ model, seen }) => seen && model.connectionEpoch === 1 && model.connection === "open",
+                    ),
+                    Stream.map(({ model }) => model),
+                  )
+                : projected.pipe(
+                    Stream.takeUntil((model) =>
+                      persistent
+                        ? model.run._tag === "Failed"
+                        : model.connectionEpoch === reconnects && model.connection === "open",
+                    ),
+                  )
+            ).pipe(Stream.runCollect)
           }),
         )
         const snapshots = (yield* Ref.get(received)).filter(Schema.is(Connection.SessionSnapshot))
-        expect(snapshots).toHaveLength(persistent ? 4 : 2)
+        expect(snapshots).toHaveLength(reconnects + 1)
         expect(snapshots[0]?.snapshot).toEqual(firstSnapshot)
         expect(snapshots[0]?.snapshot.runs.map((run) => run.run.runId)).toEqual([original.id])
         expect(snapshots[1]?.snapshot.runs.map((run) => run.run.runId)).toEqual([original.id, replacementRunId])
@@ -149,15 +183,56 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
             { _tag: "UserEntry", text: "received suffix" },
           ])
         expect(models.at(-1)).toMatchObject({
-          connectionEpoch: persistent ? 3 : 1,
+          connectionEpoch: reconnects,
           lastSeq: snapshots[1]?.snapshot.cursor,
           run: { _tag: persistent ? "Failed" : "Running" },
         })
-        expect(sockets).toHaveLength(persistent ? 4 : 2)
+        expect(sockets).toHaveLength(reconnects + 1)
         expect(
           sockets.every((socket) => socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING),
         ).toBe(true)
-        expect(subscriptions).toBe(persistent ? 4 : 2)
+        expect(subscriptions).toBe(reconnects + 1)
+        if (mode === "status-backlog") {
+          const replacementIndex = (yield* Ref.get(received)).findIndex(
+            (event) => event._tag === "SessionSnapshot" && event.epoch === 1,
+          )
+          const delayedOldStatus = (yield* Ref.get(received)).find(
+            (event) => event._tag === "ConnectionLost" && event.epoch === 0,
+          )
+          expect(replacementIndex).toBeGreaterThan(-1)
+          expect(delayedOldStatus).toBeDefined()
+          const current = models.at(-1)!
+          const withPreview = Chat.update(
+            current,
+            Chat.ReceivedConnection({
+              event: Connection.PreviewDelivery({
+                epoch: 1,
+                delivery: {
+                  _tag: "PreviewDelivery",
+                  sessionId: session.id,
+                  runId: replacementRunId!,
+                  authorityAttemptFence: 1,
+                  event: {
+                    _tag: "ModelPreview",
+                    runId: replacementRunId!,
+                    attemptFence: 1,
+                    turn: 0,
+                    modelCallId: "current-call",
+                    modelAttemptId: "current-attempt",
+                    attempt: 0,
+                    generation: 1,
+                    sequence: 0,
+                    changes: [{ channel: "text", offset: 0, delta: "current preview" }],
+                  },
+                },
+              }),
+            }),
+          )[0]
+          expect(withPreview.preview?.text).toBe("current preview")
+          expect(Chat.update(withPreview, Chat.ReceivedConnection({ event: delayedOldStatus! }))[0]).toEqual(
+            withPreview,
+          )
+        }
       }),
     )
   }

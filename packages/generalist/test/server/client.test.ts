@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest"
-import { Effect, Fiber, Layer, Schedule, Schema, Stream } from "effect"
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { Effect, Exit, Fiber, Layer, Schedule, Schema, Scope, Stream } from "effect"
+import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Server } from "generalist/server"
 import { hostEvent } from "./fixtures.js"
@@ -55,6 +55,26 @@ const socketAt = (sockets: ReadonlyArray<FakeWebSocket>, index: number): Effect.
   })
 
 const sentText = (value: string | Uint8Array | undefined): string => Schema.decodeUnknownSync(Schema.String)(value)
+
+const previewDelivery = (attemptFence: number, sequence: number, delta: string) =>
+  Server.PreviewDelivery.make({
+    _tag: "PreviewDelivery",
+    sessionId: "session-1",
+    runId: "run-1",
+    authorityAttemptFence: attemptFence,
+    event: {
+      _tag: "ModelPreview",
+      runId: "run-1",
+      attemptFence,
+      turn: 0,
+      modelCallId: `model-call:${attemptFence}`,
+      modelAttemptId: `model-attempt:${attemptFence}`,
+      attempt: 0,
+      generation: 1,
+      sequence,
+      changes: [{ channel: "text", offset: 0, delta }],
+    },
+  })
 
 describe("Server client WebSocket", () => {
   const sockets: Array<FakeWebSocket> = []
@@ -142,7 +162,7 @@ describe("Server client WebSocket", () => {
       )
     }
 
-    test.effect("reconnects from the last admitted Session cursor and sends explicit cancellation", () =>
+    test.effect("reconnects from the replacement snapshot cursor and sends explicit cancellation", () =>
       Effect.scoped(
         Effect.gen(function* () {
           sockets.length = 0
@@ -162,7 +182,7 @@ describe("Server client WebSocket", () => {
           first.close(4000, "lagged:7")
 
           const second = yield* socketAt(sockets, 1)
-          expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=7")
+          expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=-1")
           second.open()
           yield* Effect.yieldNow
           yield* connection.cancel("run-1", "cancel:run-1", "user")
@@ -215,13 +235,19 @@ describe("Server client WebSocket", () => {
             expect(yield* Fiber.join(received)).toEqual([hostEvent(7), hostEvent(12)])
             first.close(1011, "connection-lost")
             const second = yield* socketAt(sockets, 1)
-            expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=12")
+            expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=-1")
             second.open()
-            const resumed = yield* connection.events.pipe(Stream.take(1), Stream.runCollect, Effect.forkChild)
+            const resumed = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
             first.message(yield* Server.eventCodec.encode(hostEvent(99)))
-            second.message(yield* Server.eventCodec.encode(hostEvent(12)))
             second.message(yield* Server.eventCodec.encode(hostEvent(19)))
-            expect(yield* Fiber.join(resumed)).toEqual([hostEvent(19)])
+            expect(yield* Fiber.join(resumed)).toEqual([
+              {
+                _tag: "ConnectionSnapshot",
+                epoch: 1,
+                snapshot: connection.snapshot,
+              },
+              hostEvent(19),
+            ])
             const statuses = yield* connection.status.pipe(
               Stream.takeUntil((status) => status._tag === "Connected" && status.epoch === 1),
               Stream.runCollect,
@@ -229,6 +255,96 @@ describe("Server client WebSocket", () => {
             expect(statuses).toContainEqual({ _tag: "Connected", epoch: 1 })
           }),
         ),
+    )
+
+    test.effect("keeps preview delivery outside the committed cursor across reconnect", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          sockets.length = 0
+          const client = yield* Server.client({ baseUrl: "https://generalist.test" })
+          const connection = yield* client.events.connect({
+            sessionId: "session-1",
+            eventCapacity: 8,
+            reconnect: Schedule.recurs(1),
+          })
+          expect(connection.snapshot.cursor).toBe(-1)
+          const first = yield* socketAt(sockets, 0)
+          first.open()
+          const firstPreview = previewDelivery(3, 0, "first")
+          const received = yield* connection.events.pipe(Stream.take(1), Stream.runCollect, Effect.forkChild)
+          first.message(yield* Server.eventCodec.encode(firstPreview))
+          expect(yield* Fiber.join(received)).toEqual([firstPreview])
+          first.close(1011, "connection-lost")
+
+          const second = yield* socketAt(sockets, 1)
+          expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=-1")
+          second.open()
+          const currentPreview = previewDelivery(4, 0, "current")
+          const resumed = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
+          first.message(yield* Server.eventCodec.encode(previewDelivery(3, 1, "obsolete")))
+          second.message(yield* Server.eventCodec.encode(currentPreview))
+          expect(yield* Fiber.join(resumed)).toEqual([
+            { _tag: "ConnectionSnapshot", epoch: 1, snapshot: connection.snapshot },
+            currentPreview,
+          ])
+        }),
+      ),
+    )
+
+    test.effect("carries the actual socket epoch across a failed replacement snapshot and current preview", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          sockets.length = 0
+          let snapshotLoads = 0
+          const http = HttpClient.make((request) => {
+            snapshotLoads += 1
+            if (snapshotLoads === 2) {
+              return Effect.fail(
+                new HttpClientError.HttpClientError({
+                  reason: new HttpClientError.TransportError({
+                    request,
+                    description: "replacement snapshot unavailable",
+                  }),
+                }),
+              )
+            }
+            return Effect.succeed(
+              HttpClientResponse.fromWeb(
+                request,
+                Response.json({
+                  version: 1,
+                  session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+                  cursor: -1,
+                  runs: [],
+                  conversation: { leafId: null, entries: [] },
+                }),
+              ),
+            )
+          })
+          const client = yield* Server.client({ baseUrl: "https://generalist.test" }).pipe(
+            Effect.provideService(HttpClient.HttpClient, http),
+          )
+          const connection = yield* client.events.connect({
+            sessionId: "session-1",
+            eventCapacity: 8,
+            reconnect: Schedule.recurs(2),
+          })
+          const first = yield* socketAt(sockets, 0)
+          first.open()
+          first.close(1011, "connection-lost")
+
+          const second = yield* socketAt(sockets, 1)
+          second.open()
+          const currentPreview = previewDelivery(5, 0, "after failed snapshot")
+          const resumed = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
+          second.message(yield* Server.eventCodec.encode(currentPreview))
+          expect(yield* Fiber.join(resumed)).toEqual([
+            { _tag: "ConnectionSnapshot", epoch: 2, snapshot: connection.snapshot },
+            currentPreview,
+          ])
+          expect(snapshotLoads).toBe(3)
+        }),
+      ),
     )
 
     for (const [code, kind] of [
@@ -269,6 +385,57 @@ describe("Server client WebSocket", () => {
         closed.message(yield* Server.eventCodec.encode(hostEvent(100)))
         yield* Effect.yieldNow
         expect(sockets).toHaveLength(1)
+      }),
+    )
+
+    test.effect("switching Session views closes only the old subscription without sending shutdown commands", () =>
+      Effect.gen(function* () {
+        sockets.length = 0
+        const requested: Array<string> = []
+        const http = HttpClient.make((request) => {
+          requested.push(request.url)
+          const match = /\/sessions\/([^/]+)\/snapshot$/.exec(request.url)
+          const sessionId = decodeURIComponent(match?.[1] ?? "missing")
+          return Effect.succeed(
+            HttpClientResponse.fromWeb(
+              request,
+              Response.json({
+                version: 1,
+                session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z" },
+                cursor: -1,
+                runs: [],
+                conversation: { leafId: null, entries: [] },
+              }),
+            ),
+          )
+        })
+        const client = yield* Server.client({ baseUrl: "https://generalist.test" }).pipe(
+          Effect.provideService(HttpClient.HttpClient, http),
+        )
+        const firstScope = yield* Scope.make()
+        yield* client.events
+          .connect({ sessionId: "session-one", reconnect: Schedule.recurs(0) })
+          .pipe(Effect.provideService(Scope.Scope, firstScope))
+        const first = yield* socketAt(sockets, 0)
+        first.open()
+        yield* Scope.close(firstScope, Exit.void)
+        expect(first.readyState).toBe(WebSocket.CLOSED)
+        expect(first.sent).toEqual([])
+
+        const processScope = yield* Scope.make()
+        yield* client.events
+          .connect({ sessionId: "session-two", reconnect: Schedule.recurs(0) })
+          .pipe(Effect.provideService(Scope.Scope, processScope))
+        const second = yield* socketAt(sockets, 1)
+        second.open()
+        expect(second.readyState).toBe(WebSocket.OPEN)
+        expect(requested).toEqual([
+          "https://generalist.test/sessions/session-one/snapshot",
+          "https://generalist.test/sessions/session-two/snapshot",
+        ])
+        yield* Scope.close(processScope, Exit.void)
+        expect(second.readyState).toBe(WebSocket.CLOSED)
+        expect(second.sent).toEqual([])
       }),
     )
   })

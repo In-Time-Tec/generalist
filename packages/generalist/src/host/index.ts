@@ -1,5 +1,5 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context, typescript/no-unsafe-return -- Agent.Any intentionally hides invariant Agent parameters at the heterogeneous Host registry boundary; the distributive AgentDefinition/AgentServices types restore each configured Agent's exact contract. */
-import { Effect, Filter, Option, Schema, Stream, Types } from "effect"
+import { Clock, Effect, Filter, Option, Ref, Result, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
 import {
@@ -56,11 +56,13 @@ import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "
 import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
+import type { PreviewDelivery } from "./preview.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
+const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
@@ -74,6 +76,7 @@ export {
   type ToolCall,
   type Turn,
 } from "./event.js"
+export { PreviewDelivery } from "./preview.js"
 export {
   SessionNotFound,
   SessionConflict,
@@ -146,6 +149,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
       sessionId: string,
       cursor?: Cursor,
     ) => Effect.Effect<Stream.Stream<HostEvent, SessionEventsError>, SessionError>
+    readonly previews: (sessionId: string, runId: string) => Effect.Effect<Stream.Stream<PreviewDelivery>, SessionError>
   }
   readonly approvals: {
     readonly resolve: (
@@ -428,6 +432,43 @@ const create = <
               ),
             )
         },
+        previews: (sessionId, runId) =>
+          runtime.sessionRuns(sessionId).pipe(
+            Effect.map((runs) => {
+              if (!runs.some((run) => run.runId === runId)) return Stream.fromIterable<PreviewDelivery>([])
+              return Stream.unwrap(
+                Effect.gen(function* () {
+                  const initialFence = yield* runtime.previewAuthority(runId)
+                  const initialCheckedAt = yield* Clock.currentTimeMillis
+                  const authority = yield* Ref.make({
+                    fence: initialFence,
+                    checkedAt: initialFence === undefined ? Number.NEGATIVE_INFINITY : initialCheckedAt,
+                  })
+                  return runtime.previews({ runId }).pipe(
+                    Stream.filterMapEffect((event) =>
+                      Effect.gen(function* () {
+                        const now = yield* Clock.currentTimeMillis
+                        let current = yield* Ref.get(authority)
+                        if (now - current.checkedAt >= 50) {
+                          current = { fence: yield* runtime.previewAuthority(runId), checkedAt: now }
+                          yield* Ref.set(authority, current)
+                        }
+                        return current.fence === event.attemptFence
+                          ? Result.succeed<PreviewDelivery>({
+                              _tag: "PreviewDelivery",
+                              sessionId,
+                              runId,
+                              authorityAttemptFence: current.fence,
+                              event,
+                            })
+                          : rejectedPreview
+                      }),
+                    ),
+                  )
+                }),
+              )
+            }),
+          ),
       },
       approvals: {
         resolve: (runId, token, decision, operator) => resolveApproval(runtime, runId, token, decision, operator),

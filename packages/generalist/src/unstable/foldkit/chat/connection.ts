@@ -14,6 +14,8 @@ import { TransportError } from "../../../server/errors.js"
 import { HostSessionSnapshot } from "../../../runtime/session/host.js"
 import type { AgentCommand } from "./connection-command.js"
 import { applyConversationUpdate } from "../../../runtime/session/conversation.js"
+import { PreviewDelivery as HostPreviewDelivery } from "../../../host/preview.js"
+import { StatusEpochRegistry } from "./connection-internal.js"
 
 /** @experimental */
 const DeliveryIdentity = { sessionId: Schema.String, epoch: Schema.Int }
@@ -41,10 +43,14 @@ export const SessionSnapshot = m("SessionSnapshot", { epoch: Schema.Int, snapsho
 /** One committed Host event delivered within an established snapshot epoch. @experimental */
 export const HostDelivery = m("HostDelivery", { epoch: Schema.Int, event: HostEvent })
 
+/** One Host-authorized memory-only preview delivered within an established snapshot epoch. @experimental */
+export const PreviewDelivery = m("PreviewDelivery", { epoch: Schema.Int, delivery: HostPreviewDelivery })
+
 /** @experimental */
 export type Incoming =
   | typeof SessionSnapshot.Type
   | typeof HostDelivery.Type
+  | typeof PreviewDelivery.Type
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type
@@ -52,6 +58,7 @@ export type Incoming =
 export const Incoming: Schema.Schema<Incoming> = Schema.Union([
   SessionSnapshot,
   HostDelivery,
+  PreviewDelivery,
   ConnectionOpened,
   ConnectionLost,
   ConnectionFailed,
@@ -176,6 +183,9 @@ export const layerWebSocket = (options: {
                   }),
                 ),
               )
+              const deliveryEpoch = yield* Ref.make(epoch)
+              const statusEpochs = new StatusEpochRegistry()
+              yield* statusEpochs.bind(0, epoch)
               yield* Ref.set(
                 runId,
                 connection.snapshot.runs.findLast((run) => run.run.parentRunId === undefined)?.run.runId,
@@ -187,36 +197,61 @@ export const layerWebSocket = (options: {
                 ),
               )
               const statuses = connection.status.pipe(
+                Stream.mapEffect((status) =>
+                  statusEpochs
+                    .get(status.epoch)
+                    .pipe(
+                      Effect.map(
+                        Option.flatMap((boundEpoch) => statusIncoming(status, { sessionId, epoch: boundEpoch })),
+                      ),
+                    ),
+                ),
                 Stream.filterMap((status) =>
-                  Option.match(statusIncoming(status, { sessionId, epoch }), {
-                    onNone: () => Result.fail(undefined),
-                    onSome: Result.succeed,
-                  }),
+                  Option.match(status, { onNone: () => Result.fail(undefined), onSome: Result.succeed }),
                 ),
               )
               const events = connection.events.pipe(
-                Stream.tap((event) => {
-                  if (event._tag !== "Conversation")
-                    return "event" in event && event.event.parentRunId === undefined
-                      ? Ref.set(runId, event.runId)
-                      : Effect.void
-                  return Effect.gen(function* () {
-                    const next = applyConversationUpdate({
-                      conversation: yield* Ref.get(conversation),
-                      update: event.update,
+                Stream.mapEffect((event): Effect.Effect<Incoming, TransportError> => {
+                  if (event._tag === "ConnectionSnapshot") {
+                    return Effect.gen(function* () {
+                      const replacementEpoch = yield* Ref.getAndUpdate(nextEpoch, (current) => current + 1)
+                      yield* statusEpochs.bind(event.epoch, replacementEpoch)
+                      yield* Ref.set(deliveryEpoch, replacementEpoch)
+                      yield* Ref.set(epochRef, replacementEpoch)
+                      yield* Ref.set(
+                        runId,
+                        event.snapshot.runs.findLast((run) => run.run.parentRunId === undefined)?.run.runId,
+                      )
+                      yield* Ref.set(conversation, event.snapshot.conversation)
+                      return SessionSnapshot({ epoch: replacementEpoch, snapshot: event.snapshot })
                     })
-                    if (Option.isNone(next))
-                      return yield* TransportError.make({
-                        message: "Committed conversation has a missing parent or stale leaf",
-                        kind: "lagged",
+                  }
+                  return Effect.gen(function* () {
+                    const currentEpoch = yield* Ref.get(deliveryEpoch)
+                    if (event._tag === "PreviewDelivery") {
+                      return PreviewDelivery({ epoch: currentEpoch, delivery: event })
+                    }
+                    if (event._tag === "Conversation") {
+                      const next = applyConversationUpdate({
+                        conversation: yield* Ref.get(conversation),
+                        update: event.update,
                       })
-                    yield* Ref.set(conversation, next.value)
+                      if (Option.isNone(next)) {
+                        return yield* TransportError.make({
+                          message: "Committed conversation has a missing parent or stale leaf",
+                          kind: "lagged",
+                        })
+                      }
+                      yield* Ref.set(conversation, next.value)
+                    } else if (event._tag === "RunStarted" || event._tag === "Completed") {
+                      if (event.event.parentRunId === undefined) yield* Ref.set(runId, event.runId)
+                    }
+                    return HostDelivery({ epoch: currentEpoch, event })
                   })
                 }),
-                Stream.map((event): Incoming => HostDelivery({ epoch, event })),
               )
               return Stream.succeed<Incoming>(SessionSnapshot({ epoch, snapshot: connection.snapshot })).pipe(
-                Stream.concat(statuses.pipe(Stream.merge(events))),
+                Stream.concat(events.pipe(Stream.merge(statuses))),
               )
             }),
           ).pipe(

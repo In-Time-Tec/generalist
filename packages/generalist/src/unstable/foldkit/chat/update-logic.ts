@@ -7,6 +7,7 @@ import {
   ConnectionLost,
   ConnectionOpened,
   HostDelivery,
+  PreviewDelivery,
   SessionSnapshot,
 } from "./connection.js"
 import {
@@ -14,6 +15,7 @@ import {
   type ChatCommand,
   type Model,
   Model as ModelSchema,
+  MaxPreviewStateCharacters,
   type Output,
   CancelRun,
   Failed,
@@ -38,16 +40,147 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
     run: changes.run ?? model.run,
     entries: changes.entries ?? model.entries,
     conversation: changes.conversation ?? model.conversation,
+    preview: changes.preview === undefined ? model.preview : changes.preview,
+    previewAuthority: changes.previewAuthority === undefined ? model.previewAuthority : changes.previewAuthority,
     draft: changes.draft ?? model.draft,
   })
 
+const previewPosition = (
+  authority: NonNullable<Model["previewAuthority"]>,
+  event: Extract<(typeof PreviewDelivery.Type)["delivery"]["event"], { readonly _tag: "ModelPreview" }>,
+): number => {
+  if (event.attemptFence !== authority.attemptFence) return event.attemptFence - authority.attemptFence
+  if (event.generation !== authority.generation) return event.generation - authority.generation
+  if (event.turn !== authority.turn) return event.turn - authority.turn
+  return event.attempt - authority.attempt
+}
+
+const tombstonePreview = (model: Model): Model =>
+  changeModel(model, {
+    preview: null,
+    previewAuthority: model.previewAuthority === null ? null : { ...model.previewAuthority, tombstoned: true },
+  })
+
+// oxlint-disable-next-line complexity -- Every provisional ordering and authority rejection stays explicit at this boundary.
+const applyPreview = (model: Model, delivery: typeof PreviewDelivery.Type): Model => {
+  if (delivery.epoch !== model.connectionEpoch || delivery.delivery.sessionId !== model.sessionId) return model
+  if (model.run._tag !== "Running") return model
+  const { authorityAttemptFence, event, runId } = delivery.delivery
+  if (event.runId !== runId || event.attemptFence !== authorityAttemptFence) return model
+  const authority = model.previewAuthority
+  if (authority === null || authority.runId !== runId) return model
+  if (event._tag === "ModelPreviewCleared") {
+    if (
+      event.attemptFence < authority.attemptFence ||
+      (event.attemptFence === authority.attemptFence && event.generation < authority.generation)
+    ) {
+      return model
+    }
+    return changeModel(model, {
+      preview: null,
+      previewAuthority:
+        event.attemptFence === authority.attemptFence && event.generation === authority.generation
+          ? { ...authority, tombstoned: true }
+          : {
+              runId,
+              attemptFence: event.attemptFence,
+              generation: event.generation,
+              turn: -1,
+              attempt: -1,
+              modelCallId: null,
+              modelAttemptId: null,
+              sequence: -1,
+              tombstoned: true,
+            },
+    })
+  }
+
+  const position = previewPosition(authority, event)
+  if (position < 0) return model
+  if (position > 0) {
+    if (event.sequence !== 0) return tombstonePreview(model)
+  } else {
+    if (authority.tombstoned) return model
+    if (event.modelCallId !== authority.modelCallId || event.modelAttemptId !== authority.modelAttemptId) {
+      return tombstonePreview(model)
+    }
+    if (event.sequence <= authority.sequence) return model
+    if (event.sequence !== authority.sequence + 1) return tombstonePreview(model)
+  }
+
+  let text = position === 0 ? (model.preview?.text ?? "") : ""
+  let reasoning = position === 0 ? (model.preview?.reasoning ?? "") : ""
+  for (const change of event.changes) {
+    const value = change.channel === "text" ? text : reasoning
+    if (change.offset !== value.length || value.length + change.delta.length > MaxPreviewStateCharacters) {
+      return tombstonePreview(model)
+    }
+    if (change.channel === "text") text += change.delta
+    else reasoning += change.delta
+  }
+  return changeModel(model, {
+    preview: {
+      runId,
+      attemptFence: authorityAttemptFence,
+      turn: event.turn,
+      modelCallId: event.modelCallId,
+      modelAttemptId: event.modelAttemptId,
+      attempt: event.attempt,
+      sequence: event.sequence,
+      text,
+      reasoning,
+    },
+    previewAuthority: {
+      runId,
+      attemptFence: authorityAttemptFence,
+      generation: event.generation,
+      turn: event.turn,
+      attempt: event.attempt,
+      modelCallId: event.modelCallId,
+      modelAttemptId: event.modelAttemptId,
+      sequence: event.sequence,
+      tombstoned: false,
+    },
+  })
+}
+
+// oxlint-disable-next-line complexity -- The closed connection-event union is dispatched in one reducer boundary.
 const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): UpdateResult => {
   if (Schema.is(SessionSnapshot)(action.event)) {
     return [applySnapshot(model, action.event.snapshot, action.event.epoch), [], Option.none()]
   }
+  if (Schema.is(PreviewDelivery)(action.event)) {
+    return [applyPreview(model, action.event), [], Option.none()]
+  }
   if (Schema.is(HostDelivery)(action.event)) {
     if (action.event.epoch !== model.connectionEpoch) return [model, [], Option.none()]
-    const [next, output] = applyHostEvent(model, action.event.event)
+    const event = action.event.event
+    if (event.sessionId !== model.sessionId || event.cursor <= model.lastSeq) return [model, [], Option.none()]
+    const startsRoot = event._tag === "RunStarted" && event.event.parentRunId === undefined
+    const clearsPreview =
+      event._tag !== "Conversation" &&
+      model.previewAuthority?.runId === event.runId &&
+      (event._tag === "Completed" || (event._tag === "Turn" && event.event._tag === "TurnCompleted"))
+    let base = model
+    if (startsRoot) {
+      base = changeModel(model, {
+        preview: null,
+        previewAuthority: {
+          runId: event.runId,
+          attemptFence: -1,
+          generation: -1,
+          turn: -1,
+          attempt: -1,
+          modelCallId: null,
+          modelAttemptId: null,
+          sequence: -1,
+          tombstoned: false,
+        },
+      })
+    } else if (clearsPreview) {
+      base = tombstonePreview(model)
+    }
+    const [next, output] = applyHostEvent(base, event)
     return [next, [], output]
   }
   if (action.event.sessionId !== model.sessionId || action.event.epoch < model.connectionEpoch)
@@ -59,7 +192,9 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
   }
   if (Schema.is(ConnectionLost)(action.event)) {
     return [
-      changeModel(model, { connection: model.sessionId === null ? "disconnected" : "reconnecting" }),
+      changeModel(tombstonePreview(model), {
+        connection: model.sessionId === null ? "disconnected" : "reconnecting",
+      }),
       [],
       Option.none(),
     ]
@@ -69,6 +204,8 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
       changeModel(model, {
         connectionEpoch: action.event.epoch,
         connection: "disconnected",
+        preview: null,
+        previewAuthority: model.previewAuthority === null ? null : { ...model.previewAuthority, tombstoned: true },
         run: Failed({ message: action.event.reason }),
       }),
       [],
@@ -125,6 +262,8 @@ export const update: {
           connectionEpoch: -1,
           run: Idle(),
           entries: [],
+          preview: null,
+          previewAuthority: null,
         }),
         [],
         Option.none(),
