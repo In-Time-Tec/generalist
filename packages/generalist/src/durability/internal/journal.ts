@@ -15,6 +15,7 @@ import {
   freeze,
   nextSequence,
   sequenceName,
+  set,
   type Json,
   type Patch,
   type Receipt,
@@ -125,7 +126,7 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
     const snapshotsPrefix = `${prefix}snapshots/`
     const commitKey = (sequence: string) => `${commitsPrefix}${sequenceName(sequence)}.json`
     const storage = makeStorage({ store, crypto, identity, commitsPrefix, maxStateBytes, maxCommitBytes })
-    const { hash, seal, readCommit, checkState, append } = storage
+    const { hash, sealCommit, readCommit, checkState, append } = storage
     const { load, publishSnapshot, remember } = makeRecovery({
       storage,
       store,
@@ -225,12 +226,13 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
             patches: transition.patches,
             receipt: transition.receipt,
           }
-          const receipts = {
-            ...loaded.receipts,
-            [validated.id]: { inputDigest, sequence, receipt: transition.receipt },
-          }
+          const receipts = yield* set(
+            loaded.receipts,
+            validated.id,
+            freeze({ inputDigest, sequence, receipt: transition.receipt }),
+          )
           yield* checkState(state, receipts)
-          const sealed = yield* seal(record)
+          const sealed = yield* sealCommit(record)
           const key = commitKey(sequence)
           if (sealed.bytes.length > maxCommitBytes || sealed.bytes.length > maxReplayBytes) {
             return yield* failure({
@@ -246,6 +248,7 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
           }
           const outcome = yield* Effect.result(store.create(key, sealed.bytes))
           if (Result.isSuccess(outcome) && outcome.success === "created") {
+            sealed.accept()
             const committed: Loaded = {
               ...loaded,
               head: { sequence, digest: sealed.digest, state },

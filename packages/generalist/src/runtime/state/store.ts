@@ -122,7 +122,8 @@ const withDomainConflict =
 const makeStoreServices = (options: Options) =>
   Effect.gen(function* () {
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
-    const { stateRef, readState, modifyState, lookupReceipt, ownership, activation } = yield* makeState(options)
+    const { stateRef, readState, hasAdmissionKey, modifyState, lookupReceipt, ownership, activation } =
+      yield* makeState(options)
     const update = <Input, E>(
       definition: Definition<Input, void>,
       input: Input,
@@ -161,16 +162,7 @@ const makeStoreServices = (options: Options) =>
       sessionReader: (sessionId) => Effect.succeed(Option.some(sessionReader({ readState, sessionId }))),
       claimedSessionStore: (claim) =>
         Effect.succeed(Option.some(claimedSessionStore({ readState, modifyState, claim }))),
-      hasAdmission: (input) =>
-        readState.pipe(
-          Effect.flatMap((state) =>
-            state.closed
-              ? RuntimeUnavailable.make({ message: "runtime store released" })
-              : Effect.succeed(
-                  state.idempotency.has(idempotencyKey(input.address, input.sessionId, input.idempotencyKey)),
-                ),
-          ),
-        ),
+      hasAdmission: (input) => hasAdmissionKey(idempotencyKey(input.address, input.sessionId, input.idempotencyKey)),
       admitSend: (input) =>
         Effect.gen(function* () {
           yield* normalizeTreePolicy(input.treePolicy)

@@ -28,6 +28,15 @@ import { shutdownStore } from "../../runtime/state/store/events.js"
 import { activationOf } from "../../runtime/state/store/admission/activation.js"
 import { RuntimeUnavailable } from "../../runtime/errors.js"
 
+const ReceiptEnvelope = Schema.Struct({
+  value: Schema.Json,
+  observations: Schema.Struct({
+    commandId: Schema.String,
+    occurredAtMillis: Schema.Finite,
+    occurredAt: Schema.String,
+  }),
+})
+
 /** Canonical namespace and host configuration; construction only reconstructs state. */
 export interface Options extends LayerOptions, JournalOptions {
   readonly workerId?: string
@@ -222,6 +231,10 @@ export const make = (options: Options) =>
         Effect.tap((state) => Ref.set(stateRef.backing, state)),
       ),
     )
+    const hasAdmissionKey = (key: string) =>
+      stateRef.semaphore.withPermit(
+        refresh().pipe(Effect.flatMap((local) => codec.hasAdmissionKey(persistedState ?? {}, local, key))),
+      )
 
     const modifyState: ModifyState = (definition, input, transition) =>
       Effect.gen(function* () {
@@ -266,16 +279,9 @@ export const make = (options: Options) =>
               }),
           )
           yield* refresh(result.head)
-          const envelope = yield* Schema.decodeUnknownEffect(
-            Schema.Struct({
-              value: Schema.Json,
-              observations: Schema.Struct({
-                commandId: Schema.String,
-                occurredAtMillis: Schema.Finite,
-                occurredAt: Schema.String,
-              }),
-            }),
-          )(result.receipt, { onExcessProperty: "error" }).pipe(
+          const envelope = yield* Schema.decodeUnknownEffect(ReceiptEnvelope)(result.receipt, {
+            onExcessProperty: "error",
+          }).pipe(
             Effect.mapError((cause) =>
               DurabilityFailure.make({
                 reason: "corruption",
@@ -465,6 +471,7 @@ export const make = (options: Options) =>
     return {
       stateRef,
       readState,
+      hasAdmissionKey,
       modifyState,
       lookupReceipt: journal.lookupReceipt,
       activation: StoreActivation.of({ acquire, nextDueAt }),

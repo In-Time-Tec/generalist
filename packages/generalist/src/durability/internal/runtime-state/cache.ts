@@ -1,4 +1,4 @@
-import { Effect, Predicate, Schema, SchemaAST, SchemaParser } from "effect"
+import { Effect, Function, Predicate, Schema, SchemaAST, SchemaParser } from "effect"
 
 export type DataSchema = Schema.Constraint & { readonly DecodingServices: never; readonly EncodingServices: never }
 
@@ -21,6 +21,16 @@ export const ownership = () => {
   return { has: <Input extends object>(input: Input) => retained.has(input), retain }
 }
 
+export const hasKeyPrefix = Function.dual<
+  (right: ReadonlyMap<unknown, unknown>) => (left: ReadonlyMap<unknown, unknown>) => boolean,
+  (left: ReadonlyMap<unknown, unknown>, right: ReadonlyMap<unknown, unknown>) => boolean
+>(2, (left: ReadonlyMap<unknown, unknown>, right: ReadonlyMap<unknown, unknown>): boolean => {
+  if (left.size < right.size) return false
+  const keys = left.keys()
+  for (const key of right.keys()) if (!Object.is(key, keys.next().value)) return false
+  return true
+})
+
 export const mapValues = <K, A, B extends object>() => {
   let previous: ReadonlyMap<K, B> | undefined
   let previousInput: ReadonlyMap<K, A> | undefined
@@ -31,22 +41,19 @@ export const mapValues = <K, A, B extends object>() => {
     dependency?: Dependency,
   ): ReadonlyMap<K, B> => {
     if (dependency !== undefined && input === previousInput && dependency === previousDependency) return previous!
-    const output = new Map<K, B>()
-    const entries = previous?.entries()
-    let unchanged = previous?.size === input.size
-    for (const [key, item] of input) {
+    const items = new Map(input)
+    const retained = previous !== undefined && hasKeyPrefix(items, previous) ? previous : undefined
+    let output = retained === undefined ? new Map<K, B>() : undefined
+    for (const [key, item] of items) {
       const value = f(item, key)
+      if (retained !== undefined && retained.get(key) === value) continue
+      output ??= new Map(retained)
       output.set(key, value)
-      if (unchanged) {
-        const entry = entries!.next().value!
-        unchanged = entry[0] === key && entry[1] === value
-      }
     }
     previousInput = input
     previousDependency = dependency
-    if (unchanged) return previous!
-    previous = output
-    return output
+    previous = output ?? retained!
+    return previous
   }
 }
 
@@ -74,7 +81,7 @@ export const make =
             return Effect.succeed(cache.get(input))
           }
           return decode(input, options).pipe(
-            Effect.map((value) => {
+            Effect.mapEager((value) => {
               if (cacheable && privateInput) {
                 owned?.retain(value)
                 cache.set(input, value)
@@ -101,6 +108,13 @@ export const make =
 export const detach = () => {
   const retained = new WeakMap<object, object>()
   const shareable = new WeakSet<object>()
+  const maps = new WeakMap<
+    object,
+    {
+      readonly template: ReadonlyMap<unknown, unknown>
+      readonly mutable: ReadonlyArray<readonly [unknown, unknown]>
+    }
+  >()
   const records = new WeakMap<
     object,
     {
@@ -109,8 +123,9 @@ export const detach = () => {
       readonly mutable: ReadonlyArray<readonly [string, unknown]>
     }
   >()
+  const canShare = <Input>(value: Input) => !Predicate.isObjectOrArray(value) || shareable.has(value)
   const retain = <Input extends object, A extends object>(input: Input, value: A): A => {
-    if (Object.values(value).every((child) => !Predicate.isObjectOrArray(child) || shareable.has(child))) {
+    if (Object.values(value).every(canShare)) {
       Object.freeze(value)
       shareable.add(value)
       retained.set(input, value)
@@ -124,14 +139,12 @@ export const detach = () => {
       if (!Predicate.isObjectOrArray(value)) return value
       if (retained.has(value)) return retained.get(value)
       if (copies.has(value)) return copies.get(value)
-      if (value instanceof Date) return structuredClone(value)
-      if (value instanceof Uint8Array) return value.slice()
-      if (value instanceof Map) {
-        const result = new Map<unknown, unknown>()
+      if (value instanceof Date || value instanceof Uint8Array) {
+        const result = value instanceof Date ? structuredClone(value) : value.slice()
         copies.set(value, result)
-        for (const [key, item] of value) result.set(copy(key), copy(item))
         return result
       }
+      if (value instanceof Map) return copyMap(value)
       if (Array.isArray(value)) {
         const result: Array<unknown> = []
         copies.set(value, result)
@@ -147,6 +160,32 @@ export const detach = () => {
         return result
       }
       return copyObject(value)
+    }
+    const copyMap = <Key, Item>(value: ReadonlyMap<Key, Item>) => {
+      const previous = maps.get(value)
+      if (previous !== undefined) {
+        const result = new Map(previous.template)
+        copies.set(value, result)
+        for (const [key, item] of previous.mutable) result.set(key, copy(item))
+        return result
+      }
+      const result = new Map<unknown, unknown>()
+      copies.set(value, result)
+      const mutable: Array<readonly [unknown, unknown]> = []
+      let immutableKeys = true
+      for (const [key, item] of value) {
+        const copiedKey = copy(key)
+        const copiedItem = copy(item)
+        immutableKeys = immutableKeys && canShare(copiedKey)
+        result.set(copiedKey, copiedItem)
+        if (!canShare(copiedItem)) mutable.push([copiedKey, item])
+      }
+      if (immutableKeys) {
+        const template = new Map(result)
+        for (const [key] of mutable) template.set(key, undefined)
+        maps.set(value, { template, mutable })
+      }
+      return result
     }
     const copyObject = <Input extends object>(value: Input) => {
       const prototype: unknown = Object.getPrototypeOf(value)

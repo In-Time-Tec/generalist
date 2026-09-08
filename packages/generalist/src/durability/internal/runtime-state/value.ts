@@ -58,7 +58,7 @@ const StoredValue: Schema.Codec<Value> = Schema.suspend(() =>
     Schema.Struct({
       type: Schema.Literal("map"),
       length: Length,
-      order: immutableCodec(Schema.Record(Schema.String, Schema.String).check(canonicalIndices)),
+      order: Order,
       entries: Schema.Record(Schema.String, Value),
     }),
   ]),
@@ -80,30 +80,37 @@ const immutable = <Input>(input: Input): boolean => {
 
 const immutableCodec = <A extends Schema.Json>(schema: Schema.Codec<A>): Schema.Codec<A> => {
   const validatedNodes = new WeakMap<object, A>()
-  return Schema.declareConstructor<A, A>()([schema], ([storedValue]) => (input, _ast, options) => {
-    const cacheable =
-      options?.onExcessProperty === "error" && options.disableChecks !== true && options.propertyOrder !== "original"
-    const cached = cacheable && Predicate.isObject(input) ? validatedNodes.get(input) : undefined
-    if (cached !== undefined) return Effect.succeed(cached)
-    return SchemaParser.decodeUnknownEffect(storedValue)(input, options).pipe(
-      Effect.map((decoded) => {
-        if (cacheable && Predicate.isObject(input) && immutable(input)) {
-          const retained = freeze(decoded)
-          validatedNodes.set(input, retained)
-          if (Predicate.isObject(retained)) validatedNodes.set(retained, retained)
-          return retained
-        }
-        return decoded
-      }),
-    )
+  return Schema.declareConstructor<A, A>()([schema], ([storedValue]) => {
+    const decode = SchemaParser.decodeUnknownEffect(storedValue)
+    return (input, _ast, options) => {
+      if (!Predicate.isObject(input)) return decode(input, options)
+      const cacheable =
+        options?.onExcessProperty === "error" && options.disableChecks !== true && options.propertyOrder !== "original"
+      const cached = cacheable ? validatedNodes.get(input) : undefined
+      if (cached !== undefined) return Effect.succeed(cached)
+      return decode(input, options).pipe(
+        Effect.mapEager((decoded) => {
+          if (cacheable && immutable(input)) {
+            const retained = freeze(decoded)
+            validatedNodes.set(input, retained)
+            if (Predicate.isObject(retained)) validatedNodes.set(retained, retained)
+            return retained
+          }
+          return decoded
+        }),
+      )
+    }
   })
 }
 
+export const Order = immutableCodec(Schema.Record(Schema.String, Schema.String).check(canonicalIndices))
 export const Value: Schema.Codec<Value> = immutableCodec(StoredValue)
 
 const own = <A>(record: Record<string, A>, key: string, value: A): void => {
   Object.defineProperty(record, key, { value, enumerable: true, configurable: true, writable: true })
 }
+
+const undefinedValue: Value = freeze({ type: "undefined" })
 
 const normalizeNumber = (input: number): Value => {
   if (Object.is(input, -0)) return { type: "number", value: "-0" }
@@ -154,7 +161,7 @@ const normalizeMap = <Key, Item>(
 
 /** Unknown values are lossless supported data, never JSON.stringify's silently dropped callbacks. */
 const normalizeValue = <Input>(input: Input, ancestors: Set<object>, cache?: NormalizationCache): Value => {
-  if (input === undefined) return { type: "undefined" }
+  if (input === undefined) return undefinedValue
   if (input === null || Predicate.isBoolean(input) || Predicate.isString(input)) return input
   if (Predicate.isBigInt(input)) return { type: "bigint", value: input.toString() }
   if (Predicate.isNumber(input)) return normalizeNumber(input)

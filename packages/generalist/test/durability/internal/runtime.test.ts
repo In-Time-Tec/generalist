@@ -55,6 +55,42 @@ const admission = (key: string) => ({
 
 /** INV-02/03/06/07/08/09: real RunStore commands over the production journal, not a parallel reducer. */
 describe("object Runtime canonical mutations", () => {
+  it.effect("reads scalar admission presence through fresh canonical authority", () =>
+    provideScoped(
+      BunCrypto.layer,
+      Effect.gen(function* () {
+        const bucket = yield* makeSimulator()
+        const writer = yield* open(bucket)
+        const reader = yield* open(yield* bucket.connect)
+        const query = { address, sessionId: "session:presence", idempotencyKey: "presence" }
+        expect(yield* reader.hasAdmission(query)).toBe(false)
+        yield* writer.admitSend(admission("presence"))
+        expect(yield* reader.hasAdmission(query)).toBe(true)
+        expect(yield* reader.hasAdmission({ ...query, sessionId: "other" })).toBe(false)
+        expect(yield* reader.hasAdmission({ ...query, idempotencyKey: "other" })).toBe(false)
+        const fresh = yield* open(yield* bucket.connect)
+        expect(yield* fresh.hasAdmission(query)).toBe(true)
+        yield* bucket.maintenance.remove(slot("0"))
+        yield* bucket.store.create(slot("0"), new TextEncoder().encode("{}"))
+        expect(yield* reader.hasAdmission(query).pipe(Effect.flip)).toMatchObject({ reason: "corruption" })
+      }),
+    ).pipe(Effect.scoped),
+  )
+
+  it.effect("rejects scalar admission reads after their store scope closes", () =>
+    provideScoped(
+      BunCrypto.layer,
+      Effect.gen(function* () {
+        const bucket = yield* makeSimulator()
+        const store = yield* Effect.scoped(open(bucket))
+        const error = yield* store
+          .hasAdmission({ address, sessionId: "session:closed", idempotencyKey: "closed" })
+          .pipe(Effect.flip)
+        expect(error._tag).toBe("generalist/runtime/RuntimeUnavailable")
+      }),
+    ).pipe(Effect.scoped),
+  )
+
   it.effect("reconciles a reward's void receipt after restart without duplicating the event", () =>
     provideScoped(
       BunCrypto.layer,

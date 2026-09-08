@@ -17,6 +17,7 @@ import {
   nextSequence,
   parse,
   sequenceName,
+  set,
   type Json,
   type Receipt,
   type State,
@@ -96,6 +97,22 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
       const digest = yield* hash(bytes)
       return { digest, bytes: yield* envelopeBytes(digest, bytes) }
     })
+  const retainCommit = (record: Commit, digest: string, bytes: Uint8Array) => {
+    const value = freeze({ record, digest, size: bytes.length })
+    verifiedCommits.delete(record.sequence)
+    verifiedCommits.set(record.sequence, { bytes, value })
+    if (verifiedCommits.size > 3) verifiedCommits.delete(verifiedCommits.keys().next().value!)
+    return value
+  }
+  const sealCommit = (input: Commit) =>
+    Effect.gen(function* () {
+      const encoded = yield* encodeBytes(input)
+      const record = freeze(yield* decode(Commit, yield* parse(encoded), "encoding"))
+      const digest = yield* hash(encoded)
+      const bytes = yield* envelopeBytes(digest, encoded)
+      const retained = bytes.slice()
+      return { digest, bytes, accept: () => retainCommit(record, digest, retained) }
+    })
   const unseal = (object: StoredObject, key: string, limit: number) =>
     Effect.gen(function* () {
       if (object.bytes.length > limit)
@@ -160,11 +177,7 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
       }
       if (record.command.id.length === 0)
         return yield* failure({ reason: "corruption", message: "Commit command identity is empty", key })
-      const value = freeze({ record, digest: envelope.digest, size: bytes.length })
-      verifiedCommits.delete(sequence)
-      verifiedCommits.set(sequence, { bytes, value })
-      if (verifiedCommits.size > 3) verifiedCommits.delete(verifiedCommits.keys().next().value!)
-      return value
+      return retainCommit(record, envelope.digest, bytes)
     })
   const checkState = (state: State, receipts: Loaded["receipts"]) =>
     Effect.gen(function* () {
@@ -230,14 +243,15 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
         })
       }
       const state = yield* apply(loaded.head.state, record.patches, "corruption")
-      const receipts = {
-        ...loaded.receipts,
-        [record.command.id]: freeze({
+      const receipts = yield* set(
+        loaded.receipts,
+        record.command.id,
+        freeze({
           inputDigest: record.command.inputDigest,
           sequence: record.sequence,
           receipt: record.receipt,
         }),
-      }
+      )
       yield* checkState(state, receipts)
       return {
         ...loaded,
@@ -248,5 +262,5 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
       } satisfies Loaded
     })
 
-  return { hash, required, seal, unseal, sameIdentity, readCommit, checkState, listKeys, append, commitKey }
+  return { hash, required, seal, sealCommit, unseal, sameIdentity, readCommit, checkState, listKeys, append, commitKey }
 }

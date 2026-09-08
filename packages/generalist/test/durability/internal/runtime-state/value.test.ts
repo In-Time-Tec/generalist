@@ -1,10 +1,33 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Exit, Schema, SchemaParser } from "effect"
 import { freeze } from "../../../../src/durability/internal/protocol.js"
-import { normalize, restore, Value } from "../../../../src/durability/internal/runtime-state/value.js"
+import { normalize, Order, restore, Value } from "../../../../src/durability/internal/runtime-state/value.js"
 
 const decode = Schema.decodeUnknownEffect(Value)
 const strict = { onExcessProperty: "error" } as const
+
+it.effect("retains strictly validated immutable order dictionaries and rechecks mutable ones", () =>
+  Effect.gen(function* () {
+    const decodeOrder = Schema.decodeEffect(Order)
+    const input = freeze({ "0": "s:first", "1": "s:second" })
+    const first = yield* decodeOrder(input, strict)
+    expect(yield* decodeOrder(input, strict)).toBe(first)
+    expect(Object.isFrozen(first)).toBe(true)
+    const mutable = { "0": "s:first" }
+    expect(yield* decodeOrder(mutable, strict)).toEqual(mutable)
+    Object.assign(mutable, { "01": "s:second" })
+    expect((yield* decodeOrder(mutable, strict).pipe(Effect.flip))._tag).toBe("SchemaError")
+  }),
+)
+
+it.effect("keeps normalized data validation resolved through immutable cache bookkeeping", () =>
+  Effect.gen(function* () {
+    const input = freeze(normalize({ nested: [1, undefined, "value"] }))
+    const decoded = SchemaParser.decodeEffect(Value)(input, strict)
+    expect(Exit.isExit(decoded)).toBe(true)
+    expect(restore(yield* decoded)).toEqual({ nested: [1, undefined, "value"] })
+  }),
+)
 
 it.effect("reuses validated immutable values without exposing mutable cached outputs", () =>
   Effect.gen(function* () {

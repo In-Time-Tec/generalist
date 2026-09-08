@@ -11,12 +11,13 @@ import { DurabilityFailure } from "../errors.js"
 import { apply, freeze, isImmutable, type Patch, type State } from "./protocol.js"
 import { RuntimeState as RuntimeSchema, type HydratedState, type CanonicalState } from "./runtime-state/schema.js"
 import { normalize, restore, Value } from "./runtime-state/value.js"
-import { detach, mapValues as makeMapValues } from "./runtime-state/cache.js"
+import { detach, mapValues as makeMapValues, hasKeyPrefix } from "./runtime-state/cache.js"
 import { make as makeExecutables } from "./runtime-state/executable.js"
 import { make as makeProjection } from "./runtime-state/projection.js"
 import type { Changes } from "./runtime-state/publications.js"
 
 const Envelope = Schema.Struct({ version: Schema.Literal(1), data: Value })
+const Version = Schema.Struct({ version: Schema.Int })
 const strict = { onExcessProperty: "error" } as const
 const encodingFailure = (cause: unknown) =>
   DurabilityFailure.make({ reason: "encoding", message: `Cannot encode runtime state: ${String(cause)}` })
@@ -41,10 +42,12 @@ const projectTable = (
   copy: ReturnType<typeof detach>,
 ) => {
   if (field === before && retained !== undefined) return { values: retained, changed: [] }
-  const values = new Map<string, HydratedRow>()
+  const base = retained !== undefined && hasKeyPrefix(field, retained) ? retained : undefined
+  const values = new Map<string, HydratedRow>(base)
   const changed: Array<string> = []
   for (const [id, value] of field) {
     const unchanged = before?.get(id) === value
+    if (base !== undefined && unchanged) continue
     values.set(id, unchanged && retained?.has(id) === true ? retained.get(id)! : copy(value))
     if (!unchanged) changed.push(id)
   }
@@ -172,9 +175,7 @@ const decodeWith = (
 ): Effect.Effect<RuntimeState, DurabilityFailure> =>
   Effect.gen(function* () {
     if (Object.keys(persisted).length === 0) return local
-    const { version } = yield* Schema.decodeUnknownEffect(Schema.Struct({ version: Schema.Int }))(persisted).pipe(
-      Effect.mapError(corruptionFailure),
-    )
+    const { version } = yield* Schema.decodeUnknownEffect(Version)(persisted).pipe(Effect.mapError(corruptionFailure))
     if (version !== 1)
       return yield* DurabilityFailure.make({
         reason: "unsupported-version",
@@ -283,9 +284,7 @@ export const make = () => {
     Effect.gen(function* () {
       const source = Object.keys(persisted).length === 0 ? (seed ?? (seed = freeze(yield* encode(local)))) : persisted
       if (current?.source === source && isImmutable(source)) return current
-      const { version } = yield* Schema.decodeUnknownEffect(Schema.Struct({ version: Schema.Int }))(source).pipe(
-        Effect.mapError(corruptionFailure),
-      )
+      const { version } = yield* Schema.decodeUnknownEffect(Version)(source).pipe(Effect.mapError(corruptionFailure))
       if (version !== 1)
         return yield* DurabilityFailure.make({
           reason: "unsupported-version",
@@ -305,6 +304,8 @@ export const make = () => {
       return current
     })
   return {
+    hasAdmissionKey: (persisted: State, local: RuntimeState, key: string) =>
+      canonical(persisted, local).pipe(Effect.map(({ state }) => state.idempotency.has(key))),
     read: (persisted: State, local: RuntimeState) =>
       canonical(persisted, local).pipe(Effect.map(({ state }) => attachState(copy(state), local))),
     refresh: (persisted: State, local: RuntimeState) =>

@@ -134,13 +134,29 @@ export const parse = Function.dual<
       catch: (cause) => failure({ reason: "corruption", message: `Invalid UTF-8 JSON: ${String(cause)}`, key }),
     }),
 )
+const equalWideWords = (left: Uint8Array, right: Uint8Array): boolean => {
+  const length = Math.floor(left.length / 8)
+  const leftWords = new Float64Array(left.buffer, left.byteOffset, length)
+  const rightWords = new Float64Array(right.buffer, right.byteOffset, length)
+  const leftBits = new Uint32Array(left.buffer, left.byteOffset, length * 2)
+  const rightBits = new Uint32Array(right.buffer, right.byteOffset, length * 2)
+  for (let word = 0; word < length; word++) {
+    if (leftWords[word] === rightWords[word] && leftWords[word] !== 0) continue
+    if (leftBits[word * 2] !== rightBits[word * 2] || leftBits[word * 2 + 1] !== rightBits[word * 2 + 1]) return false
+  }
+  return true
+}
+
 export const equalBytes = Function.dual<
   (right: Uint8Array) => (left: Uint8Array) => boolean,
   (left: Uint8Array, right: Uint8Array) => boolean
 >(2, (left: Uint8Array, right: Uint8Array): boolean => {
   if (left.length !== right.length) return false
   let index = 0
-  if (left.length >= 4 && left.byteOffset % 4 === 0 && right.byteOffset % 4 === 0) {
+  if (left.length >= 8 && ((left.byteOffset | right.byteOffset) & 7) === 0) {
+    if (!equalWideWords(left, right)) return false
+    index = left.length - (left.length % 8)
+  } else if (left.length >= 4 && left.byteOffset % 4 === 0 && right.byteOffset % 4 === 0) {
     const length = Math.floor(left.length / 4)
     const leftWords = new Uint32Array(left.buffer, left.byteOffset, length)
     const rightWords = new Uint32Array(right.buffer, right.byteOffset, length)
@@ -198,8 +214,65 @@ const freezeChildren = <Input>(value: Input): boolean => {
   if (immutable) frozenValues.add(value)
   return immutable
 }
+
 const isContainer = (value: Json): value is State | ReadonlyArray<Json> => Predicate.isObjectOrArray(value)
 const isObject = (value: Json | undefined): value is State => Predicate.isObject(value) && !Array.isArray(value)
+const inheritByteLength = (source: State, value: State, changed: ReadonlySet<string>): void => {
+  let size = byteLengths.get(source)
+  if (size === undefined || !isObject(source)) return
+  for (const key of changed) {
+    const before = Object.prototype.propertyIsEnumerable.call(source, key)
+    const after = Object.hasOwn(value, key)
+    if (before && after) size += measure(value[key]!) - measure(source[key]!)
+    else if (before) {
+      const removed = measure(key) + 1 + measure(source[key]!)
+      size -= removed + Number(size !== removed + 2)
+    } else if (after) size += measure(key) + 1 + measure(value[key]!) + Number(size > 2)
+  }
+  byteLengths.set(value, size)
+}
+
+export const setEntries = Function.dual<
+  <A extends Json>(
+    entries: ReadonlyArray<readonly [string, A]>,
+  ) => (state: Readonly<Record<string, A>>) => Effect.Effect<Readonly<Record<string, A>>, DurabilityFailure>,
+  <A extends Json>(
+    state: Readonly<Record<string, A>>,
+    entries: ReadonlyArray<readonly [string, A]>,
+  ) => Effect.Effect<Readonly<Record<string, A>>, DurabilityFailure>
+>(2, <A extends Json>(state: Readonly<Record<string, A>>, entries: ReadonlyArray<readonly [string, A]>) =>
+  Effect.try({
+    try: () => {
+      if (entries.length === 0) return state
+      const result = { ...state }
+      const changed = new Set<string>()
+      let immutable = isImmutable(state)
+      for (const [key, value] of entries) {
+        Object.defineProperty(result, key, { value, enumerable: true, configurable: true, writable: true })
+        changed.add(key)
+        immutable = immutable && isImmutable(value)
+      }
+      if (!immutable) return freeze(result)
+      Object.freeze(result)
+      frozenValues.add(result)
+      inheritByteLength(state, result, changed)
+      return result
+    },
+    catch: (cause) => failure({ reason: "encoding", message: `Cannot update canonical record: ${String(cause)}` }),
+  }),
+)
+
+export const set = Function.dual<
+  <A extends Json>(
+    key: string,
+    value: A,
+  ) => (state: Readonly<Record<string, A>>) => Effect.Effect<Readonly<Record<string, A>>, DurabilityFailure>,
+  <A extends Json>(
+    state: Readonly<Record<string, A>>,
+    key: string,
+    value: A,
+  ) => Effect.Effect<Readonly<Record<string, A>>, DurabilityFailure>
+>(3, <A extends Json>(state: Readonly<Record<string, A>>, key: string, value: A) => setEntries(state, [[key, value]]))
 
 /** Object-only paths avoid index-shift ambiguity. Dangerous property names remain ordinary own keys. */
 export const apply = Function.dual<
@@ -217,7 +290,10 @@ export const apply = Function.dual<
     try: () => {
       if (patches.length === 0) return state
       const root = { ...state }
-      const writable = new WeakSet<object>([root])
+      const writable = new Map<State, { readonly source: State; readonly changed: Set<string> }>([
+        [root, { source: state, changed: new Set() }],
+      ])
+      let immutable = isImmutable(state)
       for (const patch of patches) {
         if (patch.path.length === 0) throw new Error("A patch must name an object property")
         let target = root
@@ -229,7 +305,8 @@ export const apply = Function.dual<
             target = child
           } else {
             const copy = { ...child }
-            writable.add(copy)
+            writable.set(copy, { source: child, changed: new Set() })
+            writable.get(target)!.changed.add(segment)
             Object.defineProperty(target, segment, {
               value: copy,
               enumerable: true,
@@ -240,9 +317,12 @@ export const apply = Function.dual<
           }
         }
         const key = patch.path[patch.path.length - 1]!
+        writable.get(target)!.changed.add(key)
         if (patch.op === "set") {
+          const value = patch.value
+          immutable = immutable && isImmutable(value)
           Object.defineProperty(target, key, {
-            value: patch.value,
+            value,
             enumerable: true,
             configurable: true,
             writable: true,
@@ -252,7 +332,13 @@ export const apply = Function.dual<
           Reflect.deleteProperty(target, key)
         }
       }
-      return freeze(root)
+      if (!immutable) return freeze(root)
+      for (const [value, { source, changed }] of [...writable].toReversed()) {
+        Object.freeze(value)
+        frozenValues.add(value)
+        inheritByteLength(source, value, changed)
+      }
+      return root
     },
     catch: (cause) => failure({ reason, message: `Invalid transition: ${String(cause)}` }),
   }),

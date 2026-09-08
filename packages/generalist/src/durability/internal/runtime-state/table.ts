@@ -1,13 +1,13 @@
 import { Effect, Predicate, Schema, SchemaAST, SchemaIssue, SchemaParser } from "effect"
-import { apply, freeze, isImmutable, type Patch, type State } from "../protocol.js"
-import { ownership, type DataSchema } from "./cache.js"
-import { make as makeValues, Value } from "./value.js"
+import { apply, freeze, isImmutable, setEntries, type Patch, type State } from "../protocol.js"
+import { ownership, hasKeyPrefix, type DataSchema } from "./cache.js"
+import { make as makeValues, Order, Value } from "./value.js"
 
 type Wire = Extract<Value, { readonly type: "map" }>
 const StoredTable = Schema.Struct({
   type: Schema.Literal("map"),
   length: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(0xffffffff)),
-  order: Schema.Record(Schema.String, Schema.String),
+  order: Order,
   entries: Schema.Record(Schema.String, Schema.Unknown),
 })
 type Diff = (previous: State, next: State) => ReadonlyArray<Patch>
@@ -17,6 +17,21 @@ type Generation<A> = {
   readonly wire: Wire
   readonly rows: ReadonlyMap<string, Row<A>>
   readonly value: ReadonlyMap<string, A>
+}
+const matchesRow = <A, Input>(row: Row<A> | undefined, input: Input): row is Row<A> =>
+  row !== undefined && isImmutable(input) && (Object.is(row.source, input) || Object.is(row.wire, input))
+const copyRows = <A>(source: Generation<A> | undefined) => ({
+  rows: new Map<string, Row<A>>(source?.rows),
+  result: new Map<string, A>(source?.value),
+  entries: { ...source?.wire.entries },
+})
+const extendsOrder = (before: Wire, after: typeof StoredTable.Type): boolean => {
+  if (before.order === after.order) return true
+  if (before.length > after.length) return false
+  for (let index = 0; index < before.length; index++) {
+    if (before.order[String(index)] !== after.order[String(index)]) return false
+  }
+  return true
 }
 
 const invalid = (message: string) => new SchemaIssue.InvalidValue({ message })
@@ -34,21 +49,30 @@ const same = (left: Schema.Json, right: Schema.Json): boolean => {
   )
 }
 
-const orderedEntries = <A>(previous: Wire | undefined, rows: ReadonlyMap<string, Row<A>>) => {
-  let index = 0
-  let unchanged = previous !== undefined && previous.length === rows.size && isImmutable(previous.order)
-  for (const key of rows.keys()) {
-    if (!unchanged || previous!.order[String(index++)] !== `s:${key}`) {
-      unchanged = false
-      break
+const orderedEntries = <A>(
+  previous: Wire | undefined,
+  rows: ReadonlyMap<string, Row<A>>,
+  additions: ReadonlyArray<readonly [string, string]> | undefined,
+) =>
+  Effect.gen(function* () {
+    if (previous !== undefined && additions !== undefined)
+      return yield* setEntries(previous.order, additions).pipe(
+        Effect.mapError(() => invalid("Cannot append canonical table order")),
+      )
+    let index = 0
+    let unchanged = previous !== undefined && previous.length === rows.size && isImmutable(previous.order)
+    for (const key of rows.keys()) {
+      if (!unchanged || previous!.order[String(index++)] !== `s:${key}`) {
+        unchanged = false
+        break
+      }
     }
-  }
-  if (unchanged) return previous!.order
-  const order: Record<string, string> = {}
-  index = 0
-  for (const key of rows.keys()) order[String(index++)] = `s:${key}`
-  return order
-}
+    if (unchanged) return previous!.order
+    const order: Record<string, string> = {}
+    index = 0
+    for (const key of rows.keys()) order[String(index++)] = `s:${key}`
+    return order
+  })
 
 export const make = <S extends DataSchema>({
   row,
@@ -62,6 +86,8 @@ export const make = <S extends DataSchema>({
   readonly owned?: ReturnType<typeof ownership>
 }) => {
   const values = makeValues(owned)
+  const original = <Input>(source: Input) =>
+    Predicate.isObjectOrArray(source) ? (originals.get(source) ?? source) : source
   const decodeRow = SchemaParser.decodeUnknownEffect(row)
   const encodeRow = SchemaParser.encodeUnknownEffect(row)
   let current: Generation<S["Type"]> | undefined
@@ -107,7 +133,7 @@ export const make = <S extends DataSchema>({
       if (previous !== undefined && same(previous.wire, wire)) return previous
       if (previous !== undefined) {
         const patched = yield* apply(
-          { value: previous.wire },
+          freeze({ value: previous.wire }),
           diff({ value: previous.wire }, { value: wire }),
           "encoding",
         ).pipe(Effect.mapError(() => invalid("Cannot project changed Runtime row")))
@@ -125,27 +151,34 @@ export const make = <S extends DataSchema>({
     })
   const decodeTable = <Input>(source: Input, wire: typeof StoredTable.Type) =>
     Effect.gen(function* () {
-      const rows = new Map<string, Row<S["Type"]>>()
-      const result = new Map<string, S["Type"]>()
-      const entries: Record<string, Value> = {}
-      for (let index = 0; index < wire.length; index++) {
+      const base = current !== undefined && extendsOrder(current.wire, wire) ? current : undefined
+      const { rows, result, entries } = copyRows(base)
+      if (base !== undefined) {
+        for (const [key, previous] of base.rows) {
+          const encodedKey = `s:${key}`
+          if (!Object.hasOwn(wire.entries, encodedKey))
+            return yield* Effect.fail(invalid("Canonical table order has an invalid or missing key"))
+          const item = wire.entries[encodedKey]
+          if (matchesRow(previous, item)) continue
+          const retained = yield* decodeStoredRow(key, item)
+          entries[encodedKey] = retained.wire
+          rows.set(key, retained)
+          result.set(key, retained.value)
+        }
+      }
+      for (let index = base === undefined ? 0 : base.rows.size; index < wire.length; index++) {
         const key = orderedKey(wire, index, rows)
         if (!Predicate.isString(key)) return yield* Effect.fail(key)
         const item = wire.entries[`s:${key}`]!
         const previous = current?.rows.get(key)
-        const retained =
-          previous !== undefined &&
-          isImmutable(item) &&
-          (Object.is(previous.source, item) || Object.is(previous.wire, item))
-            ? previous
-            : yield* decodeStoredRow(key, item)
+        const retained = matchesRow(previous, item) ? previous : yield* decodeStoredRow(key, item)
         entries[`s:${key}`] = retained.wire
         rows.set(key, retained)
         result.set(key, retained.value)
       }
       const validated: Wire = Object.freeze({
         ...wire,
-        order: freeze(orderedEntries(current?.wire, rows)),
+        order: freeze(wire.order),
         entries: Object.freeze(entries),
       })
       staged = { source, wire: validated, rows, value: result }
@@ -167,27 +200,30 @@ export const make = <S extends DataSchema>({
     })
   const encodeTable = (input: ReadonlyMap<unknown, unknown>) =>
     Effect.gen(function* () {
-      const rows = new Map<string, Row<S["Type"]>>()
-      const result = new Map<string, S["Type"]>()
-      const entries: Record<string, Value> = {}
-      let unchanged = input.size === current?.value.size
-      for (const [key, source] of input) {
+      const items = new Map(input)
+      const base = current !== undefined && hasKeyPrefix(items, current.rows) ? current : undefined
+      const { rows, result, entries } = copyRows(base)
+      let unchanged = base !== undefined
+      const additions: Array<readonly [string, string]> = []
+      for (const [key, source] of items) {
         if (!Predicate.isString(key)) return yield* Effect.fail(invalid("Runtime table keys must be strings"))
-        const item = Predicate.isObjectOrArray(source) ? (originals.get(source) ?? source) : source
+        const item = original(source)
         const previous = current?.rows.get(key)
         const retained =
           previous !== undefined && Object.is(previous.value, item) ? previous : yield* encodeChangedRow(key, item)
+        if (base !== undefined && retained === previous) continue
         const encodedKey = `s:${key}`
+        if (previous === undefined) additions.push([String(rows.size), encodedKey])
         entries[encodedKey] = retained.wire
-        unchanged = unchanged && retained === previous
+        unchanged = false
         rows.set(key, retained)
         result.set(key, retained.value)
       }
-      const order = orderedEntries(current?.wire, rows)
-      if (unchanged && order === current?.wire.order) {
-        pending = current
-        return current.wire
+      if (unchanged) {
+        pending = base!
+        return base!.wire
       }
+      const order = yield* orderedEntries(current?.wire, rows, base === undefined ? undefined : additions)
       const wire: Wire = Object.freeze({
         type: "map",
         length: rows.size,

@@ -1,17 +1,25 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, it } from "@effect/vitest"
 import { Crypto, Effect, Fiber, Schema } from "effect"
+import { vi } from "vitest"
 import { ObjectStore, type Service } from "../../../src/durability/object-store.js"
 import { make as makeJournal } from "../../../src/durability/internal/journal.js"
 import { make as makeStorage } from "../../../src/durability/internal/journal-storage.js"
 import {
   byteLength,
+  apply,
   bytes as encodeBytes,
   equalBytes,
   freeze,
+  isImmutable,
   parse,
   sequenceName,
+  set,
+  setEntries,
+  type Commit,
   type Json,
+  type Patch,
+  type State,
 } from "../../../src/durability/internal/protocol.js"
 import { make as makeSimulator } from "../../../src/testing/durability/index.js"
 
@@ -21,6 +29,328 @@ const commitKey = `${prefix}commits/00000000000000000001.json`
 const transition = Effect.succeed({ patches: [], receipt: null })
 
 it.layer(BunCrypto.layer)((test) => {
+  test.effect("accounts exactly for batched immutable record additions and replacements", () =>
+    Effect.gen(function* () {
+      const source = freeze({ first: "original" })
+      yield* byteLength(source)
+      const updated = yield* setEntries(source, [
+        ["first", "replacement"],
+        ["__proto__", "ordinary"],
+        ["second", "雪🚀"],
+        ["first", "final"],
+      ])
+      expect(source.first).toBe("original")
+      expect(updated.first).toBe("final")
+      expect(Object.getOwnPropertyDescriptor(updated, "__proto__")?.value).toBe("ordinary")
+      expect(isImmutable(updated)).toBe(true)
+      expect(yield* byteLength(updated)).toBe((yield* encodeBytes(updated)).byteLength)
+      expect(yield* setEntries(updated, [])).toBe(updated)
+    }),
+  )
+
+  test.effect("bounds confirmed commit retention and decodes authority from the exact sealed bytes", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const crypto = yield* Crypto.Crypto
+      let hashes = 0
+      const storage = makeStorage({
+        store: bucket.store,
+        crypto: {
+          ...crypto,
+          digest: (algorithm, data) =>
+            Effect.suspend(() => {
+              hashes += 1
+              return crypto.digest(algorithm, data)
+            }),
+        },
+        identity,
+        commitsPrefix: `${prefix}commits/`,
+        maxStateBytes: 1024 * 1024,
+        maxCommitBytes: 1024 * 1024,
+      })
+      let parentDigest = ""
+      for (let index = 0; index < 4; index++) {
+        const payload = { nested: { value: index }, zero: -0 }
+        const path = ["payload"]
+        const record: Commit = {
+          ...identity,
+          version: 1,
+          kind: "commit",
+          sequence: String(index),
+          parentDigest,
+          command: { id: String(index), inputDigest: "a".repeat(64) },
+          patches: [{ op: "set", path, value: payload }],
+          receipt: payload,
+        }
+        const sealed = yield* storage.sealCommit(record)
+        expect(Object.isFrozen(payload)).toBe(false)
+        payload.nested.value = 99
+        path[0] = "changed"
+        expect(yield* bucket.store.create(storage.commitKey(String(index)), sealed.bytes)).toBe("created")
+        sealed.accept()
+        parentDigest = sealed.digest
+        sealed.bytes.fill(0)
+      }
+      hashes = 0
+      const cached = yield* storage.readCommit("3")
+      expect(hashes).toBe(0)
+      expect(cached.record.receipt).toEqual({ nested: { value: 3 }, zero: 0 })
+      expect(cached.record.patches).toEqual([
+        { op: "set", path: ["payload"], value: { nested: { value: 3 }, zero: 0 } },
+      ])
+      expect(Object.isFrozen(cached.record.receipt)).toBe(true)
+      yield* storage.readCommit("0")
+      expect(hashes).toBe(1)
+    }),
+  )
+
+  test.effect("reuses a confirmed commit only after rereading and comparing its complete bytes", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const key = `${prefix}commits/${sequenceName("0")}.json`
+      const reads: Array<string> = []
+      let published: Uint8Array | undefined
+      const journal = yield* makeJournal(identity).pipe(
+        Effect.provideService(ObjectStore, {
+          ...bucket.store,
+          create: (name, bytes) => {
+            if (name === key) published = bytes
+            return bucket.store.create(name, bytes)
+          },
+          read: (name, options) =>
+            Effect.suspend(() => {
+              reads.push(name)
+              return bucket.store.read(name, options)
+            }),
+        }),
+      )
+      const committed = yield* journal.commitWithHead({ id: "first", input: null }, () =>
+        Effect.succeed({
+          patches: [{ op: "set", path: ["value"], value: -0 }],
+          receipt: { value: -0 },
+        }),
+      )
+      expect(published).toBeDefined()
+      published!.fill(0)
+      reads.length = 0
+      const decode = vi.spyOn(TextDecoder.prototype, "decode")
+      const { head, calls } = yield* journal.head.pipe(
+        Effect.map((current) => ({ head: current, calls: decode.mock.calls.length })),
+        Effect.ensuring(Effect.sync(() => decode.mockRestore())),
+      )
+      expect(reads).toContain(key)
+      expect(calls).toBe(0)
+      expect(head).toEqual(committed.head)
+      expect(Object.is(head.state.value, -0)).toBe(false)
+      yield* bucket.maintenance.remove(key)
+      yield* bucket.store.create(key, new TextEncoder().encode("{}"))
+      expect((yield* journal.head.pipe(Effect.flip)).reason).toBe("corruption")
+    }),
+  )
+
+  test.effect("compares raw wide words including signed zero and distinct NaN payloads", () =>
+    Effect.sync(() => {
+      const patterns = [
+        [0, 0],
+        [0, 0x80000000],
+        [0, 0x7ff00000],
+        [0, 0xfff00000],
+        [1, 0x7ff00000],
+        [2, 0x7ff00000],
+        [0, 0x7ff80000],
+        [1, 0x7ff80000],
+        [0, 0xfff80000],
+      ]
+      for (const first of patterns) {
+        for (const second of patterns) {
+          const left = new Uint8Array(new Uint32Array(first).buffer)
+          const right = new Uint8Array(new Uint32Array(second).buffer)
+          expect(equalBytes(left, right)).toBe(left.every((value, index) => value === right[index]))
+        }
+      }
+    }),
+  )
+
+  for (const replacement of ["1.json", "00000000000000000003.json", "000000000000000000x0.json"]) {
+    test.effect(`rejects a same-cardinality substituted retained prefix: ${replacement}`, () =>
+      Effect.gen(function* () {
+        const bucket = yield* makeSimulator()
+        const options = { ...identity, snapshotEvery: 2 }
+        const writer = yield* makeJournal(options).pipe(Effect.provideService(ObjectStore, bucket.store))
+        yield* writer.commit({ id: "zero", input: null }, () => transition)
+        yield* writer.commit({ id: "one", input: null }, () => transition)
+        yield* bucket.maintenance.remove(`${prefix}commits/${sequenceName("0")}.json`)
+        yield* bucket.store.create(`${prefix}commits/${replacement}`, new TextEncoder().encode("{}"))
+        const fresh = yield* makeJournal(options).pipe(Effect.provideService(ObjectStore, bucket.store))
+        expect((yield* fresh.head.pipe(Effect.flip)).reason).toBe("corruption")
+      }),
+    )
+  }
+
+  test.effect("checks immutability on the exact patch value that is installed", () =>
+    Effect.gen(function* () {
+      let reads = 0
+      const first = freeze({ value: 1 })
+      const second = { value: 2 }
+      const patch: Patch = {
+        op: "set",
+        path: ["item"],
+        get value() {
+          reads += 1
+          return reads === 1 ? first : second
+        },
+      }
+      const state = yield* apply(freeze({}), [patch], "encoding")
+      expect(reads).toBe(1)
+      expect(state.item).toBe(first)
+      expect(isImmutable(state)).toBe(true)
+    }),
+  )
+
+  test.effect("appends immutable receipts without rescanning retained entries", () =>
+    Effect.gen(function* () {
+      const counts: Array<number> = []
+      for (const size of [10, 1000]) {
+        const source = freeze(Object.fromEntries(Array.from({ length: size }, (_, index) => [String(index), index])))
+        yield* byteLength(source)
+        const encode = TextEncoder.prototype.encode
+        const descriptor = Object.getOwnPropertyDescriptor
+        let calls = 0
+        const encoded = vi.spyOn(TextEncoder.prototype, "encode").mockImplementation(function (
+          this: TextEncoder,
+          input,
+        ) {
+          calls += 1
+          return encode.call(this, input)
+        })
+        const descriptors = vi.spyOn(Object, "getOwnPropertyDescriptor").mockImplementation((value, key) => {
+          calls += 1
+          return descriptor(value, key)
+        })
+        const result = yield* set(source, "__proto__", -1).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              encoded.mockRestore()
+              descriptors.mockRestore()
+            }),
+          ),
+        )
+        counts.push(calls)
+        expect(isImmutable(result)).toBe(true)
+        expect(Object.hasOwn(source, "__proto__")).toBe(false)
+        expect(Object.getOwnPropertyDescriptor(result, "__proto__")?.value).toBe(-1)
+        expect(yield* byteLength(result)).toBe((yield* encodeBytes(result)).byteLength)
+      }
+      expect(counts[1]).toBe(counts[0])
+      const source = { existing: { value: 1 } }
+      const value = { value: 2 }
+      const result = yield* set(source, "new", value)
+      expect(isImmutable(result)).toBe(true)
+      expect(Object.isFrozen(value)).toBe(true)
+      expect(Object.hasOwn(source, "new")).toBe(false)
+      expect(yield* byteLength(result)).toBe((yield* encodeBytes(result)).byteLength)
+    }),
+  )
+
+  test.effect("updates exact cached sizes without remeasuring unchanged record entries", () =>
+    Effect.gen(function* () {
+      const counts: Array<number> = []
+      for (const size of [10, 1000]) {
+        const source = freeze({
+          rows: Object.fromEntries(Array.from({ length: size }, (_, index) => [String(index), String(index)])),
+        })
+        yield* byteLength(source)
+        const encode = TextEncoder.prototype.encode
+        let calls = 0
+        const spy = vi.spyOn(TextEncoder.prototype, "encode").mockImplementation(function (this: TextEncoder, input) {
+          calls += 1
+          return encode.call(this, input)
+        })
+        const result = yield* apply(source, [{ op: "set", path: ["rows", "0"], value: "changed" }], "encoding").pipe(
+          Effect.flatMap((state) => byteLength(state).pipe(Effect.map((bytes) => ({ state, size: bytes })))),
+          Effect.ensuring(Effect.sync(() => spy.mockRestore())),
+        )
+        counts.push(calls)
+        expect(result.size).toBe((yield* encodeBytes(result.state)).byteLength)
+      }
+      expect(counts[1]).toBe(counts[0])
+    }),
+  )
+
+  test.effect("preserves exact size limits through empty records nested edits and escaped keys", () =>
+    Effect.gen(function* () {
+      const batches: ReadonlyArray<ReadonlyArray<Patch>> = [
+        [{ op: "set", path: ["a"], value: "雪🚀\uD800" }],
+        [{ op: "set", path: ["nested"], value: { x: 1, y: [null, -0, true] } }],
+        [
+          { op: "set", path: ["nested", "x"], value: false },
+          { op: "remove", path: ["nested", "y"] },
+        ],
+        [
+          { op: "set", path: ["__proto__"], value: { literal: true } },
+          { op: "set", path: ['"\\\n'], value: 4 },
+        ],
+        [
+          { op: "remove", path: ["__proto__"] },
+          { op: "remove", path: ['"\\\n'] },
+        ],
+        [
+          { op: "remove", path: ["a"] },
+          { op: "remove", path: ["nested"] },
+        ],
+        [
+          { op: "set", path: ["a"], value: 1 },
+          { op: "remove", path: ["a"] },
+          { op: "set", path: ["a"], value: [1, 2] },
+        ],
+      ]
+      for (const warm of [false, true]) {
+        let state: State = freeze({})
+        if (warm) yield* byteLength(state)
+        for (const batch of batches) {
+          state = yield* apply(state, freeze(batch), "encoding")
+          expect(yield* byteLength(state)).toBe((yield* encodeBytes(state)).byteLength)
+        }
+        const mutable = { value: "new" }
+        state = yield* apply(state, [{ op: "set", path: ["mutable"], value: mutable }], "encoding")
+        expect(isImmutable(state)).toBe(true)
+        expect(yield* byteLength(state)).toBe((yield* encodeBytes(state)).byteLength)
+      }
+      const hidden: State = {}
+      Object.defineProperty(hidden, "hidden", { value: 1 })
+      freeze(hidden)
+      yield* byteLength(hidden)
+      const visible = yield* apply(hidden, [{ op: "set", path: ["hidden"], value: 2 }], "encoding")
+      expect(yield* byteLength(visible)).toBe((yield* encodeBytes(visible)).byteLength)
+    }),
+  )
+
+  test.effect("freezes only copied paths when the source and patch values are already immutable", () =>
+    Effect.gen(function* () {
+      const counts: Array<number> = []
+      for (const size of [10, 1000]) {
+        const source = freeze({
+          rows: Object.fromEntries(Array.from({ length: size }, (_, index) => [String(index), index])),
+        })
+        const descriptor = Object.getOwnPropertyDescriptor
+        let calls = 0
+        const spy = vi.spyOn(Object, "getOwnPropertyDescriptor").mockImplementation((value, key) => {
+          calls += 1
+          return descriptor(value, key)
+        })
+        const result = yield* apply(source, [{ op: "set", path: ["rows", "0"], value: -1 }], "encoding").pipe(
+          Effect.ensuring(Effect.sync(() => spy.mockRestore())),
+        )
+        counts.push(calls)
+        expect(isImmutable(result)).toBe(true)
+        expect(isImmutable(result.rows)).toBe(true)
+        expect(source.rows["0"]).toBe(0)
+        expect(result.rows).toMatchObject({ "0": -1 })
+      }
+      expect(counts[1]).toBe(counts[0])
+    }),
+  )
+
   test.effect("compares canonical bytes exactly across unaligned words and partial tails", () =>
     Effect.sync(() => {
       for (const length of [0, 1, 3, 4, 7, 8, 15, 16, 31, 255, 1024]) {

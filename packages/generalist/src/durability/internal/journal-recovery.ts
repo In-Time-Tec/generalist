@@ -47,21 +47,21 @@ export const make = ({
   const listSequences = Effect.gen(function* () {
     const keys = yield* listKeys(commitsPrefix)
     const sequences: Array<string> = []
-    for (const key of keys) {
-      const name = key.slice(commitsPrefix.length)
-      const sequence = name.endsWith(".json") ? sequenceFromName(name.slice(0, -5)) : undefined
-      if (sequence === undefined)
-        return yield* failure({ reason: "corruption", message: "Invalid numbered commit key", key })
-      sequences.push(sequence)
-    }
-    sequences.sort((left, right) => left.length - right.length || (left < right ? -1 : Number(left > right)))
-    for (let index = 0; index < sequences.length; index++) {
-      if (sequences[index] !== String(index))
+    for (let index = 0; index < keys.size; index++) {
+      const sequence = String(index)
+      if (!keys.has(commitKey(sequence))) {
+        for (const key of keys) {
+          const name = key.slice(commitsPrefix.length)
+          if (!name.endsWith(".json") || sequenceFromName(name.slice(0, -5)) === undefined)
+            return yield* failure({ reason: "corruption", message: "Invalid numbered commit key", key })
+        }
         return yield* failure({
           reason: "corruption",
           message: "Retained commit history contains a gap",
-          key: commitKey(String(index)),
+          key: commitKey(sequence),
         })
+      }
+      sequences.push(sequence)
     }
     return sequences
   })

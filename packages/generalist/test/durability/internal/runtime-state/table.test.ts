@@ -14,6 +14,152 @@ const measured = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     return { value, operations: after - before }
   }).pipe(Effect.provideService(Scheduler.PreventSchedulerYield, true))
 
+it.effect("preserves unknown-entry record decoding for immutable and exotic dictionaries", () =>
+  Effect.gen(function* () {
+    const hidden = Symbol("hidden")
+    const nullPrototype = { "s:first": 1 }
+    Object.setPrototypeOf(nullPrototype, null)
+    for (const entries of [
+      { "s:first": 1 },
+      nullPrototype,
+      { "s:first": 1, [hidden]: 2 },
+      Object.defineProperty({ "s:first": 1 }, "s:hidden", { value: 2 }),
+    ]) {
+      const table = make({ row: Schema.Int, originals: new WeakMap(), diff })
+      const wire = freeze({ type: "map", length: 1, order: { "0": "s:first" }, entries })
+      expect([...(yield* Schema.decodeUnknownEffect(table.schema)(wire))]).toEqual([["first", 1]])
+      table.accept()
+      table.begin()
+      const invalid = { ...wire, entries: { ...entries, "s:extra": 2 } }
+      expect((yield* Schema.decodeUnknownEffect(table.schema)(invalid).pipe(Effect.flip))._tag).toBe("SchemaError")
+    }
+    for (const entries of [null, [], 1]) {
+      const table = make({ row: Schema.Int, originals: new WeakMap(), diff })
+      const wire = freeze({ type: "map", length: 0, order: {}, entries })
+      expect((yield* Schema.decodeUnknownEffect(table.schema)(wire).pipe(Effect.flip))._tag).toBe("SchemaError")
+    }
+    let value = 1
+    const table = make({ row: Schema.Int, originals: new WeakMap(), diff })
+    const entries = Object.defineProperty({}, "s:first", { get: () => value, enumerable: true })
+    const wire = freeze({ type: "map", length: 1, order: { "0": "s:first" }, entries })
+    expect([...(yield* Schema.decodeUnknownEffect(table.schema)(wire))]).toEqual([["first", 1]])
+    table.accept()
+    value = 2
+    expect([...(yield* Schema.decodeUnknownEffect(table.schema)(wire))]).toEqual([["first", 2]])
+  }),
+)
+
+it.effect("extends a validated key prefix without losing changes or accepting a duplicate tail", () =>
+  Effect.gen(function* () {
+    const table = make({ row: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), originals: new WeakMap(), diff })
+    const wire = freeze(
+      normalize(
+        new Map([
+          ["first", 1],
+          ["second", 2],
+        ]),
+      ),
+    )
+    const initial = yield* Schema.decodeEffect(table.schema)(wire)
+    table.accept()
+    table.begin()
+    yield* Schema.encodeEffect(table.schema)(new Map(initial).set("first", 3).set("third", 4))
+    const committed = yield* apply({ table: wire }, table.patches(["table"]), "encoding")
+    const next = yield* Schema.decodeUnknownEffect(table.schema)(committed.table)
+    expect([...next]).toEqual([
+      ["first", 3],
+      ["second", 2],
+      ["third", 4],
+    ])
+    expect([...initial]).toEqual([
+      ["first", 1],
+      ["second", 2],
+    ])
+    table.accept()
+    const corrupted = yield* apply(
+      committed,
+      [
+        { op: "set", path: ["table", "length"], value: 4 },
+        { op: "set", path: ["table", "order", "3"], value: "s:first" },
+        { op: "set", path: ["table", "entries", "s:fourth"], value: 5 },
+      ],
+      "corruption",
+    )
+    expect((yield* Schema.decodeUnknownEffect(table.schema)(corrupted.table).pipe(Effect.flip))._tag).toBe(
+      "SchemaError",
+    )
+    expect([...(yield* Schema.decodeUnknownEffect(table.schema)(committed.table))]).toEqual([...next])
+  }),
+)
+
+it.effect("owns the table key snapshot while a row encoder runs", () =>
+  Effect.gen(function* () {
+    const entry = Schema.Struct({ value: Schema.Finite })
+    let proposal = new Map<string, typeof entry.Type>()
+    const row = entry.pipe(
+      Schema.decodeTo(
+        entry,
+        SchemaTransformation.transform({
+          decode: (value) => value,
+          encode: (value) => {
+            proposal.clear()
+            return value
+          },
+        }),
+      ),
+    )
+    const table = make({ row, originals: new WeakMap(), diff })
+    const wire = freeze(
+      normalize(
+        new Map([
+          ["first", { value: 1 }],
+          ["second", { value: 2 }],
+        ]),
+      ),
+    )
+    const initial = yield* Schema.decodeEffect(table.schema)(wire)
+    table.accept()
+    table.begin()
+    proposal = new Map(initial).set("first", { value: 3 })
+    yield* Schema.encodeEffect(table.schema)(proposal)
+    const committed = yield* apply({ table: wire }, table.patches(["table"]), "encoding")
+    const fresh = make({ row, originals: new WeakMap(), diff })
+    expect([...(yield* Schema.decodeUnknownEffect(fresh.schema)(committed.table))]).toEqual([
+      ["first", { value: 3 }],
+      ["second", { value: 2 }],
+    ])
+    expect([...initial]).toEqual([
+      ["first", { value: 1 }],
+      ["second", { value: 2 }],
+    ])
+    expect(proposal.size).toBe(0)
+  }),
+)
+
+it.effect("rejects substituted entries even when the validated order identity is retained", () =>
+  Effect.gen(function* () {
+    const table = make({ row: Schema.Finite, originals: new WeakMap(), diff })
+    const input = freeze(
+      normalize(
+        new Map([
+          ["first", 1],
+          ["second", 2],
+        ]),
+      ),
+    )
+    const initial = yield* Schema.decodeEffect(table.schema)(input)
+    table.accept()
+    const wire = yield* Schema.encodeEffect(table.schema)(initial)
+    if (!Predicate.isObject(wire) || wire.type !== "map") return yield* Effect.die("Missing canonical table")
+    const corrupted = { ...wire, entries: { "s:other": 1, "s:second": 2 } }
+    expect((yield* Schema.decodeEffect(table.schema)(corrupted).pipe(Effect.flip))._tag).toBe("SchemaError")
+    expect([...(yield* Schema.decodeEffect(table.schema)(wire))]).toEqual([
+      ["first", 1],
+      ["second", 2],
+    ])
+  }),
+)
+
 it.effect("keeps unchanged-row Effect work constant across validated table populations", () =>
   Effect.gen(function* () {
     const counts: Array<{ readonly unchanged: number; readonly changed: number; readonly committed: number }> = []
