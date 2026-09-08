@@ -107,6 +107,16 @@ export interface Lane {
 }
 
 export interface RuntimeSession {
+  readonly family?: {
+    readonly rootSessionId: string
+    readonly parentSessionId: string | null
+    readonly parentRunId: string | null
+    readonly depth: number
+    readonly treePolicy: TreePolicy
+    readonly budget: import("../../core/durable/run-budget.js").BudgetLimits
+    readonly runIds: ReadonlyArray<string>
+    readonly childSessionIds: ReadonlyArray<string>
+  }
   readonly entries: ReadonlyMap<string, SessionEntry>
   readonly order: ReadonlyArray<string>
   readonly leaf: string | null
@@ -143,6 +153,7 @@ export interface StoredArtifact {
 }
 
 export interface RuntimeState {
+  readonly delegationPolicy: TreePolicy | null
   readonly closed: boolean
   readonly nextRunCounter: number
   readonly nextSubscriberId: number
@@ -218,6 +229,7 @@ export const emptyState = (input: {
   waits: new Map(),
   sessions: new Map(),
   hostSessions: new Map(),
+  delegationPolicy: null,
   treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),

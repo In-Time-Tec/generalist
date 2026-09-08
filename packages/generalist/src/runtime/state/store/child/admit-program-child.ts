@@ -16,13 +16,13 @@ import type { AdmitProgramChildInput, Service as RunStoreService } from "../../.
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { childDigest } from "../../digest.js"
 import { idempotencyKey, type RuntimeState, type StoredRun } from "../../projection.js"
-import { readinessForAdmission, reserveSessions } from "./capacity.js"
+import { readinessForAdmission, reserveSessions, recordFamilyRun } from "./capacity.js"
 import { suspend } from "../control/suspend.js"
 import { revokeSession } from "../execution.js"
 import { defaultInheritance } from "../../../../core/agent/lifecycle/fan-out.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
-import { capGrant, profileBudget } from "../../../budget/state.js"
+import { sessionChildGrant } from "../admission/policy.js"
 
 type AdmitProgramChildResult = Effect.Effect<
   readonly [RunReceipt, RuntimeState],
@@ -125,7 +125,12 @@ export const admitProgramChild: {
     if (parentBudget.children === 0) {
       return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
     }
-    const childBudget = capGrant(childGrant(parentBudget, 1), profileBudget(executable))
+    const childBudget = yield* sessionChildGrant({
+      state,
+      sessionId: input.message.sessionId,
+      selection: input,
+      grant: childGrant(parentBudget, 1),
+    })
     const child: StoredRun = {
       runId: input.childRunId,
       status: "queued",
@@ -154,7 +159,7 @@ export const admitProgramChild: {
     const runs = new Map(state.runs)
     runs.set(parent.runId, { ...parent, children: [...parent.children, child.runId] })
     runs.set(child.runId, child)
-    let next: RuntimeState = { ...state, runs }
+    let next: RuntimeState = recordFamilyRun({ state: { ...state, runs }, run: child, budget: childBudget })
     const [, linked] = yield* appendLifecycle(
       next,
       parent.runId,

@@ -30,11 +30,13 @@ Profile references are pinned in the executable manifest. Self-reference and mut
 
 ## Family bounds
 
-The root-pinned policy contains `maxDepth`, `maxSessions`, and separate `concurrency.agents` and `concurrency.tools` fields. Root depth is zero. Direct, grouped, and Program child admission reserve distinct retained Session IDs within the root Run family. Settling or cancelling a child does not refund its retained Session reservation. Retrying an accepted admission does not reserve another Session, and a rejected group leaves no partial children.
+The root-pinned policy contains `maxDepth`, `maxSessions`, and separate `concurrency.agents` and `concurrency.tools` fields. Root depth is zero. Direct, grouped, and Program child admission reserve distinct retained Session IDs within the canonical Session family. The existing RuntimeSession records fixed parent/root Session identities, depth, policy, and spending grant; retained Run and child-Session references support family traversal. Settling or cancelling a child does not refund its retained Session reservation, and a queued root continuation does not start a new family. Retrying an accepted admission does not reserve another Session, and a rejected group leaves no partial children.
 
 Agent readiness is shared across the family rather than counted separately for each parent. Execution claims check live Agent ownership. A suspended parent releases its live slot, allowing a descendant to run when Agent concurrency is one. Tool-Run classification and Tool-capacity enforcement require the Tool-Run admission contract; the presence of `concurrency.tools` alone does not enforce Tool execution capacity.
 
-Host start routes pin detached copies of the configured limits. Raw Runtime and server root admissions remain independent of those Host start limits. The current family calculation uses retained Runs, not a separate Session queue. Child spending allocations are capped by both the parent's remaining grant and the selected profile's budget. A root request that exceeds its pinned Agent budget is rejected.
+Explicit Host limits install one canonical namespace policy before any Run is admitted. Fresh Hosts may reinstall the same policy, but cannot replace it. Raw Runtime/store admissions and serialized server start/queue routes enforce that policy; Session selections and queue edits may narrow it, never widen it. Omitting limits inherits the admitted ceiling rather than substituting a larger default.
+
+Child spending allocations are capped by the parent's remaining grant, the selected profile's budget, and any retained Session grant. A root request that exceeds its admitted Session or profile budget is rejected. Submitting a new root directly into a child Session is also rejected: continuing that child requires a fresh parent-owned admission, so a continuation cannot reuse an allocation whose unused allowance was already returned to its ancestor.
 
 ## Usage
 

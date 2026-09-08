@@ -193,6 +193,7 @@ export const artifactAppendCommandId = (input: {
 }): string => `appendArtifact:${artifactAppendIdentity(input)}`
 
 type Method =
+  | "configureDelegationPolicy"
   | "submitSessionInput"
   | "updateSessionInput"
   | "removeSessionInput"
@@ -234,6 +235,12 @@ type Commands = {
 }
 
 export const commands: Commands = {
+  configureDelegationPolicy: {
+    tag: "configureDelegationPolicy",
+    input: Schema.Tuple([TreePolicy]),
+    receipt: TreePolicy,
+    identity: ([policy]) => JSON.stringify(policy),
+  },
   submitSessionInput: {
     tag: "submitSessionInput",
     input: Schema.Tuple([SubmitInput]),

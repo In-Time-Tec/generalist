@@ -19,24 +19,24 @@ import {
 import { decodePinned, equals, resolveChild } from "../../../executable/manifest-internal.js"
 import { isTerminal, type RunReceipt } from "../../../run.js"
 import type { AdmitSendInput, AdmitStartInput } from "../../../run/store.js"
-import { digest as registrationDigest, narrow } from "../../../executable/registration.js"
+import { narrow } from "../../../executable/registration.js"
 import { make as makeMessage, type Message } from "../../../messaging/message.js"
 import type { SpawnInput, StartReceipt } from "../../../service.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { childDigest, rootDigest, startDigest } from "../../digest.js"
 import { defaultInheritance } from "../../../../core/agent/lifecycle/fan-out.js"
-import { enqueueLane, promoteHead } from "./lanes.js"
-import { idempotencyKey, laneKey, type RuntimeState, type StoredRun, type IdempotencyEntry } from "../../projection.js"
+import { enqueueLane, promoteHead, retainHostedLane } from "./lanes.js"
+import { idempotencyKey, type RuntimeState, type StoredRun, type IdempotencyEntry } from "../../projection.js"
 import { make as makeAddress } from "../../../address.js"
 import type { FanOutReceipt } from "../../../child/fan-out.js"
 import type { FanOutMemberOrigin } from "../../../child/fan-out-internal.js"
 import { admitFanOut } from "../fan-out/service.js"
-import { normalize as normalizeTreePolicy } from "../../../tree/policy.js"
-import { readinessForAdmission, reserveSessions } from "../child/capacity.js"
+import { readinessForAdmission, reserveSessions, recordFamilyRun } from "../child/capacity.js"
 import { receiptAdmission } from "./receipt.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
-import { capGrant, narrowGrant, profileBudget } from "../../../budget/state.js"
+import { rootGrant, sessionChildGrant } from "./policy.js"
+import { addRegistrations } from "./registration.js"
 
 const { duplicateReceipt, fanOutAdmission, newRunId, startReceipt } = receiptAdmission
 
@@ -46,26 +46,6 @@ type ChildDetails = {
   origin?: FanOutMemberOrigin
 }
 type ChildDigestInput = { parentRunId: string; invocationId: string; label?: string; origin?: FanOutMemberOrigin }
-
-export const addRegistrations = ({
-  state,
-  registrations,
-}: {
-  readonly state: RuntimeState
-  readonly registrations: AdmitSendInput["registrations"]
-}) =>
-  Effect.gen(function* () {
-    const catalog = new Map(state.registrationCatalog)
-    for (const registration of registrations) {
-      const digest = registrationDigest(registration)
-      const existing = catalog.get(registration.pin)
-      if (existing !== undefined && existing.digest !== digest) {
-        return yield* ExecutableRegistrationConflict.make({ pin: registration.pin })
-      }
-      catalog.set(registration.pin, { digest, value: registration })
-    }
-    return catalog
-  })
 
 const validateInitialChildren = (input: AdmitStartInput) =>
   Effect.gen(function* () {
@@ -142,12 +122,16 @@ export const admitSend: {
       if (state.closed) {
         return yield* RuntimeUnavailable.make({ message: "runtime store released" })
       }
-      const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
-      const digest = digestOverride ?? rootDigest(input.message, treePolicy)
       const executable = yield* Effect.try({
         try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
         catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
+      const { treePolicy, budget, depth } = yield* rootGrant({
+        state,
+        sessionId: input.message.sessionId,
+        selection: input,
+      })
+      const digest = digestOverride ?? rootDigest(input.message, treePolicy)
       const key = idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey)
       const existing = state.idempotency.get(key)
       if (existing !== undefined) {
@@ -170,7 +154,7 @@ export const admitSend: {
         address: input.message.to,
         message: input.message,
         rootRunId: runId,
-        depth: 0,
+        depth,
         treePolicy,
         lastSequence: -1,
         lastTurnCompletedSequence: -1,
@@ -191,9 +175,7 @@ export const admitSend: {
       let next: RuntimeState = { ...withId, runs, treeRoots }
       const enqueued = enqueueLane(next, input.message.sessionId, runId)
       next = enqueued.state
-      const budget = narrowGrant(profileBudget(executable), input.budget)
-      if (budget === undefined)
-        return yield* RuntimeUnavailable.make({ message: "Admission budget exceeds the pinned Agent budget" })
+      next = recordFamilyRun({ state: next, run, budget })
       const [, acceptedState] = yield* appendLifecycle(
         next,
         runId,
@@ -231,13 +213,6 @@ type AdmitStartResult = Effect.Effect<
   PreparedObservation
 >
 
-const retainHostedLane = (state: RuntimeState, sessionId: string): RuntimeState => {
-  if (state.hostSessions.has(sessionId)) return state
-  const lanes = new Map(state.lanes)
-  lanes.delete(laneKey(sessionId))
-  return { ...state, lanes }
-}
-
 export const admitStart: {
   (input: AdmitStartInput, options?: { readonly activate?: boolean }): (state: RuntimeState) => AdmitStartResult
   (state: RuntimeState, input: AdmitStartInput, options?: { readonly activate?: boolean }): AdmitStartResult
@@ -245,8 +220,12 @@ export const admitStart: {
   (args) => "runs" in Object(args[0]),
   (state: RuntimeState, input: AdmitStartInput, options?: { readonly activate?: boolean }) =>
     Effect.gen(function* () {
-      const treePolicy = yield* normalizeTreePolicy(input.treePolicy)
-      const normalizedInput = { ...input, treePolicy }
+      const grant = yield* rootGrant({
+        state,
+        sessionId: input.message.sessionId,
+        selection: input,
+      })
+      const normalizedInput = { ...input, treePolicy: grant.treePolicy, budget: grant.budget }
       yield* validateInitialChildren(input)
       if (input.initialFanOuts.length > 64) {
         return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
@@ -435,7 +414,12 @@ export const admitSpawn: {
       if (parentBudget.children === 0) {
         return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
       }
-      const childBudget = capGrant(childGrant(parentBudget, 1), profileBudget(executable))
+      const childBudget = yield* sessionChildGrant({
+        state,
+        sessionId,
+        selection: { executableRef, executableManifest: parent.executableManifest, registrations },
+        grant: childGrant(parentBudget, 1),
+      })
       const child: StoredRun = {
         runId,
         status: "queued",
@@ -465,7 +449,7 @@ export const admitSpawn: {
       const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }
       runs.set(parent.runId, parentUpdated)
       runs.set(runId, child)
-      let next: RuntimeState = { ...withId, runs }
+      let next: RuntimeState = recordFamilyRun({ state: { ...withId, runs }, run: child, budget: childBudget })
 
       const [, linked] = yield* appendLifecycle(
         next,

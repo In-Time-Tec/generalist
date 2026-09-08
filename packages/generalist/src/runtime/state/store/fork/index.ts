@@ -1,4 +1,5 @@
 import { requireConversationalSlot } from "../admission/activation.js"
+import { recordFamilyRun } from "../child/capacity.js"
 import { withCurrentBudget, reserveForkAllocation, reserveRewindAllocation } from "./allocation.js"
 import {
   copiedEvents,
@@ -206,6 +207,7 @@ const forkEffect = (state: RuntimeState, input: ForkRunInput) =>
       atSequence: input.atSequence,
       budget: allocation.child.allocation,
     }
+    next = recordFamilyRun({ state: next, run, budget: allocation.child.allocation })
     if (input.programBudget !== undefined) Object.assign(boundary, { programBudget: input.programBudget })
     const [, reserved] = yield* appendEvent(next, owner.runId, (base) => ({ ...base, ...boundary, role: "source" }))
     const [, allocated] = yield* appendEvent(reserved, input.newRunId, (base) => ({
@@ -380,6 +382,8 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
       }))
       next = allocated
     }
+    const archiveBudget = { tokens: 0, usd: 0, duration: 0, toolCalls: 0, children: 0 }
+    next = recordFamilyRun({ state: next, run: branch, budget: archiveBudget })
     const [, archived] = yield* appendEvent(next, input.branchRunId, (base) => ({
       ...base,
       _tag: "RunForked",
@@ -388,7 +392,7 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
       forkRunId: input.branchRunId,
       atSequence: input.toSequence,
       role: "archive",
-      budget: { tokens: 0, usd: 0, duration: 0, toolCalls: 0, children: 0 },
+      budget: archiveBudget,
     }))
     const [, closed] = yield* appendEvent(
       archived,

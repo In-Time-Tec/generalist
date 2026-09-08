@@ -556,6 +556,7 @@ export interface OperatorService {
 }
 
 export interface Service extends RuntimeHostSessions {
+  readonly configureDelegationPolicy: import("./run/store.js").Service["configureDelegationPolicy"]
   readonly sessionSelection: (
     name: string,
   ) => Effect.Effect<import("./session/queue.js").SessionSelection, UnknownAgent>

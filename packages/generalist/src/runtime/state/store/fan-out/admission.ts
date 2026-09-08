@@ -25,10 +25,11 @@ import type { RuntimeState, StoredFanOut, StoredRun } from "../../projection.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { resolveChild } from "../../../executable/manifest-internal.js"
 import { narrow } from "../../../executable/registration.js"
-import { activeChildCount, reserveSessions } from "../child/capacity.js"
+import { activeChildCount, reserveSessions, recordFamilyRun } from "../child/capacity.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
-import { capGrant, narrowGrant, split } from "../../../budget/state.js"
+import { narrowGrant, split } from "../../../budget/state.js"
+import { sessionChildGrant } from "../admission/policy.js"
 const fanOutAdmittedEvent = (input: {
   readonly fanOutId: string
   readonly memberCount: number
@@ -212,7 +213,7 @@ const addMember = (
     runs.set(parent.runId, { ...currentParent, children: [...currentParent.children, member.childRunId] })
     const linkedDetails = { ...linkedDetailsFor(member, readiness), budget }
     const [, linked] = yield* appendLifecycle(
-      { ...state, runs },
+      recordFamilyRun({ state: { ...state, runs }, run: child, budget }),
       parent.runId,
       childLinkedEvent(
         member.childRunId,
@@ -305,11 +306,17 @@ export const admitFanOut: {
     const memberBudget = split(input.budgetDivisor ?? members.length)(childGrant(available, members.length))
     const memberBudgets: Array<BudgetLimits> = []
     for (const member of members) {
-      const activeChild = parent.executableManifest.entries.find((entry) => entry.pin === member.executableRef.active)
-      const narrowed = narrowGrant(
-        capGrant(memberBudget, activeChild?._tag === "Agent" ? activeChild.manifest.budget : {}),
-        member.inherit.budget,
-      )
+      const grant = yield* sessionChildGrant({
+        state,
+        sessionId: member.sessionId,
+        selection: {
+          executableRef: member.executableRef,
+          executableManifest: parent.executableManifest,
+          registrations: parent.registrations,
+        },
+        grant: memberBudget,
+      })
+      const narrowed = narrowGrant(grant, member.inherit.budget)
       if (narrowed === undefined) {
         return yield* FanOutInvalid.make({
           message: `fan-out member '${member.key}' budget exceeds its reserved share`,

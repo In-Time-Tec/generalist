@@ -162,13 +162,25 @@ A Session cannot be projected within the supported work or response budget.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### treePolicy.concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### treePolicy.concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### treePolicy.concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### treePolicy.maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### treePolicy.maxSubagents
+###### treePolicy.maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 <a id="title"></a>
 
@@ -386,7 +398,7 @@ Runtime operations that persist and observe product-facing Sessions.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -434,13 +446,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 
@@ -484,7 +508,7 @@ readonly `object`[]
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -532,13 +556,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 

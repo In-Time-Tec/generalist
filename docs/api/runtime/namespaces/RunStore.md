@@ -1150,6 +1150,40 @@ Session writer bound to one storage-issued execution claim.
 
 `Effect`\<[`CompletionOutcome`](#completionoutcome), [`ProgramBudgetExhausted`](../../generalist/namespaces/ProgramCapabilities.md#programbudgetexhausted) \| `WorkerMutationError`\>
 
+<a id="configuredelegationpolicy"></a>
+
+##### configureDelegationPolicy
+
+> `readonly` **configureDelegationPolicy**: (`policy`) => `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+###### Parameters
+
+###### policy
+
+###### concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### concurrency.agents
+
+`number`
+
+###### concurrency.tools
+
+`number`
+
+###### maxDepth
+
+`number`
+
+###### maxSessions
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
 <a id="createhostsession"></a>
 
 ##### createHostSession
@@ -1168,7 +1202,7 @@ Persist one product-facing Session identity and metadata.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -1216,13 +1250,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 
@@ -2359,7 +2405,7 @@ Ordered durable child settlements addressed to one exact parent Run.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -2407,13 +2453,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 
@@ -2563,7 +2621,7 @@ readonly `object`[]
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -2611,13 +2669,25 @@ readonly `object`[]
 
 ###### selection.treePolicy?
 
-\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}
+
+###### selection.treePolicy.concurrency
+
+\{ `agents`: `number`; `tools`: `number`; \}
+
+###### selection.treePolicy.concurrency.agents
+
+`number`
+
+###### selection.treePolicy.concurrency.tools
+
+`number`
 
 ###### selection.treePolicy.maxDepth
 
 `number`
 
-###### selection.treePolicy.maxSubagents
+###### selection.treePolicy.maxSessions
 
 `number`
 

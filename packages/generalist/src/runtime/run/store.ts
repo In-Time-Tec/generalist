@@ -187,6 +187,9 @@ export interface Service {
     | TreePolicyInvalid
     | DurabilityFailure
   >
+  readonly configureDelegationPolicy: (
+    policy: import("../tree/policy.js").TreePolicy,
+  ) => Effect.Effect<import("../tree/policy.js").TreePolicy, TreePolicyInvalid | RuntimeUnavailable | DurabilityFailure>
   readonly admitStart: (
     input: AdmitStartInput,
     options?: { readonly activate?: boolean },

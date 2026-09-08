@@ -171,12 +171,7 @@ const requireClaimable = (state: RuntimeState, run: StoredRun, now: number) =>
       run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Agent")
     ) {
       const live = familyRuns(state, run.rootRunId).filter((candidate) => {
-        if (
-          candidate.runId === run.runId ||
-          candidate.rootRunId !== run.rootRunId ||
-          candidate.ownerId === undefined ||
-          candidate.status !== "running"
-        )
+        if (candidate.runId === run.runId || candidate.ownerId === undefined || candidate.status !== "running")
           return false
         const owner = state.workers.get(candidate.ownerId)
         return (

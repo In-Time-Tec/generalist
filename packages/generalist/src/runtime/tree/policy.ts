@@ -45,3 +45,26 @@ export const normalize = (
     ),
     Effect.mapError((error) => TreePolicyInvalid.make({ message: String(error) })),
   )
+
+export const narrow = ({
+  policy,
+  ceiling,
+}: {
+  readonly policy: TreePolicy | undefined
+  readonly ceiling: TreePolicy | null
+}): Effect.Effect<TreePolicy, TreePolicyInvalid> =>
+  Effect.gen(function* () {
+    const selected = yield* normalize(policy ?? ceiling ?? defaultTreePolicy)
+    if (
+      ceiling !== null &&
+      (selected.maxDepth > ceiling.maxDepth ||
+        selected.maxSessions > ceiling.maxSessions ||
+        selected.concurrency.agents > ceiling.concurrency.agents ||
+        selected.concurrency.tools > ceiling.concurrency.tools)
+    ) {
+      return yield* TreePolicyInvalid.make({
+        message: "Requested delegation limits exceed the canonical admitted policy",
+      })
+    }
+    return selected
+  })

@@ -6,6 +6,7 @@ import type { Service as RuntimeService } from "../runtime/service.js"
 import { UnknownAgent } from "../runtime/errors.js"
 import { SessionQueueConflict, type PendingInput, type QueueReceipt } from "../runtime/session/queue.js"
 import { AgentNotRegistered } from "./errors.js"
+import { generateId } from "../core/model/telemetry/events.js"
 
 export interface QueueCommandOptions {
   readonly commandId: string
@@ -20,6 +21,27 @@ export interface QueueEditOptions extends QueueCommandOptions {
   readonly agent?: string
 }
 export type QueueError = SessionError | SessionQueueConflict | AgentNotRegistered | UnknownAgent
+
+export const create =
+  ({
+    runtime,
+    registeredByName,
+  }: {
+    readonly runtime: RuntimeService
+    readonly registeredByName: ReadonlyMap<string, AnyAgent>
+  }) =>
+  (options: SessionCreateOptions = {}) =>
+    Effect.gen(function* () {
+      const request: Types.Mutable<import("../runtime/session/host.js").CreateSessionInput> = {
+        id: options.id ?? `session_${yield* generateId}`,
+      }
+      if (options.title !== undefined) request.title = options.title
+      if (options.agent !== undefined) {
+        if (!registeredByName.has(options.agent)) return yield* AgentNotRegistered.make({ name: options.agent })
+        request.selection = yield* runtime.sessionSelection(options.agent)
+      }
+      return make({ runtime, registeredByName })(yield* runtime.createSession(request))
+    })
 export interface SessionHandle extends Omit<HostSession, "queue"> {
   readonly inspect: Effect.Effect<HostSession, SessionError>
   readonly submit: (

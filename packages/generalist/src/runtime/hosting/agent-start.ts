@@ -154,9 +154,9 @@ export const make = (options: {
         sessionId,
         idempotencyKey: startKey,
         prompt: initialPrompt,
-        budget: startOptions?.budget ?? makeBudget(agent.budget ?? {}),
       }
       if (startOptions?.treePolicy !== undefined) admission.treePolicy = startOptions.treePolicy
+      if (startOptions?.budget !== undefined) admission.budget = startOptions.budget
       const receipt = yield* options.admitStart(admission, true)
       const events = options.store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
         Stream.mapEffect((event) => decodeEvent(agent.output, event)),

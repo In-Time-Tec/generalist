@@ -78,6 +78,30 @@ would not survive serialization or keep idempotency stable.
 
 ***
 
+<a id="narrow"></a>
+
+### narrow
+
+> `const` **narrow**: (`{ policy, ceiling, }`) => `Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+#### Parameters
+
+##### \{ policy, ceiling, \}
+
+###### ceiling
+
+[`TreePolicy`](#treepolicy) \| `null`
+
+###### policy
+
+[`TreePolicy`](#treepolicy) \| `undefined`
+
+#### Returns
+
+`Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+***
+
 <a id="normalize"></a>
 
 ### normalize

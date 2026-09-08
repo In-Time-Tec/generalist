@@ -14,15 +14,28 @@ import { make as makeAddress } from "../../../address.js"
 import { validate as validatePayload } from "../../../execution/payload/index.js"
 import { decodePinned } from "../../../executable/manifest-internal.js"
 import { laneKey, type RuntimeState } from "../../projection.js"
-import { admitStart, addRegistrations } from "../admission/accept.js"
-import { normalize as normalizeTreePolicy } from "../../../tree/policy.js"
+import { admitStart } from "../admission/accept.js"
+import { addRegistrations } from "../admission/registration.js"
+import { narrow as narrowTreePolicy } from "../../../tree/policy.js"
+import { rootGrant } from "../admission/policy.js"
+import { narrowGrant } from "../../../budget/state.js"
 
 const sessionFor = (state: RuntimeState, sessionId: string) => {
   const stored = state.hostSessions.get(sessionId)
   return stored === undefined ? Effect.fail(SessionNotFound.make({ sessionId })) : Effect.succeed(stored)
 }
 
-const validateSelection = (sessionId: string, selection: SessionSelection | undefined) =>
+export const validateSelection = ({
+  state,
+  sessionId,
+  selection,
+  ceiling,
+}: {
+  readonly state: RuntimeState
+  readonly sessionId: string
+  readonly selection: SessionSelection | undefined
+  readonly ceiling?: SessionSelection | undefined
+}) =>
   Effect.gen(function* () {
     if (selection === undefined)
       return yield* SessionQueueConflict.make({
@@ -42,12 +55,32 @@ const validateSelection = (sessionId: string, selection: SessionSelection | unde
         reason: "selection",
         hint: "Only Agent Runs occupy the conversational queue.",
       })
-    yield* normalizeTreePolicy(selection.treePolicy).pipe(
+    const grant = yield* rootGrant({
+      state,
+      sessionId,
+      selection,
+    }).pipe(
       Effect.mapError(() =>
         SessionQueueConflict.make({ sessionId, reason: "selection", hint: "Use a valid bounded tree policy." }),
       ),
     )
-    return selection
+    const treePolicy = yield* narrowTreePolicy({ policy: grant.treePolicy, ceiling: ceiling?.treePolicy ?? null }).pipe(
+      Effect.mapError(() =>
+        SessionQueueConflict.make({
+          sessionId,
+          reason: "selection",
+          hint: "Queue edits may narrow, never widen, their admitted limits.",
+        }),
+      ),
+    )
+    const budget = narrowGrant(ceiling?.budget ?? grant.budget, grant.budget)
+    if (budget === undefined)
+      return yield* SessionQueueConflict.make({
+        sessionId,
+        reason: "selection",
+        hint: "Queue edits may not widen their admitted spending grant.",
+      })
+    return { ...selection, treePolicy, budget }
   })
 
 const validateQueue = (sessionId: string, queue: ReadonlyArray<PendingInput>) =>
@@ -108,7 +141,12 @@ export const submit = ({ state, input }: { readonly state: RuntimeState; readonl
   Effect.gen(function* () {
     yield* validatePayload({ value: input, boundary: "Session input" })
     const stored = yield* sessionFor(state, input.sessionId)
-    const selection = yield* validateSelection(input.sessionId, input.selection ?? stored.session.selection)
+    const selection = yield* validateSelection({
+      state,
+      sessionId: input.sessionId,
+      selection: input.selection ?? stored.session.selection,
+      ceiling: stored.session.selection,
+    })
     const registrationCatalog = yield* addRegistrations({ state, registrations: selection.registrations }).pipe(
       Effect.mapError(() =>
         SessionQueueConflict.make({
@@ -145,7 +183,12 @@ export const update = ({ state, input }: { readonly state: RuntimeState; readonl
             ...item,
             revision,
             prompt: input.prompt,
-            selection: yield* validateSelection(input.sessionId, input.selection ?? item.selection),
+            selection: yield* validateSelection({
+              state,
+              sessionId: input.sessionId,
+              selection: input.selection ?? item.selection,
+              ceiling: item.selection,
+            }),
           }
         : undefined
     const registrationCatalog =

@@ -68,6 +68,38 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
     })
 
   suite(`bounded recursive child admission (${options.name})`, () => {
+    it.live("promotes already admitted children after their parent completes", () =>
+      provide(
+        Effect.gen(function* () {
+          const context = yield* root({ maxDepth: 1, maxSessions: 3, concurrency: { agents: 1, tools: 4 } })
+          yield* activate(context.runId)
+          const first = yield* admit(context.children, context.runId, "first-after-parent")
+          const second = yield* admit(context.children, context.runId, "second-after-parent")
+          const parentClaim = yield* context.store.claimExecution({
+            runId: context.runId,
+            ownerId: objectWorkerId,
+            commandId: "finish-parent-claim",
+          })
+          yield* context.store.complete({
+            ...parentClaim,
+            commandId: "finish-parent",
+            result: completedResult("parent done"),
+          })
+          const childClaim = yield* context.store.claimExecution({
+            runId: first.childRunId,
+            ownerId: objectWorkerId,
+            commandId: "finish-child-claim",
+          })
+          yield* context.store.complete({
+            ...childClaim,
+            commandId: "finish-child",
+            result: completedResult("child done"),
+          })
+          expect(yield* context.runtime.inspect(second.childRunId)).toMatchObject({ childReadiness: "ready" })
+        }),
+      ),
+    )
+
     it.live("does not claim an Agent when its pinned Agent concurrency is zero", () =>
       provide(
         Effect.gen(function* () {
