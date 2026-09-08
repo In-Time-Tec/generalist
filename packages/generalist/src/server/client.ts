@@ -26,7 +26,7 @@ import type { UnknownResolution } from "../runtime/execution/recovery/operator.j
 import type { Cursor } from "../runtime/cursor.js"
 import type { HostSessionSnapshot } from "../runtime/session/host.js"
 import { make as makeSessionClient, type SessionClient } from "./session-client.js"
-import { api, type RunCancelPayload, type RunStartPayload } from "./api.js"
+import { api, type RunCancelPayload, type RunMessagePayload, type RunStartPayload } from "./api.js"
 import { ApiError, InvalidConnectOptions, ReconnectExhausted, TransportError, Unauthorized } from "./errors.js"
 import { encodeCommand, eventCodec, type ClientCommand, type ServerEvent } from "./wire.js"
 
@@ -98,6 +98,15 @@ export interface Client {
       readonly commandId: string
       readonly reason?: string
     }) => ReturnType<RawClient["runs"]["cancel"]>
+    readonly message: (options: {
+      readonly runId: string
+      readonly commandId: string
+      readonly input: RunMessagePayload["input"]
+    }) => ReturnType<RawClient["runs"]["message"]>
+    readonly messages: (options: {
+      readonly runId: string
+      readonly limit?: number
+    }) => ReturnType<RawClient["runs"]["messages"]>
   }
   readonly events: {
     readonly subscribe: (options: {
@@ -114,7 +123,6 @@ export interface Client {
       readonly runId: string
       readonly token: string
       readonly decision: Decision
-      readonly operator: string
     }) => ReturnType<RawClient["approvals"]["resolve"]>
   }
   readonly operator: {
@@ -122,25 +130,21 @@ export interface Client {
     readonly retry: (options: {
       readonly runId: string
       readonly commandId: string
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["retry"]>
     readonly wake: (options: {
       readonly runId: string
       readonly commandId: string
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["wake"]>
     readonly resolveUnknown: (options: {
       readonly runId: string
       readonly commandId: string
       readonly operationId: string
       readonly resolution: UnknownResolution
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["resolveUnknown"]>
     readonly extendBudget: (options: {
       readonly runId: string
       readonly commandId: string
       readonly delta: BudgetLimits
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["extendBudget"]>
   }
 }
@@ -440,6 +444,10 @@ export const client = (options: {
           if (reason !== undefined) payload.reason = reason
           return raw.runs.cancel({ params: { id: runId }, payload })
         },
+        message: ({ runId, commandId, input }) =>
+          raw.runs.message({ params: { id: runId }, payload: { commandId, input } }),
+        messages: ({ runId, limit }) =>
+          raw.runs.messages({ params: { id: runId }, query: limit === undefined ? {} : { limit } }),
       },
       events: {
         subscribe: (subscribeOptions) => subscribe(raw, subscribeOptions),
@@ -451,22 +459,20 @@ export const client = (options: {
           ),
       },
       approvals: {
-        resolve: ({ runId, token, decision, operator }) =>
-          raw.approvals.resolve({ params: { id: runId, token }, payload: { decision, operator } }),
+        resolve: ({ runId, token, decision }) =>
+          raw.approvals.resolve({ params: { id: runId, token }, payload: { decision } }),
       },
       operator: {
         explain: ({ runId }) => raw.operator.explain({ params: { id: runId } }),
-        retry: ({ runId, commandId, operator }) =>
-          raw.operator.retry({ params: { id: runId }, payload: { commandId, operator } }),
-        wake: ({ runId, commandId, operator }) =>
-          raw.operator.wake({ params: { id: runId }, payload: { commandId, operator } }),
-        resolveUnknown: ({ runId, commandId, operationId, resolution, operator }) =>
+        retry: ({ runId, commandId }) => raw.operator.retry({ params: { id: runId }, payload: { commandId } }),
+        wake: ({ runId, commandId }) => raw.operator.wake({ params: { id: runId }, payload: { commandId } }),
+        resolveUnknown: ({ runId, commandId, operationId, resolution }) =>
           raw.operator.resolveUnknown({
             params: { id: runId },
-            payload: { commandId, operationId, resolution, operator },
+            payload: { commandId, operationId, resolution },
           }),
-        extendBudget: ({ runId, commandId, delta, operator }) =>
-          raw.operator.extendBudget({ params: { id: runId }, payload: { commandId, delta, operator } }),
+        extendBudget: ({ runId, commandId, delta }) =>
+          raw.operator.extendBudget({ params: { id: runId }, payload: { commandId, delta } }),
       },
     }
     return value

@@ -5,7 +5,7 @@ import { Config, Deferred, Effect, Fiber, Layer, Redacted, Schema, Stream } from
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { Server, type Client } from "generalist/server"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
@@ -61,7 +61,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-queue" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             host,
@@ -130,7 +130,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-not-found" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -186,7 +186,7 @@ layer(services)("Server", (it) => {
           input: Schema.Struct({ question: Schema.String }),
           output: Schema.String,
         })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -301,7 +301,7 @@ layer(services)("Server", (it) => {
         ).toMatchObject({ _tag: "generalist/server/RequestFailed", operation: "runs.cancel" })
 
         const disabled = yield* client.operator
-          .retry({ runId: started.id, commandId: "retry:disabled", operator: "operator:test" })
+          .retry({ runId: started.id, commandId: "retry:disabled" })
           .pipe(Effect.flip)
         expect(disabled).toMatchObject({ _tag: "generalist/server/OperatorDisabled", operation: "retry" })
 
@@ -333,7 +333,7 @@ layer(services)("Server", (it) => {
             ),
         })
         const agent = Agent.make({ name: "server-disconnect" })
-        const host = yield* Generalist.create({ agents: [agent] }).pipe(
+        const host = yield* Host.make({ revision: "local", agents: [agent] }).pipe(
           Effect.provideService(LanguageModel.LanguageModel, controlledModel),
         )
         const app = HttpRouter.toWebHandler(
@@ -390,7 +390,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-unknown" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -437,7 +437,6 @@ layer(services)("Server", (it) => {
           runId: run.id,
           commandId: "resolve:external-write",
           operationId: operation.operationId,
-          operator: "operator:test",
           resolution: { outcome: "succeeded" as const, result: "confirmed external receipt" },
         }
         const unauthorized = yield* makeClient(transport, "wrong")
@@ -475,7 +474,7 @@ layer(services)("Server", (it) => {
               ),
             )
             const agent = Agent.make({ name: "tenant-assistant" })
-            const host = yield* Generalist.create({ agents: [agent] }).pipe(Effect.provideContext(context))
+            const host = yield* Host.make({ revision: "local", agents: [agent] }).pipe(Effect.provideContext(context))
             const app = HttpRouter.toWebHandler(
               Server.layer({
                 authorization: { tenantId: tenant, authorize: () => Effect.succeed(true) },
@@ -583,7 +582,7 @@ layer(approvalServices)("Server approvals", (it) => {
         approvalModelCalls = 0
         approvalToolCalls = 0
         const agent = Agent.make({ name: "server-approval", toolkit: approvalToolkit })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -608,7 +607,6 @@ layer(approvalServices)("Server approvals", (it) => {
           runId: run.id,
           token,
           decision: { _tag: "Approved" },
-          operator: "operator:test",
         })
         yield* runScheduler(run.id, "server:approval:resume")
 

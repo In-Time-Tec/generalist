@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist, type SessionRunsPage } from "generalist/host"
+import { Host, type SessionRunsPage } from "generalist/host"
 import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
@@ -24,7 +24,7 @@ it.effect(
           const context = yield* Layer.build(services())
           return yield* Effect.gen(function* () {
             const agent = Agent.make({ name: "queued-history" })
-            const host = yield* Generalist.create({ agents: [agent] })
+            const host = yield* Host.make({ revision: "local", agents: [agent] })
             const session = yield* host.sessions.create({ id: "queued-history", agent: agent.name })
             yield* session.submit("active", { commandId: "queued-history:active" })
             const activeRunId = (yield* session.inspect).activeRunId!
@@ -75,7 +75,7 @@ it.effect(
           const context = yield* Layer.build(services())
           yield* Effect.gen(function* () {
             const agent = Agent.make({ name: "queued-history" })
-            const host = yield* Generalist.create({ agents: [agent] })
+            const host = yield* Host.make({ revision: "local", agents: [agent] })
             const session = yield* host.sessions.get(original.snapshot.session.id)
             expect(yield* session.snapshot).toEqual(original.snapshot)
             expect(yield* session.submit("pending", { commandId: "queued-history:pending" })).toEqual(original.pending)

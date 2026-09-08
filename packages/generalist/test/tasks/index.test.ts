@@ -4,7 +4,7 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, Approvals, Compaction, Hooks, Permissions, RunBudget, Tasks } from "../../src/index.js"
-import { Generalist } from "../../src/host/index.js"
+import { Host } from "../../src/host/index.js"
 import { RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
 import { JournalFault } from "../../src/runtime/operation/journal-fault.js"
 
@@ -107,7 +107,7 @@ it.live("emits TasksUpdated and restores the list from object storage without re
 
     const run = yield* scopedWith(firstLayer)(
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const session = yield* host.sessions.create({ id: "session:tasks-reopen" })
         const handle = yield* host.runs.start(session.id, agent, "make a task list", startOptions)
         const executor = yield* RunExecutor.RunExecutor
@@ -144,7 +144,7 @@ it.live("emits TasksUpdated and restores the list from object storage without re
 
     yield* scopedWith(recoveredLayer)(
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const handle = yield* host.runs.start(run.sessionId, agent, "make a task list", startOptions)
         const executor = yield* RunExecutor.RunExecutor
         const store = yield* RunStore.RunStore

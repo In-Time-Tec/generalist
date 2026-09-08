@@ -15,7 +15,7 @@ import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -29,7 +29,7 @@ export const editorPage = `<!doctype html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Generalist co-edit</title>
+    <title>Host co-edit</title>
     <style>
       :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
       body { max-width: 54rem; margin: 3rem auto; padding: 0 1rem; }
@@ -108,7 +108,6 @@ export const editorPage = `<!doctype html>
           _tag: "Edit",
           base: version,
           operation: { _tag: "Replace", from: 0, to: content.length, text: editor.value },
-          attribution: { _tag: "Human", actor: "browser-user" }
         }))
       })
     </script>
@@ -190,7 +189,7 @@ const routes = Layer.unwrap(
       name: "co-edit-writer",
       toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
     })
-    const host = yield* Generalist.create({ agents: [writer] })
+    const host = yield* Host.make({ revision: "local", agents: [writer] })
     return Layer.mergeAll(
       Server.layer({
         authorization: { tenantId: browserAuth.tenantId, authorize: () => Effect.succeed(true) },
@@ -308,7 +307,6 @@ const program = Effect.scoped(
       commandId: "browser:edit-1",
       base: 0,
       operation: { _tag: "Replace", from: 0, to: 5, text: "Shared" },
-      attribution: { _tag: "Human", actor: "browser-user" },
     }).pipe(Effect.orDie)
     peer.socket.send(command)
     const human = yield* nextEvent(peer).pipe(Effect.orDie)

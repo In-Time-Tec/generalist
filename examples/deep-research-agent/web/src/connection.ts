@@ -31,7 +31,6 @@ export const layer = (options: { readonly baseUrl: string }) =>
             runId: pending.runId,
             token: command.token,
             decision: command.decision,
-            operator: "research-browser",
           })
         }).pipe(
           Effect.mapError((error) =>

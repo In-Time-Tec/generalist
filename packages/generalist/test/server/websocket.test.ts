@@ -6,7 +6,7 @@ import { TestClock } from "effect/testing"
 import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, Runtime as RuntimeService, RunExecutor, RunStore } from "generalist/runtime"
 import { Server, type ServerEvent } from "generalist/server"
 import { handle } from "../../src/server/websocket.js"
@@ -73,7 +73,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("streams the route Session and cancels only an explicitly named member Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-test" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const session = yield* host.sessions.create({ id: "session-1" })
         const run = yield* host.runs.start(session.id, agent, "wait")
         const fake = yield* makeFakeSocket()
@@ -111,7 +111,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("streams only a storage-authorized memory preview for the current Session Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-preview-test" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const session = yield* host.sessions.create({ id: "session-preview" })
         const run = yield* host.runs.start(session.id, agent, "answer")
         const fake = yield* makeFakeSocket()
@@ -164,7 +164,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("requires Run observe authorization before subscribing to previews", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-preview-denied" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const session = yield* host.sessions.create({ id: "session-preview-denied" })
         yield* host.runs.start(session.id, agent, "answer")
         const fake = yield* makeFakeSocket()
@@ -206,7 +206,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const agent = Agent.make({ name: "websocket-preview-revoked" })
         const runtimeService = yield* RuntimeService.Runtime
         let authorityReads = 0
-        const host = yield* Generalist.create({ agents: [agent] }).pipe(
+        const host = yield* Host.make({ revision: "local", agents: [agent] }).pipe(
           Effect.provideService(
             RuntimeService.Runtime,
             RuntimeService.Runtime.of({

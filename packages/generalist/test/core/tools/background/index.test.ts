@@ -9,7 +9,7 @@ import { activateSkillTool } from "../../../../src/core/agent/skill-tool.js"
 import { toolkit as messagingTools } from "../../../../src/runtime/steering.js"
 import { startGroupTool } from "../../../../src/runtime/child/group.js"
 import { Tasks } from "../../../../src/index.js"
-import { Generalist, ToolIdentity } from "../../../../src/host/index.js"
+import { Host, ToolIdentity } from "../../../../src/host/index.js"
 import { layerAutoApprove } from "../../../../src/core/policy/approvals.js"
 import { layerAllowAll } from "../../../../src/core/policy/permissions.js"
 import { layerStatic } from "../../../../src/runtime/executable/resolver.js"
@@ -166,7 +166,7 @@ it.effect("continues the parent model while its independently admitted typed too
       Effect.gen(function* () {
         const context = yield* Layer.build(environment)
         yield* Effect.gen(function* () {
-          const host = yield* Generalist.create({ agents: [agent], tools: [tool] })
+          const host = yield* Host.make({ revision: "local", agents: [agent], tools: [tool] })
           const session = yield* host.sessions.create({ id: "background-session" })
           const parent = yield* host.runs.start(session.id, agent, "start work")
           const store = yield* RunStore

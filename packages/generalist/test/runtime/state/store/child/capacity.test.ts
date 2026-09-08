@@ -3,7 +3,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { Agent } from "../../../../../src/index.js"
-import { Generalist, ToolIdentity } from "../../../../../src/host/index.js"
+import { Host, ToolIdentity } from "../../../../../src/host/index.js"
 import { layerAutoApprove } from "../../../../../src/core/policy/approvals.js"
 import { layerAllowAll } from "../../../../../src/core/policy/permissions.js"
 import { ObjectStore } from "../../../../../src/durability/object-store.js"
@@ -32,6 +32,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
       layerAllowAll,
     )
   const options = {
+    revision: "local",
     agents: [parent],
     tools: [tool],
     limits: {
@@ -76,7 +77,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
     }).pipe(Effect.provideService(ObjectStore, storage.store), (effect) => provideScoped(BunCrypto.layer, effect))
   return Effect.gen(function* () {
     const ids = yield* Effect.gen(function* () {
-      const host = yield* Generalist.create(options)
+      const host = yield* Host.make(options)
       const session = yield* host.sessions.create({ id: "agent-session" })
       const agent = yield* host.runs.start(session.id, parent, "parent")
       const first = yield* host.tools.start(tool, {}, { commandId: "first", parentRunId: agent.id })
@@ -129,7 +130,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* canonical(ids.parentId, ids.rootToolId, ids.sponsored, ids.independent)
     yield* Effect.gen(function* () {
-      const host = yield* Generalist.create(options)
+      const host = yield* Host.make(options)
       const store = yield* RunStore
       for (const runId of [ids.sponsored[1]!, ...ids.independent]) {
         const claim = yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId: `fresh:${runId}` })

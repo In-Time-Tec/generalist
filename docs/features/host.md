@@ -10,7 +10,7 @@ This composition fragment expects an object-backed Runtime activated inside its 
 import { Effect, Layer, Schema } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import * as Durability from "generalist/durability"
 
 const triage = Agent.make({
@@ -20,7 +20,7 @@ const triage = Agent.make({
 
 const program = Effect.gen(function* () {
   yield* Durability.activate
-  const host = yield* Generalist.create({ agents: [triage] })
+  const host = yield* Host.make({ agents: [triage] })
   const attachment = yield* host.attachments.put({
     data: new TextEncoder().encode("attachment"),
     mediaType: "application/pdf",
@@ -46,13 +46,13 @@ Effect.runPromise(
 )
 ```
 
-`Generalist.create({ agents, tools?, plugins? })` requires Runtime, Approvals, Permissions, every configured Agent service, and tool handlers. Hosts with Agents also require `LanguageModel`; a Tool-only Host does not. It registers the configured executables with Runtime and returns no global singleton.
+`Host.make({ agents, tools?, plugins? })` requires Runtime, Approvals, Permissions, every configured Agent service, and tool handlers. Hosts with Agents also require `LanguageModel`; a Tool-only Host does not. It registers the configured executables with Runtime and returns no global singleton.
 
 The Agent fragment above admits work and returns a receipt, not the Agent's answer. The declared model and Runtime Layers determine credentials and execution; no scripted or live provider is configured there. Keep the activated host scope alive while work executes.
 
 ## Independent Tool Runs
 
-Set `Agent.make({ name: "coder", toolkit: workspaceTools, toolExecution: "background" })` when the Agent should continue after admitting work instead of waiting for each handler. Register those same Effect AI Tools with `Generalist.create({ agents: [coder], tools: [...] })`. This is a definition fragment: the application supplies the Toolkit handlers, model, authorization Layers, activated Runtime, and scheduler.
+Set `Agent.make({ name: "coder", toolkit: workspaceTools, toolExecution: "background" })` when the Agent should continue after admitting work instead of waiting for each handler. Register those same Effect AI Tools with `Host.make({ agents: [coder], tools: [...] })`. This is a definition fragment: the application supplies the Toolkit handlers, model, authorization Layers, activated Runtime, and scheduler.
 
 The model-visible success schema describes `{ _tag: "ToolRunAdmitted", runId, tool }`, not file contents or a command's final output. The execution registry retains the original parameter, success, and failure codecs, including MCP handler types. The parent can make another model step while the admitted Tool Run remains running. Tool admission has its own durable command identity; it is not memoized as the tool's final answer. Messaging, skill activation, and child/Program admission and observation controls stay inline.
 
@@ -71,7 +71,7 @@ This Effect generator fragment assumes an activated durable Runtime and a host s
 ```ts
 import { Effect, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import { Generalist, ToolIdentity } from "generalist/host"
+import { Host, ToolIdentity } from "generalist/host"
 
 const checks = Tool.make("checks", {
   parameters: Schema.Struct({ count: Schema.FiniteFromString }),
@@ -82,7 +82,7 @@ const handlers = Toolkit.make(checks).toLayer({
 })
 
 const program = Effect.gen(function* () {
-  const host = yield* Generalist.create({ agents: [], tools: [checks] })
+  const host = yield* Host.make({ agents: [], tools: [checks] })
   const run = yield* host.tools.start(checks, { count: 4 }, { commandId: "checks-1" })
   const inspection = yield* run.inspect
   const result = yield* run.await
@@ -155,7 +155,7 @@ host.operator.resolveUnknown(runId, operationId, resolution, operator, commandId
 host.operator.extendBudget(runId, delta, operator, commandId) -> void
 ```
 
-`runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
+`runs.start` accepts only the exact Agent values passed to `Host.make`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
 
 `HostRun.wait` is a model-facing control used from the active Agent tool context. It accepts at most 32 same-family Run IDs and an authenticated-message selector, and it requires a stable `commandId`. Registration and the already-arrived check share the Runtime wait transition, so a terminal Run or pending message cannot be missed across a host restart. A `Message` result includes its durable inbox cursor; a retry does not consume it again. `Timeout` closes only this wait, while sibling provider tool calls remain barriers until their own results are available. Use `await` when the host only needs terminal output.
 
@@ -201,7 +201,7 @@ The Host event union intentionally projects the product events above and retains
 import { Effect, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { Hooks, Instructions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 
 const status = Tool.make("git_status", {
   description: "Read repository status",
@@ -209,7 +209,7 @@ const status = Tool.make("git_status", {
   success: Schema.String,
 })
 
-const git = Generalist.plugin({
+const git = Host.plugin({
   name: "git",
   tools: [status],
   instructions: [Instructions.fromText("git", "Inspect status before changing files.")],
@@ -225,7 +225,7 @@ const git = Generalist.plugin({
 })
 ```
 
-Plugins are inert values with only `name`, `tools`, `instructions`, `skills`, and lifecycle `hooks`. Tools are installed on every configured Agent. Duplicate plugin names and static tool-name collisions fail `Generalist.create` before registration.
+Plugins are inert values with only `name`, `tools`, `instructions`, `skills`, and lifecycle `hooks`. Tools are installed on every configured Agent. Duplicate plugin names and static tool-name collisions fail `Host.make` before registration.
 
 Plugins load and log sequentially in caller order. Existing ambient instructions, skills, and Hooks declarations come first, followed by plugin declarations in caller order. Existing `SkillCatalog.merge` semantics apply to duplicate skill names, so the later plugin value wins. Hook declarations use the Agent driver's existing checkpoint journal; Host does not add `onEvent` or another event authority.
 

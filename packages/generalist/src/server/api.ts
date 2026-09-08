@@ -1,4 +1,5 @@
 import { Schema, SchemaTransformation } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Ref as MediaRef } from "../media/ref.js"
 import { BudgetLimits } from "../core/durable/run-budget.js"
@@ -12,9 +13,10 @@ import type { RuntimeInspection } from "../runtime/service.js"
 import { Authentication } from "./auth.js"
 import { apiErrors, artifactApiErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
+import { MailboxEntry } from "../runtime/messaging/mailbox.js"
+import { SteeringReceipt } from "../runtime/run/steering.js"
 import {
   ArtifactUpdate,
-  HumanAttribution,
   RangeOperation,
   ReadResult as ArtifactReadResult,
   Version as ArtifactVersion,
@@ -35,6 +37,12 @@ export const RunCancelPayload = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 })
 export type RunCancelPayload = typeof RunCancelPayload.Type
+
+export const RunMessagePayload = Schema.Struct({
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+  input: Schema.Union([Schema.String, Prompt.Prompt]),
+})
+export type RunMessagePayload = typeof RunMessagePayload.Type
 
 export interface EventStreamItem {
   readonly id: string
@@ -67,7 +75,6 @@ export const ArtifactClientCommand = Schema.Struct({
   commandId: Schema.String.check(Schema.isNonEmpty()),
   base: ArtifactVersion,
   operation: RangeOperation,
-  attribution: HumanAttribution,
 })
 export type ArtifactClientCommand = typeof ArtifactClientCommand.Type
 
@@ -104,10 +111,27 @@ const cancelRun = HttpApiEndpoint.post("cancel", "/runs/:id/cancel", {
   payload: RunCancelPayload,
   error: apiErrors,
 })
+const sendRunMessage = HttpApiEndpoint.post("message", "/runs/:id/messages", {
+  params: { id: Schema.String },
+  payload: RunMessagePayload,
+  success: SteeringReceipt,
+  error: apiErrors,
+})
+const listRunMessages = HttpApiEndpoint.get("messages", "/runs/:id/messages", {
+  params: { id: Schema.String },
+  query: { limit: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 64 }))) },
+  success: Schema.Array(MailboxEntry),
+  error: apiErrors,
+})
 const runs: HttpApiGroup.HttpApiGroup<
   "runs",
-  typeof startRun | typeof listRuns | typeof inspectRun | typeof cancelRun
-> = HttpApiGroup.make("runs").add(startRun, listRuns, inspectRun, cancelRun)
+  | typeof startRun
+  | typeof listRuns
+  | typeof inspectRun
+  | typeof cancelRun
+  | typeof sendRunMessage
+  | typeof listRunMessages
+> = HttpApiGroup.make("runs").add(startRun, listRuns, inspectRun, cancelRun, sendRunMessage, listRunMessages)
 
 const subscribeEvents = HttpApiEndpoint.get("subscribe", "/sessions/:id/events", {
   params: { id: Schema.String },
@@ -140,7 +164,7 @@ const artifacts: HttpApiGroup.HttpApiGroup<"artifacts", typeof readArtifact | ty
 
 const resolveApproval = HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:token", {
   params: { id: Schema.String, token: Schema.String },
-  payload: Schema.Struct({ decision: Decision, operator: Schema.String }),
+  payload: Schema.Struct({ decision: Decision }),
   error: apiErrors,
 })
 const approvals: HttpApiGroup.HttpApiGroup<"approvals", typeof resolveApproval> =
@@ -179,27 +203,26 @@ const explainRun = HttpApiEndpoint.get("explain", "/runs/:id/explain", {
 })
 const retryRun = HttpApiEndpoint.post("retry", "/runs/:id/retry", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ commandId: Schema.String, operator: Schema.String }),
+  payload: Schema.Struct({ commandId: Schema.String.check(Schema.isNonEmpty()) }),
   error: apiErrors,
 })
 const wakeRun = HttpApiEndpoint.post("wake", "/runs/:id/wake", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ commandId: Schema.String, operator: Schema.String }),
+  payload: Schema.Struct({ commandId: Schema.String.check(Schema.isNonEmpty()) }),
   error: apiErrors,
 })
 const resolveUnknown = HttpApiEndpoint.post("resolveUnknown", "/runs/:id/resolve-unknown", {
   params: { id: Schema.String },
   payload: Schema.Struct({
-    commandId: Schema.String,
+    commandId: Schema.String.check(Schema.isNonEmpty()),
     operationId: Schema.String,
     resolution: UnknownResolution,
-    operator: Schema.String,
   }),
   error: apiErrors,
 })
 const extendBudget = HttpApiEndpoint.post("extendBudget", "/runs/:id/extend-budget", {
   params: { id: Schema.String },
-  payload: Schema.Struct({ commandId: Schema.String, delta: BudgetLimits, operator: Schema.String }),
+  payload: Schema.Struct({ commandId: Schema.String.check(Schema.isNonEmpty()), delta: BudgetLimits }),
   error: apiErrors,
 })
 const operator: HttpApiGroup.HttpApiGroup<

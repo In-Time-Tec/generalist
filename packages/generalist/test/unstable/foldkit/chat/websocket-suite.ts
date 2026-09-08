@@ -6,7 +6,7 @@ import { Prompt } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -38,7 +38,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
     it.effect(`loads an existing snapshot and automatically replaces it after ${mode}`, () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: `foldkit-${mode}` })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: [agent] })
         const session = yield* host.sessions.create({ id: `foldkit-${mode}` })
         const original = yield* host.runs.start(session.id, agent, "existing input")
         const firstSnapshot = yield* host.sessions.snapshot(session.id)

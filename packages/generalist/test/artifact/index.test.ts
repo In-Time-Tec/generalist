@@ -5,7 +5,7 @@ import { Context, Effect, Fiber, Layer, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
@@ -56,7 +56,7 @@ layer(services)("Artifact", (it) => {
         name: "writer",
         toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
       })
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: [] })
       const run = yield* Agent.stream(writer, "edit the plan").pipe(Stream.runCollect, Effect.forkChild)
 
       const fixture = yield* ModelFixture

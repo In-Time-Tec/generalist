@@ -67,7 +67,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/compaction", runtimes: nodeAndBun },
       { specifier: "generalist/hooks", runtimes: nodeAndBun, exports: ["Hooks", "onToolCall"] },
       { specifier: "generalist/eval", runtimes: nodeAndBun, exports: ["score", "runSuite"] },
-      { specifier: "generalist/host", runtimes: nodeAndBun, exports: ["Generalist"] },
+      { specifier: "generalist/host", runtimes: nodeAndBun, exports: ["Host"] },
       { specifier: "generalist/server", runtimes: nodeAndBun, exports: ["Server"] },
       { specifier: "generalist/permissions", runtimes: nodeAndBun },
       { specifier: "generalist/providers/deterministic", runtimes: nodeAndBun, exports: ["layer"] },

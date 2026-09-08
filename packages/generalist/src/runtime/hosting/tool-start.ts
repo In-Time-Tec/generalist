@@ -121,7 +121,7 @@ export const make = (options: {
       const registration = yield* options.agents.getTool(tool)
       if (Option.isNone(registration))
         return yield* ExecutableRegistrationInvalid.make({
-          message: `Tool ${tool.name} is not registered. Pass it in Generalist.create({ tools: [...] }).`,
+          message: `Tool ${tool.name} is not registered. Pass it in Host.make({ revision: "local", tools: [...] }).`,
         })
       const encoded = yield* Schema.encodeEffect(registration.value.resolution.input)(input).pipe(
         Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })),

@@ -28,6 +28,7 @@ import {
 import type { Cursor } from "../runtime/cursor.js"
 import type { CreateSessionError, SessionError, SessionEventsError } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
+import type { MailboxEntry } from "../runtime/messaging/mailbox.js"
 import { make as makeSessionReads, type SessionReads } from "./session-reads.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
@@ -48,23 +49,23 @@ import {
   type StartOptions,
 } from "../runtime/service.js"
 import type { ToolServices } from "../runtime/executable/registered-tool.js"
-import { IllegalOperatorAction } from "../runtime/errors.js"
+import { ExecutableRegistrationInvalid, IllegalOperatorAction } from "../runtime/errors.js"
 import { make as makeTools, type Tools as HostTools } from "./tools.js"
-export type { CreateError } from "./errors.js"
+export type { MakeError } from "./errors.js"
 export type { HostToolRun } from "./tools.js"
 export { ToolIdentity } from "../runtime/executable/tool-identity.js"
 import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
-import { AgentInputInvalid, AgentNotRegistered, type CreateError } from "./errors.js"
+import { AgentInputInvalid, AgentNotRegistered, type MakeError } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { make as makeHostRun, type HostRun } from "./run.js"
 export type { HostRun, ChildHandle, ChildSpawnOptions, WaitOptions } from "./run.js"
 export { WaitInvalid, WaitResult } from "./run.js"
 import { ArtifactRegistry } from "../core/artifact.js"
-import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
+import { AgentBuildRevision, AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
 import {
   make as makeSessionHandle,
@@ -118,19 +119,28 @@ export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyA
   readonly skills?: ReadonlyArray<Skill>
   readonly hooks?: ReadonlyArray<HookDeclaration>
 }
-export interface CreateOptions<
-  Agents extends ReadonlyArray<AnyAgent>,
+export type AgentRegistry = Readonly<Record<string, AnyAgent>>
+export type AgentDeclarations = AgentRegistry | ReadonlyArray<AnyAgent>
+export type AgentValues<Agents extends AgentDeclarations> =
+  Agents extends ReadonlyArray<infer Agent> ? Agent : Agents extends AgentRegistry ? Agents[keyof Agents] : never
+
+export interface MakeOptions<
+  Agents extends AgentDeclarations,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
   Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > {
   readonly agents: Agents
+  /** Immutable application build identity used by the existing executable registry pins. */
+  readonly revision: string
   readonly plugins?: Plugins
   readonly tools?: Tools
   readonly limits?: HostLimits
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
-export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
+export interface Host<Agents extends AgentDeclarations> {
+  readonly revision: string
+  readonly limits?: HostLimits
   readonly tools: HostTools
   readonly attachments: Attachments
   readonly artifacts: Artifacts
@@ -148,7 +158,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   }
   readonly runs: {
     readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, import("../runtime/service.js").GetRunError>
-    readonly start: <Selected extends Agents[number]>(
+    readonly start: <Selected extends AgentValues<Agents>>(
       sessionId: string,
       agent: Selected,
       input: AgentInput<Selected>,
@@ -163,6 +173,10 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
     readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, InspectError>
     readonly send: RunSend
+    readonly messages: (
+      runId: string,
+      limit?: number,
+    ) => Effect.Effect<ReadonlyArray<MailboxEntry>, import("../runtime/service.js").DirectoryError>
     readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, CancelError>
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
@@ -235,16 +249,16 @@ type PluginServices<Plugins> =
   | Tool.HandlersFor<PluginToolsByName<Plugins>>
   | Exclude<Tool.HandlerServices<PluginTool<Plugins>>, ToolContext>
 
-export type CreateRequirements<
-  Agents extends ReadonlyArray<AnyAgent>,
+export type MakeRequirements<
+  Agents extends AgentDeclarations,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>>,
   Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > =
   | Runtime
-  | (Agents[number] extends never ? never : LanguageModel.LanguageModel)
+  | (AgentValues<Agents> extends never ? never : LanguageModel.LanguageModel)
   | Approvals
   | Permissions
-  | AgentServices<Agents[number]>
+  | AgentServices<AgentValues<Agents>>
   | PluginServices<Plugins>
   | ToolServices<Tools[number]>
 
@@ -312,41 +326,51 @@ const mergedSkills = (
   return Option.isSome(current) ? mergeSkillCatalogs(current.value, additions) : additions
 }
 
-const create = <
-  const Agents extends ReadonlyArray<AnyAgent>,
+const declarations = (agents: AgentDeclarations): ReadonlyArray<AnyAgent> =>
+  Array.isArray(agents) ? agents : Object.values(agents)
+
+const make = <
+  const Agents extends AgentDeclarations,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
   const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 >(
-  options: CreateOptions<Agents, Plugins, Tools>,
-): Effect.Effect<Host<Agents>, CreateError, CreateRequirements<Agents, Plugins, Tools>> =>
+  options: MakeOptions<Agents, Plugins, Tools>,
+): Effect.Effect<Host<Agents>, MakeError, MakeRequirements<Agents, Plugins, Tools>> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime
-    const environment = yield* Effect.context<CreateRequirements<Agents, Plugins, Tools>>()
+    const environment = yield* Effect.context<MakeRequirements<Agents, Plugins, Tools>>()
     yield* Approvals
     yield* Permissions
 
+    const revision = yield* Schema.decodeEffect(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)))(
+      options.revision,
+    ).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })))
+    const agents = declarations(options.agents)
     const plugins: ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = options.plugins ?? []
     const currentInstructions = yield* Effect.serviceOption(Instructions)
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)
     const currentHooks = yield* Effect.serviceOption(Hooks)
     const attachments = makeAttachments(yield* Effect.serviceOption(BlobStore))
     const artifacts = makeArtifacts(yield* Effect.serviceOption(ArtifactRegistry))
-    const contributions = yield* preparePlugins({ plugins, agents: options.agents })
+    const contributions = yield* preparePlugins({ plugins, agents })
     const instructions = mergedInstructions(currentInstructions, contributions.instructions)
     const skills = mergedSkills(currentSkills, contributions.skills)
     const hooks = mergedHooks(currentHooks, contributions.hooks)
 
     const registered = new Map<AnyAgent, AnyAgent>()
     const registeredByName = new Map<string, AnyAgent>()
-    const configuredAgents = options.agents.map((agent) => configuredAgent(agent, contributions.tools))
+    const configuredAgents = agents.map((agent) => configuredAgent(agent, contributions.tools))
     yield* validateProfiles(configuredAgents)
     const treePolicy =
       options.limits === undefined
         ? undefined
         : yield* runtime.configureDelegationPolicy(yield* fromHostLimits(options.limits))
-    for (const [index, agent] of options.agents.entries()) {
+    for (const [index, agent] of agents.entries()) {
       const configured = configuredAgents[index]!
-      let registration = registerAgent(runtime, configured).pipe(Effect.provideService(AgentProfiles, configuredAgents))
+      let registration = registerAgent(runtime, configured).pipe(
+        Effect.provideService(AgentProfiles, configuredAgents),
+        Effect.provideService(AgentBuildRevision, revision),
+      )
       if (instructions !== undefined) {
         registration = registration.pipe(Effect.provideService(Instructions, instructions))
       }
@@ -357,10 +381,13 @@ const create = <
       registeredByName.set(agent.name, configured)
     }
 
-    for (const tool of options.tools ?? []) yield* runtime.registerTool(tool)
+    for (const tool of options.tools ?? [])
+      yield* runtime.registerTool(tool).pipe(Effect.provideService(AgentBuildRevision, revision))
     const sessionHandle = makeSessionHandle({ runtime, registeredByName })
     const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
+      revision,
+      ...(options.limits === undefined ? undefined : { limits: options.limits }),
       tools: makeTools(runtime),
       attachments,
       artifacts,
@@ -381,7 +408,7 @@ const create = <
             if (configured === undefined) {
               return yield* AgentNotRegistered.make({
                 name: agent.name,
-                hint: "Pass an Agent from the agents array supplied to Generalist.create.",
+                hint: "Pass an Agent from the registry supplied to Host.make.",
               })
             }
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
@@ -400,14 +427,14 @@ const create = <
             if (configured === undefined) {
               return yield* AgentNotRegistered.make({
                 name: agentName,
-                hint: "Use an Agent name from the agents array supplied to Generalist.create.",
+                hint: "Use an Agent name from the registry supplied to Host.make.",
               })
             }
             const decodeWithHostEnvironment = Schema.decodeEffect(configured.input)(input).pipe(
               Effect.provide(environment),
             )
-            // SAFETY: Generalist.create captured every decoding service declared by each configured Agent input.
-            // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- The heterogeneous name registry erases the configured Agent input context, which Generalist.create captures and provides here.
+            // SAFETY: Host.make captured every decoding service declared by each configured Agent input.
+            // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- The heterogeneous name registry erases the configured Agent input context, which Host.make captures and provides here.
             const decode = decodeWithHostEnvironment as Effect.Effect<unknown, Schema.SchemaError>
             const decoded = yield* decode.pipe(
               Effect.mapError((error) => AgentInputInvalid.make({ name: agentName, message: error.message })),
@@ -420,6 +447,7 @@ const create = <
         list: runtime.sessionRuns,
         inspect: runtime.inspect,
         send: (runId, prompt, sendOptions) => runtime.send(runId, prompt, sendOptions),
+        messages: (runId, limit = 64) => runtime.messages({ runId, limit }),
         cancel: (runId, commandId, reason) => {
           const input: Types.Mutable<{ readonly runId: string; readonly commandId: string; readonly reason?: string }> =
             {
@@ -497,4 +525,5 @@ const create = <
     }
     return host
   })
-/** Stable process-local product host. */ export const Generalist = { create, plugin } as const
+/** Stable process-local product host and its compiler. */
+export const Host = { make, plugin } as const

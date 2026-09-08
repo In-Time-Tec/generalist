@@ -223,7 +223,7 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | WebSearch |
 
 ### Runtime and routes
 
-`Durability.layer` reconstructs the object-backed Runtime and `Durability.activate` starts its scheduler only inside the serving layer scope. `Generalist.create` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. `S3.layer` supplies canonical object storage; also provide `BunCrypto` and an `ExecutableResolver`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. For a custom endpoint, also set `GENERALIST_S3_ENDPOINT` and `GENERALIST_S3_CAPABILITIES_CONFIRMED` only after qualifying conditional-create, strong-read, and consistent-listing guarantees. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production). This example describes the object contract without claiming an independently qualified provider deployment.
+`Durability.layer` reconstructs the object-backed Runtime and `Durability.activate` starts its scheduler only inside the serving layer scope. `Host.make` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. `S3.layer` supplies canonical object storage; also provide `BunCrypto` and an `ExecutableResolver`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. For a custom endpoint, also set `GENERALIST_S3_ENDPOINT` and `GENERALIST_S3_CAPABILITIES_CONFIRMED` only after qualifying conditional-create, strong-read, and consistent-listing guarantees. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production). This example describes the object contract without claiming an independently qualified provider deployment.
 
 **server.ts**
 
@@ -231,7 +231,7 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | WebSearch |
 import { BunCrypto } from "@effect/platform-bun"
 import { Config, Effect, Layer, Option } from "effect"
 import { Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
@@ -312,7 +312,7 @@ const demoAuth = Layer.succeed(
 )
 
 const apiLayer = Layer.unwrap(
-  Generalist.create({ agents: [agent] }).pipe(
+  Host.make({ agents: [agent] }).pipe(
     Effect.map((host) =>
       Server.layer({
         host,

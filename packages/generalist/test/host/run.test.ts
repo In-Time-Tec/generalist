@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, Permissions, ToolContext } from "generalist"
-import { Generalist, WaitInvalid, WaitResult, type Host, type HostRun } from "generalist/host"
+import { Host, WaitInvalid, WaitResult, type HostRun } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime, SessionSender } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { SessionFamilyPage } from "../../src/runtime/session/retained.js"
@@ -24,7 +24,7 @@ it.effect("pages more than 128 retained child Sessions across fresh Hosts withou
           ),
         )
         return yield* Effect.gen(function* () {
-          return yield* body(yield* Generalist.create({ agents: [agent] as const }))
+          return yield* body(yield* Host.make({ revision: "local", agents: [agent] as const }))
         }).pipe(Effect.provide(context))
       }),
     )
@@ -172,7 +172,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     const admitted = yield* provideScoped(
       hostLayer(),
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [agent, child] })
+        const host = yield* Host.make({ revision: "local", agents: [agent, child] })
         const session = yield* host.sessions.create({ id: "question-parent", agent: agent.name })
         const parent = yield* host.runs.start(session.id, agent, "Coordinate")
         waitFor = parent.wait
@@ -192,7 +192,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     yield* provideScoped(
       hostLayer(),
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [agent, child] })
+        const host = yield* Host.make({ revision: "local", agents: [agent, child] })
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const parent = yield* host.runs.get(admitted.parentId)

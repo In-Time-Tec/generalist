@@ -232,7 +232,7 @@ const verifyLocalRuntimeGraph = Effect.fn("PackageSmoke.verifyLocalRuntimeGraph"
   }
   const sqlFiles = files.filter(isSqlGraphEntry)
   if (sqlFiles.length > 0 || sqlImports.length > 0) {
-    return yield* smokeError(`Generalist emitted graph contains SQL:\n${[...sqlFiles, ...sqlImports].join("\n")}`)
+    return yield* smokeError(`Host emitted graph contains SQL:\n${[...sqlFiles, ...sqlImports].join("\n")}`)
   }
 
   let nextIndex = 0
@@ -271,9 +271,9 @@ const verifyLocalRuntimeGraph = Effect.fn("PackageSmoke.verifyLocalRuntimeGraph"
       cycles.flatMap((cycle) => cycle.map((file) => path.relative(directory, file))),
       (left, right) => left.localeCompare(right),
     )
-    return yield* smokeError(`Generalist emitted runtime graph contains local cycles:\n${members.join("\n")}`)
+    return yield* smokeError(`Host emitted runtime graph contains local cycles:\n${members.join("\n")}`)
   }
-  yield* Console.log(`${nodes.size} Generalist runtime modules, ${edges} local static edges, 0 cycles`)
+  yield* Console.log(`${nodes.size} Host runtime modules, ${edges} local static edges, 0 cycles`)
 })
 
 const verifyDeclarationSpecifiers = Effect.fn("PackageSmoke.verifyDeclarationSpecifiers")(function* (root: string) {
@@ -946,7 +946,7 @@ for (const specifier of forbidden) {
 const { A2A } = await import("generalist/unstable/a2a")
 const { AGUI } = await import("generalist/unstable/ag-ui")
 const { Agent, Approvals, Memory, ModelMiddleware, ModelRegistry, Permissions, Session } = await import("generalist")
-const { Generalist } = await import("generalist/host")
+const { Host } = await import("generalist/host")
 const { VectorStore } = await import("generalist/memory")
 const { State, Store } = await import("generalist/instructions")
 const { MCPClient } = await import("generalist/unstable/mcp")
@@ -991,7 +991,7 @@ const layers = [
     transport: McpHttpClient.make({ url: "https://mcp.example/rpc" }),
   }),
 ]
-if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Generalist layer does not use the root Effect identity")
+if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Host layer does not use the root Effect identity")
 if (!Layer.isLayer(OpenAI.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
   throw new Error("provider constructor does not use the root Layer identity")
 }
@@ -1014,7 +1014,7 @@ await Effect.runPromise(Effect.gen(function* () {
     const context = yield* Layer.build(services())
     return yield* Effect.gen(function* () {
       const agent = Agent.make({ name: "packed-history" })
-      const host = yield* Generalist.create({ agents: [agent] })
+      const host = yield* Host.make({ revision: "local", agents: [agent] })
       const session = yield* host.sessions.create({ id: "packed-history", agent: agent.name })
       const ids = []
       for (let index = 0; index < 129; index++) ids.push((yield* host.runs.start(session.id, agent, "input-" + index)).id)
@@ -1029,7 +1029,7 @@ await Effect.runPromise(Effect.gen(function* () {
   yield* Effect.scoped(Effect.gen(function* () {
     const context = yield* Layer.build(services())
     yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [Agent.make({ name: "packed-history" })] })
+      const host = yield* Host.make({ revision: "local", agents: [Agent.make({ name: "packed-history" })] })
       const snapshot = yield* host.sessions.snapshot("packed-history")
       if (snapshot.cursor !== first.snapshot.cursor) throw new Error("packed Session cursor changed after fresh Layer")
       if (JSON.stringify(snapshot.session) !== JSON.stringify(first.snapshot.session)) throw new Error("packed Session canonical metadata changed after fresh Layer")
@@ -1049,7 +1049,7 @@ await Effect.runPromise(Effect.gen(function* () {
 }))
 await import("./components.mjs")
 await import("./background-tools.mjs")
-console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
+console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
 `,
   )
 
@@ -1088,7 +1088,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
   if (
     (yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/generalist/-/")
   ) {
-    return yield* smokeError("Bun consumer resolved the Generalist package from npm")
+    return yield* smokeError("Bun consumer resolved the Host package from npm")
   }
 
   yield* verifyWorkerEntrypoints({ root, consumerDirectory })
@@ -1125,14 +1125,14 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
       "npmjs.org/generalist/-/",
     )
   ) {
-    return yield* smokeError("npm consumer resolved the Generalist package from npm")
+    return yield* smokeError("npm consumer resolved the Host package from npm")
   }
 
   const optionalPeers = yield* validateMinimumConsumerProfiles({ manifest: packedManifest, packageExports })
 
-  // An optional peer must never be installed on Generalist's behalf when the consumer does not
+  // An optional peer must never be installed on Host's behalf when the consumer does not
   // declare it. Only Bun's isolated linker auto-materializes peers, so scope the assertion to the
-  // store subtree Bun resolves for the Generalist package itself; a peer that arrives as a real
+  // store subtree Bun resolves for the Host package itself; a peer that arrives as a real
   // dependency of the consumer's own tooling (for example @standard-schema/spec via vitest) is not
   // a violation.
   const verifyOptionalPeersNotInstalled = Effect.fn("PackageSmoke.verifyOptionalPeersNotInstalled")(function* (

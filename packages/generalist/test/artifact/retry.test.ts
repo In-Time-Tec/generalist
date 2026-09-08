@@ -3,7 +3,7 @@ import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer } from "effect"
 import { Approvals, BlobStore, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer, type CrdtService } from "generalist/unstable/artifact"
@@ -76,7 +76,7 @@ layer(services)("Artifact public retries", (suite) => {
         crdt: Layer.succeed(ArtifactCrdt, counted),
         initial: "draft",
       })
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: [] })
       const input = edit("human:retry-exact", 0, "!")
       const first = yield* host.artifacts.edit(document.name, input)
       const second = yield* host.artifacts.edit(document.name, input)
@@ -89,7 +89,7 @@ layer(services)("Artifact public retries", (suite) => {
   suite.effect("rejects divergent logical input under a reused HumanEdit commandId", () =>
     Effect.gen(function* () {
       const document = yield* Artifact.open("retry-divergent.md", { crdt: Yjs.layer(), initial: "draft" })
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: [] })
       const first = edit("human:retry-divergent", 0, "!")
       yield* host.artifacts.edit(document.name, first)
       const failure = yield* host.artifacts.edit(document.name, edit(first.commandId, 0, "?")).pipe(Effect.flip)
@@ -122,7 +122,7 @@ layer(services)("Artifact public retries", (suite) => {
         crdt: Layer.succeed(ArtifactCrdt, gated),
         initial: "draft",
       })
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: [] })
       const input = edit("human:retry-concurrent", 0, "!")
       const first = yield* Effect.forkChild(host.artifacts.edit(document.name, input))
       const second = yield* Effect.forkChild(host.artifacts.edit(document.name, input))
@@ -137,7 +137,7 @@ layer(services)("Artifact public retries", (suite) => {
   suite.effect("reconciles distinct concurrent HumanEdits without lost updates", () =>
     Effect.gen(function* () {
       const document = yield* Artifact.open("retry-distinct.md", { crdt: Yjs.layer(), initial: "draft" })
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: [] })
       const first = yield* Effect.forkChild(host.artifacts.edit(document.name, edit("human:retry-a", 0, "A")))
       const second = yield* Effect.forkChild(host.artifacts.edit(document.name, edit("human:retry-b", 0, "B")))
       const results = [yield* Fiber.join(first), yield* Fiber.join(second)]
@@ -174,7 +174,7 @@ it.effect("reconciles a successful HumanEdit after fresh Layer reopen", () =>
       firstClient,
       Effect.gen(function* () {
         const document = yield* Artifact.open("retry-reopen.md", { crdt: Yjs.layer(), initial: "draft" })
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: [] })
         return yield* host.artifacts.edit(document.name, edit("human:retry-reopen", 0, "!"))
       }),
     )
@@ -183,7 +183,7 @@ it.effect("reconciles a successful HumanEdit after fresh Layer reopen", () =>
       secondClient,
       Effect.gen(function* () {
         const document = yield* Artifact.open("retry-reopen.md", { crdt: Yjs.layer(), initial: "ignored" })
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: [] })
         const result = yield* host.artifacts.edit(document.name, edit("human:retry-reopen", 0, "!"))
         expect(yield* Artifact.read(document)).toMatchObject({ version: 1, content: "draft!" })
         return result
@@ -233,7 +233,7 @@ it.effect("reconciles a successful HumanEdit after lost acknowledgement", () =>
       firstClient,
       Effect.gen(function* () {
         const document = yield* Artifact.open("retry-lost-ack.md", { crdt: Yjs.layer(), initial: "draft" })
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: [] })
         yield* firstClient.faults.failNextCreate({ key: commitKey, phase: "after" })
         yield* firstClient.faults.failNextRead({ key: commitKey })
         return yield* host.artifacts.edit(document.name, edit("human:retry-lost-ack", 0, "!")).pipe(Effect.flip)
@@ -246,7 +246,7 @@ it.effect("reconciles a successful HumanEdit after lost acknowledgement", () =>
       secondClient,
       Effect.gen(function* () {
         const document = yield* Artifact.open("retry-lost-ack.md", { crdt: Yjs.layer(), initial: "ignored" })
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: [] })
         const retry = yield* host.artifacts.edit(document.name, edit("human:retry-lost-ack", 0, "!"))
         expect(yield* Artifact.read(document)).toMatchObject({ version: 1, content: "draft!" })
         return retry

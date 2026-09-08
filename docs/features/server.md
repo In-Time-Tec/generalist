@@ -11,13 +11,13 @@ description: "Authenticate and authorize a Host API with committed Session snaps
 import { Config, Effect, Layer } from "effect"
 import { HttpRouter } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { Server } from "generalist/server"
 
 const agent = Agent.make({ name: "support" })
 
 const apiLayer = Layer.unwrap(
-  Generalist.create({ agents: [agent] }).pipe(
+  Host.make({ agents: [agent] }).pipe(
     Effect.map((host) =>
       Server.layer({
         host,

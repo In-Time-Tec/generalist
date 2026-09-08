@@ -3,7 +3,7 @@ import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream,
 import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Server } from "generalist/server"
@@ -134,7 +134,7 @@ const runtimeLayer = Layer.unwrap(
 )
 
 const program = Effect.gen(function* () {
-  const host = yield* Generalist.create({ agents: [agent] })
+  const host = yield* Host.make({ revision: "local", agents: [agent] })
   const session = yield* host.sessions.create({ id: "release-1" })
   yield* host.runs.start(session.id, agent, "Deploy api", { idempotencyKey: "deploy-api-1" })
   const events = yield* (yield* host.events.subscribe(session.id)).pipe(

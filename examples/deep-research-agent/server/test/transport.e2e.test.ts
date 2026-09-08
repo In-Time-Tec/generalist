@@ -173,7 +173,6 @@ describe("deep-research-agent server e2e", () => {
                     runId: run.id,
                     token: approvalId,
                     decision: { _tag: "Approved" },
-                    operator: "operator:e2e",
                   })
                   const resumed = Array.from(
                     yield* client.events.subscribe({ sessionId: session.id, cursor: approval.cursor }).pipe(

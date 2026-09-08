@@ -13,7 +13,7 @@ export class AgentNotRegistered extends ActionableTaggedError<AgentNotRegistered
   "generalist/host/AgentNotRegistered",
   {
     name: Schema.String,
-    hint: errorHint("Pass an Agent from the agents array supplied to Generalist.create."),
+    hint: errorHint("Pass an Agent from the registry supplied to Host.make."),
   },
 ) {}
 
@@ -36,7 +36,7 @@ export class PluginToolConflict extends ActionableTaggedError<PluginToolConflict
   },
 ) {}
 
-export type CreateError =
+export type MakeError =
   | import("../runtime/errors.js").DuplicateAgent
   | PluginNameConflict
   | PluginToolConflict

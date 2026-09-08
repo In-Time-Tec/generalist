@@ -6,7 +6,7 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { A2A } from "generalist/unstable/a2a"
 
@@ -37,7 +37,7 @@ const registrations = [...ExecutableRegistration.requiredPins(agentBExecutable)]
 }))
 
 const card: AgentCard = {
-  name: "Generalist Agent B",
+  name: "Host Agent B",
   description: "The delegated specialist",
   supportedInterfaces: [
     { url: "http://127.0.0.1/a2a", protocolBinding: "JSONRPC", protocolVersion: "1.0", tenant: "" },
@@ -200,8 +200,8 @@ const protocolServices = delegateHandlers.pipe(
 )
 
 const program = Effect.gen(function* () {
-  const hostA = yield* Generalist.create({ agents: [agentA] })
-  const hostB = yield* Generalist.create({ agents: [agentB] })
+  const hostA = yield* Host.make({ revision: "local", agents: [agentA] })
+  const hostB = yield* Host.make({ revision: "local", agents: [agentB] })
   yield* hostB.sessions.create({ id: agentBSessionId, title: "A2A delegated work" })
   const session = yield* hostA.sessions.create({ id: "session:a2a-example", title: "A2A delegation" })
   const run = yield* hostA.runs.start(session.id, agentA, "Delegate this request to Agent B.", {
