@@ -188,6 +188,7 @@ export const reserveSessions: {
       const existing = state.sessions.get(sessionId)?.family
       if (
         sessionId === parent.message.sessionId ||
+        (existing === undefined && state.hostSessions.has(sessionId)) ||
         (existing !== undefined &&
           (existing.rootSessionId !== parentFamily?.rootSessionId ||
             existing.parentSessionId !== parent.message.sessionId))

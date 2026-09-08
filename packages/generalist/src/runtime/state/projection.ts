@@ -48,7 +48,7 @@ export interface RuntimePublication {
   readonly lastDeliveredSequence: number
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly treeSubscribers: ReadonlyMap<number, TreeSubscriberQueue>
-  readonly hostSession?: HostSessionPublication
+  readonly hostSessions?: ReadonlyArray<HostSessionPublication>
 }
 
 export interface ArtifactPublication {

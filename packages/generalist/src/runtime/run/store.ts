@@ -463,6 +463,7 @@ export interface Service {
   readonly hostSessionRunSummary: import("../session/host.js").RuntimeHostSessions["sessionRunSummary"]
   /** List product-facing Sessions in creation order. */
   readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
+  readonly hostSessionFamily: import("../session/host.js").RuntimeHostSessions["sessionFamily"]
   /** List root Runs admitted through one product-facing Session. */
   readonly hostSessionRuns: (
     sessionId: string,
