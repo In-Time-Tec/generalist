@@ -68,6 +68,8 @@ const insertWaits = (state: RuntimeState, runId: string, requestedWaits: Readonl
         const selector = requested.reason.filter
         if (selector.runs.length > 32 || (selector.runs.length === 0 && !selector.messages))
           return yield* RuntimeUnavailable.make({ message: "Run waits require a bounded, nonempty selector" })
+        if (new Set(selector.runs).size !== selector.runs.length)
+          return yield* RuntimeUnavailable.make({ message: "Run wait selectors cannot contain duplicate Run IDs" })
         const owner = state.runs.get(runId)!
         for (const targetId of selector.runs) {
           const target = state.runs.get(targetId)
@@ -90,6 +92,8 @@ const insertWaits = (state: RuntimeState, runId: string, requestedWaits: Readonl
             return yield* RuntimeUnavailable.make({
               message: "Run wait command identity cannot be reused with a different selector",
             })
+          if (previous.status === "open" && previous.waitId !== requested.waitId)
+            return yield* RuntimeUnavailable.make({ message: "Run wait command identity is already open" })
         }
       }
       const prior = waits.get(waitMapKey(runId, requested.waitId))
