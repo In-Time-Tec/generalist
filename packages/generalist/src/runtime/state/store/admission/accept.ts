@@ -126,11 +126,14 @@ export const admitSend: {
         try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
         catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
-      const { treePolicy, budget, depth } = yield* rootGrant({
+      const grant = yield* rootGrant({
         state,
         sessionId: input.message.sessionId,
         selection: input,
+        message: input.message,
       })
+      const { treePolicy, budget, depth } = grant
+      const sponsor = "sponsor" in grant ? grant.sponsor : undefined
       const digest = digestOverride ?? rootDigest(input.message, treePolicy)
       const key = idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey)
       const existing = state.idempotency.get(key)
@@ -153,7 +156,8 @@ export const admitSend: {
         executableManifest: input.executableManifest,
         address: input.message.to,
         message: input.message,
-        rootRunId: runId,
+        rootRunId: sponsor?.rootRunId ?? runId,
+        ...(sponsor === undefined ? {} : { parentRunId: sponsor.runId }),
         depth,
         treePolicy,
         lastSequence: -1,
@@ -171,7 +175,8 @@ export const admitSend: {
       const runs = new Map(withId.runs)
       runs.set(runId, run)
       const treeRoots = new Map(withId.treeRoots)
-      treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [], subscribers: new Map() })
+      if (sponsor === undefined)
+        treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [], subscribers: new Map() })
       let next: RuntimeState = { ...withId, runs, treeRoots }
       const enqueued = enqueueLane(next, input.message.sessionId, runId)
       next = enqueued.state
@@ -224,6 +229,7 @@ export const admitStart: {
         state,
         sessionId: input.message.sessionId,
         selection: input,
+        message: input.message,
       })
       const normalizedInput = { ...input, treePolicy: grant.treePolicy, budget: grant.budget }
       yield* validateInitialChildren(input)

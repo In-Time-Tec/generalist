@@ -61,6 +61,30 @@ export const activeChildCount: {
     ).length,
 )
 
+export const activeToolCount = (state: RuntimeState, run: StoredRun, now: number): number => {
+  let count = 0
+  for (const candidate of familyRuns(state, run.rootRunId)) {
+    const independent = candidate.executableManifest.entries.some(
+      (entry) => entry.pin === candidate.executableRef.active && entry._tag === "Tool",
+    )
+    if (independent && candidate.runId === run.runId) continue
+    const operations = new Set(
+      [...state.operations.values()]
+        .filter(
+          (operation) =>
+            operation.runId === candidate.runId &&
+            operation.kind === "tool" &&
+            (operation.status === "running" || operation.status === "unknown"),
+        )
+        .map((operation) => operation.operationId),
+    ).size
+    const owner = candidate.ownerId === undefined ? undefined : state.workers.get(candidate.ownerId)
+    const claimed = independent && candidate.ownerId !== undefined && (owner === undefined || owner.expiresAt > now)
+    count += Math.max(operations, claimed ? 1 : 0)
+  }
+  return count
+}
+
 export const recordFamilyRun = ({
   state,
   run,
@@ -124,7 +148,16 @@ export const reserveSessions: {
       )
         return RuntimeUnavailable.make({ message: "A child Session cannot replace another Session's admitted family" })
     }
-    const retained = new Set(familyRuns(state, parent.rootRunId).map((run) => run.message.sessionId))
+    const retained = new Set(
+      familyRuns(state, parent.rootRunId)
+        .filter(
+          (run) =>
+            !run.executableManifest.entries.some(
+              (entry) => entry.pin === run.executableRef.active && entry._tag === "Tool",
+            ),
+        )
+        .map((run) => run.message.sessionId),
+    )
     const current = retained.size
     for (const sessionId of sessionIds) retained.add(sessionId)
     return retained.size <= parent.treePolicy.maxSessions

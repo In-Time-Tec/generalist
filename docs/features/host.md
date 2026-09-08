@@ -48,6 +48,8 @@ Effect.runPromise(
 
 `Generalist.create({ agents, tools?, plugins? })` requires Runtime, Approvals, Permissions, every configured Agent service, and tool handlers. Hosts with Agents also require `LanguageModel`; a Tool-only Host does not. It registers the configured executables with Runtime and returns no global singleton.
 
+The Agent fragment above admits work and returns a receipt, not the Agent's answer. The declared model and Runtime Layers determine credentials and execution; no scripted or live provider is configured there. Keep the activated host scope alive while work executes.
+
 ## Independent Tool Runs
 
 Use a Tool Run when work must keep its own execution claim after the Run that requested it settles. Register ordinary Effect AI Tool declarations in `tools`, provide their Toolkit handlers when creating the Host, and start them without creating a conversational Session.
@@ -82,9 +84,9 @@ const program = Effect.gen(function* () {
 
 The handle exposes `id`, `inspect`, replay-then-live `events`, `await`, and `cancel(commandId, reason?)`. It has no Agent `send`, fork, or rewind controls. A declared Tool failure is decoded through its failure schema and returned by `await` as `{ _tag: "ToolRunFailure", failure }`. Approval decisions and unknown-effect resolution use the existing Host approval and operator methods.
 
-An optional `parentRunId` is retained as provenance, not a conversational child lifetime: parent settlement does not release or cancel the Tool's claim. A Tool has its own internal routing identity but creates no public Session or conversation. On a fresh host, register matching Tool declarations, codecs, handlers, and policy again before resuming work. Executable pins identify these deployment dependencies; the journal does not serialize their closures or credentials. If an interrupted external effect has no accepted outcome and cannot safely retry, recovery requires explicit resolution rather than calling the handler again.
+An optional `parentRunId` sponsors the Tool in the parent's canonical family and inherits its admitted limits. Parent settlement does not release or cancel the Tool's claim. Tool claims use the family's `concurrency.tools` capacity, not Agent concurrency, recursion depth, or `maxSessions`. Running and unresolved tool operations retain capacity until their outcome is known. A Tool has its own internal routing identity but creates no public Session or conversation and does not occupy the sponsor's conversational lane.
 
-This fragment admits work and returns a receipt, not the Agent's answer. The declared model and Runtime Layers determine credentials and execution; no scripted or live provider is configured here. Keep the activated host scope alive while work executes.
+On a fresh host, register matching Tool declarations, codecs, handlers, and policy again before resuming work. Executable pins identify these deployment dependencies; the journal does not serialize their closures or credentials. If an interrupted external effect has no accepted outcome and cannot safely retry, recovery requires explicit resolution rather than calling the handler again.
 
 ## Surface
 

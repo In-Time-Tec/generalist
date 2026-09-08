@@ -1,15 +1,18 @@
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import type { RuntimeState } from "../../projection.js"
 import { defaultTreePolicy, narrow } from "../../../tree/policy.js"
 import { capGrant, narrowGrant, profileBudget } from "../../../budget/state.js"
 import type { SessionSelection } from "../../../session/queue.js"
 import { RuntimeUnavailable } from "../../../errors.js"
 import type { BudgetLimits } from "../../../../core/durable/run-budget.js"
+import type { Message } from "../../../messaging/message.js"
+import { Input as ToolInput } from "../../../hosting/tool-start.js"
 
 interface Input {
   readonly state: RuntimeState
   readonly sessionId: string
   readonly selection: SessionSelection
+  readonly message?: Message
 }
 
 const selectedPolicy = ({ state, sessionId, selection: requested }: Input) =>
@@ -46,6 +49,25 @@ const validateTools = ({ state, sessionId, selection }: Input) =>
 
 export const rootGrant = (input: Input) =>
   Effect.gen(function* () {
+    const active = input.selection.executableManifest.entries.find(
+      (entry) => entry.pin === input.selection.executableRef.active,
+    )
+    if (active?._tag === "Tool") {
+      const admission = yield* Schema.decodeUnknownEffect(ToolInput)(input.message?.metadata.tool).pipe(
+        Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+      )
+      if (input.state.hostSessions.has(input.sessionId))
+        return yield* RuntimeUnavailable.make({ message: "Tool Runs require an independent routing identity" })
+      const sponsor = admission.parentRunId === undefined ? undefined : input.state.runs.get(admission.parentRunId)
+      if (admission.parentRunId !== undefined && sponsor === undefined)
+        return yield* RuntimeUnavailable.make({ message: "Tool sponsor does not exist" })
+      const treePolicy = yield* narrow({
+        policy: input.selection.treePolicy ?? sponsor?.treePolicy ?? input.state.delegationPolicy ?? defaultTreePolicy,
+        ceiling: sponsor?.treePolicy ?? input.state.delegationPolicy,
+      })
+      yield* narrow({ policy: treePolicy, ceiling: input.state.delegationPolicy })
+      return { treePolicy, budget: {}, depth: sponsor?.depth ?? 0, sponsor }
+    }
     const treePolicy = yield* selectedPolicy(input)
     yield* validateTools(input)
     const family = input.state.sessions.get(input.sessionId)?.family

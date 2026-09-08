@@ -4,7 +4,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../../run/ownership-errors.js"
-import { activeChildCount, familyRuns } from "./child/capacity.js"
+import { activeChildCount, activeToolCount, familyRuns } from "./child/capacity.js"
 import { runWaits, type RuntimeState, type StoredRun } from "../projection.js"
 import { checkpointRef } from "../../executable/manifest-internal.js"
 import { appendLifecycle, attemptStartedEvent } from "../append.js"
@@ -166,6 +166,13 @@ const requireClaimable = (state: RuntimeState, run: StoredRun, now: number) =>
     }
     if (run.status === "waiting" || run.status === "needs-resolution") {
       return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
+    }
+    if (
+      run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Tool")
+    ) {
+      const occupied = activeToolCount(state, run, now)
+      if (occupied >= run.treePolicy.concurrency.tools)
+        return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is awaiting family Tool capacity` })
     }
     if (
       run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Agent")
