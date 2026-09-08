@@ -1,70 +1,40 @@
-import { Effect, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Effect, Schema, type Types } from "effect"
 import { type Entry, SessionStoreError } from "../../../../core/context/session.js"
-import { promptFromResponseParts } from "../../../../media/prompt.js"
 import { RuntimeUnavailable } from "../../../errors.js"
-import { ConversationUpdate, type ConversationEntry } from "../../../session/conversation.js"
-import { type HostSessionEvent, SessionSnapshotTooLarge } from "../../../session/host.js"
+import {
+  ConversationUpdate,
+  ConversationEntry,
+  projectEntry,
+  type Conversation,
+} from "../../../session/conversation.js"
+import type { HostSessionEvent } from "../../../session/host.js"
 import { emptySession, type RuntimeSession, type RuntimeState } from "../../projection.js"
 import { SessionReads } from "../../session-reader.js"
 
-const visible = (entry: Entry): ConversationEntry | undefined => {
-  let messages: ReadonlyArray<Prompt.Message>
-  switch (entry._tag) {
-    case "Message":
-    case "Steering":
-      messages = [entry.message]
-      break
-    case "ModelResponse":
-      messages = promptFromResponseParts(entry.content).content
-      break
-    case "Handoff":
-      messages = entry.projectedHistory.content
-      break
-    case "ToolCall":
-      messages = [Prompt.makeMessage("assistant", { content: [entry.part] })]
-      break
-    case "ToolResult":
-      messages = [Prompt.makeMessage("tool", { content: [entry.part] })]
-      break
-    default:
-      return undefined
-  }
-  const content = messages.filter(
-    (message): message is Exclude<Prompt.Message, { readonly role: "system" }> => message.role !== "system",
-  )
-  return content.length === 0 ? undefined : { id: entry.id, parentId: entry.parentId, messages: content }
+export const boundedEntry = (entry: Entry): ConversationEntry | undefined => {
+  const projected = projectEntry(entry)
+  if (projected === undefined) return undefined
+  const bytes = new TextEncoder().encode(
+    Schema.encodeSync(Schema.fromJsonString(ConversationEntry))(projected),
+  ).byteLength
+  return bytes <= 8192
+    ? projected
+    : { id: projected.id, parentId: projected.parentId, messages: [], contentDeferred: true }
 }
-
-const excess = (sessionId: string) => SessionSnapshotTooLarge.make({ sessionId, limit: "entries", maximum: 8192 })
-
-const previousVisibleId = (sessionId: string, session: RuntimeSession) =>
-  Effect.gen(function* () {
-    let cursor = session.leaf
-    let scanned = 0
-    while (cursor !== null) {
-      if (++scanned > 8192) return yield* excess(sessionId)
-      const entry = session.entries.get(cursor)
-      if (entry === undefined)
-        return yield* RuntimeUnavailable.make({ message: `Session entry ${cursor} does not exist` })
-      if (visible(entry) !== undefined) return entry.id
-      cursor = entry.parentId
-    }
-    return null
-  })
 
 export const projectConversation = (input: { readonly sessionId: string; readonly session: RuntimeSession }) =>
   Effect.gen(function* () {
-    const page = SessionReads.pathPage(input.session, { leafId: input.session.leaf, limit: 8192 })
+    const page = SessionReads.pathPage(input.session, { leafId: input.session.leaf, limit: 64 })
     if (Schema.is(SessionStoreError)(page)) return yield* RuntimeUnavailable.make({ message: page.message })
-    if (page.hasOlder) return yield* excess(input.sessionId)
-    return {
+    const conversation: Types.Mutable<Conversation> = {
       leafId: input.session.leaf,
       entries: page.entries.flatMap((entry) => {
-        const projected = visible(entry)
+        const projected = boundedEntry(entry)
         return projected === undefined ? [] : [projected]
       }),
     }
+    if (page.nextCursor !== undefined) conversation.nextLeafId = page.nextCursor.entryId
+    return conversation
   })
 
 export const publishConversation = (input: {
@@ -79,26 +49,33 @@ export const publishConversation = (input: {
     const next = input.next.sessions.get(input.sessionId) ?? emptySession()
     if (previous.leaf === next.leaf) return input.next
     const appended = next.leaf === null ? undefined : next.entries.get(next.leaf)
-    let afterEntryId: string | null = null
-    let entries: ReadonlyArray<ConversationEntry>
-    if (appended !== undefined && appended.parentId === previous.leaf && !previous.entries.has(appended.id)) {
-      afterEntryId = yield* previousVisibleId(input.sessionId, previous)
-      const entry = visible(appended)
-      entries = entry === undefined ? [] : [entry]
-    } else {
-      const before = yield* projectConversation({ sessionId: input.sessionId, session: previous })
-      const after = yield* projectConversation({ sessionId: input.sessionId, session: next })
-      const mismatch = before.entries.findIndex((entry, index) => entry.id !== after.entries[index]?.id)
-      const common = mismatch < 0 ? before.entries.length : mismatch
-      afterEntryId = common === 0 ? null : before.entries[common - 1]!.id
-      entries = after.entries.slice(common)
-    }
-    const update = { previousLeafId: previous.leaf, leafId: next.leaf, afterEntryId, entries }
+    const before = yield* projectConversation({ sessionId: input.sessionId, session: previous })
+    const append =
+      appended !== undefined &&
+      appended.parentId === previous.leaf &&
+      !previous.entries.has(appended.id) &&
+      before.entries.length > 0
+    const projected = appended === undefined ? undefined : boundedEntry(appended)
+    const update: ConversationUpdate = append
+      ? {
+          previousLeafId: previous.leaf,
+          leafId: next.leaf,
+          afterEntryId: before.entries.at(-1)?.id ?? null,
+          entries: projected === undefined ? [] : [projected],
+        }
+      : {
+          previousLeafId: previous.leaf,
+          ...(yield* projectConversation({ sessionId: input.sessionId, session: next })),
+          afterEntryId: null,
+          reset: true,
+        }
     const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ConversationUpdate))(update).pipe(
       Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
     )
     if (new TextEncoder().encode(encoded).byteLength > 1048576)
-      return yield* SessionSnapshotTooLarge.make({ sessionId: input.sessionId, limit: "bytes", maximum: 1048576 })
+      return yield* RuntimeUnavailable.make({
+        message: "Bounded conversation projection exceeds its encoded byte limit",
+      })
     const cursor = host.lastCursor + 1
     const entry: HostSessionEvent = { _tag: "Conversation", cursor, update }
     return {
@@ -113,7 +90,7 @@ export const publishConversation = (input: {
     Effect.mapError((cause) =>
       SessionStoreError.make({
         message: cause.message,
-        reason: Schema.is(SessionSnapshotTooLarge)(cause) ? "unsupported" : "corrupt",
+        reason: "corrupt",
         cause,
       }),
     ),

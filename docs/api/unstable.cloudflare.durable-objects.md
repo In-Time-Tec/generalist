@@ -48,6 +48,18 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 [`Options`](./durability.md#options).[`addresses`](./durability.md#addresses)
 
+<a id="admissionreservebytes"></a>
+
+##### admissionReserveBytes?
+
+> `readonly` `optional` **admissionReserveBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`admissionReserveBytes`](./durability.md#admissionreservebytes)
+
 <a id="bucket"></a>
 
 ##### bucket

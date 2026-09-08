@@ -65,6 +65,7 @@ const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunE
 const hostEvent = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
   Connection.HostDelivery({
     epoch: 0,
+    activeRunId: tag === "Completed" ? null : "capstone-run",
     event: Schema.decodeUnknownSync(HostEvent)({
       _tag: tag,
       sessionId: "capstone-session",
@@ -79,6 +80,7 @@ const chatFrames: ReadonlyArray<Connection.Incoming> = [
   hostEvent(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
   Connection.HostDelivery({
     epoch: 0,
+    activeRunId: "capstone-run",
     event: {
       _tag: "Conversation",
       sessionId: "capstone-session",
