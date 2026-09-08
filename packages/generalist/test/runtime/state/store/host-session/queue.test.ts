@@ -156,7 +156,7 @@ for (const order of [
       BunCrypto.layer,
       Effect.gen(function* () {
         const bucket = yield* makeSimulator()
-        const open = (workerId: string) =>
+        const openHost = (workerId: string) =>
           Effect.gen(function* () {
             const client = yield* bucket.connect
             const context = yield* Layer.build(
@@ -171,17 +171,17 @@ for (const order of [
             yield* activate.pipe(Effect.provide(context))
             return yield* RunStore.pipe(Effect.provide(context))
           })
-        const first = yield* open("first")
-        const second = yield* open("second")
+        const first = yield* openHost("first")
+        const second = yield* openHost("second")
         const { executable, registrations } = durableIdentity(makeAgent({ name: "reviewer", children: ["reviewer"] }))
-        const selection = {
+        const selectedProfile = {
           executableRef: executable.ref,
           executableManifest: executable.manifest,
           registrations,
         }
-        if (order === "exhausted") Object.assign(selection, { budget: { duration: 1 } })
-        if (order === "replacement-sponsor") Object.assign(selection, { budget: { duration: 10 } })
-        yield* first.createHostSession({ id: "parent", selection })
+        if (order === "exhausted") Object.assign(selectedProfile, { budget: { duration: 1 } })
+        if (order === "replacement-sponsor") Object.assign(selectedProfile, { budget: { duration: 10 } })
+        yield* first.createHostSession({ id: "parent", selection: selectedProfile })
         yield* first.submitSessionInput({ sessionId: "parent", commandId: "start", prompt: Prompt.make("coordinate") })
         const parentRunId = (yield* first.hostSession("parent")).activeRunId!
         const message = {
@@ -217,7 +217,7 @@ for (const order of [
             yield* send
             yield* stop
           } else yield* Effect.all([send, stop], { concurrency: "unbounded" })
-          const fresh = yield* open("fresh")
+          const fresh = yield* openHost("fresh")
           const stopped = yield* fresh.hostSession("child")
           expect(stopped.lifecycle).toBe("stopped")
           expect(stopped.activeRunId).toBeUndefined()
@@ -241,7 +241,7 @@ for (const order of [
           yield* settle
           yield* first.releaseExecution(claim)
           yield* send
-          const fresh = yield* open("fresh")
+          const fresh = yield* openHost("fresh")
           expect((yield* fresh.snapshot(child.runId)).budget.duration).toBe(0)
           expect((yield* fresh.hostSession("child")).queue.map((entry) => entry.id)).toEqual(["followup"])
           expect((yield* fresh.hostSession("child")).activeRunId).toBeUndefined()
@@ -267,7 +267,7 @@ for (const order of [
           })
           yield* first.releaseExecution(parentClaim)
           yield* send
-          const fresh = yield* open("fresh")
+          const fresh = yield* openHost("fresh")
           expect((yield* fresh.hostSession("child")).queue.map((entry) => entry.id)).toEqual(["followup"])
           expect((yield* fresh.hostSessionRuns("child")).length).toBe(1)
           yield* fresh.submitSessionInput({
@@ -296,7 +296,7 @@ for (const order of [
         } else yield* Effect.all([send, settle], { concurrency: "unbounded" })
         yield* first.releaseExecution(claim)
         const verifyDelivery = Effect.gen(function* () {
-          const fresh = yield* open("fresh")
+          const fresh = yield* openHost("fresh")
           const retained = yield* fresh.hostSession("child")
           expect(retained.retainedSession).toEqual(before)
           expect(retained.sponsorRunId).toBe(parentRunId)
