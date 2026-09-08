@@ -22,7 +22,7 @@ import { make as makeCodec, decodeReceipt, encodeCommandValue } from "./runtime-
 import { detach } from "./runtime-state/cache.js"
 import type { State as CanonicalState } from "./protocol.js"
 import { type Definition, ownershipCommands } from "./runtime-command.js"
-import { make as makeCapacity } from "./runtime-capacity.js"
+import { make as makeCapacity } from "./runtime-state/capacity.js"
 import { emptyState, type RuntimeState } from "../../runtime/state/projection.js"
 import { PreparedObservation, occurredAtMillis, type Observations } from "../../runtime/state/observation.js"
 import { shutdownStore } from "../../runtime/state/store/events.js"
