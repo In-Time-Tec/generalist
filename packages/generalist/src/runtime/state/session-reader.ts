@@ -54,9 +54,9 @@ const pathPage = (session: RuntimeSession, input: PathPageInput): PathPage | Ses
       : storeError("An empty Session path cannot have a page cursor")
   }
   const newestFirst: Array<Entry> = []
-  const seen = new Set<string>()
+  const seen = new Set<string | null>()
   let cursor: string | null = input.cursor?.entryId ?? input.leafId
-  while (cursor !== null && newestFirst.length <= input.limit) {
+  while (cursor !== null && newestFirst.length < input.limit) {
     if (seen.has(cursor)) return storeError(`Session path for leaf ${input.leafId} contains a cycle`)
     seen.add(cursor)
     const entry = session.entries.get(cursor)
@@ -64,15 +64,15 @@ const pathPage = (session: RuntimeSession, input: PathPageInput): PathPage | Ses
     newestFirst.push(entry)
     cursor = entry.parentId
   }
-  const hasOlder = newestFirst.length > input.limit
-  const entries = newestFirst.slice(0, input.limit).toReversed()
-  const nextEntryId = newestFirst.at(input.limit)?.id
-  return nextEntryId !== undefined
+  if (seen.has(cursor)) return storeError(`Session path for leaf ${input.leafId} contains a cycle`)
+  const hasOlder = cursor !== null
+  const entries = newestFirst.toReversed()
+  return cursor !== null
     ? {
         entries,
         hasOlder,
         hasNewer: input.cursor !== undefined,
-        nextCursor: { leafId: input.leafId, entryId: nextEntryId },
+        nextCursor: { leafId: input.leafId, entryId: cursor },
       }
     : { entries, hasOlder, hasNewer: input.cursor !== undefined }
 }

@@ -5,6 +5,7 @@ import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { BlobNotFound, BlobStoreError, BlobTooLarge } from "../blob-store/index.js"
 import { AgentInputInvalid, AgentNotRegistered } from "../host/errors.js"
 import { SessionQueueConflict } from "../runtime/session/queue.js"
+import { SessionPageInvalid } from "../runtime/session/page.js"
 import {
   ApprovalMismatch,
   ApprovalStale,
@@ -17,7 +18,6 @@ import {
   SessionCursorExpired,
   SessionNotFound,
   SessionSubscriberLagged,
-  SessionSnapshotTooLarge,
 } from "../runtime/session/host.js"
 import {
   ArtifactAlreadyOpen,
@@ -126,7 +126,7 @@ export const apiErrors = [
   SessionCursorExpired.pipe(conflict),
   SessionNotFound.pipe(notFound),
   SessionSubscriberLagged.pipe(conflict),
-  SessionSnapshotTooLarge.pipe(payloadTooLarge),
+  SessionPageInvalid.pipe(badRequest),
 ] as const
 
 export const artifactApiErrors = [
@@ -168,7 +168,7 @@ const dedicatedErrors = Schema.Union([
   SessionCursorExpired,
   SessionNotFound,
   SessionSubscriberLagged,
-  SessionSnapshotTooLarge,
+  SessionPageInvalid,
 ])
 type EndpointError = typeof dedicatedErrors.Type
 

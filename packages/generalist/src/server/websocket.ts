@@ -31,8 +31,8 @@ const runBelongsTo = <Agents extends ReadonlyArray<AnyAgent>>(
   sessionId: string,
   runId: string,
 ): Effect.Effect<boolean> =>
-  host.runs.list(sessionId).pipe(
-    Effect.map((runs) => runs.some((run) => run.runId === runId)),
+  host.sessions.run(sessionId, runId).pipe(
+    Effect.map((run) => run.parentRunId === undefined),
     Effect.orElseSucceed(() => false),
   )
 
@@ -64,6 +64,7 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
       ).pipe(Effect.flatMap((current) => (current === undefined ? Effect.void : Fiber.interrupt(current.fiber))))
     const startPreview = (runId: string) =>
       Effect.gen(function* () {
+        if ((yield* Ref.get(previewSubscription))?.runId === runId) return
         yield* stopPreview()
         const allowed = yield* authorize({
           policy: options.authorization,
@@ -86,27 +87,23 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
         yield* Ref.set(previewSubscription, { runId, fiber })
       })
 
-    const initial = yield* options.host.runs.list(options.sessionId)
-    const activeRoot = initial.findLast(
-      (run) =>
-        run.parentRunId === undefined &&
-        run.status !== "succeeded" &&
-        run.status !== "failed" &&
-        run.status !== "cancelled",
-    )
-    if (activeRoot !== undefined) yield* startPreview(activeRoot.runId)
+    const initial = yield* options.host.sessions.get(options.sessionId)
+    if (initial.activeRunId !== undefined) yield* startPreview(initial.activeRunId)
 
     const eventFiber = yield* options.events.pipe(
       Stream.mapEffect((event) =>
         Effect.gen(function* () {
           if (event._tag === "RunStarted" && event.event.parentRunId === undefined) {
-            yield* stopPreview()
             yield* writeEvent(event)
-            yield* startPreview(event.runId)
+            const session = yield* options.host.sessions.get(options.sessionId)
+            if (session.activeRunId !== undefined) yield* startPreview(session.activeRunId)
+            else yield* stopPreview()
             return
           }
           if (event._tag === "Completed" && event.event.parentRunId === undefined) {
             yield* stopPreview(event.runId)
+            const session = yield* options.host.sessions.get(options.sessionId)
+            if (session.activeRunId !== undefined) yield* startPreview(session.activeRunId)
           }
           yield* writeEvent(event)
         }),
