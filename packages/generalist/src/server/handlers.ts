@@ -64,6 +64,22 @@ const sessionsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Age
         protect(policy)({ type: "session", id: params.id }, "read", () =>
           host.sessions.snapshot(params.id).pipe(mapError("sessions.snapshot")),
         ),
+      history: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.history(params.id, payload).pipe(mapError("sessions.history")),
+        ),
+      runs: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.runs(params.id, payload).pipe(mapError("sessions.runs")),
+        ),
+      entry: ({ params }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.entry(params.id, params.entryId).pipe(mapError("sessions.entry")),
+        ),
+      run: ({ params }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.run(params.id, params.runId).pipe(mapError("sessions.run")),
+        ),
       list: () =>
         protect(policy)({ type: "session" }, "read", () => host.sessions.list().pipe(mapError("sessions.list"))),
     }),
