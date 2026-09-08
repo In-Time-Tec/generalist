@@ -262,6 +262,36 @@ Runtime operations that persist and observe product-facing Sessions.
 
 `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
 
+<a id="sessionfamily"></a>
+
+##### sessionFamily
+
+> `readonly` **sessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
 <a id="sessionhistorypage"></a>
 
 ##### sessionHistoryPage
@@ -697,6 +727,22 @@ Re-exports [SessionConflict](../../host.md#sessionconflict)
 ### SessionCursorExpired
 
 Re-exports [SessionCursorExpired](../../host.md#sessioncursorexpired)
+
+***
+
+<a id="sessionfamilyinput"></a>
+
+### SessionFamilyInput
+
+Re-exports [SessionFamilyInput](../../host.md#sessionfamilyinput-1)
+
+***
+
+<a id="sessionfamilypage"></a>
+
+### SessionFamilyPage
+
+Re-exports [SessionFamilyPage](../../host.md#sessionfamilypage-1)
 
 ***
 

@@ -580,6 +580,46 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ## Interfaces
 
+<a id="childhandle"></a>
+
+### ChildHandle
+
+#### Properties
+
+<a id="run"></a>
+
+##### run
+
+> `readonly` **run**: [`HostRun`](#hostrun)\<`unknown`\>
+
+<a id="session"></a>
+
+##### session
+
+> `readonly` **session**: [`SessionHandle`](#sessionhandle)
+
+***
+
+<a id="childspawnoptions"></a>
+
+### ChildSpawnOptions
+
+#### Properties
+
+<a id="commandid"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+<a id="label"></a>
+
+##### label?
+
+> `readonly` `optional` **label?**: `string`
+
+***
+
 <a id="createoptions"></a>
 
 ### CreateOptions
@@ -880,6 +920,20 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `Effect`\<`void`, [`CancelError`](./runtime/namespaces/Runtime.md#cancelerror)\>
 
+###### get
+
+> `readonly` **get**: (`runId`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
+
 ###### inspect
 
 > `readonly` **inspect**: (`runId`) => `Effect`\<[`RuntimeInspection`](./runtime/namespaces/Runtime.md#runtimeinspection), [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror)\>
@@ -1010,6 +1064,34 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 `Effect`\<[`SessionHandle`](#sessionhandle), [`CreateSessionError`](./runtime/namespaces/HostSession.md#createsessionerror) \| [`AgentNotRegistered`](#agentnotregistered) \| [`UnknownAgent`](./runtime/namespaces/Errors.md#unknownagent)\>
 
+###### family
+
+> `readonly` **family**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| [`SessionPageInvalid`](#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| [`SessionPageInvalid`](#sessionpageinvalid)\>
+
 ###### fork
 
 > `readonly` **fork**: (`runId`, `options`) => `Effect`\<[`HostRun`](#hostrun)\<`unknown`\>, `ForkError`\>
@@ -1083,6 +1165,36 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ##### queue
 
 > `readonly` **queue**: readonly `object`[]
+
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
 
 <a id="selection"></a>
 
@@ -1266,7 +1378,7 @@ One deterministic collection of host-owned Agent contributions.
 
 #### Properties
 
-<a id="commandid"></a>
+<a id="commandid-1"></a>
 
 ##### commandId
 
@@ -1290,7 +1402,7 @@ One deterministic collection of host-owned Agent contributions.
 
 > `readonly` `optional` **agent?**: `string`
 
-<a id="commandid-1"></a>
+<a id="commandid-2"></a>
 
 ##### commandId
 
@@ -1298,7 +1410,7 @@ One deterministic collection of host-owned Agent contributions.
 
 ###### Inherited from
 
-[`QueueCommandOptions`](#queuecommandoptions).[`commandId`](#commandid)
+[`QueueCommandOptions`](#queuecommandoptions).[`commandId`](#commandid-1)
 
 <a id="expectedrevision"></a>
 
@@ -1433,6 +1545,40 @@ One deterministic collection of host-owned Agent contributions.
 ###### Returns
 
 `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="retainedsession-1"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`retainedSession`](#retainedsession)
 
 <a id="selection-1"></a>
 
@@ -1796,6 +1942,28 @@ One product-facing event at its exclusive Session cursor.
 
 > `readonly` **id**: [`RunHandle`](./runtime/namespaces/Runtime.md#runhandle)\<`Output`\>\[`"runId"`\]
 
+##### spawn
+
+> `readonly` **spawn**: (`selection`, `prompt`, `options`) => `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### selection
+
+`string`
+
+###### prompt
+
+`Prompt.Prompt` \| `string`
+
+###### options
+
+[`ChildSpawnOptions`](#childspawnoptions)
+
+###### Returns
+
+`Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
 #### Type Parameters
 
 ##### Output
@@ -1843,6 +2011,30 @@ One memory-only preview admitted by the Host against current storage authority.
 ### RunStartOptions
 
 > **RunStartOptions** = `Pick`\<[`StartOptions`](./generalist/namespaces/Agent.md#startoptions), `"idempotencyKey"`\>
+
+***
+
+<a id="sessionfamilyinput"></a>
+
+### SessionFamilyInput
+
+> **SessionFamilyInput** = *typeof* `SessionFamilyInput.Type`
+
+**`Experimental`**
+
+Omit at on the first page; retain it on every continuation.
+
+***
+
+<a id="sessionfamilypage"></a>
+
+### SessionFamilyPage
+
+> **SessionFamilyPage** = *typeof* `SessionFamilyPage.Type`
+
+**`Experimental`**
+
+First-admission membership with at most 64 members per 256-event scan.
 
 ***
 
@@ -1947,6 +2139,30 @@ One product-facing event at its exclusive Session cursor.
 > `const` **PreviewDelivery**: `Schema.TaggedStruct`\<`"PreviewDelivery"`, \{ `authorityAttemptFence`: `Schema.Int`; `event`: `Schema.Union`\<readonly \[`Schema.refine`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: ... \| ...; `delta`: `string`; `offset`: `number`; \}, `...(...)[]`\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \}, `Schema.TaggedStruct`\<`"ModelPreview"`, \{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `changes`: `Schema.NonEmptyArray`\<`Schema.Struct`\<\{ `channel`: ...; `delta`: ...; `offset`: ...; \}\>\>; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `turn`: `Schema.Int`; \}\>\>, `Schema.TaggedStruct`\<`"ModelPreviewCleared"`, \{ `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `runId`: `Schema.String`; \}\>\]\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
 
 One memory-only preview admitted by the Host against current storage authority.
+
+***
+
+<a id="sessionfamilyinput-1"></a>
+
+### SessionFamilyInput
+
+> `const` **SessionFamilyInput**: `Schema.Struct`\<\{ `at`: `Schema.optionalKey`\<`Schema.Int`\>; `before`: `Schema.optionalKey`\<`Schema.Int`\>; `limit`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+Omit at on the first page; retain it on every continuation.
+
+***
+
+<a id="sessionfamilypage-1"></a>
+
+### SessionFamilyPage
+
+> `const` **SessionFamilyPage**: `Schema.Struct`\<\{ `at`: `Schema.Int`; `nextBefore`: `Schema.NullOr`\<`Schema.Int`\>; `rootSessionId`: `Schema.String`; `sessions`: `Schema.$Array`\<`Schema.Struct`\<\{ `depth`: `Schema.Int`; `id`: `Schema.String`; `initialRunId`: `Schema.String`; `parentRunId`: `Schema.NullOr`\<`Schema.String`\>; `parentSessionId`: `Schema.NullOr`\<`Schema.String`\>; `rootSessionId`: `Schema.String`; \}\>\>; \}\>
+
+**`Experimental`**
+
+First-admission membership with at most 64 members per 256-event scan.
 
 ***
 

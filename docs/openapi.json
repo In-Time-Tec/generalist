@@ -20,6 +20,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "retainedSession": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "rootSessionId": { "type": "string" },
+                        "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "initialRunId": { "type": "string" },
+                        "depth": { "type": "integer", "minimum": 0 }
+                      },
+                      "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                      "additionalProperties": false
+                    },
                     "id": { "type": "string", "minLength": 1 },
                     "title": { "type": "string" },
                     "createdAt": { "type": "string" },
@@ -1450,6 +1463,19 @@
                   "items": {
                     "type": "object",
                     "properties": {
+                      "retainedSession": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "rootSessionId": { "type": "string" },
+                          "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                          "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                          "initialRunId": { "type": "string" },
+                          "depth": { "type": "integer", "minimum": 0 }
+                        },
+                        "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                        "additionalProperties": false
+                      },
                       "id": { "type": "string", "minLength": 1 },
                       "title": { "type": "string" },
                       "createdAt": { "type": "string" },
@@ -2890,6 +2916,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "retainedSession": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "rootSessionId": { "type": "string" },
+                        "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "initialRunId": { "type": "string" },
+                        "depth": { "type": "integer", "minimum": 0 }
+                      },
+                      "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                      "additionalProperties": false
+                    },
                     "id": { "type": "string", "minLength": 1 },
                     "title": { "type": "string" },
                     "createdAt": { "type": "string" },
@@ -4308,6 +4347,26 @@
                     "session": {
                       "type": "object",
                       "properties": {
+                        "retainedSession": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "string" },
+                            "rootSessionId": { "type": "string" },
+                            "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                            "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                            "initialRunId": { "type": "string" },
+                            "depth": { "type": "integer", "minimum": 0 }
+                          },
+                          "required": [
+                            "id",
+                            "rootSessionId",
+                            "parentSessionId",
+                            "parentRunId",
+                            "initialRunId",
+                            "depth"
+                          ],
+                          "additionalProperties": false
+                        },
                         "id": { "type": "string", "minLength": 1 },
                         "title": { "type": "string" },
                         "createdAt": { "type": "string" },
@@ -6879,6 +6938,19 @@
                   "items": {
                     "type": "object",
                     "properties": {
+                      "retainedSession": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "rootSessionId": { "type": "string" },
+                          "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                          "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                          "initialRunId": { "type": "string" },
+                          "depth": { "type": "integer", "minimum": 0 }
+                        },
+                        "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                        "additionalProperties": false
+                      },
                       "runId": { "type": "string", "minLength": 1 },
                       "status": {
                         "type": "string",
@@ -7740,6 +7812,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "retainedSession": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "rootSessionId": { "type": "string" },
+                        "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "initialRunId": { "type": "string" },
+                        "depth": { "type": "integer", "minimum": 0 }
+                      },
+                      "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                      "additionalProperties": false
+                    },
                     "runId": { "type": "string", "minLength": 1 },
                     "status": {
                       "type": "string",

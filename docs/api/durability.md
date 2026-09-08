@@ -130,7 +130,7 @@ A canonical durability boundary could not establish a safe result.
 
 ##### reason
 
-> `readonly` **reason**: `"transport"` \| `"limit"` \| `"encoding"` \| `"corruption"` \| `"unsupported-version"` \| `"input-conflict"` \| `"indeterminate"` \| `"configuration"` \| `"crypto"` \| `"contention"`
+> `readonly` **reason**: `"limit"` \| `"transport"` \| `"encoding"` \| `"corruption"` \| `"unsupported-version"` \| `"input-conflict"` \| `"indeterminate"` \| `"configuration"` \| `"crypto"` \| `"contention"`
 
 ###### Inherited from
 

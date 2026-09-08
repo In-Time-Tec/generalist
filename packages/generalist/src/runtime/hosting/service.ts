@@ -449,6 +449,11 @@ const makeRuntimeWith = (
         ),
       activate: store.activate,
       send,
+      getRun: (runId) =>
+        Effect.gen(function* () {
+          const run = yield* store.inspect(runId)
+          return untypedHandle({ store, runId: run.runId, send: sendRun })
+        }),
       spawn: (input: SpawnInput) =>
         Effect.gen(function* () {
           const sessionId =
@@ -492,6 +497,7 @@ const makeRuntimeWith = (
       removeSessionInput: store.removeSessionInput,
       session: store.hostSession,
       sessionSnapshot: store.hostSessionSnapshot,
+      sessionFamily: store.hostSessionFamily,
       sessionHistoryPage: store.hostSessionHistoryPage,
       sessionRunsPage: store.hostSessionRunsPage,
       sessionRunSummary: store.hostSessionRunSummary,

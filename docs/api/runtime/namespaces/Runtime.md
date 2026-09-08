@@ -1156,6 +1156,40 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 [`RunInspection`](./Run.md#runinspection).[`parentRunId`](./Run.md#parentrunid-1)
 
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`RunInspection`](./Run.md#runinspection).[`retainedSession`](./Run.md#retainedsession)
+
 <a id="runid-9"></a>
 
 ##### runId
@@ -1871,6 +1905,22 @@ Start a new Run from one committed journal prefix.
 
 `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, `ForkError`\>
 
+<a id="getrun"></a>
+
+##### getRun
+
+> `readonly` **getRun**: (`runId`) => `Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`RunHandle`](#runhandle)\<`unknown`\>, [`InspectError`](#inspecterror)\>
+
 <a id="history"></a>
 
 ##### history
@@ -2374,6 +2424,40 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionEvents`](./HostSession.md#sessionevents)
+
+<a id="sessionfamily"></a>
+
+##### sessionFamily
+
+> `readonly` **sessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionFamily`](./HostSession.md#sessionfamily)
 
 <a id="sessionhistorypage"></a>
 

@@ -188,6 +188,36 @@
 
 > `readonly` `optional` **parentRunId?**: `string`
 
+<a id="retainedsession"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
 <a id="runid-1"></a>
 
 ##### runId
@@ -325,6 +355,40 @@ Encoded durable Run inspection.
 ###### Inherited from
 
 [`RunInspection`](#runinspection).[`parentRunId`](#parentrunid-1)
+
+<a id="retainedsession-1"></a>
+
+##### retainedSession?
+
+> `readonly` `optional` **retainedSession?**: `object`
+
+###### depth
+
+> `readonly` **depth**: `number`
+
+###### id
+
+> `readonly` **id**: `string`
+
+###### initialRunId
+
+> `readonly` **initialRunId**: `string`
+
+###### parentRunId
+
+> `readonly` **parentRunId**: `string` \| `null`
+
+###### parentSessionId
+
+> `readonly` **parentSessionId**: `string` \| `null`
+
+###### rootSessionId
+
+> `readonly` **rootSessionId**: `string`
+
+###### Inherited from
+
+[`RunInspection`](#runinspection).[`retainedSession`](#retainedsession)
 
 <a id="runid-2"></a>
 
@@ -943,6 +1007,12 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 ##### parentRunId
 
 > `readonly` **parentRunId**: `Schema.optionalKey`\<`Schema.String`\>
+
+<a id="retainedsession-2"></a>
+
+##### retainedSession
+
+> `readonly` **retainedSession**: `Schema.optionalKey`\<`Schema.Struct`\<\{ `depth`: `Schema.Int`; `id`: `Schema.String`; `initialRunId`: `Schema.String`; `parentRunId`: `Schema.NullOr`\<`Schema.String`\>; `parentSessionId`: `Schema.NullOr`\<`Schema.String`\>; `rootSessionId`: `Schema.String`; \}\>\>
 
 <a id="runid-6"></a>
 
