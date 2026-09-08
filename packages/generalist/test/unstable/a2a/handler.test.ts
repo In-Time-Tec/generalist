@@ -152,8 +152,7 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
-    messageSessionInput: () => Effect.die("not used"),
-    controlSession: () => Effect.die("not used"),
+    getTool: () => Effect.die("not used"),
     registerTool: () => Effect.die("not used"),
     startTool: () => Effect.die("not used"),
     sessionFamily: () => Effect.die("not used"),

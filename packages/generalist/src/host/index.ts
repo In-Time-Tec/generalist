@@ -147,7 +147,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
-    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, InspectError>
+    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, import("../runtime/service.js").GetRunError>
     readonly start: <Selected extends Agents[number]>(
       sessionId: string,
       agent: Selected,

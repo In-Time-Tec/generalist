@@ -96,8 +96,7 @@ const rootSend = (
 
 const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
   Runtime.Runtime.of({
-    messageSessionInput: () => unused(),
-    controlSession: () => unused(),
+    getTool: () => unused(),
     registerTool: () => unused(),
     startTool: () => unused(),
     sessionSelection: () => unused(),

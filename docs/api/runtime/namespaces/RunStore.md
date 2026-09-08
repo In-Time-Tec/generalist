@@ -736,7 +736,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### admitRollback
 
-> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 ###### Parameters
 
@@ -746,7 +746,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 <a id="admitsend"></a>
 
@@ -806,7 +806,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### admitSteering
 
-> `readonly` **admitSteering**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+> `readonly` **admitSteering**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 ###### Parameters
 
@@ -816,7 +816,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 <a id="advanceschedule"></a>
 
@@ -1505,7 +1505,7 @@ Create or load the main head for one shared artifact.
 
 ##### fork
 
-> `readonly` **fork**: (`input`) => `Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`SubstitutionInvalid`](./Errors.md#substitutioninvalid) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
+> `readonly` **fork**: (`input`) => `Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`SubstitutionInvalid`](./Errors.md#substitutioninvalid) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 ###### Parameters
 
@@ -1515,7 +1515,7 @@ Create or load the main head for one shared artifact.
 
 ###### Returns
 
-`Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`SubstitutionInvalid`](./Errors.md#substitutioninvalid) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
+`Effect`\<[`RunReceipt`](./Run.md#runreceipt), [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`SubstitutionInvalid`](./Errors.md#substitutioninvalid) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 <a id="forkartifact"></a>
 
@@ -2387,7 +2387,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ##### rewind
 
-> `readonly` **rewind**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
+> `readonly` **rewind**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 ###### Parameters
 
@@ -2397,7 +2397,7 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 ###### Returns
 
-`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunKindUnsupported`](./Errors.md#runkindunsupported) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid)\>
 
 <a id="saveexecution"></a>
 

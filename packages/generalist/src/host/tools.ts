@@ -13,6 +13,13 @@ export type HostToolRun<Output, Failure> = Omit<ToolRunHandle<Output, Failure>, 
 }
 
 export interface Tools {
+  readonly get: <T extends Tool.Any>(
+    tool: T,
+    runId: string,
+  ) => Effect.Effect<
+    HostToolRun<T["successSchema"]["Type"], T["failureSchema"]["Type"]>,
+    import("../runtime/service.js").GetRunError | import("../runtime/errors.js").ExecutableRegistrationInvalid
+  >
   readonly start: <T extends Tool.Any>(
     tool: T,
     input: Tool.Parameters<T>,
@@ -24,6 +31,7 @@ export interface Tools {
 }
 
 export const make = (runtime: Runtime): Tools => ({
+  get: (tool, id) => runtime.getTool(tool, id).pipe(Effect.map(({ runId, ...handle }) => ({ id: runId, ...handle }))),
   start: (tool, input, options) =>
     runtime.startTool(tool, input, options).pipe(Effect.map(({ runId, ...handle }) => ({ id: runId, ...handle }))),
 })

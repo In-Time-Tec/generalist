@@ -35,7 +35,10 @@ const decodeEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event:
   )
 }
 
-const awaitOutput = <Output>(events: Stream.Stream<StartEvent<Output>, EventsError | InvalidOutput>) =>
+const awaitOutput = <Output>(
+  events: Stream.Stream<StartEvent<Output>, EventsError | InvalidOutput>,
+  program?: (result: import("../execution/state.js").ProgramExecutionResult) => Output,
+) =>
   events.pipe(
     Stream.filter(
       (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
@@ -47,7 +50,11 @@ const awaitOutput = <Output>(events: Stream.Stream<StartEvent<Output>, EventsErr
       }
       if (event.value._tag === "RunFailed" || event.value._tag === "RunCancelled") return Effect.fail(event.value)
       if (!("_tag" in event.value.result)) return Effect.succeed(event.value.result.output)
-      return Effect.fail(InvalidOutput.make({ issues: ["Registered Agent completed with a Program result"] }))
+      if (event.value.result._tag === "Program" && program !== undefined)
+        return Effect.succeed(program(event.value.result))
+      return Effect.fail(
+        InvalidOutput.make({ issues: [`Registered Agent completed with a ${event.value.result._tag} result`] }),
+      )
     }),
   )
 
@@ -69,7 +76,7 @@ const makeUntypedHandle = (
   )
   return {
     runId,
-    await: awaitOutput(events),
+    await: awaitOutput(events, (result) => result.value),
     events,
     send: (message: Prompt.Prompt | string, options?: RunSendOptions) => send(runId, message, options),
   }

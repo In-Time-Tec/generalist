@@ -32,7 +32,7 @@ import { normalizeInitialChild, normalizeInitialFanOut } from "../state/start.js
 import { ActiveExecutions } from "../execution/active-executions.js"
 import { make as makeSteeringAdmission, type SteeringReceipt } from "../run/steering.js"
 import { parseCursor } from "../tree/cursor.js"
-import { decodePinned, equals, resolveChild } from "../executable/manifest-internal.js"
+import { decodePinned, equals, resolveChild, requireAgentOrProgram } from "../executable/manifest-internal.js"
 import type { PinnedExecutable } from "../executable/manifest.js"
 import { ExecutableResolver, type Input as ResolverInput } from "../executable/resolver.js"
 import { validate as validateRegistrations, type ExecutableRegistration } from "../executable/registration.js"
@@ -462,6 +462,7 @@ const makeRuntimeWith = (
       getRun: (runId) =>
         Effect.gen(function* () {
           const run = yield* store.inspect(runId)
+          yield* requireAgentOrProgram({ ...run, operation: "getRun" })
           return untypedHandle({ store, runId: run.runId, send: sendRun })
         }),
       spawn: (input: SpawnInput) =>
@@ -704,6 +705,9 @@ const makeRuntimeWith = (
         }),
       rewind: (runId, input) =>
         Effect.gen(function* () {
+          yield* store
+            .inspect(runId)
+            .pipe(Effect.flatMap((run) => requireAgentOrProgram({ ...run, operation: "rewind" })))
           yield* active.interrupt(runId)
           const branchRunId = `run_${digest(["rewind", runId, input.commandId])}`
           yield* store.rewind({ runId, branchRunId, ...input })

@@ -5,6 +5,7 @@ import { RunBusy, RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict
 import type { AdmitSteeringInput, ExecutionClaim, SteeringAdmission } from "../../run/store.js"
 import { appendLifecycle, rejectIfTerminal } from "../append.js"
 import type { RuntimeState, StoredRun } from "../projection.js"
+import { requireAgentOrProgram } from "../../executable/manifest-internal.js"
 import { reconcileRunWaits } from "./control/run-wait.js"
 
 const requireRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
@@ -20,7 +21,13 @@ export const admitSteering: {
     state: RuntimeState,
   ) => Effect.Effect<
     readonly [SteeringAdmission, RuntimeState],
-    RunNotFound | RunTerminal | RunBusy | RuntimeUnavailable | SteeringConflict | InboxFull,
+    | RunNotFound
+    | RunTerminal
+    | RunBusy
+    | RuntimeUnavailable
+    | SteeringConflict
+    | InboxFull
+    | import("../../errors.js").RunKindUnsupported,
     PreparedObservation
   >
   (
@@ -28,12 +35,19 @@ export const admitSteering: {
     input: AdmitSteeringInput,
   ): Effect.Effect<
     readonly [SteeringAdmission, RuntimeState],
-    RunNotFound | RunTerminal | RunBusy | RuntimeUnavailable | SteeringConflict | InboxFull,
+    | RunNotFound
+    | RunTerminal
+    | RunBusy
+    | RuntimeUnavailable
+    | SteeringConflict
+    | InboxFull
+    | import("../../errors.js").RunKindUnsupported,
     PreparedObservation
   >
 } = Function.dual(2, (state: RuntimeState, input: AdmitSteeringInput) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
+    yield* requireAgentOrProgram({ ...run, operation: "steer" })
     const prior = run.steering.find((entry) => entry.idempotencyKey === input.idempotencyKey)
     if (prior !== undefined) {
       if (prior.digest === input.digest) {
@@ -70,7 +84,6 @@ export const admitSteering: {
       })
     }
     const entry = {
-      ...(input.sessionCommandId === undefined ? undefined : { sessionCommandId: input.sessionCommandId }),
       entryId: `steer_${state.nextSteeringCounter}`,
       runId: run.runId,
       sequence: run.steering.length,
