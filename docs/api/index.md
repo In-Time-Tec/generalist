@@ -66,7 +66,6 @@
 - [unstable.providers.openai-account-auth-http](./unstable.providers.openai-account-auth-http.md)
 - [unstable.rivet](./unstable.rivet.md)
 - [unstable.rl-export](./unstable.rl-export/index.md)
-- [unstable.rlm](./unstable.rlm.md)
 - [unstable.runtime.external-child-placement](./unstable.runtime.external-child-placement.md)
 - [unstable.runtime.external-child-reconciliation](./unstable.runtime.external-child-reconciliation.md)
 - [unstable.runtime.external-child-store](./unstable.runtime.external-child-store.md)
