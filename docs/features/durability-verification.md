@@ -12,6 +12,68 @@ Statuses mean:
 - **Missing**: no test was found for the exact normative case.
 - **Deliberately excluded**: the governing clean-v1 scope excludes the behavior; related safety evidence is still named.
 
+## Fixed long-Session cold recovery — September 8, 2026
+
+The local gate in `scripts/durability-cold-recovery.ts` completes 1,000 actual durable Tool executions and retains eight child conversations. It requires an explicitly configured 64 MiB partition with 16 MiB reserved for settlement. **This workload does not fit the default 16 MiB partition.** Pagination is not a partition-growth solution, and these results do not establish an unlimited Session lifetime.
+
+The measured source checkpoint was `7141dd0ff4d263acc30fb960751feae0958ff5cd`, incorporating Tool checkpoint `bac38333f5689cceaaa26ac681ada154c50efda2` and canonical main `df5aa4a3ff47e0a2ab8a5a170f2a3d230eec947c`, including retained child Sessions and bounded history. The machine ran macOS 26.6.2 (25G83), arm64, Bun 1.4.0 (`34cbb9a40`), and Effect 4.0.0-rc.112. The transport was the repository's in-memory ObjectStore simulator over the production durability engine. No model credentials, cloud bucket, or live provider were used.
+
+### Workload and recovery boundary
+
+- One partition contains one coordinating Agent Session, eight child Agent Sessions, and 1,000 sequential sponsored Tool Runs. Each child executes a scripted model response, retaining its prompt and response. Each Tool executes through `RunExecutor` with `replay: "never"`, returns a 256-character ASCII result, and incurs a fixed 1 ms asynchronous handler delay. That delay allows the simulator's host heartbeat timers to run; leases and timeouts are unchanged.
+- One additional Tool executes and suspends with a durable ToolWait after the 1,000 completed Tools. The coordinator and suspended Tool remain pending during reconstruction. Payloads and command indices are fixed, with no random payload distribution; runtime-generated cryptographic identities and observation timestamps still vary.
+- The build scope closes before each of three independently constructed Layers. Each Layer gets new journal, codec, Runtime, model, and registry instances. Only the simulated bucket's canonical object bytes and the caller's expected identities survive. No product projection, session cache, or executor result cache is provided to recovery.
+- Cold timing covers `Layer.build`, including canonical reconstruction. A separate audit verifies all 1,000 terminal statuses and incurred operation records, pages the complete retained family, reads each child conversation, and verifies the pending wait. Handler counts remain exactly 1,001 across all three audits. Afterwards, a fresh activated Layer cancels the pending Tool and coordinator.
+- The harness never deletes journal slots, snapshots, or referenced payloads. Closing a test fixture's process is not a production retention policy. This fixture tests fresh worker Layers, not object-service restart, remote network behavior, or a fresh operating-system process.
+
+### Measured baseline and local regression bounds
+
+The complete measured invocation took 430.5 seconds. These are three sequential cold samples, not a statistically qualified p95 or p99.
+
+| Metric                                      | Measured baseline                 | Current local gate             |
+| ------------------------------------------- | --------------------------------- | ------------------------------ |
+| Cold construction                           | 1,129.02 / 1,171.54 / 1,288.26 ms | At most 5,000 ms per sample    |
+| Cold object reads                           | 69 per sample                     | At most 256                    |
+| Cold object lists                           | 11 per sample                     | At most 32                     |
+| Cold returned bytes                         | 25,069,790 per sample             | At most 64 MiB                 |
+| Cold object writes                          | 0                                 | Exactly 0                      |
+| Process RSS sampled after cold construction | 3.74 / 4.30 / 4.31 GB, decimal    | At most 6 GiB at that boundary |
+| Complete outcome/family/wait audit          | 71.85 / 75.66 / 76.22 seconds     | At most 120 seconds per sample |
+
+These thresholds are local regression guards selected from this fixed workload's baseline, not production SLOs. RSS includes the simulator's bucket, retained snapshots, runtime allocations, and the process's GC history; it is not isolated worker memory, a measured allocation delta, or a continuously sampled peak. The report also emits RSS and heap before reconstruction and every 100 completed Tools.
+
+Building the first 1,000 Tools made 50,560 reads, 104,957 lists, and 9,348 create attempts, returning 214,062,640,737 bytes and attempting 956,300,361 write bytes. These totals include the retained-child setup and host maintenance. Repeated canonical validation reads count again even when the underlying simulator supplies memory-resident bytes. They expose a substantial object-operation cost; they are not network throughput, latency, AWS/R2 cost, or deployed capacity measurements. Cold reconstruction is much cheaper than repeatedly auditing every Run through separate canonical reads.
+
+Before changing the engine, the initial Tool checkpoint `db6abb8fbdf039dc5a29e0a92983ca6c3484c73d` reached 809 completed Tools before the next admission exceeded the default 16 MiB state-plus-receipt limit. After the Tool allocation fix and adding retained children, a run with the default reserve completed 480 Tools before the next Tool reported a failed status; that preliminary log did not record the nested failure, so it establishes a failed gate rather than a precise capacity measurement. The explicit 64 MiB configuration above passed; the default was not enlarged and no compaction or canonical segmentation was introduced.
+
+### Admission headroom and its limits
+
+The journal checks the complete post-transition canonical state **including the new immutable command receipt**, under the same conditional-create ordering as admission. `admissionReserveBytes` defaults to one quarter of `maxStateBytes`. Admission and new operation-dispatch paths cannot consume that region; completion, cancellation, recovery, and exact command receipt reconciliation retain access to the full hard cap. A failed admission does not publish its state transition, and retrying an already committed command still returns its original receipt.
+
+`packages/generalist/test/durability/internal/runtime-capacity.test.ts` uses a 128 KiB partition and 64 KiB reserve. It fills admission capacity with real RunStore admissions while an incurred operation remains running, then records an 8 KiB external receipt, refuses a new operation after settlement consumes the reserve, completes the incurred Run, and cancels a second Run. A fresh Layer verifies the outcome, terminal statuses, and unchanged admission/cancellation receipts. Invalid or zero reserve configuration is rejected.
+
+This is a finite shared reserve, **not a per-obligation reservation ledger**. Unbounded output, arbitrary numbers of outstanding Runs, other state writes, or indefinite heartbeat/receipt growth can still consume it. The measured acceptance envelope is the workload above plus the separately tested bounded settlement case; neither proves that every admitted workload can always settle. Applications must bound pending work and output, stop admitting work before partition exhaustion, and provision a fresh partition for new independent work. Do not split atomically related work or delete canonical history to reclaim room. Exceeding these bounds requires new qualification, not merely a larger UI page size.
+
+### Reproduction and release scope
+
+Install the committed lockfile with Bun 1.4.0, then run from the repository root. On the shared Mac, serialize this workload against full suites with the same advisory lock:
+
+```bash
+python3 -u - <<'PY'
+import fcntl
+from pathlib import Path
+import subprocess
+
+path = Path.home() / ".capy/work/generalist-full-gates.lock"
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("a") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    raise SystemExit(subprocess.run(["bun", "scripts/durability-cold-recovery.ts"]).returncode)
+PY
+```
+
+The fixed workload is an explicit, opt-in long-running gate, not an extra thousand-Tool workload in every unit-test invocation. The focused capacity regression runs in the normal test suite. This change's simulator evidence is separate from local MinIO/Miniflare transport qualification and from release acceptance. Release qualification still requires full check/test/package results and detached-commit artifacts under the release workflow; AWS and deployed R2 remain untested here.
+
 ## Independent model bounds
 
 `independent object Runtime domain model` in `packages/generalist/test/durability/internal/domain-model-suite.ts` uses a small business model with counters, run states, active conversation entries, and an external receipt. Expected values come only from authored actions. Production reducers, persisted snapshots, canonical state hashes, and internal digests do not generate the oracle's expected state. The production digest function is used only to form a valid model-response command at the real API boundary.

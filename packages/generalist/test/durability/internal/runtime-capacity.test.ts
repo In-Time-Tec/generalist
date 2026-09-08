@@ -10,6 +10,7 @@ import { RunStore } from "../../../src/runtime/run/store.js"
 import { make as makeSimulator } from "../../../src/testing/durability/index.js"
 import { completedResult } from "../../runtime/execution/fixtures.js"
 import { provideScoped } from "../../runtime/execution/scoped-provide.js"
+import { make as makeCapacity } from "../../../src/durability/internal/runtime-capacity.js"
 
 const executable = makeTest("capacity", "1")
 const address = Address.make("agent:capacity")
@@ -80,6 +81,22 @@ it.effect("reserves canonical settlement and cancellation bytes when admission i
           operationId: operation.operationId,
           outcome: { _tag: "Succeeded", value: { amount: 5, receipt: "r".repeat(8192) } },
         })
+        expect(
+          yield* store
+            .recordOperation({
+              ...claim,
+              operationKey: "must-not-dispatch",
+              kind: "tool",
+              inputDigest: "new-input",
+              input: {},
+              replayPolicy: "never",
+              attempt: 1,
+            })
+            .pipe(Effect.flip),
+        ).toMatchObject({ reason: "limit" })
+        expect(
+          yield* store.getOperationByKey({ runId: first.runId, operationKey: "must-not-dispatch" }),
+        ).toBeUndefined()
         yield* store.complete({ ...claim, commandId: "complete", result: completedResult("done") })
         const cancellation = yield* store.cancel({ runId: cancelled.runId, commandId: "cancel", reason: "capacity" })
         return { first, cancelled, settled, cancellation }
@@ -101,5 +118,20 @@ it.effect("reserves canonical settlement and cancellation bytes when admission i
         expect(yield* store.admitSend(admission("after-recovery")).pipe(Effect.flip)).toMatchObject({ reason: "limit" })
       }),
     )
+  }),
+)
+
+it.effect("rejects invalid reserved-byte configuration instead of disabling admission protection", () =>
+  Effect.gen(function* () {
+    for (const admissionReserveBytes of [0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, 1024]) {
+      expect(yield* makeCapacity({ maxStateBytes: 1024, admissionReserveBytes }).pipe(Effect.flip)).toMatchObject({
+        reason: "configuration",
+      })
+    }
+    const reserve = yield* makeCapacity({})
+    expect(reserve("admitStart")).toBe(4 * 1024 * 1024)
+    expect(reserve("startOperation")).toBe(4 * 1024 * 1024)
+    expect(reserve("completeOperation")).toBe(0)
+    expect(reserve("cancel")).toBe(0)
   }),
 )

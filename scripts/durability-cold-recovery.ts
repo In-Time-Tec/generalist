@@ -26,6 +26,14 @@ const workload = {
   admissionReserveBytes: 16 * 1024 * 1024,
 } as const
 const agent = Agent.make({ name: "coding-reviewer", children: ["coding-reviewer"] })
+const gates = {
+  coldMillis: 5000,
+  coldReads: 256,
+  coldLists: 32,
+  coldReadBytes: 64 * 1024 * 1024,
+  sampledProcessRss: 6 * 1024 * 1024 * 1024,
+  auditMillis: 120000,
+} as const
 const pinned = makeToolManifest({
   name: "recovery-check",
   tool: makeCapability("recovery-check"),
@@ -126,7 +134,10 @@ const program = Effect.gen(function* () {
     phase: "start",
     scope: "local object simulator; not provider qualification",
     workload,
+    gates,
     bun: process.versions.bun,
+    platform: process.platform,
+    architecture: process.arch,
   })
   yield* within(
     Effect.gen(function* () {
@@ -200,20 +211,31 @@ const program = Effect.gen(function* () {
         const before = { ...counts }
         const memoryBefore = process.memoryUsage()
         const [elapsed, context] = yield* Layer.build(fresh()).pipe(Effect.timed)
+        const memoryAfter = process.memoryUsage()
+        const coldRequests = {
+          read: counts.read - before.read,
+          create: counts.create - before.create,
+          list: counts.list - before.list,
+          readBytes: counts.readBytes - before.readBytes,
+          attemptedWriteBytes: counts.attemptedWriteBytes - before.attemptedWriteBytes,
+        }
         yield* Console.log({
           phase: "cold-construction",
           sample,
           millis: Duration.toMillis(elapsed),
           memoryBefore,
-          memoryAfter: process.memoryUsage(),
-          requests: {
-            read: counts.read - before.read,
-            create: counts.create - before.create,
-            list: counts.list - before.list,
-            readBytes: counts.readBytes - before.readBytes,
-            attemptedWriteBytes: counts.attemptedWriteBytes - before.attemptedWriteBytes,
-          },
+          memoryAfter,
+          requests: coldRequests,
         })
+        if (
+          Duration.toMillis(elapsed) > gates.coldMillis ||
+          coldRequests.read > gates.coldReads ||
+          coldRequests.list > gates.coldLists ||
+          coldRequests.readBytes > gates.coldReadBytes ||
+          coldRequests.create !== 0 ||
+          memoryAfter.rss > gates.sampledProcessRss
+        )
+          return yield* Effect.die("Cold recovery exceeded the fixed local regression bounds")
         const [auditElapsed] = yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -252,6 +274,8 @@ const program = Effect.gen(function* () {
           millis: Duration.toMillis(auditElapsed),
           outcomes: ids.length,
         })
+        if (Duration.toMillis(auditElapsed) > gates.auditMillis)
+          return yield* Effect.die("Outcome audit exceeded the fixed local regression bound")
       }),
     )
   }
