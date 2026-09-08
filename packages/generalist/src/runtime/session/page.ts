@@ -1,5 +1,4 @@
 import { Schema } from "effect"
-import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Cursor } from "../cursor.js"
 import { RunStatus } from "../run.js"
 import { Request as ApprovalRequest } from "../operation/approval.js"
@@ -65,11 +64,4 @@ export const SessionRunsPage: Schema.Codec<SessionRunsPage, unknown> = Schema.St
   nextBefore: Schema.NullOr(Cursor),
 })
 
-/** A page selector does not name retained evidence in the authorized Session. @experimental */
-export class SessionPageInvalid extends ActionableTaggedError<SessionPageInvalid>()(
-  "generalist/host/SessionPageInvalid",
-  {
-    sessionId: Schema.String,
-    hint: errorHint("Use the leaf or continuation returned by this Session's snapshot or previous page."),
-  },
-) {}
+export { SessionPageInvalid } from "./page-error.js"

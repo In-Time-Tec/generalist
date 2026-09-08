@@ -28,7 +28,19 @@ const hosted = Effect.gen(function* () {
 
 Profile references are pinned in the executable manifest. Self-reference and mutual recursion use names, not JavaScript object cycles; each admission still checks the parent's declared selections and pinned depth bound. Registering a profile does not let every other Agent delegate to it. Direct and grouped profile resolution rejects child tool names absent from the parent. Program child admission also requires the requested executable entries and profile bindings to remain within the parent's pinned closure.
 
-## Family bounds
+## Retained child conversations
+
+`HostRun.spawn(selection, prompt, { commandId, label? })` returns `{ session, run }` after admission, before execution completes. The child Session and initial Run are committed together. Reuse the same command ID and immutable input after an ambiguous response; `host.runs.get(parentRunId)` recovers a parent handle on a fresh Host, and an exact retry returns the same child Session and Run. Changed input under that command ID fails with `IdempotencyConflict`.
+
+`session.inspect` and Run inspections expose `retainedSession`: the Session identity, original parent Run and Session, root Session, initial Run, and depth. These fields are projected from canonical Session family records rather than maintained in another registry. The child Session also retains its pinned executable selection. A completed Run remains terminal; retaining its conversation does not enable sponsored follow-up execution or make terminal steering valid.
+
+`host.sessions.family(sessionId, { limit: 64 })` returns a bounded page of compact retained Session metadata. The first page pins `at` to the root Session's current event cursor. Continue with `{ at, before: nextBefore, limit: 64 }` until `nextBefore` is `null`, including when a page is empty. Each call scans at most 256 root Session events and returns at most 64 members, so families larger than a page remain inspectable. Membership comes from each Session's first admitted Run, not another family registry; later admissions cannot enter an older cursor-pinned traversal. Pages are chronological within each backward scan. Load a Session by its `id` to inspect its pinned executable selection.
+
+The Host is a trusted interface to its configured Runtime namespace; an application must authorize the requested Session before exposing family reads to a remote user. Inside an execution, `AgentChildren.listDirect`, `inspect`, and `join` expose retained Session metadata only for children belonging to the ambient parent Run; another parent cannot adopt a child by knowing its ID.
+
+Child Session snapshots return recent Run summaries and a bounded conversation tail; use the Session history and Run pages to load older retained evidence. Child lifecycle events have their own Session replay cursor and remain visible in the original root Session's stream. A snapshot cursor is exclusive: resume after it to avoid redispatching historical execution.
+
+## Family admission limits
 
 The root-pinned policy contains `maxDepth`, `maxSessions`, and separate `concurrency.agents` and `concurrency.tools` fields. Root depth is zero. Direct, grouped, and Program child admission reserve distinct retained Session IDs within the canonical Session family. The existing RuntimeSession records fixed parent/root Session identities, depth, policy, and spending grant; retained Run and child-Session references support family traversal. Settling or cancelling a child does not refund its retained Session reservation, and a queued root continuation does not start a new family. Retrying an accepted admission does not reserve another Session, and a rejected group leaves no partial children.
 
