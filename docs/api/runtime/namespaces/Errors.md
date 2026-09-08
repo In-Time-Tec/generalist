@@ -2206,6 +2206,80 @@ A reject-policy message arrived while its target Run was executing.
 
 ***
 
+<a id="runkindunsupported"></a>
+
+### RunKindUnsupported
+
+#### Extends
+
+- `RunKindUnsupported_base`
+
+#### Constructors
+
+<a id="constructor-31"></a>
+
+##### Constructor
+
+> **new RunKindUnsupported**(...`args`): [`RunKindUnsupported`](#runkindunsupported)
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`RunKindUnsupported`](#runkindunsupported)
+
+###### Inherited from
+
+`RunKindUnsupported_base.constructor`
+
+#### Properties
+
+<a id="hint-31"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+###### Inherited from
+
+`RunKindUnsupported_base.hint`
+
+<a id="kind"></a>
+
+##### kind
+
+> `readonly` **kind**: `"Program"` \| `"Tool"` \| `"Agent"`
+
+###### Inherited from
+
+`RunKindUnsupported_base.kind`
+
+<a id="operation"></a>
+
+##### operation
+
+> `readonly` **operation**: `string`
+
+###### Inherited from
+
+`RunKindUnsupported_base.operation`
+
+<a id="runid-14"></a>
+
+##### runId
+
+> `readonly` **runId**: `string`
+
+###### Inherited from
+
+`RunKindUnsupported_base.runId`
+
+***
+
 <a id="runnotfound"></a>
 
 ### RunNotFound
@@ -2216,7 +2290,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-31"></a>
+<a id="constructor-32"></a>
 
 ##### Constructor
 
@@ -2238,7 +2312,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-31"></a>
+<a id="hint-32"></a>
 
 ##### hint
 
@@ -2248,7 +2322,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `RunNotFound_base.hint`
 
-<a id="runid-14"></a>
+<a id="runid-15"></a>
 
 ##### runId
 
@@ -2270,7 +2344,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-32"></a>
+<a id="constructor-33"></a>
 
 ##### Constructor
 
@@ -2292,7 +2366,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-32"></a>
+<a id="hint-33"></a>
 
 ##### hint
 
@@ -2302,7 +2376,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `RunTerminal_base.hint`
 
-<a id="runid-15"></a>
+<a id="runid-16"></a>
 
 ##### runId
 
@@ -2334,7 +2408,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-33"></a>
+<a id="constructor-34"></a>
 
 ##### Constructor
 
@@ -2356,7 +2430,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-33"></a>
+<a id="hint-34"></a>
 
 ##### hint
 
@@ -2388,7 +2462,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-34"></a>
+<a id="constructor-35"></a>
 
 ##### Constructor
 
@@ -2420,7 +2494,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryCorrupt_base.entryId`
 
-<a id="hint-34"></a>
+<a id="hint-35"></a>
 
 ##### hint
 
@@ -2462,7 +2536,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-35"></a>
+<a id="constructor-36"></a>
 
 ##### Constructor
 
@@ -2494,7 +2568,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SessionEntryNotFound_base.entryId`
 
-<a id="hint-35"></a>
+<a id="hint-36"></a>
 
 ##### hint
 
@@ -2526,7 +2600,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-36"></a>
+<a id="constructor-37"></a>
 
 ##### Constructor
 
@@ -2558,7 +2632,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `StaleClaim_base.attemptFence`
 
-<a id="hint-36"></a>
+<a id="hint-37"></a>
 
 ##### hint
 
@@ -2568,7 +2642,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `StaleClaim_base.hint`
 
-<a id="runid-16"></a>
+<a id="runid-17"></a>
 
 ##### runId
 
@@ -2600,7 +2674,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-37"></a>
+<a id="constructor-38"></a>
 
 ##### Constructor
 
@@ -2622,7 +2696,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-37"></a>
+<a id="hint-38"></a>
 
 ##### hint
 
@@ -2654,7 +2728,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-38"></a>
+<a id="constructor-39"></a>
 
 ##### Constructor
 
@@ -2676,7 +2750,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-38"></a>
+<a id="hint-39"></a>
 
 ##### hint
 
@@ -2696,7 +2770,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SteeringConflict_base.idempotencyKey`
 
-<a id="runid-17"></a>
+<a id="runid-18"></a>
 
 ##### runId
 
@@ -2718,7 +2792,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Constructors
 
-<a id="constructor-39"></a>
+<a id="constructor-40"></a>
 
 ##### Constructor
 
@@ -2740,7 +2814,7 @@ A reject-policy message arrived while its target Run was executing.
 
 #### Properties
 
-<a id="hint-39"></a>
+<a id="hint-40"></a>
 
 ##### hint
 
@@ -2760,7 +2834,7 @@ A reject-policy message arrived while its target Run was executing.
 
 `SubscriberLagged_base.lastDeliveredSequence`
 
-<a id="runid-18"></a>
+<a id="runid-19"></a>
 
 ##### runId
 
@@ -2784,7 +2858,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Constructors
 
-<a id="constructor-40"></a>
+<a id="constructor-41"></a>
 
 ##### Constructor
 
@@ -2806,7 +2880,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Properties
 
-<a id="hint-40"></a>
+<a id="hint-41"></a>
 
 ##### hint
 
@@ -2826,7 +2900,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 `SubstitutionInvalid_base.operationId`
 
-<a id="runid-19"></a>
+<a id="runid-20"></a>
 
 ##### runId
 
@@ -2848,7 +2922,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 #### Constructors
 
-<a id="constructor-41"></a>
+<a id="constructor-42"></a>
 
 ##### Constructor
 
@@ -2890,7 +2964,7 @@ A counterfactual substitution does not name a completed operation in the selecte
 
 `TreeCursorExpired_base.earliestCursor`
 
-<a id="hint-41"></a>
+<a id="hint-42"></a>
 
 ##### hint
 
@@ -2924,7 +2998,7 @@ The cursor names a position that has not committed.
 
 #### Constructors
 
-<a id="constructor-42"></a>
+<a id="constructor-43"></a>
 
 ##### Constructor
 
@@ -2956,7 +3030,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorFuture_base.cursor`
 
-<a id="hint-42"></a>
+<a id="hint-43"></a>
 
 ##### hint
 
@@ -2998,7 +3072,7 @@ The cursor names a position that has not committed.
 
 #### Constructors
 
-<a id="constructor-43"></a>
+<a id="constructor-44"></a>
 
 ##### Constructor
 
@@ -3030,7 +3104,7 @@ The cursor names a position that has not committed.
 
 `TreeCursorInvalid_base.cursor`
 
-<a id="hint-43"></a>
+<a id="hint-44"></a>
 
 ##### hint
 
@@ -3074,7 +3148,7 @@ The cursor belongs to a different root Run.
 
 #### Constructors
 
-<a id="constructor-44"></a>
+<a id="constructor-45"></a>
 
 ##### Constructor
 
@@ -3116,7 +3190,7 @@ The cursor belongs to a different root Run.
 
 `TreeCursorRootMismatch_base.cursorRootRunId`
 
-<a id="hint-44"></a>
+<a id="hint-45"></a>
 
 ##### hint
 
@@ -3148,7 +3222,7 @@ The cursor belongs to a different root Run.
 
 #### Constructors
 
-<a id="constructor-45"></a>
+<a id="constructor-46"></a>
 
 ##### Constructor
 
@@ -3170,7 +3244,7 @@ The cursor belongs to a different root Run.
 
 #### Properties
 
-<a id="hint-45"></a>
+<a id="hint-46"></a>
 
 ##### hint
 
@@ -3204,7 +3278,7 @@ A replay request falls outside the fixed page-size contract.
 
 #### Constructors
 
-<a id="constructor-46"></a>
+<a id="constructor-47"></a>
 
 ##### Constructor
 
@@ -3226,7 +3300,7 @@ A replay request falls outside the fixed page-size contract.
 
 #### Properties
 
-<a id="hint-46"></a>
+<a id="hint-47"></a>
 
 ##### hint
 
@@ -3280,7 +3354,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Constructors
 
-<a id="constructor-47"></a>
+<a id="constructor-48"></a>
 
 ##### Constructor
 
@@ -3302,7 +3376,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
-<a id="hint-47"></a>
+<a id="hint-48"></a>
 
 ##### hint
 
@@ -3322,7 +3396,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 `UnknownAgent_base.name`
 
-<a id="runid-20"></a>
+<a id="runid-21"></a>
 
 ##### runId
 
@@ -3344,7 +3418,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Constructors
 
-<a id="constructor-48"></a>
+<a id="constructor-49"></a>
 
 ##### Constructor
 
@@ -3366,7 +3440,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 #### Properties
 
-<a id="hint-48"></a>
+<a id="hint-49"></a>
 
 ##### hint
 
@@ -3376,7 +3450,7 @@ A durable Run names an Agent that this Runtime process has not registered.
 
 `WaitNotOpen_base.hint`
 
-<a id="runid-21"></a>
+<a id="runid-22"></a>
 
 ##### runId
 

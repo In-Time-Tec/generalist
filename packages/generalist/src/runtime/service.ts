@@ -440,6 +440,7 @@ export type SpawnError =
   | ChildLimitExceeded
   | import("../core/durable/run-budget.js").Exhausted
 export type SendMessageError =
+  | import("./errors.js").RunKindUnsupported
   | AddressNotFound
   | AddressInvalid
   | NotInFamily
@@ -493,6 +494,7 @@ export type RespondApprovalError =
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure
 export type CancelError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type RunSendError =
+  | import("./errors.js").RunKindUnsupported
   | RunNotFound
   | RunTerminal
   | RunBusy
@@ -516,8 +518,10 @@ export interface SendFunction {
   (input: SendInput): Effect.Effect<RunReceipt, SendError>
 }
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable | DurabilityFailure
+export type GetRunError = InspectError | import("./errors.js").RunKindUnsupported
 export type InspectError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type ForkError =
+  | import("./errors.js").RunKindUnsupported
   | RunNotFound
   | ForkSequenceInvalid
   | NoSnapshot
@@ -527,6 +531,7 @@ export type ForkError =
   | RuntimeUnavailable
   | DurabilityFailure
 export type RewindError =
+  | import("./errors.js").RunKindUnsupported
   | RunNotFound
   | ForkSequenceInvalid
   | NoSnapshot
@@ -584,6 +589,13 @@ export interface OperatorService {
 }
 
 export interface Service extends RuntimeHostSessions {
+  readonly getTool: <T extends Tool.Any>(
+    tool: T,
+    runId: string,
+  ) => Effect.Effect<
+    ToolRunHandle<T["successSchema"]["Type"], T["failureSchema"]["Type"]>,
+    GetRunError | ExecutableRegistrationInvalid
+  >
   readonly registerTool: <T extends Tool.Any>(
     tool: T,
   ) => Effect.Effect<void, ExecutableRegistrationInvalid, import("./executable/registered-tool.js").ToolServices<T>>
@@ -650,7 +662,7 @@ export interface Service extends RuntimeHostSessions {
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>
   readonly send: SendFunction
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
-  readonly getRun: (runId: string) => Effect.Effect<RunHandle<unknown>, InspectError>
+  readonly getRun: (runId: string) => Effect.Effect<RunHandle<unknown>, GetRunError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
   /** Observe the memory-only live preview lane for one Run.
    * Frames contain bounded UTF-16 appends with per-attempt sequences and per-channel offsets.
