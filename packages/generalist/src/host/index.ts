@@ -361,9 +361,9 @@ const create = <
       attachments,
       artifacts,
       sessions: {
-        family: runtime.sessionFamily,
         ...makeSessionReads(runtime),
         list: () => runtime.listSessions,
+        family: runtime.sessionFamily,
         create: createSessionHandle({ runtime, registeredByName }),
         get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),

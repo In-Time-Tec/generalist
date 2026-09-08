@@ -466,6 +466,12 @@ RunStore public contract and canonical object-backed layer.
 
 > `readonly` **runId**: `string`
 
+<a id="sessioncommandid"></a>
+
+##### sessionCommandId?
+
+> `readonly` `optional` **sessionCommandId?**: `string`
+
 ***
 
 <a id="recordoperationinput"></a>
@@ -1184,6 +1190,32 @@ Session writer bound to one storage-issued execution claim.
 
 `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
 
+<a id="controlsession"></a>
+
+##### controlSession
+
+> `readonly` **controlSession**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+###### Parameters
+
+###### input
+
+###### action
+
+`"stop"` \| `"resume"` \| `"close"`
+
+###### commandId
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
 <a id="createhostsession"></a>
 
 ##### createHostSession
@@ -1663,32 +1695,6 @@ Replay then follow one product-facing Session's authoritative event cursor.
 
 `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
 
-<a id="hostsessionhistorypage"></a>
-
-##### hostSessionHistoryPage
-
-> `readonly` **hostSessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
-
-###### Parameters
-
-###### sessionId
-
-`string`
-
-###### input
-
-###### leafId
-
-`string` \| `null`
-
-###### limit
-
-`number`
-
-###### Returns
-
-`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
-
 <a id="hostsessionfamily"></a>
 
 ##### hostSessionFamily
@@ -1718,6 +1724,32 @@ Replay then follow one product-facing Session's authoritative event cursor.
 ###### Returns
 
 `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+<a id="hostsessionhistorypage"></a>
+
+##### hostSessionHistoryPage
+
+> `readonly` **hostSessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### leafId
+
+`string` \| `null`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
 
 <a id="hostsessionruns"></a>
 
@@ -1936,6 +1968,36 @@ Parent, direct children, and siblings under one parent, from durable links only.
 ###### Returns
 
 `Effect`\<\{ `activeSlots`: `number`; `agentRuns`: `number`; `budget`: \{ `agentRuns`: `number`; `concurrency`: `number`; `logBytes`: `number`; `outputBytes`: `number`; `tokens`: `number`; `toolCalls`: `number`; `wallClockMillis`: `number`; \}; `concurrencyRoot?`: `string`; `deadlineMillis`: `number`; `logBytes`: `number`; `programPin`: `string`; `runId`: `string`; `tokens`: `number`; `toolCalls`: `number`; \} \| `undefined`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`RunNotFound`](./Errors.md#runnotfound)\>
+
+<a id="messagesessioninput"></a>
+
+##### messageSessionInput
+
+> `readonly` **messageSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### from
+
+\{ `runId`: `string`; \} \| \{ `user`: `string`; \} \| \{ `system`: `true`; \}
+
+###### prompt
+
+`Prompt`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 <a id="operationcancellations"></a>
 

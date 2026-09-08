@@ -178,6 +178,32 @@ Runtime operations that persist and observe product-facing Sessions.
 
 #### Properties
 
+<a id="controlsession"></a>
+
+##### controlSession
+
+> `readonly` **controlSession**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+###### Parameters
+
+###### input
+
+###### action
+
+`"stop"` \| `"resume"` \| `"close"`
+
+###### commandId
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
 <a id="createsession"></a>
 
 ##### createSession
@@ -199,6 +225,22 @@ Runtime operations that persist and observe product-facing Sessions.
 ##### listSessions
 
 > `readonly` **listSessions**: `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
+
+<a id="messagesessioninput"></a>
+
+##### messageSessionInput
+
+> `readonly` **messageSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`SessionError`](#sessionerror) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict), [`SessionSender`](../index.md#sessionsender)\>
+
+###### Parameters
+
+###### input
+
+`Omit`\<`MessageInput`, `"from"`\>
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`SessionError`](#sessionerror) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict), [`SessionSender`](../index.md#sessionsender)\>
 
 <a id="removesessioninput"></a>
 
@@ -262,32 +304,6 @@ Runtime operations that persist and observe product-facing Sessions.
 
 `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
 
-<a id="sessionhistorypage"></a>
-
-##### sessionHistoryPage
-
-> `readonly` **sessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](#sessionpageerror)\>
-
-###### Parameters
-
-###### sessionId
-
-`string`
-
-###### input
-
-###### leafId
-
-`string` \| `null`
-
-###### limit
-
-`number`
-
-###### Returns
-
-`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](#sessionpageerror)\>
-
 <a id="sessionfamily"></a>
 
 ##### sessionFamily
@@ -317,6 +333,32 @@ Runtime operations that persist and observe product-facing Sessions.
 ###### Returns
 
 `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+<a id="sessionhistorypage"></a>
+
+##### sessionHistoryPage
+
+> `readonly` **sessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### leafId
+
+`string` \| `null`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](#sessionpageerror)\>
 
 <a id="sessionruns"></a>
 

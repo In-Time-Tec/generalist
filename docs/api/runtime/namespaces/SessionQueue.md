@@ -84,6 +84,14 @@ A queue mutation lost a revision race or exceeded a supported bound.
 
 ## Type Aliases
 
+<a id="controlinput"></a>
+
+### ControlInput
+
+> **ControlInput** = *typeof* `ControlInput.Type`
+
+***
+
 <a id="pendinginput"></a>
 
 ### PendingInput
@@ -166,11 +174,19 @@ The immutable executable and settings selected for conversational input.
 
 ## Variables
 
+<a id="controlinput-1"></a>
+
+### ControlInput
+
+> `const` **ControlInput**: `Schema.Struct`\<\{ `action`: `Schema.Literals`\<readonly \[`"stop"`, `"close"`, `"resume"`\]\>; `commandId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
+
+***
+
 <a id="pendinginput-1"></a>
 
 ### PendingInput
 
-> `const` **PendingInput**: `Schema.Struct`\<\{ `id`: `Schema.String`; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `revision`: `Schema.Int`; `selection`: `Schema.Struct`\<\{ `budget`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `executableManifest`: `Schema.Codec`\<[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest), [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest.md#executablemanifestencoded), `never`, `never`\>; `executableRef`: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>; `registrations`: `Schema.$Array`\<`Schema.Struct`\<\{ `codec`: `Schema.String`; `payload`: `Schema.Unknown`; `pin`: `Schema.String`; `version`: `Schema.String`; \}\>\>; `treePolicy`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `concurrency`: `Schema.Struct`\<\{ `agents`: `Schema.Int`; `tools`: `Schema.Int`; \}\>; `maxDepth`: `Schema.Int`; `maxSessions`: `Schema.Int`; \}\>\>; \}\>; \}\>
+> `const` **PendingInput**: `Schema.Struct`\<\{ `from`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[`Schema.Struct`\<\{ `runId`: `Schema.String`; \}\>, `Schema.Struct`\<\{ `user`: `Schema.String`; \}\>, `Schema.Struct`\<\{ `system`: `Schema.Literal`\<`true`\>; \}\>\]\>\>; `id`: `Schema.String`; `prompt`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `revision`: `Schema.Int`; `selection`: `Schema.Struct`\<\{ `budget`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `children`: `Schema.optionalKey`\<`Schema.Finite`\>; `duration`: `Schema.optionalKey`\<`Schema.Finite`\>; `tokens`: `Schema.optionalKey`\<`Schema.Finite`\>; `toolCalls`: `Schema.optionalKey`\<`Schema.Finite`\>; `usd`: `Schema.optionalKey`\<`Schema.Finite`\>; \}\>\>; `executableManifest`: `Schema.Codec`\<[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest), [`ExecutableManifestEncoded`](../../generalist/namespaces/ExecutableManifest.md#executablemanifestencoded), `never`, `never`\>; `executableRef`: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>; `registrations`: `Schema.$Array`\<`Schema.Struct`\<\{ `codec`: `Schema.String`; `payload`: `Schema.Unknown`; `pin`: `Schema.String`; `version`: `Schema.String`; \}\>\>; `treePolicy`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `concurrency`: `Schema.Struct`\<\{ `agents`: `Schema.Int`; `tools`: `Schema.Int`; \}\>; `maxDepth`: `Schema.Int`; `maxSessions`: `Schema.Int`; \}\>\>; \}\>; \}\>
 
 **`Experimental`**
 

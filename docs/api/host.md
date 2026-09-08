@@ -1160,6 +1160,12 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 > `readonly` **id**: `string`
 
+<a id="lifecycle"></a>
+
+##### lifecycle?
+
+> `readonly` `optional` **lifecycle?**: `"stopped"` \| `"closed"`
+
 <a id="queue"></a>
 
 ##### queue
@@ -1269,6 +1275,12 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ###### treePolicy.maxSessions
 
 > `readonly` **maxSessions**: `number`
+
+<a id="sponsorrunid"></a>
+
+##### sponsorRunId?
+
+> `readonly` `optional` **sponsorRunId?**: `string`
 
 <a id="title"></a>
 
@@ -1466,6 +1478,22 @@ One deterministic collection of host-owned Agent contributions.
 
 [`HostSession`](#hostsession).[`activeRunId`](#activerunid)
 
+<a id="close"></a>
+
+##### close
+
+> `readonly` **close**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
 <a id="createdat-1"></a>
 
 ##### createdAt
@@ -1491,6 +1519,36 @@ One deterministic collection of host-owned Agent contributions.
 ##### inspect
 
 > `readonly` **inspect**: `Effect`\<[`HostSession`](#hostsession-1), [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+<a id="lifecycle-1"></a>
+
+##### lifecycle?
+
+> `readonly` `optional` **lifecycle?**: `"stopped"` \| `"closed"`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`lifecycle`](#lifecycle)
+
+<a id="message-1"></a>
+
+##### message
+
+> `readonly` **message**: (`input`, `options`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror), [`SessionSender`](./runtime/index.md#sessionsender)\>
+
+###### Parameters
+
+###### input
+
+`string` \| `Prompt`
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror), [`SessionSender`](./runtime/index.md#sessionsender)\>
 
 <a id="queue-1"></a>
 
@@ -1545,6 +1603,22 @@ One deterministic collection of host-owned Agent contributions.
 ###### Returns
 
 `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="resume"></a>
+
+##### resume
+
+> `readonly` **resume**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="retainedsession-1"></a>
 
@@ -1663,6 +1737,32 @@ One deterministic collection of host-owned Agent contributions.
 ##### snapshot
 
 > `readonly` **snapshot**: `Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+
+<a id="sponsorrunid-1"></a>
+
+##### sponsorRunId?
+
+> `readonly` `optional` **sponsorRunId?**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`sponsorRunId`](#sponsorrunid)
+
+<a id="stop"></a>
+
+##### stop
+
+> `readonly` **stop**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="submit"></a>
 
@@ -2014,6 +2114,30 @@ One memory-only preview admitted by the Host against current storage authority.
 
 ***
 
+<a id="sessionfamilyinput"></a>
+
+### SessionFamilyInput
+
+> **SessionFamilyInput** = *typeof* `SessionFamilyInput.Type`
+
+**`Experimental`**
+
+Omit at on the first page; retain it on every continuation.
+
+***
+
+<a id="sessionfamilypage"></a>
+
+### SessionFamilyPage
+
+> **SessionFamilyPage** = *typeof* `SessionFamilyPage.Type`
+
+**`Experimental`**
+
+First-admission membership with at most 64 members per 256-event scan.
+
+***
+
 <a id="sessionhistoryinput"></a>
 
 ### SessionHistoryInput
@@ -2115,6 +2239,30 @@ One product-facing event at its exclusive Session cursor.
 > `const` **PreviewDelivery**: `Schema.TaggedStruct`\<`"PreviewDelivery"`, \{ `authorityAttemptFence`: `Schema.Int`; `event`: `Schema.Union`\<readonly \[`Schema.refine`\<\{ `_tag`: `"ModelPreview"`; `attempt`: `number`; `attemptFence`: `number`; `changes`: readonly \[\{ `channel`: ... \| ...; `delta`: `string`; `offset`: `number`; \}, `...(...)[]`\]; `generation`: `number`; `modelAttemptId`: `string`; `modelCallId`: `string`; `runId`: `string`; `sequence`: `number`; `turn`: `number`; \}, `Schema.TaggedStruct`\<`"ModelPreview"`, \{ `attempt`: `Schema.Int`; `attemptFence`: `Schema.Int`; `changes`: `Schema.NonEmptyArray`\<`Schema.Struct`\<\{ `channel`: ...; `delta`: ...; `offset`: ...; \}\>\>; `generation`: `Schema.Int`; `modelAttemptId`: `Schema.String`; `modelCallId`: `Schema.String`; `runId`: `Schema.String`; `sequence`: `Schema.Int`; `turn`: `Schema.Int`; \}\>\>, `Schema.TaggedStruct`\<`"ModelPreviewCleared"`, \{ `attemptFence`: `Schema.Int`; `generation`: `Schema.Int`; `runId`: `Schema.String`; \}\>\]\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
 
 One memory-only preview admitted by the Host against current storage authority.
+
+***
+
+<a id="sessionfamilyinput-1"></a>
+
+### SessionFamilyInput
+
+> `const` **SessionFamilyInput**: `Schema.Struct`\<\{ `at`: `Schema.optionalKey`\<`Schema.Int`\>; `before`: `Schema.optionalKey`\<`Schema.Int`\>; `limit`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+Omit at on the first page; retain it on every continuation.
+
+***
+
+<a id="sessionfamilypage-1"></a>
+
+### SessionFamilyPage
+
+> `const` **SessionFamilyPage**: `Schema.Struct`\<\{ `at`: `Schema.Int`; `nextBefore`: `Schema.NullOr`\<`Schema.Int`\>; `rootSessionId`: `Schema.String`; `sessions`: `Schema.$Array`\<`Schema.Struct`\<\{ `depth`: `Schema.Int`; `id`: `Schema.String`; `initialRunId`: `Schema.String`; `parentRunId`: `Schema.NullOr`\<`Schema.String`\>; `parentSessionId`: `Schema.NullOr`\<`Schema.String`\>; `rootSessionId`: `Schema.String`; \}\>\>; \}\>
+
+**`Experimental`**
+
+First-admission membership with at most 64 members per 256-event scan.
 
 ***
 

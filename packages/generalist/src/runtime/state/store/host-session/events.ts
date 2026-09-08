@@ -13,9 +13,14 @@ export const append = ({
 }) => {
   const hostSessions = new Map(state.hostSessions)
   const rootRun = state.runs.get(run.rootRunId)
+  const family = state.sessions.get(run.message.sessionId)?.family
+  const retainsSession = run.executableManifest.entries.some(
+    (entry) => entry.pin === run.executableRef.active && (entry._tag === "Agent" || entry._tag === "Program"),
+  )
   if (
+    family !== undefined &&
+    retainsSession &&
     run.parentRunId !== undefined &&
-    state.sessions.get(run.message.sessionId)?.family !== undefined &&
     !hostSessions.has(run.message.sessionId)
   ) {
     hostSessions.set(run.message.sessionId, {
@@ -30,7 +35,7 @@ export const append = ({
           executableManifest: run.executableManifest,
           registrations: run.registrations,
           treePolicy: run.treePolicy,
-          budget: state.sessions.get(run.message.sessionId)!.family!.budget,
+          budget: family.budget,
         },
       },
       lastCursor: -1,
