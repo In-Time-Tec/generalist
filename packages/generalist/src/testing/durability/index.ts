@@ -50,7 +50,7 @@ export interface Simulator extends Client {
   readonly connect: Effect.Effect<Client>
 }
 
-/** Supply a simulator client to the production durability engine in tests. @experimental */
+/** Provide a simulator client to the production object Runtime in a test scope. @experimental */
 export const layer = (client: Client): Layer.Layer<ObjectStore> => Layer.succeed(ObjectStore, client.store)
 
 interface Bucket {

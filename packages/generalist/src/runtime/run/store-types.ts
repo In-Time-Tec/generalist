@@ -136,6 +136,7 @@ export type OperationCompletionOutcome =
   | { readonly _tag: "Unknown" }
 
 export interface ExecutionRecord {
+  readonly sessionComponents?: ReadonlyArray<import("../../core/durable/component/state.js").Checkpoint>
   readonly runId: string
   readonly rootRunId: string
   readonly depth: number

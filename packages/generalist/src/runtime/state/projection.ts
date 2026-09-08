@@ -64,6 +64,7 @@ export interface IdempotencyEntry {
 }
 
 export interface StoredRun {
+  readonly initialSessionComponents?: ReadonlyArray<import("../../core/durable/component/state.js").Checkpoint>
   readonly runId: string
   readonly status: RunStatus
   readonly executableRef: ExecutableRef
@@ -107,6 +108,7 @@ export interface Lane {
 }
 
 export interface RuntimeSession {
+  readonly components?: ReadonlyArray<import("../../core/durable/component/state.js").Checkpoint>
   readonly entries: ReadonlyMap<string, SessionEntry>
   readonly order: ReadonlyArray<string>
   readonly leaf: string | null

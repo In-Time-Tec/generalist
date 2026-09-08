@@ -564,7 +564,7 @@ A new client must see acknowledged writes and distinguish absence.
 
 **`Experimental`**
 
-Supply a simulator client to the production durability engine in tests.
+Provide a simulator client to the production object Runtime in a test scope.
 
 #### Parameters
 

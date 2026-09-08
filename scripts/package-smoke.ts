@@ -3,6 +3,7 @@ import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Pat
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CryptoHasher, version as bunVersion } from "bun"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
+import { componentConsumer } from "./package-smoke-components.js"
 import { auditInstalledDependencyGraph } from "./package-smoke-dependency-graph.js"
 import {
   isForbiddenTransportRuntime,
@@ -915,6 +916,7 @@ const program = Effect.gen(function* () {
     }),
   )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
+  yield* fileSystem.writeFileString(path.join(consumerDirectory, "components.mjs"), componentConsumer)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "external-child-bundle.ts"),
     `import * as ExternalChildPlacement from "generalist/unstable/runtime/external-child-placement"
@@ -1043,6 +1045,7 @@ await Effect.runPromise(Effect.gen(function* () {
     }).pipe(Effect.provideContext(context))
   }))
 }))
+await import("./components.mjs")
 console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
 `,
   )
@@ -1089,7 +1092,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Generalist exports\`)
 
   const npmConsumerDirectory = path.join(directory, "npm-consumer")
   yield* fileSystem.makeDirectory(npmConsumerDirectory)
-  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs"]) {
+  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs", "components.mjs"]) {
     yield* fileSystem.copyFile(path.join(consumerDirectory, filename), path.join(npmConsumerDirectory, filename))
   }
   yield* run("npm", ["install", "--ignore-scripts"], npmConsumerDirectory)
