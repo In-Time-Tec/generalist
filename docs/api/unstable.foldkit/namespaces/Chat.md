@@ -42,11 +42,15 @@
 
 ###### entries
 
-> `readonly` **entries**: readonly `object`[]
+> `readonly` **entries**: readonly `ConversationEntry`[]
 
 ###### leafId
 
 > `readonly` **leafId**: `string` \| `null`
+
+###### nextLeafId?
+
+> `readonly` `optional` **nextLeafId?**: `string`
 
 <a id="draft"></a>
 

@@ -109,6 +109,22 @@ void deterministicLayer
 void makeModelRoute
 const cursor: Cursor.Cursor = Cursor.origin
 const serverClient = Server.client({ baseUrl: "https://generalist.test" })
+const sessionPages = Effect.gen(function* () {
+  const client = yield* serverClient
+  const snapshot = yield* client.sessions.snapshot({ sessionId: "package-history" })
+  yield* client.sessions.list()
+  const created = yield* client.sessions.create({ id: "package-queue", agent: "package-agent" })
+  const pending = yield* client.sessions.submit({ sessionId: created.id, input: "pending", commandId: "package-submit" })
+  const edited = yield* client.sessions.updateInput({ sessionId: created.id, id: pending.id, input: "edited", commandId: "package-edit", expectedRevision: pending.revision, agent: "package-agent" })
+  yield* client.sessions.removeInput({ sessionId: created.id, id: pending.id, commandId: "package-remove", expectedRevision: edited.revision })
+  const history = yield* client.sessions.history({ sessionId: snapshot.session.id, leafId: snapshot.conversation.leafId, limit: 64 })
+  const runs = yield* client.sessions.runs({ sessionId: snapshot.session.id, at: snapshot.cursor, limit: 32 })
+  if (history.nextLeafId !== null) yield* client.sessions.history({ sessionId: snapshot.session.id, leafId: history.nextLeafId, limit: 64 })
+  if (runs.nextBefore !== null) yield* client.sessions.runs({ sessionId: snapshot.session.id, at: runs.at, before: runs.nextBefore, limit: 32 })
+  for (const entry of history.entries) if (entry.contentDeferred === true) yield* client.sessions.entry({ sessionId: snapshot.session.id, entryId: entry.id })
+  for (const run of runs.runs) yield* client.sessions.run({ sessionId: snapshot.session.id, runId: run.runId })
+})
+void sessionPages
 type ServerClientRequirements = Assert<Equal<EffectServices<typeof serverClient>, HttpClient.HttpClient>>
 void cursor
 void serverClient

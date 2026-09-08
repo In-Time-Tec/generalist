@@ -3,10 +3,18 @@ import type { DurabilityFailure } from "../../durability/errors.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Cursor } from "../cursor.js"
 import type { RuntimeUnavailable } from "../errors.js"
-import { RunSnapshot, type RunInspection } from "../run.js"
+import type { RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
 import { PendingInput, SessionSelection } from "./queue.js"
+import {
+  SessionHistoryPage,
+  SessionRunsPage,
+  SessionPageInvalid,
+  type SessionHistoryInput,
+  type SessionRunsInput,
+  SessionRunSummary,
+} from "./page.js"
 
 /** Durable product-facing Session metadata owned by a Runtime driver. */
 export interface HostSession {
@@ -31,29 +39,19 @@ export interface HostSessionSnapshot {
   readonly version: 1
   readonly session: HostSession
   readonly cursor: Cursor
-  readonly runs: ReadonlyArray<RunSnapshot>
+  readonly runs: ReadonlyArray<SessionRunSummary>
   readonly conversation: Conversation
 }
 export const HostSessionSnapshot: Schema.Codec<HostSessionSnapshot, unknown> = Schema.Struct({
   version: Schema.Literal(1),
   session: HostSession,
   cursor: Cursor,
-  runs: Schema.Array(RunSnapshot),
+  runs: Schema.Array(SessionRunSummary).check(Schema.isMaxLength(33)),
   conversation: Conversation,
 })
 
-/** A Session cannot be projected within the supported work or response budget. @experimental */
-export class SessionSnapshotTooLarge extends ActionableTaggedError<SessionSnapshotTooLarge>()(
-  "generalist/host/SessionSnapshotTooLarge",
-  {
-    sessionId: Schema.String,
-    limit: Schema.Literals(["scanned-runs", "runs", "events", "entries", "bytes"]),
-    maximum: Schema.Int,
-    hint: errorHint("Load a smaller Session; this snapshot was rejected without truncation."),
-  },
-) {}
-
-export type SessionSnapshotError = SessionError | SessionSnapshotTooLarge
+export type SessionSnapshotError = SessionError | SessionPageInvalid
+export type SessionPageError = SessionError | SessionPageInvalid
 
 /** One Runtime event at its exclusive Session replay cursor. */
 export const HostSessionEvent = Schema.Union([
@@ -124,6 +122,15 @@ export interface RuntimeHostSessions {
   readonly createSession: (input: CreateSessionInput) => Effect.Effect<HostSession, CreateSessionError>
   readonly session: (sessionId: string) => Effect.Effect<HostSession, SessionError>
   readonly sessionSnapshot: (sessionId: string) => Effect.Effect<HostSessionSnapshot, SessionSnapshotError>
+  readonly sessionHistoryPage: (
+    sessionId: string,
+    input: SessionHistoryInput,
+  ) => Effect.Effect<SessionHistoryPage, SessionPageError>
+  readonly sessionRunsPage: (
+    sessionId: string,
+    input: SessionRunsInput,
+  ) => Effect.Effect<SessionRunsPage, SessionPageError>
+  readonly sessionRunSummary: (sessionId: string, runId: string) => Effect.Effect<SessionRunSummary, SessionPageError>
   readonly listSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
   readonly sessionRuns: (sessionId: string) => Effect.Effect<ReadonlyArray<RunInspection>, SessionError>
   readonly sessionEvents: (input: SessionEventsInput) => Stream.Stream<HostSessionEvent, SessionEventsError>

@@ -1,6 +1,7 @@
-import { Deferred, Effect, Ref, Schema, Scope } from "effect"
+import { Deferred, Effect, Layer, Ref, Schema, Scope } from "effect"
 import {
   ObjectStoreFailure,
+  ObjectStore,
   validateReadOptions,
   type Service,
   type StoredObject,
@@ -48,6 +49,9 @@ export interface Client {
 export interface Simulator extends Client {
   readonly connect: Effect.Effect<Client>
 }
+
+/** Supply a simulator client to the production durability engine in tests. @experimental */
+export const layer = (client: Client): Layer.Layer<ObjectStore> => Layer.succeed(ObjectStore, client.store)
 
 interface Bucket {
   readonly objects: Map<string, StoredObject>
