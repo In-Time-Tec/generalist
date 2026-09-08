@@ -87,7 +87,7 @@ describe("Server client WebSocket", () => {
             request,
             Response.json({
               version: 1,
-              session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+              session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
               cursor: -1,
               runs: [],
               conversation: { leafId: null, entries: [] },
@@ -140,7 +140,7 @@ describe("Server client WebSocket", () => {
                   request,
                   Response.json({
                     version: 1,
-                    session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z" },
+                    session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
                     cursor: 23,
                     runs: [],
                     conversation: { leafId: null, entries: [] },
@@ -313,7 +313,7 @@ describe("Server client WebSocket", () => {
                 request,
                 Response.json({
                   version: 1,
-                  session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+                  session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
                   cursor: -1,
                   runs: [],
                   conversation: { leafId: null, entries: [] },
@@ -401,7 +401,7 @@ describe("Server client WebSocket", () => {
               request,
               Response.json({
                 version: 1,
-                session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z" },
+                session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
                 cursor: -1,
                 runs: [],
                 conversation: { leafId: null, entries: [] },

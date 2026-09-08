@@ -4,6 +4,7 @@ import { Invalid as BudgetInvalid } from "../core/durable/run-budget.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { BlobNotFound, BlobStoreError, BlobTooLarge } from "../blob-store/index.js"
 import { AgentInputInvalid, AgentNotRegistered } from "../host/errors.js"
+import { SessionQueueConflict } from "../runtime/session/queue.js"
 import {
   ApprovalMismatch,
   ApprovalStale,
@@ -121,6 +122,7 @@ export const apiErrors = [
   RunNotFound.pipe(notFound),
   RuntimeUnavailable.pipe(unavailable),
   SessionConflict.pipe(conflict),
+  SessionQueueConflict.pipe(conflict),
   SessionCursorExpired.pipe(conflict),
   SessionNotFound.pipe(notFound),
   SessionSubscriberLagged.pipe(conflict),
@@ -146,6 +148,7 @@ export const ApiError = Schema.Union([...apiErrors, ...artifactApiErrors])
 export type ApiError = typeof ApiError.Type
 
 const dedicatedErrors = Schema.Union([
+  SessionQueueConflict,
   Forbidden,
   Unauthorized,
   AgentInputInvalid,

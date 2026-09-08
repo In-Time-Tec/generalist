@@ -6,7 +6,7 @@ const incomingFrames = Stream.make(
     epoch: 0,
     snapshot: {
       version: 1,
-      session: { id: "guide-session", createdAt: "2026-09-02T00:00:00.000Z" },
+      session: { id: "guide-session", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
       cursor: -1,
       runs: [],
       conversation: { leafId: null, entries: [] },

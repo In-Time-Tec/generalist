@@ -25,6 +25,8 @@ import {
 import { toInspection } from "../events.js"
 import { projectRunSnapshot } from "../../../execution/inspection.js"
 import { projectConversation } from "./conversation.js"
+import { submit, update } from "./queue.js"
+import { SessionQueueConflict } from "../../../session/queue.js"
 
 const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {
@@ -78,7 +80,7 @@ const missing = (sessionId: string) =>
     hint: "Create the Session through host.sessions.create before starting or observing Runs.",
   })
 
-const createHostSession = (state: RuntimeState, input: { readonly id: string; readonly title?: string }) =>
+const createHostSession = (state: RuntimeState, input: import("../../../session/host.js").CreateSessionInput) =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     yield* validatePayload({ value: input, boundary: "host Session metadata" })
@@ -88,10 +90,12 @@ const createHostSession = (state: RuntimeState, input: { readonly id: string; re
         hint: "Use a different Session identity or load the existing Session.",
       })
     }
-    const session = {
+    const session: HostSession = {
       id: input.id,
       createdAt: yield* preparedOccurredAt,
+      queue: [],
     }
+    if (input.selection !== undefined) Object.assign(session, { selection: input.selection })
     if (input.title !== undefined) Object.assign(session, { title: input.title })
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(input.id, { session, lastCursor: -1, events: [], subscribers: new Map() })
@@ -228,12 +232,38 @@ export const make = (input: {
 }): Pick<
   RunStoreService,
   | "createHostSession"
+  | "submitSessionInput"
+  | "updateSessionInput"
+  | "removeSessionInput"
   | "hostSession"
   | "hostSessionSnapshot"
   | "listHostSessions"
   | "hostSessionRuns"
   | "hostSessionEvents"
 > => ({
+  submitSessionInput: (request) =>
+    input.modifyState(commands.submitSessionInput, [request], (state, [prepared]) =>
+      submit({ state, input: prepared }),
+    ),
+  updateSessionInput: (request, resolveSelection) =>
+    input.modifyState(commands.updateSessionInput, [request], (state, [prepared]) =>
+      Effect.gen(function* () {
+        if (prepared.agent === undefined) return yield* update({ state, input: prepared })
+        if (prepared.selection !== undefined || resolveSelection === undefined) {
+          return yield* SessionQueueConflict.make({
+            sessionId: prepared.sessionId,
+            reason: "selection",
+            hint: "Provide one Agent name with its admission resolver, or an explicit pinned selection.",
+          })
+        }
+        const selection = yield* resolveSelection(prepared.agent)
+        return yield* update({ state, input: { ...prepared, selection } })
+      }),
+    ),
+  removeSessionInput: (request) =>
+    input.modifyState(commands.removeSessionInput, [request], (state, [prepared]) =>
+      update({ state, input: prepared }),
+    ),
   createHostSession: (request) =>
     input.modifyState(commands.createHostSession, [request], (state, [prepared]) => createHostSession(state, prepared)),
   hostSession: (sessionId) => input.readState.pipe(Effect.flatMap((state) => getHostSession(state, sessionId))),
