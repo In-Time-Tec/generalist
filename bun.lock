@@ -330,7 +330,7 @@
     },
     "packages/generalist": {
       "name": "generalist",
-      "version": "0.62.0",
+      "version": "0.64.0",
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@ag-ui/core": "catalog:",
@@ -411,6 +411,7 @@
     },
   },
   "patchedDependencies": {
+    "@mintlify/link-rot@3.0.1327": "patches/@mintlify%2Flink-rot@3.0.1327.patch",
     "miniflare@5.20260811.1-alpha": "patches/miniflare@5.20260811.1-alpha.patch",
   },
   "catalog": {

@@ -1,0 +1,36 @@
+diff --git a/dist/graph.js b/dist/graph.js
+index ba0894a10d4544b50fe054dbb2ff77204794dd15..494a008519f960c3ad21216807348f1ead104b39 100644
+--- a/dist/graph.js
++++ b/dist/graph.js
+@@ -123,23 +123,26 @@ export class MdxPath {
+         if (this.pathType !== PathType.INTERNAL)
+             return [];
+         const parsedPath = this.path;
+-        const resolvedFiles = [];
+         if (existsSync(resolve(baseDir, this.toString()))) {
+-            resolvedFiles.push(join(parsedPath.dir, parsedPath.base));
++            return [join(parsedPath.dir, parsedPath.base)];
+         }
++        const resolvedFiles = new Set();
+         // there may be multiple files/folders corresponding to the node
+         for (const file of allFiles) {
+             const fileWithoutLeadingSlash = file.startsWith('/') ? file.slice(1) : file;
+             const parsedFilePath = parse(fileWithoutLeadingSlash);
+             if (parsedFilePath.dir === parsedPath.dir && parsedFilePath.name === parsedPath.name) {
+-                resolvedFiles.push(fileWithoutLeadingSlash);
++                resolvedFiles.add(fileWithoutLeadingSlash);
+             }
+             if (parsedFilePath.dir === parsedPath.dir && parsedPath.base === parsedFilePath.name) {
+                 // account for edge case when there is another . in the filename
+-                resolvedFiles.push(fileWithoutLeadingSlash);
++                resolvedFiles.add(fileWithoutLeadingSlash);
+             }
+         }
+-        return resolvedFiles;
++        if (parsedPath.ext && parsedPath.ext !== '.md' && parsedPath.ext !== '.mdx' && resolvedFiles.size > 1) {
++            return [];
++        }
++        return [...resolvedFiles];
+     }
+     resolvesTo(node, allFiles, baseDir) {
+         if (this.pathType !== PathType.INTERNAL)

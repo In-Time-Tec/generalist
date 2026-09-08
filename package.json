@@ -116,6 +116,7 @@
     "semi": false
   },
   "patchedDependencies": {
-    "miniflare@5.20260811.1-alpha": "patches/miniflare@5.20260811.1-alpha.patch"
+    "miniflare@5.20260811.1-alpha": "patches/miniflare@5.20260811.1-alpha.patch",
+    "@mintlify/link-rot@3.0.1327": "patches/@mintlify%2Flink-rot@3.0.1327.patch"
   }
 }
