@@ -1663,6 +1663,36 @@ Replay then follow one product-facing Session's authoritative event cursor.
 
 `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionCursorExpired`](../../host.md#sessioncursorexpired) \| [`SessionSubscriberLagged`](../../host.md#sessionsubscriberlagged)\>
 
+<a id="hostsessionfamily"></a>
+
+##### hostSessionFamily
+
+> `readonly` **hostSessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+
 <a id="hostsessionhistorypage"></a>
 
 ##### hostSessionHistoryPage

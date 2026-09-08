@@ -4,7 +4,7 @@ import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Hooks, Instructions, Permissions } from "generalist"
+import { Agent, AgentTool, Approvals, Hooks, Instructions, Permissions } from "generalist"
 import { Generalist, type Host } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
@@ -76,6 +76,97 @@ const backend = "object" as const
       }),
     )
 
+    test.effect("rejects recovering a missing Run handle", () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "missing-run-handle" })
+        const host = yield* Generalist.create({ agents: [agent] })
+        expect(yield* host.runs.get("missing-host-run").pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/RunNotFound",
+          runId: "missing-host-run",
+        })
+      }),
+    )
+    test.effect("retains a named child profile and leaves rejected admission atomic", () =>
+      Effect.gen(function* () {
+        const reviewer = Agent.make({ name: "named-retained-reviewer" })
+        const agent = Agent.make({ name: "named-retained-parent", children: [reviewer.name] })
+        const host = yield* Generalist.create({ agents: [agent, reviewer] })
+        const session = yield* host.sessions.create({ id: "named-retained-session" })
+        const parent = yield* host.runs.start(session.id, agent, "Review")
+        const before = yield* host.sessions.family(session.id, { limit: 64 })
+        expect(
+          yield* parent.spawn("not-declared", "Review", { commandId: "rejected" }).pipe(Effect.flip),
+        ).toMatchObject({
+          _tag: "generalist/runtime/ChildSelectionMissing",
+        })
+        expect(yield* host.sessions.family(session.id, { limit: 64 })).toEqual(before)
+        const child = yield* parent.spawn(reviewer.name, "Review", { commandId: "accepted" })
+        expect((yield* child.session.inspect).selection?.executableRef).toEqual(
+          (yield* host.runs.inspect(child.run.id)).executableRef,
+        )
+        expect((yield* host.runs.inspect(parent.id)).children.map((entry) => entry.retainedSession?.id)).toEqual([
+          child.session.id,
+        ])
+      }),
+    )
+    test.effect("returns a retained child Session and initial Run before execution", () =>
+      Effect.gen(function* () {
+        const reviewer = Agent.make({ name: "retained-reviewer" })
+        const delegate = AgentTool.fanOut({
+          name: "retained_delegate",
+          description: "Review work in a retained conversation",
+          agents: { reviewer: { agent: reviewer } },
+          maxChildren: 2,
+        })
+        const agent = Agent.make({ name: "retained-parent", toolkit: Toolkit.make(delegate) })
+        const host = yield* Generalist.create({ agents: [agent] })
+        const session = yield* host.sessions.create({ id: "retained-parent-session" })
+        const parent = yield* host.runs.start(session.id, agent, "Coordinate a review")
+        const child = yield* parent.spawn("reviewer", "Review authorization", {
+          commandId: "review-1",
+          label: "authorization",
+        })
+        expect(child.session.id).not.toBe(session.id)
+        expect(yield* child.session.inspect).toMatchObject({
+          retainedSession: {
+            id: child.session.id,
+            rootSessionId: session.id,
+            parentSessionId: session.id,
+            parentRunId: parent.id,
+            initialRunId: child.run.id,
+            depth: 1,
+          },
+        })
+        expect(
+          (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),
+        ).toEqual([session.id, child.session.id])
+        expect(yield* host.runs.inspect(child.run.id)).toMatchObject({ status: "queued", parentRunId: parent.id })
+        expect(yield* host.runs.list(child.session.id)).toEqual([expect.objectContaining({ runId: child.run.id })])
+        const retry = yield* (yield* host.runs.get(parent.id)).spawn("reviewer", "Review authorization", {
+          commandId: "review-1",
+          label: "authorization",
+        })
+        expect(retry.session.id).toBe(child.session.id)
+        expect(retry.run.id).toBe(child.run.id)
+        const admittedSnapshot = yield* child.session.snapshot
+        yield* completeRun(child.run.id, "retained-child-complete")
+        expect(yield* child.run.await).toBe(`${backend} complete`)
+        expect(yield* child.session.inspect).toMatchObject({ id: child.session.id })
+        expect(
+          (yield* child.session.snapshot).runs.map((entry) => ({ runId: entry.runId, status: entry.status })),
+        ).toEqual([{ runId: child.run.id, status: "succeeded" }])
+        const snapshot = yield* child.session.snapshot
+        const store = yield* RunStore.RunStore
+        const replay = yield* store
+          .hostSessionEvents({ sessionId: child.session.id, cursor: admittedSnapshot.cursor })
+          .pipe(Stream.take(snapshot.cursor - admittedSnapshot.cursor), Stream.runCollect)
+        expect(replay.length).toBe(snapshot.cursor - admittedSnapshot.cursor)
+        expect(replay.every((entry) => entry.cursor > admittedSnapshot.cursor)).toBe(true)
+        expect(yield* child.run.send("Do more", { idempotencyKey: "terminal-steer" }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/RunTerminal",
+        })
+      }),
+    )
     test.effect("keeps direct root activation behind the active conversational Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "host-active-conversation" })
@@ -376,6 +467,70 @@ it.effect("replays named Agent edits before resolving a changed or removed fresh
     )
   }),
 )
+
+it.effect("recovers the same child conversation and admission after replacing the Host", () => {
+  const storage = makeObjectStorage()
+  const reviewer = Agent.make({ name: "reopened-reviewer" })
+  const agent = Agent.make({
+    name: "reopened-parent",
+    toolkit: Toolkit.make(
+      AgentTool.fanOut({
+        name: "reopened_delegate",
+        description: "Retain a reviewer across hosts",
+        agents: { reviewer: { agent: reviewer } },
+        maxChildren: 2,
+      }),
+    ),
+  })
+  const withHost = <A, E>(
+    body: (host: Host<readonly [typeof agent]>) => Effect.Effect<A, E, RunStore.RunStore | RunExecutor.RunExecutor>,
+  ) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const context = yield* Layer.build(
+          Layer.mergeAll(
+            objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolver)),
+            modelLayer(() => textResponse("reopened complete")),
+            authorization,
+          ),
+        )
+        return yield* Effect.gen(function* () {
+          const host = yield* Generalist.create({ agents: [agent] as const })
+          return yield* body(host)
+        }).pipe(Effect.provide(context))
+      }),
+    )
+  return Effect.gen(function* () {
+    const admitted = yield* withHost((host) =>
+      Effect.gen(function* () {
+        const session = yield* host.sessions.create({ id: "reopened-parent-session" })
+        const parent = yield* host.runs.start(session.id, agent, "Coordinate review")
+        const child = yield* parent.spawn("reviewer", "Review once", { commandId: "review" })
+        yield* completeRun(child.run.id, "reopened-child-complete")
+        expect(yield* child.run.await).toBe("reopened complete")
+        return { parentId: parent.id, sessionId: child.session.id, runId: child.run.id }
+      }),
+    )
+    yield* withHost((host) =>
+      Effect.gen(function* () {
+        const parent = yield* host.runs.get(admitted.parentId)
+        const child = yield* parent.spawn("reviewer", "Review once", { commandId: "review" })
+        expect(child.session.id).toBe(admitted.sessionId)
+        expect(child.run.id).toBe(admitted.runId)
+        expect(yield* child.run.await).toBe("reopened complete")
+        const snapshot = yield* child.session.snapshot
+        expect(snapshot.runs[0]?.status).toBe("succeeded")
+        expect(yield* host.runs.list(child.session.id)).toHaveLength(1)
+        expect(
+          (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),
+        ).toEqual(["reopened-parent-session", admitted.sessionId])
+        expect(yield* parent.spawn("reviewer", "Changed", { commandId: "review" }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/IdempotencyConflict",
+        })
+      }),
+    )
+  })
+})
 
 it.effect("object storage preserves Sessions and their root Run list across a fresh Layer", () => {
   const storage = makeObjectStorage()

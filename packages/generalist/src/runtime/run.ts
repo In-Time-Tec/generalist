@@ -11,6 +11,7 @@ import { ExecutionFailure } from "../core/program/runner.js"
 import { decodePinned } from "./executable/manifest-internal.js"
 import { ExecutableManifest, ExecutableRef } from "./executable/manifest.js"
 import { RunWait } from "./run/wait.js"
+import { RetainedSession } from "./session/retained.js"
 import { Cursor } from "./cursor.js"
 import type { ParseOptions } from "effect/SchemaAST"
 import {
@@ -68,6 +69,7 @@ export const RunReceipt: Schema.Codec<RunReceipt, RunReceiptEncoded> = Schema.St
 })
 
 export interface RunInspection {
+  readonly retainedSession?: RetainedSession
   readonly runId: RunId
   readonly status: RunStatus
   readonly executableRef: ExecutableRef
@@ -113,6 +115,7 @@ const hasValidExecutable = (value: {
 
 /** Field schemas shared by `RunInspection` and the schemas that extend it. */
 export const RunInspectionFields = {
+  retainedSession: Schema.optionalKey(RetainedSession),
   runId: RunId,
   status: RunStatus,
   executableRef: ExecutableRef,

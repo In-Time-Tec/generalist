@@ -82,7 +82,10 @@ export const sessionRun = ({
     if (!state.hostSessions.has(sessionId)) return yield* SessionNotFound.make({ sessionId })
     if (runId.length === 0 || runId.length > 1024) return yield* SessionPageInvalid.make({ sessionId })
     const run = state.runs.get(runId)
-    if (run === undefined || state.runs.get(run.rootRunId)?.message.sessionId !== sessionId)
+    if (
+      run === undefined ||
+      (run.message.sessionId !== sessionId && state.runs.get(run.rootRunId)?.message.sessionId !== sessionId)
+    )
       return yield* SessionPageInvalid.make({ sessionId })
     return runSummary({ state, run })
   })

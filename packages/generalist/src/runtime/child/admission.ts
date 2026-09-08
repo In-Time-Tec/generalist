@@ -57,6 +57,7 @@ export type AdmitReceipt = typeof AdmitReceipt.Type
 
 /** One direct child as the parent may observe it. */
 export interface ChildInspection {
+  readonly retainedSession?: import("../session/retained.js").RetainedSession
   readonly childRunId: string
   readonly status: RunStatus
   readonly readiness: ChildReadiness
@@ -208,7 +209,12 @@ export const make = (store: RunStoreService): Service => {
     })
 
   const inspection = (snapshot: {
-    readonly run: { readonly runId: string; readonly status: RunStatus; readonly childReadiness?: ChildReadiness }
+    readonly run: {
+      readonly runId: string
+      readonly status: RunStatus
+      readonly childReadiness?: ChildReadiness
+      readonly retainedSession?: import("../session/retained.js").RetainedSession
+    }
     readonly outcome?: RunOutcome
   }): ChildInspection => {
     const value = {
@@ -216,6 +222,8 @@ export const make = (store: RunStoreService): Service => {
       status: snapshot.run.status,
       readiness: snapshot.run.childReadiness ?? "settled",
     }
+    if (snapshot.run.retainedSession !== undefined)
+      Object.assign(value, { retainedSession: snapshot.run.retainedSession })
     return snapshot.outcome === undefined ? value : { ...value, outcome: snapshot.outcome }
   }
 
@@ -270,6 +278,8 @@ export const make = (store: RunStoreService): Service => {
               status: entry.run.status,
               readiness: entry.run.childReadiness ?? "settled",
             }
+            if (entry.run.retainedSession !== undefined)
+              Object.assign(value, { retainedSession: entry.run.retainedSession })
             if (entry.invocationId === undefined)
               return entry.outcome === undefined ? value : { ...value, outcome: entry.outcome }
             const foundOrigin = originOf(entry.invocationId)

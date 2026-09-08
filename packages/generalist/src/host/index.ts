@@ -60,6 +60,8 @@ import type { PreviewDelivery } from "./preview.js"
 import { AgentInputInvalid, AgentNotRegistered, type CreateError } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
+import { make as makeHostRun, type HostRun } from "./run.js"
+export type { HostRun, ChildHandle, ChildSpawnOptions } from "./run.js"
 import { ArtifactRegistry } from "../core/artifact.js"
 import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
@@ -79,6 +81,7 @@ export type {
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
+export { SessionFamilyInput, SessionFamilyPage } from "../runtime/session/retained.js"
 export {
   SessionHistoryInput,
   SessionHistoryPage,
@@ -126,13 +129,13 @@ export interface CreateOptions<
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
-export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly tools: HostTools
   readonly attachments: Attachments
   readonly artifacts: Artifacts
   readonly sessions: SessionReads & {
     readonly list: () => import("../runtime/session/host.js").RuntimeHostSessions["listSessions"]
+    readonly family: import("../runtime/session/host.js").RuntimeHostSessions["sessionFamily"]
     readonly create: (
       options?: SessionCreateOptions,
     ) => Effect.Effect<
@@ -143,6 +146,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
+    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, InspectError>
     readonly start: <Selected extends Agents[number]>(
       sessionId: string,
       agent: Selected,
@@ -278,12 +282,6 @@ const startAgent = <Value extends AnyAgent>(
     return started as Effect.Effect<RunHandle<AgentOutput<Value>>, StartError>
   })
 
-const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
-  id: handle.runId,
-  await: handle.await,
-  events: handle.events,
-  send: handle.send,
-})
 const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService => {
   const all = [...skills]
   const byName = new Map(all.map((skill) => [skill.name, skill]))
@@ -360,6 +358,7 @@ const create = <
 
     for (const tool of options.tools ?? []) yield* runtime.registerTool(tool)
     const sessionHandle = makeSessionHandle({ runtime, registeredByName })
+    const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
       tools: makeTools(runtime),
       attachments,
@@ -367,11 +366,13 @@ const create = <
       sessions: {
         ...makeSessionReads(runtime),
         list: () => runtime.listSessions,
+        family: runtime.sessionFamily,
         create: createSessionHandle({ runtime, registeredByName }),
         get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
       runs: {
+        get: (runId) => runtime.getRun(runId).pipe(Effect.map(hostRun)),
         start: (sessionId, agent, input, startOptions) =>
           Effect.gen(function* () {
             yield* runtime.session(sessionId)

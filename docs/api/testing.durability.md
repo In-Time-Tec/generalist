@@ -336,7 +336,7 @@ Fork the provider request into the current fixture scope before awaiting it.
 
 ###### reason?
 
-`"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"limit"` \| `"unavailable"` \| `"invalid-response"`
+`"limit"` \| `"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"unavailable"` \| `"invalid-response"`
 
 ###### Returns
 
@@ -360,7 +360,7 @@ Fork the provider request into the current fixture scope before awaiting it.
 
 ###### reason?
 
-`"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"limit"` \| `"unavailable"` \| `"invalid-response"`
+`"limit"` \| `"authentication"` \| `"rate-limit"` \| `"timeout"` \| `"unavailable"` \| `"invalid-response"`
 
 ###### Returns
 
