@@ -616,6 +616,60 @@ Application-owned identities for an independently retained Tool implementation a
 
 `ToolIdentity_base.constructor`
 
+***
+
+<a id="waitinvalid"></a>
+
+### WaitInvalid
+
+#### Extends
+
+- `WaitInvalid_base`
+
+#### Constructors
+
+<a id="constructor-10"></a>
+
+##### Constructor
+
+> **new WaitInvalid**(...`args`): [`WaitInvalid`](#waitinvalid)
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`WaitInvalid`](#waitinvalid)
+
+###### Inherited from
+
+`WaitInvalid_base.constructor`
+
+#### Properties
+
+<a id="hint-9"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+###### Inherited from
+
+`WaitInvalid_base.hint`
+
+<a id="message-1"></a>
+
+##### message
+
+> `readonly` **message**: `string`
+
+###### Inherited from
+
+`WaitInvalid_base.message`
+
 ## Interfaces
 
 <a id="childhandle"></a>
@@ -1584,7 +1638,7 @@ One deterministic collection of host-owned Agent contributions.
 
 [`HostSession`](#hostsession).[`lifecycle`](#lifecycle)
 
-<a id="message-1"></a>
+<a id="message-2"></a>
 
 ##### message
 
@@ -2004,6 +2058,38 @@ Run metadata without retained manifests, results, or event history.
 
 **`Experimental`**
 
+***
+
+<a id="waitoptions"></a>
+
+### WaitOptions
+
+#### Properties
+
+<a id="commandid-3"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+<a id="messages"></a>
+
+##### messages?
+
+> `readonly` `optional` **messages?**: `boolean`
+
+<a id="runs-2"></a>
+
+##### runs?
+
+> `readonly` `optional` **runs?**: readonly `string`[]
+
+<a id="timeout"></a>
+
+##### timeout?
+
+> `readonly` `optional` **timeout?**: `Input`
+
 ## Type Aliases
 
 <a id="approvalrequested"></a>
@@ -2121,6 +2207,20 @@ One product-facing event at its exclusive Session cursor.
 ###### Returns
 
 `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+##### wait
+
+> `readonly` **wait**: (`options`) => `Effect.Effect`\<[`WaitResult`](#waitresult), [`WaitInvalid`](#waitinvalid) \| [`AwaitEventInvalid`](./generalist/namespaces/Agent.md#awaiteventinvalid), [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\>
+
+###### Parameters
+
+###### options
+
+[`WaitOptions`](#waitoptions)
+
+###### Returns
+
+`Effect.Effect`\<[`WaitResult`](#waitresult), [`WaitInvalid`](#waitinvalid) \| [`AwaitEventInvalid`](./generalist/namespaces/Agent.md#awaiteventinvalid), [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\>
 
 #### Type Parameters
 
@@ -2268,6 +2368,14 @@ The authoritative journaled task list changed.
 
 > **Turn** = *typeof* `Turn.Type`
 
+***
+
+<a id="waitresult"></a>
+
+### WaitResult
+
+> **WaitResult** = *typeof* `WaitResult.Type`
+
 ## Variables
 
 <a id="artifactupdated-1"></a>
@@ -2403,3 +2511,11 @@ Membership is pinned to at; summaries report current committed status.
 > `const` **TasksUpdated**: `Schema.TaggedStruct`\<`"TasksUpdated"`, \{ `cursor`: `Schema.Int`; `items`: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>; `title`: `Schema.String`; \}\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
 
 The authoritative journaled task list changed.
+
+***
+
+<a id="waitresult-1"></a>
+
+### WaitResult
+
+> `const` **WaitResult**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"RunSettled"`, \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Message"`, \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Timeout"`, \{ \}\>, `Schema.TaggedStruct`\<`"Event"`, \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \}\>, `Schema.TaggedStruct`\<`"TimedOut"`, \{ `deadline`: `Schema.String`; \}\>\]\>

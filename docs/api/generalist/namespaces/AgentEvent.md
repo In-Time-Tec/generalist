@@ -1503,7 +1503,7 @@ A tool reached a durable wait without disturbing admitted siblings.
 
 ###### filter
 
-> `readonly` **filter**: \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"update"` \| `"create"` \| `"remove"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
+> `readonly` **filter**: \{ `commandId`: `string`; `messages`: `boolean`; `runs`: readonly `string`[]; \} \| \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"update"` \| `"create"` \| `"remove"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
 
 <a id="call-3"></a>
 
