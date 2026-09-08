@@ -38,7 +38,7 @@ Profile references are pinned in the executable manifest. Self-reference and mut
 
 The Host is a trusted interface to its configured Runtime namespace; an application must authorize the requested Session before exposing family reads to a remote user. Inside an execution, `AgentChildren.listDirect`, `inspect`, and `join` expose retained Session metadata only for children belonging to the ambient parent Run; another parent cannot adopt a child by knowing its ID.
 
-Child Session snapshots retain that child's conversation and Run history. Child lifecycle events have their own Session replay cursor and remain visible in the original root Session's stream. A snapshot cursor is exclusive: resume after it to avoid redispatching historical execution.
+Child Session snapshots return recent Run summaries and a bounded conversation tail; use the Session history and Run pages to load older retained evidence. Child lifecycle events have their own Session replay cursor and remain visible in the original root Session's stream. A snapshot cursor is exclusive: resume after it to avoid redispatching historical execution.
 
 ## Family admission limits
 
