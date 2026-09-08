@@ -7,7 +7,7 @@ import type { RuntimeState } from "../../projection.js"
 import { cancel } from "../control.js"
 import { promote } from "./queue.js"
 
-export const control = (state: RuntimeState, input: ControlInput) =>
+export const control = ({ state, input }: { readonly state: RuntimeState; readonly input: ControlInput }) =>
   Effect.gen(function* () {
     const stored = state.hostSessions.get(input.sessionId)
     if (stored === undefined) return yield* SessionNotFound.make({ sessionId: input.sessionId })
@@ -15,13 +15,12 @@ export const control = (state: RuntimeState, input: ControlInput) =>
     if (stored.session.lifecycle === "closed" && input.action === "resume")
       return yield* RuntimeUnavailable.make({ message: "A closed Session cannot be resumed" })
     const { lifecycle: _, ...session } = stored.session
+    if (input.action !== "resume")
+      Object.assign(session, { lifecycle: input.action === "close" ? "closed" : "stopped" })
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(input.sessionId, {
       ...stored,
-      session:
-        input.action === "resume"
-          ? session
-          : { ...session, lifecycle: input.action === "close" ? "closed" : "stopped" },
+      session,
     })
     let next: RuntimeState = { ...state, hostSessions }
     if (input.action === "resume")

@@ -236,7 +236,7 @@ export const make = (input: {
       message({ state, input: prepared }),
     ),
   controlSession: (request) =>
-    input.modifyState(commands.controlSession, [request], (state, [prepared]) => control(state, prepared)),
+    input.modifyState(commands.controlSession, [request], (state, [prepared]) => control({ state, input: prepared })),
   submitSessionInput: (request) =>
     input.modifyState(commands.submitSessionInput, [request], (state, [prepared]) =>
       submit({ state, input: prepared }),

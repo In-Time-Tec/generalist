@@ -4,7 +4,7 @@ import { MessageSource } from "../run/steering.js"
 
 /** Authenticated identity supplied at the application or executing Run boundary. @experimental */
 export class SessionSender extends Context.Service<SessionSender, MessageSource>()(
-  "generalist/runtime/SessionSender",
+  "generalist/runtime/session/message/SessionSender",
 ) {}
 
 export const MessageInput = Schema.Struct({

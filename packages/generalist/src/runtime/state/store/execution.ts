@@ -163,8 +163,6 @@ export const releaseExecution: {
 
 const requireClaimable = (state: RuntimeState, run: StoredRun, now: number) =>
   Effect.gen(function* () {
-    if (state.hostSessions.get(run.message.sessionId)?.session.lifecycle !== undefined && !run.cancellationRequested)
-      return yield* RuntimeUnavailable.make({ message: `Session ${run.message.sessionId} is not open` })
     const lease = run.ownerId === undefined ? undefined : state.workers.get(run.ownerId)
     if (run.ownerId !== undefined && (lease === undefined || lease.expiresAt > now)) {
       return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is owned by ${run.ownerId}` })
@@ -229,6 +227,8 @@ export const claimExecution: {
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (state.hostSessions.get(run.message.sessionId)?.session.lifecycle !== undefined && !run.cancellationRequested)
+      return yield* RuntimeUnavailable.make({ message: `Session ${run.message.sessionId} is not open` })
     const now = yield* occurredAtMillis
     yield* requireClaimable(state, run, now)
     const claimed = {

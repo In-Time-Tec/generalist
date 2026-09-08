@@ -72,6 +72,10 @@ session.submit(input, { commandId })  -> QueueReceipt { id, revision }
 session.queue.list()                 -> PendingInput[]
 session.queue.update(id, input, { commandId, expectedRevision, agent? }) -> QueueReceipt
 session.queue.remove(id, { commandId, expectedRevision }) -> QueueReceipt
+session.message(input, { commandId }) -> QueueReceipt (requires authenticated SessionSender)
+session.stop({ commandId })          -> void
+session.resume({ commandId })        -> void
+session.close({ commandId })         -> void
 
 host.runs.start(sessionId, agent, typedInput, { idempotencyKey? })
   -> { id, await, events, send }
@@ -114,7 +118,9 @@ Every accepted queue command returns an immutable `{ id, revision }` receipt. Pr
 
 An edit's requested Agent name is part of its command identity; its registered executable is resolved only for a new admission, after receipt reconciliation. An exact retry still returns its accepted receipt if that registration later changes or disappears. New edits must pass the current Host's Agent allowlist and revision checks. HTTP authentication and resource authorization apply to every request, including retries.
 
-The queue permits at most 64 pending entries and 1 MiB of encoded pending input, including pinned settings and registrations. A mutation exceeding a bound fails without changing the queue. These limits are independent of the exact-Run steering inbox. Canonical object state, not the Session handle or host memory, owns recovery. Use fresh namespaces; there is no compatibility reader for retired durable enqueue state.
+The queue permits at most 64 pending entries and 1 MiB of encoded pending input, including pinned settings and registrations. Undelivered `session.message` entries in the active Run inbox count against this retention bound too, so cancellation can retain them without overflowing the queue. A mutation exceeding a bound fails without changing the queue. Exact-Run steering still has its own inbox bound. Canonical object state, not the Session handle or host memory, owns recovery. Use fresh namespaces; there is no compatibility reader for retired durable enqueue state.
+
+`submit` schedules a separate conversational Run. `message` instead reaches the active Run at a safe model boundary, or queues a fresh sponsored Run when idle. Supply the `SessionSender` service from `generalist/runtime` at the authenticated application boundary; it is not a field in message options. Retained child Sessions keep their current sponsor separately from their immutable family provenance. Stop, close, and explicit resume operate on Session admission policy rather than resurrecting terminal Runs; see [child admission](child-admission.md) for allocation and cancellation semantics.
 
 `generalist/server` exposes the same commands through `POST /sessions/:id/queue`, `PATCH /sessions/:id/queue/:inputId`, and `DELETE /sessions/:id/queue/:inputId`. The Session client offers `sessions.submit`, `sessions.updateInput`, and `sessions.removeInput`; submit takes `sessionId`, `input`, and `commandId`, while edits and removals also carry `id` and `expectedRevision`. Updates optionally carry `agent`. These routes use the existing authentication and resource-authorization boundary, not a second queue authority.
 

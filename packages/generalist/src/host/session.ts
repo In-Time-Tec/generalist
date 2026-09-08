@@ -82,13 +82,13 @@ export const make =
   (session: HostSession): SessionHandle => ({
     ...session,
     message: (input, options) =>
-      Effect.gen(function* () {
-        return yield* runtime.messageSessionInput({
+      Effect.suspend(() =>
+        runtime.messageSessionInput({
           sessionId: session.id,
           commandId: options.commandId,
           prompt: Prompt.make(input),
-        })
-      }),
+        }),
+      ),
     stop: (options) => runtime.controlSession({ sessionId: session.id, commandId: options.commandId, action: "stop" }),
     close: (options) =>
       runtime.controlSession({ sessionId: session.id, commandId: options.commandId, action: "close" }),
