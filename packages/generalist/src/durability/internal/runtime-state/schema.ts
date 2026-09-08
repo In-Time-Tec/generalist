@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { Checkpoint as ComponentCheckpoint } from "../../../core/durable/component/state.js"
 import { ArtifactHead, ArtifactUpdate } from "../../../core/artifact.js"
 import { WakeEvent } from "../../../core/agent/tools/wake-event.js"
 import { Ref as MediaRef } from "../../../media/ref.js"
@@ -81,6 +82,7 @@ const makeRun = (reuse: Reuse) =>
       attempt: Counter,
       attemptFence: Counter,
       ownerId: Schema.optionalKey(Schema.String),
+      initialSessionComponents: Schema.optionalKey(Schema.Array(ComponentCheckpoint)),
       checkpoint: Schema.optionalKey(reuse(ExecutionCheckpoint)),
       suspension: Schema.optionalKey(reuse(ExecutionSuspension)),
       continuation: Schema.optionalKey(reuse(ExecutionContinuation)),
@@ -204,6 +206,7 @@ export const fields = ({ reuse, table }: { readonly reuse: Reuse; readonly table
         leaf: Schema.NullOr(Schema.String),
         counter: Counter,
         writerEpoch: Schema.BigInt.check(Schema.isGreaterThanOrEqualToBigInt(0n)),
+        components: Schema.optionalKey(Schema.Array(ComponentCheckpoint)),
         writer: Schema.optionalKey(
           Schema.Struct({
             runId: Schema.String,

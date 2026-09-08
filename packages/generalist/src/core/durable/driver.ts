@@ -42,15 +42,13 @@ export {
   DriverJournal,
   DriverUnknownReplay,
   guardUnknownNeverReplay,
-  layerInline,
-  layerTest,
   make as makeInline,
   type Journal,
   type OperationSpec,
   type RecordedOperation,
 } from "./driver/interpreter.js"
 export { arrayStreamCodec, type StreamSuccessCodec } from "./driver/stream-success.js"
-export { layerForRun } from "./driver/layer-for-run.js"
+export { layerForRun, layerInline, layerTest } from "./driver/layer-for-run.js"
 export { make as makeLoopDriver } from "./loop-driver.js"
 export {
   abortPending,

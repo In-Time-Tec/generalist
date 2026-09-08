@@ -39,7 +39,10 @@ const forkCheckpoint = (
               ...component,
               receipts: component.receipts.map((receipt) => ({
                 ...receipt,
-                id: forkOperationKey(receipt.id, sourceRunId, targetRunId),
+                id:
+                  component.descriptor.scope === "run"
+                    ? forkOperationKey(receipt.id, sourceRunId, targetRunId)
+                    : receipt.id,
               })),
             })),
           }),

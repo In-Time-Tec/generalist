@@ -8,6 +8,7 @@ import { LoopDriverState } from "../../core/durable/loop-driver-state.js"
 import { DriverError } from "../../core/durable/service.js"
 import { declaration } from "../../tasks/component.js"
 import type { ForkRewindCapability, Options, Services } from "./contract.js"
+import { registerSessionComponents } from "./components/session.js"
 
 export const registerComponents = <LayerError, ClaimsLayerError>(input: {
   readonly options: Options<LayerError, ClaimsLayerError>
@@ -15,6 +16,7 @@ export const registerComponents = <LayerError, ClaimsLayerError>(input: {
   readonly prepare: <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<A, E>
   readonly open: <A, E>(use: (services: Services) => Effect.Effect<A, E>) => Effect.Effect<A, E | LayerError>
 }): void => {
+  registerSessionComponents(input)
   it.effect("restores selected component state and command receipts across fork, rewind, and reopen", () => {
     const identity = `conformance:${input.options.name}:components`
     const scenario = (services: Services) =>

@@ -114,7 +114,7 @@
 
 ###### provider?
 
-> `readonly` `optional` **provider?**: \{ `allow_fallbacks?`: `boolean` \| `null`; `data_collection?`: `"allow"` \| `"deny"` \| `null`; `enforce_distillable_text?`: `boolean` \| `null`; `ignore?`: readonly `string`[] \| `null`; `max_price?`: \{ `audio?`: `string`; `completion?`: `string`; `image?`: `string`; `prompt?`: `string`; `request?`: `string`; \}; `only?`: readonly `string`[] \| `null`; `order?`: readonly `string`[] \| `null`; `preferred_max_latency?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `preferred_min_throughput?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `quantizations?`: readonly (`"unknown"` \| `"int4"` \| `"int8"` \| `"fp4"` \| `"fp6"` \| `"fp8"` \| `"fp16"` \| `"bf16"` \| `"fp32"`)[] \| `null`; `require_parameters?`: `boolean` \| `null`; `sort?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| \{ `by?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| `null`; `partition?`: `"model"` \| `"none"` \| `null`; \} \| `null`; `zdr?`: `boolean` \| `null`; \} \| `null`
+> `readonly` `optional` **provider?**: \{ `allow_fallbacks?`: `boolean` \| `null`; `data_collection?`: `"allow"` \| `"deny"` \| `null`; `enforce_distillable_text?`: `boolean` \| `null`; `ignore?`: readonly `string`[] \| `null`; `max_price?`: \{ `audio?`: `string`; `completion?`: `string`; `image?`: `string`; `prompt?`: `string`; `request?`: `string`; \}; `only?`: readonly `string`[] \| `null`; `order?`: readonly `string`[] \| `null`; `preferred_max_latency?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `preferred_min_throughput?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `quantizations?`: readonly (`"unknown"` \| `"int4"` \| `"int8"` \| `"fp4"` \| `"fp6"` \| `"fp8"` \| `"fp16"` \| `"bf16"` \| `"fp32"`)[] \| `null`; `require_parameters?`: `boolean` \| `null`; `sort?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| \{ `by?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| `null`; `partition?`: `"none"` \| `"model"` \| `null`; \} \| `null`; `zdr?`: `boolean` \| `null`; \} \| `null`
 
 ###### reasoning?
 
@@ -122,7 +122,7 @@
 
 ###### reasoning.effort?
 
-> `readonly` `optional` **effort?**: `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `"none"` \| `null`
+> `readonly` `optional` **effort?**: `"none"` \| `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `null`
 
 ###### reasoning.summary?
 
@@ -130,7 +130,7 @@
 
 ###### reasoning\_effort?
 
-> `readonly` `optional` **reasoning\_effort?**: `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `"none"` \| `null`
+> `readonly` `optional` **reasoning\_effort?**: `"none"` \| `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `null`
 
 ###### repetition\_penalty?
 
@@ -350,7 +350,7 @@
 
 ###### provider?
 
-> `readonly` `optional` **provider?**: \{ `allow_fallbacks?`: `boolean` \| `null`; `data_collection?`: `"allow"` \| `"deny"` \| `null`; `enforce_distillable_text?`: `boolean` \| `null`; `ignore?`: readonly `string`[] \| `null`; `max_price?`: \{ `audio?`: `string`; `completion?`: `string`; `image?`: `string`; `prompt?`: `string`; `request?`: `string`; \}; `only?`: readonly `string`[] \| `null`; `order?`: readonly `string`[] \| `null`; `preferred_max_latency?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `preferred_min_throughput?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `quantizations?`: readonly (`"unknown"` \| `"int4"` \| `"int8"` \| `"fp4"` \| `"fp6"` \| `"fp8"` \| `"fp16"` \| `"bf16"` \| `"fp32"`)[] \| `null`; `require_parameters?`: `boolean` \| `null`; `sort?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| \{ `by?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| `null`; `partition?`: `"model"` \| `"none"` \| `null`; \} \| `null`; `zdr?`: `boolean` \| `null`; \} \| `null`
+> `readonly` `optional` **provider?**: \{ `allow_fallbacks?`: `boolean` \| `null`; `data_collection?`: `"allow"` \| `"deny"` \| `null`; `enforce_distillable_text?`: `boolean` \| `null`; `ignore?`: readonly `string`[] \| `null`; `max_price?`: \{ `audio?`: `string`; `completion?`: `string`; `image?`: `string`; `prompt?`: `string`; `request?`: `string`; \}; `only?`: readonly `string`[] \| `null`; `order?`: readonly `string`[] \| `null`; `preferred_max_latency?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `preferred_min_throughput?`: `number` \| \{ `p50?`: `number` \| `null`; `p75?`: `number` \| `null`; `p90?`: `number` \| `null`; `p99?`: `number` \| `null`; \} \| `null`; `quantizations?`: readonly (`"unknown"` \| `"int4"` \| `"int8"` \| `"fp4"` \| `"fp6"` \| `"fp8"` \| `"fp16"` \| `"bf16"` \| `"fp32"`)[] \| `null`; `require_parameters?`: `boolean` \| `null`; `sort?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| \{ `by?`: `"latency"` \| `"price"` \| `"throughput"` \| `"exacto"` \| `null`; `partition?`: `"none"` \| `"model"` \| `null`; \} \| `null`; `zdr?`: `boolean` \| `null`; \} \| `null`
 
 ###### reasoning?
 
@@ -358,7 +358,7 @@
 
 ###### reasoning.effort?
 
-> `readonly` `optional` **effort?**: `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `"none"` \| `null`
+> `readonly` `optional` **effort?**: `"none"` \| `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `null`
 
 ###### reasoning.summary?
 
@@ -366,7 +366,7 @@
 
 ###### reasoning\_effort?
 
-> `readonly` `optional` **reasoning\_effort?**: `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `"none"` \| `null`
+> `readonly` `optional` **reasoning\_effort?**: `"none"` \| `"low"` \| `"medium"` \| `"high"` \| `"max"` \| `"xhigh"` \| `"minimal"` \| `null`
 
 ###### repetition\_penalty?
 
