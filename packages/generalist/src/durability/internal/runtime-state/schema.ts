@@ -58,7 +58,7 @@ export const ExecutionClaim = Schema.Struct({
   runId: Schema.String,
   ownerId: Schema.String,
   attemptFence: Counter,
-  session: SessionWriteClaim,
+  session: Schema.optionalKey(SessionWriteClaim),
 })
 
 const makeRun = (reuse: Reuse) =>

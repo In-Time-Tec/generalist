@@ -176,6 +176,7 @@ describe("generalist public surface", () => {
         "ToolAuthorization",
         "ToolContext",
         "ToolExecutor",
+        "ToolManifest",
         "ToolOutput",
         "ToolPlacement",
         "Triggers",

@@ -113,7 +113,7 @@ it.live("retries an ambiguously committed stable Session append across object re
       storage,
       Effect.gen(function* () {
         const first = yield* claimedSession(sessionId, objectWorkerId, "stable-append:first")
-        firstClaimEpoch = BigInt(first.claim.session.epoch)
+        firstClaimEpoch = BigInt(first.claim.session!.epoch)
         const committed = yield* Deferred.make<void>()
         const append = first.store.append(entry, options).pipe(
           Effect.tap((receipt) =>
@@ -156,7 +156,7 @@ it.live("retries an ambiguously committed stable Session append across object re
           ownerId: objectWorkerId,
         })
         const checkpointStore = Option.getOrThrow(yield* first.runStore.claimedSessionStore(checkpointClaim))
-        expect(BigInt(checkpointClaim.session.epoch)).toBeGreaterThan(BigInt(replacement.session.epoch))
+        expect(BigInt(checkpointClaim.session!.epoch)).toBeGreaterThan(BigInt(replacement.session!.epoch))
         expect((yield* checkpointStore.appendCheckpoint(prepared))._tag).toBe("AlreadyPresent")
         expect((yield* (yield* sessionReader(sessionId)).path(prepared.id)).map((candidate) => candidate.id)).toEqual([
           options.id,
@@ -189,7 +189,7 @@ it.live("retries an ambiguously committed stable Session append across object re
         )
 
         expect(staleRetry).toEqual(originalReceipt)
-        expect(BigInt(replacement.session.epoch)).toBeGreaterThan(firstClaimEpoch)
+        expect(BigInt(replacement.session!.epoch)).toBeGreaterThan(firstClaimEpoch)
         expect(retried.id).toBe(options.id)
         expect(divergentPayload._tag).toBe("generalist/core/SessionConflict")
         expect(divergentParent._tag).toBe("generalist/core/SessionConflict")
@@ -207,7 +207,7 @@ it.live("retries an ambiguously committed stable Session append across object re
       storage,
       Effect.gen(function* () {
         const { claim, store } = yield* claimedSession(sessionId, objectWorkerId, "stable-append:reopen")
-        expect(BigInt(claim.session.epoch)).toBeGreaterThan(firstClaimEpoch)
+        expect(BigInt(claim.session!.epoch)).toBeGreaterThan(firstClaimEpoch)
         const reopenedRetry = yield* store.append(entry, options)
         expect(reopenedRetry.id).toBe(options.id)
         expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)

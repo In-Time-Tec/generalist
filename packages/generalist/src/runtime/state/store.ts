@@ -178,7 +178,11 @@ const makeStoreServices = (options: Options) =>
       info: Effect.succeed({ durability: "durable", backend: "object", multiWorker: true }),
       sessionReader: (sessionId) => Effect.succeed(Option.some(sessionReader({ readState, sessionId }))),
       claimedSessionStore: (claim) =>
-        Effect.succeed(Option.some(claimedSessionStore({ readState, modifyState, claim }))),
+        Effect.succeed(
+          claim.session === undefined
+            ? Option.none()
+            : Option.some(claimedSessionStore({ readState, modifyState, claim: { ...claim, session: claim.session } })),
+        ),
       hasAdmission: (input) => hasAdmissionKey(idempotencyKey(input.address, input.sessionId, input.idempotencyKey)),
       admitSend: (input) =>
         Effect.gen(function* () {

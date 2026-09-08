@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import type { CompactionEntry } from "../../../core/context/session.js"
 import { CompactionCommit, Event as ModelTelemetryEvent } from "../../../core/model/telemetry/events.js"
-import { ExecutionClaim } from "./schema.js"
+import { ExecutionClaim, SessionWriteClaim } from "./schema.js"
 import { SessionAppendInputCodec, SessionEntryCodec } from "./session.js"
 
 const CommandId = Schema.String.check(Schema.isNonEmpty())
@@ -23,10 +23,11 @@ const CheckpointAppend = Schema.Struct({
   checkpoint: SessionEntryCodec.pipe(Schema.refine((entry): entry is CompactionEntry => entry._tag === "Compaction")),
   leafId: Schema.String,
 })
-const reserveInput = Schema.Tuple([ExecutionClaim, CommandId])
-const appendInput = Schema.Tuple([ExecutionClaim, SessionAppendInputCodec, AppendOptions])
-const checkpointInput = Schema.Tuple([ExecutionClaim, PreparedCheckpoint])
-const leafInput = Schema.Tuple([ExecutionClaim, Schema.NullOr(Schema.String), CommandId])
+const SessionClaim = Schema.Struct({ ...ExecutionClaim.fields, session: SessionWriteClaim })
+const reserveInput = Schema.Tuple([SessionClaim, CommandId])
+const appendInput = Schema.Tuple([SessionClaim, SessionAppendInputCodec, AppendOptions])
+const checkpointInput = Schema.Tuple([SessionClaim, PreparedCheckpoint])
+const leafInput = Schema.Tuple([SessionClaim, Schema.NullOr(Schema.String), CommandId])
 
 export const commands = {
   reserveEntryId: {

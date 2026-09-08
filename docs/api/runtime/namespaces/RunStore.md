@@ -558,9 +558,9 @@ RunStore public contract and canonical object-backed layer.
 
 <a id="session"></a>
 
-##### session
+##### session?
 
-> `readonly` **session**: `SessionWriteClaim`
+> `readonly` `optional` **session?**: `SessionWriteClaim`
 
 ###### Inherited from
 
