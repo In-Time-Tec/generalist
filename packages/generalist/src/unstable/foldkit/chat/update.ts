@@ -23,6 +23,7 @@ import {
 } from "./service.js"
 import { conversationEntries, conversationToolKey } from "./conversation.js"
 import { applyConversationUpdate } from "../../../runtime/session/conversation.js"
+import { isTerminal } from "../../../runtime/run.js"
 
 const CompletedFields = { isFailure: Schema.Boolean, result: Schema.Unknown }
 
@@ -242,22 +243,22 @@ const applyHostEvent = (model: Model, hostEvent: HostEvent): readonly [Model, Op
 
 const applySnapshot = (model: Model, snapshot: HostSessionSnapshot, epoch: number): Model => {
   if (snapshot.session.id !== model.sessionId || epoch <= model.connectionEpoch) return model
-  const roots = snapshot.runs.filter((run) => run.run.parentRunId === undefined)
+  const roots = snapshot.runs.filter((run) => run.parentRunId === undefined)
   const entries = conversationEntries(snapshot.conversation)
-  const current = roots.findLast((item) => item.outcome === undefined) ?? roots.at(-1)
+  const current = roots.find((item) => item.runId === snapshot.session.activeRunId)
+  const settled = roots.findLast((item) => isTerminal(item.status))
   let run: Model["run"] = Idle()
-  if (current?.outcome?._tag === "Failed") run = Failed({ message: current.outcome.error.message })
-  else if (current !== undefined && current.outcome === undefined) {
-    const approval = current.run.waits.find((wait) => wait.status === "open" && wait.reason._tag === "Approval")
+  if (current === undefined && settled?.status === "failed")
+    run = Failed({ message: "Run failed; inspect its committed outcome for details." })
+  else if (current !== undefined && !isTerminal(current.status))
     run =
-      approval?.reason._tag === "Approval"
-        ? AwaitingApproval({
-            token: approval.reason.request.approvalId,
-            toolName: approval.reason.request.capability,
-            params: approval.reason.request.input,
+      current.approval === undefined
+        ? Running({ turn: current.turn })
+        : AwaitingApproval({
+            token: current.approval.approvalId,
+            toolName: current.approval.capability,
+            params: current.approval.input,
           })
-        : Running({ turn: current.turn })
-  }
   return changeModel(model, {
     connectionEpoch: epoch,
     lastSeq: snapshot.cursor,
@@ -267,10 +268,10 @@ const applySnapshot = (model: Model, snapshot: HostSessionSnapshot, epoch: numbe
     conversation: snapshot.conversation,
     preview: null,
     previewAuthority:
-      current === undefined || current.outcome !== undefined
+      current === undefined || isTerminal(current.status)
         ? null
         : {
-            runId: current.run.runId,
+            runId: current.runId,
             attemptFence: -1,
             generation: -1,
             turn: -1,

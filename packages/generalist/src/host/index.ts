@@ -26,8 +26,9 @@ import {
   type Service as InstructionsService,
 } from "../instructions/providers.js"
 import type { Cursor } from "../runtime/cursor.js"
-import type { CreateSessionError, HostSession, SessionError, SessionEventsError } from "../runtime/session/host.js"
+import type { CreateSessionError, SessionError, SessionEventsError } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
+import { make as makeSessionReads, type SessionReads } from "./session-reads.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
 import type { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
@@ -73,6 +74,14 @@ export type {
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
+export {
+  SessionHistoryInput,
+  SessionHistoryPage,
+  SessionRunsInput,
+  SessionRunsPage,
+  SessionRunSummary,
+  SessionPageInvalid,
+} from "../runtime/session/page.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
   HostEvent,
@@ -114,7 +123,8 @@ export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: 
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
-  readonly sessions: {
+  readonly sessions: SessionReads & {
+    readonly list: () => import("../runtime/session/host.js").RuntimeHostSessions["listSessions"]
     readonly create: (
       options?: SessionCreateOptions,
     ) => Effect.Effect<
@@ -122,16 +132,6 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
       CreateSessionError | AgentNotRegistered | import("../runtime/errors.js").UnknownAgent
     >
     readonly get: (sessionId: string) => Effect.Effect<SessionHandle, SessionError>
-    readonly snapshot: (
-      sessionId: string,
-    ) => Effect.Effect<
-      import("../runtime/session/host.js").HostSessionSnapshot,
-      import("../runtime/session/host.js").SessionSnapshotError
-    >
-    readonly list: () => Effect.Effect<
-      ReadonlyArray<HostSession>,
-      RuntimeUnavailable | import("../durability/errors.js").DurabilityFailure
-    >
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
@@ -357,16 +357,15 @@ const create = <
       registered.set(agent, configured)
       registeredByName.set(agent.name, configured)
     }
-
     const sessionHandle = makeSessionHandle({ runtime, registeredByName })
     const host: Host<Agents> = {
       attachments,
       artifacts,
       sessions: {
+        ...makeSessionReads(runtime),
+        list: () => runtime.listSessions,
         create: createSessionHandle({ runtime, registeredByName }),
         get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
-        snapshot: runtime.sessionSnapshot,
-        list: () => runtime.listSessions,
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
       runs: {
@@ -442,9 +441,10 @@ const create = <
             )
         },
         previews: (sessionId, runId) =>
-          runtime.sessionRuns(sessionId).pipe(
-            Effect.map((runs) => {
-              if (!runs.some((run) => run.runId === runId)) return Stream.fromIterable<PreviewDelivery>([])
+          runtime.sessionRunSummary(sessionId, runId).pipe(
+            Effect.catchTag("generalist/host/SessionPageInvalid", () => Effect.void),
+            Effect.map((run) => {
+              if (run === undefined || run.parentRunId !== undefined) return Stream.fromIterable<PreviewDelivery>([])
               return Stream.unwrap(
                 Effect.gen(function* () {
                   const initialFence = yield* runtime.previewAuthority(runId)

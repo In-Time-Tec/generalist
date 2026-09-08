@@ -125,7 +125,7 @@ layer(objectLayer)("atomic model response memory commit", (suite) => {
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact, checkpoint })
       const committedSnapshot = yield* runtime.sessionSnapshot("session:model-commit-memory")
-      expect(committedSnapshot.runs[0]?.outcome).toBeUndefined()
+      expect(committedSnapshot.runs[0]?.status).toBe("running")
       expect(committedSnapshot.conversation.entries).toHaveLength(2)
       const committedUpdates = yield* runtime
         .sessionEvents({ sessionId: "session:model-commit-memory", cursor: beforeModelCommit.cursor })

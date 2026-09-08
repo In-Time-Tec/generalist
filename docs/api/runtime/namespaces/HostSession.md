@@ -6,94 +6,6 @@
 
 # HostSession
 
-## Classes
-
-<a id="sessionsnapshottoolarge"></a>
-
-### SessionSnapshotTooLarge
-
-**`Experimental`**
-
-A Session cannot be projected within the supported work or response budget.
-
-#### Extends
-
-- `SessionSnapshotTooLarge_base`
-
-#### Constructors
-
-<a id="constructor"></a>
-
-##### Constructor
-
-> **new SessionSnapshotTooLarge**(...`args`): [`SessionSnapshotTooLarge`](#sessionsnapshottoolarge)
-
-**`Experimental`**
-
-###### Parameters
-
-###### args
-
-...\[`object`, `MakeOptions`\]
-
-###### Returns
-
-[`SessionSnapshotTooLarge`](#sessionsnapshottoolarge)
-
-###### Inherited from
-
-`SessionSnapshotTooLarge_base.constructor`
-
-#### Properties
-
-<a id="hint"></a>
-
-##### hint
-
-> `readonly` **hint**: `string`
-
-**`Experimental`**
-
-###### Inherited from
-
-`SessionSnapshotTooLarge_base.hint`
-
-<a id="limit"></a>
-
-##### limit
-
-> `readonly` **limit**: `"bytes"` \| `"events"` \| `"entries"` \| `"runs"` \| `"scanned-runs"`
-
-**`Experimental`**
-
-###### Inherited from
-
-`SessionSnapshotTooLarge_base.limit`
-
-<a id="maximum"></a>
-
-##### maximum
-
-> `readonly` **maximum**: `number`
-
-**`Experimental`**
-
-###### Inherited from
-
-`SessionSnapshotTooLarge_base.maximum`
-
-<a id="sessionid"></a>
-
-##### sessionId
-
-> `readonly` **sessionId**: `string`
-
-**`Experimental`**
-
-###### Inherited from
-
-`SessionSnapshotTooLarge_base.sessionId`
-
 ## Interfaces
 
 <a id="createsessioninput"></a>
@@ -210,11 +122,15 @@ One bounded committed Session projection and its exact exclusive replay cursor.
 
 ###### entries
 
-> `readonly` **entries**: readonly `object`[]
+> `readonly` **entries**: readonly `ConversationEntry`[]
 
 ###### leafId
 
 > `readonly` **leafId**: `string` \| `null`
+
+###### nextLeafId?
+
+> `readonly` `optional` **nextLeafId?**: `string`
 
 <a id="cursor"></a>
 
@@ -228,7 +144,7 @@ One bounded committed Session projection and its exact exclusive replay cursor.
 
 ##### runs
 
-> `readonly` **runs**: readonly [`RunSnapshot`](./Run.md#runsnapshot)[]
+> `readonly` **runs**: readonly [`SessionRunSummary`](../../host.md#sessionrunsummary)[]
 
 **`Experimental`**
 
@@ -334,7 +250,7 @@ Runtime operations that persist and observe product-facing Sessions.
 
 ##### sessionEvents
 
-> `readonly` **sessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
+> `readonly` **sessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
 
 ###### Parameters
 
@@ -344,7 +260,33 @@ Runtime operations that persist and observe product-facing Sessions.
 
 ###### Returns
 
-`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
+`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](#sessioneventserror)\>
+
+<a id="sessionhistorypage"></a>
+
+##### sessionHistoryPage
+
+> `readonly` **sessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### leafId
+
+`string` \| `null`
+
+###### limit
+
+`number`
+
+###### Returns
+
+`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](#sessionpageerror)\>
 
 <a id="sessionruns"></a>
 
@@ -361,6 +303,60 @@ Runtime operations that persist and observe product-facing Sessions.
 ###### Returns
 
 `Effect`\<readonly [`RunInspection`](./Run.md#runinspection)[], [`SessionError`](#sessionerror)\>
+
+<a id="sessionrunspage"></a>
+
+##### sessionRunsPage
+
+> `readonly` **sessionRunsPage**: (`sessionId`, `input`) => `Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### rootRunId?
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](#sessionpageerror)\>
+
+<a id="sessionrunsummary"></a>
+
+##### sessionRunSummary
+
+> `readonly` **sessionRunSummary**: (`sessionId`, `runId`) => `Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](#sessionpageerror)\>
 
 <a id="sessionsnapshot"></a>
 
@@ -604,7 +600,7 @@ readonly `object`[]
 
 > `readonly` `optional` **cursor?**: `number`
 
-<a id="sessionid-1"></a>
+<a id="sessionid"></a>
 
 ##### sessionId
 
@@ -646,11 +642,19 @@ One Runtime event at its exclusive Session replay cursor.
 
 ***
 
+<a id="sessionpageerror"></a>
+
+### SessionPageError
+
+> **SessionPageError** = [`SessionError`](#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)
+
+***
+
 <a id="sessionsnapshoterror"></a>
 
 ### SessionSnapshotError
 
-> **SessionSnapshotError** = [`SessionError`](#sessionerror) \| [`SessionSnapshotTooLarge`](#sessionsnapshottoolarge)
+> **SessionSnapshotError** = [`SessionError`](#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)
 
 ## Variables
 
@@ -658,7 +662,7 @@ One Runtime event at its exclusive Session replay cursor.
 
 ### HostSessionEvent
 
-> `const` **HostSessionEvent**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Run"`, \{ `cursor`: `Schema.Int`; `event`: `Schema.Codec`\<[`RunEvent`](./RunEvent.md#runevent), `object` & \{ `_tag`: `"TurnStarted"`; `metadata?`: \{\[`x`: ...\]: ...; \}; `turn`: `number`; \} \| \{ `_tag`: `"ModelResponseCommitted"`; `attempt`: `number`; `budgetCharge`: `number`; `digest`: `string`; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `metadata?`: \{\[`x`: ...\]: ...; \}; `modelAttemptId`: `string`; `modelCallId`: `string`; `operationKey`: `string`; `originOperationKey`: `string`; `originRunId`: `string`; `sessionEntryId`: `string`; `sessionId`: `string`; `sessionParentId`: ... \| ...; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"ModelResponseInterrupted"`; `attempt`: `number`; `digest`: `string`; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `modelAttemptId`: `string`; `modelCallId`: `string`; `operationKey`: `string`; `originOperationKey`: `string`; `originRunId`: `string`; `reason`: ... \| ...; `sessionEntryId`: `string`; `sessionId`: `string`; `sessionParentId`: ... \| ...; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"ToolExecutionStarted"`; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `turn`: `number`; \} \| \{ `_tag`: `"ToolProgress"`; `data?`: \{\[`x`: ...\]: ...; \}; `message?`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `toolCallId`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ToolExecutionCompleted"`; `artifactRead?`: \{ `artifact`: ...; `branch?`: ...; `version`: ...; \}; `artifactUpdated?`: \{ `artifact`: ...; `attribution`: ...; `base`: ...; `branch?`: ...; `result`: ...; \}; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `result`: \{ `~effect/ai/Content/Part?`: ...; `encodedResult`: ...; `id`: ...; `isFailure`: ...; `memoized?`: ...; `metadata`: ...; `name`: ...; `preliminary`: ...; `providerExecuted`: ...; `result`: ...; `taint`: ...; `type`: ...; \}; `tasksUpdated?`: readonly ...; `turn`: `number`; \} \| \{ `_tag`: `"ToolExecutionWaiting"`; `awaitEvent?`: \{ `deadline`: ...; `filter`: ...; \}; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `token`: `string`; `turn`: `number`; `waitId`: `string`; \} \| \{ `_tag`: `"HandoffRequested"`; `handoffId`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `reason?`: `string`; `source`: `string`; `target`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"HandoffCompleted"`; `handoffId`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `source`: `string`; `target`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"Rejected"`; `handoffId`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `reason`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ApprovalRequested"`; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `request`: \{ `approvalId`: ...; `capability`: ...; `input`: ...; `operation`: ...; \}; `turn`: `number`; \} \| \{ `_tag`: `"SteeringDrained"`; `count`: `number`; `metadata?`: \{\[`x`: ...\]: ...; \}; `queue`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"TurnCompleted"`; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `metadata?`: \{\[`x`: ...\]: ...; \}; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"GateResult"`; `evidence`: `Schema.Json`; `name`: `string`; `turn`: `number`; `verdict`: ... \| ...; \} \| \{ `_tag`: `"ModelCallStarted"`; `compactionId?`: `string`; `deliveryId`: `string`; `model?`: `string`; `modelCallId`: `string`; `provider?`: `string`; `purpose`: ... \| ... \| ...; `startedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"ModelAttemptStarted"`; `attempt`: `number`; `candidate?`: `number`; `deliveryId`: `string`; `model?`: `string`; `modelAttemptId`: `string`; `modelCallId`: `string`; `provider?`: `string`; `registrationKey?`: `string`; `startedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"ModelAttemptFirstOutput"`; `at`: `number`; `attempt`: `number`; `deliveryId`: `string`; `kind`: ... \| ... \| ...; `modelAttemptId`: `string`; `modelCallId`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ModelAttemptCompleted"`; `attempt`: `number`; `candidate?`: `number`; `completedAt`: `number`; `deliveryId`: `string`; `finishReason`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `model?`: `string`; `modelAttemptId`: `string`; `modelCallId`: `string`; `provider?`: `string`; `providerMetadata?`: \{\[`x`: ...\]: ...; \}; `registrationKey?`: `string`; `requestId?`: `string`; `responseModel?`: `string`; `serviceTier?`: `string`; `turn`: `number`; `usage`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; `usageAt`: `number`; \} \| \{ `_tag`: `"ModelAttemptFailed"`; `attempt`: `number`; `candidate?`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `classification`: ... \| ...; `deliveryId`: `string`; `disposition`: ... \| ... \| ...; `failedAt`: `number`; `model?`: `string`; `modelAttemptId`: `string`; `modelCallId`: `string`; `provider?`: `string`; `providerUsage?`: \{ `inputTokens?`: ...; `outputTokens?`: ...; `totalTokens?`: ...; \}; `registrationKey?`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ModelRetryScheduled"`; `at`: `number`; `attempt`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `delayMillis`: `number`; `deliveryId`: `string`; `modelCallId`: `string`; `reason`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"ModelFallbackScheduled"`; `at`: `number`; `attempt`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `deliveryId`: `string`; `fromCandidate`: `number`; `fromModel`: `string`; `fromProvider`: `string`; `fromRegistrationKey?`: `string`; `modelCallId`: `string`; `toCandidate`: `number`; `toModel`: `string`; `toProvider`: `string`; `toRegistrationKey?`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ModelCallCompleted"`; `attempts`: `number`; `completedAt`: `number`; `deliveryId`: `string`; `failedAttemptUsage?`: \{ `inputTokens?`: ...; `outputTokens?`: ...; `totalTokens?`: ...; \}; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `modelCallId`: `string`; `purpose`: ... \| ... \| ...; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"ModelCallFailed"`; `attempts`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `classification`: ... \| ...; `deliveryId`: `string`; `failedAt`: `number`; `failedAttemptUsage?`: \{ `inputTokens?`: ...; `outputTokens?`: ...; `totalTokens?`: ...; \}; `modelCallId`: `string`; `purpose`: ... \| ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"CompactionStarted"`; `compactionId`: `string`; `contextTokensBefore?`: `number`; `deliveryId`: `string`; `entriesBefore?`: `number`; `startedAt`: `number`; `trigger`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"CompactionSkipped"`; `compactionId`: `string`; `deliveryId`: `string`; `skippedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: ...; `compactionId`: ...; `contextTokensAfter?`: ...; `contextTokensBefore?`: ...; `entriesAfter?`: ...; `entriesBefore?`: ...; `summaryModelCallId?`: ...; \}; `compactionId`: `string`; `deliveryId`: `string`; `kind`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"CompactionFailed"`; `compactionId`: `string`; `deliveryId`: `string`; `failedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"Awaiting"`; `deadline`: `string`; `filter`: ... \| ... \| ... \| ... \| ...; `waitId`: `string`; \} \| \{ `_tag`: `"Duplicate"`; `dedupeKey`: `string`; \} \| \{ `_tag`: `"TimedOut"`; `deadline`: `string`; `waitId`: `string`; \} \| \{ `_tag`: `"WakeReceived"`; `event`: ... \| ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"RunAccepted"`; `address`: `string`; `budget?`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; `messageId`: `string`; \} \| \{ `_tag`: `"BudgetExtended"`; `delta`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; \} \| \{ `_tag`: `"RunForked"`; `allocationRunId`: `string`; `atSequence`: `number`; `budget`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; `forkRunId`: `string`; `programBudget?`: \{ `agentRuns`: ...; `concurrency`: ...; `logBytes`: ...; `outputBytes`: ...; `tokens`: ...; `toolCalls`: ...; `wallClockMillis`: ...; \}; `role`: ... \| ... \| ...; `sourceRunId`: `string`; \} \| \{ `_tag`: `"RunRewound"`; `allocation?`: \{ `baseline`: ...; `budget`: ...; `runId`: ...; \}; `branchRunId`: `string`; `toSequence`: `number`; \} \| \{ `_tag`: `"ProgramOperationSettled"`; `operation`: `string`; `status`: ... \| ... \| ...; \} \| \{ `_tag`: `"BudgetSuspended"`; `budget`: ... \| ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"RunAttemptStarted"`; `attempt`: `number`; \} \| \{ `_tag`: `"RunWaiting"`; `wait`: \{ `closedAt?`: ...; `openedAt`: ...; `reason`: ...; `resolution?`: ...; `status`: ...; `waitId`: ...; \}; \} \| \{ `_tag`: `"RunResumed"`; `resolution`: ... \| ... \| ... \| ...; `waitId`: `string`; \} \| \{ `_tag`: `"Inbox"`; `addressed?`: \{ `causationId?`: ...; `correlationId`: ...; `from?`: ...; `id`: ...; `idempotencyKey`: ...; `inReplyTo?`: ...; `metadata`: ...; `prompt`: ...; `sessionId`: ...; `to`: ...; \}; `digest`: `string`; `entryId`: `string`; `from`: ... \| ... \| ...; `idempotencyKey`: `string`; `inboxSequence`: `number`; `message`: `PromptEncoded`; `policy`: ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"SteeringAccepted"`; `digest`: `string`; `entryId`: `string`; `idempotencyKey`: `string`; `prompt`: `PromptEncoded`; `steeringSequence`: `number`; \} \| \{ `_tag`: `"SteeringConsumed"`; `entryIds`: readonly ...; `operationId`: `string`; \} \| \{ `_tag`: `"SteeringDiscarded"`; `entryIds`: readonly ...; `reason`: ... \| ... \| ...; \} \| \{ `_tag`: `"OperationUnknown"`; `operationId`: `string`; \} \| \{ `_tag`: `"Substituted"`; `operationId`: `string`; \} \| \{ `_tag`: `"ChildLinked"`; `budget?`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; `childDepth`: `number`; `childRunId`: `string`; `inherit`: \{ `budget?`: ...; `history`: ...; `instructions`: ...; `memory`: ...; `permissions`: ...; `sandbox`: ...; `tasks`: ...; `tools`: ...; \}; `invocationId`: `string`; `key?`: `string`; `label?`: `string`; `origin?`: \{ `operationKey?`: ...; `parentToolCallId?`: ...; \}; `prompt`: `PromptEncoded`; `readiness`: ... \| ... \| ...; `selection`: `string`; \} \| \{ `_tag`: `"ChildReadinessChanged"`; `childRunId`: `string`; `readiness`: ... \| ... \| ...; \} \| \{ `_tag`: `"ChildSettled"`; `childRunId`: `string`; `spend?`: \{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}; `terminalEventId`: `string`; \} \| \{ `_tag`: `"FanOutAdmitted"`; `concurrency`: `number`; `fanOutId`: `string`; `join`: ... \| ... \| ... \| ... \| ...; `memberCount`: `number`; `remainder`: ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"FanOutJoined"`; `abandoned`: `number`; `cancelled`: `number`; `failed`: `number`; `fanOutId`: `string`; `remainder`: readonly ...; `status`: ... \| ... \| ...; `succeeded`: `number`; \} \| \{ `_tag`: `"RunCompleted"`; `result`: ... \| ...; \} \| \{ `_tag`: `"RunFailed"`; `error`: `unknown`; \} \| \{ `_tag`: `"RunCancellationRequested"`; `reason?`: `string`; \} \| \{ `_tag`: `"RunCancelled"`; `reason?`: `string`; \} \| \{ `_tag`: `"ProgramLog"`; `data?`: \{\[`x`: ...\]: ...; \}; `level`: ... \| ... \| ... \| ...; `message`: `string`; `operation`: `string`; \} \| \{ `_tag`: `"Rewarded"`; `leaf`: `string`; `source`: `string`; `value`: `number`; \}, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Conversation"`, \{ `cursor`: `Schema.Int`; `update`: `Schema.Struct`\<\{ `afterEntryId`: `Schema.NullOr`\<`Schema.String`\>; `entries`: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `messages`: `Schema.$Array`\<...\>; `parentId`: `Schema.NullOr`\<...\>; \}\>\>; `leafId`: `Schema.NullOr`\<`Schema.String`\>; `previousLeafId`: `Schema.NullOr`\<`Schema.String`\>; \}\>; \}\>\]\>
+> `const` **HostSessionEvent**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Run"`, \{ `cursor`: `Schema.Int`; `event`: `Schema.Codec`\<[`RunEvent`](./RunEvent.md#runevent), `object` & \{ `_tag`: `"TurnStarted"`; `metadata?`: \{\[`x`: ...\]: ...; \}; `turn`: `number`; \} \| \{ `_tag`: `"ModelResponseCommitted"`; `attempt`: `number`; `budgetCharge`: `number`; `digest`: `string`; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `metadata?`: \{\[`x`: ...\]: ...; \}; `modelAttemptId`: `string`; `modelCallId`: `string`; `operationKey`: `string`; `originOperationKey`: `string`; `originRunId`: `string`; `sessionEntryId`: `string`; `sessionId`: `string`; `sessionParentId`: ... \| ...; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"ModelResponseInterrupted"`; `attempt`: `number`; `digest`: `string`; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `modelAttemptId`: `string`; `modelCallId`: `string`; `operationKey`: `string`; `originOperationKey`: `string`; `originRunId`: `string`; `reason`: ... \| ...; `sessionEntryId`: `string`; `sessionId`: `string`; `sessionParentId`: ... \| ...; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"ToolExecutionStarted"`; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `turn`: `number`; \} \| \{ `_tag`: `"ToolProgress"`; `data?`: \{\[`x`: ...\]: ...; \}; `message?`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `toolCallId`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ToolExecutionCompleted"`; `artifactRead?`: \{ `artifact`: ...; `branch?`: ...; `version`: ...; \}; `artifactUpdated?`: \{ `artifact`: ...; `attribution`: ...; `base`: ...; `branch?`: ...; `result`: ...; \}; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `result`: \{ `~effect/ai/Content/Part?`: ...; `encodedResult`: ...; `id`: ...; `isFailure`: ...; `memoized?`: ...; `metadata`: ...; `name`: ...; `preliminary`: ...; `providerExecuted`: ...; `result`: ...; `taint`: ...; `type`: ...; \}; `tasksUpdated?`: readonly ...; `turn`: `number`; \} \| \{ `_tag`: `"ToolExecutionWaiting"`; `awaitEvent?`: \{ `deadline`: ...; `filter`: ...; \}; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `token`: `string`; `turn`: `number`; `waitId`: `string`; \} \| \{ `_tag`: `"HandoffRequested"`; `handoffId`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `reason?`: `string`; `source`: `string`; `target`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"HandoffCompleted"`; `handoffId`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `source`: `string`; `target`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"Rejected"`; `handoffId`: `string`; `metadata?`: \{\[`x`: ...\]: ...; \}; `reason`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ApprovalRequested"`; `call`: \{ `~effect/ai/Content/Part?`: ...; `id`: ...; `metadata`: ...; `name`: ...; `params`: ...; `providerExecuted`: ...; `type`: ...; \}; `metadata?`: \{\[`x`: ...\]: ...; \}; `request`: \{ `approvalId`: ...; `capability`: ...; `input`: ...; `operation`: ...; \}; `turn`: `number`; \} \| \{ `_tag`: `"SteeringDrained"`; `count`: `number`; `metadata?`: \{\[`x`: ...\]: ...; \}; `queue`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"TurnCompleted"`; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `metadata?`: \{\[`x`: ...\]: ...; \}; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"GateResult"`; `evidence`: `Schema.Json`; `name`: `string`; `turn`: `number`; `verdict`: ... \| ...; \} \| \{ `_tag`: `"ModelCallStarted"`; `compactionId?`: `string`; `deliveryId`: `string`; `model?`: `string`; `modelCallId`: `string`; `provider?`: `string`; `purpose`: ... \| ... \| ...; `startedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"ModelAttemptStarted"`; `attempt`: `number`; `candidate?`: `number`; `deliveryId`: `string`; `model?`: `string`; `modelAttemptId`: `string`; `modelCallId`: `string`; `provider?`: `string`; `registrationKey?`: `string`; `startedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"ModelAttemptFirstOutput"`; `at`: `number`; `attempt`: `number`; `deliveryId`: `string`; `kind`: ... \| ... \| ...; `modelAttemptId`: `string`; `modelCallId`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ModelAttemptCompleted"`; `attempt`: `number`; `candidate?`: `number`; `completedAt`: `number`; `deliveryId`: `string`; `finishReason`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `model?`: `string`; `modelAttemptId`: `string`; `modelCallId`: `string`; `provider?`: `string`; `providerMetadata?`: \{\[`x`: ...\]: ...; \}; `registrationKey?`: `string`; `requestId?`: `string`; `responseModel?`: `string`; `serviceTier?`: `string`; `turn`: `number`; `usage`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; `usageAt`: `number`; \} \| \{ `_tag`: `"ModelAttemptFailed"`; `attempt`: `number`; `candidate?`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `classification`: ... \| ...; `deliveryId`: `string`; `disposition`: ... \| ... \| ...; `failedAt`: `number`; `model?`: `string`; `modelAttemptId`: `string`; `modelCallId`: `string`; `provider?`: `string`; `providerUsage?`: \{ `inputTokens?`: ...; `outputTokens?`: ...; `totalTokens?`: ...; \}; `registrationKey?`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ModelRetryScheduled"`; `at`: `number`; `attempt`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `delayMillis`: `number`; `deliveryId`: `string`; `modelCallId`: `string`; `reason`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"ModelFallbackScheduled"`; `at`: `number`; `attempt`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `deliveryId`: `string`; `fromCandidate`: `number`; `fromModel`: `string`; `fromProvider`: `string`; `fromRegistrationKey?`: `string`; `modelCallId`: `string`; `toCandidate`: `number`; `toModel`: `string`; `toProvider`: `string`; `toRegistrationKey?`: `string`; `turn`: `number`; \} \| \{ `_tag`: `"ModelCallCompleted"`; `attempts`: `number`; `completedAt`: `number`; `deliveryId`: `string`; `failedAttemptUsage?`: \{ `inputTokens?`: ...; `outputTokens?`: ...; `totalTokens?`: ...; \}; `finishReason?`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `modelCallId`: `string`; `purpose`: ... \| ... \| ...; `turn`: `number`; `usage?`: \{ `inputTokens`: ...; `outputTokens`: ...; \}; \} \| \{ `_tag`: `"ModelCallFailed"`; `attempts`: `number`; `category`: ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ... \| ...; `classification`: ... \| ...; `deliveryId`: `string`; `failedAt`: `number`; `failedAttemptUsage?`: \{ `inputTokens?`: ...; `outputTokens?`: ...; `totalTokens?`: ...; \}; `modelCallId`: `string`; `purpose`: ... \| ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"CompactionStarted"`; `compactionId`: `string`; `contextTokensBefore?`: `number`; `deliveryId`: `string`; `entriesBefore?`: `number`; `startedAt`: `number`; `trigger`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"CompactionSkipped"`; `compactionId`: `string`; `deliveryId`: `string`; `skippedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: ...; `compactionId`: ...; `contextTokensAfter?`: ...; `contextTokensBefore?`: ...; `entriesAfter?`: ...; `entriesBefore?`: ...; `summaryModelCallId?`: ...; \}; `compactionId`: `string`; `deliveryId`: `string`; `kind`: ... \| ...; `turn`: `number`; \} \| \{ `_tag`: `"CompactionFailed"`; `compactionId`: `string`; `deliveryId`: `string`; `failedAt`: `number`; `turn`: `number`; \} \| \{ `_tag`: `"Awaiting"`; `deadline`: `string`; `filter`: ... \| ... \| ... \| ... \| ...; `waitId`: `string`; \} \| \{ `_tag`: `"Duplicate"`; `dedupeKey`: `string`; \} \| \{ `_tag`: `"TimedOut"`; `deadline`: `string`; `waitId`: `string`; \} \| \{ `_tag`: `"WakeReceived"`; `event`: ... \| ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"RunAccepted"`; `address`: `string`; `budget?`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; `messageId`: `string`; \} \| \{ `_tag`: `"BudgetExtended"`; `delta`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; \} \| \{ `_tag`: `"RunForked"`; `allocationRunId`: `string`; `atSequence`: `number`; `budget`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; `forkRunId`: `string`; `programBudget?`: \{ `agentRuns`: ...; `concurrency`: ...; `logBytes`: ...; `outputBytes`: ...; `tokens`: ...; `toolCalls`: ...; `wallClockMillis`: ...; \}; `role`: ... \| ... \| ...; `sourceRunId`: `string`; \} \| \{ `_tag`: `"RunRewound"`; `allocation?`: \{ `baseline`: ...; `budget`: ...; `runId`: ...; \}; `branchRunId`: `string`; `toSequence`: `number`; \} \| \{ `_tag`: `"ProgramOperationSettled"`; `operation`: `string`; `status`: ... \| ... \| ...; \} \| \{ `_tag`: `"BudgetSuspended"`; `budget`: ... \| ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"RunAttemptStarted"`; `attempt`: `number`; \} \| \{ `_tag`: `"RunWaiting"`; `wait`: \{ `closedAt?`: ...; `openedAt`: ...; `reason`: ...; `resolution?`: ...; `status`: ...; `waitId`: ...; \}; \} \| \{ `_tag`: `"RunResumed"`; `resolution`: ... \| ... \| ... \| ...; `waitId`: `string`; \} \| \{ `_tag`: `"Inbox"`; `addressed?`: \{ `causationId?`: ...; `correlationId`: ...; `from?`: ...; `id`: ...; `idempotencyKey`: ...; `inReplyTo?`: ...; `metadata`: ...; `prompt`: ...; `sessionId`: ...; `to`: ...; \}; `digest`: `string`; `entryId`: `string`; `from`: ... \| ... \| ...; `idempotencyKey`: `string`; `inboxSequence`: `number`; `message`: `PromptEncoded`; `policy`: ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"SteeringAccepted"`; `digest`: `string`; `entryId`: `string`; `idempotencyKey`: `string`; `prompt`: `PromptEncoded`; `steeringSequence`: `number`; \} \| \{ `_tag`: `"SteeringConsumed"`; `entryIds`: readonly ...; `operationId`: `string`; \} \| \{ `_tag`: `"SteeringDiscarded"`; `entryIds`: readonly ...; `reason`: ... \| ... \| ...; \} \| \{ `_tag`: `"OperationUnknown"`; `operationId`: `string`; \} \| \{ `_tag`: `"Substituted"`; `operationId`: `string`; \} \| \{ `_tag`: `"ChildLinked"`; `budget?`: \{ `children?`: ...; `duration?`: ...; `tokens?`: ...; `toolCalls?`: ...; `usd?`: ...; \}; `childDepth`: `number`; `childRunId`: `string`; `inherit`: \{ `budget?`: ...; `history`: ...; `instructions`: ...; `memory`: ...; `permissions`: ...; `sandbox`: ...; `tasks`: ...; `tools`: ...; \}; `invocationId`: `string`; `key?`: `string`; `label?`: `string`; `origin?`: \{ `operationKey?`: ...; `parentToolCallId?`: ...; \}; `prompt`: `PromptEncoded`; `readiness`: ... \| ... \| ...; `selection`: `string`; \} \| \{ `_tag`: `"ChildReadinessChanged"`; `childRunId`: `string`; `readiness`: ... \| ... \| ...; \} \| \{ `_tag`: `"ChildSettled"`; `childRunId`: `string`; `spend?`: \{ `children`: ...; `duration`: ...; `tokens`: ...; `toolCalls`: ...; `usd`: ...; \}; `terminalEventId`: `string`; \} \| \{ `_tag`: `"FanOutAdmitted"`; `concurrency`: `number`; `fanOutId`: `string`; `join`: ... \| ... \| ... \| ... \| ...; `memberCount`: `number`; `remainder`: ... \| ... \| ... \| ...; \} \| \{ `_tag`: `"FanOutJoined"`; `abandoned`: `number`; `cancelled`: `number`; `failed`: `number`; `fanOutId`: `string`; `remainder`: readonly ...; `status`: ... \| ... \| ...; `succeeded`: `number`; \} \| \{ `_tag`: `"RunCompleted"`; `result`: ... \| ...; \} \| \{ `_tag`: `"RunFailed"`; `error`: `unknown`; \} \| \{ `_tag`: `"RunCancellationRequested"`; `reason?`: `string`; \} \| \{ `_tag`: `"RunCancelled"`; `reason?`: `string`; \} \| \{ `_tag`: `"ProgramLog"`; `data?`: \{\[`x`: ...\]: ...; \}; `level`: ... \| ... \| ... \| ...; `message`: `string`; `operation`: `string`; \} \| \{ `_tag`: `"Rewarded"`; `leaf`: `string`; `source`: `string`; `value`: `number`; \}, `never`, `never`\>; \}\>, `Schema.TaggedStruct`\<`"Conversation"`, \{ `cursor`: `Schema.Int`; `update`: `Schema.Struct`\<\{ `afterEntryId`: `Schema.NullOr`\<`Schema.String`\>; `entries`: `Schema.$Array`\<`Schema.Codec`\<`ConversationEntry`, `unknown`, `never`, `never`\>\>; `leafId`: `Schema.NullOr`\<`Schema.String`\>; `nextLeafId`: `Schema.optionalKey`\<`Schema.String`\>; `previousLeafId`: `Schema.NullOr`\<`Schema.String`\>; `reset`: `Schema.optionalKey`\<`Schema.Literal`\<`true`\>\>; \}\>; \}\>\]\>
 
 One Runtime event at its exclusive Session replay cursor.
 
