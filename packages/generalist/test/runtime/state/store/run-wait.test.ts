@@ -23,7 +23,13 @@ const setup = Effect.gen(function* () {
     selection: "researcher",
     prompt: textPrompt("child"),
   })
-  const wait = (waitId: string, commandId = waitId) =>
+  const sibling = yield* runtime.spawn({
+    parentRunId: parent.runId,
+    invocationId: "sibling",
+    selection: "researcher",
+    prompt: textPrompt("sibling"),
+  })
+  const wait = (waitId: string, commandId = waitId, runs = [child.runId], messages = true) =>
     Effect.gen(function* () {
       const claim = yield* store.claimExecution({
         runId: parent.runId,
@@ -39,7 +45,7 @@ const setup = Effect.gen(function* () {
             openedAt: "1970-01-01T00:00:00.000Z",
             reason: {
               _tag: "AwaitEvent",
-              filter: { _tag: "Run", runs: [child.runId], messages: true, commandId },
+              filter: { _tag: "Run", runs, messages, commandId },
               deadline: DateTime.formatIso(DateTime.makeUnsafe((yield* Clock.currentTimeMillis) + 1000)),
             },
           },
@@ -59,15 +65,17 @@ const setup = Effect.gen(function* () {
     }
     return store.admitSteering({ ...input, digest: digest(input) })
   }
-  const complete = Effect.gen(function* () {
-    const claim = yield* store.claimExecution({
-      runId: child.runId,
-      commandId: `${child.runId}:claim`,
-      ownerId: objectWorkerId,
+  const completeRun = (runId: string, suffix: string) =>
+    Effect.gen(function* () {
+      const claim = yield* store.claimExecution({
+        runId,
+        commandId: `${runId}:claim:${suffix}`,
+        ownerId: objectWorkerId,
+      })
+      yield* store.complete({ ...claim, commandId: `${runId}:complete:${suffix}`, result: completedResult("answer") })
     })
-    yield* store.complete({ ...claim, commandId: `${child.runId}:complete`, result: completedResult("answer") })
-  })
-  return { runtime, store, parent, child, wait, message, complete }
+  const complete = completeRun(child.runId, "child")
+  return { runtime, store, parent, child, sibling, wait, message, complete, completeRun }
 })
 
 layer(objectLayer)("Run-or-message wait", (it) => {
@@ -133,6 +141,16 @@ layer(objectLayer)("Run-or-message wait", (it) => {
         _tag: "generalist/runtime/RunTerminal",
       })
       expect((yield* f.runtime.inspect(f.parent.runId)).waits).toEqual([])
+    }),
+  )
+  it.effect("selects the earliest settled Run independent of selector order", () =>
+    Effect.gen(function* () {
+      const f = yield* setup
+      yield* f.completeRun(f.sibling.runId, "first")
+      yield* f.wait("ordered", "ordered", [f.child.runId, f.sibling.runId], false)
+      expect((yield* f.store.loadExecution(f.parent.runId)).resolutions).toMatchObject([
+        { resolution: { result: { _tag: "RunSettled", runId: f.sibling.runId } } },
+      ])
     }),
   )
 })

@@ -30,16 +30,20 @@ export const reconcileRunWaits = (state: RuntimeState, runId: string) =>
       if (message !== undefined) {
         result = { _tag: "Message", messageId: message.entryId, input: message.prompt, cursor: message.sequence }
       } else {
-        for (const targetId of selector.runs) {
-          const target = next.runs.get(targetId)
-          if (target === undefined || target.rootRunId !== run.rootRunId) continue
-          const terminal = target.events.find(
-            (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
-          )
-          if (terminal === undefined) continue
-          result = { _tag: "RunSettled", runId: targetId, terminalEventId: terminal.eventId }
-          break
-        }
+        const settled = selector.runs
+          .flatMap((targetId) => {
+            const target = next.runs.get(targetId)
+            if (target === undefined || target.rootRunId !== run.rootRunId) return []
+            const terminal = target.events.find(
+              (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+            )
+            return terminal === undefined ? [] : [{ runId: targetId, terminal }]
+          })
+          .toSorted(
+            (left, right) => left.terminal.sequence - right.terminal.sequence || left.runId.localeCompare(right.runId),
+          )[0]
+        if (settled !== undefined)
+          result = { _tag: "RunSettled", runId: settled.runId, terminalEventId: settled.terminal.eventId }
       }
       if (result === undefined && receipt === undefined) continue
       const resolution = receipt ?? {
