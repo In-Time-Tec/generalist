@@ -26,8 +26,9 @@ import {
   type Service as InstructionsService,
 } from "../instructions/providers.js"
 import type { Cursor } from "../runtime/cursor.js"
-import type { CreateSessionError, HostSession, SessionError, SessionEventsError } from "../runtime/session/host.js"
+import type { CreateSessionError, SessionError, SessionEventsError } from "../runtime/session/host.js"
 import type { RunInspection } from "../runtime/run.js"
+import { make as makeSessionReads, type SessionReads } from "./session-reads.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
 import type { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
@@ -47,20 +48,16 @@ import {
   type StartOptions,
 } from "../runtime/service.js"
 import type { ToolServices } from "../runtime/executable/registered-tool.js"
-import {
-  DuplicateAgent,
-  IllegalOperatorAction,
-  type RuntimeUnavailable,
-  type ExecutableRegistrationInvalid,
-} from "../runtime/errors.js"
+import { IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
 import { make as makeTools, type Tools as HostTools } from "./tools.js"
+export type { CreateError } from "./errors.js"
 export type { HostToolRun } from "./tools.js"
 export { ToolIdentity } from "../runtime/executable/tool-identity.js"
 import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
-import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
+import { AgentInputInvalid, AgentNotRegistered, type CreateError } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
@@ -82,6 +79,14 @@ export type {
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
+export {
+  SessionHistoryInput,
+  SessionHistoryPage,
+  SessionRunsInput,
+  SessionRunsPage,
+  SessionRunSummary,
+  SessionPageInvalid,
+} from "../runtime/session/page.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
   HostEvent,
@@ -126,7 +131,8 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly tools: HostTools
   readonly attachments: Attachments
   readonly artifacts: Artifacts
-  readonly sessions: {
+  readonly sessions: SessionReads & {
+    readonly list: () => import("../runtime/session/host.js").RuntimeHostSessions["listSessions"]
     readonly create: (
       options?: SessionCreateOptions,
     ) => Effect.Effect<
@@ -134,16 +140,6 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
       CreateSessionError | AgentNotRegistered | import("../runtime/errors.js").UnknownAgent
     >
     readonly get: (sessionId: string) => Effect.Effect<SessionHandle, SessionError>
-    readonly snapshot: (
-      sessionId: string,
-    ) => Effect.Effect<
-      import("../runtime/session/host.js").HostSessionSnapshot,
-      import("../runtime/session/host.js").SessionSnapshotError
-    >
-    readonly list: () => Effect.Effect<
-      ReadonlyArray<HostSession>,
-      RuntimeUnavailable | import("../durability/errors.js").DurabilityFailure
-    >
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
@@ -246,15 +242,6 @@ export type CreateRequirements<
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
   | ToolServices<Tools[number]>
-
-export type CreateError =
-  | DuplicateAgent
-  | PluginNameConflict
-  | PluginToolConflict
-  | import("../runtime/errors.js").ExecutableRegistrationInvalid
-  | import("../runtime/errors.js").TreePolicyInvalid
-  | RuntimeUnavailable
-  | import("../durability/errors.js").DurabilityFailure
 
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,
@@ -378,10 +365,10 @@ const create = <
       attachments,
       artifacts,
       sessions: {
+        ...makeSessionReads(runtime),
+        list: () => runtime.listSessions,
         create: createSessionHandle({ runtime, registeredByName }),
         get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
-        snapshot: runtime.sessionSnapshot,
-        list: () => runtime.listSessions,
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
       runs: {
@@ -457,9 +444,10 @@ const create = <
             )
         },
         previews: (sessionId, runId) =>
-          runtime.sessionRuns(sessionId).pipe(
-            Effect.map((runs) => {
-              if (!runs.some((run) => run.runId === runId)) return Stream.fromIterable<PreviewDelivery>([])
+          runtime.sessionRunSummary(sessionId, runId).pipe(
+            Effect.catchTag("generalist/host/SessionPageInvalid", () => Effect.void),
+            Effect.map((run) => {
+              if (run === undefined || run.parentRunId !== undefined) return Stream.fromIterable<PreviewDelivery>([])
               return Stream.unwrap(
                 Effect.gen(function* () {
                   const initialFence = yield* runtime.previewAuthority(runId)

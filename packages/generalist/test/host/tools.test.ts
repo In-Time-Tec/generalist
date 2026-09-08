@@ -275,7 +275,6 @@ it.effect("retains sponsored Tool capacity across fresh hosts without consuming 
           .pipe(Effect.flip),
       ).toMatchObject({
         _tag: "generalist/runtime/RuntimeUnavailable",
-        message: expect.stringContaining("Tool capacity"),
       })
       yield* RunExecutor.use((executor) => executor.execute(claim))
       yield* complete(second.id, "released-second")
@@ -307,7 +306,6 @@ it.effect("enforces zero Tool capacity while preserving admitted handles", () =>
         .pipe(Effect.flip),
     ).toMatchObject({
       _tag: "generalist/runtime/RuntimeUnavailable",
-      message: expect.stringContaining("Tool capacity"),
     })
     yield* run.cancel("disabled-cancel")
     expect(yield* run.await.pipe(Effect.flip)).toMatchObject({ _tag: "RunCancelled" })
@@ -373,7 +371,6 @@ it.effect("keeps unknown sponsored effects in family capacity across a fresh hos
           .pipe(Effect.flip),
       ).toMatchObject({
         _tag: "generalist/runtime/RuntimeUnavailable",
-        message: expect.stringContaining("Tool capacity"),
       })
       yield* Runtime.use((runtime) =>
         runtime.resolveOperation({

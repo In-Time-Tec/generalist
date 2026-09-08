@@ -45,6 +45,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
         const subscribe = host.events.subscribe
         let subscriptions = 0
         let replacementRunId: string | undefined
+        let lateCursor = -1
         const spy = vi.spyOn(host.events, "subscribe").mockImplementation((sessionId, cursor) =>
           Effect.gen(function* () {
             const events = yield* subscribe(sessionId, cursor)
@@ -128,6 +129,14 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
                   : Effect.void,
               ),
               Stream.tap((event) =>
+                mode === "status-backlog" && event._tag === "SessionSnapshot" && event.epoch === 1
+                  ? Effect.gen(function* () {
+                      yield* host.runs.start(session.id, agent, "later queued input")
+                      lateCursor = (yield* host.sessions.snapshot(session.id)).cursor
+                    })
+                  : Effect.void,
+              ),
+              Stream.tap((event) =>
                 mode === "conversation-gap" && event._tag === "SessionSnapshot" && event.epoch === 0
                   ? Effect.gen(function* () {
                       const store = yield* RunStore.RunStore
@@ -158,7 +167,11 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
                 ? projected.pipe(
                     Stream.mapEffect((model) => Ref.get(oldStatusSeen).pipe(Effect.map((seen) => ({ model, seen })))),
                     Stream.takeUntil(
-                      ({ model, seen }) => seen && model.connectionEpoch === 1 && model.connection === "open",
+                      ({ model, seen }) =>
+                        seen &&
+                        model.connectionEpoch === 1 &&
+                        model.connection === "open" &&
+                        model.lastSeq >= lateCursor,
                     ),
                     Stream.map(({ model }) => model),
                   )
@@ -175,8 +188,9 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
         const snapshots = (yield* Ref.get(received)).filter(Schema.is(Connection.SessionSnapshot))
         expect(snapshots).toHaveLength(reconnects + 1)
         expect(snapshots[0]?.snapshot).toEqual(firstSnapshot)
-        expect(snapshots[0]?.snapshot.runs.map((run) => run.run.runId)).toEqual([original.id])
-        expect(snapshots[1]?.snapshot.runs.map((run) => run.run.runId)).toEqual([original.id, replacementRunId])
+        expect(snapshots[0]?.snapshot.runs.map((run) => run.runId)).toEqual([original.id])
+        expect(snapshots[1]?.snapshot.runs.map((run) => run.runId)).toEqual([original.id, replacementRunId])
+        expect(snapshots[1]?.snapshot.session.activeRunId).toBe(original.id)
         if (mode === "conversation-gap")
           expect(models.at(-1)?.entries).toEqual([
             { _tag: "UserEntry", text: "missed prefix" },
@@ -184,7 +198,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
           ])
         expect(models.at(-1)).toMatchObject({
           connectionEpoch: reconnects,
-          lastSeq: snapshots[1]?.snapshot.cursor,
+          lastSeq: mode === "status-backlog" ? lateCursor : snapshots[1]?.snapshot.cursor,
           run: { _tag: persistent ? "Failed" : "Running" },
         })
         expect(sockets).toHaveLength(reconnects + 1)
@@ -202,6 +216,11 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
           expect(replacementIndex).toBeGreaterThan(-1)
           expect(delayedOldStatus).toBeDefined()
           const current = models.at(-1)!
+          expect(current.previewAuthority?.runId).toBe(original.id)
+          expect((yield* Ref.get(received)).findLast(Schema.is(Connection.HostDelivery))).toMatchObject({
+            activeRunId: original.id,
+            event: { cursor: lateCursor, _tag: "RunStarted" },
+          })
           const withPreview = Chat.update(
             current,
             Chat.ReceivedConnection({
@@ -210,11 +229,11 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
                 delivery: {
                   _tag: "PreviewDelivery",
                   sessionId: session.id,
-                  runId: replacementRunId!,
+                  runId: original.id,
                   authorityAttemptFence: 1,
                   event: {
                     _tag: "ModelPreview",
-                    runId: replacementRunId!,
+                    runId: original.id,
                     attemptFence: 1,
                     turn: 0,
                     modelCallId: "current-call",

@@ -189,7 +189,7 @@ describe("object Runtime canonical mutations", () => {
       yield* first.releaseExecution(claim)
       const replacement = yield* second.claimExecution({ runId: run.runId, ownerId: "owner-b", commandId: "claim-b" })
       expect(replacement.attemptFence).toBeGreaterThan(claim.attemptFence)
-      expect(BigInt(replacement.session.epoch)).toBeGreaterThan(BigInt(claim.session.epoch))
+      expect(BigInt(replacement.session!.epoch)).toBeGreaterThan(BigInt(claim.session!.epoch))
       expect(
         yield* writer
           .append(

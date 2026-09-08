@@ -47,27 +47,30 @@ const validateTools = ({ state, sessionId, selection }: Input) =>
     }
   })
 
+const toolGrant = (input: Input) =>
+  Effect.gen(function* () {
+    const admission = yield* Schema.decodeUnknownEffect(ToolInput)(input.message?.metadata.tool).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+    )
+    if (input.state.hostSessions.has(input.sessionId))
+      return yield* RuntimeUnavailable.make({ message: "Tool Runs require an independent routing identity" })
+    const sponsor = admission.parentRunId === undefined ? undefined : input.state.runs.get(admission.parentRunId)
+    if (admission.parentRunId !== undefined && sponsor === undefined)
+      return yield* RuntimeUnavailable.make({ message: "Tool sponsor does not exist" })
+    const treePolicy = yield* narrow({
+      policy: input.selection.treePolicy ?? sponsor?.treePolicy ?? input.state.delegationPolicy ?? defaultTreePolicy,
+      ceiling: sponsor?.treePolicy ?? input.state.delegationPolicy,
+    })
+    yield* narrow({ policy: treePolicy, ceiling: input.state.delegationPolicy })
+    return { treePolicy, budget: {}, depth: sponsor?.depth ?? 0, sponsor }
+  })
+
 export const rootGrant = (input: Input) =>
   Effect.gen(function* () {
     const active = input.selection.executableManifest.entries.find(
       (entry) => entry.pin === input.selection.executableRef.active,
     )
-    if (active?._tag === "Tool") {
-      const admission = yield* Schema.decodeUnknownEffect(ToolInput)(input.message?.metadata.tool).pipe(
-        Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
-      )
-      if (input.state.hostSessions.has(input.sessionId))
-        return yield* RuntimeUnavailable.make({ message: "Tool Runs require an independent routing identity" })
-      const sponsor = admission.parentRunId === undefined ? undefined : input.state.runs.get(admission.parentRunId)
-      if (admission.parentRunId !== undefined && sponsor === undefined)
-        return yield* RuntimeUnavailable.make({ message: "Tool sponsor does not exist" })
-      const treePolicy = yield* narrow({
-        policy: input.selection.treePolicy ?? sponsor?.treePolicy ?? input.state.delegationPolicy ?? defaultTreePolicy,
-        ceiling: sponsor?.treePolicy ?? input.state.delegationPolicy,
-      })
-      yield* narrow({ policy: treePolicy, ceiling: input.state.delegationPolicy })
-      return { treePolicy, budget: {}, depth: sponsor?.depth ?? 0, sponsor }
-    }
+    if (active?._tag === "Tool") return yield* toolGrant(input)
     const treePolicy = yield* selectedPolicy(input)
     yield* validateTools(input)
     const family = input.state.sessions.get(input.sessionId)?.family

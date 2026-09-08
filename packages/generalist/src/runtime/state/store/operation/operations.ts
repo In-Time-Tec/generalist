@@ -26,7 +26,7 @@ import {
   verifyInterruptedSessionEntry,
 } from "../../session-store.js"
 import { handoffSessionEntry, isCommit, sameHandoffCheckpoint, sameCommit } from "../../../session/handoff.js"
-import { activeToolCount } from "../child/capacity.js"
+import { requireToolCapacity } from "../child/capacity.js"
 
 const getRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -233,11 +233,7 @@ export const startOperation: {
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     if (current.status !== "requested") return [current, state] as const
-    if (
-      current.kind === "tool" &&
-      activeToolCount(state, run, yield* occurredAtMillis) >= run.treePolicy.concurrency.tools
-    )
-      return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is awaiting family Tool capacity` })
+    if (current.kind === "tool") yield* requireToolCapacity({ state, run, now: yield* occurredAtMillis })
     const record: OperationRecord = { ...current, status: "running" }
     const operations = new Map(state.operations)
     operations.set(operationMapKey(input.runId, input.operationId), record)

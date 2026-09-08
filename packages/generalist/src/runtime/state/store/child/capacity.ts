@@ -30,17 +30,19 @@ export const familyRuns: {
       }
       sessions.push(...member.childSessionIds)
     }
-    return runs
+    const roots = new Set(runs.map((run) => run.rootRunId))
+    return [
+      ...runs,
+      ...[...state.runs.values()].filter(
+        (run) =>
+          roots.has(run.rootRunId) &&
+          run.executableManifest.entries.some(
+            (entry) => entry.pin === run.executableRef.active && entry._tag === "Tool",
+          ),
+      ),
+    ]
   }
-  const runs: Array<StoredRun> = []
-  const pending = [rootRunId]
-  for (let index = 0; index < pending.length; index++) {
-    const run = state.runs.get(pending[index]!)
-    if (run === undefined || run.rootRunId !== rootRunId) continue
-    runs.push(run)
-    pending.push(...run.children)
-  }
-  return runs
+  return [...state.runs.values()].filter((run) => run.rootRunId === rootRunId)
 })
 
 export const activeChildCount: {
@@ -61,7 +63,13 @@ export const activeChildCount: {
     ).length,
 )
 
-export const activeToolCount = (state: RuntimeState, run: StoredRun, now: number): number => {
+interface CapacityInput {
+  readonly state: RuntimeState
+  readonly run: StoredRun
+  readonly now: number
+}
+
+const activeToolCount = ({ state, run, now }: CapacityInput): number => {
   let count = 0
   for (const candidate of familyRuns(state, run.rootRunId)) {
     const independent = candidate.executableManifest.entries.some(
@@ -79,11 +87,47 @@ export const activeToolCount = (state: RuntimeState, run: StoredRun, now: number
         .map((operation) => operation.operationId),
     ).size
     const owner = candidate.ownerId === undefined ? undefined : state.workers.get(candidate.ownerId)
-    const claimed = independent && candidate.ownerId !== undefined && (owner === undefined || owner.expiresAt > now)
+    const claimed =
+      independent &&
+      !isTerminal(candidate.status) &&
+      candidate.ownerId !== undefined &&
+      (owner === undefined || owner.expiresAt > now)
     count += Math.max(operations, claimed ? 1 : 0)
   }
   return count
 }
+
+export const requireToolCapacity = (input: CapacityInput) =>
+  activeToolCount(input) >= input.run.treePolicy.concurrency.tools
+    ? RuntimeUnavailable.make({ message: `Run ${input.run.runId} is awaiting family Tool capacity` })
+    : Effect.void
+
+export const requireFamilyCapacity = ({ state, run, now }: CapacityInput) =>
+  Effect.gen(function* () {
+    if (
+      run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Tool")
+    ) {
+      yield* requireToolCapacity({ state, run, now })
+    }
+    if (
+      run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Agent")
+    ) {
+      const live = familyRuns(state, run.rootRunId).filter((candidate) => {
+        if (candidate.runId === run.runId || candidate.ownerId === undefined || candidate.status !== "running")
+          return false
+        const owner = state.workers.get(candidate.ownerId)
+        return (
+          (owner === undefined || owner.expiresAt > now) &&
+          candidate.executableManifest.entries.some(
+            (entry) => entry.pin === candidate.executableRef.active && entry._tag === "Agent",
+          )
+        )
+      }).length
+      if (live >= run.treePolicy.concurrency.agents) {
+        return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is awaiting family Agent capacity` })
+      }
+    }
+  })
 
 export const recordFamilyRun = ({
   state,
@@ -94,6 +138,8 @@ export const recordFamilyRun = ({
   readonly run: StoredRun
   readonly budget: BudgetLimits
 }): RuntimeState => {
+  if (run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Tool"))
+    return state
   const sessionId = run.message.sessionId
   const session = state.sessions.get(sessionId) ?? emptySession()
   const parent = run.parentRunId === undefined ? undefined : state.runs.get(run.parentRunId)
@@ -102,7 +148,7 @@ export const recordFamilyRun = ({
   const family = session.family ?? {
     rootSessionId: parentSession?.family?.rootSessionId ?? sessionId,
     parentSessionId,
-    parentRunId: parent?.runId ?? null,
+    parentRunId: run.parentRunId ?? null,
     depth: run.depth,
     treePolicy: run.treePolicy,
     budget,

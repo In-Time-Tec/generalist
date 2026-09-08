@@ -47,6 +47,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
   ) => provideScoped(layer, effect)
   const placement = (claim: ExecutionClaim, placementId: string) =>
     Effect.gen(function* () {
+      expect(claim.session).toBeDefined()
       const admission = yield* externalRoot(placementId)
       const request = {
         parent: { partition: "conformance", runId: claim.runId },
@@ -55,6 +56,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
       }
       return {
         ...claim,
+        session: claim.session!,
         placementId,
         request,
         invocationId: `invoke:${placementId}`,

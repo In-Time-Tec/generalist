@@ -35,3 +35,12 @@ export class PluginToolConflict extends ActionableTaggedError<PluginToolConflict
     hint: errorHint("Rename or remove one of the colliding static tools."),
   },
 ) {}
+
+export type CreateError =
+  | import("../runtime/errors.js").DuplicateAgent
+  | PluginNameConflict
+  | PluginToolConflict
+  | import("../runtime/errors.js").ExecutableRegistrationInvalid
+  | import("../runtime/errors.js").TreePolicyInvalid
+  | import("../runtime/errors.js").RuntimeUnavailable
+  | import("../durability/errors.js").DurabilityFailure

@@ -84,7 +84,7 @@ const program = Effect.gen(function* () {
 
 The handle exposes `id`, `inspect`, replay-then-live `events`, `await`, and `cancel(commandId, reason?)`. It has no Agent `send`, fork, or rewind controls. A declared Tool failure is decoded through its failure schema and returned by `await` as `{ _tag: "ToolRunFailure", failure }`. Approval decisions and unknown-effect resolution use the existing Host approval and operator methods.
 
-An optional `parentRunId` sponsors the Tool in the parent's canonical family and inherits its admitted limits. Parent settlement does not release or cancel the Tool's claim. Tool claims use the family's `concurrency.tools` capacity, not Agent concurrency, recursion depth, or `maxSessions`. Running and unresolved tool operations retain capacity until their outcome is known. A Tool has its own internal routing identity but creates no public Session or conversation and does not occupy the sponsor's conversational lane.
+An optional `parentRunId` sponsors the Tool in the parent's canonical family and inherits its admitted limits. Parent settlement does not release or cancel the Tool's claim. Tool claims use the family's `concurrency.tools` capacity, not Agent concurrency, recursion depth, or `maxSessions`. Running and unresolved tool operations retain capacity until their outcome is known. Sponsorship lives on Run records: a Tool's routing identity creates no Runtime Session row, Session family membership, or Session writer claim, and does not occupy the sponsor's conversational lane.
 
 On a fresh host, register matching Tool declarations, codecs, handlers, and policy again before resuming work. Executable pins identify these deployment dependencies; the journal does not serialize their closures or credentials. If an interrupted external effect has no accepted outcome and cannot safely retry, recovery requires explicit resolution rather than calling the handler again.
 
@@ -97,6 +97,10 @@ host.attachments.get(sha256)                         -> { ref, data }
 host.sessions.create({ id?, title?, agent? }) -> SessionHandle
 host.sessions.get(sessionId)          -> SessionHandle
 host.sessions.snapshot(sessionId)     -> HostSessionSnapshot
+host.sessions.history(sessionId, { leafId, limit }) -> SessionHistoryPage
+host.sessions.runs(sessionId, { at, before?, rootRunId?, limit }) -> SessionRunsPage
+host.sessions.run(sessionId, runId)    -> SessionRunSummary
+host.sessions.entry(sessionId, entryId) -> ConversationEntry
 host.sessions.list()                  -> HostSession[]
 host.sessions.fork(runId, { commandId, atSequence, budget?, programBudget?, substitute? }) -> HostRun<unknown>
 
@@ -152,13 +156,13 @@ The queue permits at most 64 pending entries and 1 MiB of encoded pending input,
 
 `generalist/server` exposes the same commands through `POST /sessions/:id/queue`, `PATCH /sessions/:id/queue/:inputId`, and `DELETE /sessions/:id/queue/:inputId`. The Session client offers `sessions.submit`, `sessions.updateInput`, and `sessions.removeInput`; submit takes `sessionId`, `input`, and `commandId`, while edits and removals also carry `id` and `expectedRevision`. Updates optionally carry `agent`. These routes use the existing authentication and resource-authorization boundary, not a second queue authority.
 
-`sessions.snapshot` reads version-1 metadata, Run projections, and a bounded active-path `conversation` at one committed Session cursor. Conversation entries preserve original entry IDs, parent IDs, and the Session leaf; they expose non-system user/tool/assistant messages, not instruction, memory, or skill bodies. Oversized projections fail rather than truncate; see the [snapshot limits](./server.md#snapshot-limits).
+`sessions.snapshot` reads version-1 metadata, up to 32 recent Run summaries plus the canonical active Run when absent from that window, and up to 64 native active-path entries at one committed Session cursor. It preserves `selection`, `queue`, and `activeRunId`; the recent summaries do not determine which Run owns conversational control. It returns conversation continuations instead of rejecting long Sessions. Conversation entries preserve original entry IDs and parent IDs; they expose non-system user/tool/assistant messages, not instruction, memory, or skill bodies. Content larger than 8 KiB is represented by an entry with `contentDeferred: true` and no inline messages; `sessions.entry` hydrates its complete public content from the existing canonical Session entry. See the [snapshot limits](./server.md#snapshot-limits).
 
-Runtime's `HostSessionEvent` is tagged `Run | Conversation`, with one shared cursor. Host maps the Run branch into product lifecycle events and forwards Conversation updates with their Session ID and cursor. Consumers retain the update's common visible prefix and replace its suffix, so branch changes do not append abandoned-path text. `HostEvent` therefore includes `Conversation` as well as `RunStarted`, `Turn`, `ToolCall`, `TasksUpdated`, `ArtifactUpdated`, `ApprovalRequested`, `Compacted`, and `Completed`.
+Runtime's `HostSessionEvent` is tagged `Run | Conversation`, with one shared cursor. Host maps the Run branch into product lifecycle events and forwards Conversation updates with their Session ID and cursor. Appends retain the update's visible prefix and replace its suffix. Branch updates carry `reset: true`, a bounded replacement page, and its older-history continuation, so clients do not append abandoned-path text. `HostEvent` therefore includes `Conversation` as well as `RunStarted`, `Turn`, `ToolCall`, `TasksUpdated`, `ArtifactUpdated`, `ApprovalRequested`, `Compacted`, and `Completed`.
 
 Attachments delegate to an optional ambient `BlobStore`. Provide one of the Layers from `generalist/blob-store` when creating the Host to enable upload and download. Existing Hosts can still be constructed without storage; attachment calls then fail with `BlobStoreError` instead of adding a BlobStore requirement to unrelated Host operations.
 
-Session run lists contain root Runs only. Runtime child Runs contribute events to their root Run's product Session but do not appear as separate entries in that list.
+The administrative `runs.list` enumeration contains root Runs only. Use `sessions.runs` for bounded display pages, including descendants; its optional `rootRunId` selects one family and is validated against the path Session. These pages bound projection work, not the size of the canonical partition materialized by the durability engine.
 
 ## Events and cursors
 

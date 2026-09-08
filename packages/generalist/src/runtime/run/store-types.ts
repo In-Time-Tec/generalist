@@ -179,7 +179,7 @@ export interface ExecutionClaim {
   readonly runId: string
   readonly ownerId: string
   readonly attemptFence: number
-  readonly session: SessionWriteClaim
+  readonly session?: SessionWriteClaim
 }
 
 export type WorkerMutationError =
