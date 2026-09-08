@@ -17,6 +17,7 @@ export { ClosedTypeId } from "./lifecycle/closure-identity.js"
 export interface Any<PolicyServices = unknown> {
   readonly [AgentTypeId]: unknown
   readonly name: string
+  readonly toolExecution: "inline" | "background"
   readonly instructions?: string
   readonly toolkit: Toolkit.Any
   readonly policy: Policy<PolicyServices>

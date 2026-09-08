@@ -1,5 +1,6 @@
 import { Effect, Function, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
+import { Inline } from "../core/tools/background/index.js"
 import { type Agent, withTools } from "../core/agent/service.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import type { ProgramAuthority } from "../core/durable/manifest/agent-manifest.js"
@@ -132,7 +133,7 @@ const makeDeclaration = (parameters: ReturnType<typeof makeParameters>) =>
     parameters,
     success: Schema.Unknown,
     failure: Schema.Union([ProgramAuthorityMissing, ProgramAuthorityExceeded, ProgramAdmissionFailed]),
-  })
+  }).annotate(Inline, true)
 
 /** Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority. */
 export const makeTool = (authority: ProgramAuthority) => makeDeclaration(makeParameters(authority))
@@ -155,26 +156,26 @@ export const makeBackgroundTools = (authority: ProgramAuthority) => ({
     parameters: makeParameters(authority),
     success: ProgramHandle,
     failure: ProgramAdmissionFailed,
-  }),
+  }).annotate(Inline, true),
   inspect: Tool.make("inspect_program", {
     description: "Read the current state of an owned background Program without waiting or consuming its output.",
     parameters: ProgramHandle,
     success: ProgramInspection,
     failure: ProgramAdmissionFailed,
-  }),
+  }).annotate(Inline, true),
   await: Tool.make("await_program", {
     description:
       "Durably suspend until an owned background Program settles and return its result, as code_mode does. Interruption of this wait does not cancel the Program.",
     parameters: ProgramHandle,
     success: Schema.Unknown,
     failure: ProgramAdmissionFailed,
-  }),
+  }).annotate(Inline, true),
   cancel: Tool.make("cancel_program", {
     description: "Durably request cancellation of an owned background Program. Inspect or await to observe settlement.",
     parameters: Schema.Struct({ childRunId: Schema.String, reason: Schema.optionalKey(Schema.String) }),
     success: ProgramInspection,
     failure: ProgramAdmissionFailed,
-  }),
+  }).annotate(Inline, true),
 })
 
 const selected = <A>(
