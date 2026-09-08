@@ -61,6 +61,14 @@ import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolCo
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
+import { make as makeSessionHandle, type SessionHandle, type SessionCreateOptions } from "./session.js"
+export type {
+  SessionHandle,
+  SessionCreateOptions,
+  QueueCommandOptions,
+  QueueEditOptions,
+  QueueError,
+} from "./session.js"
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
@@ -98,21 +106,20 @@ export interface CreateOptions<
   readonly agents: Agents
   readonly plugins?: Plugins
 }
-export interface SessionCreateOptions {
-  readonly id?: string
-  readonly title?: string
-}
-export interface RunStartOptions {
-  readonly idempotencyKey?: string
-}
+export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
 export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
   readonly sessions: {
-    readonly create: (options?: SessionCreateOptions) => Effect.Effect<HostSession, CreateSessionError>
-    readonly get: (sessionId: string) => Effect.Effect<HostSession, SessionError>
+    readonly create: (
+      options?: SessionCreateOptions,
+    ) => Effect.Effect<
+      SessionHandle,
+      CreateSessionError | AgentNotRegistered | import("../runtime/errors.js").UnknownAgent
+    >
+    readonly get: (sessionId: string) => Effect.Effect<SessionHandle, SessionError>
     readonly snapshot: (
       sessionId: string,
     ) => Effect.Effect<
@@ -345,19 +352,25 @@ const create = <
       registeredByName.set(agent.name, configured)
     }
 
+    const sessionHandle = makeSessionHandle({ runtime, registeredByName })
     const host: Host<Agents> = {
       attachments,
       artifacts,
       sessions: {
         create: (sessionOptions = {}) =>
           Effect.gen(function* () {
-            const request: Types.Mutable<{ readonly id: string; readonly title?: string }> = {
+            const request: Types.Mutable<import("../runtime/session/host.js").CreateSessionInput> = {
               id: sessionOptions.id ?? `session_${yield* generateId}`,
             }
             if (sessionOptions.title !== undefined) request.title = sessionOptions.title
-            return yield* runtime.createSession(request)
+            if (sessionOptions.agent !== undefined) {
+              if (!registeredByName.has(sessionOptions.agent))
+                return yield* AgentNotRegistered.make({ name: sessionOptions.agent })
+              request.selection = yield* runtime.sessionSelection(sessionOptions.agent)
+            }
+            return sessionHandle(yield* runtime.createSession(request))
           }),
-        get: runtime.session,
+        get: (sessionId) => runtime.session(sessionId).pipe(Effect.map(sessionHandle)),
         snapshot: runtime.sessionSnapshot,
         list: () => runtime.listSessions,
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),

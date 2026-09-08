@@ -116,7 +116,7 @@ export const modelResponseFaultConformance = <LayerError>(options: ModelResponse
                 prompt: Prompt.make("continue after durable response"),
                 nextTurn: 1,
                 steeringEntryIds: [],
-                queue: "followUp" as const,
+                queue: "steering" as const,
               }
               const commit = { ...claim, operationId: operation.operationId, ...exact, checkpoint, continuation }
               const observe = (host: Services) =>

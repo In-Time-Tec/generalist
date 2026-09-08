@@ -20,8 +20,8 @@ import {
 import { MessageReceipt } from "./mailbox.js"
 import type { Metadata } from "./message.js"
 import type { Service as RunStoreService } from "../run/store.js"
-import { InboxFull, type AdmissionPolicy } from "../../core/turn/steering.js"
-import type { SteeringEntry } from "../run/steering.js"
+import { InboxFull } from "../../core/turn/steering.js"
+import type { AdmissionPolicy, SteeringEntry } from "../run/steering.js"
 
 /** One authorization question about one exact sender and target. */
 export interface PolicyInput {

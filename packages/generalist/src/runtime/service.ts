@@ -555,6 +555,10 @@ export interface OperatorService {
 }
 
 export interface Service extends RuntimeHostSessions {
+  readonly sessionSelection: (
+    name: string,
+  ) => Effect.Effect<import("./session/queue.js").SessionSelection, UnknownAgent>
+
   readonly operator: OperatorService
   /** Register one Agent name and its exact environment for start and recovery. */
   readonly register: <

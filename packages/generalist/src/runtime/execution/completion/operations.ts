@@ -24,7 +24,7 @@ export const continuationForOperation = (input: {
   readonly model: boolean
   readonly steeringEntryIds: ReadonlyArray<string>
   readonly steeringPrompt: Prompt.Prompt | undefined
-  readonly queue: "steering" | "followUp" | undefined
+  readonly queue: "steering" | undefined
   readonly completed: DurableAgentLoopEvent | undefined
   readonly current: ExecutionContinuation | undefined
 }): ExecutionContinuation | null | undefined => {

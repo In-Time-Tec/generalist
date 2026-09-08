@@ -46,7 +46,7 @@ const readyModel = (): Model => {
             epoch: 0,
             snapshot: {
               version: 1,
-              session: { id: sessionId, createdAt: "2026-08-03T00:00:00.000Z" },
+              session: { id: sessionId, createdAt: "2026-08-03T00:00:00.000Z", queue: [] },
               cursor: -1,
               runs: [],
               conversation: { leafId: null, entries: [] },

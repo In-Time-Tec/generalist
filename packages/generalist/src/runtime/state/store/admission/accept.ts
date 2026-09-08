@@ -46,7 +46,13 @@ type ChildDetails = {
 }
 type ChildDigestInput = { parentRunId: string; invocationId: string; label?: string; origin?: FanOutMemberOrigin }
 
-const addRegistrations = (state: RuntimeState, registrations: AdmitSendInput["registrations"]) =>
+export const addRegistrations = ({
+  state,
+  registrations,
+}: {
+  readonly state: RuntimeState
+  readonly registrations: AdmitSendInput["registrations"]
+}) =>
   Effect.gen(function* () {
     const catalog = new Map(state.registrationCatalog)
     for (const registration of registrations) {
@@ -152,7 +158,7 @@ export const admitSend: {
       if (requestedRun !== undefined) {
         return yield* RunIdConflict.make({ runId: requestedRun.runId, existingRunId: requestedRun.runId })
       }
-      const registrationCatalog = yield* addRegistrations(state, input.registrations)
+      const registrationCatalog = yield* addRegistrations({ state, registrations: input.registrations })
       const [generatedRunId, withId] = input.runId === undefined ? newRunId(state) : ([input.runId, state] as const)
       const runId = generatedRunId
       const run: StoredRun = {
@@ -223,6 +229,13 @@ type AdmitStartResult = Effect.Effect<
   PreparedObservation
 >
 
+const retainHostedLane = (state: RuntimeState, sessionId: string): RuntimeState => {
+  if (state.hostSessions.has(sessionId)) return state
+  const lanes = new Map(state.lanes)
+  lanes.delete(laneKey(sessionId))
+  return { ...state, lanes }
+}
+
 export const admitStart: {
   (input: AdmitStartInput, options?: { readonly activate?: boolean }): (state: RuntimeState) => AdmitStartResult
   (state: RuntimeState, input: AdmitStartInput, options?: { readonly activate?: boolean }): AdmitStartResult
@@ -236,7 +249,7 @@ export const admitStart: {
       if (input.initialFanOuts.length > 64) {
         return yield* StartInvalid.make({ message: "initialFanOuts cannot contain more than 64 requests" })
       }
-      const catalog = yield* addRegistrations(state, input.registrations)
+      const catalog = yield* addRegistrations({ state, registrations: input.registrations })
       const [receipt, admitted] = yield* admitSend(
         { ...state, registrationCatalog: catalog },
         normalizedInput,
@@ -280,9 +293,7 @@ export const admitStart: {
         }
         return [startReceipt(receipt, childRunIds, fanOuts), admitted] as const
       }
-      const lanes = new Map(admitted.lanes)
-      lanes.delete(laneKey(input.message.sessionId))
-      let next: RuntimeState = { ...admitted, lanes }
+      let next = retainHostedLane(admitted, input.message.sessionId)
       const childRunIds: Array<string> = []
       for (const child of input.initialChildren) {
         const address = makeAddress(`spawn:${receipt.runId}`)

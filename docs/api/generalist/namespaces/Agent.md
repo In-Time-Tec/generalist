@@ -3106,7 +3106,7 @@ Admit one message to a process-local Run under an explicit policy.
 
 ###### policy
 
-`"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+`"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"` \| `"enqueue"`
 
 ##### Returns
 
@@ -3142,7 +3142,7 @@ Admit one message to a process-local Run under an explicit policy.
 
 ###### policy
 
-`"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+`"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"` \| `"enqueue"`
 
 ##### Returns
 

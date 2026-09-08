@@ -2,7 +2,6 @@ import { digest as pinDigest } from "../../core/durable/pin.js"
 export { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from "../../core/turn/steering.js"
 import { Effect, Schema, Semaphore, SynchronizedRef } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { AdmissionPolicy as AdmissionPolicySchema, type AdmissionPolicy } from "../../core/turn/steering.js"
 import { generateId } from "../../core/model/telemetry/events.js"
 import { origin as cursorOrigin } from "../cursor.js"
 import type { Service as ActiveExecutionsService } from "../execution/active-executions.js"
@@ -11,7 +10,8 @@ import { Message } from "../messaging/message.js"
 import type { AdmitSteeringInput, Service as RunStoreService, SteeringAdmission } from "./store.js"
 import type { RunSendError, RunSendOptions } from "../service.js"
 
-export { AdmissionPolicySchema as AdmissionPolicy }
+export const AdmissionPolicy = Schema.Literals(["steer", "interrupt", "rollback", "reject"])
+export type AdmissionPolicy = typeof AdmissionPolicy.Type
 
 /** Authoritative identity that admitted one inbox message. */
 export const MessageSource = Schema.Union([
@@ -38,7 +38,7 @@ export const SteeringEntry = Schema.Struct({
   idempotencyKey: Schema.String,
   digest: Schema.String,
   prompt: Prompt.Prompt,
-  policy: AdmissionPolicySchema,
+  policy: AdmissionPolicy,
   from: MessageSource,
   addressed: Schema.optionalKey(Message),
 })
@@ -50,7 +50,7 @@ export const ExecutionContinuation = Schema.Struct({
   prompt: Prompt.Prompt,
   nextTurn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   steeringEntryIds: Schema.Array(Schema.String),
-  queue: Schema.optionalKey(Schema.Literals(["steering", "followUp"])),
+  queue: Schema.optionalKey(Schema.Literal("steering")),
 })
 
 /** Durable reconstruction data for a steering-driven turn. */

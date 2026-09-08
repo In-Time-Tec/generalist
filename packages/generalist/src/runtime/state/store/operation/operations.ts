@@ -47,13 +47,8 @@ const steeringProblem = (run: StoredRun, entryIds: ReadonlyArray<string>): strin
   const pending = run.steering.filter(
     (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
   )
-  const first = pending.find((entry) => entry.entryId === entryIds[0])
-  const lane = first?.policy === "enqueue" ? "enqueue" : "steering"
-  const selected = pending
-    .filter((entry) => (entry.policy === "enqueue" ? "enqueue" : "steering") === lane)
-    .slice(0, entryIds.length)
-    .map((entry) => entry.entryId)
-  return sameEntries(selected, entryIds) ? undefined : `${lane} entries are not the pending lane prefix`
+  const selected = pending.slice(0, entryIds.length).map((entry) => entry.entryId)
+  return sameEntries(selected, entryIds) ? undefined : "steering entries are not the pending lane prefix"
 }
 
 const completionSteeringProblem = (run: StoredRun, operationId: string, entryIds: ReadonlyArray<string>) => {
