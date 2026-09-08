@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Breaking:** resolve `makeRuntimeActor` namespaces per actor identity through `namespace({ actorId, key })` instead of fixed factory namespace fields. Keep low-level `layerActorRuntime` configuration explicit. Rivet recovery runs after readiness, controls remain available during execution, and idle or failed hosts release their owned Runtime resources.
+- Add the scoped Cloudflare Durable Object host controller for concurrent Runtime commands and alarm-driven execution over native R2. Preserve earlier alarm hints, close idle execution scopes, and keep independent reconciliation for missed wakeups. Worker leases only contribute a wake deadline when they gate unfinished execution; canonical S3/R2 journals, receipts, and fencing remain authoritative.
 - **Breaking:** remove `generalist/unstable/rlm`, including `layer` and `rlmOffload`, with no compatibility alias. Use the existing durable Runtime for delegation and background work. Agent and Program execution, Sandbox, compaction, budgets, and nested operations remain available. (#457)
 
 ## 0.64.0

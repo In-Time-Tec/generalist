@@ -58,7 +58,7 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxCommitBytes`](./unstable.cloudflare.durable-objects.md#maxcommitbytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxCommitBytes`](./unstable.cloudflare.durable-objects.md#maxcommitbytes-1)
 
 <a id="maxconflictretries"></a>
 
@@ -72,7 +72,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxConflictRetries`](./unstable.cloudflare.durable-objects.md#maxconflictretries)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxConflictRetries`](./unstable.cloudflare.durable-objects.md#maxconflictretries-1)
 
 <a id="maxreplaybytes"></a>
 
@@ -84,7 +84,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxReplayBytes`](./unstable.cloudflare.durable-objects.md#maxreplaybytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxReplayBytes`](./unstable.cloudflare.durable-objects.md#maxreplaybytes-1)
 
 <a id="maxstatebytes"></a>
 
@@ -96,7 +96,7 @@ Number of deterministic reevaluations after a competing command wins; zero disab
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxStateBytes`](./unstable.cloudflare.durable-objects.md#maxstatebytes)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`maxStateBytes`](./unstable.cloudflare.durable-objects.md#maxstatebytes-1)
 
 <a id="messagingpolicy"></a>
 
@@ -122,7 +122,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`ownershipLeaseMillis`](./unstable.cloudflare.durable-objects.md#ownershipleasemillis)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`ownershipLeaseMillis`](./unstable.cloudflare.durable-objects.md#ownershipleasemillis-1)
 
 <a id="reconcileinterval"></a>
 
@@ -134,7 +134,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`reconcileInterval`](./unstable.cloudflare.durable-objects.md#reconcileinterval)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`reconcileInterval`](./unstable.cloudflare.durable-objects.md#reconcileinterval-1)
 
 <a id="resolver"></a>
 
@@ -174,7 +174,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`snapshotEvery`](./unstable.cloudflare.durable-objects.md#snapshotevery)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`snapshotEvery`](./unstable.cloudflare.durable-objects.md#snapshotevery-1)
 
 <a id="subscriberqueuecapacity"></a>
 
@@ -198,7 +198,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ###### Inherited from
 
-[`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid)
+[`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid-1)
 
 ***
 
