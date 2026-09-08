@@ -153,7 +153,7 @@ const backend = "object" as const
         expect(yield* child.run.await).toBe(`${backend} complete`)
         expect(yield* child.session.inspect).toMatchObject({ id: child.session.id })
         expect(
-          (yield* child.session.snapshot).runs.map((entry) => ({ runId: entry.run.runId, status: entry.run.status })),
+          (yield* child.session.snapshot).runs.map((entry) => ({ runId: entry.runId, status: entry.status })),
         ).toEqual([{ runId: child.run.id, status: "succeeded" }])
         const snapshot = yield* child.session.snapshot
         const store = yield* RunStore.RunStore
@@ -519,7 +519,7 @@ it.effect("recovers the same child conversation and admission after replacing th
         expect(child.run.id).toBe(admitted.runId)
         expect(yield* child.run.await).toBe("reopened complete")
         const snapshot = yield* child.session.snapshot
-        expect(snapshot.runs[0]?.run.status).toBe("succeeded")
+        expect(snapshot.runs[0]?.status).toBe("succeeded")
         expect(yield* host.runs.list(child.session.id)).toHaveLength(1)
         expect(
           (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),

@@ -738,7 +738,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### subscribe
 
-> `readonly` **subscribe**: (`sessionId`, `cursor?`) => `Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+> `readonly` **subscribe**: (`sessionId`, `cursor?`) => `Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 ###### Parameters
 
@@ -752,7 +752,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### Returns
 
-`Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+`Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="operator"></a>
 
@@ -1046,7 +1046,9 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ##### sessions
 
-> `readonly` **sessions**: `object`
+> `readonly` **sessions**: `SessionReads` & `object`
+
+###### Type Declaration
 
 ###### create
 
@@ -1124,25 +1126,11 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 ###### list
 
-> `readonly` **list**: () => `Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable)\>
+> `readonly` **list**: () => `Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `never`\>
 
 ###### Returns
 
-`Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable)\>
-
-###### snapshot
-
-> `readonly` **snapshot**: (`sessionId`) => `Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
-
-###### Parameters
-
-###### sessionId
-
-`string`
-
-###### Returns
-
-`Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+`Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `never`\>
 
 ***
 
@@ -1706,6 +1694,162 @@ One deterministic collection of host-owned Agent contributions.
 
 [`HostSession`](#hostsession).[`title`](#title)
 
+***
+
+<a id="sessionhistorypage"></a>
+
+### SessionHistoryPage
+
+**`Experimental`**
+
+Follow nextLeafId until null; pages contain chronological entries.
+
+#### Properties
+
+<a id="entries"></a>
+
+##### entries
+
+> `readonly` **entries**: readonly `ConversationEntry`[]
+
+**`Experimental`**
+
+<a id="leafid"></a>
+
+##### leafId
+
+> `readonly` **leafId**: `string` \| `null`
+
+**`Experimental`**
+
+<a id="nextleafid"></a>
+
+##### nextLeafId
+
+> `readonly` **nextLeafId**: `string` \| `null`
+
+**`Experimental`**
+
+***
+
+<a id="sessionrunspage"></a>
+
+### SessionRunsPage
+
+**`Experimental`**
+
+Scan at most 256 events, including empty filtered pages with a continuation.
+
+#### Properties
+
+<a id="at"></a>
+
+##### at
+
+> `readonly` **at**: `number`
+
+**`Experimental`**
+
+<a id="nextbefore"></a>
+
+##### nextBefore
+
+> `readonly` **nextBefore**: `number` \| `null`
+
+**`Experimental`**
+
+<a id="runs-1"></a>
+
+##### runs
+
+> `readonly` **runs**: readonly [`SessionRunSummary`](#sessionrunsummary)[]
+
+**`Experimental`**
+
+***
+
+<a id="sessionrunsummary"></a>
+
+### SessionRunSummary
+
+**`Experimental`**
+
+Run metadata without retained manifests, results, or event history.
+
+#### Properties
+
+<a id="approval"></a>
+
+##### approval?
+
+> `readonly` `optional` **approval?**: `object`
+
+**`Experimental`**
+
+###### approvalId
+
+> `readonly` **approvalId**: `string`
+
+###### capability
+
+> `readonly` **capability**: `string`
+
+###### input
+
+> `readonly` **input**: `unknown`
+
+###### operation
+
+> `readonly` **operation**: `string`
+
+<a id="cursor-1"></a>
+
+##### cursor
+
+> `readonly` **cursor**: `number`
+
+**`Experimental`**
+
+<a id="parentrunid"></a>
+
+##### parentRunId?
+
+> `readonly` `optional` **parentRunId?**: `string`
+
+**`Experimental`**
+
+<a id="rootrunid"></a>
+
+##### rootRunId
+
+> `readonly` **rootRunId**: `string`
+
+**`Experimental`**
+
+<a id="runid"></a>
+
+##### runId
+
+> `readonly` **runId**: `string`
+
+**`Experimental`**
+
+<a id="status"></a>
+
+##### status
+
+> `readonly` **status**: `"succeeded"` \| `"failed"` \| `"cancelled"` \| `"queued"` \| `"running"` \| `"waiting"` \| `"needs-resolution"` \| `"cancelling"`
+
+**`Experimental`**
+
+<a id="turn"></a>
+
+##### turn
+
+> `readonly` **turn**: `number`
+
+**`Experimental`**
+
 ## Type Aliases
 
 <a id="approvalrequested"></a>
@@ -1894,6 +2038,30 @@ First-admission membership with at most 64 members per 256-event scan.
 
 ***
 
+<a id="sessionhistoryinput"></a>
+
+### SessionHistoryInput
+
+> **SessionHistoryInput** = *typeof* `SessionHistoryInput.Type`
+
+**`Experimental`**
+
+A bounded selector over one immutable conversation path.
+
+***
+
+<a id="sessionrunsinput"></a>
+
+### SessionRunsInput
+
+> **SessionRunsInput** = *typeof* `SessionRunsInput.Type`
+
+**`Experimental`**
+
+Membership is pinned to at; summaries report current committed status.
+
+***
+
 <a id="tasksupdated"></a>
 
 ### TasksUpdated
@@ -1912,7 +2080,7 @@ The authoritative journaled task list changed.
 
 ***
 
-<a id="turn"></a>
+<a id="turn-1"></a>
 
 ### Turn
 
@@ -1995,6 +2163,54 @@ Omit at on the first page; retain it on every continuation.
 **`Experimental`**
 
 First-admission membership with at most 64 members per 256-event scan.
+
+***
+
+<a id="sessionhistoryinput-1"></a>
+
+### SessionHistoryInput
+
+> `const` **SessionHistoryInput**: `Schema.Struct`\<\{ `leafId`: `Schema.NullOr`\<`Schema.String`\>; `limit`: `Schema.Int`; \}\>
+
+**`Experimental`**
+
+A bounded selector over one immutable conversation path.
+
+***
+
+<a id="sessionhistorypage-1"></a>
+
+### SessionHistoryPage
+
+> **SessionHistoryPage**: `Codec`\<[`SessionHistoryPage`](#sessionhistorypage), `unknown`, `never`, `never`\>
+
+***
+
+<a id="sessionrunsinput-1"></a>
+
+### SessionRunsInput
+
+> `const` **SessionRunsInput**: `Schema.Struct`\<\{ `at`: `Schema.Int`; `before`: `Schema.optionalKey`\<`Schema.Int`\>; `limit`: `Schema.Int`; `rootRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>
+
+**`Experimental`**
+
+Membership is pinned to at; summaries report current committed status.
+
+***
+
+<a id="sessionrunspage-1"></a>
+
+### SessionRunsPage
+
+> **SessionRunsPage**: `Codec`\<[`SessionRunsPage`](#sessionrunspage), `unknown`, `never`, `never`\>
+
+***
+
+<a id="sessionrunsummary-1"></a>
+
+### SessionRunSummary
+
+> **SessionRunSummary**: `Codec`\<[`SessionRunSummary`](#sessionrunsummary), `unknown`, `never`, `never`\>
 
 ***
 

@@ -498,6 +498,9 @@ const makeRuntimeWith = (
       session: store.hostSession,
       sessionSnapshot: store.hostSessionSnapshot,
       sessionFamily: store.hostSessionFamily,
+      sessionHistoryPage: store.hostSessionHistoryPage,
+      sessionRunsPage: store.hostSessionRunsPage,
+      sessionRunSummary: store.hostSessionRunSummary,
       listSessions: store.listHostSessions,
       sessionRuns: store.hostSessionRuns,
       sessionEvents: (input) =>

@@ -2,11 +2,10 @@ import type { ModifyState } from "../../../../durability/internal/runtime.js"
 import type { DurabilityFailure } from "../../../../durability/errors.js"
 import { commands } from "../../../../durability/internal/runtime-command-admission.js"
 import { occurredAt as preparedOccurredAt } from "../../observation.js"
-import { Effect, Function, Queue, Schema, Stream, SynchronizedRef } from "effect"
+import { Effect, Function, Queue, Stream, SynchronizedRef } from "effect"
 import {
   type HostSession,
-  HostSessionSnapshot,
-  SessionSnapshotTooLarge,
+  type HostSessionSnapshot,
   SessionConflict,
   SessionCursorExpired,
   SessionNotFound,
@@ -23,7 +22,7 @@ import {
   type RuntimeState,
 } from "../../projection.js"
 import { toInspection, retainedSession } from "../events.js"
-import { projectRunSnapshot } from "../../../execution/inspection.js"
+import { historyPage, runsPage, sessionRun, recentRuns } from "./page.js"
 import { projectConversation } from "./conversation.js"
 import { submit, update, validateSelection } from "./queue.js"
 import { page as familyPage } from "./family.js"
@@ -34,47 +33,20 @@ const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
     const session = yield* getHostSession(state, sessionId)
     const stored = state.hostSessions.get(sessionId)
     if (stored === undefined) return yield* missing(sessionId)
-    const excess = (limit: SessionSnapshotTooLarge["limit"], maximum: number) =>
-      SessionSnapshotTooLarge.make({ sessionId, limit, maximum })
-    if (state.runs.size > 10000) return yield* excess("scanned-runs", 10000)
-    const runs = []
-    let events = 0
-    let bytes = 0
-    for (const run of [...state.runs.values()].filter(
-      (candidate) =>
-        candidate.message.sessionId === sessionId ||
-        state.runs.get(candidate.rootRunId)?.message.sessionId === sessionId,
-    )) {
-      if (runs.length >= 128) return yield* excess("runs", 128)
-      events += run.events.length
-      if (events > 8192) return yield* excess("events", 8192)
-      for (const event of run.events) {
-        const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(event).pipe(
-          Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
-        )
-        bytes += new TextEncoder().encode(encoded).byteLength
-        if (bytes > 1048576) return yield* excess("bytes", 1048576)
-      }
-      const projection = {
-        inspection: toInspection(state, run),
-        rootRunId: run.rootRunId,
-        events: run.events,
-        firstTreePosition: 0,
-      }
-      if (run.parentRunId !== undefined) Object.assign(projection, { parentRunId: run.parentRunId })
-      if (run.invocationId !== undefined) Object.assign(projection, { invocationId: run.invocationId })
-      if (run.terminalEventId !== undefined) Object.assign(projection, { terminalEventId: run.terminalEventId })
-      runs.push(yield* projectRunSnapshot(projection))
-    }
+    const runs = yield* recentRuns({ state, events: stored.events })
+    if (session.activeRunId !== undefined && !runs.some((run) => run.runId === session.activeRunId))
+      runs.push(yield* sessionRun({ state, sessionId, runId: session.activeRunId }))
     const conversation = yield* projectConversation({
       sessionId,
       session: state.sessions.get(sessionId) ?? emptySession(),
     })
-    const snapshot: HostSessionSnapshot = { version: 1, session, cursor: stored.lastCursor, runs, conversation }
-    const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(HostSessionSnapshot))(snapshot).pipe(
-      Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
-    )
-    if (new TextEncoder().encode(encoded).byteLength > 1048576) return yield* excess("bytes", 1048576)
+    const snapshot: HostSessionSnapshot = {
+      version: 1,
+      session,
+      cursor: stored.lastCursor,
+      runs,
+      conversation,
+    }
     return snapshot
   })
 
@@ -249,6 +221,9 @@ export const make = (input: {
   | "hostSession"
   | "hostSessionSnapshot"
   | "hostSessionFamily"
+  | "hostSessionHistoryPage"
+  | "hostSessionRunsPage"
+  | "hostSessionRunSummary"
   | "listHostSessions"
   | "hostSessionRuns"
   | "hostSessionEvents"
@@ -283,6 +258,12 @@ export const make = (input: {
     input.readState.pipe(Effect.flatMap((state) => hostSessionSnapshot(state, sessionId))),
   hostSessionFamily: (sessionId, request) =>
     input.readState.pipe(Effect.flatMap((state) => familyPage({ state, sessionId, input: request }))),
+  hostSessionHistoryPage: (sessionId, request) =>
+    input.readState.pipe(Effect.flatMap((state) => historyPage({ state, sessionId, input: request }))),
+  hostSessionRunsPage: (sessionId, request) =>
+    input.readState.pipe(Effect.flatMap((state) => runsPage({ state, sessionId, input: request }))),
+  hostSessionRunSummary: (sessionId, runId) =>
+    input.readState.pipe(Effect.flatMap((state) => sessionRun({ state, sessionId, runId }))),
   listHostSessions: input.readState.pipe(
     Effect.flatMap((state) =>
       state.closed

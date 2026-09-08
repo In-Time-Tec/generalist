@@ -41,7 +41,11 @@ export const ConnectionFailed: CallableTaggedStruct<
 export const SessionSnapshot = m("SessionSnapshot", { epoch: Schema.Int, snapshot: HostSessionSnapshot })
 
 /** One committed Host event delivered within an established snapshot epoch. @experimental */
-export const HostDelivery = m("HostDelivery", { epoch: Schema.Int, event: HostEvent })
+export const HostDelivery = m("HostDelivery", {
+  epoch: Schema.Int,
+  event: HostEvent,
+  activeRunId: Schema.NullOr(Schema.String),
+})
 
 /** One Host-authorized memory-only preview delivered within an established snapshot epoch. @experimental */
 export const PreviewDelivery = m("PreviewDelivery", { epoch: Schema.Int, delivery: HostPreviewDelivery })
@@ -186,10 +190,7 @@ export const layerWebSocket = (options: {
               const deliveryEpoch = yield* Ref.make(epoch)
               const statusEpochs = new StatusEpochRegistry()
               yield* statusEpochs.bind(0, epoch)
-              yield* Ref.set(
-                runId,
-                connection.snapshot.runs.findLast((run) => run.run.parentRunId === undefined)?.run.runId,
-              )
+              yield* Ref.set(runId, connection.snapshot.session.activeRunId)
               const conversation = yield* Ref.make(connection.snapshot.conversation)
               yield* Effect.acquireRelease(Ref.set(owner.connection, Option.some(connection)), () =>
                 Ref.update(owner.connection, (current) =>
@@ -218,10 +219,7 @@ export const layerWebSocket = (options: {
                       yield* statusEpochs.bind(event.epoch, replacementEpoch)
                       yield* Ref.set(deliveryEpoch, replacementEpoch)
                       yield* Ref.set(epochRef, replacementEpoch)
-                      yield* Ref.set(
-                        runId,
-                        event.snapshot.runs.findLast((run) => run.run.parentRunId === undefined)?.run.runId,
-                      )
+                      yield* Ref.set(runId, event.snapshot.session.activeRunId)
                       yield* Ref.set(conversation, event.snapshot.conversation)
                       return SessionSnapshot({ epoch: replacementEpoch, snapshot: event.snapshot })
                     })
@@ -244,9 +242,18 @@ export const layerWebSocket = (options: {
                       }
                       yield* Ref.set(conversation, next.value)
                     } else if (event._tag === "RunStarted" || event._tag === "Completed") {
-                      if (event.event.parentRunId === undefined) yield* Ref.set(runId, event.runId)
+                      if (event.event.parentRunId === undefined) {
+                        const metadata = yield* client.sessions
+                          .get({ sessionId })
+                          .pipe(
+                            Effect.mapError((error) =>
+                              TransportError.make({ kind: "protocol", message: error.message }),
+                            ),
+                          )
+                        yield* Ref.set(runId, metadata.activeRunId)
+                      }
                     }
-                    return HostDelivery({ epoch: currentEpoch, event })
+                    return HostDelivery({ epoch: currentEpoch, event, activeRunId: (yield* Ref.get(runId)) ?? null })
                   })
                 }),
               )

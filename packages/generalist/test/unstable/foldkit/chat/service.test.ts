@@ -9,24 +9,11 @@ import { Chat, Connection } from "../../../../src/unstable/foldkit/index.js"
 const executable = ExecutableManifest.makeTest("assistant", "1")
 const executableRef = executable.ref
 const previewRun = {
-  run: {
-    runId: "run-1",
-    status: "running" as const,
-    executableRef,
-    executableManifest: executable.manifest,
-    depth: 0,
-    treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
-    waits: [],
-    lastSequence: -1,
-    durability: "durable" as const,
-    branches: [],
-  },
+  runId: "run-1",
+  rootRunId: "run-1",
+  status: "running" as const,
   cursor: -1,
   turn: 0,
-  usageFacts: [],
-  budget: {},
-  compactions: [],
-  gates: [],
 }
 const runtimeEvent = <Fields extends object>(sequence: number, fields: Fields): RunEvent.RunEvent =>
   Schema.decodeUnknownSync(RunEvent.RunEvent)({
@@ -51,7 +38,16 @@ const hostEvent = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEv
   })
 
 const updateWith = (model: Chat.Model, event: HostEvent, epoch = 0) =>
-  Chat.update(model, Chat.ReceivedConnection({ event: Connection.HostDelivery({ epoch, event }) }))
+  Chat.update(
+    model,
+    Chat.ReceivedConnection({
+      event: Connection.HostDelivery({
+        epoch,
+        event,
+        activeRunId: event._tag === "Completed" && event.event.parentRunId === undefined ? null : "run-1",
+      }),
+    }),
+  )
 
 const connectedModel = () =>
   Chat.update(
@@ -78,7 +74,7 @@ const connectedPreviewModel = () =>
         epoch: 0,
         snapshot: {
           version: 1,
-          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
+          session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [], activeRunId: "run-1" },
           cursor: -1,
           runs: [previewRun],
           conversation: { leafId: null, entries: [] },
@@ -125,6 +121,103 @@ const searchCall = Response.makePart("tool-call", {
 })
 
 describe("Chat HostEvent projection", () => {
+  it("keeps queued admissions out of live control and follows canonical promotion without another admission", () => {
+    const [streaming] = Chat.update(
+      connectedPreviewModel(),
+      Chat.ReceivedConnection({
+        event: preview({ epoch: 0, authority: 1, sequence: 0, offset: 0, delta: "active preview" }),
+      }),
+    )
+    const queued = Schema.decodeUnknownSync(HostEvent)({
+      _tag: "RunStarted",
+      sessionId: "session-1",
+      cursor: 1,
+      runId: "queued",
+      event: {
+        ...runtimeEvent(0, {
+          _tag: "RunAccepted",
+          messageId: "queued-message",
+          address: Address.make("agent:assistant"),
+        }),
+        runId: "queued",
+        rootRunId: "queued",
+      },
+    })
+    const [admitted] = Chat.update(
+      streaming,
+      Chat.ReceivedConnection({
+        event: Connection.HostDelivery({ epoch: 0, event: queued, activeRunId: "run-1" }),
+      }),
+    )
+    expect(admitted.preview).toEqual(streaming.preview)
+    expect(admitted.previewAuthority).toEqual(streaming.previewAuthority)
+    expect(admitted.lastSeq).toBe(1)
+    const [promoted, , output] = Chat.update(
+      admitted,
+      Chat.ReceivedConnection({
+        event: Connection.HostDelivery({
+          epoch: 0,
+          activeRunId: "queued",
+          event: hostEvent(
+            2,
+            "Completed",
+            runtimeEvent(1, {
+              _tag: "RunCompleted",
+              result: { text: "done", output: "done", turns: 1, session: { sessionId: "session-1", leafId: "answer" } },
+            }),
+          ),
+        }),
+      }),
+    )
+    expect(promoted.run).toMatchObject({ _tag: "Running", turn: 0 })
+    expect(promoted.previewAuthority?.runId).toBe("queued")
+    expect(promoted.preview).toBeNull()
+    expect(Option.getOrThrow(output)).toEqual(Chat.RunCompleted({ text: "done" }))
+    const next = preview({ epoch: 0, authority: 1, sequence: 0, offset: 0, delta: "promoted preview" })
+    const [rendered] = Chat.update(
+      promoted,
+      Chat.ReceivedConnection({
+        event: Connection.PreviewDelivery({
+          epoch: 0,
+          delivery: { ...next.delivery, runId: "queued", event: { ...next.delivery.event, runId: "queued" } },
+        }),
+      }),
+    )
+    expect(rendered.preview?.text).toBe("promoted preview")
+  })
+
+  it("selects conversational control from canonical Session metadata rather than recent Run order", () => {
+    const snapshot = Server.SessionSnapshot.make({
+      version: 1,
+      session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [], activeRunId: "run-1" },
+      cursor: 20,
+      conversation: { leafId: null, entries: [] },
+      runs: [
+        { ...previewRun, turn: 7 },
+        { ...previewRun, runId: "queued-later", rootRunId: "queued-later", status: "queued", turn: 0 },
+      ],
+    })
+    const [active] = Chat.update(
+      Chat.initialModel("session-1"),
+      Chat.ReceivedConnection({
+        event: Connection.SessionSnapshot({ epoch: 1, snapshot }),
+      }),
+    )
+    expect(active.run).toMatchObject({ _tag: "Running", turn: 7 })
+    expect(active.previewAuthority?.runId).toBe("run-1")
+    const [idle] = Chat.update(
+      active,
+      Chat.ReceivedConnection({
+        event: Connection.SessionSnapshot({
+          epoch: 2,
+          snapshot: { ...snapshot, session: { id: "session-1", createdAt: snapshot.session.createdAt, queue: [] } },
+        }),
+      }),
+    )
+    expect(idle.run).toEqual(Chat.Idle())
+    expect(idle.previewAuthority).toBeNull()
+  })
+
   it("rejects obsolete previews after snapshot rebuild and bounds provisional ordering", () => {
     let model = connectedPreviewModel()
     ;[model] = Chat.update(
@@ -142,7 +235,7 @@ describe("Chat HostEvent projection", () => {
           epoch: 1,
           snapshot: {
             version: 1,
-            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
+            session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [], activeRunId: "run-1" },
             cursor: 4,
             runs: [previewRun],
             conversation: { leafId: null, entries: [] },
@@ -282,7 +375,6 @@ describe("Chat HostEvent projection", () => {
     expect(model.preview).toBeNull()
   })
   it("restores committed terminal summaries and ignores snapshots and events from older epochs", () => {
-    const restoredExecutable = ExecutableManifest.makeTest("assistant", "1")
     const snapshot = Schema.decodeSync(Server.SessionSnapshot)({
       version: 1,
       session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
@@ -301,35 +393,11 @@ describe("Chat HostEvent projection", () => {
       },
       runs: [
         {
-          run: {
-            runId: "run-1",
-            status: "succeeded",
-            executableRef: restoredExecutable.ref,
-            executableManifest: restoredExecutable.manifest,
-            depth: 0,
-            treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
-            waits: [],
-            lastSequence: 8,
-            durability: "durable",
-            branches: [],
-          },
+          runId: "run-1",
+          rootRunId: "run-1",
+          status: "succeeded",
           cursor: 8,
           turn: 1,
-          usageFacts: [],
-          budget: {},
-          compactions: [],
-          gates: [],
-          outcome: {
-            _tag: "Succeeded",
-            eventId: "run-1:8",
-            occurredAt: "2026-09-02T00:00:00.000Z",
-            result: {
-              text: "Existing answer",
-              output: "Existing answer",
-              turns: 1,
-              session: { sessionId: "session-1", leafId: "entry-1" },
-            },
-          },
         },
       ],
     })
@@ -349,11 +417,13 @@ describe("Chat HostEvent projection", () => {
       Connection.SessionSnapshot({ epoch: 1, snapshot: { ...snapshot, cursor: 999, runs: [] } }),
       Connection.HostDelivery({
         epoch: 1,
+        activeRunId: "run-1",
         event: hostEvent(999, "Turn", runtimeEvent(9, { _tag: "TurnStarted", turn: 99 })),
       }),
       Connection.ConnectionLost({ epoch: 1, sessionId: "session-1" }),
       Connection.HostDelivery({
         epoch: 2,
+        activeRunId: "run-1",
         event: hostEvent(12, "Turn", runtimeEvent(9, { _tag: "TurnStarted", turn: 99 })),
       }),
       Connection.SessionSnapshot({
@@ -364,6 +434,7 @@ describe("Chat HostEvent projection", () => {
     for (const event of stale) expect(Chat.update(model, Chat.ReceivedConnection({ event }))[0]).toEqual(model)
     const resumed = Connection.HostDelivery({
       epoch: 2,
+      activeRunId: "run-1",
       event: hostEvent(20, "Turn", runtimeEvent(10, { _tag: "TurnStarted", turn: 2 })),
     })
     expect(Chat.update(model, Chat.ReceivedConnection({ event: resumed }))[0]).toMatchObject({
@@ -374,7 +445,6 @@ describe("Chat HostEvent projection", () => {
   })
 
   it("rebuilds a deleted client projection from the authoritative Session snapshot", () => {
-    const restoredExecutable = ExecutableManifest.makeTest("assistant", "1")
     const snapshot = Schema.decodeSync(Server.SessionSnapshot)({
       version: 1,
       session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
@@ -395,35 +465,11 @@ describe("Chat HostEvent projection", () => {
       },
       runs: [
         {
-          run: {
-            runId: "run-1",
-            status: "succeeded",
-            executableRef: restoredExecutable.ref,
-            executableManifest: restoredExecutable.manifest,
-            depth: 0,
-            treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
-            waits: [],
-            lastSequence: 4,
-            durability: "durable",
-            branches: [],
-          },
+          runId: "run-1",
+          rootRunId: "run-1",
+          status: "succeeded",
           cursor: 4,
           turn: 1,
-          usageFacts: [],
-          budget: {},
-          compactions: [],
-          gates: [],
-          outcome: {
-            _tag: "Succeeded",
-            eventId: "run-1:4",
-            occurredAt: "2026-09-02T00:00:00.000Z",
-            result: {
-              text: "rebuilt answer",
-              output: "rebuilt answer",
-              turns: 1,
-              session: { sessionId: "session-1", leafId: "entry-1" },
-            },
-          },
         },
       ],
     })
@@ -451,6 +497,7 @@ describe("Chat HostEvent projection", () => {
         Chat.ReceivedConnection({
           event: Connection.HostDelivery({
             epoch: 1,
+            activeRunId: "run-1",
             event: hostEvent(99, "Turn", runtimeEvent(5, { _tag: "TurnStarted", turn: 99 })),
           }),
         }),
