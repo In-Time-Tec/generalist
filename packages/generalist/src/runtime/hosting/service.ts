@@ -47,6 +47,7 @@ type Registrations = ReadonlyArray<ExecutableRegistration>
 import { childSessionId } from "../child/session.js"
 import { Policy as MessagingPolicy, reachable } from "../messaging/service.js"
 import { deliveryPrompt, promptBytes, type MailboxEntry } from "../messaging/mailbox.js"
+import { SessionSender } from "../session/message.js"
 import type { RunInspection, RunReceipt } from "../run.js"
 import { explain as explainRecovery, verify as verifyRecovery } from "../execution/recovery/operator.js"
 import { resolveWith as resolveDurableApproval } from "../operation/approval.js"
@@ -498,6 +499,20 @@ const makeRuntimeWith = (
       session: store.hostSession,
       sessionSnapshot: store.hostSessionSnapshot,
       sessionFamily: store.hostSessionFamily,
+      controlSession: (input) =>
+        Effect.gen(function* () {
+          yield* store.controlSession(input)
+          if (input.action === "resume") return
+          for (const runId of yield* active.active) {
+            const run = yield* store.loadExecution(runId).pipe(Effect.option)
+            if (Option.isSome(run) && run.value.cancellationRequested) yield* active.interrupt(runId)
+          }
+        }),
+      messageSessionInput: (input) =>
+        Effect.gen(function* () {
+          const from = yield* SessionSender
+          return yield* store.messageSessionInput({ ...input, from })
+        }),
       listSessions: store.listHostSessions,
       sessionRuns: store.hostSessionRuns,
       sessionEvents: (input) =>

@@ -13,10 +13,16 @@ export const append = ({
 }) => {
   const hostSessions = new Map(state.hostSessions)
   const rootRun = state.runs.get(run.rootRunId)
-  if (run.parentRunId !== undefined && !hostSessions.has(run.message.sessionId)) {
+  if (
+    run.parentRunId !== undefined &&
+    state.sessions.get(run.message.sessionId)?.family !== undefined &&
+    !hostSessions.has(run.message.sessionId)
+  ) {
     hostSessions.set(run.message.sessionId, {
       session: {
         id: run.message.sessionId,
+        sponsorRunId: run.parentRunId,
+        activeRunId: run.runId,
         createdAt: event.occurredAt,
         queue: [],
         selection: {

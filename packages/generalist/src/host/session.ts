@@ -7,6 +7,7 @@ import { UnknownAgent } from "../runtime/errors.js"
 import { SessionQueueConflict, type PendingInput, type QueueReceipt } from "../runtime/session/queue.js"
 import { AgentNotRegistered } from "./errors.js"
 import { generateId } from "../core/model/telemetry/events.js"
+import { SessionSender } from "../runtime/session/message.js"
 
 export interface QueueCommandOptions {
   readonly commandId: string
@@ -43,6 +44,13 @@ export const create =
       return make({ runtime, registeredByName })(yield* runtime.createSession(request))
     })
 export interface SessionHandle extends Omit<HostSession, "queue"> {
+  readonly message: (
+    input: Prompt.Prompt | string,
+    options: QueueCommandOptions,
+  ) => Effect.Effect<QueueReceipt, QueueError, SessionSender>
+  readonly stop: (options: QueueCommandOptions) => Effect.Effect<void, SessionError>
+  readonly close: (options: QueueCommandOptions) => Effect.Effect<void, SessionError>
+  readonly resume: (options: QueueCommandOptions) => Effect.Effect<void, SessionError>
   readonly inspect: Effect.Effect<HostSession, SessionError>
   readonly submit: (
     input: Prompt.Prompt | string,
@@ -73,6 +81,19 @@ export const make =
   }) =>
   (session: HostSession): SessionHandle => ({
     ...session,
+    message: (input, options) =>
+      Effect.gen(function* () {
+        return yield* runtime.messageSessionInput({
+          sessionId: session.id,
+          commandId: options.commandId,
+          prompt: Prompt.make(input),
+        })
+      }),
+    stop: (options) => runtime.controlSession({ sessionId: session.id, commandId: options.commandId, action: "stop" }),
+    close: (options) =>
+      runtime.controlSession({ sessionId: session.id, commandId: options.commandId, action: "close" }),
+    resume: (options) =>
+      runtime.controlSession({ sessionId: session.id, commandId: options.commandId, action: "resume" }),
     inspect: runtime.session(session.id),
     snapshot: runtime.sessionSnapshot(session.id),
     submit: (input, options) =>
