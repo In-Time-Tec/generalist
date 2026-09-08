@@ -179,14 +179,20 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
         return yield* failure({ reason: "corruption", message: "Commit command identity is empty", key })
       return retainCommit(record, envelope.digest, bytes)
     })
-  const checkState = (state: State, receipts: Loaded["receipts"]) =>
+  const checkState = (state: State, receipts: Loaded["receipts"], reserveBytes = 0) =>
     Effect.gen(function* () {
+      if (!Number.isSafeInteger(reserveBytes) || reserveBytes < 0 || reserveBytes >= maxStateBytes) {
+        return yield* failure({
+          reason: "configuration",
+          message: "Reserved bytes must be a nonnegative safe integer below maxStateBytes",
+        })
+      }
       // Retained receipts are canonical state, not an unbounded process-side deduplication cache.
       const size = yield* byteLength(freeze({ state, receipts }))
-      if (size > maxStateBytes)
+      if (size > maxStateBytes - reserveBytes)
         return yield* failure({
           reason: "limit",
-          message: `Partition state and receipts exceed ${maxStateBytes} bytes`,
+          message: `Partition state and receipts exceed ${maxStateBytes - reserveBytes} bytes${reserveBytes === 0 ? "" : ` with ${reserveBytes} bytes reserved for settlement`}`,
         })
     })
   const listKeys = (namespace: string) =>

@@ -25,6 +25,7 @@ import { probe } from "./probe.js"
 import { Identity, ensure } from "./discovery-marker.js"
 
 export type { Json, Patch, State } from "./protocol.js"
+export const defaultMaxStateBytes = 16 * 1024 * 1024
 export interface Head {
   readonly sequence: string
   readonly digest: string
@@ -61,6 +62,7 @@ export interface Journal {
   readonly commitWithHead: <E>(
     command: typeof Command.Type,
     evaluate: (state: State) => Effect.Effect<typeof Transition.Type, E>,
+    reserveBytes?: number,
   ) => Effect.Effect<{ readonly receipt: Json; readonly head: Omit<Head, "stateDigest"> }, E | DurabilityFailure>
 }
 
@@ -83,7 +85,7 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
         message: "The provider does not satisfy the canonical object-store contract",
       })
     }
-    const maxStateBytes = options.maxStateBytes ?? 16 * 1024 * 1024
+    const maxStateBytes = options.maxStateBytes ?? defaultMaxStateBytes
     const maxCommitBytes = options.maxCommitBytes ?? 1024 * 1024
     const maxSnapshotBytes = maxStateBytes + maxCommitBytes + 4096
     const snapshotEvery = options.snapshotEvery ?? 128
@@ -179,7 +181,7 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
         }
       })
     const committedResult = (loaded: Loaded, receipt: Json) => freeze({ receipt, head: { ...loaded.head } })
-    const commitWithHead: Journal["commitWithHead"] = (command, evaluate) =>
+    const commitWithHead: Journal["commitWithHead"] = (command, evaluate, reserveBytes = 0) =>
       Effect.gen(function* () {
         const validated = yield* decode(Command, command, "encoding")
         const inputDigest = yield* hash(yield* bytes(validated.input))
@@ -231,7 +233,7 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
             validated.id,
             freeze({ inputDigest, sequence, receipt: transition.receipt }),
           )
-          yield* checkState(state, receipts)
+          yield* checkState(state, receipts, reserveBytes)
           const sealed = yield* sealCommit(record)
           const key = commitKey(sequence)
           if (sealed.bytes.length > maxCommitBytes || sealed.bytes.length > maxReplayBytes) {
