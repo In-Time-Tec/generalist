@@ -54,6 +54,48 @@ const suspendedRuns = (
   return runs
 }
 
+const validateRunWaitSelector = (
+  state: RuntimeState,
+  runId: string,
+  selector: Extract<RunWait["reason"], { _tag: "AwaitEvent" }>["filter"] & { _tag: "Run" },
+) => {
+  if (selector.runs.length > 32 || (selector.runs.length === 0 && !selector.messages))
+    return Effect.fail(RuntimeUnavailable.make({ message: "Run waits require a bounded, nonempty selector" }))
+  if (new Set(selector.runs).size !== selector.runs.length)
+    return Effect.fail(RuntimeUnavailable.make({ message: "Run wait selectors cannot contain duplicate Run IDs" }))
+  const owner = state.runs.get(runId)!
+  const invalidTarget = selector.runs.find((targetId) => {
+    const target = state.runs.get(targetId)
+    return target === undefined || target.rootRunId !== owner.rootRunId || targetId === runId
+  })
+  return invalidTarget === undefined
+    ? Effect.void
+    : Effect.fail(
+        RuntimeUnavailable.make({
+          message: "Run wait targets must be other Runs in the authenticated execution family",
+        }),
+      )
+}
+
+const validateRunWaitIdentity = (
+  waits: ReadonlyMap<string, RunWait>,
+  runId: string,
+  requested: RunWait,
+  selector: Extract<RunWait["reason"], { _tag: "AwaitEvent" }>["filter"] & { _tag: "Run" },
+) => {
+  for (const [key, previous] of waits) {
+    if (!key.startsWith(`${runId}\0`) || previous.reason._tag !== "AwaitEvent" || previous.reason.filter._tag !== "Run")
+      continue
+    if (previous.reason.filter.commandId === selector.commandId && !Equal.equals(previous.reason.filter, selector))
+      return Effect.fail(
+        RuntimeUnavailable.make({ message: "Run wait command identity cannot be reused with a different selector" }),
+      )
+    if (previous.status === "open" && previous.waitId !== requested.waitId)
+      return Effect.fail(RuntimeUnavailable.make({ message: "Run wait command identity is already open" }))
+  }
+  return Effect.void
+}
+
 const insertWaits = (state: RuntimeState, runId: string, requestedWaits: ReadonlyArray<RunWait>) =>
   Effect.gen(function* () {
     const waits = new Map(state.waits)
@@ -66,35 +108,8 @@ const insertWaits = (state: RuntimeState, runId: string, requestedWaits: Readonl
       identities.add(requested.waitId)
       if (requested.reason._tag === "AwaitEvent" && requested.reason.filter._tag === "Run") {
         const selector = requested.reason.filter
-        if (selector.runs.length > 32 || (selector.runs.length === 0 && !selector.messages))
-          return yield* RuntimeUnavailable.make({ message: "Run waits require a bounded, nonempty selector" })
-        if (new Set(selector.runs).size !== selector.runs.length)
-          return yield* RuntimeUnavailable.make({ message: "Run wait selectors cannot contain duplicate Run IDs" })
-        const owner = state.runs.get(runId)!
-        for (const targetId of selector.runs) {
-          const target = state.runs.get(targetId)
-          if (target === undefined || target.rootRunId !== owner.rootRunId || targetId === runId)
-            return yield* RuntimeUnavailable.make({
-              message: "Run wait targets must be other Runs in the authenticated execution family",
-            })
-        }
-        for (const [key, previous] of waits) {
-          if (
-            !key.startsWith(`${runId}\0`) ||
-            previous.reason._tag !== "AwaitEvent" ||
-            previous.reason.filter._tag !== "Run"
-          )
-            continue
-          if (
-            previous.reason.filter.commandId === selector.commandId &&
-            !Equal.equals(previous.reason.filter, selector)
-          )
-            return yield* RuntimeUnavailable.make({
-              message: "Run wait command identity cannot be reused with a different selector",
-            })
-          if (previous.status === "open" && previous.waitId !== requested.waitId)
-            return yield* RuntimeUnavailable.make({ message: "Run wait command identity is already open" })
-        }
+        yield* validateRunWaitSelector(state, runId, selector)
+        yield* validateRunWaitIdentity(waits, runId, requested, selector)
       }
       const prior = waits.get(waitMapKey(runId, requested.waitId))
       if (prior === undefined) {

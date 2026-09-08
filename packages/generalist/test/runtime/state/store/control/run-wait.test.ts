@@ -8,13 +8,13 @@ import { objectWorkerId } from "../../../execution/object.js"
 
 let fixtureId = 0
 const setup = Effect.gen(function* () {
-  const id = String(fixtureId++)
+  const fixtureKey = String(fixtureId++)
   const runtime = yield* Runtime.Runtime
   const store = yield* RunStore.RunStore
   const parent = yield* runtime.send({
     to: assistantAddress,
-    sessionId: `wait:${id}`,
-    idempotencyKey: `parent:${id}`,
+    sessionId: `wait:${fixtureKey}`,
+    idempotencyKey: `parent:${fixtureKey}`,
     prompt: textPrompt("parent"),
   })
   const child = yield* runtime.spawn({
@@ -54,12 +54,12 @@ const setup = Effect.gen(function* () {
       })
       return (yield* store.loadExecution(parent.runId)).resolutions.find((entry) => entry.waitId === waitId)
     })
-  const message = (id: string) => {
+  const message = (messageId: string) => {
     const input = {
       runId: parent.runId,
-      commandId: `${parent.runId}:${id}`,
-      idempotencyKey: id,
-      prompt: textPrompt(id),
+      commandId: `${parent.runId}:${messageId}`,
+      idempotencyKey: messageId,
+      prompt: textPrompt(messageId),
       policy: "steer" as const,
       from: { runId: child.runId },
     }

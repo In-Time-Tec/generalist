@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, Permissions, ToolContext } from "generalist"
 import { Generalist, WaitInvalid, WaitResult, type Host, type HostRun } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime, SessionSender } from "generalist/runtime"
@@ -84,6 +84,7 @@ const finish = Response.makePart("finish", {
   }),
   response: undefined,
 })
+const ToolResultPart = Schema.Struct({ type: Schema.Literal("tool-result"), id: Schema.String })
 
 it.effect("reopens a message-completed wait without redispatch and preserves the sibling result barrier", () => {
   const storage = makeObjectStorage()
@@ -127,17 +128,14 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
             }),
             finish,
           ])
-        const results = options.prompt.content
-          .flatMap((message) => (Array.isArray(message.content) ? message.content : []))
-          .filter(
-            (part): part is { readonly type: "tool-result"; readonly id: string } =>
-              typeof part === "object" &&
-              part !== null &&
-              "type" in part &&
-              part.type === "tool-result" &&
-              "id" in part &&
-              typeof part.id === "string",
-          )
+        const results = options.prompt.content.flatMap((message) => {
+          const content = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown))(message.content)
+          if (Option.isNone(content)) return []
+          return content.value.flatMap((part) => {
+            const result = Schema.decodeUnknownOption(ToolResultPart)(part)
+            return Option.isSome(result) ? [result.value] : []
+          })
+        })
         expect(results).toHaveLength(2)
         expect(results.map((part) => part.id)).toEqual(["wait-call", "sibling-call"])
         return Stream.make(Response.makePart("text-delta", { id: "done", delta: "I can answer the child now" }), finish)

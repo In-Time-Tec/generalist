@@ -497,5 +497,4 @@ const create = <
     }
     return host
   })
-/** Stable process-local product host. */
-export const Generalist = { create, plugin } as const
+/** Stable process-local product host. */ export const Generalist = { create, plugin } as const

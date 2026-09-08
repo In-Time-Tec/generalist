@@ -1,11 +1,19 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { AwaitEventResult } from "../../../../core/agent/tools/wake-event.js"
-import { occurredAt } from "../../observation.js"
+import { RuntimeUnavailable } from "../../../errors.js"
+import { occurredAt, type PreparedObservation } from "../../observation.js"
 import { appendLifecycle, resumedEvent } from "../../append.js"
 import { openRunWaits, type RuntimeState } from "../../projection.js"
 import { closeWait } from "./wait.js"
 
-export const reconcileRunWaits = (state: RuntimeState, runId: string) =>
+type ReconcileRunWaits = Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+
+export const reconcileRunWaits: {
+  (runId: string): (state: RuntimeState) => ReconcileRunWaits
+  (state: RuntimeState, runId: string): ReconcileRunWaits
+} = Function.dual(2, (state: RuntimeState, runId: string) => reconcileRunWaitsInternal(state, runId))
+
+const reconcileRunWaitsInternal = (state: RuntimeState, runId: string) =>
   Effect.gen(function* () {
     let next = state
     for (const wait of openRunWaits(next, runId)) {
@@ -49,7 +57,9 @@ export const reconcileRunWaits = (state: RuntimeState, runId: string) =>
       const resolution = receipt ?? {
         _tag: "ToolResult" as const,
         result: result!,
-        encodedResult: Schema.encodeSync(AwaitEventResult)(result!),
+        encodedResult: yield* Schema.encodeEffect(AwaitEventResult)(result!).pipe(
+          Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+        ),
       }
       const closed = closeWait(next, {
         runId,

@@ -65,7 +65,7 @@ export const make = ({
           return yield* WaitInvalid.make({
             message: "A model-facing wait must belong to the currently executing Agent Run.",
           })
-        const filter = yield* Schema.decodeUnknownEffect(WakeEventFilter)({
+        const filter = yield* Schema.decodeEffect(WakeEventFilter)({
           _tag: "Run",
           runs: options.runs ?? [],
           messages: options.messages ?? false,
