@@ -15,6 +15,10 @@ Write for the developer deciding whether Generalist solves a real problem. Lead 
 
 `PRODUCT.md` owns the product thesis and audience. The writing skills own the documentation workflow. This positioning never relaxes the correctness, safety, testing, or release requirements below.
 
+## GitHub issues
+
+Use the [writing-github-issues](.agents/skills/writing-github-issues/SKILL.md) skill before creating, splitting, or rewriting implementation issues. Lead with the problem, a concrete proposed interface when relevant, and the desired runtime flow.
+
 ## Commands
 
 Use Bun 1.4.0, pinned in `package.json`, and the committed lockfile.
