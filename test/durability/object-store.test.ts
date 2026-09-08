@@ -81,6 +81,34 @@ describe("ObjectStore conformance", () => {
 })
 
 describe("testing-only ObjectStore simulator", () => {
+  it.effect("keeps sorted listings private across clients, conflicts, deletions and recreated keys", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make({ pageSize: 2 })
+      const other = yield* simulator.connect
+      for (const key of ["p/z", "q/a", "p/a", "p/😀", "p/é", "p/b", "p/aa", "a"]) {
+        yield* simulator.store.create(key, Uint8Array.of(1))
+      }
+      const first = yield* other.store.list("p/")
+      expect(first.keys).toEqual(["p/a", "p/aa"])
+      Reflect.set(first.keys, "0", "changed")
+      expect((yield* simulator.store.list("p/")).keys).toEqual(["p/a", "p/aa"])
+      expect(yield* other.store.create("p/b", Uint8Array.of(2))).toBe("conflict")
+      yield* other.maintenance.remove("missing")
+      yield* other.maintenance.remove("p/aa")
+      yield* other.maintenance.remove("p/b")
+      yield* other.store.create("p/b", Uint8Array.of(3))
+      yield* other.store.create("p/ab", Uint8Array.of(4))
+      yield* other.faults.corrupt("p/z", Uint8Array.of(5))
+      const second = yield* simulator.store.list("p/", first.cursor)
+      expect(second.keys).toEqual(["p/ab", "p/b"])
+      const third = yield* other.store.list("p/", second.cursor)
+      expect(third.keys).toEqual(["p/z", "p/é"])
+      expect(yield* simulator.store.list("p/", third.cursor)).toEqual({ keys: ["p/😀"] })
+      expect(yield* other.store.list("q/")).toEqual({ keys: ["q/a"] })
+      expect(yield* other.store.list("p/zzz")).toEqual({ keys: [] })
+    }),
+  )
+
   it.effect("publishes a write before losing its acknowledgement, without allowing a retry to overwrite", () =>
     Effect.gen(function* () {
       const simulator = yield* make()

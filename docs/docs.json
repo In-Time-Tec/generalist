@@ -196,7 +196,6 @@
                   "features/learning",
                   "features/consolidation",
                   "features/rl-export",
-                  "features/rlm",
                   "features/mcp",
                   "features/a2a",
                   "features/ag-ui",

@@ -51,7 +51,19 @@ export interface Simulator extends Client {
 
 interface Bucket {
   readonly objects: Map<string, StoredObject>
+  readonly keys: Array<string>
   revision: bigint
+}
+
+const keyIndex = (keys: ReadonlyArray<string>, key: string): number => {
+  let start = 0
+  let end = keys.length
+  while (start < end) {
+    const middle = start + Math.floor((end - start) / 2)
+    if (keys[middle]! < key) start = middle + 1
+    else end = middle
+  }
+  return start
 }
 
 type CreateFault =
@@ -116,11 +128,11 @@ export const make = (
     if (!Number.isSafeInteger(pageSize) || pageSize < 1) {
       return yield* failure("initialize", "", "invalid-response", "pageSize must be a positive safe integer")
     }
-    const bucket = yield* Ref.make<Bucket>({ objects: new Map(), revision: 0n })
+    const bucket = yield* Ref.make<Bucket>({ objects: new Map(), keys: [], revision: 0n })
     const maintenance: Client["maintenance"] = {
       remove: (key) =>
         Ref.update(bucket, (current) => {
-          current.objects.delete(key)
+          if (current.objects.delete(key)) current.keys.splice(keyIndex(current.keys, key), 1)
           return current
         }),
     }
@@ -129,6 +141,7 @@ export const make = (
         if (current.objects.has(key)) return ["conflict", current]
         current.revision += 1n
         current.objects.set(key, { bytes, etag: `test-object-${current.revision}` })
+        current.keys.splice(keyIndex(current.keys, key), 0, key)
         return ["created", current]
       })
     const connect: Effect.Effect<Client> = Effect.gen(function* () {
@@ -205,13 +218,17 @@ export const make = (
               after = decoded[1]
             }
             return yield* Ref.modify(bucket, (current) => {
-              const keys = Array.from(current.objects.keys())
-                .filter((key) => key.startsWith(prefix) && (after === undefined || key > after))
-                .toSorted()
-              const page = keys.slice(0, pageSize)
+              let start = keyIndex(current.keys, after ?? prefix)
+              if (after !== undefined && current.keys[start] === after) start += 1
+              const page: Array<string> = []
+              let index = start
+              while (page.length < pageSize) {
+                if (current.keys[index]?.startsWith(prefix) !== true) break
+                page.push(current.keys[index++]!)
+              }
               const last = page[page.length - 1]
               return [
-                keys.length > pageSize && last !== undefined
+                current.keys[index]?.startsWith(prefix) === true && last !== undefined
                   ? { keys: page, cursor: JSON.stringify([prefix, last]) }
                   : { keys: page },
                 current,
