@@ -98,6 +98,8 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
   Runtime.Runtime.of({
     messageSessionInput: () => unused(),
     controlSession: () => unused(),
+    registerTool: () => unused(),
+    startTool: () => unused(),
     sessionSelection: () => unused(),
     sessionFamily: () => Effect.die("not used"),
     getRun: () => unused(),

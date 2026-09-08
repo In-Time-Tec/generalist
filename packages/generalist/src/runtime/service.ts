@@ -73,7 +73,7 @@ import type {
   RunEvent,
   RunFailed,
 } from "./run/event.js"
-import type { AgentExecutionResult, ProgramExecutionResult } from "./execution/state.js"
+import type { AgentExecutionResult, ProgramExecutionResult, ToolExecutionResult } from "./execution/state.js"
 import type { WaitResolution } from "./run/wait.js"
 import type { FanOutInspection, FanOutReceipt } from "./child/fan-out.js"
 import type { FanOutInput, FanOutMemberOrigin, InitialFanOutInput } from "./child/fan-out-internal.js"
@@ -220,7 +220,7 @@ type StartedAgentResult<Output> = Omit<AgentExecutionResult, "output"> & { reado
 export type StartEvent<Output> =
   | Exclude<RunEvent, RunCompleted>
   | (Omit<RunCompleted, "result"> & {
-      readonly result: StartedAgentResult<Output> | ProgramExecutionResult
+      readonly result: StartedAgentResult<Output> | ProgramExecutionResult | ToolExecutionResult
     })
 
 /** One typed durable Run and its replay-then-live event stream. */
@@ -232,6 +232,34 @@ export interface RunHandle<Output> {
     message: Prompt.Prompt | string,
     options?: RunSendOptions,
   ) => Effect.Effect<SteeringReceipt, RunSendError>
+}
+
+export interface ToolStartOptions {
+  readonly parentRunId?: string
+  readonly commandId?: string
+}
+
+export type ToolRunEvent<Output, Failure> =
+  | Exclude<RunEvent, RunCompleted>
+  | (Omit<RunCompleted, "result"> & {
+      readonly result:
+        | { readonly _tag: "Tool"; readonly isFailure: false; readonly value: Output }
+        | { readonly _tag: "Tool"; readonly isFailure: true; readonly value: Failure }
+    })
+
+export interface ToolRunHandle<Output, Failure> {
+  readonly runId: import("../core/durable/run-id.js").RunId
+  readonly await: Effect.Effect<
+    Output,
+    | RunFailed
+    | RunCancelled
+    | EventsError
+    | InvalidOutput
+    | { readonly _tag: "ToolRunFailure"; readonly failure: Failure }
+  >
+  readonly events: Stream.Stream<ToolRunEvent<Output, Failure>, EventsError | InvalidOutput>
+  readonly inspect: Effect.Effect<RuntimeInspection, InspectError>
+  readonly cancel: (commandId: string, reason?: string) => Effect.Effect<void, CancelError>
 }
 
 /** Durable admission for one existing Run. */
@@ -556,6 +584,17 @@ export interface OperatorService {
 }
 
 export interface Service extends RuntimeHostSessions {
+  readonly registerTool: <T extends Tool.Any>(
+    tool: T,
+  ) => Effect.Effect<void, ExecutableRegistrationInvalid, import("./executable/registered-tool.js").ToolServices<T>>
+  readonly startTool: <T extends Tool.Any>(
+    tool: T,
+    input: Tool.Parameters<T>,
+    options?: ToolStartOptions,
+  ) => Effect.Effect<
+    ToolRunHandle<T["successSchema"]["Type"], T["failureSchema"]["Type"]>,
+    StartExecutionError | InspectError
+  >
   readonly configureDelegationPolicy: import("./run/store.js").Service["configureDelegationPolicy"]
   readonly sessionSelection: (
     name: string,

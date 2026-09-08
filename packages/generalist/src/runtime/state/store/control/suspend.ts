@@ -25,6 +25,7 @@ const requireRun = (state: RuntimeState, runId: string) => {
 }
 
 const suspensionTokens = (suspension: SuspendInput["suspension"]): ReadonlyArray<string> => {
+  if (suspension._tag === "generalist/runtime/ToolSuspended") return [suspension.token]
   if (suspension._tag === "generalist/core/AgentSuspended") return suspension.waits.map((wait) => wait.token)
   if (suspension._tag === "generalist/core/ProgramSuspended") {
     return suspension.token === undefined ? [] : [suspension.token]

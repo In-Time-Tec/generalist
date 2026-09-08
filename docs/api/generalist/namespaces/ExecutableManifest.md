@@ -60,7 +60,7 @@ Complete closed executable profile registry and entry closure.
 
 ##### root
 
-> `readonly` **root**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **root**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 <a id="version"></a>
 
@@ -134,7 +134,7 @@ Executable closure paired with its constructor-owned reference.
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -270,15 +270,73 @@ One complete pinned Agent Program entry in an executable closure.
 
 > `readonly` **pin**: `string` & `Brand`\<`"generalist/program-pin"`\>
 
+***
+
+<a id="toolentry"></a>
+
+### ToolEntry
+
+One exact executable definition in a closed closure.
+
+#### Properties
+
+<a id="_tag-2"></a>
+
+##### \_tag
+
+> `readonly` **\_tag**: `"Tool"`
+
+<a id="manifest-3"></a>
+
+##### manifest
+
+> `readonly` **manifest**: `object`
+
+###### failure
+
+> `readonly` **failure**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+###### input
+
+> `readonly` **input**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+###### name
+
+> `readonly` **name**: `string`
+
+###### output
+
+> `readonly` **output**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+###### policy?
+
+> `readonly` `optional` **policy?**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+###### replay
+
+> `readonly` **replay**: `"provider-idempotent"` \| `"never"`
+
+###### tool
+
+> `readonly` **tool**: `string` & `Brand`\<`"generalist/capability-pin"`\>
+
+###### version
+
+> `readonly` **version**: `"1"`
+
+<a id="pin-2"></a>
+
+##### pin
+
+> `readonly` **pin**: `string` & `Brand`\<`"generalist/tool-pin"`\>
+
 ## Type Aliases
 
 <a id="executableentry"></a>
 
 ### ExecutableEntry
 
-> **ExecutableEntry** = [`AgentEntry`](#agententry) \| [`ProgramEntry`](#programentry)
-
-One exact executable definition in a closed closure.
+> **ExecutableEntry** = [`AgentEntry`](#agententry) \| [`ProgramEntry`](#programentry) \| [`ToolEntry`](#toolentry)
 
 ***
 
@@ -382,8 +440,6 @@ Encode one constructor-validated executable authority.
 
 > **ExecutableEntry**: `Codec`\<[`ExecutableEntry`](#executableentry), `ExecutableEntryEncoded`, `never`, `never`\>
 
-One exact executable definition in a closed closure.
-
 ***
 
 <a id="executablemanifest-1"></a>
@@ -400,7 +456,7 @@ Complete closed executable profile registry and entry closure.
 
 ### ExecutableRef
 
-> `const` **ExecutableRef**: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>
+> `const` **ExecutableRef**: `Schema.Struct`\<\{ `active`: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>; `executable`: `Schema.brand`\<`Schema.String`, `"generalist/executable-pin"`\>; \}\>
 
 Durable reference to one exact executable closure and active Agent.
 
@@ -410,7 +466,7 @@ Durable reference to one exact executable closure and active Agent.
 
 ### ExecutableTarget
 
-> `const` **ExecutableTarget**: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>
+> `const` **ExecutableTarget**: `Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>
 
 Exact active executable within one closed closure.
 
@@ -434,7 +490,7 @@ Construct, validate, canonicalize, and pin a complete executable closure.
 
 ###### entries
 
-`ReadonlyArray`\<`object` & [`PinnedAgent`](./AgentManifest.md#pinnedagent) \| `object` & [`PinnedProgram`](./ProgramManifest.md#pinnedprogram)\>
+`ReadonlyArray`\<`object` & [`PinnedAgent`](./AgentManifest.md#pinnedagent) \| `object` & [`PinnedProgram`](./ProgramManifest.md#pinnedprogram) \| `object` & [`PinnedTool`](./ToolManifest.md#pinnedtool)\>
 
 ###### profiles?
 
@@ -512,6 +568,16 @@ One complete pinned Agent Program entry in an executable closure.
 
 ***
 
+<a id="toolentry-1"></a>
+
+### ToolEntry
+
+> **ToolEntry**: `Codec`\<[`ToolEntry`](#toolentry), `ToolEntryEncoded`, `never`, `never`\>
+
+One exact executable definition in a closed closure.
+
+***
+
 <a id="validateref"></a>
 
 ### validateRef
@@ -544,7 +610,7 @@ Verify that a durable reference is exactly owned by a closure.
 
 ###### active
 
-`Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>\]\>
+`Schema.Union`\<readonly \[`Schema.brand`\<`Schema.String`, `"generalist/agent-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/program-pin"`\>, `Schema.brand`\<`Schema.String`, `"generalist/tool-pin"`\>\]\>
 
 ###### executable
 

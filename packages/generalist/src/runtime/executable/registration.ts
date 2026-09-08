@@ -29,30 +29,11 @@ export const requiredPins = (executable: PinnedExecutable): ReadonlySet<string> 
   const pins = new Set<string>()
   for (const entry of executable.manifest.entries) {
     if (entry._tag === "Agent") {
-      pins.add(entry.manifest.model)
-      for (const capability of entry.manifest.tools) pins.add(capability.pin)
-      for (const capability of entry.manifest.skills) pins.add(capability.pin)
-      for (const capability of entry.manifest.services) pins.add(capability.pin)
-      if (entry.manifest.policy._tag === "Pinned") pins.add(entry.manifest.policy.pin)
-      if (entry.manifest.compaction !== undefined) {
-        pins.add(entry.manifest.compaction.service)
-        pins.add(entry.manifest.compaction.summaryModel)
-      }
-      if (entry.manifest.programAuthority !== undefined) {
-        pins.add(entry.manifest.programAuthority.sandbox)
-        pins.add(entry.manifest.programAuthority.input)
-        pins.add(entry.manifest.programAuthority.output)
-        for (const capability of entry.manifest.programAuthority.tools) pins.add(capability.pin)
-        for (const capability of entry.manifest.programAuthority.steps) pins.add(capability.pin)
-        for (const capability of entry.manifest.programAuthority.agents) pins.add(capability.input)
-      }
+      agentPins(entry, pins, new Map())
+    } else if (entry._tag === "Tool") {
+      toolPins(entry, pins)
     } else {
-      pins.add(entry.manifest.sandbox)
-      pins.add(entry.manifest.input)
-      pins.add(entry.manifest.output)
-      for (const capability of entry.manifest.capabilities.tools) pins.add(capability.pin)
-      for (const capability of entry.manifest.capabilities.steps) pins.add(capability.pin)
-      for (const capability of entry.manifest.capabilities.agents) pins.add(capability.input)
+      programPins(entry, pins)
     }
   }
   return pins
@@ -60,6 +41,14 @@ export const requiredPins = (executable: PinnedExecutable): ReadonlySet<string> 
 
 type ManifestEntry = PinnedExecutable["manifest"]["entries"][number]
 type ActiveExecutable = PinnedExecutable["ref"]["active"]
+
+const toolPins = (entry: Extract<ManifestEntry, { readonly _tag: "Tool" }>, pins: Set<string>): void => {
+  pins.add(entry.manifest.tool)
+  pins.add(entry.manifest.input)
+  pins.add(entry.manifest.output)
+  pins.add(entry.manifest.failure)
+  if (entry.manifest.policy !== undefined) pins.add(entry.manifest.policy)
+}
 
 const agentPins = (
   entry: Extract<ManifestEntry, { readonly _tag: "Agent" }>,
@@ -122,6 +111,10 @@ export const requiredPinsForActiveExecutable = (executable: PinnedExecutable): R
       for (const child of agentPins(entry, pins, profiles)) visit(child)
       return
     }
+    if (entry._tag === "Tool") {
+      toolPins(entry, pins)
+      return
+    }
     for (const child of programPins(entry, pins)) visit(child)
   }
   visit(executable.ref.active)
@@ -138,7 +131,9 @@ const namedCapabilities = (executable: PinnedExecutable): ReadonlyArray<NamedCap
       }
       continue
     }
-    capabilities.push(...entry.manifest.capabilities.tools, ...entry.manifest.capabilities.steps)
+    if (entry._tag === "Program") {
+      capabilities.push(...entry.manifest.capabilities.tools, ...entry.manifest.capabilities.steps)
+    }
   }
   return capabilities
 }

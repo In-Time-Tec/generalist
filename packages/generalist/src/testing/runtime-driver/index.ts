@@ -322,7 +322,9 @@ const registerMultiWorkerClaims = <LayerError, ClaimsLayerError>(
           Effect.gen(function* () {
             const fresh = yield* capability.claim(services, { runId: stale.runId, commandId: "stale-after" })
             expect(fresh.attemptFence).toBeGreaterThan(stale.attemptFence)
-            expect(BigInt(fresh.session.epoch)).toBeGreaterThan(BigInt(stale.session.epoch))
+            expect(fresh.session).toBeDefined()
+            expect(stale.session).toBeDefined()
+            expect(BigInt(fresh.session!.epoch)).toBeGreaterThan(BigInt(stale.session!.epoch))
             const session = Option.getOrThrow(yield* services.store.claimedSessionStore(stale))
             expect(
               (yield* Effect.exit(
@@ -337,14 +339,14 @@ const registerMultiWorkerClaims = <LayerError, ClaimsLayerError>(
               .complete({
                 ...stale,
                 commandId: `${stale.runId}:stale-complete`,
-                result: completedResult(stale.session.sessionId, "stale"),
+                result: completedResult(stale.session!.sessionId, "stale"),
               })
               .pipe(Effect.flip)
             expect(error).toBeInstanceOf(StaleClaim)
             yield* services.store.complete({
               ...fresh,
               commandId: `${fresh.runId}:fresh-complete`,
-              result: completedResult(fresh.session.sessionId, "fresh"),
+              result: completedResult(fresh.session!.sessionId, "fresh"),
             })
             expect((yield* services.runtime.inspect(stale.runId)).status).toBe("succeeded")
           }),

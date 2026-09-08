@@ -47,12 +47,17 @@ import {
   type StartError,
   type StartOptions,
 } from "../runtime/service.js"
-import { DuplicateAgent, IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
+import type { ToolServices } from "../runtime/executable/registered-tool.js"
+import { IllegalOperatorAction } from "../runtime/errors.js"
+import { make as makeTools, type Tools as HostTools } from "./tools.js"
+export type { CreateError } from "./errors.js"
+export type { HostToolRun } from "./tools.js"
+export { ToolIdentity } from "../runtime/executable/tool-identity.js"
 import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
-import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
+import { AgentInputInvalid, AgentNotRegistered, type CreateError } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { make as makeHostRun, type HostRun } from "./run.js"
@@ -115,14 +120,17 @@ export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyA
 export interface CreateOptions<
   Agents extends ReadonlyArray<AnyAgent>,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
+  Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > {
   readonly agents: Agents
   readonly plugins?: Plugins
+  readonly tools?: Tools
   readonly limits?: HostLimits
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
+  readonly tools: HostTools
   readonly attachments: Attachments
   readonly artifacts: Artifacts
   readonly sessions: SessionReads & {
@@ -229,27 +237,19 @@ type PluginServices<Plugins> =
 export type CreateRequirements<
   Agents extends ReadonlyArray<AnyAgent>,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>>,
+  Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > =
   | Runtime
-  | LanguageModel.LanguageModel
+  | (Agents[number] extends never ? never : LanguageModel.LanguageModel)
   | Approvals
   | Permissions
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
-
-export type CreateError =
-  | DuplicateAgent
-  | PluginNameConflict
-  | PluginToolConflict
-  | import("../runtime/errors.js").ExecutableRegistrationInvalid
-  | import("../runtime/errors.js").TreePolicyInvalid
-  | RuntimeUnavailable
-  | import("../durability/errors.js").DurabilityFailure
+  | ToolServices<Tools[number]>
 
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,
 ): Plugin<Tools> => options
-
 const configuredAgent = <Value extends AnyAgent>(agent: Value, tools: ReadonlyArray<Tool.Any>): Value => {
   const hidden: unknown = agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; it is produced by Agent.make.
@@ -314,13 +314,13 @@ const mergedSkills = (
 const create = <
   const Agents extends ReadonlyArray<AnyAgent>,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
+  const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 >(
-  options: CreateOptions<Agents, Plugins>,
-): Effect.Effect<Host<Agents>, CreateError, CreateRequirements<Agents, Plugins>> =>
+  options: CreateOptions<Agents, Plugins, Tools>,
+): Effect.Effect<Host<Agents>, CreateError, CreateRequirements<Agents, Plugins, Tools>> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime
-    const environment = yield* Effect.context<CreateRequirements<Agents, Plugins>>()
-    yield* LanguageModel.LanguageModel
+    const environment = yield* Effect.context<CreateRequirements<Agents, Plugins, Tools>>()
     yield* Approvals
     yield* Permissions
 
@@ -355,9 +355,12 @@ const create = <
       registered.set(agent, configured)
       registeredByName.set(agent.name, configured)
     }
+
+    for (const tool of options.tools ?? []) yield* runtime.registerTool(tool)
     const sessionHandle = makeSessionHandle({ runtime, registeredByName })
     const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
+      tools: makeTools(runtime),
       attachments,
       artifacts,
       sessions: {

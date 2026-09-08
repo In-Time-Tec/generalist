@@ -5,7 +5,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../../run/ownership-errors.js"
-import { activeChildCount, familyRuns } from "./child/capacity.js"
+import { activeChildCount, requireFamilyCapacity } from "./child/capacity.js"
 import { runWaits, type RuntimeState, type StoredRun } from "../projection.js"
 import { checkpointRef } from "../../executable/manifest-internal.js"
 import { appendLifecycle, attemptStartedEvent } from "../append.js"
@@ -106,6 +106,7 @@ export const revokeSession: {
   (claim: ExecutionClaim): (state: RuntimeState) => RuntimeState
   (state: RuntimeState, claim: ExecutionClaim): RuntimeState
 } = Function.dual(2, (state: RuntimeState, claim: ExecutionClaim): RuntimeState => {
+  if (claim.session === undefined) return state
   if (state.runs.get(claim.runId)?.ownerId !== undefined) return state
   const current = state.sessions.get(claim.session.sessionId)
   if (
@@ -170,24 +171,7 @@ const requireClaimable = (state: RuntimeState, run: StoredRun, now: number) =>
     if (run.status === "waiting" || run.status === "needs-resolution") {
       return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
     }
-    if (
-      run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Agent")
-    ) {
-      const live = familyRuns(state, run.rootRunId).filter((candidate) => {
-        if (candidate.runId === run.runId || candidate.ownerId === undefined || candidate.status !== "running")
-          return false
-        const owner = state.workers.get(candidate.ownerId)
-        return (
-          (owner === undefined || owner.expiresAt > now) &&
-          candidate.executableManifest.entries.some(
-            (entry) => entry.pin === candidate.executableRef.active && entry._tag === "Agent",
-          )
-        )
-      }).length
-      if (live >= run.treePolicy.concurrency.agents) {
-        return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is awaiting family Agent capacity` })
-      }
-    }
+    yield* requireFamilyCapacity({ state, run, now })
     if (run.status === "queued") {
       if (run.parentRunId === undefined) {
         return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is queued` })
@@ -248,6 +232,12 @@ export const claimExecution: {
         ? (yield* appendLifecycle(claimedState, run.runId, attemptStartedEvent(claimed.attempt), "running"))[1]
         : claimedState
     const loaded = started.runs.get(run.runId)!
+    if (
+      loaded.executableManifest.entries.some(
+        (entry) => entry.pin === loaded.executableRef.active && entry._tag === "Tool",
+      )
+    )
+      return [{ ...executionRecord(started, loaded), ownerId: input.ownerId }, started] as const
     const [session, withSession] = acquireSession(started, {
       sessionId: loaded.message.sessionId,
       runId: loaded.runId,
@@ -358,7 +348,7 @@ export const saveExecution: {
       )
       if (
         checkpoint.sessionId !== run.message.sessionId ||
-        input.session.sessionId !== run.message.sessionId ||
+        input.session?.sessionId !== run.message.sessionId ||
         (run.parentRunId !== undefined && state.runs.get(run.parentRunId)?.message.sessionId === run.message.sessionId)
       ) {
         return yield* RuntimeUnavailable.make({ message: "Session component ownership mismatch" })

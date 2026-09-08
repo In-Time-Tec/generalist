@@ -5,7 +5,7 @@ import type { ESTree } from "@oxlint/plugins"
 const SERVICE_CONSTRUCTOR_NAME = /^make[A-Z]/u
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/u
 const PURE_DOMAIN_CONSTRUCTORS = new Map([
-  ["/pin.js", new Set(["makeCapability", "makeModel", "makeProgram"])],
+  ["/pin.js", new Set(["makeCapability", "makeModel", "makeProgram", "makeTool"])],
   ["/pin-internal.js", new Set(["makeAgent", "makeExecutable"])],
   ["/manifest/executable-manifest.js", new Set(["makeTest"])],
   ["/code-executor.js", new Set(["makeRequest"])],

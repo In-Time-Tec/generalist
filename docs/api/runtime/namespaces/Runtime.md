@@ -1114,7 +1114,7 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 ###### active
 
-> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+> `readonly` **active**: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### executable
 
@@ -2192,6 +2192,28 @@ Bind one host-assigned name, unique within the Run's naming scope.
 
 `Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`RegisterAgentNameError`](#registeragentnameerror)\>
 
+<a id="registertool"></a>
+
+##### registerTool
+
+> `readonly` **registerTool**: \<`T`\>(`tool`) => `Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid), `ToolServices`\<`T`\>\>
+
+###### Type Parameters
+
+###### T
+
+`T` *extends* `Any`
+
+###### Parameters
+
+###### tool
+
+`T`
+
+###### Returns
+
+`Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid), `ToolServices`\<`T`\>\>
+
 <a id="removesessioninput"></a>
 
 ##### removeSessionInput
@@ -2625,7 +2647,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### sessionSelection
 
-> `readonly` **sessionSelection**: (`name`) => `Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
+> `readonly` **sessionSelection**: (`name`) => `Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
 
 ###### Parameters
 
@@ -2635,7 +2657,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
+`Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
 
 <a id="sessionsnapshot"></a>
 
@@ -2777,6 +2799,36 @@ Begin one already-normalized pinned execution.
 
 `Effect`\<[`StartReceipt`](#startreceipt), [`StartExecutionError`](#startexecutionerror)\>
 
+<a id="starttool"></a>
+
+##### startTool
+
+> `readonly` **startTool**: \<`T`\>(`tool`, `input`, `options?`) => `Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound)\>
+
+###### Type Parameters
+
+###### T
+
+`T` *extends* `Any`
+
+###### Parameters
+
+###### tool
+
+`T`
+
+###### input
+
+`Parameters`\<`T`\>
+
+###### options?
+
+[`ToolStartOptions`](#toolstartoptions)
+
+###### Returns
+
+`Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound)\>
+
 <a id="submitsessioninput"></a>
 
 ##### submitSessionInput
@@ -2797,7 +2849,7 @@ Begin one already-normalized pinned execution.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -2829,11 +2881,11 @@ Begin one already-normalized pinned execution.
 
 ###### selection.executableRef
 
-\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
 
 ###### selection.executableRef.active
 
-`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### selection.executableRef.executable
 
@@ -2963,7 +3015,7 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 
 ###### selection?
 
-\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}; \}
 
 ###### selection.budget?
 
@@ -2995,11 +3047,11 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 
 ###### selection.executableRef
 
-\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
 
 ###### selection.executableRef.active
 
-`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\> \| `string` & `Brand`\<`"generalist/tool-pin"`\>
 
 ###### selection.executableRef.executable
 
@@ -3445,6 +3497,88 @@ Exact root execution admission used below the typed Agent API.
 
 [`RunReceipt`](./Run.md#runreceipt).[`runId`](./Run.md#runid-3)
 
+***
+
+<a id="toolrunhandle"></a>
+
+### ToolRunHandle
+
+#### Type Parameters
+
+##### Output
+
+`Output`
+
+##### Failure
+
+`Failure`
+
+#### Properties
+
+<a id="await-1"></a>
+
+##### await
+
+> `readonly` **await**: `Effect`\<`Output`, [`RunFailed`](./RunEvent.md#runfailed) \| [`RunCancelled`](./RunEvent.md#runcancelled) \| [`EventsError`](#eventserror) \| [`InvalidOutput`](../../generalist/namespaces/AgentEvent.md#invalidoutput) \| \{ `_tag`: `"ToolRunFailure"`; `failure`: `Failure`; \}\>
+
+<a id="cancel-1"></a>
+
+##### cancel
+
+> `readonly` **cancel**: (`commandId`, `reason?`) => `Effect`\<`void`, [`CancelError`](#cancelerror)\>
+
+###### Parameters
+
+###### commandId
+
+`string`
+
+###### reason?
+
+`string`
+
+###### Returns
+
+`Effect`\<`void`, [`CancelError`](#cancelerror)\>
+
+<a id="events-2"></a>
+
+##### events
+
+> `readonly` **events**: `Stream`\<[`ToolRunEvent`](#toolrunevent)\<`Output`, `Failure`\>, [`EventsError`](#eventserror) \| [`InvalidOutput`](../../generalist/namespaces/AgentEvent.md#invalidoutput)\>
+
+<a id="inspect-1"></a>
+
+##### inspect
+
+> `readonly` **inspect**: `Effect`\<[`RuntimeInspection`](#runtimeinspection), [`InspectError`](#inspecterror)\>
+
+<a id="runid-14"></a>
+
+##### runId
+
+> `readonly` **runId**: `string`
+
+***
+
+<a id="toolstartoptions"></a>
+
+### ToolStartOptions
+
+#### Properties
+
+<a id="commandid-4"></a>
+
+##### commandId?
+
+> `readonly` `optional` **commandId?**: `string`
+
+<a id="parentrunid-6"></a>
+
+##### parentRunId?
+
+> `readonly` `optional` **parentRunId?**: `string`
+
 ## Type Aliases
 
 <a id="ackerror"></a>
@@ -3716,6 +3850,24 @@ Typed Agent start failures before a Run handle exists.
 ### StartExecutionError
 
 > **StartExecutionError** = [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted)
+
+***
+
+<a id="toolrunevent"></a>
+
+### ToolRunEvent
+
+> **ToolRunEvent**\<`Output`, `Failure`\> = `Exclude`\<[`RunEvent`](./RunEvent.md#runevent), [`RunCompleted`](./RunEvent.md#runcompleted)\> \| `Omit`\<[`RunCompleted`](./RunEvent.md#runcompleted), `"result"`\> & `object`
+
+#### Type Parameters
+
+##### Output
+
+`Output`
+
+##### Failure
+
+`Failure`
 
 ***
 

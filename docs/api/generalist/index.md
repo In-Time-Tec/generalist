@@ -53,6 +53,7 @@
 - [ToolAuthorization](./namespaces/ToolAuthorization.md)
 - [ToolContext](./namespaces/ToolContext.md)
 - [ToolExecutor](./namespaces/ToolExecutor.md)
+- [ToolManifest](./namespaces/ToolManifest.md)
 - [ToolOutput](./namespaces/ToolOutput.md)
 - [ToolPlacement](./namespaces/ToolPlacement.md)
 - [Triggers](./namespaces/Triggers.md)

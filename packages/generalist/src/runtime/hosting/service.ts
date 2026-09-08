@@ -53,6 +53,7 @@ import { explain as explainRecovery, verify as verifyRecovery } from "../executi
 import { resolveWith as resolveDurableApproval } from "../operation/approval.js"
 import { awaitSessionTerminal } from "../session/lifecycle.js"
 import { make as makeAgentStart, untypedHandle } from "./agent-start.js"
+import { make as makeToolStart } from "./tool-start.js"
 import { normalizer as fanOutNormalizer } from "./fan-out.js"
 import { messageDraft } from "./message.js"
 import { Invalid as BudgetInvalid, make as makeBudget } from "../../core/durable/run-budget.js"
@@ -433,7 +434,15 @@ const makeRuntimeWith = (
       return sendRun(input, prompt ?? "", sendOptions)
     }
 
+    const toolStart = makeToolStart({
+      agents,
+      store,
+      admitStart,
+      cancel: (input) => service.cancel(input),
+      inspect: (runId) => service.inspect(runId),
+    })
     const service: RuntimeService = {
+      ...toolStart,
       operator,
       register: agentStart.register,
       schedule: agentStart.schedule,
