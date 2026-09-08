@@ -90,6 +90,11 @@ layer(objectLayer)("Run-or-message wait", (it) => {
           (entry) => entry.waitId === "first",
         )
         expect(first).toMatchObject({ resolution: { result: { _tag: "Message", cursor: 0 } } })
+        expect(
+          (yield* f.runtime.history({ runId: f.parent.runId, limit: 100 })).filter(
+            (event) => event._tag === "SteeringConsumed",
+          ),
+        ).toHaveLength(1)
         yield* f.message("question")
         const retry = yield* f.wait("retry", "question-wait")
         expect(retry?.resolution).toEqual(first?.resolution)

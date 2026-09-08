@@ -69,6 +69,11 @@ export const reconcileRunWaits = (state: RuntimeState, runId: string) =>
           ),
         })
         next = { ...next, runs }
+        ;[, next] = yield* appendLifecycle(next, runId, {
+          _tag: "SteeringConsumed",
+          entryIds: [message.entryId],
+          operationId: wait.waitId,
+        })
       }
       ;[, next] = yield* appendLifecycle(next, runId, resumedEvent(wait.waitId, resolution), "running")
     }
