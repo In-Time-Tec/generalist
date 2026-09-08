@@ -23,6 +23,17 @@ export const control = ({ state, input }: { readonly state: RuntimeState; readon
       session,
     })
     let next: RuntimeState = { ...state, hostSessions }
+    if (input.action === "close") {
+      const runtimeSession = next.sessions.get(input.sessionId)
+      if (runtimeSession?.continuation !== undefined) {
+        const sessions = new Map(next.sessions)
+        sessions.set(input.sessionId, {
+          ...runtimeSession,
+          continuation: { ...runtimeSession.continuation, closed: true },
+        })
+        next = { ...next, sessions }
+      }
+    }
     if (input.action === "resume")
       return [undefined, yield* promote({ state: next, sessionId: input.sessionId })] as const
     for (const run of state.runs.values()) {

@@ -42,7 +42,7 @@ export class SessionQueueConflict extends ActionableTaggedError<SessionQueueConf
   "generalist/session/SessionQueueConflict",
   {
     sessionId: Schema.String,
-    reason: Schema.Literals(["revision", "capacity", "selection"]),
+    reason: Schema.Literals(["revision", "capacity", "selection", "closed"]),
     hint: errorHint("Reload the Session queue and retry with its current revision and pinned Agent selection."),
   },
 ) {}

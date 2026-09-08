@@ -1,4 +1,4 @@
-import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
+import type { PreparedObservation } from "../../observation.js"
 import { Effect, Function, Schema } from "effect"
 import {
   IdempotencyConflict,
@@ -31,10 +31,15 @@ import { make as makeAddress } from "../../../address.js"
 import type { FanOutReceipt } from "../../../child/fan-out.js"
 import type { FanOutMemberOrigin } from "../../../child/fan-out-internal.js"
 import { admitFanOut } from "../fan-out/service.js"
-import { readinessForAdmission, reserveSessions, recordFamilyRun } from "../child/capacity.js"
+import {
+  continuationFor,
+  continuationGrant,
+  readinessForAdmission,
+  reserveSessions,
+  recordFamilyRun,
+} from "../child/capacity.js"
 import { receiptAdmission } from "./receipt.js"
-import { budgetForEvents } from "../../../execution/inspection.js"
-import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
+import { Exhausted } from "../../../../core/durable/run-budget.js"
 import { rootGrant, sessionChildGrant, retainedBudget } from "./policy.js"
 import { capGrant } from "../../../budget/state.js"
 import { addRegistrations } from "./registration.js"
@@ -47,6 +52,11 @@ type ChildDetails = {
   origin?: FanOutMemberOrigin
 }
 type ChildDigestInput = { parentRunId: string; invocationId: string; label?: string; origin?: FanOutMemberOrigin }
+type SponsoredSpawnInput = SpawnInput & {
+  readonly message: Message
+  readonly parentRunId: string
+  readonly sponsoredContinuation?: boolean
+}
 
 const validateInitialChildren = (input: AdmitStartInput) =>
   Effect.gen(function* () {
@@ -339,152 +349,147 @@ type AdmitSpawnResult = Effect.Effect<
 >
 
 export const admitSpawn: {
-  (
-    input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
-  ): (state: RuntimeState) => AdmitSpawnResult
-  (
-    state: RuntimeState,
-    input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
-  ): AdmitSpawnResult
-} = Function.dual(
-  2,
-  (state: RuntimeState, input: SpawnInput & { readonly message: Message; readonly parentRunId: string }) =>
-    Effect.gen(function* () {
-      if (state.closed) {
-        return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-      }
-      const parent = state.runs.get(input.parentRunId)
-      if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
-      if (isTerminal(parent.status)) {
-        return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
-      }
-      const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
-      if (executableRef === undefined) {
-        return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
-      }
+  (input: SponsoredSpawnInput): (state: RuntimeState) => AdmitSpawnResult
+  (state: RuntimeState, input: SponsoredSpawnInput): AdmitSpawnResult
+} = Function.dual(2, (state: RuntimeState, input: SponsoredSpawnInput) =>
+  Effect.gen(function* () {
+    if (state.closed) {
+      return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+    }
+    const sessionId = input.message.sessionId
+    const parent = state.runs.get(input.parentRunId)
+    if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
+    const continuation = yield* continuationFor({
+      state,
+      sessionId,
+      parentSessionId: parent.message.sessionId,
+      sponsored: input.sponsoredContinuation === true,
+    })
+    if (isTerminal(parent.status) && continuation === undefined) {
+      return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
+    }
+    const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
+    if (executableRef === undefined) {
+      return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
+    }
 
-      const sessionId = input.message.sessionId
-      const digestInput: ChildDigestInput = {
+    const digestInput: ChildDigestInput = {
+      parentRunId: parent.runId,
+      invocationId: input.invocationId,
+    }
+    if (input.label !== undefined) digestInput.label = input.label
+    if (input.origin !== undefined) digestInput.origin = input.origin
+    const digest = childDigest(input.message, executableRef, digestInput)
+    const executable = yield* Effect.try({
+      try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
+    const registrations = yield* narrow(executable, parent.registrations).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
+    )
+    const key = idempotencyKey(input.message.to, sessionId, input.message.idempotencyKey)
+    const existing = state.idempotency.get(key)
+    if (existing !== undefined) {
+      if (existing.digest !== digest || !equals(existing.executable, executable)) {
+        return yield* IdempotencyConflict.make({
+          address: input.message.to,
+          sessionId,
+          idempotencyKey: input.message.idempotencyKey,
+          existingRunId: existing.receipt.runId,
+        })
+      }
+      return [duplicateReceipt(existing.receipt), state] as const
+    }
+
+    const [runId, withId] = newRunId(state)
+    yield* reserveSessions(state, parent, [sessionId])
+    const depth = parent.depth + 1
+    if (depth > parent.treePolicy.maxDepth) {
+      return yield* ChildDepthExceeded.make({
         parentRunId: parent.runId,
-        invocationId: input.invocationId,
-      }
-      if (input.label !== undefined) digestInput.label = input.label
-      if (input.origin !== undefined) digestInput.origin = input.origin
-      const digest = childDigest(input.message, executableRef, digestInput)
-      const executable = yield* Effect.try({
-        try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-      })
-      const registrations = yield* narrow(executable, parent.registrations).pipe(
-        Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
-      )
-      const key = idempotencyKey(input.message.to, sessionId, input.message.idempotencyKey)
-      const existing = state.idempotency.get(key)
-      if (existing !== undefined) {
-        if (existing.digest !== digest || !equals(existing.executable, executable)) {
-          return yield* IdempotencyConflict.make({
-            address: input.message.to,
-            sessionId,
-            idempotencyKey: input.message.idempotencyKey,
-            existingRunId: existing.receipt.runId,
-          })
-        }
-        return [duplicateReceipt(existing.receipt), state] as const
-      }
-
-      const [runId, withId] = newRunId(state)
-      yield* reserveSessions(state, parent, [sessionId])
-      const depth = parent.depth + 1
-      if (depth > parent.treePolicy.maxDepth) {
-        return yield* ChildDepthExceeded.make({
-          parentRunId: parent.runId,
-          rootRunId: parent.rootRunId,
-          parentDepth: parent.depth,
-          depth,
-          requested: depth,
-          current: parent.depth,
-          limit: parent.treePolicy.maxDepth,
-        })
-      }
-      if (parent.treePolicy.concurrency.agents === 0) {
-        return yield* ChildLimitExceeded.make({
-          parentRunId: parent.runId,
-          rootRunId: parent.rootRunId,
-          parentDepth: parent.depth,
-          depth,
-          requested: 1,
-          current: 0,
-          limit: parent.treePolicy.concurrency.agents,
-        })
-      }
-      const childReadiness = readinessForAdmission(withId, parent)
-      const parentBudget = yield* budgetForEvents({ events: parent.events, observedMillis: yield* occurredAtMillis })
-      if (parentBudget.children === 0) {
-        return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
-      }
-      const childBudget = yield* sessionChildGrant({
-        state,
-        sessionId,
-        selection: { executableRef, executableManifest: parent.executableManifest, registrations },
-        grant: childGrant(parentBudget, 1),
-      })
-      const child: StoredRun = {
-        runId,
-        status: "queued",
-        executableRef,
-        executableManifest: parent.executableManifest,
-        address: input.message.to,
-        message: input.message,
         rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
         depth,
-        treePolicy: parent.treePolicy,
+        requested: depth,
+        current: parent.depth,
+        limit: parent.treePolicy.maxDepth,
+      })
+    }
+    if (parent.treePolicy.concurrency.agents === 0) {
+      return yield* ChildLimitExceeded.make({
         parentRunId: parent.runId,
-        childReadiness,
-        invocationId: input.invocationId,
-        lastSequence: -1,
-        lastTurnCompletedSequence: -1,
-        attempt: 0,
-        attemptFence: 0,
-        cancellationRequested: false,
-        children: [],
-        events: [],
-        subscribers: new Map(),
-        steering: [],
-        registrations,
-        checkpoints: new Map(),
-      }
-      const runs = new Map(withId.runs)
-      const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }
-      runs.set(parent.runId, parentUpdated)
-      runs.set(runId, child)
-      let next: RuntimeState = recordFamilyRun({ state: { ...withId, runs }, run: child, budget: childBudget })
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: 1,
+        current: 0,
+        limit: parent.treePolicy.concurrency.agents,
+      })
+    }
+    const childReadiness = readinessForAdmission(withId, parent)
+    const childBudget = yield* sessionChildGrant({
+      state,
+      sessionId,
+      selection: { executableRef, executableManifest: parent.executableManifest, registrations },
+      grant: yield* continuationGrant({ state, parent, sessionId, continuation }),
+    })
+    const child: StoredRun = {
+      runId,
+      status: "queued",
+      executableRef,
+      executableManifest: parent.executableManifest,
+      address: input.message.to,
+      message: input.message,
+      rootRunId: parent.rootRunId,
+      depth,
+      treePolicy: parent.treePolicy,
+      parentRunId: parent.runId,
+      childReadiness,
+      invocationId: input.invocationId,
+      lastSequence: -1,
+      lastTurnCompletedSequence: -1,
+      attempt: 0,
+      attemptFence: 0,
+      cancellationRequested: false,
+      children: [],
+      events: [],
+      subscribers: new Map(),
+      steering: [],
+      registrations,
+      checkpoints: new Map(),
+    }
+    const runs = new Map(withId.runs)
+    const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }
+    runs.set(parent.runId, parentUpdated)
+    runs.set(runId, child)
+    let next: RuntimeState = recordFamilyRun({ state: { ...withId, runs }, run: child, budget: childBudget })
 
-      const [, linked] = yield* appendLifecycle(
-        next,
-        parent.runId,
-        childLinkedEvent(runId, input.invocationId, input.selection, input.message.prompt, parent.depth + 1, {
-          ...childDetails(childReadiness, input),
-          inherit: defaultInheritance,
-          budget: childBudget,
-        }),
-      )
-      next = linked
+    const [, linked] = yield* appendLifecycle(
+      next,
+      parent.runId,
+      childLinkedEvent(runId, input.invocationId, input.selection, input.message.prompt, parent.depth + 1, {
+        ...childDetails(childReadiness, input),
+        inherit: defaultInheritance,
+        budget: childBudget,
+      }),
+    )
+    next = linked
 
-      const [, accepted] = yield* appendLifecycle(
-        next,
-        runId,
-        acceptedEvent({ address: input.message.to, messageId: input.message.id, budget: childBudget }),
-        "queued",
-      )
-      next = accepted
-      const receipt: RunReceipt = {
-        runId,
-        messageId: input.message.id,
-        acceptedSequence: 0,
-        duplicate: false,
-      }
-      const idempotency = new Map(next.idempotency)
-      idempotency.set(key, { digest, executable, receipt })
-      return [receipt, { ...next, idempotency }] as const
-    }),
+    const [, accepted] = yield* appendLifecycle(
+      next,
+      runId,
+      acceptedEvent({ address: input.message.to, messageId: input.message.id, budget: childBudget }),
+      "queued",
+    )
+    next = accepted
+    const receipt: RunReceipt = {
+      runId,
+      messageId: input.message.id,
+      acceptedSequence: 0,
+      duplicate: false,
+    }
+    const idempotency = new Map(next.idempotency)
+    idempotency.set(key, { digest, executable, receipt })
+    return [receipt, { ...next, idempotency }] as const
+  }),
 )

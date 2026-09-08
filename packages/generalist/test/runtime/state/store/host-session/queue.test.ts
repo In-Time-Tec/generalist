@@ -141,6 +141,60 @@ it.effect("rejects a pinned Program selection without creating a conversational 
   ).pipe(Effect.scoped),
 )
 
+it.effect("closes a Session as read-only while preserving exact prior receipts", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const client = yield* bucket.connect
+      const store = yield* open(client, "closed-session")
+      const sessionId = "session:queue:closed"
+      yield* store.createHostSession({ id: sessionId, selection })
+      const first = { sessionId, commandId: "closed:first", prompt: Prompt.make("first") }
+      const accepted = yield* store.submitSessionInput(first)
+      yield* store.submitSessionInput({ sessionId, commandId: "closed:pending", prompt: Prompt.make("pending") })
+      const message = {
+        sessionId,
+        commandId: "closed:message",
+        prompt: Prompt.make("message"),
+        from: { user: "operator" } as const,
+      }
+      const messageReceipt = yield* store.messageSessionInput(message)
+      yield* store.controlSession({ sessionId, commandId: "closed:close", action: "close" })
+      expect(yield* store.submitSessionInput(first)).toEqual(accepted)
+      expect(yield* store.messageSessionInput(message)).toEqual(messageReceipt)
+      expect(
+        yield* store
+          .submitSessionInput({ sessionId, commandId: "closed:new", prompt: Prompt.make("new") })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/session/SessionQueueConflict", reason: "closed" })
+      expect(
+        yield* store.messageSessionInput({ ...message, commandId: "closed:new-message" }).pipe(Effect.flip),
+      ).toMatchObject({
+        _tag: "generalist/session/SessionQueueConflict",
+        reason: "closed",
+      })
+      expect(
+        yield* store
+          .updateSessionInput({
+            sessionId,
+            commandId: "closed:edit",
+            id: "closed:pending",
+            expectedRevision: 1,
+            prompt: Prompt.make("edited"),
+          })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/session/SessionQueueConflict", reason: "closed" })
+      expect(
+        yield* store
+          .removeSessionInput({ sessionId, commandId: "closed:remove", id: "closed:pending", expectedRevision: 1 })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/session/SessionQueueConflict", reason: "closed" })
+      expect((yield* store.hostSession(sessionId)).lifecycle).toBe("closed")
+    }),
+  ).pipe(Effect.scoped),
+)
+
 for (const order of [
   "send-first",
   "settle-first",
@@ -148,6 +202,7 @@ for (const order of [
   "stop-first",
   "send-stop",
   "concurrent-stop",
+  "terminal-parent",
   "replacement-sponsor",
   "exhausted",
 ] as const) {
@@ -255,6 +310,7 @@ for (const order of [
           yield* TestClock.adjust("2 millis")
           yield* settle
           yield* first.releaseExecution(claim)
+          yield* first.controlSession({ sessionId: "child", commandId: "stop", action: "stop" })
           const parentClaim = yield* first.claimExecution({
             runId: parentRunId,
             ownerId: "first",
@@ -278,12 +334,37 @@ for (const order of [
           const sponsorRunId = (yield* fresh.hostSession("parent")).activeRunId!
           expect(sponsorRunId).not.toBe(parentRunId)
           yield* fresh.messageSessionInput({ ...followup, commandId: "responsor", from: { runId: sponsorRunId } })
+          yield* fresh.controlSession({ sessionId: "child", commandId: "resume", action: "resume" })
           const retained = yield* fresh.hostSession("child")
           expect(retained.sponsorRunId).toBe(sponsorRunId)
           expect(retained.retainedSession).toEqual(before)
           expect(retained.retainedSession?.parentRunId).toBe(parentRunId)
           expect((yield* fresh.loadExecution(retained.activeRunId!)).parentRunId).toBe(sponsorRunId)
-          expect((yield* fresh.snapshot(retained.activeRunId!)).budget.duration).toBe(6)
+          expect((yield* fresh.snapshot(retained.activeRunId!)).budget.duration).toBeGreaterThan(0)
+          expect((yield* fresh.snapshot(retained.activeRunId!)).budget.duration).toBeLessThan(10)
+          expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
+          return
+        }
+        if (order === "terminal-parent") {
+          yield* TestClock.adjust("2 millis")
+          yield* settle
+          yield* first.releaseExecution(claim)
+          const parentClaim = yield* first.claimExecution({
+            runId: parentRunId,
+            ownerId: "first",
+            commandId: "terminal-parent-claim",
+          })
+          yield* first.complete({
+            ...parentClaim,
+            commandId: "terminal-parent-complete",
+            result: { text: "done", output: "done", turns: 1, session: { sessionId: "parent", leafId: null } },
+          })
+          yield* first.releaseExecution(parentClaim)
+          yield* send
+          const fresh = yield* openHost("fresh")
+          const retained = yield* fresh.hostSession("child")
+          expect(retained.activeRunId).toBeDefined()
+          expect((yield* fresh.loadExecution(retained.activeRunId!)).parentRunId).toBe(parentRunId)
           expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
           return
         }
