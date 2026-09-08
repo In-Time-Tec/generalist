@@ -135,6 +135,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
         expect((yield* store.loadExecution(parent.id)).resolutions).toMatchObject([
           { resolution: { result: { _tag: "Message", cursor: 0 } } },
         ])
+        expect(yield* store.pendingSteering({ runId: parent.id, limit: 10 })).toEqual([])
         yield* runtime.wake({
           runId: parent.id,
           commandId: "finish-sibling",
