@@ -20,7 +20,11 @@ const triage = Agent.make({
 
 const program = Effect.gen(function* () {
   yield* Durability.activate
-  const host = yield* Host.make({ agents: [triage] })
+  const host = yield* Host.make({
+    agents: { triage },
+    revision: "support-build-2026-09-08",
+    limits: { tree: { maxDepth: 3, maxSessions: 32 }, concurrency: { agents: 4, tools: 8 } },
+  })
   const attachment = yield* host.attachments.put({
     data: new TextEncoder().encode("attachment"),
     mediaType: "application/pdf",
@@ -46,13 +50,13 @@ Effect.runPromise(
 )
 ```
 
-`Host.make({ agents, tools?, plugins? })` requires Runtime, Approvals, Permissions, every configured Agent service, and tool handlers. Hosts with Agents also require `LanguageModel`; a Tool-only Host does not. It registers the configured executables with Runtime and returns no global singleton.
+`Host.make({ agents, revision, limits, tools?, plugins? })` requires Runtime, Approvals, Permissions, every configured Agent service, and tool handlers. `agents` is a named registry whose values are the exact typed Agent definitions; `revision` identifies the deployed build and is included in the existing executable pins. Hosts with Agents also require `LanguageModel`; a Tool-only Host does not. Host limits are pinned at construction and are never widened by a client request.
 
 The Agent fragment above admits work and returns a receipt, not the Agent's answer. The declared model and Runtime Layers determine credentials and execution; no scripted or live provider is configured there. Keep the activated host scope alive while work executes.
 
 ## Independent Tool Runs
 
-Set `Agent.make({ name: "coder", toolkit: workspaceTools, toolExecution: "background" })` when the Agent should continue after admitting work instead of waiting for each handler. Register those same Effect AI Tools with `Host.make({ agents: [coder], tools: [...] })`. This is a definition fragment: the application supplies the Toolkit handlers, model, authorization Layers, activated Runtime, and scheduler.
+Set `Agent.make({ name: "coder", toolkit: workspaceTools, toolExecution: "background" })` when the Agent should continue after admitting work instead of waiting for each handler. Register those same Effect AI Tools with `Host.make({ agents: { coder }, revision: "coder-build", limits, tools: [...] })`. This is a definition fragment: the application supplies the Toolkit handlers, model, authorization Layers, activated Runtime, and scheduler.
 
 The model-visible success schema describes `{ _tag: "ToolRunAdmitted", runId, tool }`, not file contents or a command's final output. The execution registry retains the original parameter, success, and failure codecs, including MCP handler types. The parent can make another model step while the admitted Tool Run remains running. Tool admission has its own durable command identity; it is not memoized as the tool's final answer. Messaging, skill activation, and child/Program admission and observation controls stay inline.
 
@@ -82,7 +86,7 @@ const handlers = Toolkit.make(checks).toLayer({
 })
 
 const program = Effect.gen(function* () {
-  const host = yield* Host.make({ agents: [], tools: [checks] })
+  const host = yield* Host.make({ agents: {}, revision: "checks-v1", limits: { tree: { maxDepth: 0, maxSessions: 1 }, concurrency: { agents: 0, tools: 1 } }, tools: [checks] })
   const run = yield* host.tools.start(checks, { count: 4 }, { commandId: "checks-1" })
   const inspection = yield* run.inspect
   const result = yield* run.await

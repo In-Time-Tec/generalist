@@ -17,7 +17,8 @@ const researcher = Agent.make({ name: "researcher", children: ["researcher"] })
 
 const hosted = Effect.gen(function* () {
   return yield* Host.make({
-    agents: [researcher],
+    agents: { researcher },
+    revision: "researcher-build",
     limits: {
       tree: { maxDepth: 3, maxSessions: 32 },
       concurrency: { agents: 4, tools: 8 },

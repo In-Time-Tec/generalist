@@ -140,7 +140,6 @@ export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
 export interface Host<Agents extends AgentDeclarations> {
   readonly revision: string
-  readonly limits?: HostLimits
   readonly tools: HostTools
   readonly attachments: Attachments
   readonly artifacts: Artifacts
@@ -387,7 +386,6 @@ const make = <
     const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
       revision,
-      ...(options.limits === undefined ? undefined : { limits: options.limits }),
       tools: makeTools(runtime),
       attachments,
       artifacts,

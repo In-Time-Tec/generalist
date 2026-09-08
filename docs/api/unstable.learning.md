@@ -1021,7 +1021,7 @@ One exact run turn supporting a proposed change.
 
 #### Call Signature
 
-> **layer**\<`ApplyR`, `ApplyE`\>(`options`): `Layer`\<[`Hooks`](./hooks.md#hooks), [`ConsolidationInvalid`](#consolidationinvalid) \| [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`ScheduleError`](./runtime/namespaces/Runtime.md#scheduleerror), [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Memory`](./generalist/namespaces/Memory.md#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry) \| `ApplyR`\>
+> **layer**\<`ApplyR`, `ApplyE`\>(`options`): `Layer`\<[`Hooks`](./hooks.md#hooks), [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`ConsolidationInvalid`](#consolidationinvalid) \| [`ScheduleError`](./runtime/namespaces/Runtime.md#scheduleerror), [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Memory`](./generalist/namespaces/Memory.md#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry) \| `ApplyR`\>
 
 **`Experimental`**
 
@@ -1046,7 +1046,7 @@ already has other hook declarations.
 
 ##### Returns
 
-`Layer`\<[`Hooks`](./hooks.md#hooks), [`ConsolidationInvalid`](#consolidationinvalid) \| [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`ScheduleError`](./runtime/namespaces/Runtime.md#scheduleerror), [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Memory`](./generalist/namespaces/Memory.md#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry) \| `ApplyR`\>
+`Layer`\<[`Hooks`](./hooks.md#hooks), [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`ConsolidationInvalid`](#consolidationinvalid) \| [`ScheduleError`](./runtime/namespaces/Runtime.md#scheduleerror), [`Approvals`](./approvals.md#approvals) \| [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`Memory`](./generalist/namespaces/Memory.md#memory) \| [`ModelRegistry`](./generalist/namespaces/ModelRegistry.md#modelregistry) \| `ApplyR`\>
 
 #### Call Signature
 

@@ -351,7 +351,11 @@ const services = Layer.mergeAll(
 )
 
 const apiLayer = Layer.unwrap(
-  Host.make({ agents: [agent] }).pipe(
+  Host.make({
+    agents: { support: agent },
+    revision: "serve-demo-build",
+    limits: { tree: { maxDepth: 3, maxSessions: 32 }, concurrency: { agents: 4, tools: 8 } },
+  }).pipe(
     Effect.map((host) =>
       Server.layer({
         authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },

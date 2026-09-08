@@ -712,52 +712,6 @@ Application-owned identities for an independently retained Tool implementation a
 
 ***
 
-<a id="createoptions"></a>
-
-### CreateOptions
-
-#### Type Parameters
-
-##### Agents
-
-`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
-
-##### Plugins
-
-`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\> = `ReadonlyArray`\<`never`\>
-
-##### Tools
-
-`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
-
-#### Properties
-
-<a id="agents-1"></a>
-
-##### agents
-
-> `readonly` **agents**: `Agents`
-
-<a id="limits"></a>
-
-##### limits?
-
-> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
-
-<a id="plugins-1"></a>
-
-##### plugins?
-
-> `readonly` `optional` **plugins?**: `Plugins`
-
-<a id="tools-1"></a>
-
-##### tools?
-
-> `readonly` `optional` **tools?**: `Tools`
-
-***
-
 <a id="host"></a>
 
 ### Host
@@ -766,7 +720,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 ##### Agents
 
-`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
+`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
 
 #### Properties
 
@@ -855,6 +809,12 @@ Application-owned identities for an independently retained Tool implementation a
 ###### Returns
 
 `Effect`\<`Stream`\<\{ `cursor`: `number`; `event`: \{ `_tag`: `"RunAccepted"`; `address`: `string` & `Brand`\<`"Address"`\>; `attemptId?`: `string`; `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `messageId`: `string`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `object` & [`TurnStarted`](./generalist/namespaces/AgentEvent.md#turnstarted) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `TurnCompleted` & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `object` & [`ToolExecutionStarted`](./generalist/namespaces/AgentEvent.md#toolexecutionstarted) & `object` \| `object` & [`ToolProgress`](./generalist/namespaces/AgentEvent.md#toolprogress) & `object` \| `object` & [`ToolExecutionCompleted`](./generalist/namespaces/AgentEvent.md#toolexecutioncompleted) & `object` \| `object` & [`ToolExecutionWaiting`](./generalist/namespaces/AgentEvent.md#toolexecutionwaiting) & `object` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `items`: readonly `object`[]; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `runId`: `string`; `sessionId`: `string`; `update`: \{ `artifact`: `string`; `attribution`: \{ `actor`: `string`; `runId`: `string`; \} \| \{ `actor`: `string`; \}; `base`: `number`; `branch?`: `string`; `result`: `number`; \}; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"ApprovalRequested"`; `attemptId?`: `string`; `call`: `ToolCallPart`\<`string`, `unknown`\>; `causationId?`: `string`; `correlationId?`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `metadata?`: `Readonly`\<`Record`\<`string`, `Json`\>\>; `occurredAt`: `string`; `parentRunId?`: `string`; `request`: \{ `approvalId`: `string`; `capability`: `string`; `input`: `unknown`; `operation`: `string`; \}; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: \{ `_tag`: `"CompactionApplied"`; `appliedAt`: `number`; `attemptId?`: `string`; `causationId?`: `string`; `checkpointId`: `string`; `commit`: \{ `checkpointId`: `string`; `compactionId`: `string`; `contextTokensAfter?`: `number`; `contextTokensBefore?`: `number`; `entriesAfter?`: `number`; `entriesBefore?`: `number`; `summaryModelCallId?`: `string`; \}; `compactionId`: `string`; `correlationId?`: `string`; `deliveryId`: `string`; `depth`: `number`; `eventId`: `string`; `executableRef`: \{ `active`: `string` & `Brand`\<...\> \| `string` & `Brand`\<...\> \| `string` & `Brand`\<...\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `kind`: `"summarize"` \| `"microcompact"`; `occurredAt`: `string`; `parentRunId?`: `string`; `rootRunId`: `string`; `runId`: `string`; `sequence`: `number`; `specVersion`: `"1"`; `turn`: `number`; \}; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `event`: `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `never` \| `object` & `object` & `object` \| `object` & `object` & `object` \| `never` \| `object` & `object` & `object` \| `never` \| `never`; `runId`: `string`; `sessionId`: `string`; \} \| \{ `cursor`: `number`; `sessionId`: `string`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./runtime/namespaces/HostSession.md#sessioneventserror), `never`\>, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+<a id="limits"></a>
+
+##### limits?
+
+> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
 
 <a id="operator"></a>
 
@@ -994,6 +954,12 @@ Application-owned identities for an independently retained Tool implementation a
 
 `Effect`\<`void`, [`OperatorActionError`](./runtime/namespaces/Runtime.md#operatoractionerror)\>
 
+<a id="revision"></a>
+
+##### revision
+
+> `readonly` **revision**: `string`
+
 <a id="runs"></a>
 
 ##### runs
@@ -1063,6 +1029,24 @@ Application-owned identities for an independently retained Tool implementation a
 ###### Returns
 
 `Effect`\<readonly [`RunInspection`](./runtime/namespaces/Run.md#runinspection)[], [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### messages
+
+> `readonly` **messages**: (`runId`, `limit?`) => `Effect`\<readonly [`MailboxEntry`](./runtime/namespaces/Mailbox.md#mailboxentry)[], [`DirectoryError`](./runtime/namespaces/Runtime.md#directoryerror)\>
+
+###### Parameters
+
+###### runId
+
+`string`
+
+###### limit?
+
+`number`
+
+###### Returns
+
+`Effect`\<readonly [`MailboxEntry`](./runtime/namespaces/Mailbox.md#mailboxentry)[], [`DirectoryError`](./runtime/namespaces/Runtime.md#directoryerror)\>
 
 ###### rewind
 
@@ -1234,7 +1218,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 `Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `never`\>
 
-<a id="tools-2"></a>
+<a id="tools"></a>
 
 ##### tools
 
@@ -1395,6 +1379,60 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ##### title?
 
 > `readonly` `optional` **title?**: `string`
+
+***
+
+<a id="makeoptions"></a>
+
+### MakeOptions
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+
+##### Plugins
+
+`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\> = `ReadonlyArray`\<`never`\>
+
+##### Tools
+
+`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
+
+#### Properties
+
+<a id="agents-2"></a>
+
+##### agents
+
+> `readonly` **agents**: `Agents`
+
+<a id="limits-1"></a>
+
+##### limits?
+
+> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
+
+<a id="plugins-1"></a>
+
+##### plugins?
+
+> `readonly` `optional` **plugins?**: `Plugins`
+
+<a id="revision-1"></a>
+
+##### revision
+
+> `readonly` **revision**: `string`
+
+Immutable application build identity used by the existing executable registry pins.
+
+<a id="tools-2"></a>
+
+##### tools?
+
+> `readonly` `optional` **tools?**: `Tools`
 
 ***
 
@@ -2092,6 +2130,36 @@ Run metadata without retained manifests, results, or event history.
 
 ## Type Aliases
 
+<a id="agentdeclarations"></a>
+
+### AgentDeclarations
+
+> **AgentDeclarations** = [`AgentRegistry`](#agentregistry) \| `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
+
+***
+
+<a id="agentregistry"></a>
+
+### AgentRegistry
+
+> **AgentRegistry** = `Readonly`\<`Record`\<`string`, [`Any`](./generalist/namespaces/Agent.md#any)\>\>
+
+***
+
+<a id="agentvalues"></a>
+
+### AgentValues
+
+> **AgentValues**\<`Agents`\> = `Agents` *extends* `ReadonlyArray`\<infer Agent\> ? `Agent` : `Agents` *extends* [`AgentRegistry`](#agentregistry) ? `Agents`\[keyof `Agents`\] : `never`
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+
+***
+
 <a id="approvalrequested"></a>
 
 ### ApprovalRequested
@@ -2123,36 +2191,6 @@ One Agent-authored shared artifact edit committed by this Run.
 ### Completed
 
 > **Completed** = *typeof* `Completed.Type`
-
-***
-
-<a id="createerror"></a>
-
-### CreateError
-
-> **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
-
-***
-
-<a id="createrequirements"></a>
-
-### CreateRequirements
-
-> **CreateRequirements**\<`Agents`, `Plugins`, `Tools`\> = [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| `Agents`\[`number`\] *extends* `never` ? `never` : `LanguageModel.LanguageModel` \| [`Approvals`](./approvals.md#approvals) \| [`Permissions`](./permissions.md#permissions) \| `AgentServices`\<`Agents`\[`number`\]\> \| `PluginServices`\<`Plugins`\> \| `ToolServices`\<`Tools`\[`number`\]\>
-
-#### Type Parameters
-
-##### Agents
-
-`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
-
-##### Plugins
-
-`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\>
-
-##### Tools
-
-`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
 
 ***
 
@@ -2259,6 +2297,36 @@ One product-facing event at its exclusive Session cursor.
 ##### Failure
 
 `Failure`
+
+***
+
+<a id="makeerror"></a>
+
+### MakeError
+
+> **MakeError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
+
+***
+
+<a id="makerequirements"></a>
+
+### MakeRequirements
+
+> **MakeRequirements**\<`Agents`, `Plugins`, `Tools`\> = [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`AgentValues`](#agentvalues)\<`Agents`\> *extends* `never` ? `never` : `LanguageModel.LanguageModel` \| [`Approvals`](./approvals.md#approvals) \| [`Permissions`](./permissions.md#permissions) \| `AgentServices`\<[`AgentValues`](#agentvalues)\<`Agents`\>\> \| `PluginServices`\<`Plugins`\> \| `ToolServices`\<`Tools`\[`number`\]\>
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+
+##### Plugins
+
+`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\>
+
+##### Tools
+
+`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
 
 ***
 
@@ -2388,27 +2456,67 @@ One Agent-authored shared artifact edit committed by this Run.
 
 ***
 
-<a id="generalist"></a>
+<a id="host-1"></a>
 
-### Generalist
+### Host
 
-> `const` **Generalist**: `object`
+> **Host**: `object`
 
-Stable process-local product host.
+Stable process-local product host and its compiler.
 
 #### Type Declaration
 
-<a id="create"></a>
+<a id="make"></a>
 
-##### create
+##### make
 
-> `readonly` **create**: *typeof* `create`
+> `readonly` **make**: \<`Agents`, `Plugins`, `Tools`\>(`options`) => `Effect`\<[`Host`](#host)\<`Agents`\>, [`MakeError`](#makeerror), [`MakeRequirements`](#makerequirements)\<`Agents`, `Plugins`, `Tools`\>\>
+
+###### Type Parameters
+
+###### Agents
+
+`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+
+###### Plugins
+
+`Plugins` *extends* readonly [`Plugin`](#plugin)\<readonly `Any`[]\>[] = readonly `never`[]
+
+###### Tools
+
+`Tools` *extends* readonly `Any`[] = readonly `never`[]
+
+###### Parameters
+
+###### options
+
+[`MakeOptions`](#makeoptions)\<`Agents`, `Plugins`, `Tools`\>
+
+###### Returns
+
+`Effect`\<[`Host`](#host)\<`Agents`\>, [`MakeError`](#makeerror), [`MakeRequirements`](#makerequirements)\<`Agents`, `Plugins`, `Tools`\>\>
 
 <a id="plugin-1"></a>
 
 ##### plugin
 
-> `readonly` **plugin**: *typeof* `plugin`
+> `readonly` **plugin**: \<`Tools`\>(`options`) => [`Plugin`](#plugin)\<`Tools`\>
+
+###### Type Parameters
+
+###### Tools
+
+`Tools` *extends* readonly `Any`[] = readonly `never`[]
+
+###### Parameters
+
+###### options
+
+[`PluginOptions`](#pluginoptions)\<`Tools`\>
+
+###### Returns
+
+[`Plugin`](#plugin)\<`Tools`\>
 
 ***
 

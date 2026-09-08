@@ -130,6 +130,190 @@ Addressed-message projection over one durable Run inbox entry.
 
 ***
 
+<a id="mailboxentryencoded"></a>
+
+### MailboxEntryEncoded
+
+#### Extends
+
+- `Omit`\<[`MailboxEntry`](#mailboxentry), `"from"` \| `"to"` \| `"prompt"`\>
+
+#### Properties
+
+<a id="admittedatmillis-1"></a>
+
+##### admittedAtMillis
+
+> `readonly` **admittedAtMillis**: `number`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`admittedAtMillis`](#admittedatmillis)
+
+<a id="bytes-1"></a>
+
+##### bytes
+
+> `readonly` **bytes**: `number`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`bytes`](#bytes)
+
+<a id="causationid-1"></a>
+
+##### causationId?
+
+> `readonly` `optional` **causationId?**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`causationId`](#causationid)
+
+<a id="correlationid-1"></a>
+
+##### correlationId
+
+> `readonly` **correlationId**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`correlationId`](#correlationid)
+
+<a id="deliveredrunid-1"></a>
+
+##### deliveredRunId?
+
+> `readonly` `optional` **deliveredRunId?**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`deliveredRunId`](#deliveredrunid)
+
+<a id="digest-1"></a>
+
+##### digest
+
+> `readonly` **digest**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`digest`](#digest)
+
+<a id="entryid-1"></a>
+
+##### entryId
+
+> `readonly` **entryId**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`entryId`](#entryid)
+
+<a id="from-1"></a>
+
+##### from
+
+> `readonly` **from**: `string`
+
+<a id="fromrunid-1"></a>
+
+##### fromRunId
+
+> `readonly` **fromRunId**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`fromRunId`](#fromrunid)
+
+<a id="idempotencykey-1"></a>
+
+##### idempotencyKey
+
+> `readonly` **idempotencyKey**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`idempotencyKey`](#idempotencykey)
+
+<a id="inreplyto-1"></a>
+
+##### inReplyTo?
+
+> `readonly` `optional` **inReplyTo?**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`inReplyTo`](#inreplyto)
+
+<a id="messageid-1"></a>
+
+##### messageId
+
+> `readonly` **messageId**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`messageId`](#messageid)
+
+<a id="metadata-1"></a>
+
+##### metadata
+
+> `readonly` **metadata**: `object`
+
+###### Index Signature
+
+\[`key`: `string`\]: `unknown`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`metadata`](#metadata)
+
+<a id="prompt-1"></a>
+
+##### prompt
+
+> `readonly` **prompt**: `PromptEncoded`
+
+<a id="sequence-1"></a>
+
+##### sequence
+
+> `readonly` **sequence**: `number`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`sequence`](#sequence)
+
+<a id="steeringentryid-1"></a>
+
+##### steeringEntryId?
+
+> `readonly` `optional` **steeringEntryId?**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`steeringEntryId`](#steeringentryid)
+
+<a id="targetsessionid-1"></a>
+
+##### targetSessionId
+
+> `readonly` **targetSessionId**: `string`
+
+###### Inherited from
+
+[`MailboxEntry`](#mailboxentry).[`targetSessionId`](#targetsessionid)
+
+<a id="to-1"></a>
+
+##### to
+
+> `readonly` **to**: `string`
+
+***
+
 <a id="messagereceipt"></a>
 
 ### MessageReceipt
@@ -144,19 +328,19 @@ Receipt for one admitted message.
 
 > `readonly` **duplicate**: `boolean`
 
-<a id="entryid-1"></a>
+<a id="entryid-2"></a>
 
 ##### entryId
 
 > `readonly` **entryId**: `string`
 
-<a id="messageid-1"></a>
+<a id="messageid-2"></a>
 
 ##### messageId
 
 > `readonly` **messageId**: `string`
 
-<a id="sequence-1"></a>
+<a id="sequence-2"></a>
 
 ##### sequence
 
@@ -186,7 +370,7 @@ Receipt for one admitted message.
 
 ### MailboxEntry
 
-> **MailboxEntry**: `Codec`\<[`MailboxEntry`](#mailboxentry), `MailboxEntryEncoded`, `never`, `never`\>
+> **MailboxEntry**: `Codec`\<[`MailboxEntry`](#mailboxentry), [`MailboxEntryEncoded`](#mailboxentryencoded), `never`, `never`\>
 
 ***
 

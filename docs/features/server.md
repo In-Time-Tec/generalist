@@ -17,7 +17,11 @@ import { Server } from "generalist/server"
 const agent = Agent.make({ name: "support" })
 
 const apiLayer = Layer.unwrap(
-  Host.make({ agents: [agent] }).pipe(
+  Host.make({
+    agents: { support: agent },
+    revision: "support-build-2026-09-08",
+    limits: { tree: { maxDepth: 3, maxSessions: 32 }, concurrency: { agents: 4, tools: 8 } },
+  }).pipe(
     Effect.map((host) =>
       Server.layer({
         host,
@@ -71,12 +75,12 @@ void program.pipe(Effect.provideService(HttpClient.HttpClient, authenticatedHttp
 ```text
 client.attachments.put({ data, mediaType, filename? })
 client.attachments.get({ sha256 }) -> { body: Uint8Array, headers }
-client.sessions.create/get/list/snapshot
-client.runs.start/list/inspect/cancel
+client.sessions.create/get/list/snapshot/family/control/queue
+client.runs.start/list/inspect/messages/cancel
 client.events.subscribe({ sessionId, cursor?, reconnect? })
 client.events.connect({ sessionId, eventCapacity?, reconnect? })
-client.approvals.resolve({ runId, token, decision, operator })
-client.operator.explain/retry/wake/resolveUnknown/extendBudget
+client.approvals.resolve({ runId, token, decision })
+client.operator.explain/retry/wake/resolveUnknown/extendBudget (operator comes from CurrentPrincipal)
 ```
 
 The caller provides an Effect `HttpClient`. Add the bearer token there with `HttpClient.mapRequest(HttpClientRequest.bearerToken(...))`. WebSocket construction also requires `Socket.WebSocketConstructor` and a Scope.
@@ -91,10 +95,17 @@ The caller provides an Effect `HttpClient`. Add the bearer token there with `Htt
 | sessions    | GET    | `/sessions`                  | `sessions.list`           |
 | sessions    | GET    | `/sessions/:id`              | `sessions.get`            |
 | sessions    | GET    | `/sessions/:id/snapshot`     | `sessions.snapshot`       |
+| sessions    | POST   | `/sessions/:id/family`       | `sessions.family`         |
+| sessions    | POST   | `/sessions/:id/control`      | `sessions.control`        |
+| sessions    | POST   | `/sessions/:id/queue`        | `sessions.submit`         |
+| sessions    | PATCH  | `/sessions/:id/queue/:inputId` | `sessions.updateInput`  |
+| sessions    | DELETE | `/sessions/:id/queue/:inputId` | `sessions.removeInput`  |
 | runs        | POST   | `/sessions/:sessionId/runs`  | `runs.start`              |
 | runs        | GET    | `/sessions/:sessionId/runs`  | `runs.list`               |
 | runs        | GET    | `/runs/:id`                  | `runs.inspect`            |
 | runs        | POST   | `/runs/:id/cancel`           | `runs.cancel`             |
+| runs        | POST   | `/runs/:id/messages`         | `runs.message`            |
+| runs        | GET    | `/runs/:id/messages`         | `runs.messages`           |
 | events      | GET    | `/sessions/:id/events`       | `events.subscribe`        |
 | events      | GET    | `/sessions/:id/ws`           | `events.connect`          |
 | approvals   | POST   | `/runs/:id/approvals/:token` | `approvals.resolve`       |
@@ -110,7 +121,7 @@ Future ingress features add one HttpApi group to `Server.api` and one matching i
 
 ## SSE and WebSocket
 
-Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter.
+Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter. Authorization is rechecked before each committed event and preview delivery, so a revoked resource closes its stream instead of retaining opening-time authority.
 
 `Conversation` events carry committed conversation changes alongside the Run lifecycle wrappers. Both advance the same Session cursor. A Conversation event has `sessionId`, `cursor`, and `update`; it is not a Run event and has no `runId` or `event` field. Host filters some Runtime Run events, so visible cursor values need not be consecutive.
 

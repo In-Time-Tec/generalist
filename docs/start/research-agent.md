@@ -312,7 +312,11 @@ const demoAuth = Layer.succeed(
 )
 
 const apiLayer = Layer.unwrap(
-  Host.make({ agents: [agent] }).pipe(
+  Host.make({
+    agents: { "research-agent": agent },
+    revision: "research-demo-build",
+    limits: { tree: { maxDepth: 3, maxSessions: 32 }, concurrency: { agents: 4, tools: 8 } },
+  }).pipe(
     Effect.map((host) =>
       Server.layer({
         host,
