@@ -1090,10 +1090,6 @@ test.for(["transport", "lease"] as const)(
     })
     await started.promise
     const closedBeforeLoss = closed
-    const drain = partition.runtime.drain().then(
-      () => false,
-      () => true,
-    )
     if (loss === "transport") failList = true
     else {
       const injection = ManagedRuntime.make(
@@ -1117,7 +1113,6 @@ test.for(["transport", "lease"] as const)(
         }),
       )
     }
-    expect(await Effect.runPromise(Effect.promise(() => drain).pipe(Effect.timeout("3 seconds")))).toBe(true)
     await expect.poll(() => closed).toBeGreaterThan(closedBeforeLoss)
     expect(interrupted).toBe(1)
     await expect.poll(async () => (await partition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")

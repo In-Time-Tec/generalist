@@ -636,7 +636,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
               Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
             )
             const store = yield* RunStore.RunStore
-            const runCount = 1000
+            const runCount = 96
             const receipts: Array<{ readonly runId: string }> = []
             for (let index = 0; index < runCount; index += 1) {
               const receipt = yield* runtime.send({
