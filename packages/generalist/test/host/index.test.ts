@@ -104,8 +104,8 @@ const backend = "object" as const
         expect((yield* child.session.inspect).selection?.executableRef).toEqual(
           (yield* host.runs.inspect(child.run.id)).executableRef,
         )
-        expect((yield* host.runs.inspect(parent.id)).children).toEqual([
-          expect.objectContaining({ retainedSession: expect.objectContaining({ id: child.session.id }) }),
+        expect((yield* host.runs.inspect(parent.id)).children.map((entry) => entry.retainedSession?.id)).toEqual([
+          child.session.id,
         ])
       }),
     )
@@ -153,9 +153,9 @@ const backend = "object" as const
         yield* completeRun(child.run.id, "retained-child-complete")
         expect(yield* child.run.await).toBe(`${backend} complete`)
         expect(yield* child.session.inspect).toMatchObject({ id: child.session.id })
-        expect((yield* child.session.snapshot).runs).toEqual([
-          expect.objectContaining({ run: expect.objectContaining({ runId: child.run.id, status: "succeeded" }) }),
-        ])
+        expect(
+          (yield* child.session.snapshot).runs.map((entry) => ({ runId: entry.run.runId, status: entry.run.status })),
+        ).toEqual([{ runId: child.run.id, status: "succeeded" }])
         const snapshot = yield* child.session.snapshot
         const store = yield* RunStore.RunStore
         const replay = yield* store
@@ -488,17 +488,18 @@ it.effect("recovers the same child conversation and admission after replacing th
   ) =>
     Effect.scoped(
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [agent] as const })
-        return yield* body(host)
-      }).pipe(
-        Effect.provide(
+        const context = yield* Layer.build(
           Layer.mergeAll(
             objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolver)),
             modelLayer(() => textResponse("reopened complete")),
             authorization,
           ),
-        ),
-      ),
+        )
+        return yield* Effect.gen(function* () {
+          const host = yield* Generalist.create({ agents: [agent] as const })
+          return yield* body(host)
+        }).pipe(Effect.provide(context))
+      }),
     )
   return Effect.gen(function* () {
     const admitted = yield* withHost((host) =>

@@ -39,9 +39,11 @@ const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
     const runs = []
     let events = 0
     let bytes = 0
-    for (const run of state.runs.values()) {
-      if (run.message.sessionId !== sessionId && state.runs.get(run.rootRunId)?.message.sessionId !== sessionId)
-        continue
+    for (const run of [...state.runs.values()].filter(
+      (candidate) =>
+        candidate.message.sessionId === sessionId ||
+        state.runs.get(candidate.rootRunId)?.message.sessionId === sessionId,
+    )) {
       if (runs.length >= 128) return yield* excess("runs", 128)
       events += run.events.length
       if (events > 8192) return yield* excess("events", 8192)
@@ -116,7 +118,7 @@ const getHostSession = (
   const stored = state.hostSessions.get(sessionId)
   return stored === undefined
     ? Effect.fail(missing(sessionId))
-    : Effect.succeed({ ...stored.session, ...retainedSession(state, sessionId) })
+    : Effect.succeed({ ...stored.session, ...retainedSession({ state, sessionId }) })
 }
 
 const hostSessionFamily = (state: RuntimeState, sessionId: string) =>
@@ -307,7 +309,7 @@ export const make = (input: {
         : Effect.succeed(
             [...state.hostSessions.values()].map(({ session }) => ({
               ...session,
-              ...retainedSession(state, session.id),
+              ...retainedSession({ state, sessionId: session.id }),
             })),
           ),
     ),

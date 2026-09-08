@@ -1732,7 +1732,7 @@ One product-facing event at its exclusive Session cursor.
 
 ###### prompt
 
-`Prompt` \| `string`
+`Prompt.Prompt` \| `string`
 
 ###### options
 

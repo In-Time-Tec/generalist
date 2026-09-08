@@ -12,7 +12,7 @@ import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type
 import type { RuntimePublication, RuntimeState, StoredRun, SubscriberQueue } from "./projection.js"
 import { projectTreeEvent } from "../tree/event.js"
 import { appendTerminalToolResults } from "./session-store.js"
-import type { HostSessionEvent } from "../session/host.js"
+import { append as appendHostSessionEvent } from "./store/host-session/events.js"
 
 const occurredAt = preparedOccurredAt
 type MutableStoredRun = { -readonly [Key in keyof StoredRun]: StoredRun[Key] }
@@ -184,47 +184,8 @@ export const appendEvent: {
         subscribers: run.subscribers,
         treeSubscribers: root.subscribers,
       }
-      const hostSessions = new Map(terminalState.hostSessions)
-      const rootRun = terminalState.runs.get(run.rootRunId)
-      if (run.parentRunId !== undefined && !hostSessions.has(run.message.sessionId)) {
-        hostSessions.set(run.message.sessionId, {
-          session: {
-            id: run.message.sessionId,
-            createdAt: event.occurredAt,
-            queue: [],
-            selection: {
-              executableRef: run.executableRef,
-              executableManifest: run.executableManifest,
-              registrations: run.registrations,
-              treePolicy: run.treePolicy,
-              budget: terminalState.sessions.get(run.message.sessionId)!.family!.budget,
-            },
-          },
-          lastCursor: -1,
-          events: [],
-          subscribers: new Map(),
-        })
-      }
-      const hostPublications = []
-      const sessionIds = new Set([run.message.sessionId, ...(rootRun === undefined ? [] : [rootRun.message.sessionId])])
-      for (const sessionId of sessionIds) {
-        const hostSession = hostSessions.get(sessionId)
-        if (hostSession === undefined) continue
-        const cursor = hostSession.lastCursor + 1
-        const entry: HostSessionEvent = { _tag: "Run", cursor, event }
-        hostSessions.set(hostSession.session.id, {
-          ...hostSession,
-          lastCursor: cursor,
-          events: [...hostSession.events, entry],
-        })
-        hostPublications.push({
-          sessionId: hostSession.session.id,
-          entry,
-          lastDeliveredCursor: hostSession.lastCursor,
-          subscribers: hostSession.subscribers,
-        })
-      }
-      publication.hostSessions = hostPublications
+      const { hostSessions, publications } = appendHostSessionEvent({ state: terminalState, run, event })
+      publication.hostSessions = publications
       return [
         event,
         {

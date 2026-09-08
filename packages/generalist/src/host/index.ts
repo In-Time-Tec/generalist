@@ -54,6 +54,8 @@ import type { PreviewDelivery } from "./preview.js"
 import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
+import { make as makeHostRun, type HostRun } from "./run.js"
+export type { HostRun, ChildHandle, ChildSpawnOptions } from "./run.js"
 import { ArtifactRegistry } from "../core/artifact.js"
 import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
@@ -110,22 +112,6 @@ export interface CreateOptions<
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
-export interface ChildSpawnOptions {
-  readonly commandId: string
-  readonly label?: string
-}
-export interface ChildHandle {
-  readonly session: SessionHandle
-  readonly run: HostRun<unknown>
-}
-export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & {
-  readonly id: RunHandle<Output>["runId"]
-  readonly spawn: (
-    selection: string,
-    prompt: import("effect/unstable/ai/Prompt").Prompt | string,
-    options: ChildSpawnOptions,
-  ) => Effect.Effect<ChildHandle, import("../runtime/service.js").SpawnError | InspectError | SessionError>
-}
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
@@ -372,27 +358,7 @@ const create = <
     }
 
     const sessionHandle = makeSessionHandle({ runtime, registeredByName })
-    const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
-      id: handle.runId,
-      await: handle.await,
-      events: handle.events,
-      send: handle.send,
-      spawn: (selection, prompt, spawnOptions) =>
-        Effect.gen(function* () {
-          const receipt = yield* runtime.spawn({
-            parentRunId: handle.runId,
-            invocationId: spawnOptions.commandId,
-            selection,
-            prompt,
-            ...(spawnOptions.label === undefined ? {} : { label: spawnOptions.label }),
-          })
-          const inspection = yield* runtime.inspect(receipt.runId)
-          if (inspection.retainedSession === undefined)
-            return yield* Effect.die("An admitted child must have a canonical retained Session")
-          const session = sessionHandle(yield* runtime.session(inspection.retainedSession.id))
-          return { session, run: hostRun(yield* runtime.getRun(receipt.runId)) }
-        }),
-    })
+    const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
       attachments,
       artifacts,

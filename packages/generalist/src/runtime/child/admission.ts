@@ -218,11 +218,12 @@ export const make = (store: RunStoreService): Service => {
     readonly outcome?: RunOutcome
   }): ChildInspection => {
     const value = {
-      ...(snapshot.run.retainedSession === undefined ? {} : { retainedSession: snapshot.run.retainedSession }),
       childRunId: snapshot.run.runId,
       status: snapshot.run.status,
       readiness: snapshot.run.childReadiness ?? "settled",
     }
+    if (snapshot.run.retainedSession !== undefined)
+      Object.assign(value, { retainedSession: snapshot.run.retainedSession })
     return snapshot.outcome === undefined ? value : { ...value, outcome: snapshot.outcome }
   }
 
@@ -273,11 +274,12 @@ export const make = (store: RunStoreService): Service => {
           .filter((entry) => entry.parentRunId === parentRunId)
           .map((entry) => {
             const value: ChildInspection = {
-              ...(entry.run.retainedSession === undefined ? {} : { retainedSession: entry.run.retainedSession }),
               childRunId: entry.run.runId,
               status: entry.run.status,
               readiness: entry.run.childReadiness ?? "settled",
             }
+            if (entry.run.retainedSession !== undefined)
+              Object.assign(value, { retainedSession: entry.run.retainedSession })
             if (entry.invocationId === undefined)
               return entry.outcome === undefined ? value : { ...value, outcome: entry.outcome }
             const foundOrigin = originOf(entry.invocationId)

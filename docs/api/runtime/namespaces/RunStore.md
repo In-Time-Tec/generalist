@@ -730,7 +730,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ##### admitRollback
 
-> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+> `readonly` **admitRollback**: (`input`) => `Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 ###### Parameters
 
@@ -740,7 +740,7 @@ Persist one definitive semantic cancellation acknowledgement under the current c
 
 ###### Returns
 
-`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`RunTerminal`](./Errors.md#runterminal) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
+`Effect`\<`SteeringAdmission`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound) \| [`ForkSequenceInvalid`](./Errors.md#forksequenceinvalid) \| [`NoSnapshot`](./Errors.md#nosnapshot) \| [`Invalid`](../../generalist/namespaces/RunBudget.md#invalid) \| [`RunTerminal`](./Errors.md#runterminal) \| [`InboxFull`](../../generalist/namespaces/Steering.md#inboxfull) \| [`RunBusy`](./Errors.md#runbusy) \| [`SteeringConflict`](./Errors.md#steeringconflict)\>
 
 <a id="admitsend"></a>
 
