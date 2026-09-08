@@ -89,12 +89,33 @@ export const validateSelection = ({
     return { ...selection, treePolicy, budget }
   })
 
-const validateQueue = (sessionId: string, queue: ReadonlyArray<PendingInput>) =>
+const validateQueue = (state: RuntimeState, sessionId: string, queue: ReadonlyArray<PendingInput>) =>
   Effect.gen(function* () {
-    const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Array(PendingInput)))(queue).pipe(
+    const session = state.hostSessions.get(sessionId)?.session
+    const active = session?.activeRunId === undefined ? undefined : state.runs.get(session.activeRunId)
+    const retained = [
+      ...queue,
+      ...(active?.steering ?? []).flatMap(
+        (entry): ReadonlyArray<PendingInput> =>
+          entry.sessionCommandId === undefined ||
+          entry.consumedOperationId !== undefined ||
+          session?.selection === undefined
+            ? []
+            : [
+                {
+                  id: entry.sessionCommandId,
+                  revision: 1,
+                  prompt: entry.prompt,
+                  from: entry.from,
+                  selection: session.selection,
+                },
+              ],
+      ),
+    ]
+    const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Array(PendingInput)))(retained).pipe(
       Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
     )
-    if (queue.length > 64 || new TextEncoder().encode(encoded).byteLength > 1048576) {
+    if (retained.length > 64 || new TextEncoder().encode(encoded).byteLength > 1048576) {
       return yield* SessionQueueConflict.make({
         sessionId,
         reason: "capacity",
@@ -214,29 +235,9 @@ export const message = ({ state, input }: { readonly state: RuntimeState; readon
       prompt: input.prompt,
       idempotencyKey: input.commandId,
       correlationId: input.commandId,
-      metadata: { sessionMessage: true },
+      metadata: {},
     })
     const prompt = deliveryPrompt({ from, messageId: addressed.id, prompt: input.prompt })
-    if (
-      stored.session.lifecycle === undefined &&
-      active !== undefined &&
-      !isTerminal(active.status) &&
-      !active.cancellationRequested &&
-      active.pendingOutcome === undefined
-    ) {
-      const [, next] = yield* admitSteering(state, {
-        runId: active.runId,
-        idempotencyKey: input.commandId,
-        prompt,
-        from: input.from,
-        policy: "steer",
-        addressed,
-        digest: digest({ prompt, from: input.from, policy: "steer", addressed }),
-      }).pipe(
-        Effect.mapError((error) => RuntimeUnavailable.make({ message: `Session delivery failed: ${error._tag}` })),
-      )
-      return [{ id: input.commandId, revision: 1 }, next] as const
-    }
     if (stored.session.selection === undefined)
       return yield* SessionQueueConflict.make({ sessionId: input.sessionId, reason: "selection" })
     const item: PendingInput = {
@@ -247,7 +248,32 @@ export const message = ({ state, input }: { readonly state: RuntimeState; readon
       selection: stored.session.selection,
     }
     const queue = [...stored.session.queue, item]
-    yield* validateQueue(input.sessionId, queue)
+    yield* validateQueue(state, input.sessionId, queue)
+    const sponsored = new Map(state.hostSessions)
+    if (sender !== undefined && sender.message.sessionId === family?.parentSessionId)
+      sponsored.set(input.sessionId, { ...stored, session: { ...stored.session, sponsorRunId: sender.runId } })
+    if (
+      stored.session.lifecycle === undefined &&
+      active !== undefined &&
+      !isTerminal(active.status) &&
+      !active.cancellationRequested &&
+      active.pendingOutcome === undefined
+    ) {
+      const [, next] = yield* admitSteering(
+        { ...state, hostSessions: sponsored },
+        {
+          sessionCommandId: input.commandId,
+          runId: active.runId,
+          idempotencyKey: input.commandId,
+          prompt,
+          from: input.from,
+          policy: "steer",
+          addressed,
+          digest: digest({ prompt, from: input.from, policy: "steer", addressed }),
+        },
+      ).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: `Session delivery failed: ${error._tag}` })))
+      return [{ id: input.commandId, revision: 1 }, next] as const
+    }
     const hostSessions = new Map(state.hostSessions)
     const session = { ...stored.session, queue }
     if (sender !== undefined && sender.message.sessionId === family?.parentSessionId)
@@ -278,7 +304,7 @@ export const submit = ({ state, input }: { readonly state: RuntimeState; readonl
     )
     const item: PendingInput = { id: input.commandId, revision: 1, prompt: input.prompt, selection }
     const queue = [...stored.session.queue, item]
-    yield* validateQueue(input.sessionId, queue)
+    yield* validateQueue(state, input.sessionId, queue)
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(input.sessionId, { ...stored, session: { ...stored.session, selection, queue } })
     const next = yield* promote({ state: { ...state, hostSessions, registrationCatalog }, sessionId: input.sessionId })
@@ -327,7 +353,7 @@ export const update = ({ state, input }: { readonly state: RuntimeState; readonl
       if (entry.id !== item.id) return [entry]
       return replacement === undefined ? [] : [replacement]
     })
-    yield* validateQueue(input.sessionId, queue)
+    yield* validateQueue(state, input.sessionId, queue)
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(input.sessionId, { ...stored, session: { ...stored.session, queue } })
     return [

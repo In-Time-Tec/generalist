@@ -11,7 +11,14 @@ import { make as makeSimulator } from "../../../src/testing/durability/index.js"
 import { make as address } from "../../../src/runtime/address.js"
 import { provideScoped } from "../../runtime/execution/scoped-provide.js"
 
-for (const order of ["send-first", "settle-first", "concurrent"] as const) {
+for (const order of [
+  "send-first",
+  "settle-first",
+  "concurrent",
+  "stop-first",
+  "send-stop",
+  "concurrent-stop",
+] as const) {
   it.effect(`delivers a retained child follow-up once across independent hosts (${order})`, () =>
     provideScoped(
       BunCrypto.layer,
@@ -56,7 +63,6 @@ for (const order of ["send-first", "settle-first", "concurrent"] as const) {
           message,
         })
         const before = (yield* first.hostSession("child")).retainedSession
-        const claim = yield* first.claimExecution({ runId: child.runId, ownerId: "first", commandId: "claim" })
         const followup = {
           sessionId: "child",
           commandId: "followup",
@@ -64,6 +70,29 @@ for (const order of ["send-first", "settle-first", "concurrent"] as const) {
           from: { runId: parentRunId },
         }
         const send = second.messageSessionInput(followup)
+        if (order === "stop-first" || order === "send-stop" || order === "concurrent-stop") {
+          const stop = first.controlSession({ sessionId: "child", commandId: "stop", action: "stop" })
+          if (order === "stop-first") {
+            yield* stop
+            yield* send
+          } else if (order === "send-stop") {
+            yield* send
+            yield* stop
+          } else yield* Effect.all([send, stop], { concurrency: "unbounded" })
+          const fresh = yield* open("fresh")
+          const stopped = yield* fresh.hostSession("child")
+          expect(stopped.lifecycle).toBe("stopped")
+          expect(stopped.activeRunId).toBeUndefined()
+          expect(stopped.queue.map((entry) => entry.id)).toEqual(["followup"])
+          expect(stopped.retainedSession).toEqual(before)
+          expect((yield* fresh.hostSessionRuns("child")).length).toBe(1)
+          expect(yield* fresh.messageSessionInput(followup)).toEqual({ id: "followup", revision: 1 })
+          yield* fresh.controlSession({ sessionId: "child", commandId: "resume", action: "resume" })
+          expect((yield* fresh.hostSession("child")).activeRunId).not.toBe(child.runId)
+          expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
+          return
+        }
+        const claim = yield* first.claimExecution({ runId: child.runId, ownerId: "first", commandId: "claim" })
         const settle = first.complete({
           ...claim,
           commandId: "complete",

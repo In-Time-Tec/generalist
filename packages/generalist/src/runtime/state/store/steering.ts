@@ -69,6 +69,7 @@ export const admitSteering: {
       })
     }
     const entry = {
+      ...(input.sessionCommandId === undefined ? undefined : { sessionCommandId: input.sessionCommandId }),
       entryId: `steer_${state.nextSteeringCounter}`,
       runId: run.runId,
       sequence: run.steering.length,

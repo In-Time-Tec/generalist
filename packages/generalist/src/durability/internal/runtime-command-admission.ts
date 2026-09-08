@@ -123,6 +123,7 @@ const AdmitProgramChildAndSuspendInput = Schema.Struct({
 })
 
 const AdmitSteeringInput = Schema.Struct({
+  sessionCommandId: Schema.optionalKey(Schema.String),
   runId: Schema.String,
   idempotencyKey: Schema.String,
   digest: Schema.String,

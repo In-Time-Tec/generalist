@@ -107,6 +107,7 @@ export type DirectoryLookupError = RunNotFound | RuntimeUnavailable
 export type ResolveAddressError = import("../errors.js").AddressNotFound | AddressInvalid | RuntimeUnavailable
 
 export interface AdmitSteeringInput {
+  readonly sessionCommandId?: string
   readonly runId: string
   readonly idempotencyKey: string
   readonly digest: string

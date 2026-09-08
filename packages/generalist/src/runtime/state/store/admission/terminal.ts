@@ -15,7 +15,7 @@ export const afterTerminal: {
     if (stored?.session.activeRunId === run.runId) {
       const { activeRunId: _, ...session } = stored.session
       const pending = run.steering.filter(
-        (entry) => entry.consumedOperationId === undefined && entry.addressed?.metadata.sessionMessage === true,
+        (entry) => entry.consumedOperationId === undefined && entry.sessionCommandId !== undefined,
       )
       if (session.selection !== undefined) {
         Object.assign(session, {
