@@ -605,6 +605,7 @@ export interface Service extends RuntimeHostSessions {
   readonly activate: (input: ActivateInput) => Effect.Effect<RunInspection, ActivateError>
   readonly send: SendFunction
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
+  readonly getRun: (runId: string) => Effect.Effect<RunHandle<unknown>, InspectError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
   /** Observe the memory-only live preview lane for one Run.
    * Frames contain bounded UTF-16 appends with per-attempt sequences and per-channel offsets.

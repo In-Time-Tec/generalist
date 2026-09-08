@@ -40,7 +40,8 @@ const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
     let events = 0
     let bytes = 0
     for (const run of state.runs.values()) {
-      if (state.runs.get(run.rootRunId)?.message.sessionId !== sessionId) continue
+      if (run.message.sessionId !== sessionId && state.runs.get(run.rootRunId)?.message.sessionId !== sessionId)
+        continue
       if (runs.length >= 128) return yield* excess("runs", 128)
       events += run.events.length
       if (events > 8192) return yield* excess("events", 8192)
@@ -115,7 +116,7 @@ const hostSessionRuns = (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {
     yield* getHostSession(state, sessionId)
     return [...state.runs.values()]
-      .filter((run) => run.rootRunId === run.runId && run.message.sessionId === sessionId)
+      .filter((run) => run.message.sessionId === sessionId)
       .map((run) => toInspection(state, run))
   })
 

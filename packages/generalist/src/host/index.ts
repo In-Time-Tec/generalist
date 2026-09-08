@@ -62,6 +62,7 @@ import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
 import { make as makeSessionHandle, type SessionHandle, type SessionCreateOptions } from "./session.js"
+import { childSessionId } from "../runtime/child/session.js"
 export type {
   SessionHandle,
   SessionCreateOptions,
@@ -108,7 +109,22 @@ export interface CreateOptions<
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
-export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & { readonly id: RunHandle<Output>["runId"] }
+export interface ChildSpawnOptions {
+  readonly commandId: string
+  readonly label?: string
+}
+export interface ChildHandle {
+  readonly session: SessionHandle
+  readonly run: HostRun<unknown>
+}
+export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & {
+  readonly id: RunHandle<Output>["runId"]
+  readonly spawn: (
+    selection: string,
+    prompt: import("effect/unstable/ai/Prompt").Prompt | string,
+    options: ChildSpawnOptions,
+  ) => Effect.Effect<ChildHandle, import("../runtime/service.js").SpawnError | InspectError | SessionError>
+}
 export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
@@ -133,6 +149,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
+    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, InspectError>
     readonly start: <Selected extends Agents[number]>(
       sessionId: string,
       agent: Selected,
@@ -269,12 +286,6 @@ const startAgent = <Value extends AnyAgent>(
     return started as Effect.Effect<RunHandle<AgentOutput<Value>>, StartError>
   })
 
-const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
-  id: handle.runId,
-  await: handle.await,
-  events: handle.events,
-  send: handle.send,
-})
 const staticSkillCatalog = (skills: ReadonlyArray<Skill>): SkillCatalogService => {
   const all = [...skills]
   const byName = new Map(all.map((skill) => [skill.name, skill]))
@@ -353,6 +364,26 @@ const create = <
     }
 
     const sessionHandle = makeSessionHandle({ runtime, registeredByName })
+    const hostRun = <Output>(handle: RunHandle<Output>): HostRun<Output> => ({
+      id: handle.runId,
+      await: handle.await,
+      events: handle.events,
+      send: handle.send,
+      spawn: (selection, prompt, spawnOptions) =>
+        Effect.gen(function* () {
+          const receipt = yield* runtime.spawn({
+            parentRunId: handle.runId,
+            invocationId: spawnOptions.commandId,
+            selection,
+            prompt,
+            ...(spawnOptions.label === undefined ? {} : { label: spawnOptions.label }),
+          })
+          const session = sessionHandle(
+            yield* runtime.session(childSessionId({ parentRunId: handle.runId, invocationId: spawnOptions.commandId })),
+          )
+          return { session, run: hostRun(yield* runtime.getRun(receipt.runId)) }
+        }),
+    })
     const host: Host<Agents> = {
       attachments,
       artifacts,
@@ -376,6 +407,7 @@ const create = <
         fork: (runId, forkOptions) => runtime.fork(runId, forkOptions).pipe(Effect.map(hostRun)),
       },
       runs: {
+        get: (runId) => runtime.getRun(runId).pipe(Effect.map(hostRun)),
         start: (sessionId, agent, input, startOptions) =>
           Effect.gen(function* () {
             yield* runtime.session(sessionId)
