@@ -22,11 +22,12 @@ import {
   type RuntimeState,
 } from "../../projection.js"
 import { toInspection, retainedSession } from "../events.js"
-import { historyPage, runsPage, sessionRun, recentRuns } from "./page.js"
 import { projectConversation } from "./conversation.js"
-import { submit, update, validateSelection } from "./queue.js"
+import { submit, update, validateSelection, message } from "./queue.js"
 import { page as familyPage } from "./family.js"
+import { historyPage, runsPage, sessionRun, recentRuns } from "./page.js"
 import { SessionQueueConflict } from "../../../session/queue.js"
+import { control } from "./lifecycle.js"
 
 const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {
@@ -215,6 +216,8 @@ export const make = (input: {
 }): Pick<
   RunStoreService,
   | "createHostSession"
+  | "controlSession"
+  | "messageSessionInput"
   | "submitSessionInput"
   | "updateSessionInput"
   | "removeSessionInput"
@@ -228,6 +231,12 @@ export const make = (input: {
   | "hostSessionRuns"
   | "hostSessionEvents"
 > => ({
+  messageSessionInput: (request) =>
+    input.modifyState(commands.messageSessionInput, [request], (state, [prepared]) =>
+      message({ state, input: prepared }),
+    ),
+  controlSession: (request) =>
+    input.modifyState(commands.controlSession, [request], (state, [prepared]) => control({ state, input: prepared })),
   submitSessionInput: (request) =>
     input.modifyState(commands.submitSessionInput, [request], (state, [prepared]) =>
       submit({ state, input: prepared }),

@@ -33,6 +33,7 @@ export type SteeringReceipt = typeof SteeringReceipt.Type
 
 /** One pending durable inbox entry. */
 export const SteeringEntry = Schema.Struct({
+  sessionCommandId: Schema.optionalKey(Schema.String),
   entryId: Schema.String,
   runId: Schema.String,
   sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),

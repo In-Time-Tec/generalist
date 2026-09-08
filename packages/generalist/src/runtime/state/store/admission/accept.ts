@@ -35,7 +35,8 @@ import { readinessForAdmission, reserveSessions, recordFamilyRun } from "../chil
 import { receiptAdmission } from "./receipt.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
-import { rootGrant, sessionChildGrant } from "./policy.js"
+import { rootGrant, sessionChildGrant, retainedBudget } from "./policy.js"
+import { capGrant } from "../../../budget/state.js"
 import { addRegistrations } from "./registration.js"
 
 const { duplicateReceipt, fanOutAdmission, newRunId, startReceipt } = receiptAdmission
@@ -132,7 +133,8 @@ export const admitSend: {
         selection: input,
         message: input.message,
       })
-      const { treePolicy, budget, depth } = grant
+      const { treePolicy, budget: grantedBudget, depth } = grant
+      const budget = capGrant(grantedBudget, yield* retainedBudget({ state, sessionId: input.message.sessionId }))
       const sponsor = "sponsor" in grant ? grant.sponsor : undefined
       const digest = digestOverride ?? rootDigest(input.message, treePolicy)
       const key = idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey)

@@ -211,6 +211,8 @@ export const claimExecution: {
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (state.hostSessions.get(run.message.sessionId)?.session.lifecycle !== undefined && !run.cancellationRequested)
+      return yield* RuntimeUnavailable.make({ message: `Session ${run.message.sessionId} is not open` })
     const now = yield* occurredAtMillis
     yield* requireClaimable(state, run, now)
     const claimed = {

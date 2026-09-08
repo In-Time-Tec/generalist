@@ -59,6 +59,8 @@ import { RuntimeUnavailable } from "../errors.js"
 import { withInherited as withInheritedTasks } from "../../tasks/internal.js"
 import { Items as TaskItems } from "../../tasks/item.js"
 import { Descriptor as CapabilityDescriptor } from "../../core/capability/state.js"
+import { BackgroundTools } from "../../core/tools/background/index.js"
+import { FrameworkFailure } from "../../core/tools/tool-executor.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
@@ -188,6 +190,25 @@ const makeFor = (
                   yield* hostContext({ agent, environment, store, codeMode, nested, messaging }),
                   boundSession.context,
                   interruption.context,
+                  Option.isSome(runtime)
+                    ? Context.make(BackgroundTools, {
+                        admit: (tool, input, commandId) =>
+                          runtime.value.startTool(tool, input, { parentRunId: runId, commandId }).pipe(
+                            Effect.map((handle) => ({
+                              _tag: "ToolRunAdmitted" as const,
+                              runId: handle.runId,
+                              tool: String(tool.name),
+                            })),
+                            Effect.mapError((error) =>
+                              FrameworkFailure.make({
+                                stage: "handler",
+                                tool: String(tool.name),
+                                message: String(error),
+                              }),
+                            ),
+                          ),
+                      })
+                    : Context.empty(),
                 )
                 const executionRetry = yield* makeExecutionRetry(claimed.attempt)
                 const runHosted = (

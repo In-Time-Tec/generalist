@@ -52,6 +52,18 @@ The Agent fragment above admits work and returns a receipt, not the Agent's answ
 
 ## Independent Tool Runs
 
+Set `Agent.make({ name: "coder", toolkit: workspaceTools, toolExecution: "background" })` when the Agent should continue after admitting work instead of waiting for each handler. Register those same Effect AI Tools with `Generalist.create({ agents: [coder], tools: [...] })`. This is a definition fragment: the application supplies the Toolkit handlers, model, authorization Layers, activated Runtime, and scheduler.
+
+The model-visible success schema describes `{ _tag: "ToolRunAdmitted", runId, tool }`, not file contents or a command's final output. The execution registry retains the original parameter, success, and failure codecs, including MCP handler types. The parent can make another model step while the admitted Tool Run remains running. Tool admission has its own durable command identity; it is not memoized as the tool's final answer. Messaging, skill activation, and child/Program admission and observation controls stay inline.
+
+Process-local Core defaults to inline execution. Explicit background mode without a durable Runtime fails before the first model call rather than falling back to local fibers. Unregistered work tools fail closed, including tools discovered after Agent construction.
+
+Background admission applies to framework-executed handlers. Provider-executed built-ins keep their provider result contract; Generalist does not claim to admit a Tool Run for an effect executed inside a model provider.
+
+The Agent's existing authorization runs before admission. A pending admission-time approval still suspends that Agent; the registered Tool Run authorizes its actual execution independently. Background mode does not bypass a custom Agent authorizer or transfer its approval decision to a different policy.
+
+The shared Tool Run executor applies a 60-second deadline to each execution attempt, retains at most 256 KiB per outcome, accepts at most 64 progress events of at most 16 KiB each, and accepts at most 16 artifact references of at most 2 KiB each. These limits enter registered Tool policy identity. Progress over its bound is declined; typed outcomes and admission receipts are never replaced with truncated previews. An unretained outcome or expired external operation remains actionable through the existing unknown-outcome resolution path, not an invented success or automatic redispatch. Deadline expiry requests Effect interruption; it is not proof that an external process stopped, and cannot forcibly terminate an uninterruptible handler. Artifact references do not grant storage access or enlarge the artifact store's own payload limits. Canonical family Tool concurrency and durable storage capacity bound execution and retained admission state.
+
 Use a Tool Run when work must keep its own execution claim after the Run that requested it settles. Register ordinary Effect AI Tool declarations in `tools`, provide their Toolkit handlers when creating the Host, and start them without creating a conversational Session.
 
 This Effect generator fragment assumes an activated durable Runtime and a host scheduler. The `checks` handler is scripted arithmetic: it invokes no model or external service and needs no credentials.
@@ -112,6 +124,10 @@ session.submit(input, { commandId })  -> QueueReceipt { id, revision }
 session.queue.list()                 -> PendingInput[]
 session.queue.update(id, input, { commandId, expectedRevision, agent? }) -> QueueReceipt
 session.queue.remove(id, { commandId, expectedRevision }) -> QueueReceipt
+session.message(input, { commandId }) -> QueueReceipt (requires authenticated SessionSender)
+session.stop({ commandId })          -> void
+session.resume({ commandId })        -> void
+session.close({ commandId })         -> void
 
 host.runs.start(sessionId, agent, typedInput, { idempotencyKey? })
   -> { id, await, events, send }
@@ -123,6 +139,9 @@ host.runs.send(runId, prompt, { policy?, from?, idempotencyKey? })
                                       -> { entryId, sequence }
 host.runs.cancel(runId, commandId, reason?)       -> void
 host.runs.rewind(runId, { commandId, toSequence, budget? }) -> void
+
+HostRun.wait({ runs?, messages?, commandId, timeout? })
+                                      -> RunSettled | Message | Timeout
 
 host.events.subscribe(sessionId, cursor?)
   -> Effect<Stream<HostEvent>, SessionError>
@@ -137,6 +156,8 @@ host.operator.extendBudget(runId, delta, operator, commandId) -> void
 ```
 
 `runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
+
+`HostRun.wait` is a model-facing control used from the active Agent tool context. It accepts at most 32 same-family Run IDs and an authenticated-message selector, and it requires a stable `commandId`. Registration and the already-arrived check share the Runtime wait transition, so a terminal Run or pending message cannot be missed across a host restart. A `Message` result includes its durable inbox cursor; a retry does not consume it again. `Timeout` closes only this wait, while sibling provider tool calls remain barriers until their own results are available. Use `await` when the host only needs terminal output.
 
 `runs.startByName` is the serialized-host boundary used by `generalist/server`. It finds one configured Agent by name and decodes the unknown input with that Agent's input Schema before starting it. Unknown names and invalid inputs remain typed Host failures. Approval and operator methods are the same Runtime operations with no second decision or recovery authority; every mutation requires the caller identity recorded by Runtime.
 
@@ -154,7 +175,9 @@ Every accepted queue command returns an immutable `{ id, revision }` receipt. Pr
 
 An edit's requested Agent name is part of its command identity; its registered executable is resolved only for a new admission, after receipt reconciliation. An exact retry still returns its accepted receipt if that registration later changes or disappears. New edits must pass the current Host's Agent allowlist and revision checks. HTTP authentication and resource authorization apply to every request, including retries.
 
-The queue permits at most 64 pending entries and 1 MiB of encoded pending input, including pinned settings and registrations. A mutation exceeding a bound fails without changing the queue. These limits are independent of the exact-Run steering inbox. Canonical object state, not the Session handle or host memory, owns recovery. Use fresh namespaces; there is no compatibility reader for retired durable enqueue state.
+The queue permits at most 64 pending entries and 1 MiB of encoded pending input, including pinned settings and registrations. Undelivered `session.message` entries in the active Run inbox count against this retention bound too, so cancellation can retain them without overflowing the queue. A mutation exceeding a bound fails without changing the queue. Exact-Run steering still has its own inbox bound. Canonical object state, not the Session handle or host memory, owns recovery. Use fresh namespaces; there is no compatibility reader for retired durable enqueue state.
+
+`submit` schedules a separate conversational Run. `message` instead reaches the active Run at a safe model boundary, or queues a fresh sponsored Run when idle. Supply the `SessionSender` service from `generalist/runtime` at the authenticated application boundary; it is not a field in message options. Retained child Sessions keep their current sponsor separately from their immutable family provenance. Stop, close, and explicit resume operate on Session admission policy rather than resurrecting terminal Runs; see [child admission](./child-admission.md) for allocation and cancellation semantics.
 
 `generalist/server` exposes the same commands through `POST /sessions/:id/queue`, `PATCH /sessions/:id/queue/:inputId`, and `DELETE /sessions/:id/queue/:inputId`. The Session client offers `sessions.submit`, `sessions.updateInput`, and `sessions.removeInput`; submit takes `sessionId`, `input`, and `commandId`, while edits and removals also carry `id` and `expectedRevision`. Updates optionally carry `agent`. These routes use the existing authentication and resource-authorization boundary, not a second queue authority.
 

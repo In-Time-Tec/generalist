@@ -1,9 +1,11 @@
-import { Effect, Function, Schema } from "effect"
+import { Effect, Function, Option, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { AgentError } from "../event.js"
-import type { Agent, ToolDeclaration } from "../service.js"
+import type { Agent, MakeOptions, ToolDeclaration } from "../service.js"
 import { dispatchForOrigin } from "../tools/dispatch.js"
 import { type Candidate, assemble } from "../../tools/tool-registry.js"
+import { BackgroundTools, modelTool } from "../../tools/background/index.js"
+import { definition as fanOutDefinition } from "../tool/fan-out.js"
 
 export const errorMessage = <E>(error: E): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -26,12 +28,12 @@ export const progressOverflowPolicySchema = Schema.Union([
 
 type StaticDeclaration = { readonly origin: import("../event.js").ToolOrigin; readonly tool: Tool.Any }
 
-export const childProfiles = (names: ReadonlyArray<string> = []): ReadonlyArray<string> => {
-  const children = Object.freeze([...names])
+export const definitionCapabilities = (options: Pick<MakeOptions, "children" | "toolExecution">) => {
+  const children = Object.freeze([...(options.children ?? [])])
   if (children.some((name) => name.trim().length === 0) || new Set(children).size !== children.length) {
     throw new TypeError("Agent children must contain unique, non-empty profile names")
   }
-  return children
+  return { children, toolExecution: options.toolExecution ?? "inline" }
 }
 
 /** @internal Validate and assemble the immutable tools declared by an Agent. */
@@ -39,17 +41,23 @@ export const setupStaticTools = <T extends Record<string, Tool.Any>, R, P, A>(
   agent: Agent<T, R, P, A, Schema.Top, Schema.Top>,
 ) =>
   Effect.gen(function* () {
+    if (agent.toolExecution === "background" && Option.isNone(yield* Effect.serviceOption(BackgroundTools))) {
+      return yield* AgentError.make({ message: "Background tool execution requires a durable Runtime", turn: 0 })
+    }
     const declarations: ReadonlyArray<StaticDeclaration> =
       agent.toolDeclarations ??
       Object.values(agent.toolkit.tools).map((tool) => ({
         tool,
         origin: { _tag: "Static" as const, agent: agent.name },
       }))
-    const candidates: ReadonlyArray<Candidate> = declarations.map(({ origin, tool }) => ({
-      origin,
-      tool,
-      dispatch: dispatchForOrigin(origin),
-    }))
+    const candidates: ReadonlyArray<Candidate> = declarations.map(({ origin, tool }) => {
+      const candidate: Candidate = { origin, tool, dispatch: dispatchForOrigin(origin) }
+      const projected =
+        agent.toolExecution === "background" && origin._tag === "Static" && fanOutDefinition(tool) === undefined
+          ? modelTool(tool)
+          : undefined
+      return projected === undefined ? candidate : { ...candidate, modelTool: projected }
+    })
     const registry = yield* assemble(candidates)
     const declarationsDiffer =
       agent.toolDeclarations !== undefined &&

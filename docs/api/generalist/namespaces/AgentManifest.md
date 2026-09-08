@@ -102,6 +102,12 @@ Closed, reconstructable identity contract for one Agent.
 
 > `readonly` `optional` **supplemental?**: `string`
 
+<a id="toolexecution"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
+
 <a id="tools"></a>
 
 ##### tools
@@ -584,7 +590,7 @@ Construct and pin a canonical closed Agent manifest.
 
 ##### input
 
-`Omit`\<[`AgentManifest`](#agentmanifest), `"version"`\> & `object`
+`Omit`\<[`AgentManifest`](#agentmanifest), `"version"` \| `"toolExecution"`\> & `object`
 
 #### Returns
 

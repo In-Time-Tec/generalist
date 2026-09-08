@@ -5,6 +5,7 @@ import { type DomainFailure, FrameworkFailure, type Outcome, type Success } from
 import { type Candidate, type Registry, assemble } from "../../tools/tool-registry.js"
 import { activateSkillParameters } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
+import { modelTool } from "../../tools/background/index.js"
 
 const isToolNameCollision = Schema.is(ToolNameCollision)
 
@@ -15,6 +16,7 @@ export interface ToolState {
 }
 
 interface SkillActivationContext {
+  readonly toolExecution?: "inline" | "background"
   readonly skillRuntime:
     | { readonly catalog: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillCatalogError> } }
     | undefined
@@ -64,13 +66,11 @@ export const make =
       if (body === undefined) {
         const registry = yield* assemble([
           ...current.registry.entries,
-          ...skill.tools.map(
-            (tool): Candidate => ({
-              tool,
-              origin: { _tag: "Skill", skill: skill.name },
-              dispatch: "Skill",
-            }),
-          ),
+          ...skill.tools.map((tool): Candidate => {
+            const candidate: Candidate = { tool, origin: { _tag: "Skill", skill: skill.name }, dispatch: "Skill" }
+            const projected = context.toolExecution === "background" ? modelTool(tool) : undefined
+            return projected === undefined ? candidate : { ...candidate, modelTool: projected }
+          }),
         ])
         body = restoredBody ?? (yield* skill.instructions)
         const activatedSkillBodies = new Map(current.activatedSkillBodies)

@@ -616,6 +616,60 @@ Application-owned identities for an independently retained Tool implementation a
 
 `ToolIdentity_base.constructor`
 
+***
+
+<a id="waitinvalid"></a>
+
+### WaitInvalid
+
+#### Extends
+
+- `WaitInvalid_base`
+
+#### Constructors
+
+<a id="constructor-10"></a>
+
+##### Constructor
+
+> **new WaitInvalid**(...`args`): [`WaitInvalid`](#waitinvalid)
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`WaitInvalid`](#waitinvalid)
+
+###### Inherited from
+
+`WaitInvalid_base.constructor`
+
+#### Properties
+
+<a id="hint-9"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+###### Inherited from
+
+`WaitInvalid_base.hint`
+
+<a id="message-1"></a>
+
+##### message
+
+> `readonly` **message**: `string`
+
+###### Inherited from
+
+`WaitInvalid_base.message`
+
 ## Interfaces
 
 <a id="childhandle"></a>
@@ -1214,6 +1268,12 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 > `readonly` **id**: `string`
 
+<a id="lifecycle"></a>
+
+##### lifecycle?
+
+> `readonly` `optional` **lifecycle?**: `"stopped"` \| `"closed"`
+
 <a id="queue"></a>
 
 ##### queue
@@ -1323,6 +1383,12 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ###### treePolicy.maxSessions
 
 > `readonly` **maxSessions**: `number`
+
+<a id="sponsorrunid"></a>
+
+##### sponsorRunId?
+
+> `readonly` `optional` **sponsorRunId?**: `string`
 
 <a id="title"></a>
 
@@ -1520,6 +1586,22 @@ One deterministic collection of host-owned Agent contributions.
 
 [`HostSession`](#hostsession).[`activeRunId`](#activerunid)
 
+<a id="close"></a>
+
+##### close
+
+> `readonly` **close**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
 <a id="createdat-1"></a>
 
 ##### createdAt
@@ -1545,6 +1627,36 @@ One deterministic collection of host-owned Agent contributions.
 ##### inspect
 
 > `readonly` **inspect**: `Effect`\<[`HostSession`](#hostsession-1), [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+<a id="lifecycle-1"></a>
+
+##### lifecycle?
+
+> `readonly` `optional` **lifecycle?**: `"stopped"` \| `"closed"`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`lifecycle`](#lifecycle)
+
+<a id="message-2"></a>
+
+##### message
+
+> `readonly` **message**: (`input`, `options`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror), [`SessionSender`](./runtime/index.md#sessionsender)\>
+
+###### Parameters
+
+###### input
+
+`string` \| `Prompt`
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror), [`SessionSender`](./runtime/index.md#sessionsender)\>
 
 <a id="queue-1"></a>
 
@@ -1599,6 +1711,22 @@ One deterministic collection of host-owned Agent contributions.
 ###### Returns
 
 `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="resume"></a>
+
+##### resume
+
+> `readonly` **resume**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="retainedsession-1"></a>
 
@@ -1717,6 +1845,32 @@ One deterministic collection of host-owned Agent contributions.
 ##### snapshot
 
 > `readonly` **snapshot**: `Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+
+<a id="sponsorrunid-1"></a>
+
+##### sponsorRunId?
+
+> `readonly` `optional` **sponsorRunId?**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`sponsorRunId`](#sponsorrunid)
+
+<a id="stop"></a>
+
+##### stop
+
+> `readonly` **stop**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="submit"></a>
 
@@ -1904,6 +2058,38 @@ Run metadata without retained manifests, results, or event history.
 
 **`Experimental`**
 
+***
+
+<a id="waitoptions"></a>
+
+### WaitOptions
+
+#### Properties
+
+<a id="commandid-3"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
+<a id="messages"></a>
+
+##### messages?
+
+> `readonly` `optional` **messages?**: `boolean`
+
+<a id="runs-2"></a>
+
+##### runs?
+
+> `readonly` `optional` **runs?**: readonly `string`[]
+
+<a id="timeout"></a>
+
+##### timeout?
+
+> `readonly` `optional` **timeout?**: `Input`
+
 ## Type Aliases
 
 <a id="approvalrequested"></a>
@@ -2021,6 +2207,20 @@ One product-facing event at its exclusive Session cursor.
 ###### Returns
 
 `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| `GetRunError`\>
+
+##### wait
+
+> `readonly` **wait**: (`options`) => `Effect.Effect`\<[`WaitResult`](#waitresult), [`WaitInvalid`](#waitinvalid) \| [`AwaitEventInvalid`](./generalist/namespaces/Agent.md#awaiteventinvalid), [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\>
+
+###### Parameters
+
+###### options
+
+[`WaitOptions`](#waitoptions)
+
+###### Returns
+
+`Effect.Effect`\<[`WaitResult`](#waitresult), [`WaitInvalid`](#waitinvalid) \| [`AwaitEventInvalid`](./generalist/namespaces/Agent.md#awaiteventinvalid), [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\>
 
 #### Type Parameters
 
@@ -2168,6 +2368,14 @@ The authoritative journaled task list changed.
 
 > **Turn** = *typeof* `Turn.Type`
 
+***
+
+<a id="waitresult"></a>
+
+### WaitResult
+
+> **WaitResult** = *typeof* `WaitResult.Type`
+
 ## Variables
 
 <a id="artifactupdated-1"></a>
@@ -2303,3 +2511,11 @@ Membership is pinned to at; summaries report current committed status.
 > `const` **TasksUpdated**: `Schema.TaggedStruct`\<`"TasksUpdated"`, \{ `cursor`: `Schema.Int`; `items`: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>; `title`: `Schema.String`; \}\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
 
 The authoritative journaled task list changed.
+
+***
+
+<a id="waitresult-1"></a>
+
+### WaitResult
+
+> `const` **WaitResult**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"RunSettled"`, \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Message"`, \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Timeout"`, \{ \}\>, `Schema.TaggedStruct`\<`"Event"`, \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \}\>, `Schema.TaggedStruct`\<`"TimedOut"`, \{ `deadline`: `Schema.String`; \}\>\]\>

@@ -24,8 +24,8 @@ const eventResolution = (event: WakeEvent): WaitResolution => {
   return { _tag: "ToolResult", result, encodedResult: result }
 }
 
-const timeoutResolution = (deadline: string): WaitResolution => {
-  const result: AwaitEventResult = { _tag: "TimedOut", deadline }
+const timeoutResolution = (deadline: string, runWait: boolean): WaitResolution => {
+  const result: AwaitEventResult = runWait ? { _tag: "Timeout" } : { _tag: "TimedOut", deadline }
   return { _tag: "ToolResult", result, encodedResult: result }
 }
 
@@ -148,7 +148,7 @@ export const timeoutAwaitEvent: {
     ) {
       return [false, state] as const
     }
-    const resolution = timeoutResolution(input.deadline)
+    const resolution = timeoutResolution(input.deadline, wait.reason.filter._tag === "Run")
     const transitioned = closeWait(state, {
       runId: input.runId,
       waitId: input.waitId,

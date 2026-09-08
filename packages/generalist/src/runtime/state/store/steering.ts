@@ -6,6 +6,7 @@ import type { AdmitSteeringInput, ExecutionClaim, SteeringAdmission } from "../.
 import { appendLifecycle, rejectIfTerminal } from "../append.js"
 import type { RuntimeState, StoredRun } from "../projection.js"
 import { requireAgentOrProgram } from "../../executable/manifest-internal.js"
+import { reconcileRunWaits } from "./control/run-wait.js"
 
 const requireRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -113,7 +114,10 @@ export const admitSteering: {
         ...(entry.addressed === undefined ? undefined : { addressed: entry.addressed }),
       },
     )
-    return [{ receipt: { entryId: entry.entryId, sequence: entry.sequence }, duplicate: false }, accepted] as const
+    return [
+      { receipt: { entryId: entry.entryId, sequence: entry.sequence }, duplicate: false },
+      yield* reconcileRunWaits(accepted, run.runId),
+    ] as const
   }),
 )
 

@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
+import { Inline } from "../tools/background/index.js"
 
 export const skillListingBudgetTokens = 2_048
 
@@ -24,4 +25,4 @@ export const activateSkillTool = Tool.make(activateSkillToolName, {
   success: activateSkillSuccess,
   failure: activateSkillFailure,
   failureMode: "return",
-})
+}).annotate(Inline, true)

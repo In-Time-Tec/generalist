@@ -380,6 +380,12 @@ Capability descriptors attached only by child inheritance.
 
 > `readonly` `optional` **toolDeclarations?**: readonly [`ToolDeclaration`](#tooldeclaration)[]
 
+<a id="toolexecution"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
+
 <a id="toolkit"></a>
 
 ##### toolkit
@@ -531,6 +537,12 @@ Capability descriptors attached only by child inheritance.
 ##### toolDeclarations?
 
 > `readonly` `optional` **toolDeclarations?**: readonly [`ToolDeclaration`](#tooldeclaration)[]
+
+<a id="toolexecution-1"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
 
 <a id="toolkit-1"></a>
 
@@ -787,6 +799,16 @@ Capability descriptors attached only by child inheritance.
 ###### Inherited from
 
 [`Any`](#any).[`toolDeclarations`](#tooldeclarations-1)
+
+<a id="toolexecution-2"></a>
+
+##### toolExecution
+
+> `readonly` **toolExecution**: `"background"` \| `"inline"`
+
+###### Inherited from
+
+[`Any`](#any).[`toolExecution`](#toolexecution-1)
 
 <a id="toolkit-2"></a>
 
@@ -1236,6 +1258,12 @@ Process-local Agent Run inspection seam.
 
 > `readonly` `optional` **supplemental?**: `string`
 
+<a id="toolexecution-3"></a>
+
+##### toolExecution?
+
+> `readonly` `optional` **toolExecution?**: `"background"` \| `"inline"`
+
 <a id="toolkit-3"></a>
 
 ##### toolkit?
@@ -1459,6 +1487,16 @@ Agent options with ordered static declarations instead of a pre-built toolkit.
 ###### Inherited from
 
 `Omit.supplemental`
+
+<a id="toolexecution-4"></a>
+
+##### toolExecution?
+
+> `readonly` `optional` **toolExecution?**: `"background"` \| `"inline"`
+
+###### Inherited from
+
+`Omit.toolExecution`
 
 <a id="toolkit-4"></a>
 
@@ -2855,7 +2893,7 @@ Allocate one scoped Run and its producer handle before consuming its event strea
 
 ### awaitEvent
 
-> `const` **awaitEvent**: \{(`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>; (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>; \}
+> `const` **awaitEvent**: \{(`options`): (`filter`) => `Effect`\<\{ \} \| \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \} \| \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \} \| \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>; (`filter`, `options`): `Effect`\<\{ \} \| \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \} \| \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \} \| \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>; \}
 
 Suspend the current durable tool call until a matching environmental event or timeout.
 
@@ -2864,7 +2902,7 @@ call's result rather than re-running JavaScript after this Effect.
 
 #### Call Signature
 
-> (`options`): (`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
+> (`options`): (`filter`) => `Effect`\<\{ \} \| \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \} \| \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \} \| \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Parameters
 
@@ -2874,17 +2912,17 @@ call's result rather than re-running JavaScript after this Effect.
 
 ##### Returns
 
-(`filter`) => `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
+(`filter`) => `Effect`\<\{ \} \| \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \} \| \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \} \| \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 #### Call Signature
 
-> (`filter`, `options`): `Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
+> (`filter`, `options`): `Effect`\<\{ \} \| \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \} \| \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \} \| \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ##### Parameters
 
 ###### filter
 
-\{ `scheduleId?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `source?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `childRunId?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `kind?`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"create"`, `"update"`, `"remove"`\]\>\>; `path?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `approvalId?`: `Schema.optionalKey`\<`Schema.String`\>; \}
+\{ `commandId`: `Schema.String`; `messages`: `Schema.Boolean`; `runs`: `Schema.$Array`\<`Schema.String`\>; \} \| \{ `scheduleId?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `source?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `childRunId?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `kind?`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"create"`, `"update"`, `"remove"`\]\>\>; `path?`: `Schema.optionalKey`\<`Schema.String`\>; \} \| \{ `approvalId?`: `Schema.optionalKey`\<`Schema.String`\>; \}
 
 ###### options
 
@@ -2892,7 +2930,7 @@ call's result rather than re-running JavaScript after this Effect.
 
 ##### Returns
 
-`Effect`\<\{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
+`Effect`\<\{ \} \| \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \} \| \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \} \| \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<`Schema.String`, `Schema.String`\>; `payload`: `Schema.Codec`\<`Schema.Json`, `Schema.Json`, `never`, `never`\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<readonly ...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly ...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \} \| \{ `deadline`: `Schema.String`; \}, [`AwaitEventInvalid`](#awaiteventinvalid), [`ToolContext`](./ToolContext.md#toolcontext)\>
 
 ***
 
@@ -2900,7 +2938,7 @@ call's result rather than re-running JavaScript after this Effect.
 
 ### AwaitEvent
 
-> `const` **AwaitEvent**: `Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `scheduleId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `kind`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ...\]\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>; \}\>
+> `const` **AwaitEvent**: `Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Run"`, \{ `commandId`: `Schema.String`; `messages`: `Schema.Boolean`; `runs`: `Schema.$Array`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Timer"`, \{ `scheduleId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `kind`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[..., ..., ...\]\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>; \}\>
 
 Durable metadata carried by a tool suspension created by `Agent.awaitEvent`.
 
@@ -2910,7 +2948,7 @@ Durable metadata carried by a tool suspension created by `Agent.awaitEvent`.
 
 ### AwaitEventResult
 
-> `const` **AwaitEventResult**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Event"`, \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \}\>, `Schema.TaggedStruct`\<`"TimedOut"`, \{ `deadline`: `Schema.String`; \}\>\]\>
+> `const` **AwaitEventResult**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"RunSettled"`, \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Message"`, \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Timeout"`, \{ \}\>, `Schema.TaggedStruct`\<`"Event"`, \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \}\>, `Schema.TaggedStruct`\<`"TimedOut"`, \{ `deadline`: `Schema.String`; \}\>\]\>
 
 Result injected as the terminal result of the awaiting tool call.
 
@@ -3308,7 +3346,7 @@ A typed environmental fact that can resume an awaiting Agent tool call.
 
 ### WakeEventFilter
 
-> `const` **WakeEventFilter**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `scheduleId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `kind`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"create"`, `"update"`, `"remove"`\]\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>
+> `const` **WakeEventFilter**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Run"`, \{ `commandId`: `Schema.String`; `messages`: `Schema.Boolean`; `runs`: `Schema.$Array`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Timer"`, \{ `scheduleId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `source`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `kind`: `Schema.optionalKey`\<`Schema.Literals`\<readonly \[`"create"`, `"update"`, `"remove"`\]\>\>; `path`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>
 
 Serializable selector persisted with an `Agent.awaitEvent` obligation.
 
