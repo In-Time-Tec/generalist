@@ -1,7 +1,7 @@
 import { Cause, Clock, DateTime, Duration, Effect, Function, Option, Schema } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { ToolContext } from "../../tools/tool-context.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
-import { Prompt } from "effect/unstable/ai"
 
 const DedupeKey = Schema.String.check(Schema.isNonEmpty())
 
