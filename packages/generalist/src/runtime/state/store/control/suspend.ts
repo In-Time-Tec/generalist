@@ -9,6 +9,7 @@ import { groupWaitsFromSuspension, resultFromInspection } from "../../../child/g
 import { reconcileChildWait } from "../child/settlement.js"
 import { closeWait } from "./wait.js"
 import { promoteChildCapacity } from "../child/capacity.js"
+import { reconcileRunWaits } from "./run-wait.js"
 
 type SuspendInput = import("../../../run/store.js").ExecutionClaim & {
   readonly waits: ReadonlyArray<RunWait>
@@ -63,6 +64,34 @@ const insertWaits = (state: RuntimeState, runId: string, requestedWaits: Readonl
         return yield* RuntimeUnavailable.make({ message: `Invalid wait batch for Run ${runId}` })
       }
       identities.add(requested.waitId)
+      if (requested.reason._tag === "AwaitEvent" && requested.reason.filter._tag === "Run") {
+        const selector = requested.reason.filter
+        if (selector.runs.length > 32 || (selector.runs.length === 0 && !selector.messages))
+          return yield* RuntimeUnavailable.make({ message: "Run waits require a bounded, nonempty selector" })
+        const owner = state.runs.get(runId)!
+        for (const targetId of selector.runs) {
+          const target = state.runs.get(targetId)
+          if (target === undefined || target.rootRunId !== owner.rootRunId || targetId === runId)
+            return yield* RuntimeUnavailable.make({
+              message: "Run wait targets must be other Runs in the authenticated execution family",
+            })
+        }
+        for (const [key, previous] of waits) {
+          if (
+            !key.startsWith(`${runId}\0`) ||
+            previous.reason._tag !== "AwaitEvent" ||
+            previous.reason.filter._tag !== "Run"
+          )
+            continue
+          if (
+            previous.reason.filter.commandId === selector.commandId &&
+            !Equal.equals(previous.reason.filter, selector)
+          )
+            return yield* RuntimeUnavailable.make({
+              message: "Run wait command identity cannot be reused with a different selector",
+            })
+        }
+      }
       const prior = waits.get(waitMapKey(runId, requested.waitId))
       if (prior === undefined) {
         waits.set(waitMapKey(runId, requested.waitId), requested)
@@ -166,7 +195,11 @@ export const suspend: {
         "waiting",
       )
     }
-    const withChildren = yield* reconcileChildren(waiting, run.runId, suspensionTokens(input.suspension))
+    const withChildren = yield* reconcileChildren(
+      yield* reconcileRunWaits(waiting, run.runId),
+      run.runId,
+      suspensionTokens(input.suspension),
+    )
     return yield* promoteChildCapacity(yield* reconcileGroups(withChildren, run.runId, input.suspension), run.runId)
   }),
 )

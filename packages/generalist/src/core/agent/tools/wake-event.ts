@@ -1,6 +1,7 @@
 import { Cause, Clock, DateTime, Duration, Effect, Function, Option, Schema } from "effect"
 import { ToolContext } from "../../tools/tool-context.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
+import { Prompt } from "effect/unstable/ai"
 
 const DedupeKey = Schema.String.check(Schema.isNonEmpty())
 
@@ -41,6 +42,11 @@ export type WakeEvent = typeof WakeEvent.Type
 
 /** Serializable selector persisted with an `Agent.awaitEvent` obligation. */
 export const WakeEventFilter = Schema.Union([
+  Schema.TaggedStruct("Run", {
+    runs: Schema.Array(Schema.String.check(Schema.isNonEmpty())).check(Schema.isMaxLength(32)),
+    messages: Schema.Boolean,
+    commandId: Schema.String.check(Schema.isNonEmpty()),
+  }),
   Schema.TaggedStruct("Timer", { scheduleId: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct("Webhook", { source: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct("ChildCompleted", { childRunId: Schema.optionalKey(Schema.String) }),
@@ -54,6 +60,9 @@ export type WakeEventFilter = typeof WakeEventFilter.Type
 
 /** Result injected as the terminal result of the awaiting tool call. */
 export const AwaitEventResult = Schema.Union([
+  Schema.TaggedStruct("RunSettled", { runId: Schema.String, terminalEventId: Schema.String }),
+  Schema.TaggedStruct("Message", { messageId: Schema.String, input: Prompt.Prompt, cursor: Schema.Int }),
+  Schema.TaggedStruct("Timeout", {}),
   Schema.TaggedStruct("Event", { event: WakeEvent }),
   Schema.TaggedStruct("TimedOut", { deadline: Schema.String }),
 ])
@@ -105,6 +114,7 @@ export const matches: {
   (event: WakeEvent): (filter: WakeEventFilter) => boolean
   (filter: WakeEventFilter, event: WakeEvent): boolean
 } = Function.dual(2, (filter: WakeEventFilter, event: WakeEvent): boolean => {
+  if (filter._tag === "Run") return false
   if (filter._tag !== event._tag) return false
   switch (filter._tag) {
     case "Timer":
