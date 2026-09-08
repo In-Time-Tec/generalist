@@ -1,11 +1,10 @@
-import type { AgentManifest } from "../../core/durable/manifest/agent-manifest.js"
+import type { AgentManifest, ProgramAuthority } from "../../core/durable/manifest/agent-manifest.js"
 import { make as makeToolManifest } from "../../core/durable/manifest/tool-manifest.js"
 import type { StaticRunOptions, StaticToolExecutable } from "./resolver.js"
 import { validateRef as validateCoreRef } from "../../core/durable/manifest/executable-manifest.js"
 import { Function, Schema } from "effect"
 import type { ExecutionCheckpoint } from "../execution/state.js"
 import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
-import type { ProgramAuthority } from "../../core/durable/manifest/agent-manifest.js"
 import type { ProgramManifest } from "../../core/durable/manifest/program-manifest.js"
 
 type PinnedExecutableEncoded = typeof PinnedExecutable.Encoded

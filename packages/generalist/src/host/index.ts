@@ -47,20 +47,16 @@ import {
   type StartOptions,
 } from "../runtime/service.js"
 import type { ToolServices } from "../runtime/executable/registered-tool.js"
-import {
-  DuplicateAgent,
-  IllegalOperatorAction,
-  type RuntimeUnavailable,
-  type ExecutableRegistrationInvalid,
-} from "../runtime/errors.js"
+import { IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
 import { make as makeTools, type Tools as HostTools } from "./tools.js"
+export type { CreateError } from "./errors.js"
 export type { HostToolRun } from "./tools.js"
 export { ToolIdentity } from "../runtime/executable/tool-identity.js"
 import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
-import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
+import { AgentInputInvalid, AgentNotRegistered, type CreateError } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
@@ -246,15 +242,6 @@ export type CreateRequirements<
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
   | ToolServices<Tools[number]>
-
-export type CreateError =
-  | DuplicateAgent
-  | PluginNameConflict
-  | PluginToolConflict
-  | import("../runtime/errors.js").ExecutableRegistrationInvalid
-  | import("../runtime/errors.js").TreePolicyInvalid
-  | RuntimeUnavailable
-  | import("../durability/errors.js").DurabilityFailure
 
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,

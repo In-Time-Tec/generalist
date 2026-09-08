@@ -157,7 +157,7 @@ export const admitSend: {
         address: input.message.to,
         message: input.message,
         rootRunId: sponsor?.rootRunId ?? runId,
-        ...(sponsor === undefined ? {} : { parentRunId: sponsor.runId }),
+        ...(sponsor === undefined ? undefined : { parentRunId: sponsor.runId }),
         depth,
         treePolicy,
         lastSequence: -1,

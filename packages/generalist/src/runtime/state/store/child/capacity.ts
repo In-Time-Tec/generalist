@@ -61,7 +61,13 @@ export const activeChildCount: {
     ).length,
 )
 
-export const activeToolCount = (state: RuntimeState, run: StoredRun, now: number): number => {
+interface CapacityInput {
+  readonly state: RuntimeState
+  readonly run: StoredRun
+  readonly now: number
+}
+
+const activeToolCount = ({ state, run, now }: CapacityInput): number => {
   let count = 0
   for (const candidate of familyRuns(state, run.rootRunId)) {
     const independent = candidate.executableManifest.entries.some(
@@ -84,6 +90,38 @@ export const activeToolCount = (state: RuntimeState, run: StoredRun, now: number
   }
   return count
 }
+
+export const requireToolCapacity = (input: CapacityInput) =>
+  activeToolCount(input) >= input.run.treePolicy.concurrency.tools
+    ? RuntimeUnavailable.make({ message: `Run ${input.run.runId} is awaiting family Tool capacity` })
+    : Effect.void
+
+export const requireFamilyCapacity = ({ state, run, now }: CapacityInput) =>
+  Effect.gen(function* () {
+    if (
+      run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Tool")
+    ) {
+      yield* requireToolCapacity({ state, run, now })
+    }
+    if (
+      run.executableManifest.entries.some((entry) => entry.pin === run.executableRef.active && entry._tag === "Agent")
+    ) {
+      const live = familyRuns(state, run.rootRunId).filter((candidate) => {
+        if (candidate.runId === run.runId || candidate.ownerId === undefined || candidate.status !== "running")
+          return false
+        const owner = state.workers.get(candidate.ownerId)
+        return (
+          (owner === undefined || owner.expiresAt > now) &&
+          candidate.executableManifest.entries.some(
+            (entry) => entry.pin === candidate.executableRef.active && entry._tag === "Agent",
+          )
+        )
+      }).length
+      if (live >= run.treePolicy.concurrency.agents) {
+        return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} is awaiting family Agent capacity` })
+      }
+    }
+  })
 
 export const recordFamilyRun = ({
   state,
