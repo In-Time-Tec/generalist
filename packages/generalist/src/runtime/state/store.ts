@@ -540,12 +540,10 @@ const makeStoreServices = (options: Options) =>
                     (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
                   )
                   if (!run.cancellationRequested && pending.length > 0 && "session" in preparedInput.result) {
-                    const followUp = pending.filter((entry) => entry.policy === "enqueue")
-                    const selected =
-                      followUp.length > 0 ? followUp : pending.filter((entry) => entry.policy !== "enqueue")
+                    const selected = pending
                     const continuation = {
                       schemaVersion: 1 as const,
-                      queue: followUp.length > 0 ? ("followUp" as const) : ("steering" as const),
+                      queue: "steering" as const,
                       prompt: selected.reduce<Prompt.Prompt>(
                         (prompt, entry) => Prompt.concat(prompt, entry.prompt),
                         Prompt.empty,

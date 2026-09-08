@@ -144,6 +144,8 @@ Every accepted message appends `Inbox { message, policy, from }` with its pendin
 
 ## 4. Choose delivery timing
 
-`policy` accepts `steer`, `enqueue`, `interrupt`, `rollback`, or `reject`. Consumption with the next model operation is the acknowledgement; listing the inbox does not consume entries.
+`policy` accepts `steer`, `interrupt`, `rollback`, or `reject`. Consumption with the next model operation is the acknowledgement; listing the inbox does not consume entries.
+
+Addressed messages still target an existing Run, even when a Session address resolves that Run. To queue a new conversational instruction, use a Host Session handle's `submit(input, { commandId })` instead. The Session retains an editable FIFO item with pinned Agent selection and promotes it into a fresh Run when idle. Queue updates and removals require the observed revision, and retries retain the original command identity and content. Durable `enqueue` is no longer a messaging policy; Core's process-local `Agent.send(..., "enqueue")` remains available.
 
 See [How to steer a run](/guides/steering) for exact policy semantics and [the generalist/runtime reference](/reference/runtime) for the surrounding Run lifecycle.

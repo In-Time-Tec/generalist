@@ -192,7 +192,11 @@ export const register = ({
             const session = yield* host.sessions.create({ id: "snapshot-session", title: "Existing work" })
             const run = yield* host.runs.start(session.id, agent, "existing input")
             const snapshot = yield* host.sessions.snapshot(session.id)
-            expect(snapshot).toMatchObject({ version: 1, session, runs: [{ run: { runId: run.id } }] })
+            expect(snapshot).toMatchObject({
+              version: 1,
+              session: yield* session.inspect,
+              runs: [{ run: { runId: run.id } }],
+            })
             return snapshot
           }).pipe(Effect.provideContext(context))
         }),
@@ -218,9 +222,11 @@ export const register = ({
             ])
             const canonical = yield* (yield* Runtime.Runtime)
               .sessionEvents({ sessionId: original.session.id, cursor: reopened.cursor })
-              .pipe(Stream.take(2), Stream.runCollect)
-            expect(fresh.cursor).toBe(canonical[1]?.cursor)
-            expect(fresh.cursor).toBeGreaterThan(next[0]!.cursor)
+              .pipe(Stream.take(1), Stream.runCollect)
+            expect(fresh.cursor).toBe(canonical[0]?.cursor)
+            expect(fresh.cursor).toBe(next[0]!.cursor)
+            expect(fresh.session.activeRunId).toBe(original.session.activeRunId)
+            expect(fresh.runs.find((run) => run.run.runId === raced.id)?.run.status).toBe("queued")
           }).pipe(Effect.provideContext(context))
         }),
       )

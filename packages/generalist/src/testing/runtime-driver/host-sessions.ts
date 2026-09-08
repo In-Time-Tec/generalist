@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Stream } from "effect"
 import type { HostSessionsCapability, Options, Services } from "./contract.js"
+import { registerSessionQueue } from "./host-sessions/queue.js"
 
 type Provide<LayerError> = <A, E>(use: (services: Services) => Effect.Effect<A, E>) => Effect.Effect<A, E | LayerError>
 
@@ -13,6 +14,7 @@ export const registerHostSessions = <LayerError, ClaimsLayerError>(input: {
   readonly provide: Provide<LayerError>
 }): void => {
   const { capability, options, provide } = input
+  registerSessionQueue(input)
 
   it.effect("persists Session metadata, root Runs, and strict replay-then-live cursors", () =>
     provide((services) =>

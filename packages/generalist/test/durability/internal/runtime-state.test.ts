@@ -142,7 +142,7 @@ const storedRun = (): StoredRun => ({
       idempotencyKey: "steer",
       digest: "steer-digest",
       prompt,
-      policy: "enqueue",
+      policy: "steer",
       from: { user: "operator" },
       consumedOperationId: "operation-codec",
     },
@@ -239,7 +239,7 @@ const fixture = (): RuntimeState => {
       [
         "session-codec",
         {
-          session: { id: "session-codec", createdAt: instant },
+          session: { id: "session-codec", createdAt: instant, queue: [] },
           lastCursor: 1,
           events: [{ _tag: "Run", cursor: Cursor.make(1), event: event(1) }],
           subscribers: new Map(),
@@ -407,7 +407,7 @@ describe("canonical runtime state", () => {
               [
                 "conversation-only",
                 {
-                  session: { id: "conversation-only", createdAt: instant },
+                  session: { id: "conversation-only", createdAt: instant, queue: [] },
                   lastCursor: 0,
                   events: [conversation],
                   subscribers: new Map(),
@@ -1114,7 +1114,7 @@ describe("canonical runtime state", () => {
           [
             "empty",
             {
-              session: { id: "empty", createdAt: instant },
+              session: { id: "empty", createdAt: instant, queue: [] },
               lastCursor: -1,
               events: [],
               subscribers: new Map(),

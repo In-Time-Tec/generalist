@@ -6,14 +6,25 @@ import type { RuntimeUnavailable } from "../errors.js"
 import { RunSnapshot, type RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
+import { PendingInput, SessionSelection } from "./queue.js"
 
 /** Durable product-facing Session metadata owned by a Runtime driver. */
-export const HostSession = Schema.Struct({
+export interface HostSession {
+  readonly id: string
+  readonly title?: string
+  readonly createdAt: string
+  readonly selection?: SessionSelection
+  readonly queue: ReadonlyArray<PendingInput>
+  readonly activeRunId?: string
+}
+export const HostSession: Schema.Codec<HostSession, unknown> = Schema.Struct({
   id: Schema.String.check(Schema.isNonEmpty()),
   title: Schema.optionalKey(Schema.String),
   createdAt: Schema.String,
+  selection: Schema.optionalKey(SessionSelection),
+  queue: Schema.Array(PendingInput),
+  activeRunId: Schema.optionalKey(Schema.String),
 })
-export type HostSession = typeof HostSession.Type
 
 /** One bounded committed Session projection and its exact exclusive replay cursor. @experimental */
 export interface HostSessionSnapshot {
@@ -54,6 +65,7 @@ export type HostSessionEvent = typeof HostSessionEvent.Type
 export interface CreateSessionInput {
   readonly id: string
   readonly title?: string
+  readonly selection?: SessionSelection
 }
 
 export interface SessionEventsInput {
@@ -106,6 +118,9 @@ export type SessionEventsError =
 
 /** Runtime operations that persist and observe product-facing Sessions. */
 export interface RuntimeHostSessions {
+  readonly submitSessionInput: import("../run/store.js").Service["submitSessionInput"]
+  readonly updateSessionInput: import("../run/store.js").Service["updateSessionInput"]
+  readonly removeSessionInput: import("../run/store.js").Service["removeSessionInput"]
   readonly createSession: (input: CreateSessionInput) => Effect.Effect<HostSession, CreateSessionError>
   readonly session: (sessionId: string) => Effect.Effect<HostSession, SessionError>
   readonly sessionSnapshot: (sessionId: string) => Effect.Effect<HostSessionSnapshot, SessionSnapshotError>

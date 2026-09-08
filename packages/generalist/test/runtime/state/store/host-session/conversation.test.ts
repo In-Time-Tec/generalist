@@ -33,7 +33,7 @@ const state = (conversation: RuntimeSession): RuntimeState => ({
     [
       "session-1",
       {
-        session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z" },
+        session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
         lastCursor: -1,
         events: [],
         subscribers: new Map(),

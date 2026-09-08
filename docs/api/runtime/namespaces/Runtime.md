@@ -996,7 +996,7 @@ Admission options for a message sent to one existing Run.
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+> `readonly` `optional` **policy?**: `"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 ***
 
@@ -1499,7 +1499,7 @@ durable Run record, so callers cannot forge a sender by supplying an Address.
 
 ##### policy?
 
-> `readonly` `optional` **policy?**: `"steer"` \| `"enqueue"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
+> `readonly` `optional` **policy?**: `"steer"` \| `"interrupt"` \| `"rollback"` \| `"reject"`
 
 <a id="prompt-3"></a>
 
@@ -1731,7 +1731,7 @@ Read ordered durable child settlements for one exact parent Run.
 
 ##### createSession
 
-> `readonly` **createSession**: (`input`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`CreateSessionError`](./HostSession.md#createsessionerror)\>
+> `readonly` **createSession**: (`input`) => `Effect`\<[`HostSession`](../../host.md#hostsession-1), [`CreateSessionError`](./HostSession.md#createsessionerror)\>
 
 ###### Parameters
 
@@ -1741,7 +1741,7 @@ Read ordered durable child settlements for one exact parent Run.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`CreateSessionError`](./HostSession.md#createsessionerror)\>
+`Effect`\<[`HostSession`](../../host.md#hostsession-1), [`CreateSessionError`](./HostSession.md#createsessionerror)\>
 
 ###### Inherited from
 
@@ -1905,7 +1905,7 @@ Start a new Run from one committed journal prefix.
 
 ##### listSessions
 
-> `readonly` **listSessions**: `Effect`\<readonly `object`[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
+> `readonly` **listSessions**: `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable)\>
 
 ###### Inherited from
 
@@ -2057,6 +2057,40 @@ Bind one host-assigned name, unique within the Run's naming scope.
 ###### Returns
 
 `Effect`\<[`DirectoryEntry`](./AgentDirectory.md#directoryentry), [`RegisterAgentNameError`](#registeragentnameerror)\>
+
+<a id="removesessioninput"></a>
+
+##### removeSessionInput
+
+> `readonly` **removeSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### expectedRevision
+
+`number`
+
+###### id
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`removeSessionInput`](./HostSession.md#removesessioninput)
 
 <a id="resolvemodelresponse"></a>
 
@@ -2255,7 +2289,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### session
 
-> `readonly` **session**: (`sessionId`) => `Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./HostSession.md#sessionerror)\>
+> `readonly` **session**: (`sessionId`) => `Effect`\<[`HostSession`](../../host.md#hostsession-1), [`SessionError`](./HostSession.md#sessionerror)\>
 
 ###### Parameters
 
@@ -2265,7 +2299,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Effect`\<\{ `createdAt`: `string`; `id`: `string`; `title?`: `string`; \}, [`SessionError`](./HostSession.md#sessionerror)\>
+`Effect`\<[`HostSession`](../../host.md#hostsession-1), [`SessionError`](./HostSession.md#sessionerror)\>
 
 ###### Inherited from
 
@@ -2326,6 +2360,22 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRuns`](./HostSession.md#sessionruns)
+
+<a id="sessionselection"></a>
+
+##### sessionSelection
+
+> `readonly` **sessionSelection**: (`name`) => `Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
+
+###### Parameters
+
+###### name
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}, [`UnknownAgent`](./Errors.md#unknownagent)\>
 
 <a id="sessionsnapshot"></a>
 
@@ -2467,6 +2517,96 @@ Begin one already-normalized pinned execution.
 
 `Effect`\<[`StartReceipt`](#startreceipt), [`StartExecutionError`](#startexecutionerror)\>
 
+<a id="submitsessioninput"></a>
+
+##### submitSessionInput
+
+> `readonly` **submitSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### commandId
+
+`string`
+
+###### prompt
+
+`Prompt`
+
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSubagents
+
+`number`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`submitSessionInput`](./HostSession.md#submitsessioninput)
+
 <a id="treechanges"></a>
 
 ##### treeChanges
@@ -2518,6 +2658,112 @@ Read one bounded, ordered page strictly after an opaque root-bound cursor.
 ###### Returns
 
 `Effect`\<[`ReplayPage`](./RunTree.md#replaypage), [`TreeReplayError`](#treereplayerror)\>
+
+<a id="updatesessioninput"></a>
+
+##### updateSessionInput
+
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Parameters
+
+###### input
+
+###### agent?
+
+`string`
+
+###### commandId
+
+`string`
+
+###### expectedRevision
+
+`number`
+
+###### id
+
+`string`
+
+###### prompt
+
+`Prompt`
+
+###### selection?
+
+\{ `budget?`: \{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}; `executableManifest`: [`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest); `executableRef`: \{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}; `registrations`: readonly `object`[]; `treePolicy?`: \{ `maxDepth`: `number`; `maxSubagents`: `number`; \}; \}
+
+###### selection.budget?
+
+\{ `children?`: `number`; `duration?`: `number`; `tokens?`: `number`; `toolCalls?`: `number`; `usd?`: `number`; \}
+
+###### selection.budget.children?
+
+`number`
+
+###### selection.budget.duration?
+
+`number`
+
+###### selection.budget.tokens?
+
+`number`
+
+###### selection.budget.toolCalls?
+
+`number`
+
+###### selection.budget.usd?
+
+`number`
+
+###### selection.executableManifest
+
+[`ExecutableManifest`](../../generalist/namespaces/ExecutableManifest.md#executablemanifest)
+
+###### selection.executableRef
+
+\{ `active`: `string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>; `executable`: `string` & `Brand`\<`"generalist/executable-pin"`\>; \}
+
+###### selection.executableRef.active
+
+`string` & `Brand`\<`"generalist/agent-pin"`\> \| `string` & `Brand`\<`"generalist/program-pin"`\>
+
+###### selection.executableRef.executable
+
+`string` & `Brand`\<`"generalist/executable-pin"`\>
+
+###### selection.registrations
+
+readonly `object`[]
+
+###### selection.treePolicy?
+
+\{ `maxDepth`: `number`; `maxSubagents`: `number`; \}
+
+###### selection.treePolicy.maxDepth
+
+`number`
+
+###### selection.treePolicy.maxSubagents
+
+`number`
+
+###### sessionId
+
+`string`
+
+###### resolveSelection?
+
+[`SelectionResolver`](./SessionQueue.md#selectionresolver)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`updateSessionInput`](./HostSession.md#updatesessioninput)
 
 <a id="wake-1"></a>
 
@@ -3263,7 +3509,7 @@ Re-exports [CreateSessionInput](./HostSession.md#createsessioninput)
 
 ### HostSession
 
-Re-exports [HostSession](../../host.md#hostsession)
+Re-exports [HostSession](../../host.md#hostsession-1)
 
 ***
 

@@ -1,3 +1,4 @@
+import { requireConversationalSlot } from "../admission/activation.js"
 import { withCurrentBudget, reserveForkAllocation, reserveRewindAllocation } from "./allocation.js"
 import {
   copiedEvents,
@@ -236,6 +237,7 @@ export const fork: {
 const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
   Effect.gen(function* () {
     const { source, owner, reservation, available, baseline } = yield* reserveRewindAllocation({ state, input })
+    yield* requireConversationalSlot({ state, run: source })
     yield* validateSequence(source, input.toSequence)
     if (snapshotUnavailableAt(source, input.toSequence)) {
       return yield* NoSnapshot.make({ runId: input.runId, atSequence: input.toSequence })

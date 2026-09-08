@@ -486,6 +486,10 @@ const makeRuntimeWith = (
           ? HistoryLimitInvalid.make({ received: String(input.limit), minimum: 1, maximum: 1000 })
           : store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
       createSession: store.createHostSession,
+      sessionSelection: agentStart.sessionSelection,
+      submitSessionInput: store.submitSessionInput,
+      updateSessionInput: store.updateSessionInput,
+      removeSessionInput: store.removeSessionInput,
       session: store.hostSession,
       sessionSnapshot: store.hostSessionSnapshot,
       listSessions: store.listHostSessions,
