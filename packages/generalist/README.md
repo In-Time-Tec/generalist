@@ -8,7 +8,7 @@ For scripts and request-local work, use the Effect agent loop without storage or
 
 ## Install
 
-This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. This checkout targets unreleased 0.64.0. Registry installation does not verify this revision; use the [repository examples](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/examples.md) for the current workspace.
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/examples.md).
 
 ```bash
 bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
@@ -57,7 +57,7 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 
 Generalist is pre-1.0: APIs can change between releases. Requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
-Version 0.64.0 is not published. Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Performance gates remain pending. Use fresh object namespaces; there is no compatibility reader or migration fallback.
+Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Local performance measurements are not production latency or throughput guarantees. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 
 Everything ships in this package. Imports such as `generalist/runtime`, `generalist/durability/s3`, and `generalist/testing/model` are subpaths, not separate installs. You only need the optional dependencies for adapters you use. Object storage is the only production execution authority; ordinary process-local agents need no persistence. The durability contract's long-term intent is not provider certification or a verified performance claim.
 

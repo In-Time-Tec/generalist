@@ -56,7 +56,7 @@ The core package runs an agent in the current process. generalist/runtime adds p
 
 Commands serialize within a partition, not globally. Recovery uses recorded outcomes; when an external action may have happened but its result is unknown, it requires resolution instead of blindly repeating the action. This is not an exactly-once guarantee for external services.
 
-This checkout targets unreleased 0.64.0. Local MinIO and Miniflare/workerd qualification is not live AWS S3 or deployed R2 certification, and performance gates remain pending.
+Local MinIO and Miniflare/workerd qualification is not live AWS S3 or deployed R2 certification. Local performance measurements do not establish production latency or throughput guarantees.
 
 ## Next steps
 

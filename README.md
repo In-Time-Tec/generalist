@@ -10,7 +10,7 @@ Don't need recovery yet? Use the process-local Effect agent loop on its own: cal
 
 ## Run your first agent
 
-This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. The checkout targets unreleased 0.64.0, so the registry install below is not a way to test this revision. Use the [repository examples](docs/start/examples.md) for the current workspace.
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](docs/start/examples.md).
 
 ```bash
 bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
@@ -72,7 +72,7 @@ Durable execution uses one object-storage engine through `generalist/durability`
 
 Generalist is pre-1.0: APIs can change between releases. It currently requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are marked `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
-Version 0.64.0 is not published. Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Performance gates remain pending. Use fresh object namespaces; there is no compatibility reader or migration fallback.
+Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Local performance measurements are not production latency or throughput guarantees. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 
 Everything ships in the `generalist` package. Imports such as `generalist/runtime` and `generalist/durability/s3` are subpaths, not separate packages. The durability contract is intended to be the long-term storage boundary, but remains `@experimental`; that intent is not provider certification or a performance claim.
 

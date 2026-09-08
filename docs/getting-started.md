@@ -12,7 +12,7 @@ You can start without a database, server, or API key. The [offline quickstart](/
 ## Run an agent with OpenAI
 
 <Warning>
-This checkout targets unreleased 0.64.0. The install command below documents that target, not an available registry release. To try the current code now, use the [repository examples](/start/examples).
+These instructions target Generalist 0.64.0. Use matching Effect packages and do not substitute an older Generalist release expecting the same APIs. To run directly from a checkout, use the [repository examples](/start/examples).
 </Warning>
 
 You will need Bun 1.4+ and an OpenAI API key. Generalist also supports Node 22+; see [Installation](/start/installation) for other setups.

@@ -11,7 +11,7 @@ This is the process-local loop, not restart-safe execution. Once the tool path w
 
 You will need Bun 1.4+.
 
-Version 0.64.0 is not published yet. The command below documents the target release; use the [repository examples](/start/examples) to try the current workspace now.
+This quickstart targets Generalist 0.64.0. To run directly from a checkout instead of installing from the registry, use the [repository examples](/start/examples).
 
 ```bash
 mkdir generalist-quickstart && cd generalist-quickstart

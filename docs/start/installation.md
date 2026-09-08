@@ -6,7 +6,7 @@ description: "Install Generalist and the dependencies for your model provider or
 Start with `generalist` and its matching `effect` version. Add provider or storage dependencies only when you use those integrations.
 
 <Warning>
-Version 0.64.0 is not published. The registry commands on these pages describe the target release; use the [repository examples](/start/examples) to run the current workspace instead. Do not substitute an older release and assume the same APIs.
+These instructions target Generalist 0.64.0. Use the [repository examples](/start/examples) to run directly from a checkout. Do not substitute an older release and assume the same APIs.
 </Warning>
 
 **Terminal**
