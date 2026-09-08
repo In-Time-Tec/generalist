@@ -137,17 +137,16 @@ export const make = (options: {
       const sessionId =
         startOptions?.sessionId ??
         (startOptions?.idempotencyKey === undefined ? `session_${identity}` : `agent:${agent.name}`)
-      const receipt = yield* options.admitStart(
-        {
-          executable: registration.value.executable,
-          registrations: registration.value.registrations,
-          sessionId,
-          idempotencyKey: startKey,
-          prompt: initialPrompt,
-          budget: startOptions?.budget ?? makeBudget(agent.budget ?? {}),
-        },
-        true,
-      )
+      const admission: import("effect").Types.Mutable<StartExecutionInput> = {
+        executable: registration.value.executable,
+        registrations: registration.value.registrations,
+        sessionId,
+        idempotencyKey: startKey,
+        prompt: initialPrompt,
+        budget: startOptions?.budget ?? makeBudget(agent.budget ?? {}),
+      }
+      if (startOptions?.treePolicy !== undefined) admission.treePolicy = startOptions.treePolicy
+      const receipt = yield* options.admitStart(admission, true)
       const events = options.store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
         Stream.mapEffect((event) => decodeEvent(agent.output, event)),
         Stream.takeUntil(

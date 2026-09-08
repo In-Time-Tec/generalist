@@ -42,6 +42,7 @@ export interface Agent<
   }
   readonly name: string
   readonly input: InputSchema
+  readonly children: ReadonlyArray<string>
   readonly output: OutputSchema
   readonly instructions?: string
   readonly supplemental?: string
@@ -81,6 +82,7 @@ export interface Any {
   readonly [AgentTypeId]: unknown
   readonly name: string
   readonly input: Schema.Top
+  readonly children: ReadonlyArray<string>
   readonly output: Schema.Top
   readonly instructions?: string
   readonly toolkit: Toolkit.Any

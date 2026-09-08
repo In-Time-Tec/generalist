@@ -17,7 +17,7 @@ import {
   TreePolicyInvalid,
 } from "../../../errors.js"
 import { decodePinned, equals, resolveChild } from "../../../executable/manifest-internal.js"
-import type { RunReceipt } from "../../../run.js"
+import { isTerminal, type RunReceipt } from "../../../run.js"
 import type { AdmitSendInput, AdmitStartInput } from "../../../run/store.js"
 import { digest as registrationDigest, narrow } from "../../../executable/registration.js"
 import { make as makeMessage, type Message } from "../../../messaging/message.js"
@@ -32,10 +32,11 @@ import type { FanOutReceipt } from "../../../child/fan-out.js"
 import type { FanOutMemberOrigin } from "../../../child/fan-out-internal.js"
 import { admitFanOut } from "../fan-out/service.js"
 import { normalize as normalizeTreePolicy } from "../../../tree/policy.js"
-import { readinessForAdmission } from "../child/capacity.js"
+import { readinessForAdmission, reserveSessions } from "../child/capacity.js"
 import { receiptAdmission } from "./receipt.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
+import { capGrant, narrowGrant, profileBudget } from "../../../budget/state.js"
 
 const { duplicateReceipt, fanOutAdmission, newRunId, startReceipt } = receiptAdmission
 
@@ -184,8 +185,9 @@ export const admitSend: {
       let next: RuntimeState = { ...withId, runs, treeRoots }
       const enqueued = enqueueLane(next, input.message.sessionId, runId)
       next = enqueued.state
-      const active = input.executableManifest.entries.find((entry) => entry.pin === input.executableRef.active)
-      const budget = input.budget ?? (active?._tag === "Agent" ? active.manifest.budget : {})
+      const budget = narrowGrant(profileBudget(executable), input.budget)
+      if (budget === undefined)
+        return yield* RuntimeUnavailable.make({ message: "Admission budget exceeds the pinned Agent budget" })
       const [, acceptedState] = yield* appendLifecycle(
         next,
         runId,
@@ -355,7 +357,7 @@ export const admitSpawn: {
       }
       const parent = state.runs.get(input.parentRunId)
       if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
-      if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
+      if (isTerminal(parent.status)) {
         return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
       }
       const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
@@ -393,6 +395,7 @@ export const admitSpawn: {
       }
 
       const [runId, withId] = newRunId(state)
+      yield* reserveSessions(state, parent, [sessionId])
       const depth = parent.depth + 1
       if (depth > parent.treePolicy.maxDepth) {
         return yield* ChildDepthExceeded.make({
@@ -405,7 +408,7 @@ export const admitSpawn: {
           limit: parent.treePolicy.maxDepth,
         })
       }
-      if (parent.treePolicy.maxSubagents === 0) {
+      if (parent.treePolicy.concurrency.agents === 0) {
         return yield* ChildLimitExceeded.make({
           parentRunId: parent.runId,
           rootRunId: parent.rootRunId,
@@ -413,7 +416,7 @@ export const admitSpawn: {
           depth,
           requested: 1,
           current: 0,
-          limit: parent.treePolicy.maxSubagents,
+          limit: parent.treePolicy.concurrency.agents,
         })
       }
       const childReadiness = readinessForAdmission(withId, parent)
@@ -421,7 +424,7 @@ export const admitSpawn: {
       if (parentBudget.children === 0) {
         return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
       }
-      const childBudget = childGrant(parentBudget, 1)
+      const childBudget = capGrant(childGrant(parentBudget, 1), profileBudget(executable))
       const child: StoredRun = {
         runId,
         status: "queued",

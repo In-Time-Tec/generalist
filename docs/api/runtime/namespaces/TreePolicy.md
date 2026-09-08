@@ -6,6 +6,34 @@
 
 # TreePolicy
 
+## Interfaces
+
+<a id="hostlimits"></a>
+
+### HostLimits
+
+#### Properties
+
+<a id="concurrency"></a>
+
+##### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### agents
+
+> `readonly` **agents**: `number`
+
+###### tools
+
+> `readonly` **tools**: `number`
+
+<a id="tree"></a>
+
+##### tree
+
+> `readonly` **tree**: `Pick`\<[`TreePolicy`](#treepolicy), `"maxDepth"` \| `"maxSessions"`\>
+
 ## Type Aliases
 
 <a id="treepolicy"></a>
@@ -29,6 +57,24 @@ schema's fixed ceiling. A host that wants recursion limits pins them explicitly;
 policy must not invent one. `TREE_POLICY_MAX` is the representation because tree policy is
 durable — it is stored in integer columns and feeds the root digest, so a non-finite sentinel
 would not survive serialization or keep idempotency stable.
+
+***
+
+<a id="fromhostlimits"></a>
+
+### fromHostLimits
+
+> `const` **fromHostLimits**: (`limits`) => `Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
+
+#### Parameters
+
+##### limits
+
+[`HostLimits`](#hostlimits) \| `undefined`
+
+#### Returns
+
+`Effect.Effect`\<[`TreePolicy`](#treepolicy), [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
 
 ***
 
@@ -66,6 +112,6 @@ Fixed upper bound for each recursive Run tree policy dimension.
 
 ### TreePolicy
 
-> `const` **TreePolicy**: `Schema.Struct`\<\{ `maxDepth`: `Schema.Int`; `maxSubagents`: `Schema.Int`; \}\>
+> `const` **TreePolicy**: `Schema.Struct`\<\{ `concurrency`: `Schema.Struct`\<\{ `agents`: `Schema.Int`; `tools`: `Schema.Int`; \}\>; `maxDepth`: `Schema.Int`; `maxSessions`: `Schema.Int`; \}\>
 
 Root-pinned bounds for recursive child admission. Root depth is zero.

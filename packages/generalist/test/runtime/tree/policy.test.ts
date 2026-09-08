@@ -5,7 +5,7 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, ExecutableManifest, RunBudget, ToolExecutor } from "../../../src/index.js"
 import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import { defaultTreePolicy, TREE_POLICY_MAX } from "../../../src/runtime/tree/policy.js"
-import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
+import { pinnedTestAgent, unusedModel } from "../run/identity.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { allowAllAuthorization } from "../../authorization.js"
 
@@ -31,7 +31,11 @@ it("an unspecified agent budget is unbounded rather than a runtime-invented ceil
 })
 
 it("an unspecified tree policy admits recursion up to the schema ceiling instead of a smaller default", () => {
-  expect(defaultTreePolicy).toEqual({ maxDepth: TREE_POLICY_MAX, maxSubagents: TREE_POLICY_MAX })
+  expect(defaultTreePolicy).toEqual({
+    maxDepth: TREE_POLICY_MAX,
+    maxSessions: 1024,
+    concurrency: { agents: TREE_POLICY_MAX, tools: 1024 },
+  })
 })
 
 it.effect("a spawned child with no budget survives cumulative usage beyond one million tokens", () => {
@@ -44,7 +48,7 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
     toolkit: Toolkit.make(noop),
   })
   const childPinned = pinnedTestAgent(childAgent)
-  const parentAgent = Agent.make({ name: "parent-heavy" })
+  const parentAgent = Agent.make({ name: "parent-heavy", toolkit: Toolkit.make(noop) })
   const parentPinned = pinnedTestAgent(parentAgent, "1", [{ selection: "child" }])
   const entries = [
     { _tag: "Agent" as const, ...parentPinned },
@@ -109,7 +113,10 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
   }).pipe(
     Layer.provide(
       ExecutableResolver.layerStatic([
-        { executable: parentRef, agent: closedTestAgent(parentAgent) },
+        {
+          executable: parentRef,
+          agent: Agent.close(parentAgent, Layer.mergeAll(allowAllAuthorization, unusedModel, handlers)),
+        },
         {
           executable: childRef,
           agent: Agent.close(childAgent, Layer.mergeAll(allowAllAuthorization, model, executor, handlers)),

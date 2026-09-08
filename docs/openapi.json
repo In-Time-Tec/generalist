@@ -1074,9 +1074,23 @@
                                 "type": "object",
                                 "properties": {
                                   "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
-                                  "maxSubagents": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                                  "maxSessions": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1024,
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "concurrency": {
+                                    "type": "object",
+                                    "properties": {
+                                      "agents": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                                      "tools": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                                    },
+                                    "required": ["agents", "tools"],
+                                    "additionalProperties": false
+                                  }
                                 },
-                                "required": ["maxDepth", "maxSubagents"],
+                                "required": ["maxDepth", "maxSessions", "concurrency"],
                                 "additionalProperties": false
                               },
                               "waits": {
@@ -2495,9 +2509,18 @@
                         "type": "object",
                         "properties": {
                           "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
-                          "maxSubagents": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                          "maxSessions": { "type": "integer", "minimum": 0, "maximum": 1024, "exclusiveMinimum": 0 },
+                          "concurrency": {
+                            "type": "object",
+                            "properties": {
+                              "agents": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                              "tools": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                            },
+                            "required": ["agents", "tools"],
+                            "additionalProperties": false
+                          }
                         },
-                        "required": ["maxDepth", "maxSubagents"],
+                        "required": ["maxDepth", "maxSessions", "concurrency"],
                         "additionalProperties": false
                       },
                       "waits": {
@@ -3346,9 +3369,18 @@
                       "type": "object",
                       "properties": {
                         "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
-                        "maxSubagents": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                        "maxSessions": { "type": "integer", "minimum": 0, "maximum": 1024, "exclusiveMinimum": 0 },
+                        "concurrency": {
+                          "type": "object",
+                          "properties": {
+                            "agents": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                            "tools": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                          },
+                          "required": ["agents", "tools"],
+                          "additionalProperties": false
+                        }
                       },
-                      "required": ["maxDepth", "maxSubagents"],
+                      "required": ["maxDepth", "maxSessions", "concurrency"],
                       "additionalProperties": false
                     },
                     "waits": {

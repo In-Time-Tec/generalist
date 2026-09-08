@@ -199,6 +199,7 @@ export interface StartReceipt extends RunReceipt {
 
 /** Typed durable start identity. Budget admission is reserved for the RunBudget contract. */
 export interface StartOptions {
+  readonly treePolicy?: TreePolicy
   readonly sessionId?: string
   readonly idempotencyKey?: string
   readonly budget?: RunBudget
@@ -566,7 +567,11 @@ export interface Service extends RuntimeHostSessions {
     OutputCodec extends Schema.Top,
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
-  ) => Effect.Effect<void, DuplicateAgent, ClosedServices<Tools, R, InputCodec, OutputCodec>>
+  ) => Effect.Effect<
+    void,
+    DuplicateAgent | import("./errors.js").ExecutableRegistrationInvalid,
+    ClosedServices<Tools, R, InputCodec, OutputCodec>
+  >
   /** Start one registered Agent with Schema-derived input and output. */
   readonly start: <
     Tools extends Record<string, Tool.Any>,

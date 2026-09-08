@@ -1188,13 +1188,25 @@ Authoritative Runtime inspection, including the process-local Inspector snapshot
 
 > `readonly` **treePolicy**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -1404,13 +1416,25 @@ Stable identity for idempotent registration across Runtime restarts.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 
@@ -1976,7 +2000,7 @@ Journal one scalar reward assigned by an export policy.
 
 ##### register
 
-> `readonly` **register**: \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputCodec`, `OutputCodec`\>(`agent`) => `Effect`\<`void`, [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
+> `readonly` **register**: \<`Tools`, `R`, `PolicyServices`, `AuthorizationServices`, `InputCodec`, `OutputCodec`\>(`agent`) => `Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
 Register one Agent name and its exact environment for start and recovery.
 
@@ -2014,7 +2038,7 @@ Register one Agent name and its exact environment for start and recovery.
 
 ###### Returns
 
-`Effect`\<`void`, [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
+`Effect`\<`void`, [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`DuplicateAgent`](./Errors.md#duplicateagent), [`ClosedServices`](../../generalist/namespaces/Agent.md#closedservices)\<`Tools`, `R`, `InputCodec`, `OutputCodec`\>\>
 
 <a id="registeragentname"></a>
 
@@ -2807,13 +2831,25 @@ Exact root execution admission used below the typed Agent API.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### maxSubagents
+###### maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ***
 

@@ -61,6 +61,8 @@ import { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolCo
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { ArtifactRegistry } from "../core/artifact.js"
+import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
+import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
@@ -97,6 +99,7 @@ export interface CreateOptions<
 > {
   readonly agents: Agents
   readonly plugins?: Plugins
+  readonly limits?: HostLimits
 }
 export interface SessionCreateOptions {
   readonly id?: string
@@ -224,7 +227,12 @@ export type CreateRequirements<
   | AgentServices<Agents[number]>
   | PluginServices<Plugins>
 
-export type CreateError = DuplicateAgent | PluginNameConflict | PluginToolConflict
+export type CreateError =
+  | DuplicateAgent
+  | PluginNameConflict
+  | PluginToolConflict
+  | import("../runtime/errors.js").ExecutableRegistrationInvalid
+  | import("../runtime/errors.js").TreePolicyInvalid
 
 const plugin = <const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>>(
   options: PluginOptions<Tools>,
@@ -332,9 +340,12 @@ const create = <
 
     const registered = new Map<AnyAgent, AnyAgent>()
     const registeredByName = new Map<string, AnyAgent>()
-    for (const agent of options.agents) {
-      const configured = configuredAgent(agent, contributions.tools)
-      let registration = registerAgent(runtime, configured)
+    const configuredAgents = options.agents.map((agent) => configuredAgent(agent, contributions.tools))
+    yield* validateProfiles(configuredAgents)
+    const treePolicy = yield* fromHostLimits(options.limits)
+    for (const [index, agent] of options.agents.entries()) {
+      const configured = configuredAgents[index]!
+      let registration = registerAgent(runtime, configured).pipe(Effect.provideService(AgentProfiles, configuredAgents))
       if (instructions !== undefined) {
         registration = registration.pipe(Effect.provideService(Instructions, instructions))
       }
@@ -374,6 +385,7 @@ const create = <
               })
             }
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
+            runtimeOptions.treePolicy = treePolicy
             if (startOptions?.idempotencyKey !== undefined) {
               runtimeOptions.idempotencyKey = startOptions.idempotencyKey
             }
@@ -402,6 +414,7 @@ const create = <
             )
             const runtimeOptions: Types.Mutable<StartOptions> = { sessionId }
             if (startOptions?.idempotencyKey !== undefined) runtimeOptions.idempotencyKey = startOptions.idempotencyKey
+            runtimeOptions.treePolicy = treePolicy
             return hostRun(yield* startAgent(runtime, configured, decoded, runtimeOptions))
           }),
         list: runtime.sessionRuns,

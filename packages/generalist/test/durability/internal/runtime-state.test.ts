@@ -121,7 +121,7 @@ const storedRun = (): StoredRun => ({
   },
   rootRunId: runId,
   depth: 0,
-  treePolicy: { maxDepth: 3, maxSubagents: 4 },
+  treePolicy: { maxDepth: 3, maxSessions: 1024, concurrency: { agents: 4, tools: 1024 } },
   lastSequence: 1,
   lastTurnCompletedSequence: 0,
   attempt: 2,

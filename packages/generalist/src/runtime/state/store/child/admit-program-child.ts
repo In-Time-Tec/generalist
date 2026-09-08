@@ -9,19 +9,20 @@ import {
   RunTerminal,
   RuntimeUnavailable,
 } from "../../../errors.js"
-import { decodePinned, equals } from "../../../executable/manifest-internal.js"
-import { narrow } from "../../../executable/registration.js"
-import type { RunReceipt } from "../../../run.js"
+import { containsChild, decodePinned, equals } from "../../../executable/manifest-internal.js"
+import { digest as registrationDigest, narrow } from "../../../executable/registration.js"
+import { isTerminal, type RunReceipt } from "../../../run.js"
 import type { AdmitProgramChildInput, Service as RunStoreService } from "../../../run/store.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { childDigest } from "../../digest.js"
 import { idempotencyKey, type RuntimeState, type StoredRun } from "../../projection.js"
-import { readinessForAdmission } from "./capacity.js"
+import { readinessForAdmission, reserveSessions } from "./capacity.js"
 import { suspend } from "../control/suspend.js"
 import { revokeSession } from "../execution.js"
 import { defaultInheritance } from "../../../../core/agent/lifecycle/fan-out.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
+import { capGrant, profileBudget } from "../../../budget/state.js"
 
 type AdmitProgramChildResult = Effect.Effect<
   readonly [RunReceipt, RuntimeState],
@@ -44,7 +45,7 @@ export const admitProgramChild: {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     const parent = state.runs.get(input.runId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.runId })
-    if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
+    if (isTerminal(parent.status)) {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
     const executable = yield* Effect.try({
@@ -82,7 +83,21 @@ export const admitProgramChild: {
     if (state.runs.has(input.childRunId)) {
       return yield* RunIdConflict.make({ runId: input.childRunId, existingRunId: input.childRunId })
     }
+    if (!containsChild({ ref: parent.executableRef, manifest: parent.executableManifest }, executable)) {
+      return yield* RuntimeUnavailable.make({ message: "Program child is not an authorized pinned child profile" })
+    }
+    const grantedRegistrations = new Map(
+      parent.registrations.map((registration) => [registration.pin, registrationDigest(registration)]),
+    )
+    if (
+      !registrations.every(
+        (registration) => grantedRegistrations.get(registration.pin) === registrationDigest(registration),
+      )
+    ) {
+      return yield* RuntimeUnavailable.make({ message: "Program child registration differs from the parent grant" })
+    }
     const depth = parent.depth + 1
+    yield* reserveSessions(state, parent, [input.message.sessionId])
     if (depth > parent.treePolicy.maxDepth) {
       return yield* ChildDepthExceeded.make({
         parentRunId: parent.runId,
@@ -94,7 +109,7 @@ export const admitProgramChild: {
         limit: parent.treePolicy.maxDepth,
       })
     }
-    if (parent.treePolicy.maxSubagents === 0) {
+    if (parent.treePolicy.concurrency.agents === 0) {
       return yield* ChildLimitExceeded.make({
         parentRunId: parent.runId,
         rootRunId: parent.rootRunId,
@@ -102,7 +117,7 @@ export const admitProgramChild: {
         depth,
         requested: 1,
         current: 0,
-        limit: parent.treePolicy.maxSubagents,
+        limit: parent.treePolicy.concurrency.agents,
       })
     }
     const childReadiness = readinessForAdmission(state, parent)
@@ -110,7 +125,7 @@ export const admitProgramChild: {
     if (parentBudget.children === 0) {
       return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
     }
-    const childBudget = childGrant(parentBudget, 1)
+    const childBudget = capGrant(childGrant(parentBudget, 1), profileBudget(executable))
     const child: StoredRun = {
       runId: input.childRunId,
       status: "queued",

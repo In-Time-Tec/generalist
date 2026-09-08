@@ -154,7 +154,7 @@ const makeFor = (
               activeEntry?._tag === "Agent" &&
               activeEntry.manifest.children.length > 0 &&
               claimed.depth < claimed.treePolicy.maxDepth &&
-              claimed.treePolicy.maxSubagents > 0
+              claimed.treePolicy.concurrency.agents > 0
                 ? ChildRunTools.make({ children: activeEntry.manifest.children })
                 : undefined
             const programAuthority = activeEntry?._tag === "Agent" ? activeEntry.manifest.programAuthority : undefined
@@ -588,7 +588,7 @@ const makeFor = (
                     ? agent
                     : withTools(agent, [
                         childRunTools.awaitChildGroup,
-                        ...(claimed.activeChildCount < claimed.treePolicy.maxSubagents
+                        ...(claimed.activeChildCount < claimed.treePolicy.concurrency.agents
                           ? [childRunTools.runChild, childRunTools.runChildGroup, childRunTools.startChildGroup]
                           : []),
                       ])

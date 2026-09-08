@@ -25,10 +25,10 @@ import type { RuntimeState, StoredFanOut, StoredRun } from "../../projection.js"
 import { appendLifecycle, acceptedEvent, childLinkedEvent } from "../../append.js"
 import { resolveChild } from "../../../executable/manifest-internal.js"
 import { narrow } from "../../../executable/registration.js"
-import { activeChildCount } from "../child/capacity.js"
+import { activeChildCount, reserveSessions } from "../child/capacity.js"
 import { budgetForEvents } from "../../../execution/inspection.js"
 import { childGrant, Exhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
-import { narrowGrant, split } from "../../../budget/state.js"
+import { capGrant, narrowGrant, split } from "../../../budget/state.js"
 const fanOutAdmittedEvent = (input: {
   readonly fanOutId: string
   readonly memberCount: number
@@ -115,6 +115,11 @@ const validateParent = (
       return yield* FanOutInvalid.make({ message: `parent Run ${parent.runId} is cancelling` })
     if (isTerminal(parent.status)) return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     const depth = parent.depth + 1
+    yield* reserveSessions(
+      state,
+      parent,
+      members.map((member) => member.sessionId),
+    )
     if (depth > parent.treePolicy.maxDepth) {
       return yield* ChildDepthExceeded.make({
         parentRunId: parent.runId,
@@ -126,7 +131,7 @@ const validateParent = (
         limit: parent.treePolicy.maxDepth,
       })
     }
-    if (parent.treePolicy.maxSubagents === 0) {
+    if (parent.treePolicy.concurrency.agents === 0) {
       return yield* ChildLimitExceeded.make({
         parentRunId: parent.runId,
         rootRunId: parent.rootRunId,
@@ -134,13 +139,17 @@ const validateParent = (
         depth,
         requested: members.length,
         current: 0,
-        limit: parent.treePolicy.maxSubagents,
+        limit: parent.treePolicy.concurrency.agents,
       })
     }
-    const concurrency = Math.min(requestedConcurrency ?? members.length, members.length, parent.treePolicy.maxSubagents)
+    const concurrency = Math.min(
+      requestedConcurrency ?? members.length,
+      members.length,
+      parent.treePolicy.concurrency.agents,
+    )
     const readyCount = Math.min(
       concurrency,
-      Math.max(0, parent.treePolicy.maxSubagents - activeChildCount(state, parent)),
+      Math.max(0, parent.treePolicy.concurrency.agents - activeChildCount(state, parent)),
     )
     return { depth, concurrency, readyCount }
   })
@@ -296,7 +305,11 @@ export const admitFanOut: {
     const memberBudget = split(input.budgetDivisor ?? members.length)(childGrant(available, members.length))
     const memberBudgets: Array<BudgetLimits> = []
     for (const member of members) {
-      const narrowed = narrowGrant(memberBudget, member.inherit.budget)
+      const activeChild = parent.executableManifest.entries.find((entry) => entry.pin === member.executableRef.active)
+      const narrowed = narrowGrant(
+        capGrant(memberBudget, activeChild?._tag === "Agent" ? activeChild.manifest.budget : {}),
+        member.inherit.budget,
+      )
       if (narrowed === undefined) {
         return yield* FanOutInvalid.make({
           message: `fan-out member '${member.key}' budget exceeds its reserved share`,
