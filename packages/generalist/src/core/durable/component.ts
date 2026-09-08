@@ -1,46 +1,19 @@
 import { Context, Effect, Function, Layer, Option, Schema } from "effect"
-import type { Tool } from "effect/unstable/ai"
-import type { ReplayPolicy } from "./driver/contract.js"
-import { CapabilityPin, makeCapability } from "./pin.js"
-import { DriverStateInvalid } from "./service.js"
+import { type CapabilityPin, makeCapability } from "./pin.js"
+import { DriverError, DriverStateInvalid } from "./service.js"
+import { DriverInterpreter } from "./driver/interpreter/service.js"
+import { ToolContext } from "../tools/tool-context.js"
+import { Registry } from "./component/services.js"
+import { Descriptor, bounded, namespace } from "./component/definition.js"
+export { Descriptor } from "./component/definition.js"
 
-const Identity = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/))
-
-export const Descriptor = Schema.Struct({
-  version: Schema.Literal("1"),
-  key: Identity,
-  instance: Identity,
-  schemaVersion: Identity,
-  handler: Identity,
-  handlerVersion: Identity,
-  scope: Schema.Literal("run"),
-  branch: Schema.Literal("restore"),
-  redaction: Schema.Literal("visible"),
-  maxStateBytes: Schema.Int.check(Schema.isGreaterThan(0)),
-  maxCommandBytes: Schema.Int.check(Schema.isGreaterThan(0)),
-  maxReceiptBytes: Schema.Int.check(Schema.isGreaterThan(0)),
-})
-export type Descriptor = typeof Descriptor.Type
-
-export const Checkpoint = Schema.Struct({
-  descriptor: Descriptor,
-  pin: CapabilityPin,
-  state: Schema.Json,
-  receipts: Schema.Array(
-    Schema.Struct({
-      id: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(1024)),
-      digest: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
-      result: Schema.Json,
-    }),
-  ),
-})
-export type Checkpoint = typeof Checkpoint.Type
-
+/** Identity held by one registered component declaration. @experimental */
 export interface CommandCapability {
   readonly namespace: string
   readonly pin: CapabilityPin
 }
 
+/** Register the same declaration that its tools use; rebuild it with matching pins on recovery. @experimental */
 export interface Registration {
   readonly capability: CommandCapability
   readonly descriptor: Descriptor
@@ -50,27 +23,14 @@ export interface Registration {
   readonly transition: (state: Schema.Json, command: Schema.Json) => Effect.Effect<Schema.Json, DriverStateInvalid>
 }
 
+/** One typed, schema-pinned component declaration. @experimental */
 export interface Declaration<State, Command> {
   readonly registration: Registration
   readonly state: Schema.Codec<State, unknown>
   readonly command: Schema.Codec<Command, unknown>
 }
 
-export const bounded = (input: {
-  readonly value: unknown
-  readonly limit: number
-}): Effect.Effect<Schema.Json, DriverStateInvalid> =>
-  Schema.decodeUnknownEffect(Schema.Json)(input.value).pipe(
-    Effect.mapError(() => DriverStateInvalid.make({ message: "Component data must be JSON" })),
-    Effect.flatMap((json) => {
-      const codec = Schema.fromJsonString(Schema.Json)
-      const text = Schema.encodeSync(codec)(json)
-      return new TextEncoder().encode(text).byteLength <= input.limit
-        ? Effect.succeed(Schema.decodeSync(codec)(text))
-        : DriverStateInvalid.make({ message: "Component byte bound exceeded" })
-    }),
-  )
-
+/** Declare a bounded deterministic component without allocating state or running a transition. @experimental */
 export const make = <State, Command>(input: {
   readonly descriptor: Descriptor
   readonly state: Schema.Codec<State, unknown>
@@ -116,25 +76,12 @@ export const make = <State, Command>(input: {
   }
 }
 
-export const namespace = (descriptor: Descriptor): string => JSON.stringify([descriptor.key, descriptor.instance])
-
-export class Registry extends Context.Service<Registry, ReadonlyArray<Registration>>()(
-  "generalist/core/durable/component/Registry",
-) {}
-
+/** Annotate an Effect AI command tool so recovery may safely retry its accepted component command. @experimental */
 export class CommandTool extends Context.Service<CommandTool, Registration>()(
   "generalist/core/durable/component/CommandTool",
 ) {}
 
-export const toolReplayPolicy = (input: {
-  readonly tool: Tool.Any | undefined
-  readonly fallback: ReplayPolicy | undefined
-}): ReplayPolicy => {
-  if (input.tool !== undefined && Option.isSome(Context.getOption(input.tool.annotations, CommandTool)))
-    return "provider-idempotent"
-  return input.fallback ?? "never"
-}
-
+/** Provide the single component registry for Agent registration and execution. @experimental */
 export const layer = (registrations: ReadonlyArray<Registration>): Layer.Layer<Registry, DriverStateInvalid> =>
   Layer.effect(
     Registry,
@@ -147,42 +94,60 @@ export const layer = (registrations: ReadonlyArray<Registration>): Layer.Layer<R
     }),
   )
 
+/** Provide component registrations in a test environment. @experimental */
 export const layerTest = layer
 
-export const validate: {
-  (
-    registrations: ReadonlyArray<Registration>,
-  ): (checkpoints: ReadonlyArray<Checkpoint>) => Effect.Effect<void, DriverStateInvalid>
-  (
-    checkpoints: ReadonlyArray<Checkpoint>,
-    registrations: ReadonlyArray<Registration>,
-  ): Effect.Effect<void, DriverStateInvalid>
-} = Function.dual(2, (checkpoints: ReadonlyArray<Checkpoint>, registrations: ReadonlyArray<Registration>) =>
-  Effect.forEach(
-    checkpoints,
-    (checkpoint) =>
-      Effect.gen(function* () {
-        const registration = registrations.find(
-          (entry) => namespace(entry.descriptor) === namespace(checkpoint.descriptor) && entry.pin === checkpoint.pin,
-        )
-        if (registration === undefined || makeCapability(checkpoint.descriptor) !== checkpoint.pin) {
-          return yield* DriverStateInvalid.make({
-            message: `Component registration is missing: ${namespace(checkpoint.descriptor)}`,
-          })
-        }
-        if (
-          checkpoints.filter((entry) => namespace(entry.descriptor) === namespace(checkpoint.descriptor)).length !==
-            1 ||
-          new Set(checkpoint.receipts.map((receipt) => receipt.id)).size !== checkpoint.receipts.length
-        ) {
-          return yield* DriverStateInvalid.make({ message: "Duplicate component namespace or command receipt" })
-        }
-        yield* bounded({ value: checkpoint.receipts, limit: registration.descriptor.maxReceiptBytes })
-        yield* Effect.forEach(checkpoint.receipts, (receipt) => registration.validate(receipt.result), {
-          discard: true,
-        })
-        return yield* registration.validate(checkpoint.state)
-      }),
-    { discard: true },
-  ),
+/** Read the current component value without accepting a command or changing its receipts. @experimental */
+export const read = <State, Command>(
+  declaration: Declaration<State, Command>,
+): Effect.Effect<State, DriverStateInvalid> =>
+  Effect.gen(function* () {
+    const driver = yield* Effect.serviceOption(DriverInterpreter)
+    if (Option.isNone(driver))
+      return yield* DriverStateInvalid.make({ message: "Component read requires an active Agent Run" })
+    const state = yield* driver.value.componentRead(declaration.registration.capability)
+    return yield* bounded({ value: state, limit: declaration.registration.descriptor.maxStateBytes }).pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(declaration.state)),
+      Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid component state" })),
+    )
+  })
+
+/** Accept one deterministic command. In a tool, omit id to reuse its durable operation identity. @experimental */
+export const command: {
+  <Command>(input: {
+    readonly id?: string
+    readonly command: Command
+  }): <State>(declaration: Declaration<State, Command>) => Effect.Effect<State, DriverStateInvalid | DriverError>
+  <State, Command>(
+    declaration: Declaration<State, Command>,
+    input: { readonly id?: string; readonly command: Command },
+  ): Effect.Effect<State, DriverStateInvalid | DriverError>
+} = Function.dual(
+  2,
+  <State, Command>(
+    declaration: Declaration<State, Command>,
+    input: { readonly id?: string; readonly command: Command },
+  ) =>
+    Effect.gen(function* () {
+      const driver = yield* Effect.serviceOption(DriverInterpreter)
+      if (Option.isNone(driver))
+        return yield* DriverStateInvalid.make({ message: "Component command requires an active Agent Run" })
+      const context = yield* Effect.serviceOption(ToolContext)
+      const id = input.id ?? Option.getOrUndefined(context)?.operationKey
+      if (id === undefined)
+        return yield* DriverStateInvalid.make({ message: "Component command requires a stable command identity" })
+      const encoded = yield* Schema.encodeEffect(declaration.command)(input.command).pipe(
+        Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid component command" })),
+        Effect.flatMap((value) => bounded({ value, limit: declaration.registration.descriptor.maxCommandBytes })),
+      )
+      const state = yield* driver.value.componentCommand({
+        capability: declaration.registration.capability,
+        id,
+        command: encoded,
+      })
+      return yield* bounded({ value: state, limit: declaration.registration.descriptor.maxStateBytes }).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(declaration.state)),
+        Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid component state" })),
+      )
+    }),
 )

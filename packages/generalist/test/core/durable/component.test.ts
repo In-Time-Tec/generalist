@@ -5,7 +5,8 @@ import { make as makeInterpreter, journalNoop } from "../../../src/core/durable/
 import { make as makeDriver } from "../../../src/core/durable/loop-driver.js"
 import { make as makeBudget } from "../../../src/core/durable/run-budget.js"
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
-import { layerTest, make, validate } from "../../../src/core/durable/component.js"
+import { layerTest, make } from "../../../src/core/durable/component.js"
+import { validate } from "../../../src/core/durable/component/state.js"
 import { DriverError } from "../../../src/core/durable/service.js"
 import { declaration } from "../../../src/tasks/component.js"
 
