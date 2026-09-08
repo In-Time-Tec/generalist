@@ -22,7 +22,8 @@ import type { Input as ResolverInput, Resolution, Service as ResolverService } f
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
-import { CommandTool, namespace } from "../../core/durable/component.js"
+import { CommandTool } from "../../core/durable/component.js"
+import { namespace } from "../../core/durable/component/definition.js"
 import { Hooks } from "../../hooks/index.js"
 import { codec as toolCodec, type RegisteredTool } from "./registered-tool.js"
 

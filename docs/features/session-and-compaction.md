@@ -72,6 +72,78 @@ The default strategy first bounds successful tool outputs, then keeps a safe rec
 
 ## Invariants
 
+### Session-owned components
+
+A retained plan or workspace reference can outlive one Run without moving into an application cache. The existing durable component descriptor accepts `scope: "session"` with explicit `access: "session-owner"` and `inheritance: "none"`. The same registry, schema and handler pins, JSON byte bounds, deterministic transitions, and command receipts apply. This is a Runtime-backed lifetime; process-local Sessions do not provide durable component storage.
+
+An accepted component command commits its new value and immutable receipt through the Run checkpoint and the owning Runtime Session in one canonical transition. The next Run hydrates that Session materialization. A crash before the later tool-result publication preserves the accepted mutation but does not invent a successful tool result; replay returns the accepted receipt without repeating the transition. Missing registrations or incompatible pins fail before dispatch.
+
+Only the fenced Run writer for that Session may accept a mutation. Child Runs use independent Sessions and do not inherit these values or a parent write capability. A fork copies the selected values into its own Session. Rewind restores the selected values while retaining accepted receipts, incurred costs, and abandoned history. Rewinding before first use restores the retained initial value; retrying an abandoned command returns its original result without reinstating its later value. An initial component snapshot also preserves values inherited from earlier Runs when branching before the current Run's first checkpoint.
+
+`Tasks` remains Run-scoped, including its existing explicit read-only child inheritance. Session components do not change task-list ownership, introduce a second registry, schedule work, restore external files, or roll back third-party effects.
+
+The scripted [Session tool recovery test](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/durable/driver/layer-for-run.test.ts) uses the public component API, interrupts execution after the accepted mutation, and reopens a fresh object Runtime Layer before continuing into a second Run. Shared runtime-driver expectations cover branch restoration and command receipt retention. The [packed consumer](https://github.com/In-Time-Tec/generalist/blob/main/scripts/package-smoke-components.ts) also registers, mutates, and reads a component across four Runs and fresh Runtime Layers using only package exports under Bun and Node. These use scripted models and a shared test bucket; they do not certify a cloud storage provider or simulate durable external files.
+
+### Declare and use a Session component
+
+Import `generalist/components` to define application-owned state. This composition fragment adds a retained counter and its two Effect AI tools. Provide the resulting environment when registering the Agent and on each recovery host, along with an activated object Runtime, a model, and tool authorization. Production storage uses the existing S3 or native R2 Layer; `generalist/testing/durability` provides a test-only simulator and `layer(client)` for fresh-Layer tests.
+
+```ts
+import { Layer, Schema } from "effect"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, DurableDriver } from "generalist"
+import * as Components from "generalist/components"
+
+const counter = Components.make({
+  descriptor: {
+    version: "1",
+    key: "counter",
+    instance: "default",
+    schemaVersion: "1",
+    handler: "increment",
+    handlerVersion: "1",
+    scope: "session",
+    access: "session-owner",
+    inheritance: "none",
+    branch: "restore",
+    redaction: "visible",
+    maxStateBytes: 64,
+    maxCommandBytes: 64,
+    maxReceiptBytes: 4096,
+  },
+  state: Schema.Int,
+  command: Schema.Int,
+  initial: 0,
+  transition: (state, amount) => state + amount,
+})
+
+const add = Tool.make("counter_add", {
+  parameters: Schema.Struct({ amount: Schema.Int }),
+  success: Schema.Int,
+  failure: Schema.Union([DurableDriver.DriverError, DurableDriver.DriverStateInvalid]),
+}).annotate(Components.CommandTool, counter.registration)
+const read = Tool.make("counter_read", {
+  parameters: Schema.Struct({}),
+  success: Schema.Int,
+  failure: DurableDriver.DriverStateInvalid,
+})
+const toolkit = Toolkit.make(add, read)
+const agent = Agent.make({ name: "counter-assistant", toolkit })
+const environment = Layer.mergeAll(
+  Components.layer([counter.registration]),
+  toolkit.toLayer({
+    counter_add: ({ amount }) => Components.command(counter, { command: amount }),
+    counter_read: () => Components.read(counter),
+  }),
+)
+```
+
+`Components.command` encodes the typed command and uses the active tool's durable operation identity when `id` is omitted. Keep the `CommandTool` annotation on mutation tools: it selects the existing receipt-backed replay policy. Calls outside a tool must supply an explicit stable `id` and still execute inside an active Agent Run. `Components.read` returns the current schema-decoded value without appending a command or receipt. Both reject missing registrations or Session ownership; neither exposes a setter or a Session writer service.
+
+The same Session ID retains the counter across Runs; a different Session starts from zero. After rewind, `read` returns the restored value, while an exact retry of an abandoned command still returns its original immutable receipt result. Byte bounds also apply across successive Runs, so a full receipt budget rejects new mutations instead of growing indefinitely. The API is `@experimental`.
+
+### Conversation and compaction
+
 - `RunOptions.sessionId` is the only caller-supplied Session identity; setup acquires one exact store and same-ID lane for the Run scope and uses it for sync, compaction, resume, and same-run handoff.
 - `Session.layerMemory` keeps per-ID stores for its Layer lifetime, serializes ordinary Runs for one ID, and permits different IDs concurrently; IDs never share entries, leaves, or checkpoints.
 - The shared object engine provides durable keyed Sessions; conversation projections join execution transitions in the canonical partition commit.

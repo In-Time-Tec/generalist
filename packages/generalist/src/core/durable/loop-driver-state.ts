@@ -6,7 +6,7 @@ import { Exhausted } from "./run-budget.js"
 import { ToolBatchCheckpoint } from "../agent/tools/checkpoint.js"
 import { Checkpoint as HookCheckpoint } from "../../hooks/index.js"
 import { Checkpoint as GateCheckpoint } from "../agent/gates/definition.js"
-import { Checkpoint as ComponentCheckpoint } from "./component.js"
+import { Checkpoint as ComponentCheckpoint } from "./component/state.js"
 import { Checkpoint as CapabilityCheckpoint } from "../capability/state.js"
 import { ArtifactCheckpoints } from "../artifact.js"
 

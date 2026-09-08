@@ -1,5 +1,6 @@
 import { type PreparedObservation, occurredAtMillis } from "../observation.js"
-import { Effect, Function } from "effect"
+import { Effect, Function, Schema } from "effect"
+import { Checkpoint as ComponentCheckpoint } from "../../../core/durable/component/state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
@@ -39,6 +40,8 @@ const executionRecord = (
     registrations: run.registrations,
   }
   if (run.parentRunId !== undefined) record = { ...record, parentRunId: run.parentRunId }
+  const components = state.sessions.get(run.message.sessionId)?.components
+  if (components !== undefined) record = { ...record, sessionComponents: components }
   if (run.invocationId !== undefined) record = { ...record, invocationId: run.invocationId }
   if (run.ownerId !== undefined) record = { ...record, ownerId: run.ownerId }
   if (run.checkpoint !== undefined) record = { ...record, checkpoint: run.checkpoint }
@@ -235,6 +238,8 @@ export const claimExecution: {
     yield* requireClaimable(state, run, now)
     const claimed = {
       ...run,
+      initialSessionComponents:
+        run.initialSessionComponents ?? state.sessions.get(run.message.sessionId)?.components ?? [],
       status: run.cancellationRequested ? ("cancelling" as const) : ("running" as const),
       ownerId: input.ownerId,
       attemptFence: run.attemptFence + 1,
@@ -341,6 +346,33 @@ export const saveExecution: {
       if (input.checkpoint !== undefined) saved = { ...saved, checkpoint: input.checkpoint }
       if (input.suspension !== undefined) saved = { ...saved, suspension: input.suspension }
       runs.set(run.runId, saved)
-      return { ...state, runs }
+      if (input.checkpoint === undefined || !("driverVersion" in input.checkpoint)) return { ...state, runs }
+      if (!Schema.is(Schema.Struct({ components: Schema.Unknown }))(input.checkpoint.state)) return { ...state, runs }
+      const checkpoint = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({
+          sessionId: Schema.String,
+          components: Schema.Array(ComponentCheckpoint),
+        }),
+      )(input.checkpoint.state).pipe(
+        Effect.mapError(() => RuntimeUnavailable.make({ message: "Invalid component checkpoint" })),
+      )
+      const components = checkpoint.components.filter((component) => component.descriptor.scope === "session")
+      if (components.length === 0) return { ...state, runs }
+      yield* requireExecutionClaim(state, input).pipe(
+        Effect.mapError(() => RuntimeUnavailable.make({ message: "Session component writer claim is stale" })),
+      )
+      if (
+        checkpoint.sessionId !== run.message.sessionId ||
+        input.session.sessionId !== run.message.sessionId ||
+        (run.parentRunId !== undefined && state.runs.get(run.parentRunId)?.message.sessionId === run.message.sessionId)
+      ) {
+        return yield* RuntimeUnavailable.make({ message: "Session component ownership mismatch" })
+      }
+      const session = state.sessions.get(run.message.sessionId)!
+      return {
+        ...state,
+        runs,
+        sessions: new Map(state.sessions).set(run.message.sessionId, { ...session, components }),
+      }
     }),
 )

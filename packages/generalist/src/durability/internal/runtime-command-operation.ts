@@ -1,4 +1,5 @@
 import { Schema, type Effect } from "effect"
+import { Checkpoint as ComponentCheckpoint } from "../../core/durable/component/state.js"
 import { digest } from "../../core/durable/pin.js"
 import { ProgramBudget } from "../../core/durable/manifest/program-manifest.js"
 import { BudgetLimits } from "../../core/durable/run-budget.js"
@@ -25,6 +26,7 @@ import { AdmitFanOutInput } from "./runtime-command-admission.js"
 import { ExecutionClaim, Operation, OperationError } from "./runtime-state/schema.js"
 
 export const ExecutionRecord = Schema.Struct({
+  sessionComponents: Schema.optionalKey(Schema.Array(ComponentCheckpoint)),
   runId: Schema.String,
   rootRunId: Schema.String,
   depth: Schema.Finite,
