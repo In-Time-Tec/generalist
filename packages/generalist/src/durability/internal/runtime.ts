@@ -278,9 +278,12 @@ export const make = (options: Options) =>
                   value: committed.receipt,
                   observations: { ...observations },
                 }
-                return { patches: committed.patches, receipt }
+                return {
+                  patches: committed.patches,
+                  receipt,
+                  reserveBytes: reservedBytes(definition.tag, committed.next),
+                }
               }),
-            reservedBytes(definition.tag),
           )
           yield* refresh(result.head)
           const envelope = yield* Schema.decodeUnknownEffect(ReceiptEnvelope)(result.receipt, {

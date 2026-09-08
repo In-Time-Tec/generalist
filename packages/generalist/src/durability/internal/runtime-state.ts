@@ -381,6 +381,7 @@ export const make = () => {
         return {
           receipt: freeze(yield* encodeCommandValue(receipt, receiptSchema)),
           patches,
+          next,
         }
       }),
   }

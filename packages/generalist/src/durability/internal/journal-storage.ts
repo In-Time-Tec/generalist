@@ -181,10 +181,10 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
     })
   const checkState = (state: State, receipts: Loaded["receipts"], reserveBytes = 0) =>
     Effect.gen(function* () {
-      if (!Number.isSafeInteger(reserveBytes) || reserveBytes < 0 || reserveBytes >= maxStateBytes) {
+      if (!Number.isSafeInteger(reserveBytes) || reserveBytes < 0) {
         return yield* failure({
           reason: "configuration",
-          message: "Reserved bytes must be a nonnegative safe integer below maxStateBytes",
+          message: "Reserved bytes must be a nonnegative safe integer",
         })
       }
       // Retained receipts are canonical state, not an unbounded process-side deduplication cache.
@@ -192,7 +192,7 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
       if (size > maxStateBytes - reserveBytes)
         return yield* failure({
           reason: "limit",
-          message: `Partition state and receipts exceed ${maxStateBytes - reserveBytes} bytes${reserveBytes === 0 ? "" : ` with ${reserveBytes} bytes reserved for settlement`}`,
+          message: `Partition state and receipts exceed ${maxStateBytes} bytes${reserveBytes === 0 ? "" : ` including ${reserveBytes} bytes reserved for settlement`}`,
         })
     })
   const listKeys = (namespace: string) =>
