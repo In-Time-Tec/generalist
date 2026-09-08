@@ -93,13 +93,13 @@ const backend = "object" as const
         const host = yield* Generalist.create({ agents: [agent, reviewer] })
         const session = yield* host.sessions.create({ id: "named-retained-session" })
         const parent = yield* host.runs.start(session.id, agent, "Review")
-        const before = yield* host.sessions.family(session.id)
+        const before = yield* host.sessions.family(session.id, { limit: 64 })
         expect(
           yield* parent.spawn("not-declared", "Review", { commandId: "rejected" }).pipe(Effect.flip),
         ).toMatchObject({
           _tag: "generalist/runtime/ChildSelectionMissing",
         })
-        expect(yield* host.sessions.family(session.id)).toEqual(before)
+        expect(yield* host.sessions.family(session.id, { limit: 64 })).toEqual(before)
         const child = yield* parent.spawn(reviewer.name, "Review", { commandId: "accepted" })
         expect((yield* child.session.inspect).selection?.executableRef).toEqual(
           (yield* host.runs.inspect(child.run.id)).executableRef,
@@ -137,10 +137,9 @@ const backend = "object" as const
             depth: 1,
           },
         })
-        expect((yield* host.sessions.family(child.session.id)).map((member) => member.id)).toEqual([
-          session.id,
-          child.session.id,
-        ])
+        expect(
+          (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),
+        ).toEqual([session.id, child.session.id])
         expect(yield* host.runs.inspect(child.run.id)).toMatchObject({ status: "queued", parentRunId: parent.id })
         expect(yield* host.runs.list(child.session.id)).toEqual([expect.objectContaining({ runId: child.run.id })])
         const retry = yield* (yield* host.runs.get(parent.id)).spawn("reviewer", "Review authorization", {
@@ -522,10 +521,9 @@ it.effect("recovers the same child conversation and admission after replacing th
         const snapshot = yield* child.session.snapshot
         expect(snapshot.runs[0]?.run.status).toBe("succeeded")
         expect(yield* host.runs.list(child.session.id)).toHaveLength(1)
-        expect((yield* host.sessions.family(child.session.id)).map((member) => member.id)).toEqual([
-          "reopened-parent-session",
-          admitted.sessionId,
-        ])
+        expect(
+          (yield* host.sessions.family(child.session.id, { limit: 64 })).sessions.map((member) => member.id),
+        ).toEqual(["reopened-parent-session", admitted.sessionId])
         expect(yield* parent.spawn("reviewer", "Changed", { commandId: "review" }).pipe(Effect.flip)).toMatchObject({
           _tag: "generalist/runtime/IdempotencyConflict",
         })

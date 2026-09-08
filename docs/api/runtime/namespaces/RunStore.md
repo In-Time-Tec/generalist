@@ -1667,7 +1667,7 @@ Replay then follow one product-facing Session's authoritative event cursor.
 
 ##### hostSessionFamily
 
-> `readonly` **hostSessionFamily**: (`sessionId`) => `Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
+> `readonly` **hostSessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
 
 ###### Parameters
 
@@ -1675,9 +1675,23 @@ Replay then follow one product-facing Session's authoritative event cursor.
 
 `string`
 
+###### input
+
+###### at?
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
 ###### Returns
 
-`Effect`\<readonly [`HostSession`](../../host.md#hostsession-1)[], [`SessionSnapshotError`](./HostSession.md#sessionsnapshoterror)\>
+`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
 
 <a id="hostsessionruns"></a>
 
@@ -2609,7 +2623,7 @@ readonly `object`[]
 
 ##### updateSessionInput
 
-> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+> `readonly` **updateSessionInput**: (`input`, `resolveSelection?`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 ###### Parameters
 
@@ -2717,7 +2731,7 @@ readonly `object`[]
 
 ###### Returns
 
-`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`UnknownAgent`](./Errors.md#unknownagent) \| [`SessionNotFound`](../../host.md#sessionnotfound) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict)\>
 
 <a id="wake"></a>
 

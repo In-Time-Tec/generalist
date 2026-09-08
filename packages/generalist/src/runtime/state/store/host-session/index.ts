@@ -26,6 +26,7 @@ import { toInspection, retainedSession } from "../events.js"
 import { projectRunSnapshot } from "../../../execution/inspection.js"
 import { projectConversation } from "./conversation.js"
 import { submit, update, validateSelection } from "./queue.js"
+import { page as familyPage } from "./family.js"
 import { SessionQueueConflict } from "../../../session/queue.js"
 
 const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
@@ -120,26 +121,6 @@ const getHostSession = (
     ? Effect.fail(missing(sessionId))
     : Effect.succeed({ ...stored.session, ...retainedSession({ state, sessionId }) })
 }
-
-const hostSessionFamily = (state: RuntimeState, sessionId: string) =>
-  Effect.gen(function* () {
-    yield* getHostSession(state, sessionId)
-    const pending = [state.sessions.get(sessionId)?.family?.rootSessionId ?? sessionId]
-    const seen = new Set<string>()
-    const sessions: Array<HostSession> = []
-    for (let index = 0; index < pending.length; index++) {
-      const id = pending[index]!
-      if (seen.has(id)) continue
-      if (seen.size >= 128) return yield* SessionSnapshotTooLarge.make({ sessionId, limit: "sessions", maximum: 128 })
-      seen.add(id)
-      if (state.hostSessions.has(id)) sessions.push(yield* getHostSession(state, id))
-      const children = state.sessions.get(id)?.family?.childSessionIds ?? []
-      if (pending.length + children.length > 128)
-        return yield* SessionSnapshotTooLarge.make({ sessionId, limit: "sessions", maximum: 128 })
-      pending.push(...children)
-    }
-    return sessions
-  })
 
 const hostSessionRuns = (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {
@@ -300,8 +281,8 @@ export const make = (input: {
   hostSession: (sessionId) => input.readState.pipe(Effect.flatMap((state) => getHostSession(state, sessionId))),
   hostSessionSnapshot: (sessionId) =>
     input.readState.pipe(Effect.flatMap((state) => hostSessionSnapshot(state, sessionId))),
-  hostSessionFamily: (sessionId) =>
-    input.readState.pipe(Effect.flatMap((state) => hostSessionFamily(state, sessionId))),
+  hostSessionFamily: (sessionId, request) =>
+    input.readState.pipe(Effect.flatMap((state) => familyPage({ state, sessionId, input: request }))),
   listHostSessions: input.readState.pipe(
     Effect.flatMap((state) =>
       state.closed

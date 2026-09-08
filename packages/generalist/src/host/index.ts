@@ -75,6 +75,8 @@ export type {
 import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
+export { SessionFamilyInput, SessionFamilyPage } from "../runtime/session/retained.js"
+export { SessionPageInvalid } from "../runtime/session/page-error.js"
 export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
 export {
   HostEvent,
@@ -116,9 +118,7 @@ export interface Host<Agents extends ReadonlyArray<AnyAgent>> {
   readonly attachments: Attachments
   readonly artifacts: Artifacts
   readonly sessions: {
-    readonly family: (
-      sessionId: string,
-    ) => Effect.Effect<ReadonlyArray<HostSession>, import("../runtime/session/host.js").SessionSnapshotError>
+    readonly family: import("../runtime/session/host.js").RuntimeHostSessions["sessionFamily"]
     readonly create: (
       options?: SessionCreateOptions,
     ) => Effect.Effect<

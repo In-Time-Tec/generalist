@@ -11066,7 +11066,7 @@
                                     "sessionId": { "type": "string" },
                                     "limit": {
                                       "type": "string",
-                                      "enum": ["scanned-runs", "sessions", "runs", "events", "entries", "bytes"]
+                                      "enum": ["scanned-runs", "runs", "events", "entries", "bytes"]
                                     },
                                     "maximum": { "type": "integer" },
                                     "hint": { "type": "string" }
@@ -13233,7 +13233,7 @@
         "properties": {
           "_tag": { "type": "string", "enum": ["generalist/host/SessionSnapshotTooLarge"] },
           "sessionId": { "type": "string" },
-          "limit": { "type": "string", "enum": ["scanned-runs", "sessions", "runs", "events", "entries", "bytes"] },
+          "limit": { "type": "string", "enum": ["scanned-runs", "runs", "events", "entries", "bytes"] },
           "maximum": { "type": "integer" },
           "hint": { "type": "string" }
         },
