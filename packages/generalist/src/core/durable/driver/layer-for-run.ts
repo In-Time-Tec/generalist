@@ -1,15 +1,39 @@
-import { Effect, Function, Layer, Schema } from "effect"
+import { Effect, Function, Layer, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { Agent, RunOptions } from "../../agent/service.js"
 import { make as makeLoopDriver, type LoopDriverOptions } from "../loop-driver.js"
 import { make, type RunBudget } from "../run-budget.js"
-import { DriverError, DriverStateInvalid } from "../service.js"
+import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
 import { currentDriverVersion, type DriverCheckpoint } from "./contract.js"
-import { DriverInterpreter, layerInline } from "./interpreter.js"
+import { DriverInterpreter, DriverJournal, journalNoop, make as makeInterpreter, type Journal } from "./interpreter.js"
+import { Registry, SessionState } from "../component/services.js"
 import { initialize as initializeCapabilities } from "../../capability/state.js"
 import { LoopDriverState } from "../loop-driver-state.js"
 
 const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
+
+export const layerInline = (input: {
+  readonly driver: DurableAgentDriver
+  readonly journal?: Journal
+  readonly initial: DriverCheckpoint
+}): Layer.Layer<DriverInterpreter> =>
+  Layer.effect(
+    DriverInterpreter,
+    Effect.gen(function* () {
+      const hostJournal = yield* Effect.serviceOption(DriverJournal)
+      const components = yield* Effect.serviceOption(Registry)
+      const sessionState = yield* Effect.serviceOption(SessionState)
+      const journal = input.journal ?? Option.getOrElse(hostJournal, () => journalNoop)
+      return yield* makeInterpreter({
+        ...input,
+        journal,
+        components: Option.getOrElse(components, () => []),
+        sessionState: Option.getOrUndefined(sessionState),
+      })
+    }),
+  )
+
+export const layerTest = layerInline
 
 /** Construct the inline driver Layer for one Agent run. */
 export const layerForRun: {

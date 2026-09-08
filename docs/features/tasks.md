@@ -58,7 +58,7 @@ The Host still emits `ToolCall` when `tasks_write` starts. Its successful comple
 
 The built-in descriptor pins key `generalist.tasks`, instance `default`, schema and handler version `1`, Run scope, and branch policy `restore`. Fork and rewind restore the selected component state; accepted command receipts remain retained. Missing or incompatible component code fails instead of silently resetting the list. State and command limits are each 65,536 bytes; the receipt limit is 1,048,576 bytes.
 
-Before every model call, the current list is rendered as one canonical system message in Chat history. Compaction normalizes every custom result so that exact message remains in the retained `history` prefix. Session persistence continues to store conversation only; after a Session projection rebuild, the task message is reconstructed from the driver checkpoint.
+Before every model call, the current list is rendered as one canonical system message in Chat history. Compaction normalizes every custom result so that exact message remains in the retained `history` prefix. The task list remains in its Run checkpoint, not in Session-owned component state; after a Session conversation projection rebuild, the task message is reconstructed from the driver checkpoint.
 
 ## Child inheritance
 

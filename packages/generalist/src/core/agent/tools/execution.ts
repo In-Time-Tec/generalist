@@ -47,7 +47,7 @@ import type { RunInbox } from "../../turn/steering-inbox.js"
 import { taintForCall } from "../../capability/internal.js"
 import { make as makeToolProgress } from "../tool/progress.js"
 import { managedToolHandlers } from "../../artifact.js"
-import { toolReplayPolicy } from "../../durable/component.js"
+import { toolReplayPolicy } from "../../durable/component/replay.js"
 
 const provideManagedHandlers = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
