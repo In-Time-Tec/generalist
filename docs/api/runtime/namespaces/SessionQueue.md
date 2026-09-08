@@ -62,7 +62,7 @@ A queue mutation lost a revision race or exceeded a supported bound.
 
 ##### reason
 
-> `readonly` **reason**: `"selection"` \| `"revision"` \| `"capacity"`
+> `readonly` **reason**: `"selection"` \| `"revision"` \| `"capacity"` \| `"closed"`
 
 **`Experimental`**
 

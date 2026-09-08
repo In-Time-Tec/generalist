@@ -244,6 +244,12 @@ export const make = (input: {
   updateSessionInput: (request, resolveSelection) =>
     input.modifyState(commands.updateSessionInput, [request], (state, [prepared]) =>
       Effect.gen(function* () {
+        if (state.hostSessions.get(prepared.sessionId)?.session.lifecycle === "closed")
+          return yield* SessionQueueConflict.make({
+            sessionId: prepared.sessionId,
+            reason: "closed",
+            hint: "A closed Session is read-only; use a new Session for additional work.",
+          })
         if (prepared.agent === undefined) return yield* update({ state, input: prepared })
         if (prepared.selection !== undefined || resolveSelection === undefined) {
           return yield* SessionQueueConflict.make({

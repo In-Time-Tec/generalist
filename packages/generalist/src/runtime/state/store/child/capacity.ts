@@ -1,4 +1,4 @@
-import type { PreparedObservation } from "../../observation.js"
+import { occurredAtMillis, type PreparedObservation } from "../../observation.js"
 import { Effect, Function } from "effect"
 import type { ChildReadiness } from "../../../child/readiness.js"
 import { ChildLimitExceeded, RuntimeUnavailable } from "../../../errors.js"
@@ -6,10 +6,76 @@ import type { FanOutMemberResult } from "../../../child/fan-out.js"
 import { isTerminal } from "../../../run.js"
 import type { RunEvent } from "../../../run/event.js"
 import { appendLifecycle, childReadinessChangedEvent } from "../../append.js"
-import { emptySession, type RuntimeState, type StoredRun } from "../../projection.js"
-import type { BudgetLimits } from "../../../../core/durable/run-budget.js"
+import { emptySession, type RuntimeSession, type RuntimeState, type StoredRun } from "../../projection.js"
+import { childGrant, Exhausted, type BudgetLimits } from "../../../../core/durable/run-budget.js"
+import { capGrant } from "../../../budget/state.js"
+import { budgetForEvents } from "../../../execution/inspection.js"
+import { retainedBudget } from "../admission/policy.js"
+
+export const continuationFor = (input: {
+  readonly state: RuntimeState
+  readonly sessionId: string
+  readonly parentSessionId: string
+  readonly sponsored: boolean
+}): Effect.Effect<RuntimeSession["continuation"], RuntimeUnavailable | Exhausted> =>
+  Effect.gen(function* () {
+    if (!input.sponsored) return undefined
+    const continuation = input.state.sessions.get(input.sessionId)?.continuation
+    if (continuation === undefined || continuation.closed || continuation.remainingRuns === 0) {
+      const exhaustion = {
+        budget: "children" as const,
+        requested: 1,
+        remaining: continuation?.remainingRuns ?? 0,
+      }
+      return yield* Exhausted.make(exhaustion)
+    }
+    const source = input.state.runs.get(continuation.sourceRunId)
+    if (source === undefined || source.message.sessionId !== input.parentSessionId) {
+      return yield* RuntimeUnavailable.make({ message: "Session continuation allocation has no valid origin" })
+    }
+    return continuation
+  })
+
+export const continuationGrant = (input: {
+  readonly state: RuntimeState
+  readonly parent: StoredRun
+  readonly sessionId: string
+  readonly continuation: RuntimeSession["continuation"]
+}) =>
+  Effect.gen(function* () {
+    const parentBudget =
+      input.continuation === undefined
+        ? yield* budgetForEvents({ events: input.parent.events, observedMillis: yield* occurredAtMillis })
+        : yield* retainedBudget({ state: input.state, sessionId: input.sessionId })
+    if (input.continuation === undefined && parentBudget.children === 0) {
+      return yield* Exhausted.make({ budget: "children", requested: 1, remaining: 0 })
+    }
+    const admitted = childGrant(parentBudget, 1)
+    return input.continuation === undefined ? admitted : capGrant(admitted, input.continuation.allocation)
+  })
 
 type MutableFanOutMemberResult = { -readonly [Key in keyof FanOutMemberResult]: FanOutMemberResult[Key] }
+
+const continuationForRun = (
+  session: RuntimeSession,
+  parent: StoredRun | undefined,
+  budget: BudgetLimits,
+): RuntimeSession["continuation"] => {
+  if (session.continuation !== undefined) return session.continuation
+  if (parent === undefined) return undefined
+  return { sourceRunId: parent.runId, allocation: budget, remainingRuns: 1, closed: false }
+}
+
+const sessionWithContinuation = (
+  session: RuntimeSession,
+  family: NonNullable<RuntimeSession["family"]>,
+  continuation: RuntimeSession["continuation"],
+  runId: string,
+) => {
+  const next = { ...session, family: { ...family, runIds: [...family.runIds, runId] } }
+  if (continuation !== undefined) Object.assign(next, { continuation })
+  return next
+}
 
 export const familyRuns: {
   (rootRunId: string): (state: RuntimeState) => ReadonlyArray<StoredRun>
@@ -155,8 +221,10 @@ export const recordFamilyRun = ({
     runIds: [],
     childSessionIds: [],
   }
+  const continuation = continuationForRun(session, parent, budget)
   const sessions = new Map(state.sessions)
-  sessions.set(sessionId, { ...session, family: { ...family, runIds: [...family.runIds, run.runId] } })
+  const nextSession = sessionWithContinuation(session, family, continuation, run.runId)
+  sessions.set(sessionId, nextSession)
   if (parentSession?.family !== undefined && !parentSession.family.childSessionIds.includes(sessionId)) {
     sessions.set(parentSessionId!, {
       ...parentSession,
