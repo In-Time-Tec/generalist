@@ -95,6 +95,8 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
     "docs/start/quickstart.md",
     "docs/guides/define-tools.md",
     "docs/start/cell-agent.md",
+    "docs/features/cloudflare.md",
+    "docs/features/rivet.md",
   ]) {
     const source = yield* fileSystem.readFileString(path.join(root, filename))
     const blocks = Array.from(source.matchAll(typescriptFence), (match) => match[1] ?? "")

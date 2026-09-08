@@ -66,7 +66,67 @@ const runtime = DurableObjects.layer({
 This is a binding fragment: supply the application's native R2 binding, Worker-compatible
 Crypto, pinned executable resolver, and an owned scope. `layer` reconstructs and activates
 the shared object Runtime; `layerRunStore` supplies storage without starting execution.
-The Durable Object owns the scope and alarms only accelerate wakeup.
+The Durable Object owns the scope and alarms only accelerate wakeup. Construction and
+execution are different boundaries: do not drain model/tool work inside a constructor's
+`blockConcurrencyWhile`, which blocks request delivery and has a platform timeout.
+
+### Hosted commands and alarms
+
+`make(options)` constructs an Effect-scoped host controller without starting execution.
+Its `run(effect)` supplies the existing Runtime services to a command; `alarm` drains
+eligible work and schedules the next wake hint. Concurrent calls share initialization
+and authority. When the last call finishes, its execution scope closes, stopping the
+ownership heartbeat. The next call reconstructs the same namespace.
+
+This composition fragment belongs inside an application-owned Durable Object host. The
+application provides the R2 binding, native alarm methods, Crypto, and resolver. No model
+or external tool is configured by this fragment:
+
+```ts
+import { Context, Crypto, Effect, Layer, ManagedRuntime } from "effect"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
+import type * as R2 from "generalist/durability/r2"
+
+declare const bucket: R2.Bucket
+declare const storage: DurableObjects.AlarmStorage
+declare const dependencies: Layer.Layer<Crypto.Crypto | ExecutableResolver.ExecutableResolver>
+
+class Host extends Context.Service<Host, DurableObjects.Host>()("app/RuntimeHost") {}
+
+const managed = ManagedRuntime.make(
+  Layer.effect(
+    Host,
+    DurableObjects.make({
+      bucket,
+      storage,
+      environment: "development",
+      tenant: "example-team",
+      partition: "coding-fix-average",
+      addresses: [],
+    }),
+  ).pipe(Layer.provide(dependencies)),
+)
+
+const inspect = (runId: string) =>
+  managed.runPromise(
+    Effect.flatMap(Host, (host) => host.run(Effect.flatMap(Runtime.Runtime, (runtime) => runtime.inspect(runId)))),
+  )
+
+const alarm = () => managed.runPromise(Effect.flatMap(Host, (host) => host.alarm))
+```
+
+Wire the application's `alarm()` handler to `alarm` and authorize each RPC/HTTP command
+before calling `run`. The owning application disposes `managed` when it explicitly
+tears down the host; forced platform eviction need not run cleanup for object recovery
+to remain correct. Do not cache a returned Runtime service or Run handle beyond its
+execution scope; return serialized results or stable Run IDs instead.
+
+The controller only moves an existing alarm earlier, rather than overwriting an earlier
+wakeup with a later one. It does not set an alarm merely because its constructor ran.
+Duplicate delivery rechecks canonical state. An alarm-update failure cannot undo an
+already committed command, and the independent reconciler remains required. `fuel`
+bounds scheduler candidates, not the duration of a model or tool admitted by that drain.
 
 Run `reconcile(options, fuel?)` from an independent Cron Trigger or queue consumer for
 every configured partition. It activates, drains bounded work, and closes the scope.
