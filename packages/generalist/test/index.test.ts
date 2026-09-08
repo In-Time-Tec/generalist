@@ -51,6 +51,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "RunWait",
       "Runtime",
       "SessionQueue",
+      "SessionSender",
       "Steering",
       "TreePolicy",
     ],
