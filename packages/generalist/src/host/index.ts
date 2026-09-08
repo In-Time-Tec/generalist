@@ -48,7 +48,7 @@ import {
   type StartOptions,
 } from "../runtime/service.js"
 import type { ToolServices } from "../runtime/executable/registered-tool.js"
-import { IllegalOperatorAction, type RuntimeUnavailable } from "../runtime/errors.js"
+import { IllegalOperatorAction } from "../runtime/errors.js"
 import { make as makeTools, type Tools as HostTools } from "./tools.js"
 export type { CreateError } from "./errors.js"
 export type { HostToolRun } from "./tools.js"

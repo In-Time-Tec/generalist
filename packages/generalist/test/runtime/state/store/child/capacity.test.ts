@@ -12,7 +12,7 @@ import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { Runtime } from "../../../../../src/runtime/service.js"
 import { familyRuns, reserveSessions } from "../../../../../src/runtime/state/store/child/capacity.js"
 import { layerStatic } from "../../../../../src/runtime/executable/resolver.js"
-import * as TestModel from "../../../../../src/testing/model/service.js"
+import { layer } from "../../../../../src/testing/model/service.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../execution/object.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
 
@@ -27,7 +27,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
     Layer.mergeAll(
       objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([]))),
       Toolkit.make(tool).toLayer({ count: () => Effect.succeed(1) }),
-      TestModel.layer([]),
+    layer([]),
       layerAutoApprove,
       layerAllowAll,
     )
