@@ -3,7 +3,7 @@ import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import { actor, setup, type Registry, type RegistryActors, type RegistryConfigInput } from "rivetkit"
 import { setupTest as setupRivetTest } from "rivetkit/test"
 import { afterAll, expect, test, type TestContext } from "vitest"
-import { Context, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Context, Deferred, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, AgentManifest, Pins } from "generalist"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
@@ -17,9 +17,17 @@ import {
   type RuntimeActorOptions,
 } from "../../../../src/unstable/rivet/actors/index.js"
 import type { ActivationFailure } from "../../../../src/durability/internal/runtime.js"
+import { DurabilityFailure } from "../../../../src/durability/errors.js"
+import { make as makeJournal } from "../../../../src/durability/internal/journal.js"
+import {
+  decode as decodeState,
+  diff,
+  encode as encodeState,
+} from "../../../../src/durability/internal/runtime-state.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
-import { ObjectStore } from "../../../../src/durability/object-store.js"
+import { ObjectStore, ObjectStoreFailure } from "../../../../src/durability/object-store.js"
 import { RuntimeInspectionResponse } from "../../../../src/runtime/inspection.js"
+import { emptyState } from "../../../../src/runtime/state/projection.js"
 import { make as makeBucket, type Client } from "../../../../src/testing/durability/index.js"
 import { Engine, layer as engineLayer } from "./engine.js"
 import "./bootstrap-suite.js"
@@ -67,7 +75,7 @@ const makeComposedDefinition = (options: RuntimeActorOptions, counters: Counters
     c.vars.host = undefined
     return host?.dispose() ?? Promise.resolve()
   }
-  const { storage, resolver, actorOptions, ...runtimeOptions } = options
+  const { storage, resolver, actorOptions, namespace, ...runtimeOptions } = options
   return actor({
     createVars: (): Vars => ({ host: undefined }),
     options: actorOptions ?? { sleepTimeout: 60_000 },
@@ -76,6 +84,7 @@ const makeComposedDefinition = (options: RuntimeActorOptions, counters: Counters
         Layer.merge(
           layerActorRuntime(c, {
             ...runtimeOptions,
+            ...namespace(c),
             drainAction: "work.drain",
             reconcile: (context) =>
               Effect.gen(function* () {
@@ -100,6 +109,12 @@ const makeComposedDefinition = (options: RuntimeActorOptions, counters: Counters
     },
     onSleep: dispose,
     onDestroy: dispose,
+    run: (c) =>
+      c.keepAwake(
+        requireHost(c).runPromise(Effect.flatMap(ActorRuntime, (runtime) => runtime.drain).pipe(Effect.asVoid), {
+          signal: c.abortSignal,
+        }),
+      ),
     actions: {
       work: {
         admitWithoutNotify: (c, input: Runtime.SendInput) =>
@@ -219,9 +234,7 @@ const makeOptions = (
   partition: string,
   sleepTimeout = 100,
 ): RuntimeActorOptions => ({
-  environment: "test",
-  tenant: "rivet",
-  partition,
+  namespace: ({ key }) => ({ environment: "test", tenant: "rivet", partition: `${partition}:${JSON.stringify(key)}` }),
   storage: Layer.merge(Layer.succeed(ObjectStore, client.store), cryptoLayer),
   addresses: [{ address, executable, registrations }],
   resolver: ExecutableResolver.layerStatic([{ executable, agent: Agent.close(agent, modelLayer) }]).pipe(Layer.orDie),
@@ -259,6 +272,7 @@ const addCrashWindowAction = (definition: RuntimeActorDefinition) => {
   const send = actions.runtime.send
   return actor({
     ...definition.config,
+    run: () => undefined,
     actions: {
       ...actions,
       test: {
@@ -402,8 +416,7 @@ test("fresh actor discovers committed work without the admission doorbell", asyn
   )
   const { client: secondClient } = await setupTest(context, secondRegistry)
   const partition = secondClient.runtimeCrashWindow.getOrCreate(key, testPool(context))
-  const inspection = await partition.runtime.inspect(runId)
-  expect(inspection.status).toBe("succeeded")
+  await expect.poll(async () => (await partition.runtime.inspect(runId)).status).toBe("succeeded")
   expect(executions).toBe(1)
 
   await partition.runtime.drain()
@@ -467,7 +480,7 @@ test("registry reset makes interrupted never-replay work unknown without redispa
   )
   const { client: secondClient } = await setupTest(context, secondRegistry)
   const secondPartition = secondClient.runtimeUnknown.getOrCreate(key, testPool(context))
-  expect((await secondPartition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+  await expect.poll(async () => (await secondPartition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
   await secondPartition.runtime.drain()
   expect((await secondPartition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
   expect(recoveredCalls).toBe(0)
@@ -516,6 +529,7 @@ test("composes scoped application services and recovers missed work across three
   context.onTestFinished(() => secondRegistry.shutdown())
   const { client: secondClient } = await setupTest(context, secondRegistry)
   const second = secondClient.composed.getOrCreate(key, testPool(context))
+  await expect.poll(async () => (await second.work.snapshot(receipt.runId)).status).toBe("succeeded")
   const recovered = await second.work.snapshot(receipt.runId)
   expect(recovered.status).toBe("succeeded")
   expect(recovered.ownerId).not.toBe(initial.ownerId)
@@ -578,6 +592,7 @@ test("failed initialization releases acquired application services", async () =>
   const {
     storage,
     resolver,
+    namespace,
     actorOptions: _actorOptions,
     ...options
   } = makeOptions(model, bucket, "failed-initialization")
@@ -585,6 +600,7 @@ test("failed initialization releases acquired application services", async () =>
     Layer.merge(
       layerActorRuntime(context, {
         ...options,
+        ...namespace({ actorId: context.actorId, key: ["failed-initialization"] }),
         drainAction: "work.drain",
         initialize: () => RuntimeUnavailable.make({ message: "test initialization failure" }),
       }).pipe(Layer.provide(resolver), Layer.provide(storage)),
@@ -649,3 +665,463 @@ test("failed canonical admission leaves no run and typed custom actions can retr
   await registry.shutdown()
   expect(counters.finalized).toBe(1)
 })
+
+test("reopened recovery is ready for inspection and concurrent cancellation while its model blocks", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  const key = partitionKey("blocked-reopen")
+  const firstRegistry = registerShutdown(
+    context,
+    await setupRegistry({
+      envoy: testPool(context),
+      use: { blocked: addCrashWindowAction(makeDefinition(model, bucket, "blocked-reopen", 60_000)) },
+    }),
+  )
+  const { client: firstClient } = await setupTest(context, firstRegistry)
+  const command = {
+    runId: "run:blocked-reopen",
+    to: address,
+    sessionId: "blocked-reopen",
+    idempotencyKey: "blocked-reopen",
+    prompt: "recover without blocking actor readiness",
+  }
+  const receipt = await firstClient.blocked.getOrCreate(key, testPool(context)).test.admitWithoutDoorbell(command)
+  await firstRegistry.shutdown()
+
+  let executions = 0
+  let interrupted = 0
+  const started = Promise.withResolvers<void>()
+  const blockingModel = Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.never,
+      streamText: () => {
+        executions++
+        started.resolve()
+        return Stream.never.pipe(Stream.ensuring(Effect.sync(() => void interrupted++)))
+      },
+    }),
+  )
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({
+      envoy: testPool(context),
+      use: {
+        blocked: makeDefinition(blockingModel, await Effect.runPromise(bucket.connect), "blocked-reopen", 60_000),
+      },
+    }),
+  )
+  const { client } = await setupTest(context, registry)
+  const partition = client.blocked.getOrCreate(key, testPool(context))
+  const inspection = await Effect.runPromise(
+    Effect.promise(() => partition.runtime.inspect(receipt.runId)).pipe(Effect.timeout("2 seconds")),
+  )
+  expect(inspection.status).toBe("running")
+  await started.promise
+  const drains = Promise.all([partition.runtime.drain(), partition.runtime.drain()])
+  const [cancelled, concurrent] = await Effect.runPromise(
+    Effect.promise(() =>
+      Promise.all([
+        partition.runtime.cancel({ runId: receipt.runId, commandId: "cancel:blocked-reopen" }),
+        partition.runtime.inspect(receipt.runId),
+      ]),
+    ).pipe(Effect.timeout("2 seconds")),
+  )
+  expect(cancelled).toBeUndefined()
+  expect(["running", "cancelling", "cancelled"]).toContain(concurrent.status)
+  await drains
+  expect((await partition.runtime.inspect(receipt.runId)).status).toBe("cancelled")
+  expect(await partition.runtime.send(command)).toEqual(receipt)
+  await partition.runtime.drain()
+  expect(executions).toBe(1)
+  expect(interrupted).toBe(1)
+})
+
+test("periodic recovery discovers missed admission without an inspection or startup drain", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  let executions = 0
+  const definition = addCrashWindowAction(
+    makeRuntimeActor({
+      ...makeOptions(
+        makeModel(() => void executions++),
+        bucket,
+        "periodic-recovery",
+        60_000,
+      ),
+      recoveryIntervalMillis: 5_000,
+    }),
+  )
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { periodic: definition } }),
+  )
+  const { client } = await setupTest(context, registry)
+  const partition = client.periodic.getOrCreate(partitionKey("periodic-recovery"), testPool(context))
+  const receipt = await partition.test.admitWithoutDoorbell({
+    to: address,
+    sessionId: "periodic-recovery",
+    idempotencyKey: "periodic-recovery",
+    prompt: "recover from the independent cron",
+  })
+  expect(executions).toBe(0)
+  await expect.poll(() => executions, { timeout: 8_000 }).toBe(1)
+  await partition.runtime.drain()
+  expect((await partition.runtime.inspect(receipt.runId)).status).toBe("succeeded")
+  expect(executions).toBe(1)
+})
+
+test.for(["empty", "throwing"] as const)("rejects a %s namespace before building storage", async (kind, context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  let built = 0
+  let failure: DurabilityFailure | undefined
+  const definition = makeRuntimeActor({
+    ...makeOptions(model, bucket, "invalid-namespace", 60_000),
+    namespace: () => {
+      if (kind === "throwing") throw RuntimeUnavailable.make({ message: "Injected resolver failure" })
+      return { environment: "test", tenant: "rivet", partition: "" }
+    },
+    storage: Layer.merge(
+      cryptoLayer,
+      Layer.effect(
+        ObjectStore,
+        Effect.sync(() => {
+          built++
+          return bucket.store
+        }),
+      ),
+    ),
+  })
+  const onWake = definition.config.onWake
+  if (onWake === undefined) throw new Error("Runtime actor must initialize on wake")
+  const probe = actor({
+    ...definition.config,
+    onWake: async (c) => {
+      try {
+        await onWake(c)
+      } catch (cause) {
+        if (!Schema.is(DurabilityFailure)(cause)) throw cause
+        failure = cause
+      }
+    },
+    run: () => undefined,
+    actions: {
+      probe: (c) => ({
+        reason: failure?.reason,
+        message: failure?.message,
+        host: c.vars.host === undefined,
+        opening: c.vars.opening === undefined,
+      }),
+    },
+  })
+  const registry = await setupRegistry({ envoy: testPool(context), use: { invalid: probe } })
+  context.onTestFinished(() => registry.shutdown())
+  const { client } = await setupTest(context, registry)
+  expect(await client.invalid.getOrCreate(partitionKey(`invalid-${kind}`), testPool(context)).probe()).toEqual({
+    reason: "configuration",
+    message: kind === "empty" ? "Invalid Rivet Runtime namespace" : "Rivet Runtime namespace resolver failed",
+    host: true,
+    opening: true,
+  })
+  expect(built).toBe(0)
+})
+
+test("two instances of one definition isolate commands and recover their own stable namespaces", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  let executions = 0
+  let resolutions = 0
+  const countingModel = makeModel(() => void executions++)
+  const options = makeOptions(countingModel, bucket, "isolated", 60_000)
+  const definition = makeRuntimeActor({
+    ...options,
+    namespace: (identity) => {
+      resolutions++
+      return options.namespace(identity)
+    },
+  })
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { isolated: definition } }),
+  )
+  const { client } = await setupTest(context, registry)
+  const keys = [partitionKey("isolation-a"), partitionKey("isolation-b")] as const
+  const first = client.isolated.getOrCreate(keys[0], testPool(context))
+  const second = client.isolated.getOrCreate(keys[1], testPool(context))
+  const command = { to: address, sessionId: "shared-session", idempotencyKey: "shared-command", prompt: "hello" }
+  const firstCommand = { ...command, runId: "run:isolation-a" }
+  const secondCommand = { ...command, runId: "run:isolation-b", prompt: "a different request" }
+  const [firstReceipt, secondReceipt] = await Promise.all([
+    first.runtime.send(firstCommand),
+    second.runtime.send(secondCommand),
+  ])
+  await Promise.all([first.runtime.drain(), second.runtime.drain()])
+  expect((await first.runtime.inspect(firstReceipt.runId)).status).toBe("succeeded")
+  expect((await second.runtime.inspect(secondReceipt.runId)).status).toBe("succeeded")
+  await expect(first.runtime.inspect(secondReceipt.runId)).rejects.toBeDefined()
+  await expect(second.runtime.inspect(firstReceipt.runId)).rejects.toBeDefined()
+  expect(resolutions).toBe(2)
+  expect(executions).toBe(2)
+  await registry.shutdown()
+
+  const reopened = registerShutdown(
+    context,
+    await setupRegistry({
+      envoy: testPool(context),
+      use: { isolated: makeDefinition(countingModel, await Effect.runPromise(bucket.connect), "isolated", 60_000) },
+    }),
+  )
+  const { client: fresh } = await setupTest(context, reopened)
+  const freshFirst = fresh.isolated.getOrCreate(keys[0], testPool(context))
+  const freshSecond = fresh.isolated.getOrCreate(keys[1], testPool(context))
+  expect(await freshFirst.runtime.send(firstCommand)).toEqual(firstReceipt)
+  expect(await freshSecond.runtime.send(secondCommand)).toEqual(secondReceipt)
+  await Promise.all([freshFirst.runtime.drain(), freshSecond.runtime.drain()])
+  expect((await freshFirst.runtime.inspect(firstReceipt.runId)).status).toBe("succeeded")
+  expect((await freshSecond.runtime.inspect(secondReceipt.runId)).status).toBe("succeeded")
+  expect(executions).toBe(2)
+})
+
+test("idle hosts stop storage heartbeats and wait for closure before concurrent admission", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  let opened = 0
+  let closed = 0
+  let operations = 0
+  let resolutions = 0
+  let executions = 0
+  let holdClosure = false
+  const closing = Promise.withResolvers<void>()
+  const release = await Effect.runPromise(Deferred.make<void>())
+  context.onTestFinished(() => Effect.runPromise(Deferred.succeed(release, undefined).pipe(Effect.asVoid)))
+  const storage = Layer.merge(
+    cryptoLayer,
+    Layer.effect(
+      ObjectStore,
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          opened++
+          return ObjectStore.of({
+            ...bucket.store,
+            list: (prefix, cursor) =>
+              Effect.sync(() => void operations++).pipe(Effect.andThen(bucket.store.list(prefix, cursor))),
+            create: (key, bytes) =>
+              Effect.sync(() => void operations++).pipe(Effect.andThen(bucket.store.create(key, bytes))),
+          })
+        }),
+        () =>
+          Effect.gen(function* () {
+            if (holdClosure) {
+              holdClosure = false
+              closing.resolve()
+              yield* Deferred.await(release)
+            }
+            closed++
+          }),
+      ),
+    ),
+  )
+  const options = makeOptions(
+    makeModel(() => void executions++),
+    bucket,
+    "idle-host",
+    60_000,
+  )
+  const definition = makeRuntimeActor({
+    ...options,
+    storage,
+    ownershipLeaseMillis: 1_000,
+    reconcileInterval: "50 millis",
+    namespace: (identity) => {
+      resolutions++
+      return options.namespace(identity)
+    },
+  })
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { idle: definition } }),
+  )
+  const { client } = await setupTest(context, registry)
+  const partition = client.idle.getOrCreate(partitionKey("idle-host"), testPool(context))
+  const command = { to: address, sessionId: "idle-host", idempotencyKey: "idle-host", prompt: "hello" }
+  await partition.runtime.send(command)
+  await partition.runtime.drain()
+  await expect.poll(() => closed === opened && opened > 0).toBe(true)
+  const idleOperations = operations
+  await Effect.runPromise(Effect.sleep("1100 millis"))
+  expect(operations).toBe(idleOperations)
+  expect(closed).toBe(opened)
+
+  holdClosure = true
+  const drain = partition.runtime.drain()
+  await closing.promise
+  const beforeAdmission = opened
+  let admitted = false
+  const admission = partition.runtime.send({ ...command, idempotencyKey: "after-idle" }).then((receipt) => {
+    admitted = true
+    return receipt
+  })
+  await Effect.runPromise(Effect.sleep("50 millis"))
+  expect(admitted).toBe(false)
+  expect(opened).toBe(beforeAdmission)
+  await Effect.runPromise(Deferred.succeed(release, undefined))
+  await drain
+  const receipt = await admission
+  await partition.runtime.drain()
+  expect((await partition.runtime.inspect(receipt.runId)).status).toBe("succeeded")
+  await expect.poll(() => closed === opened).toBe(true)
+  expect(executions).toBe(2)
+  expect(resolutions).toBe(1)
+})
+
+test("an idle drain cannot retire a host with concurrent canonical admission", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  const reconcileEntered = Promise.withResolvers<void>()
+  const releaseReconcile = await Effect.runPromise(Deferred.make<void>())
+  context.onTestFinished(() => Effect.runPromise(Deferred.succeed(releaseReconcile, undefined).pipe(Effect.asVoid)))
+  let reconciles = 0
+  let closed = 0
+  const options = makeOptions(model, bucket, "idle-admission-race", 60_000)
+  const definition = makeRuntimeActor({
+    ...options,
+    storage: Layer.merge(
+      cryptoLayer,
+      Layer.effect(
+        ObjectStore,
+        Effect.acquireRelease(Effect.succeed(bucket.store), () => Effect.sync(() => void closed++)),
+      ),
+    ),
+    reconcile: () =>
+      Effect.gen(function* () {
+        if (++reconciles === 2) {
+          reconcileEntered.resolve()
+          yield* Deferred.await(releaseReconcile)
+        }
+        return undefined
+      }),
+  })
+  Object.assign(definition.config, { run: () => undefined })
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { race: definition } }),
+  )
+  const { client } = await setupTest(context, registry)
+  const partition = client.race.getOrCreate(partitionKey("idle-admission-race"), testPool(context))
+  const drain = partition.runtime.drain()
+  await reconcileEntered.promise
+  const paused = await Effect.runPromise(bucket.faults.pauseNextCreate())
+  context.onTestFinished(() => Effect.runPromise(paused.release))
+  const admission = partition.runtime.send({
+    to: address,
+    sessionId: "idle-admission-race",
+    idempotencyKey: "idle-admission-race",
+    prompt: "do not close while admitting",
+  })
+  await Effect.runPromise(paused.entered)
+  await Effect.runPromise(Deferred.succeed(releaseReconcile, undefined))
+  expect((await drain).hasMore).toBe(false)
+  expect(closed).toBe(0)
+  await Effect.runPromise(paused.release)
+  const receipt = await admission
+  await partition.runtime.drain()
+  expect((await partition.runtime.inspect(receipt.runId)).status).toBe("succeeded")
+  await expect.poll(() => closed).toBeGreaterThan(0)
+})
+
+test.for(["transport", "lease"] as const)(
+  "%s monitor loss interrupts active work and safely reopens",
+  async (loss, context) => {
+    const bucket = await Effect.runPromise(makeBucket())
+    let failList = false
+    let closed = 0
+    let executions = 0
+    let interrupted = 0
+    const started = Promise.withResolvers<void>()
+    const blockingModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.never,
+        streamText: () => {
+          executions++
+          started.resolve()
+          return Stream.never.pipe(Stream.ensuring(Effect.sync(() => void interrupted++)))
+        },
+      }),
+    )
+    const options = makeOptions(blockingModel, bucket, `monitor-${loss}`, 60_000)
+    const definition = makeRuntimeActor({
+      ...options,
+      workerId: "forced-loss-worker",
+      reconcileInterval: "50 millis",
+      storage: Layer.merge(
+        cryptoLayer,
+        Layer.effect(
+          ObjectStore,
+          Effect.acquireRelease(
+            Effect.succeed(
+              ObjectStore.of({
+                ...bucket.store,
+                list: (prefix, cursor) =>
+                  Effect.suspend(() => {
+                    if (!failList) return bucket.store.list(prefix, cursor)
+                    failList = false
+                    return ObjectStoreFailure.make({
+                      operation: "list",
+                      key: prefix,
+                      reason: "authentication",
+                      message: "Injected monitor failure",
+                    })
+                  }),
+              }),
+            ),
+            () => Effect.sync(() => void closed++),
+          ),
+        ),
+      ),
+    })
+    const registry = registerShutdown(
+      context,
+      await setupRegistry({ envoy: testPool(context), use: { monitor: definition } }),
+    )
+    const { client } = await setupTest(context, registry)
+    const key = partitionKey(`monitor-${loss}`)
+    const partition = client.monitor.getOrCreate(key, testPool(context))
+    const receipt = await partition.runtime.send({
+      to: address,
+      sessionId: "monitor",
+      idempotencyKey: "monitor",
+      prompt: "lose ownership while executing",
+    })
+    await started.promise
+    const closedBeforeLoss = closed
+    const drain = partition.runtime.drain().then(
+      () => false,
+      () => true,
+    )
+    if (loss === "transport") failList = true
+    else {
+      const injection = ManagedRuntime.make(
+        Layer.merge(cryptoLayer, Layer.succeed(ObjectStore, (await Effect.runPromise(bucket.connect)).store)),
+      )
+      context.onTestFinished(() => injection.dispose())
+      await injection.runPromise(
+        Effect.gen(function* () {
+          const journal = yield* makeJournal(options.namespace({ actorId: "diagnostic", key }))
+          yield* journal.commit({ id: "force-lease-loss", input: null }, (state) =>
+            Effect.gen(function* () {
+              const decoded = yield* decodeState(
+                state,
+                emptyState({ addressBindings: new Map(), subscriberQueueCapacity: 16 }),
+              )
+              const workers = new Map(decoded.workers)
+              workers.set("forced-loss-worker", { incarnation: "replacement-incarnation", expiresAt: 0 })
+              return { patches: diff(state, yield* encodeState({ ...decoded, workers })), receipt: null }
+            }),
+          )
+        }),
+      )
+    }
+    expect(await Effect.runPromise(Effect.promise(() => drain).pipe(Effect.timeout("3 seconds")))).toBe(true)
+    await expect.poll(() => closed).toBeGreaterThan(closedBeforeLoss)
+    expect(interrupted).toBe(1)
+    await expect.poll(async () => (await partition.runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+    await partition.runtime.drain()
+    expect(executions).toBe(1)
+  },
+)

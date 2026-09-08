@@ -256,7 +256,7 @@ export const minimumConsumerProfiles = [
       {
         specifier: "generalist/unstable/cloudflare/durable-objects",
         runtimes: workerOnly,
-        exports: ["layerRunStore"],
+        exports: ["layerRunStore", "make", "reconcile"],
       },
       { specifier: "generalist/unstable/cloudflare/dynamic-workers", runtimes: workerOnly, exports: ["layer", "make"] },
       { specifier: "generalist/unstable/cloudflare/workers", runtimes: workerOnly, exports: ["make"] },
@@ -276,7 +276,13 @@ export const minimumConsumerProfiles = [
     name: "rivet",
     peers: ["@standard-schema/spec", "rivetkit"],
     nativeHostPeers: ["rivetkit"],
-    imports: [{ specifier: "generalist/unstable/rivet", runtimes: nodeAndBun, exports: ["makeRuntimeActor"] }],
+    imports: [
+      {
+        specifier: "generalist/unstable/rivet",
+        runtimes: nodeAndBun,
+        exports: ["makeRuntimeActor", "RuntimeActorNamespace", "ActorRuntime", "layerActorRuntime"],
+      },
+    ],
   },
 ] as const satisfies ReadonlyArray<MinimumConsumerProfile>
 

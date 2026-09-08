@@ -19,6 +19,8 @@ import { Cursor, Runtime, RunEvent } from "generalist/runtime"
 import * as Durability from "generalist/durability"
 import * as S3 from "generalist/durability/s3"
 import * as R2 from "generalist/durability/r2"
+import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
+import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import { Server } from "generalist/server"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -43,6 +45,15 @@ type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? 
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
+declare const actorHost: DurableObjects.Host
+const hostedCommand = actorHost.run(Effect.gen(function* () {
+  yield* Scope.Scope
+  return yield* Runtime.Runtime
+}))
+type HostedCommandServices = Assert<Equal<EffectServices<typeof hostedCommand>, never>>
+type ActorNamespace = Assert<Equal<ReturnType<Rivet.RuntimeActorOptions["namespace"]>, Rivet.RuntimeActorNamespace>>
+type FactoryStaticPartitionRemoved = Assert<Equal<"partition" extends keyof Rivet.RuntimeActorOptions ? true : false, false>>
+type CustomActorPartition = Assert<Equal<Rivet.ActorRuntimeOptions["partition"], string>>
 type TestingRuntimeDriver = Assert<Equal<typeof Testing.runtimeDriver, typeof import("generalist/testing/runtime-driver").runtimeDriver>>
 type TasksCanonical = Assert<Equal<typeof Tasks, typeof import("generalist/tasks")>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
