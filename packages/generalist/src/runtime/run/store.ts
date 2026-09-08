@@ -332,12 +332,20 @@ export interface Service {
     input: AdmitSteeringInput,
   ) => Effect.Effect<
     SteeringAdmission,
-    RunNotFound | RunTerminal | RunBusy | SteeringConflict | InboxFull | RuntimeUnavailable | DurabilityFailure
+    | RunNotFound
+    | RunTerminal
+    | RunBusy
+    | SteeringConflict
+    | InboxFull
+    | RuntimeUnavailable
+    | import("../errors.js").RunKindUnsupported
+    | DurabilityFailure
   >
   readonly admitRollback: (
     input: AdmitRollbackInput,
   ) => Effect.Effect<
     SteeringAdmission,
+    | import("../errors.js").RunKindUnsupported
     | RunNotFound
     | RunTerminal
     | RunBusy
@@ -388,6 +396,7 @@ export interface Service {
     input: ForkRunInput,
   ) => Effect.Effect<
     RunReceipt,
+    | import("../errors.js").RunKindUnsupported
     | RunNotFound
     | ForkSequenceInvalid
     | NoSnapshot
@@ -401,6 +410,7 @@ export interface Service {
     input: RewindRunInput,
   ) => Effect.Effect<
     void,
+    | import("../errors.js").RunKindUnsupported
     | RunNotFound
     | ForkSequenceInvalid
     | NoSnapshot

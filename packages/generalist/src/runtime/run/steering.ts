@@ -9,6 +9,7 @@ import { authorize, type MessagingPolicy } from "../messaging/service.js"
 import { Message } from "../messaging/message.js"
 import type { AdmitSteeringInput, Service as RunStoreService, SteeringAdmission } from "./store.js"
 import type { RunSendError, RunSendOptions } from "../service.js"
+import { requireAgentOrProgram } from "../executable/manifest-internal.js"
 
 export const AdmissionPolicy = Schema.Literals(["steer", "interrupt", "rollback", "reject"])
 export type AdmissionPolicy = typeof AdmissionPolicy.Type
@@ -129,6 +130,9 @@ export const make = (services: Options) =>
       options: SendOptions,
     ): Effect.Effect<SteeringAdmission, RunSendError> =>
       Effect.gen(function* () {
+        yield* services.store
+          .inspect(runId)
+          .pipe(Effect.flatMap((run) => requireAgentOrProgram({ ...run, operation: "steer" })))
         const prompt = normalizePrompt(input)
         const policy = options.policy ?? "steer"
         const from = options.from ?? { system: true }

@@ -2,12 +2,23 @@ import type { AgentManifest, ProgramAuthority } from "../../core/durable/manifes
 import { make as makeToolManifest } from "../../core/durable/manifest/tool-manifest.js"
 import type { StaticRunOptions, StaticToolExecutable } from "./resolver.js"
 import { validateRef as validateCoreRef } from "../../core/durable/manifest/executable-manifest.js"
-import { Function, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
+import { RunKindUnsupported } from "../errors.js"
 import type { ExecutionCheckpoint } from "../execution/state.js"
 import { ExecutableManifest, ExecutableRef, PinnedExecutable } from "./manifest.js"
 import type { ProgramManifest } from "../../core/durable/manifest/program-manifest.js"
 
 type PinnedExecutableEncoded = typeof PinnedExecutable.Encoded
+
+export const requireAgentOrProgram = (input: {
+  readonly runId: string
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
+  readonly operation: string
+}) =>
+  input.executableManifest.entries.some((entry) => entry.pin === input.executableRef.active && entry._tag === "Tool")
+    ? RunKindUnsupported.make({ runId: input.runId, operation: input.operation, kind: "Tool" })
+    : Effect.void
 
 export const validateRef: {
   (manifest: ExecutableManifest): (ref: ExecutableRef) => void

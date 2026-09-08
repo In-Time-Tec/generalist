@@ -103,6 +103,18 @@ export class RunNotFound extends ActionableTaggedError<RunNotFound>()("generalis
   hint: errorHint("Check the Run ID and inspect the Runtime instance that admitted it."),
 }) {}
 
+export class RunKindUnsupported extends ActionableTaggedError<RunKindUnsupported>()(
+  "generalist/runtime/RunKindUnsupported",
+  {
+    runId: Schema.String,
+    operation: Schema.String,
+    kind: Schema.Literals(["Agent", "Program", "Tool"]),
+    hint: errorHint(
+      "Use a handle and controls supported by this executable kind. Retrieve Tool Runs through host.tools.get.",
+    ),
+  },
+) {}
+
 export class IllegalOperatorAction extends ActionableTaggedError<IllegalOperatorAction>()(
   "generalist/runtime/IllegalOperatorAction",
   {
