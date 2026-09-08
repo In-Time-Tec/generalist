@@ -40,7 +40,7 @@ it.effect("fresh Session queue hosts retain selection and exact receipts without
         executableRef: alternateAssistantRef.ref,
         executableManifest: alternateAssistantRef.manifest,
         registrations: registrationsFor(alternateAssistantRef),
-        treePolicy: { maxDepth: 2, maxSubagents: 3 },
+        treePolicy: { maxDepth: 2, maxSessions: 1024, concurrency: { agents: 3, tools: 1024 } },
         budget: { tokens: 1200, toolCalls: 4 },
       }
       const edit = {

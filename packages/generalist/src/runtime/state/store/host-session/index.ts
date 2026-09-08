@@ -24,7 +24,7 @@ import {
 import { toInspection } from "../events.js"
 import { historyPage, runsPage, sessionRun, recentRuns } from "./page.js"
 import { projectConversation } from "./conversation.js"
-import { submit, update } from "./queue.js"
+import { submit, update, validateSelection } from "./queue.js"
 import { SessionQueueConflict } from "../../../session/queue.js"
 
 const hostSessionSnapshot = (state: RuntimeState, sessionId: string) =>
@@ -70,7 +70,12 @@ const createHostSession = (state: RuntimeState, input: import("../../../session/
       createdAt: yield* preparedOccurredAt,
       queue: [],
     }
-    if (input.selection !== undefined) Object.assign(session, { selection: input.selection })
+    if (input.selection !== undefined)
+      Object.assign(session, {
+        selection: yield* validateSelection({ state, sessionId: input.id, selection: input.selection }).pipe(
+          Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+        ),
+      })
     if (input.title !== undefined) Object.assign(session, { title: input.title })
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(input.id, { session, lastCursor: -1, events: [], subscribers: new Map() })

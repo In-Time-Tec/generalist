@@ -153,6 +153,7 @@ const makeRuntime = (acceptedSequence = 0) => {
 
   const runtime: Runtime.Service = {
     sessionSelection: () => Effect.die("not used"),
+    configureDelegationPolicy: () => Effect.die("not used"),
     submitSessionInput: () => Effect.die("not used"),
     updateSessionInput: () => Effect.die("not used"),
     removeSessionInput: () => Effect.die("not used"),

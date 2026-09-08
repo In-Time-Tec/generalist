@@ -32,7 +32,7 @@ const mapValues = <K, A, B>(input: ReadonlyMap<K, A>, f: (value: A, key: K) => B
 
 const withSubscribers = <A, S>(value: A, subscribers: S) => ({ ...value, subscribers })
 
-type HydratedTable = Exclude<HydratedState[keyof HydratedState], number>
+type HydratedTable = Extract<HydratedState[keyof HydratedState], ReadonlyMap<string, unknown>>
 type HydratedRow = HydratedTable extends ReadonlyMap<string, infer Row> ? Row : never
 type MutableChanges = { [Key in keyof Changes]: Array<Changes[Key][number]> }
 const projectTable = (
@@ -332,13 +332,13 @@ export const make = () => {
           }
           for (const key of Record.keys(state)) {
             const field = state[key]
-            if (Predicate.isNumber(field)) continue
+            if (!(field instanceof Map)) continue
             const before = previous?.[key]
             const retained = installed?.view[key]
             const projected = projectTable(
               field,
-              Predicate.isNumber(before) ? undefined : before,
-              Predicate.isNumber(retained) ? undefined : retained,
+              before instanceof Map ? before : undefined,
+              retained instanceof Map ? retained : undefined,
               hostCopy,
             )
             Reflect.set(view, key, projected.values)

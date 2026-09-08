@@ -35,6 +35,7 @@ import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner 
 import type { HandlersFor } from "./tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
 import type { ManagedArtifactTool } from "../artifact.js"
+import { childProfiles } from "./lifecycle/construction.js"
 export {
   AgentTypeId,
   close,
@@ -85,6 +86,7 @@ export interface MakeOptions<
   OutputSchema extends Schema.Top = typeof Schema.String,
 > {
   readonly name: string
+  readonly children?: ReadonlyArray<string>
   readonly input?: InputSchema
   readonly output?: OutputSchema
   readonly instructions?: string
@@ -150,9 +152,6 @@ type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | InputCodecOf<O>["EncodingServices"]
   | OutputCodecOf<O>["DecodingServices"]
   | OutputCodecOf<O>["EncodingServices"]
-interface MakeImplementationResult {
-  readonly name: string
-}
 type MakeOptionsConstraint<Tools extends Record<string, Tool.Any>> = Omit<
   MakeOptions<Tools, unknown, unknown, Schema.Top, Schema.Top>,
   "gates"
@@ -209,7 +208,7 @@ export function make<
   options:
     | MakeOptions<Tools, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>
     | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
-): MakeImplementationResult {
+): Pick<Agent<Record<never, never>, never>, "name"> {
   const declaredTools: ReadonlyArray<Tool.Any> | undefined =
     "tools" in options && Array.isArray(options.tools) ? options.tools : undefined
   const toolkit = declaredTools === undefined ? (options.toolkit ?? Toolkit.empty) : Toolkit.make(...declaredTools)
@@ -231,6 +230,7 @@ export function make<
   }
   const definition = {
     name: options.name,
+    children: childProfiles(options.children),
     input: options.input ?? Schema.String,
     output: options.output ?? Schema.String,
     instructions: options.instructions,

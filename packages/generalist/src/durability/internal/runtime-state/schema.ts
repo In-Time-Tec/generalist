@@ -38,6 +38,7 @@ import { RunWait } from "../../../runtime/run/wait.js"
 import { HostSession, HostSessionEvent } from "../../../runtime/session/host.js"
 import { TreeEvent } from "../../../runtime/tree.js"
 import { TreePolicy } from "../../../runtime/tree/policy.js"
+import { BudgetLimits } from "../../../core/durable/run-budget.js"
 import { SessionEntryCodec } from "./session.js"
 import { FrameworkError } from "./framework-error.js"
 import type { DataSchema, Reuse } from "./cache.js"
@@ -193,6 +194,7 @@ export const fields = ({ reuse, table }: { readonly reuse: Reuse; readonly table
   const map = <S extends DataSchema>(value: S) => reuse(Schema.ReadonlyMap(Schema.String, reuse(value)))
   const rootMap = table ?? map
   return {
+    delegationPolicy: Schema.NullOr(TreePolicy),
     nextRunCounter: Counter,
     nextOperationCounter: Counter,
     nextSteeringCounter: Counter,
@@ -201,6 +203,18 @@ export const fields = ({ reuse, table }: { readonly reuse: Reuse; readonly table
     waits: rootMap(RunWait),
     sessions: rootMap(
       Schema.Struct({
+        family: Schema.optionalKey(
+          Schema.Struct({
+            rootSessionId: Schema.String,
+            parentSessionId: Schema.NullOr(Schema.String),
+            parentRunId: Schema.NullOr(Schema.String),
+            depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+            treePolicy: TreePolicy,
+            budget: BudgetLimits,
+            runIds: strings,
+            childSessionIds: strings,
+          }),
+        ),
         entries: map(SessionEntryCodec),
         order: strings,
         leaf: Schema.NullOr(Schema.String),

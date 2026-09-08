@@ -1,10 +1,22 @@
-import { Effect } from "effect"
+import { Effect, Function, Option } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { Skill } from "../core/context/skill-catalog.js"
-import type { Declaration as HookDeclaration } from "../hooks/index.js"
+import { make as makeHooks, type Declaration as HookDeclaration, type Service as HooksService } from "../hooks/index.js"
 import type { Provider as InstructionProvider } from "../instructions/providers.js"
 import { PluginNameConflict, PluginToolConflict } from "./errors.js"
+
+export const mergedHooks: {
+  (contributed: ReadonlyArray<HookDeclaration>): (current: Option.Option<HooksService>) => HooksService | undefined
+  (current: Option.Option<HooksService>, contributed: ReadonlyArray<HookDeclaration>): HooksService | undefined
+} = Function.dual(
+  2,
+  (current: Option.Option<HooksService>, contributed: ReadonlyArray<HookDeclaration>): HooksService | undefined => {
+    const existing = Option.getOrUndefined(current)
+    if (contributed.length === 0) return existing
+    return makeHooks({ declarations: [...(existing?.declarations ?? []), ...contributed] })
+  },
+)
 
 /** One deterministic collection of host-owned Agent contributions. */
 export interface Plugin<Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>> {

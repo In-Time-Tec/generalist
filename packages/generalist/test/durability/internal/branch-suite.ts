@@ -21,6 +21,7 @@ import { make as makeProgramRunner } from "../../../src/runtime/program/runner.j
 import { program, programAddress, programExecutable, programFixture } from "../../runtime/program/fixture.js"
 import { make as makeSimulator, type Client } from "../../../src/testing/durability/index.js"
 import { registrationsFor } from "../../runtime/execution/fixtures.js"
+import { AgentManifest, ExecutableManifest } from "../../../src/index.js"
 
 export const register = ({
   makeRunStore,
@@ -29,7 +30,15 @@ export const register = ({
   readonly makeRunStore: typeof import("../../../src/runtime/state/store.js").makeRunStore
   readonly makeTest: typeof import("../../../src/runtime/executable/manifest.js").makeTest
 }): void => {
-  const executable = makeTest("branch-evidence", "1")
+  const base = makeTest("branch-evidence", "1")
+  const entry = base.manifest.entries[0]!
+  if (entry._tag !== "Agent") throw new TypeError("Branch evidence requires an Agent fixture")
+  const agent = AgentManifest.make({ ...entry.manifest, children: [{ selection: "branch-evidence" }] })
+  const executable = ExecutableManifest.make({
+    root: agent.pin,
+    profiles: [{ selection: "branch-evidence", agent: agent.pin }],
+    entries: [{ _tag: "Agent", ...agent }],
+  })
   const address = Address.make("agent:branch-evidence")
   const options = {
     environment: "test",

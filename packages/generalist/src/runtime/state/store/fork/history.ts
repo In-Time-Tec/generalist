@@ -102,6 +102,7 @@ export const rewoundSession = ({
       return { ...component, state: selected === undefined ? component.initialState! : selected.state }
     }),
   }
+  if (session.family !== undefined) copy.family = session.family
   return Effect.succeed(copy)
 }
 

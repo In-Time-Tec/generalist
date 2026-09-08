@@ -34,7 +34,7 @@ const externalRoot = (id: string) =>
         executableRef: assistantRef.ref,
         executableManifest: assistantRef.manifest,
         registrations: registrationsFor(assistantRef),
-        treePolicy: { maxDepth: 2, maxSubagents: 2 },
+        treePolicy: { maxDepth: 2, maxSessions: 1024, concurrency: { agents: 2, tools: 1024 } },
       },
     }
     return { placementId: `placement:${id}`, ...request, ...(yield* identifyRequest(request)) }
@@ -69,7 +69,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
       sessionId: id,
       idempotencyKey: id,
       prompt: textPrompt("external parent"),
-      treePolicy: { maxDepth: 2, maxSubagents: 1 },
+      treePolicy: { maxDepth: 2, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
     })
   })
   describe(`external child placement (${name})`, () => {

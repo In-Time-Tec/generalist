@@ -602,6 +602,12 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 > `readonly` **agents**: `Agents`
 
+<a id="limits"></a>
+
+##### limits?
+
+> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
+
 <a id="plugins-1"></a>
 
 ##### plugins?
@@ -1132,13 +1138,25 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### treePolicy.concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### treePolicy.concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### treePolicy.concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### treePolicy.maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### treePolicy.maxSubagents
+###### treePolicy.maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 <a id="title"></a>
 
@@ -1470,13 +1488,25 @@ One deterministic collection of host-owned Agent contributions.
 
 > `readonly` `optional` **treePolicy?**: `object`
 
+###### treePolicy.concurrency
+
+> `readonly` **concurrency**: `object`
+
+###### treePolicy.concurrency.agents
+
+> `readonly` **agents**: `number`
+
+###### treePolicy.concurrency.tools
+
+> `readonly` **tools**: `number`
+
 ###### treePolicy.maxDepth
 
 > `readonly` **maxDepth**: `number`
 
-###### treePolicy.maxSubagents
+###### treePolicy.maxSessions
 
-> `readonly` **maxSubagents**: `number`
+> `readonly` **maxSessions**: `number`
 
 ###### Inherited from
 
@@ -1714,7 +1744,7 @@ One Agent-authored shared artifact edit committed by this Run.
 
 ### CreateError
 
-> **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict)
+> **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
 
 ***
 
