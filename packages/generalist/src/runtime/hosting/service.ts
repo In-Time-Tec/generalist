@@ -513,6 +513,9 @@ const makeRuntimeWith = (
           const from = yield* SessionSender
           return yield* store.messageSessionInput({ ...input, from })
         }),
+      sessionHistoryPage: store.hostSessionHistoryPage,
+      sessionRunsPage: store.hostSessionRunsPage,
+      sessionRunSummary: store.hostSessionRunSummary,
       listSessions: store.listHostSessions,
       sessionRuns: store.hostSessionRuns,
       sessionEvents: (input) =>

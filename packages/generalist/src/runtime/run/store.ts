@@ -458,6 +458,9 @@ export interface Service {
     import("../session/host.js").HostSessionSnapshot,
     import("../session/host.js").SessionSnapshotError
   >
+  readonly hostSessionHistoryPage: import("../session/host.js").RuntimeHostSessions["sessionHistoryPage"]
+  readonly hostSessionRunsPage: import("../session/host.js").RuntimeHostSessions["sessionRunsPage"]
+  readonly hostSessionRunSummary: import("../session/host.js").RuntimeHostSessions["sessionRunSummary"]
   /** List product-facing Sessions in creation order. */
   readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
   readonly hostSessionFamily: import("../session/host.js").RuntimeHostSessions["sessionFamily"]

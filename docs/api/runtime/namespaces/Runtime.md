@@ -2409,7 +2409,7 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ##### sessionEvents
 
-> `readonly` **sessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
+> `readonly` **sessionEvents**: (`input`) => `Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
 
 ###### Parameters
 
@@ -2419,17 +2419,17 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `object`[]; `leafId`: `string` \| `null`; `previousLeafId`: `string` \| `null`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
+`Stream`\<\{ `cursor`: `number`; `event`: [`RunEvent`](./RunEvent.md#runevent); \} \| \{ `cursor`: `number`; `update`: \{ `afterEntryId`: `string` \| `null`; `entries`: readonly `ConversationEntry`[]; `leafId`: `string` \| `null`; `nextLeafId?`: `string`; `previousLeafId`: `string` \| `null`; `reset?`: `true`; \}; \}, [`SessionEventsError`](./HostSession.md#sessioneventserror)\>
 
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionEvents`](./HostSession.md#sessionevents)
 
-<a id="sessionfamily"></a>
+<a id="sessionhistorypage"></a>
 
-##### sessionFamily
+##### sessionHistoryPage
 
-> `readonly` **sessionFamily**: (`sessionId`, `input`) => `Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+> `readonly` **sessionHistoryPage**: (`sessionId`, `input`) => `Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
 
 ###### Parameters
 
@@ -2439,13 +2439,9 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### input
 
-###### at?
+###### leafId
 
-`number`
-
-###### before?
-
-`number`
+`string` \| `null`
 
 ###### limit
 
@@ -2453,11 +2449,11 @@ Address resolution selects one exact target Run before unified inbox admission.
 
 ###### Returns
 
-`Effect`\<\{ `at`: `number`; `nextBefore`: `number` \| `null`; `rootSessionId`: `string`; `sessions`: readonly `object`[]; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionPageInvalid`](../../host.md#sessionpageinvalid)\>
+`Effect`\<[`SessionHistoryPage`](../../host.md#sessionhistorypage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
 
 ###### Inherited from
 
-[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionFamily`](./HostSession.md#sessionfamily)
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionHistoryPage`](./HostSession.md#sessionhistorypage)
 
 <a id="sessionruns"></a>
 
@@ -2478,6 +2474,68 @@ Address resolution selects one exact target Run before unified inbox admission.
 ###### Inherited from
 
 [`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRuns`](./HostSession.md#sessionruns)
+
+<a id="sessionrunspage"></a>
+
+##### sessionRunsPage
+
+> `readonly` **sessionRunsPage**: (`sessionId`, `input`) => `Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### input
+
+###### at
+
+`number`
+
+###### before?
+
+`number`
+
+###### limit
+
+`number`
+
+###### rootRunId?
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunsPage`](../../host.md#sessionrunspage), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRunsPage`](./HostSession.md#sessionrunspage)
+
+<a id="sessionrunsummary"></a>
+
+##### sessionRunSummary
+
+> `readonly` **sessionRunSummary**: (`sessionId`, `runId`) => `Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Parameters
+
+###### sessionId
+
+`string`
+
+###### runId
+
+`string`
+
+###### Returns
+
+`Effect`\<[`SessionRunSummary`](../../host.md#sessionrunsummary), [`SessionPageError`](./HostSession.md#sessionpageerror)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`sessionRunSummary`](./HostSession.md#sessionrunsummary)
 
 <a id="sessionselection"></a>
 

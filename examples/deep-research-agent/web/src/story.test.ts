@@ -28,6 +28,7 @@ const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunE
 const eventFrame = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
   Connection.HostDelivery({
     epoch: 0,
+    activeRunId: tag === "Completed" ? null : sessionId,
     event: Schema.decodeUnknownSync(HostEvent)({ _tag: tag, sessionId, cursor, runId: sessionId, event }),
   })
 
@@ -111,6 +112,7 @@ const toolResult = Object.assign(
 const completionFrames: ReadonlyArray<Connection.Incoming> = [
   Connection.HostDelivery({
     epoch: 0,
+    activeRunId: sessionId,
     event: {
       _tag: "Conversation",
       sessionId,
@@ -159,6 +161,7 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
   eventFrame(5, "Turn", runEvent(5, { _tag: "TurnStarted", turn: 1 })),
   Connection.HostDelivery({
     epoch: 0,
+    activeRunId: sessionId,
     event: {
       _tag: "Conversation",
       sessionId,
