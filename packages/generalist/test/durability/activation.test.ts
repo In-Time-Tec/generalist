@@ -110,7 +110,7 @@ describe("partition activation deadlines", () => {
           commandId: "replacement-claim",
         })
         expect(claim.attemptFence).toBeGreaterThan(prior.attemptFence)
-        expect(BigInt(claim.session.epoch)).toBeGreaterThan(BigInt(prior.session.epoch))
+        expect(BigInt(claim.session!.epoch)).toBeGreaterThan(BigInt(prior.session!.epoch))
       }),
     ),
   )
