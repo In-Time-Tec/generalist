@@ -1250,7 +1250,7 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 ##### lifecycle?
 
-> `readonly` `optional` **lifecycle?**: `"stopped"` \| `"closed"`
+> `readonly` `optional` **lifecycle?**: `"closed"` \| `"stopped"`
 
 <a id="queue"></a>
 
@@ -1664,7 +1664,7 @@ One deterministic collection of host-owned Agent contributions.
 
 ##### lifecycle?
 
-> `readonly` `optional` **lifecycle?**: `"stopped"` \| `"closed"`
+> `readonly` `optional` **lifecycle?**: `"closed"` \| `"stopped"`
 
 ###### Inherited from
 

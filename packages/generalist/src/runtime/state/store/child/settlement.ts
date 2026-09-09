@@ -32,6 +32,21 @@ export const hasUnsettledChild: {
   )
 })
 
+const childSettlementMetadata = (parent: StoredRun, childRunId: string) => {
+  const linked = parent.events.find((event) => event._tag === "ChildLinked" && event.childRunId === childRunId)
+  if (linked?._tag !== "ChildLinked") return {}
+  type Metadata = Pick<
+    Extract<RunEvent, { readonly _tag: "ChildLinked" }>,
+    "continuationBudget" | "sponsoredContinuation"
+  >
+  const metadata: Metadata = {}
+  if (linked.continuationBudget !== undefined)
+    Object.assign(metadata, { continuationBudget: linked.continuationBudget })
+  if (linked.sponsoredContinuation !== undefined)
+    Object.assign(metadata, { sponsoredContinuation: linked.sponsoredContinuation })
+  return metadata
+}
+
 export const reconcileChildWait: {
   (
     parent: StoredRun,
@@ -115,6 +130,7 @@ export const settleParentChild: {
     runs.set(child.runId, { ...child, childReadiness: "settled" })
     const settledState = { ...state, runs }
     const terminalEvent = child.events.find((event) => event.eventId === terminalEventId)
+    const metadata = childSettlementMetadata(parent, child.runId)
     const notified =
       terminalEvent === undefined
         ? settledState
@@ -127,15 +143,13 @@ export const settleParentChild: {
       parent.runId,
       childReadinessChangedEvent(child.runId, "settled"),
     )
-    const [, linked] = yield* appendLifecycle(
-      readinessChanged,
-      parent.runId,
-      childSettledEvent({
-        childRunId: child.runId,
-        terminalEventId,
-        spend: yield* spendForEvents({ events: child.events, observedMillis: yield* occurredAtMillis }),
-      }),
-    )
+    const settledEvent = childSettledEvent({
+      childRunId: child.runId,
+      terminalEventId,
+      spend: yield* spendForEvents({ events: child.events, observedMillis: yield* occurredAtMillis }),
+    })
+    Object.assign(settledEvent, metadata)
+    const [, linked] = yield* appendLifecycle(readinessChanged, parent.runId, settledEvent)
     const currentParent = linked.runs.get(parent.runId)
     const reconciled =
       currentParent === undefined || terminalEvent === undefined

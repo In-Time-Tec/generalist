@@ -13,7 +13,7 @@ import { make as makeMessage } from "../../../messaging/message.js"
 import { make as makeAddress } from "../../../address.js"
 import { validate as validatePayload } from "../../../execution/payload/index.js"
 import { decodePinned, resolveChild } from "../../../executable/manifest-internal.js"
-import { laneKey, type RuntimeState } from "../../projection.js"
+import { laneKey, type RuntimeSession, type RuntimeState, type StoredRun } from "../../projection.js"
 import { admitStart, admitSpawn } from "../admission/accept.js"
 import { addRegistrations } from "../admission/registration.js"
 import { narrow as narrowTreePolicy } from "../../../tree/policy.js"
@@ -30,6 +30,13 @@ const sessionFor = (state: RuntimeState, sessionId: string) => {
   const stored = state.hostSessions.get(sessionId)
   return stored === undefined ? Effect.fail(SessionNotFound.make({ sessionId })) : Effect.succeed(stored)
 }
+
+const rejectClosed = (sessionId: string) =>
+  SessionQueueConflict.make({
+    sessionId,
+    reason: "closed",
+    hint: "A closed Session is read-only; use a new Session for additional work.",
+  })
 
 export const validateSelection = ({
   state,
@@ -137,8 +144,12 @@ const promoteChild = ({
     const stored = state.hostSessions.get(sessionId)!
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(sessionId, { ...stored, session: { ...stored.session, queue: stored.session.queue.slice(1) } })
-    const sponsor = stored.session.sponsorRunId === undefined ? undefined : state.runs.get(stored.session.sponsorRunId)
-    if (sponsor === undefined || isTerminal(sponsor.status) || sponsor.cancellationRequested) return state
+    const authority = continuationAuthority(
+      stored.session.sponsorRunId === undefined ? undefined : state.runs.get(stored.session.sponsorRunId),
+      state.sessions.get(sessionId)?.continuation,
+    )
+    if (authority === undefined) return state
+    const { sponsor, continuation } = authority
     const selection = sponsor.executableManifest.profiles.find(
       (profile) =>
         resolveChild(sponsor.executableRef, sponsor.executableManifest, profile.selection)?.active ===
@@ -161,6 +172,7 @@ const promoteChild = ({
           correlationId: pending.id,
           prompt: pending.prompt,
         }),
+        sponsoredContinuation: true,
       },
     ).pipe(Effect.result)
     if (result._tag === "Failure") {
@@ -169,11 +181,63 @@ const promoteChild = ({
       return yield* RuntimeUnavailable.make({ message: `Session message promotion failed: ${result.failure._tag}` })
     }
     const [receipt, admitted] = result.success
-    const sessions = new Map(admitted.hostSessions)
+    let next = admitted
+    const replenished = wasReplenished(continuation, next, sessionId, sponsor.runId)
+    if (!receipt.duplicate && !replenished) next = consumeContinuation(next, sessionId, continuation)
+    const sessions = new Map(next.hostSessions)
     const current = sessions.get(sessionId)!
     sessions.set(sessionId, { ...current, session: { ...current.session, activeRunId: receipt.runId } })
-    return { ...admitted, hostSessions: sessions }
+    return { ...next, hostSessions: sessions }
   })
+
+const continuationAuthority = (
+  sponsor: StoredRun | undefined,
+  continuation: RuntimeSession["continuation"],
+): { readonly sponsor: StoredRun; readonly continuation: NonNullable<RuntimeSession["continuation"]> } | undefined => {
+  if (
+    sponsor === undefined ||
+    sponsor.cancellationRequested ||
+    continuation === undefined ||
+    continuation.closed ||
+    (continuation.remainingRuns === 0 && continuation.fundingRunId === sponsor.runId)
+  )
+    return undefined
+  return { sponsor, continuation }
+}
+
+const wasReplenished = (
+  continuation: RuntimeSession["continuation"],
+  state: RuntimeState,
+  sessionId: string,
+  sponsorRunId: string,
+): boolean => {
+  const next = state.sessions.get(sessionId)?.continuation
+  return (
+    continuation !== undefined &&
+    continuation.remainingRuns === 0 &&
+    next?.fundingRunId === sponsorRunId &&
+    next.remainingRuns === 1
+  )
+}
+
+const consumeContinuation = (
+  state: RuntimeState,
+  sessionId: string,
+  continuation: RuntimeSession["continuation"],
+): RuntimeState => {
+  if (continuation === undefined || continuation.remainingRuns === 0) return state
+  const runtimeSession = state.sessions.get(sessionId)
+  if (runtimeSession?.continuation === undefined) return state
+  const sessions = new Map(state.sessions)
+  sessions.set(sessionId, {
+    ...runtimeSession,
+    continuation: {
+      ...runtimeSession.continuation,
+      remainingRuns: runtimeSession.continuation.remainingRuns - 1,
+    },
+  })
+  return { ...state, sessions }
+}
 
 export const promote = ({ state, sessionId }: { readonly state: RuntimeState; readonly sessionId: string }) =>
   Effect.gen(function* () {
@@ -232,6 +296,7 @@ const authenticateSender = ({ state, input }: { readonly state: RuntimeState; re
     if (
       "runId" in input.from &&
       (sender === undefined ||
+        state.hostSessions.get(sender.message.sessionId)?.session.lifecycle === "closed" ||
         state.sessions.get(sender.message.sessionId)?.family?.rootSessionId !== family?.rootSessionId)
     )
       return yield* RuntimeUnavailable.make({ message: "Session sender is not an authenticated member of this family" })
@@ -244,6 +309,7 @@ export const message = ({ state, input }: { readonly state: RuntimeState; readon
   Effect.gen(function* () {
     yield* validatePayload({ value: input, boundary: "Session message" })
     const stored = yield* sessionFor(state, input.sessionId)
+    if (stored.session.lifecycle === "closed") return yield* rejectClosed(input.sessionId)
     const { family, sender, from } = yield* authenticateSender({ state, input })
     const active = stored.session.activeRunId === undefined ? undefined : state.runs.get(stored.session.activeRunId)
     const addressed = makeMessage({
@@ -304,6 +370,7 @@ export const submit = ({ state, input }: { readonly state: RuntimeState; readonl
   Effect.gen(function* () {
     yield* validatePayload({ value: input, boundary: "Session input" })
     const stored = yield* sessionFor(state, input.sessionId)
+    if (stored.session.lifecycle === "closed") return yield* rejectClosed(input.sessionId)
     const selection = yield* validateSelection({
       state,
       sessionId: input.sessionId,
@@ -332,6 +399,7 @@ export const update = ({ state, input }: { readonly state: RuntimeState; readonl
   Effect.gen(function* () {
     yield* validatePayload({ value: input, boundary: "Session queue mutation" })
     const stored = yield* sessionFor(state, input.sessionId)
+    if (stored.session.lifecycle === "closed") return yield* rejectClosed(input.sessionId)
     const item = stored.session.queue.find((entry) => entry.id === input.id)
     if (item === undefined || item.revision !== input.expectedRevision)
       return yield* SessionQueueConflict.make({

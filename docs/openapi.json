@@ -11017,7 +11017,10 @@
                                   "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/session/SessionQueueConflict"] },
                                     "sessionId": { "type": "string" },
-                                    "reason": { "type": "string", "enum": ["revision", "capacity", "selection"] },
+                                    "reason": {
+                                      "type": "string",
+                                      "enum": ["revision", "capacity", "selection", "closed"]
+                                    },
                                     "hint": { "type": "string" }
                                   },
                                   "required": ["_tag", "sessionId", "reason", "hint"],
@@ -13152,7 +13155,7 @@
         "properties": {
           "_tag": { "type": "string", "enum": ["generalist/session/SessionQueueConflict"] },
           "sessionId": { "type": "string" },
-          "reason": { "type": "string", "enum": ["revision", "capacity", "selection"] },
+          "reason": { "type": "string", "enum": ["revision", "capacity", "selection", "closed"] },
           "hint": { "type": "string" }
         },
         "required": ["_tag", "sessionId", "reason", "hint"],
