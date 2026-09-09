@@ -14,6 +14,7 @@ interface Input {
   readonly sessionId: string
   readonly selection: SessionSelection
   readonly message?: Message
+  readonly bypassRetained?: boolean
 }
 
 export const retainedBudget = (input: Pick<Input, "state" | "sessionId">) =>
@@ -114,7 +115,7 @@ export const sessionChildGrant = (input: Input & { readonly grant: BudgetLimits 
   Effect.gen(function* () {
     yield* validateTools(input)
     const profile = profileBudget({ ref: input.selection.executableRef, manifest: input.selection.executableManifest })
-    const remaining = yield* retainedBudget(input)
+    const remaining = input.bypassRetained === true ? profile : yield* retainedBudget(input)
     const budget = capGrant(capGrant(input.grant, profile), remaining)
     yield* requireAvailable(budget)
     return budget
