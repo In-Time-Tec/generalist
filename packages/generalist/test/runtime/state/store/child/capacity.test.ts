@@ -25,7 +25,10 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
   const parent = Agent.make({ name: "parent", children: ["parent"] })
   const fresh = () =>
     Layer.mergeAll(
-      objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([]))),
+      objectRuntimeLayer(
+        { addresses: [], maxStateBytes: 64 * 1024 * 1024, admissionReserveBytes: 16 * 1024 * 1024 },
+        storage,
+      ).pipe(Layer.provide(layerStatic([]))),
       Toolkit.make(tool).toLayer({ count: () => Effect.succeed(1) }),
       layer([]),
       layerAutoApprove,
