@@ -1388,3 +1388,102 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
   expect(serverBuilds).toBe(2)
   expect(serverFinalized).toBe(2)
 })
+
+test("owns scoped server factory resources until the actor host retires", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  const serverAgents = { [agent.name]: agent } as const
+  let acquired = 0
+  let released = 0
+  const principal = { id: "factory-controller", tenantId: "rivet", role: "controller" as const }
+  const definition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, Runtime.Runtime>({
+    ...makeOptions(model, bucket, "server-factory-scope", 60_000),
+    server: {
+      make: () =>
+        Effect.gen(function* () {
+          const lifetime = yield* Effect.acquireRelease(
+            Effect.sync(() => {
+              acquired++
+              return { open: true }
+            }),
+            (resource) =>
+              Effect.sync(() => {
+                resource.open = false
+                released++
+              }),
+          )
+          const services = yield* Layer.build(
+            Layer.mergeAll(model, Approvals.layerAutoApprove, Permissions.layerAllowAll),
+          )
+          const host = yield* Host.make({ agents: serverAgents, revision: "factory-scope" }).pipe(
+            Effect.provide(services),
+          )
+          return {
+            host,
+            auth: Layer.succeed(
+              Authentication,
+              Authentication.of({
+                bearer: (httpEffect) => Effect.provideService(httpEffect, CurrentPrincipal, principal),
+              }),
+            ),
+            authorization: {
+              tenantId: "rivet",
+              authorize: () => Effect.sync(() => lifetime.open),
+            },
+          }
+        }),
+    },
+  })
+  const key = partitionKey("server-factory-scope")
+  for (let incarnation = 0; incarnation < 2; incarnation++) {
+    const before = acquired
+    const registry = registerShutdown(
+      context,
+      await setupRegistry({ envoy: testPool(context), use: { factoryScope: definition } }),
+    )
+    const { client } = await setupTest(context, registry)
+    const partition = client.factoryScope.getOrCreate(key, testPool(context))
+    const response = await partition.fetch("/sessions", {
+      method: "POST",
+      headers: { authorization: "Bearer local-token", "content-type": "application/json" },
+      body: JSON.stringify({ id: `factory-session-${incarnation}`, agent: agent.name }),
+    })
+    expect(response.status).toBe(200)
+    expect(acquired).toBeGreaterThan(before)
+    expect(released).toBe(before)
+    await response.arrayBuffer()
+    await partition.runtime.drain()
+    expect(released).toBe(before)
+    await registry.shutdown()
+    expect(released).toBe(acquired)
+  }
+})
+
+test("releases scoped server factory resources when construction fails", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  let acquired = 0
+  let released = 0
+  const definition = makeRuntimeActor({
+    ...makeOptions(model, bucket, "failed-server-factory", 60_000),
+    server: {
+      make: () =>
+        Effect.gen(function* () {
+          yield* Effect.acquireRelease(
+            Effect.sync(() => void acquired++),
+            () => Effect.sync(() => void released++),
+          )
+          return yield* RuntimeUnavailable.make({ message: "server factory fixture failed" })
+        }),
+    },
+  })
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { failedFactory: definition } }),
+  )
+  const { client } = await setupTest(context, registry)
+  const partition = client.failedFactory.getOrCreate(partitionKey("failed-server-factory"), testPool(context))
+  const response = await partition.fetch("/sessions")
+  expect(response.status).toBe(503)
+  expect(acquired).toBeGreaterThan(0)
+  await registry.shutdown()
+  expect(released).toBe(acquired)
+})

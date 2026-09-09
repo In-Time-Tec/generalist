@@ -14,14 +14,14 @@ You will learn how to:
 
 ## Step 1: Create the project
 
-The install command targets Generalist 0.65.1; see [Installation](/start/installation) before using the registry. The [repository examples](/start/examples) run against the current workspace.
+The install command targets Generalist 0.65.2; see [Installation](/start/installation) before using the registry. The [repository examples](/start/examples) run against the current workspace.
 
 **Terminal**
 
 ```bash
 mkdir cell-agent && cd cell-agent
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.65.1 @effect/platform-bun@4.0.0-rc.112
+bun add effect@4.0.0-rc.112 generalist@0.65.2 @effect/platform-bun@4.0.0-rc.112
 ```
 
 `generalist/repl`'s root export is contracts only, so nothing so far touches a process.
