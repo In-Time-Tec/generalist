@@ -3,6 +3,7 @@ import { Tool, Toolkit } from "effect/unstable/ai"
 import { AgentMessaging } from "./messaging/service.js"
 import { MessageReceipt } from "./messaging/mailbox.js"
 import { ToolContext } from "../core/tools/tool-context.js"
+import { Inline } from "../core/tools/background/index.js"
 import { AdmissionPolicy as AdmissionPolicySchema, SteeringEntry } from "./run/steering.js"
 
 export {
@@ -40,7 +41,7 @@ const sendToChild = Tool.make("send_to_child", {
   failure: ToolFailure,
   failureMode: "return",
   dependencies: [AgentMessaging, ToolContext],
-})
+}).annotate(Inline, true)
 const sendToParent = Tool.make("send_to_parent", {
   description: "Send a message to this Run's direct parent.",
   parameters: SendParameters,
@@ -48,7 +49,7 @@ const sendToParent = Tool.make("send_to_parent", {
   failure: ToolFailure,
   failureMode: "return",
   dependencies: [AgentMessaging, ToolContext],
-})
+}).annotate(Inline, true)
 const listInbox = Tool.make("list_inbox", {
   description: "List this Run's pending admitted messages in delivery order.",
   parameters: ListParameters,
@@ -56,7 +57,7 @@ const listInbox = Tool.make("list_inbox", {
   failure: ToolFailure,
   failureMode: "return",
   dependencies: [AgentMessaging, ToolContext],
-})
+}).annotate(Inline, true)
 const steeringToolkit = Toolkit.make(sendToChild, sendToParent, listInbox)
 
 /** Effect AI tools for messaging direct children and parents and inspecting this Run's inbox. */

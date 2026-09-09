@@ -98,6 +98,9 @@ export const memoizeRegistered = <E, R>(input: {
   readonly operation: string
   readonly execute: Effect.Effect<Outcome, E, R>
 }): Effect.Effect<Outcome, E | FrameworkFailure, R> => {
-  const tool = get(input.registry, input.name)?.tool
-  return tool === undefined || input.skillActivation || input.handoff ? input.execute : memoize({ ...input, tool })
+  const candidate = get(input.registry, input.name)
+  const tool = candidate?.tool
+  return tool === undefined || candidate?.modelTool !== undefined || input.skillActivation || input.handoff
+    ? input.execute
+    : memoize({ ...input, tool })
 }

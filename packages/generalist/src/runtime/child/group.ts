@@ -1,5 +1,6 @@
 import { Function, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
+import { Inline } from "../../core/tools/background/index.js"
 import { FanOutMemberStatus, FanOutStatus, type FanOutInspection } from "./fan-out.js"
 import { MAX_FAN_OUT_MEMBERS } from "./fan-out-internal.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
@@ -137,7 +138,7 @@ const makeRunChildTool = (selection: Schema.Codec<string>): Tool.Any =>
     parameters: parametersFor(selection),
     success: Result,
     failure: Failure,
-  })
+  }).annotate(Inline, true)
 
 const makeStartGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
   Tool.make(startGroupToolName, {
@@ -146,7 +147,7 @@ const makeStartGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
     parameters: startGroupParametersFor(selection),
     success: GroupReceipt,
     failure: Failure,
-  })
+  }).annotate(Inline, true)
 
 const makeRunGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
   Tool.make(runGroupToolName, {
@@ -155,7 +156,7 @@ const makeRunGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
     parameters: startGroupParametersFor(selection),
     success: GroupResult,
     failure: Failure,
-  })
+  }).annotate(Inline, true)
 
 /** Blocking tool for dependent singleton child work. */
 export const tool = makeRunChildTool(Selection)
@@ -169,7 +170,7 @@ export const awaitGroupTool = Tool.make(awaitGroupToolName, {
   parameters: AwaitGroupParameters,
   success: GroupResult,
   failure: Failure,
-})
+}).annotate(Inline, true)
 
 /** Model-facing child tools narrowed to the active Agent's declared child selections. */
 const makeTools = (authority: Authority) => {
