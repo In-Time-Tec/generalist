@@ -760,7 +760,7 @@ One canonical HTTP/WebSocket handler retained for an actor incarnation.
 
 ##### handle
 
-> `readonly` **handle**: (`request`, `websocket?`) => `Effect`\<`Response`, `unknown`\>
+> `readonly` **handle**: (`request`, `websocket?`, `signal?`) => `Effect`\<`Response`, `unknown`\>
 
 **`Experimental`**
 
@@ -773,6 +773,10 @@ One canonical HTTP/WebSocket handler retained for an actor incarnation.
 ###### websocket?
 
 `UniversalWebSocket`
+
+###### signal?
+
+`AbortSignal`
 
 ###### Returns
 

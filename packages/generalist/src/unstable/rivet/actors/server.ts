@@ -1,6 +1,13 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context -- Effect HTTP's raw router handler intentionally preserves its platform error channel. */
-import { Context, Effect, Exit, Layer, Scope } from "effect"
-import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse, HttpServer } from "effect/unstable/http"
+import { Context, Effect, Exit, Layer, Scope, Stream } from "effect"
+import {
+  HttpBody,
+  HttpEffect,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+  HttpServer,
+} from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { UniversalWebSocket } from "rivetkit"
 import type { AgentRegistry } from "../../../host/index.js"
@@ -40,7 +47,11 @@ export interface RuntimeActorServerFactory<
 
 /** @experimental One canonical HTTP/WebSocket handler retained for an actor incarnation. */
 export interface RuntimeActorServer {
-  readonly handle: (request: Request, websocket?: UniversalWebSocket) => Effect.Effect<Response, unknown>
+  readonly handle: (
+    request: Request,
+    websocket?: UniversalWebSocket,
+    signal?: AbortSignal,
+  ) => Effect.Effect<Response, unknown>
 }
 
 interface ScopedResponse {
@@ -86,6 +97,17 @@ const scoped = <E>(
     (scope, exit) => (Exit.isSuccess(exit) && exit.value.retainScope ? Effect.void : Scope.close(scope, exit)),
   ).pipe(Effect.map((result) => result.value))
 
+const aborted = (signal: AbortSignal): Effect.Effect<void> =>
+  Effect.callback((resume) => {
+    const onAbort = () => resume(Effect.void)
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+    signal.addEventListener("abort", onAbort, { once: true })
+    return Effect.sync(() => signal.removeEventListener("abort", onAbort))
+  })
+
 const build = <Agents extends AgentRegistry, AuthError, AuthServices extends ActorRuntimeServices>(options: {
   readonly config: RuntimeActorServerOptions<Agents, AuthError, AuthServices>
   readonly memoMap: Layer.MemoMap
@@ -99,15 +121,35 @@ const build = <Agents extends AgentRegistry, AuthError, AuthServices extends Act
     )
     const router = Context.getUnsafe(context, HttpRouter.HttpRouter)
     const effect = router.asHttpEffect()
-    const handle = (request: Request, websocket?: UniversalWebSocket) =>
+    const handle = (request: Request, websocket?: UniversalWebSocket, signal?: AbortSignal) =>
       scoped(
         Effect.gen(function* () {
           const incoming = serverRequest(request, websocket)
           const current = yield* Effect.context()
           const services = Context.add(Context.merge(context, current), HttpServerRequest.HttpServerRequest, incoming)
-          const response = yield* Effect.provideContext(effect, services)
+          const streamSignal =
+            signal === undefined || signal === request.signal
+              ? (signal ?? request.signal)
+              : AbortSignal.any([signal, request.signal])
+          const response = yield* Effect.raceFirst(
+            Effect.provideContext(effect, services),
+            aborted(streamSignal).pipe(Effect.andThen(Effect.interrupt)),
+          )
           const retainScope = response.body._tag === "Stream"
-          const transferred = retainScope ? HttpEffect.scopeTransferToStream(response) : response
+          let transferred = retainScope ? HttpEffect.scopeTransferToStream(response) : response
+          if (retainScope) {
+            const body = transferred.body
+            if (body._tag === "Stream") {
+              transferred = HttpServerResponse.setBody(
+                transferred,
+                HttpBody.stream(
+                  Stream.interruptWhen(body.stream, aborted(streamSignal)),
+                  body.contentType,
+                  body.contentLength,
+                ),
+              )
+            }
+          }
           return {
             value: HttpServerResponse.toWeb(transferred, { context: services }),
             retainScope,

@@ -281,30 +281,28 @@ export const makeRuntimeActor = <
     recover: boolean,
     effect: (host: Host) => Effect.Effect<A, E, ActorRuntimeServices>,
   ): Promise<A> =>
-    c.keepAwake(
-      (async () => {
-        const host = await getHost(c)
-        if (c.vars.host !== host) return useHost(c, recover, effect)
-        host.requests++
-        try {
-          return await host.runtime.runPromise(
-            Effect.suspend(() => effect(host)).pipe(
-              Effect.raceFirst(host.service.failure),
-              Effect.ensuring(recover ? host.service.notify : Effect.void),
-            ),
-            {
-              signal: c.abortSignal,
-            },
-          )
-        } finally {
-          host.requests--
-          if (host.requests === 0) {
-            host.released?.()
-            if (host.server === undefined && host.idleRevision === host.revision) await retire(c, host)
-          }
+    (async () => {
+      const host = await getHost(c)
+      if (c.vars.host !== host) return useHost(c, recover, effect)
+      host.requests++
+      try {
+        return await host.runtime.runPromise(
+          Effect.suspend(() => effect(host)).pipe(
+            Effect.raceFirst(host.service.failure),
+            Effect.ensuring(recover ? host.service.notify : Effect.void),
+          ),
+          {
+            signal: c.abortSignal,
+          },
+        )
+      } finally {
+        host.requests--
+        if (host.requests === 0) {
+          host.released?.()
+          if (host.server === undefined && host.idleRevision === host.revision) await retire(c, host)
         }
-      })(),
-    )
+      }
+    })()
 
   const runAction = <A, E>(c: Context, effect: (runtime: RuntimeService) => Effect.Effect<A, E>): Promise<A> =>
     useHost(c, true, (host) => {
@@ -346,13 +344,23 @@ export const makeRuntimeActor = <
             useHost(c, false, (host) =>
               host.server === undefined
                 ? Effect.fail(RuntimeUnavailable.make({ message: "Rivet Server is not ready" }))
-                : host.server.handle(request).pipe(Effect.ensuring(host.service.notify)),
+                : host.server.handle(request, undefined, c.abortSignal).pipe(Effect.ensuring(host.service.notify)),
             ),
           onWebSocket: (c: Context, websocket: UniversalWebSocket) =>
             useHost(c, false, (host) =>
               host.server === undefined || c.request === undefined
                 ? Effect.fail(RuntimeUnavailable.make({ message: "Rivet Server is not ready" }))
-                : host.server.handle(c.request, websocket).pipe(Effect.asVoid, Effect.ensuring(host.service.notify)),
+                : Effect.forkIn(host.runtime.scope, { startImmediately: true })(
+                    host.server.handle(c.request, websocket, c.abortSignal).pipe(
+                      Effect.flatMap((response) =>
+                        response.status >= 400
+                          ? Effect.sync(() => websocket.close(1008, "request-rejected"))
+                          : Effect.void,
+                      ),
+                      Effect.catchCause(() => Effect.sync(() => websocket.close(1011, "request-failed"))),
+                      Effect.ensuring(host.service.notify),
+                    ),
+                  ).pipe(Effect.asVoid),
             ),
         }
 
