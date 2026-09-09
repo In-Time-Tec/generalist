@@ -27,6 +27,8 @@ import { registerChildRuns } from "./children/runs.js"
 import { registerSteering } from "./steering/recovery.js"
 import { registerArtifacts } from "./artifact/index.js"
 import { registerRuntime as registerRuntimeConformance } from "./runtime-registration.js"
+import { registerRunWaits } from "./run-waits/index.js"
+import { registerToolRuns } from "./tool-runs/index.js"
 
 export type * from "./contract.js"
 export * from "./payload/model-response-fault.js"
@@ -411,6 +413,18 @@ export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<Lay
       registerRuntimeConformance({
         options,
         capability: options.capabilities.runtime,
+        provide: (use) => provide(options, use),
+      })
+      registerRunWaits({
+        options,
+        capability: options.capabilities.runtime,
+        provide: (use) => provide(options, use),
+      })
+    }
+    if (options.capabilities["tool-runs"] !== undefined) {
+      registerToolRuns({
+        options,
+        capability: options.capabilities["tool-runs"],
         provide: (use) => provide(options, use),
       })
     }

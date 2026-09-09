@@ -222,6 +222,12 @@ Independently selectable Runtime driver conformance capabilities.
 
 > `readonly` `optional` **steering?**: [`SteeringCapability`](#steeringcapability)
 
+<a id="tool-runs"></a>
+
+##### tool-runs?
+
+> `readonly` `optional` **tool-runs?**: [`ToolRunsCapability`](#toolrunscapability)
+
 <a id="unknown-agent-on-recovery"></a>
 
 ##### unknown-agent-on-recovery?
@@ -622,6 +628,22 @@ Inbox persistence and exactly-once delivery capability.
 
 ***
 
+<a id="toolrunscapability"></a>
+
+### ToolRunsCapability
+
+Independently scheduled Tool Run lifecycle and capacity conformance capability.
+
+#### Properties
+
+<a id="claim-17"></a>
+
+##### claim
+
+> `readonly` **claim**: [`ClaimExecution`](#claimexecution)
+
+***
+
 <a id="unknownagentonrecoverycapability"></a>
 
 ### UnknownAgentOnRecoveryCapability
@@ -630,7 +652,7 @@ Missing-registration recovery capability exercised with one storage-issued execu
 
 #### Properties
 
-<a id="claim-17"></a>
+<a id="claim-18"></a>
 
 ##### claim
 
