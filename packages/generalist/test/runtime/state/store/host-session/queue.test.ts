@@ -343,6 +343,61 @@ for (const order of [
           expect((yield* fresh.snapshot(retained.activeRunId!)).budget.duration).toBeGreaterThan(0)
           expect((yield* fresh.snapshot(retained.activeRunId!)).budget.duration).toBeLessThan(10)
           expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
+          const continuedClaim = yield* fresh.claimExecution({
+            runId: retained.activeRunId!,
+            ownerId: "fresh",
+            commandId: "replacement-child-claim",
+          })
+          yield* fresh.complete({
+            ...continuedClaim,
+            commandId: "replacement-child-complete",
+            result: { text: "done", output: "done", turns: 1, session: { sessionId: "child", leafId: null } },
+          })
+          yield* fresh.releaseExecution(continuedClaim)
+          const renewed = yield* fresh.hostSession("child")
+          expect(renewed.activeRunId).toBeDefined()
+          expect((yield* fresh.hostSessionRuns("child")).length).toBe(3)
+          expect((yield* fresh.loadExecution(renewed.activeRunId!)).parentRunId).toBe(sponsorRunId)
+          const renewedClaim = yield* fresh.claimExecution({
+            runId: renewed.activeRunId!,
+            ownerId: "fresh",
+            commandId: "replacement-renewed-claim",
+          })
+          yield* fresh.complete({
+            ...renewedClaim,
+            commandId: "replacement-renewed-complete",
+            result: { text: "done", output: "done", turns: 1, session: { sessionId: "child", leafId: null } },
+          })
+          yield* fresh.releaseExecution(renewedClaim)
+          yield* fresh.messageSessionInput({
+            ...followup,
+            commandId: "replacement-followup-again",
+            from: { runId: sponsorRunId },
+          })
+          const final = yield* fresh.hostSession("child")
+          expect(final.activeRunId).toBeDefined()
+          expect((yield* fresh.hostSessionRuns("child")).length).toBe(4)
+          expect((yield* fresh.loadExecution(final.activeRunId!)).parentRunId).toBe(sponsorRunId)
+          const finalClaim = yield* fresh.claimExecution({
+            runId: final.activeRunId!,
+            ownerId: "fresh",
+            commandId: "replacement-final-claim",
+          })
+          yield* fresh.complete({
+            ...finalClaim,
+            commandId: "replacement-final-complete",
+            result: { text: "done", output: "done", turns: 1, session: { sessionId: "child", leafId: null } },
+          })
+          yield* fresh.releaseExecution(finalClaim)
+          yield* fresh.messageSessionInput({
+            ...followup,
+            commandId: "replacement-followup-final",
+            from: { runId: sponsorRunId },
+          })
+          expect((yield* fresh.hostSession("child")).queue.map((entry) => entry.id)).toEqual([
+            "replacement-followup-final",
+          ])
+          expect((yield* fresh.hostSessionRuns("child")).length).toBe(4)
           return
         }
         if (order === "terminal-parent") {
@@ -400,3 +455,132 @@ for (const order of [
     ),
   )
 }
+
+it.effect("conserves sponsor allocations across fresh-host sibling and continuation races", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const firstClient = yield* bucket.connect
+      const secondClient = yield* bucket.connect
+      const first = yield* open(firstClient, "conservation-first")
+      const second = yield* open(secondClient, "conservation-second")
+      const child = makeAgent({ name: "conservation-child", budget: { tokens: 3, toolCalls: 1 } })
+      const parent = makeAgent({
+        name: "conservation-parent",
+        children: [child.name],
+        budget: { tokens: 20, toolCalls: 4, children: 5 },
+      })
+      const { executable, registrations } = durableIdentity(parent, [parent, child])
+      const selected = {
+        executableRef: executable.ref,
+        executableManifest: executable.manifest,
+        registrations,
+      }
+      yield* first.createHostSession({ id: "parent", selection: selected })
+      yield* first.submitSessionInput({ sessionId: "parent", commandId: "start", prompt: Prompt.make("parent") })
+      const parentRunId = (yield* first.hostSession("parent")).activeRunId!
+      const message = (id: string, sessionId: string, prompt: string) => ({
+        id,
+        to: address(`spawn:${parentRunId}`),
+        sessionId,
+        prompt: Prompt.make(prompt),
+        idempotencyKey: id,
+        correlationId: id,
+        metadata: {},
+      })
+      const firstChild = message("child", "child", "child")
+      const childReceipt = yield* first.admitSpawn({
+        parentRunId,
+        invocationId: "child",
+        selection: child.name,
+        prompt: firstChild.prompt,
+        message: firstChild,
+      })
+      const initialHistory = yield* first.history({ runId: parentRunId, cursor: -1, limit: 100 })
+      const initialLinked = initialHistory.find(
+        (event) => event._tag === "ChildLinked" && event.childRunId === childReceipt.runId,
+      )
+      expect(initialLinked).toMatchObject({
+        _tag: "ChildLinked",
+        budget: { tokens: 3, toolCalls: 1 },
+        continuationBudget: { tokens: 3, toolCalls: 1 },
+      })
+      expect((yield* first.snapshot(parentRunId)).budget).toMatchObject({
+        tokens: 14,
+        toolCalls: 2,
+        children: 1,
+      })
+
+      const childClaim = yield* second.claimExecution({
+        runId: childReceipt.runId,
+        ownerId: "conservation-second",
+        commandId: "child-claim",
+      })
+      yield* second.complete({
+        ...childClaim,
+        commandId: "child-complete",
+        result: { text: "done", output: "done", turns: 1, session: { sessionId: "child", leafId: null } },
+      })
+      yield* second.releaseExecution(childClaim)
+      expect((yield* second.snapshot(parentRunId)).budget).toMatchObject({
+        tokens: 17,
+        toolCalls: 3,
+        children: 2,
+      })
+
+      const sibling = message("sibling", "sibling", "sibling")
+      const followup = {
+        sessionId: "child",
+        commandId: "followup",
+        prompt: Prompt.make("followup"),
+        from: { runId: parentRunId },
+      }
+      yield* Effect.all(
+        [
+          first.admitSpawn({
+            parentRunId,
+            invocationId: "sibling",
+            selection: child.name,
+            prompt: sibling.prompt,
+            message: sibling,
+          }),
+          second.messageSessionInput(followup),
+        ],
+        { concurrency: "unbounded" },
+      )
+
+      const fresh = yield* open(yield* bucket.connect, "conservation-fresh")
+      const parentHistory = yield* fresh.history({ runId: parentRunId, cursor: -1, limit: 100 })
+      const linked = parentHistory.filter((event) => event._tag === "ChildLinked")
+      expect(linked.filter((event) => event.sponsoredContinuation === true)).toHaveLength(1)
+      expect(linked.filter((event) => event.sponsoredContinuation !== true)).toHaveLength(2)
+      expect((yield* fresh.snapshot(parentRunId)).budget).toMatchObject({
+        tokens: 11,
+        toolCalls: 1,
+        children: 0,
+      })
+      const continuedRunId = (yield* fresh.hostSession("child")).activeRunId!
+      expect((yield* fresh.snapshot(continuedRunId)).budget).toMatchObject({
+        tokens: 3,
+        toolCalls: 1,
+        children: 0,
+      })
+      const continuedClaim = yield* fresh.claimExecution({
+        runId: continuedRunId,
+        ownerId: "conservation-fresh",
+        commandId: "continued-claim",
+      })
+      yield* fresh.complete({
+        ...continuedClaim,
+        commandId: "continued-complete",
+        result: { text: "done", output: "done", turns: 1, session: { sessionId: "child", leafId: null } },
+      })
+      yield* fresh.releaseExecution(continuedClaim)
+      expect((yield* fresh.hostSession("child")).activeRunId).toBeUndefined()
+      yield* fresh.messageSessionInput({ ...followup, commandId: "followup-again" })
+      expect((yield* fresh.hostSession("child")).queue.map((entry) => entry.id)).toEqual(["followup-again"])
+      expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
+    }),
+  ).pipe(Effect.scoped),
+)

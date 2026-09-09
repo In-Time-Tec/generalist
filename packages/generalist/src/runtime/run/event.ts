@@ -169,6 +169,8 @@ export type ChildLinked = RunEventBase & {
   readonly origin?: FanOutOrigin
   readonly inherit: Inheritance
   readonly budget?: BudgetLimits
+  readonly continuationBudget?: BudgetLimits
+  readonly sponsoredContinuation?: boolean
 }
 export type ChildReadinessChanged = RunEventBase & {
   readonly _tag: "ChildReadinessChanged"
@@ -180,6 +182,8 @@ export type ChildSettled = RunEventBase & {
   readonly childRunId: string
   readonly terminalEventId: string
   readonly spend?: Spend
+  readonly continuationBudget?: BudgetLimits
+  readonly sponsoredContinuation?: boolean
 }
 export type FanOutAdmitted = RunEventBase & {
   readonly _tag: "FanOutAdmitted"
@@ -541,12 +545,16 @@ const LifecycleEventSchema = Schema.Union([
     origin: Schema.optionalKey(FanOutMemberOrigin),
     inherit: Inheritance,
     budget: Schema.optionalKey(BudgetLimits),
+    continuationBudget: Schema.optionalKey(BudgetLimits),
+    sponsoredContinuation: Schema.optionalKey(Schema.Boolean),
   }),
   Schema.TaggedStruct("ChildReadinessChanged", { childRunId: RunId, readiness: ChildReadiness }),
   Schema.TaggedStruct("ChildSettled", {
     childRunId: RunId,
     terminalEventId: Schema.String,
     spend: Schema.optionalKey(Spend),
+    continuationBudget: Schema.optionalKey(BudgetLimits),
+    sponsoredContinuation: Schema.optionalKey(Schema.Boolean),
   }),
   Schema.TaggedStruct("FanOutAdmitted", {
     fanOutId: Schema.String,

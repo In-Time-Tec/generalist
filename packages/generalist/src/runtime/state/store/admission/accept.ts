@@ -33,14 +33,17 @@ import type { FanOutMemberOrigin } from "../../../child/fan-out-internal.js"
 import { admitFanOut } from "../fan-out/service.js"
 import {
   continuationFor,
-  continuationGrant,
+  continuationBudgets,
+  familyRunOptions,
+  requireOpen,
+  spawnedChild,
   readinessForAdmission,
   reserveSessions,
   recordFamilyRun,
 } from "../child/capacity.js"
 import { receiptAdmission } from "./receipt.js"
 import { Exhausted } from "../../../../core/durable/run-budget.js"
-import { rootGrant, sessionChildGrant, retainedBudget } from "./policy.js"
+import { rootGrant, retainedBudget } from "./policy.js"
 import { capGrant } from "../../../budget/state.js"
 import { addRegistrations } from "./registration.js"
 
@@ -353,19 +356,18 @@ export const admitSpawn: {
   (state: RuntimeState, input: SponsoredSpawnInput): AdmitSpawnResult
 } = Function.dual(2, (state: RuntimeState, input: SponsoredSpawnInput) =>
   Effect.gen(function* () {
-    if (state.closed) {
-      return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-    }
+    yield* requireOpen(state)
     const sessionId = input.message.sessionId
     const parent = state.runs.get(input.parentRunId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
-    const continuation = yield* continuationFor({
+    const continuationPlan = yield* continuationFor({
       state,
       sessionId,
       parentSessionId: parent.message.sessionId,
+      parentRunId: parent.runId,
       sponsored: input.sponsoredContinuation === true,
     })
-    if (isTerminal(parent.status) && continuation === undefined) {
+    if (isTerminal(parent.status) && continuationPlan.continuation === undefined) {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
     const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
@@ -427,50 +429,51 @@ export const admitSpawn: {
       })
     }
     const childReadiness = readinessForAdmission(withId, parent)
-    const childBudget = yield* sessionChildGrant({
+    const childSelection = { executableRef, executableManifest: parent.executableManifest, registrations }
+    const grants = yield* continuationBudgets({
       state,
+      parent,
       sessionId,
-      selection: { executableRef, executableManifest: parent.executableManifest, registrations },
-      grant: yield* continuationGrant({ state, parent, sessionId, continuation }),
+      selection: childSelection,
+      plan: continuationPlan,
     })
-    const child: StoredRun = {
+    const childBudget = grants.child
+    const continuationBudget = grants.continuation
+    const child = spawnedChild({
       runId,
-      status: "queued",
+      parent,
       executableRef,
-      executableManifest: parent.executableManifest,
       address: input.message.to,
       message: input.message,
-      rootRunId: parent.rootRunId,
-      depth,
-      treePolicy: parent.treePolicy,
-      parentRunId: parent.runId,
       childReadiness,
       invocationId: input.invocationId,
-      lastSequence: -1,
-      lastTurnCompletedSequence: -1,
-      attempt: 0,
-      attemptFence: 0,
-      cancellationRequested: false,
-      children: [],
-      events: [],
-      subscribers: new Map(),
-      steering: [],
       registrations,
-      checkpoints: new Map(),
-    }
+    })
     const runs = new Map(withId.runs)
     const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }
     runs.set(parent.runId, parentUpdated)
     runs.set(runId, child)
-    let next: RuntimeState = recordFamilyRun({ state: { ...withId, runs }, run: child, budget: childBudget })
+    let next: RuntimeState = recordFamilyRun({
+      state: { ...withId, runs },
+      run: child,
+      budget: childBudget,
+      ...familyRunOptions(continuationPlan, continuationBudget, parent.runId),
+    })
+
+    const linkedDetails: Parameters<typeof childLinkedEvent>[5] = {
+      ...childDetails(childReadiness, input),
+      inherit: defaultInheritance,
+      budget: childBudget,
+    }
+    if (continuationBudget !== undefined) Object.assign(linkedDetails, { continuationBudget })
+    if (input.sponsoredContinuation === true && !continuationPlan.replenish)
+      Object.assign(linkedDetails, { sponsoredContinuation: true })
 
     const [, linked] = yield* appendLifecycle(
       next,
       parent.runId,
       childLinkedEvent(runId, input.invocationId, input.selection, input.message.prompt, parent.depth + 1, {
-        ...childDetails(childReadiness, input),
-        inherit: defaultInheritance,
-        budget: childBudget,
+        ...linkedDetails,
       }),
     )
     next = linked

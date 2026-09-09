@@ -102,6 +102,10 @@
 
 > `readonly` **childRunId**: `string`
 
+##### continuationBudget?
+
+> `readonly` `optional` **continuationBudget?**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
+
 ##### inherit
 
 > `readonly` **inherit**: [`Inheritance`](../../generalist/namespaces/Agent.md#inheritance)
@@ -133,6 +137,10 @@
 ##### selection
 
 > `readonly` **selection**: `string`
+
+##### sponsoredContinuation?
+
+> `readonly` `optional` **sponsoredContinuation?**: `boolean`
 
 ***
 
@@ -174,9 +182,17 @@
 
 > `readonly` **childRunId**: `string`
 
+##### continuationBudget?
+
+> `readonly` `optional` **continuationBudget?**: [`BudgetLimits`](../../generalist/namespaces/RunBudget.md#budgetlimits)
+
 ##### spend?
 
 > `readonly` `optional` **spend?**: [`Spend`](../../generalist/namespaces/RunBudget.md#spend)
+
+##### sponsoredContinuation?
+
+> `readonly` `optional` **sponsoredContinuation?**: `boolean`
 
 ##### terminalEventId
 
