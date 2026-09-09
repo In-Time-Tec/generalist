@@ -130,6 +130,7 @@ export type Inbox = RunEventBase & {
   readonly message: Prompt.Prompt
   readonly policy: AdmissionPolicy
   readonly from: MessageSource
+  readonly sessionCommandId?: string
   readonly addressed?: Message
 }
 /** Exact durable steering consumption fact. */
@@ -510,6 +511,7 @@ const LifecycleEventSchema = Schema.Union([
     message: Prompt.Prompt,
     policy: AdmissionPolicy,
     from: MessageSource,
+    sessionCommandId: Schema.optionalKey(Schema.String),
     addressed: Schema.optionalKey(AddressedMessage),
   }),
   Schema.TaggedStruct("SteeringAccepted", {
