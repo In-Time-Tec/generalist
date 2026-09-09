@@ -130,6 +130,72 @@ A Run start used an Agent that was not configured on this host.
 
 ***
 
+<a id="agentregistrykeymismatch"></a>
+
+### AgentRegistryKeyMismatch
+
+The record key and Agent.name must identify the same registered Agent.
+
+#### Extends
+
+- `AgentRegistryKeyMismatch_base`
+
+#### Constructors
+
+<a id="constructor-2"></a>
+
+##### Constructor
+
+> **new AgentRegistryKeyMismatch**(...`args`): [`AgentRegistryKeyMismatch`](#agentregistrykeymismatch)
+
+###### Parameters
+
+###### args
+
+...\[`object`, `MakeOptions`\]
+
+###### Returns
+
+[`AgentRegistryKeyMismatch`](#agentregistrykeymismatch)
+
+###### Inherited from
+
+`AgentRegistryKeyMismatch_base.constructor`
+
+#### Properties
+
+<a id="hint-2"></a>
+
+##### hint
+
+> `readonly` **hint**: `string`
+
+###### Inherited from
+
+`AgentRegistryKeyMismatch_base.hint`
+
+<a id="key"></a>
+
+##### key
+
+> `readonly` **key**: `string`
+
+###### Inherited from
+
+`AgentRegistryKeyMismatch_base.key`
+
+<a id="name-2"></a>
+
+##### name
+
+> `readonly` **name**: `string`
+
+###### Inherited from
+
+`AgentRegistryKeyMismatch_base.name`
+
+***
+
 <a id="pluginnameconflict"></a>
 
 ### PluginNameConflict
@@ -142,7 +208,7 @@ A plugin name was declared more than once in one host.
 
 #### Constructors
 
-<a id="constructor-2"></a>
+<a id="constructor-3"></a>
 
 ##### Constructor
 
@@ -164,7 +230,7 @@ A plugin name was declared more than once in one host.
 
 #### Properties
 
-<a id="hint-2"></a>
+<a id="hint-3"></a>
 
 ##### hint
 
@@ -174,7 +240,7 @@ A plugin name was declared more than once in one host.
 
 `PluginNameConflict_base.hint`
 
-<a id="name-2"></a>
+<a id="name-3"></a>
 
 ##### name
 
@@ -198,7 +264,7 @@ Two host declarations attempted to install the same static tool name.
 
 #### Constructors
 
-<a id="constructor-3"></a>
+<a id="constructor-4"></a>
 
 ##### Constructor
 
@@ -220,7 +286,7 @@ Two host declarations attempted to install the same static tool name.
 
 #### Properties
 
-<a id="hint-3"></a>
+<a id="hint-4"></a>
 
 ##### hint
 
@@ -230,7 +296,7 @@ Two host declarations attempted to install the same static tool name.
 
 `PluginToolConflict_base.hint`
 
-<a id="name-3"></a>
+<a id="name-4"></a>
 
 ##### name
 
@@ -264,7 +330,7 @@ A host Session already owns the requested identity.
 
 #### Constructors
 
-<a id="constructor-4"></a>
+<a id="constructor-5"></a>
 
 ##### Constructor
 
@@ -286,7 +352,7 @@ A host Session already owns the requested identity.
 
 #### Properties
 
-<a id="hint-4"></a>
+<a id="hint-5"></a>
 
 ##### hint
 
@@ -320,7 +386,7 @@ A Session replay cursor is outside the driver's retained event range.
 
 #### Constructors
 
-<a id="constructor-5"></a>
+<a id="constructor-6"></a>
 
 ##### Constructor
 
@@ -362,7 +428,7 @@ A Session replay cursor is outside the driver's retained event range.
 
 `SessionCursorExpired_base.earliestCursor`
 
-<a id="hint-5"></a>
+<a id="hint-6"></a>
 
 ##### hint
 
@@ -406,7 +472,7 @@ A requested host Session does not exist.
 
 #### Constructors
 
-<a id="constructor-6"></a>
+<a id="constructor-7"></a>
 
 ##### Constructor
 
@@ -428,7 +494,7 @@ A requested host Session does not exist.
 
 #### Properties
 
-<a id="hint-6"></a>
+<a id="hint-7"></a>
 
 ##### hint
 
@@ -464,7 +530,7 @@ A page selector does not name retained evidence in the authorized Session.
 
 #### Constructors
 
-<a id="constructor-7"></a>
+<a id="constructor-8"></a>
 
 ##### Constructor
 
@@ -488,7 +554,7 @@ A page selector does not name retained evidence in the authorized Session.
 
 #### Properties
 
-<a id="hint-7"></a>
+<a id="hint-8"></a>
 
 ##### hint
 
@@ -526,7 +592,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 #### Constructors
 
-<a id="constructor-8"></a>
+<a id="constructor-9"></a>
 
 ##### Constructor
 
@@ -548,7 +614,7 @@ A Session event subscriber could not keep up with its bounded live queue.
 
 #### Properties
 
-<a id="hint-8"></a>
+<a id="hint-9"></a>
 
 ##### hint
 
@@ -594,7 +660,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 #### Constructors
 
-<a id="constructor-9"></a>
+<a id="constructor-10"></a>
 
 ##### Constructor
 
@@ -628,7 +694,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 #### Constructors
 
-<a id="constructor-10"></a>
+<a id="constructor-11"></a>
 
 ##### Constructor
 
@@ -650,7 +716,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 #### Properties
 
-<a id="hint-9"></a>
+<a id="hint-10"></a>
 
 ##### hint
 
@@ -1524,7 +1590,7 @@ One deterministic collection of host-owned Agent contributions.
 
 > `readonly` `optional` **instructions?**: readonly [`Provider`](./instructions/index.md#provider)\<`never`\>[]
 
-<a id="name-4"></a>
+<a id="name-5"></a>
 
 ##### name
 
@@ -1568,7 +1634,7 @@ One deterministic collection of host-owned Agent contributions.
 
 > `readonly` `optional` **instructions?**: readonly [`Provider`](./instructions/index.md#provider)\<`never`\>[]
 
-<a id="name-5"></a>
+<a id="name-6"></a>
 
 ##### name
 
@@ -2358,7 +2424,7 @@ One product-facing event at its exclusive Session cursor.
 
 ### MakeError
 
-> **MakeError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
+> **MakeError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`AgentRegistryKeyMismatch`](#agentregistrykeymismatch) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
 
 ***
 

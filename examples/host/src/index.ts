@@ -67,7 +67,7 @@ const plugin = Host.plugin({
 })
 
 const program = Effect.gen(function* () {
-  const host = yield* Host.make({ revision: "local", agents: { assistant }, plugins: [plugin] })
+  const host = yield* Host.make({ revision: "local", agents: { [assistant.name]: assistant }, plugins: [plugin] })
   const session = yield* host.sessions.create({ id: "session:host-example", title: "Host example" })
   const run = yield* host.runs.start(
     session.id,

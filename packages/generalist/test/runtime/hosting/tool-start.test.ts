@@ -134,7 +134,7 @@ it.effect("preserves Agent and Program retrieval with their own terminal values"
   const fixture = programFixture()
   const agent = Agent.make({ name: "lookup-agent" })
   return Effect.gen(function* () {
-    const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [tool] })
+    const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [tool] })
     const session = yield* host.sessions.create({ id: "lookup-agent" })
     const run = yield* host.runs.start(session.id, agent, "answer")
     yield* execute(run.id)

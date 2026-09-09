@@ -37,7 +37,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
     Effect.gen(function* () {
       const agent = Agent.make({ name: "server-policy" })
       const limits = { tree: { maxDepth: 2, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
-      const host = yield* Host.make({ revision: "local", agents: { agent }, limits })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, limits })
       const server = yield* Layer.build(
         HttpRouter.serve(
           Server.layer({
@@ -78,7 +78,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
     () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "http-history" })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: "http-history" })
         const other = yield* host.sessions.create({ id: "http-history-private" })
         const otherRun = yield* host.runs.start(other.id, agent, "private")
@@ -181,7 +181,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
   it.effect("loads an existing Session before connecting and observes an admission racing the snapshot response", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "local-snapshot" })
-      const host = yield* Host.make({ revision: "local", agents: { agent } })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
       const session = yield* host.sessions.create({ id: "local-snapshot" })
       const original = yield* host.runs.start(session.id, agent, "existing input")
       const before = yield* host.sessions.snapshot(session.id)
@@ -230,7 +230,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
       Effect.gen(function* () {
         const allowed = yield* Ref.make(true)
         const agent = Agent.make({ name: `local-${mode}` })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: `local-${mode}` })
         const run = yield* host.runs.start(session.id, agent, "existing input")
         const document = yield* Artifact.open(`local-${mode}.md`, { crdt: Yjs.layer(), initial: "draft" })

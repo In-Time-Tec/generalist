@@ -59,7 +59,7 @@ import { resolveApproval } from "./approval.js"
 import { make as preparePlugins, mergedHooks, type Plugin } from "./plugins.js"
 import { project, type HostEvent } from "./event.js"
 import type { PreviewDelivery } from "./preview.js"
-import { AgentInputInvalid, AgentNotRegistered, type MakeError } from "./errors.js"
+import { AgentInputInvalid, AgentNotRegistered, AgentRegistryKeyMismatch, type MakeError } from "./errors.js"
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { make as makeHostRun, type HostRun } from "./run.js"
@@ -93,7 +93,13 @@ export {
   SessionRunSummary,
   SessionPageInvalid,
 } from "../runtime/session/page.js"
-export { AgentInputInvalid, AgentNotRegistered, PluginNameConflict, PluginToolConflict } from "./errors.js"
+export {
+  AgentInputInvalid,
+  AgentNotRegistered,
+  AgentRegistryKeyMismatch,
+  PluginNameConflict,
+  PluginToolConflict,
+} from "./errors.js"
 export {
   HostEvent,
   TasksUpdated,
@@ -352,7 +358,11 @@ const make = <
     const revision = yield* Schema.decodeEffect(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)))(
       options.revision,
     ).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })))
-    const agents = Object.values(options.agents)
+    const agentEntries = Object.entries(options.agents)
+    for (const [key, agent] of agentEntries) {
+      if (key !== agent.name) return yield* AgentRegistryKeyMismatch.make({ key, name: agent.name })
+    }
+    const agents = agentEntries.map(([, agent]) => agent)
     const plugins: ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = options.plugins ?? []
     const currentInstructions = yield* Effect.serviceOption(Instructions)
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)

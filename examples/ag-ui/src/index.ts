@@ -161,7 +161,7 @@ const applicationAuth = Server.authBearer({
   principal: { id: "example-controller", tenantId: "example", role: "controller" },
 })
 const routes = Layer.unwrap(
-  Host.make({ revision: "local", agents: { agent } }).pipe(
+  Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
     Effect.map((host) =>
       Layer.merge(
         Server.layer({

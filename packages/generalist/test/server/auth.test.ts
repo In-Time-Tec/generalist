@@ -29,9 +29,20 @@ const services = Layer.mergeAll(
   Approvals.layerAutoApprove,
 )
 
-const mutations = [
+interface Mutation {
+  readonly method?: "GET" | "POST"
+  readonly path: string
+  readonly body?: Readonly<Record<string, Schema.Json>>
+}
+
+const mutations: ReadonlyArray<Mutation> = [
   { path: "/sessions", body: { id: "forbidden" } },
   { path: "/sessions/existing/runs", body: { agent: "authorization", input: "forbidden", commandId: "forbidden" } },
+  {
+    path: "/runs/existing/children",
+    body: { commandId: "child", selection: "authorization", prompt: "forbidden" },
+  },
+  { path: "/runs/existing/tools/authorization", body: { commandId: "tool", input: {} } },
   { path: "/runs/existing/cancel", body: { commandId: "cancel" } },
   {
     path: "/runs/existing/approvals/token",
@@ -70,7 +81,7 @@ layer(services)("Server authorization", (it) => {
     it.effect(`denies every declared mutation before Host calls by ${deniedBy}`, () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: `authorization-${deniedBy}` })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const principal: Principal = {
           id: "application-user",
           tenantId: deniedBy === "tenant" ? "other" : "test",
@@ -79,6 +90,11 @@ layer(services)("Server authorization", (it) => {
         const spies = [
           vi.spyOn(host.sessions, "create"),
           vi.spyOn(host.runs, "startByName"),
+          vi.spyOn(host.runs, "admitChild"),
+          vi.spyOn(host.runs, "children"),
+          vi.spyOn(host.runs, "inspectChild"),
+          vi.spyOn(host.tools, "startByName"),
+          vi.spyOn(host.tools, "getByName"),
           vi.spyOn(host.runs, "cancel"),
           vi.spyOn(host.approvals, "resolve"),
           vi.spyOn(host.operator, "retry"),
@@ -103,17 +119,23 @@ layer(services)("Server authorization", (it) => {
         )
         yield* Effect.addFinalizer(() => Effect.promise(app.dispose))
         for (const mutation of mutations) {
-          const body = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
-            ...mutation.body,
-            role: "controller",
-            tenantId: "test",
-          })
+          const body =
+            mutation.body === undefined
+              ? undefined
+              : yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+                  ...mutation.body,
+                  role: "controller",
+                  tenantId: "test",
+                })
           const response = yield* Effect.promise(() =>
             app.handler(
               new Request(`http://generalist.test${mutation.path}?role=controller&tenantId=test`, {
-                method: "POST",
-                headers: { authorization: "Bearer test-token", "content-type": "application/json" },
-                body,
+                method: mutation.method ?? "POST",
+                headers:
+                  body === undefined
+                    ? { authorization: "Bearer test-token" }
+                    : { authorization: "Bearer test-token", "content-type": "application/json" },
+                ...(body === undefined ? undefined : { body }),
               }),
             ),
           )
@@ -177,7 +199,10 @@ layer(services)("Server authorization", (it) => {
           "/sessions/existing/snapshot",
           "/sessions/existing/runs",
           "/runs/existing",
+          "/runs/existing/children",
+          "/runs/existing/children/child",
           "/runs/existing/explain",
+          "/tools/authorization/runs/existing",
           "/sessions/existing/events",
           "/sessions/existing/ws",
           "/artifacts/existing",

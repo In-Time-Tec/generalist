@@ -196,7 +196,7 @@ it.effect("keeps held-open Tool work after its Agent parent settles and resumes 
         executor,
       )
     const identity = yield* Effect.gen(function* () {
-      const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [checks] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [checks] })
       const session = yield* host.sessions.create({ id: "parent-session" })
       const parent = yield* host.runs.start(session.id, agent, "finish")
       const child = yield* host.tools.start(checks, { count: 6 }, { commandId: "independent", parentRunId: parent.id })
@@ -211,7 +211,7 @@ it.effect("keeps held-open Tool work after its Agent parent settles and resumes 
       return { parentRunId: parent.id, childRunId: child.id }
     }).pipe(scopedWith(fresh()))
     yield* Effect.gen(function* () {
-      const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [checks] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [checks] })
       const child = yield* host.tools.start(
         checks,
         { count: 6 },

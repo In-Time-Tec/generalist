@@ -61,7 +61,7 @@ await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     ) }),
   ))
   yield* Effect.gen(function* () {
-    const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [work] })
+    const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [work] })
     const session = yield* host.sessions.create({ id: "packed-session" })
     const parent = yield* host.runs.start(session.id, agent, "work")
     const store = yield* RunStore.RunStore
