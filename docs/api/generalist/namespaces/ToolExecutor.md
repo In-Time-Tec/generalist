@@ -608,7 +608,7 @@ Stable identity for semantic cancellation of one admitted tool operation.
 
 ###### filter
 
-> `readonly` **filter**: \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"update"` \| `"create"` \| `"remove"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
+> `readonly` **filter**: \{ `commandId`: `string`; `messages`: `boolean`; `runs`: readonly `string`[]; \} \| \{ `scheduleId?`: `string`; \} \| \{ `source?`: `string`; \} \| \{ `childRunId?`: `string`; \} \| \{ `kind?`: `"update"` \| `"create"` \| `"remove"`; `path?`: `string`; \} \| \{ `approvalId?`: `string`; \}
 
 <a id="token"></a>
 
@@ -784,7 +784,7 @@ Route tool calls to an MCP placement adapter.
 
 ### Outcome
 
-> `const` **Outcome**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Success"`\>; `encodedResult`: `Schema.Unknown`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: `Schema.String`; `fromRun`: `Schema.String`; \}\>\>; `outputPaths`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.String`\>\>; `result`: `Schema.Unknown`; `taint`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `capabilityId`: `Schema.brand`\<`Schema.String`, `"generalist/capability/CapabilityId"`\>; `tool`: `Schema.String`; `toolCallId`: `Schema.String`; \}\>\>\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"DomainFailure"`\>; `encodedFailure`: `Schema.Unknown`; `failure`: `Schema.Unknown`; `taint`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `capabilityId`: `Schema.brand`\<`Schema.String`, `"generalist/capability/CapabilityId"`\>; `tool`: `Schema.String`; `toolCallId`: `Schema.String`; \}\>\>\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Suspend"`\>; `awaitEvent`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[..., ..., ..., ..., ...\]\>; \}\>\>; `token`: `Schema.String`; \}\>\]\>
+> `const` **Outcome**: `Schema.Union`\<readonly \[`Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Success"`\>; `encodedResult`: `Schema.Unknown`; `memoized`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `fromOperation`: `Schema.String`; `fromRun`: `Schema.String`; \}\>\>; `outputPaths`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.String`\>\>; `result`: `Schema.Unknown`; `taint`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `capabilityId`: `Schema.brand`\<`Schema.String`, `"generalist/capability/CapabilityId"`\>; `tool`: `Schema.String`; `toolCallId`: `Schema.String`; \}\>\>\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"DomainFailure"`\>; `encodedFailure`: `Schema.Unknown`; `failure`: `Schema.Unknown`; `taint`: `Schema.optionalKey`\<`Schema.$Array`\<`Schema.Struct`\<\{ `capabilityId`: `Schema.brand`\<`Schema.String`, `"generalist/capability/CapabilityId"`\>; `tool`: `Schema.String`; `toolCallId`: `Schema.String`; \}\>\>\>; \}\>, `Schema.Struct`\<\{ `_tag`: `Schema.tag`\<`"Suspend"`\>; `awaitEvent`: `Schema.optionalKey`\<`Schema.Struct`\<\{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly \[..., ..., ..., ..., ..., ...\]\>; \}\>\>; `token`: `Schema.String`; \}\>\]\>
 
 Durable tool execution outcome.
 

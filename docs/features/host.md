@@ -140,6 +140,9 @@ host.runs.send(runId, prompt, { policy?, from?, idempotencyKey? })
 host.runs.cancel(runId, commandId, reason?)       -> void
 host.runs.rewind(runId, { commandId, toSequence, budget? }) -> void
 
+HostRun.wait({ runs?, messages?, commandId, timeout? })
+                                      -> RunSettled | Message | Timeout
+
 host.events.subscribe(sessionId, cursor?)
   -> Effect<Stream<HostEvent>, SessionError>
 
@@ -153,6 +156,8 @@ host.operator.extendBudget(runId, delta, operator, commandId) -> void
 ```
 
 `runs.start` accepts only the exact Agent values passed to `Generalist.create`; the Agent's input and output Schemas determine the input and `await` types. The returned `id` is Runtime's `runId`. Runs started with the same Session and `idempotencyKey` retain Runtime's existing idempotency behavior.
+
+`HostRun.wait` is a model-facing control used from the active Agent tool context. It accepts at most 32 same-family Run IDs and an authenticated-message selector, and it requires a stable `commandId`. Registration and the already-arrived check share the Runtime wait transition, so a terminal Run or pending message cannot be missed across a host restart. A `Message` result includes its durable inbox cursor; a retry does not consume it again. `Timeout` closes only this wait, while sibling provider tool calls remain barriers until their own results are available. Use `await` when the host only needs terminal output.
 
 `runs.startByName` is the serialized-host boundary used by `generalist/server`. It finds one configured Agent by name and decodes the unknown input with that Agent's input Schema before starting it. Unknown names and invalid inputs remain typed Host failures. Approval and operator methods are the same Runtime operations with no second decision or recovery authority; every mutation requires the caller identity recorded by Runtime.
 

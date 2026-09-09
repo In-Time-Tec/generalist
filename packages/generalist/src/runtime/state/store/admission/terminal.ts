@@ -4,6 +4,7 @@ import { RuntimeUnavailable } from "../../../errors.js"
 import type { RuntimeState, StoredRun } from "../../projection.js"
 import { promote } from "../host-session/queue.js"
 import { removeFromLane, promoteHead } from "./lanes.js"
+import { reconcileRunWaits } from "../control/run-wait.js"
 
 export const afterTerminal: {
   (run: StoredRun): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
@@ -11,6 +12,10 @@ export const afterTerminal: {
 } = Function.dual(2, (state: RuntimeState, run: StoredRun) =>
   Effect.gen(function* () {
     let without = removeFromLane(state, run.message.sessionId, run.runId)
+    for (const candidate of without.runs.values()) {
+      if (candidate.rootRunId === run.rootRunId && candidate.status === "waiting")
+        without = yield* reconcileRunWaits(without, candidate.runId)
+    }
     const stored = without.hostSessions.get(run.message.sessionId)
     if (stored?.session.activeRunId === run.runId) {
       const { activeRunId: _, ...session } = stored.session
