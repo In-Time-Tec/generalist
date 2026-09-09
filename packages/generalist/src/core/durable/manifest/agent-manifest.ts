@@ -70,6 +70,7 @@ export interface AgentManifest {
   readonly services: ReadonlyArray<NamedCapability>
   readonly policy: PolicyIdentity
   readonly toolScheduling: ToolSchedulingPolicy
+  readonly toolExecution: "inline" | "background"
   readonly compaction?: CompactionIdentity
   readonly programAuthority?: ProgramAuthority
   readonly budget: BudgetLimits
@@ -174,6 +175,7 @@ export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = 
   services: Schema.Array(NamedCapability),
   policy: PolicyIdentity,
   toolScheduling: ToolSchedulingPolicySchema,
+  toolExecution: Schema.Literals(["inline", "background"]),
   compaction: Schema.optionalKey(CompactionIdentity),
   programAuthority: Schema.optionalKey(ProgramAuthority),
   budget: BudgetLimits,
@@ -210,7 +212,12 @@ const capabilityIdentity = (value: NamedCapability): string => value.pin
 const childOrder = (value: ChildSelection): string => value.selection
 
 /** Construct and pin a canonical closed Agent manifest. */
-export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "1" }): PinnedAgent => {
+export const make = (
+  input: Omit<AgentManifest, "version" | "toolExecution"> & {
+    readonly version?: "1"
+    readonly toolExecution?: "inline" | "background"
+  },
+): PinnedAgent => {
   const invalidToolScheduling = toolSchedulingFailure(
     input.toolScheduling,
     input.tools.map(({ name }) => name),
@@ -220,6 +227,7 @@ export const make = (input: Omit<AgentManifest, "version"> & { readonly version?
   const canonical = {
     ...input,
     version,
+    toolExecution: input.toolExecution ?? "inline",
     toolScheduling: {
       ...input.toolScheduling,
       parallelSafe: [...input.toolScheduling.parallelSafe].toSorted(compareText),
@@ -322,6 +330,7 @@ export const fromLiveAgent: {
       name: agent.name,
       ...identity,
       toolScheduling: agent.toolScheduling,
+      toolExecution: agent.toolExecution,
     }
     if (agent.instructions !== undefined) Object.assign(manifestInput, { instructions: agent.instructions })
     if (agent.supplemental !== undefined) Object.assign(manifestInput, { supplemental: agent.supplemental })

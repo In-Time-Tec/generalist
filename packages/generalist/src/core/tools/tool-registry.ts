@@ -7,6 +7,7 @@ export interface Candidate {
   readonly tool: Tool.Any
   readonly origin: ToolOrigin
   readonly dispatch: Dispatch
+  readonly modelTool?: Tool.Any
 }
 export interface Registry {
   readonly entries: ReadonlyArray<Candidate>
@@ -15,14 +16,14 @@ export interface Registry {
 }
 
 const makeToolkit = (entries: ReadonlyArray<Candidate>): Toolkit.Toolkit<Record<string, Tool.Any>> => {
-  const toolkit = Toolkit.make(...entries.map((candidate) => candidate.tool))
+  const toolkit = Toolkit.make(...entries.map((candidate) => candidate.modelTool ?? candidate.tool))
   for (const entry of entries) {
     const name = Schema.decodeUnknownSync(Schema.String)(entry.tool.name)
     if (!Object.hasOwn(toolkit.tools, name)) {
       Object.defineProperty(toolkit.tools, name, {
         configurable: true,
         enumerable: true,
-        value: entry.tool,
+        value: entry.modelTool ?? entry.tool,
         writable: true,
       })
     }
