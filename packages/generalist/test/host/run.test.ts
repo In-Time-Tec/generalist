@@ -24,7 +24,7 @@ it.effect("pages more than 128 retained child Sessions across fresh Hosts withou
           ),
         )
         return yield* Effect.gen(function* () {
-          return yield* body(yield* Host.make({ revision: "local", agents: { agent } }))
+          return yield* body(yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }))
         }).pipe(Effect.provide(context))
       }),
     )
@@ -172,7 +172,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     const admitted = yield* provideScoped(
       hostLayer(),
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: { agent, child } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent, [child.name]: child } })
         const session = yield* host.sessions.create({ id: "question-parent", agent: agent.name })
         const parent = yield* host.runs.start(session.id, agent, "Coordinate")
         waitFor = parent.wait
@@ -192,7 +192,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     yield* provideScoped(
       hostLayer(),
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: { agent, child } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent, [child.name]: child } })
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const parent = yield* host.runs.get(admitted.parentId)

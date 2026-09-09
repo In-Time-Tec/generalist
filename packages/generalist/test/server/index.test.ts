@@ -61,7 +61,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-queue" })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             host,
@@ -130,7 +130,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-not-found" })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -204,7 +204,11 @@ layer(services)("Server", (it) => {
         ).toMatchObject({ _tag: "generalist/runtime/ExecutableRegistrationInvalid" })
         const child = Agent.make({ name: "server-child" })
         const parent = Agent.make({ name: "server-parent", children: [child.name] })
-        const host = yield* Host.make({ revision: "local", agents: { parent, child }, tools: [checks] }).pipe(
+        const host = yield* Host.make({
+          revision: "local",
+          agents: { [parent.name]: parent, [child.name]: child },
+          tools: [checks],
+        }).pipe(
           // oxlint-disable-next-line effecttsgo/strict-effect-provide -- Test-only Tool registration context.
           Effect.provide(toolHandlers),
         )
@@ -295,7 +299,7 @@ layer(services)("Server", (it) => {
           input: Schema.Struct({ question: Schema.String }),
           output: Schema.String,
         })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -444,7 +448,7 @@ layer(services)("Server", (it) => {
             ),
         })
         const agent = Agent.make({ name: "server-disconnect" })
-        const host = yield* Host.make({ revision: "local", agents: { agent } }).pipe(
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
           Effect.provideService(LanguageModel.LanguageModel, controlledModel),
         )
         const app = HttpRouter.toWebHandler(
@@ -501,7 +505,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-unknown" })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -590,7 +594,9 @@ layer(services)("Server", (it) => {
               ),
             )
             const agent = Agent.make({ name: "tenant-assistant" })
-            const host = yield* Host.make({ revision: "local", agents: { agent } }).pipe(Effect.provideContext(context))
+            const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
+              Effect.provideContext(context),
+            )
             const app = HttpRouter.toWebHandler(
               Server.layer({
                 authorization: { tenantId: tenant, authorize: () => Effect.succeed(true) },
@@ -699,7 +705,7 @@ layer(approvalServices)("Server approvals", (it) => {
         approvalModelCalls = 0
         approvalToolCalls = 0
         const agent = Agent.make({ name: "server-approval", toolkit: approvalToolkit })
-        const host = yield* Host.make({ revision: "local", agents: { agent } })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },

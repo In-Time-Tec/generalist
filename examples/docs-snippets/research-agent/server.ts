@@ -75,7 +75,7 @@ const applicationAuth = Server.authBearer({
 })
 
 const apiLayer = Layer.unwrap(
-  Host.make({ revision: "local", agents: { agent } }).pipe(
+  Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
     Effect.map((host) =>
       Server.layer({
         authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },

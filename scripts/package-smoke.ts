@@ -1014,7 +1014,7 @@ await Effect.runPromise(Effect.gen(function* () {
     const context = yield* Layer.build(services())
     return yield* Effect.gen(function* () {
       const agent = Agent.make({ name: "packed-history" })
-      const host = yield* Host.make({ revision: "local", agents: { agent } })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
       const session = yield* host.sessions.create({ id: "packed-history", agent: agent.name })
       const ids = []
       for (let index = 0; index < 129; index++) ids.push((yield* host.runs.start(session.id, agent, "input-" + index)).id)
