@@ -127,9 +127,16 @@ layer(objectLayer)("Run-or-message wait", (it) => {
       const [due] = yield* f.store.dueAwaitEvents({ now: yield* Clock.currentTimeMillis, limit: 10 })
       expect(due).toBeDefined()
       yield* f.store.timeoutAwaitEvent({ ...due!, commandId: "timeout" })
-      expect((yield* f.store.loadExecution(f.parent.runId)).resolutions).toMatchObject([
-        { resolution: { result: { _tag: "Timeout" } } },
-      ])
+      const timedOut = (yield* f.store.loadExecution(f.parent.runId)).resolutions.find(
+        (entry) => entry.waitId === "timeout",
+      )
+      expect(timedOut).toMatchObject({ resolution: { result: { _tag: "Timeout" } } })
+      yield* f.wait("timeout-retry", "timeout")
+      expect(
+        (yield* f.store.loadExecution(f.parent.runId)).resolutions.find((entry) => entry.waitId === "timeout-retry")
+          ?.resolution,
+      ).toEqual(timedOut?.resolution)
+      expect((yield* f.store.loadExecution(f.parent.runId)).resolutions).toHaveLength(2)
       expect((yield* f.runtime.inspect(f.child.runId)).status).not.toBe("cancelled")
       yield* f.complete
       expect((yield* f.wait("late"))?.resolution).toMatchObject({ result: { _tag: "RunSettled" } })
@@ -156,6 +163,16 @@ layer(objectLayer)("Run-or-message wait", (it) => {
       expect((yield* f.store.loadExecution(f.parent.runId)).resolutions).toMatchObject([
         { resolution: { result: { _tag: "RunSettled", runId: f.sibling.runId } } },
       ])
+    }),
+  )
+  it.effect("rejects a changed selector after the original command has completed", () =>
+    Effect.gen(function* () {
+      const f = yield* setup
+      yield* f.message("question")
+      yield* f.wait("first", "question-wait")
+      const error = yield* f.wait("changed", "question-wait", [f.sibling.runId]).pipe(Effect.flip)
+      expect(error).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
+      expect((yield* f.store.loadExecution(f.parent.runId)).resolutions).toHaveLength(1)
     }),
   )
 })
