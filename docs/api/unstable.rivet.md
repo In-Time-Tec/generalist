@@ -398,6 +398,28 @@ Stable actor identity available before Runtime construction.
 
 - `Omit`\<[`ActorRuntimeOptions`](#actorruntimeoptions), `"drainAction"` \| `"environment"` \| `"tenant"` \| `"partition"`\>
 
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
+
+##### ServerError
+
+`ServerError` = `never`
+
+##### AuthError
+
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
+
+##### ServerRequirements
+
+`ServerRequirements` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = [`ActorRuntimeServices`](#actorruntimeservices)
+
 #### Properties
 
 <a id="activationprojection-1"></a>
@@ -666,6 +688,16 @@ Application-owned executable reconstruction composed into each actor incarnation
 
 [`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`scheduler`](./runtime/namespaces/Runtime.md#scheduler)
 
+<a id="server"></a>
+
+##### server?
+
+> `readonly` `optional` **server?**: [`RuntimeActorServerFactory`](#runtimeactorserverfactory)\<`Agents`, `ServerError`, `AuthError`, `AuthServices`, `ServerRequirements`\>
+
+**`Experimental`**
+
+Server configuration constructed once inside this actor incarnation.
+
 <a id="snapshotevery-1"></a>
 
 ##### snapshotEvery?
@@ -712,6 +744,144 @@ Application-owned transport and cryptography; never actor-local durability.
 
 [`Options`](./unstable.cloudflare.durable-objects.md#options).[`workerId`](./unstable.cloudflare.durable-objects.md#workerid-1)
 
+***
+
+<a id="runtimeactorserver"></a>
+
+### RuntimeActorServer
+
+**`Experimental`**
+
+One canonical HTTP/WebSocket handler retained for an actor incarnation.
+
+#### Properties
+
+<a id="handle"></a>
+
+##### handle
+
+> `readonly` **handle**: (`request`, `websocket?`, `signal?`) => `Effect`\<`Response`, `unknown`\>
+
+**`Experimental`**
+
+###### Parameters
+
+###### request
+
+`Request`
+
+###### websocket?
+
+`UniversalWebSocket`
+
+###### signal?
+
+`AbortSignal`
+
+###### Returns
+
+`Effect`\<`Response`, `unknown`\>
+
+***
+
+<a id="runtimeactorservercontext"></a>
+
+### RuntimeActorServerContext
+
+**`Experimental`**
+
+Identity supplied to an actor-incarnation Server factory.
+
+#### Properties
+
+<a id="actorid-1"></a>
+
+##### actorId
+
+> `readonly` **actorId**: `string`
+
+**`Experimental`**
+
+<a id="key-1"></a>
+
+##### key
+
+> `readonly` **key**: readonly `string`[]
+
+**`Experimental`**
+
+<a id="namespace-1"></a>
+
+##### namespace
+
+> `readonly` **namespace**: `object`
+
+**`Experimental`**
+
+###### environment
+
+> `readonly` **environment**: `string`
+
+###### partition
+
+> `readonly` **partition**: `string`
+
+###### tenant
+
+> `readonly` **tenant**: `string`
+
+***
+
+<a id="runtimeactorserverfactory"></a>
+
+### RuntimeActorServerFactory
+
+**`Experimental`**
+
+Actor-incarnation factory for one canonical server configuration.
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
+
+##### ServerError
+
+`ServerError` = `never`
+
+##### AuthError
+
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
+
+##### ServerRequirements
+
+`ServerRequirements` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = [`ActorRuntimeServices`](#actorruntimeservices)
+
+#### Properties
+
+<a id="make"></a>
+
+##### make
+
+> `readonly` **make**: (`context`) => `Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `ServerRequirements`\>
+
+**`Experimental`**
+
+###### Parameters
+
+###### context
+
+[`RuntimeActorServerContext`](#runtimeactorservercontext)
+
+###### Returns
+
+`Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `ServerRequirements`\>
+
 ## Type Aliases
 
 <a id="actorruntimeservices"></a>
@@ -757,6 +927,32 @@ One typed Rivet Actor definition owning one Runtime partition.
 > **RuntimeActorNamespace** = *typeof* `RuntimeActorNamespace.Type`
 
 **`Experimental`**
+
+***
+
+<a id="runtimeactorserveroptions"></a>
+
+### RuntimeActorServerOptions
+
+> **RuntimeActorServerOptions**\<`Agents`, `AuthError`, `AuthServices`\> = [`LayerOptions`](./server.md#layeroptions)\<`Agents`, `AuthError`, `AuthServices`\>
+
+**`Experimental`**
+
+Server configuration returned by a Rivet actor-incarnation factory.
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
+
+##### AuthError
+
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
 
 ## Variables
 
@@ -808,7 +1004,7 @@ Build in onWake, drain after readiness, observe failure, and dispose the owning 
 
 ### makeRuntimeActor
 
-> `const` **makeRuntimeActor**: (`options`) => [`RuntimeActorDefinition`](#runtimeactordefinition)
+> `const` **makeRuntimeActor**: \<`Agents`, `ServerError`, `AuthError`, `AuthServices`, `ServerRequirements`\>(`options`) => [`RuntimeActorDefinition`](#runtimeactordefinition)
 
 **`Experimental`**
 
@@ -816,11 +1012,33 @@ Build one Rivet Actor per Runtime partition.
 
 The object journal is the only Runtime authority. Schedules and cron are wake hints.
 
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
+
+##### ServerError
+
+`ServerError` = `never`
+
+##### AuthError
+
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
+
+##### ServerRequirements
+
+`ServerRequirements` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = [`ActorRuntimeServices`](#actorruntimeservices)
+
 #### Parameters
 
 ##### options
 
-[`RuntimeActorOptions`](#runtimeactoroptions)
+[`RuntimeActorOptions`](#runtimeactoroptions)\<`Agents`, `ServerError`, `AuthError`, `AuthServices`, `ServerRequirements`\>
 
 #### Returns
 

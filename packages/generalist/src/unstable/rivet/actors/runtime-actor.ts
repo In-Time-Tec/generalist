@@ -1,5 +1,6 @@
 /* oxlint-disable effecttsgo/async-function -- Rivet actor hooks and actions are Promise-only host boundaries. */
 /* oxlint-disable anti-slop-effect/no-service-constructor-imports -- the actor is the scoped object-runtime composition root. */
+/* oxlint-disable effecttsgo/any-unknown-in-error-context -- the raw Rivet transport preserves Effect HTTP's platform error channel. */
 import { Crypto, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { DurabilityFailure } from "../../../durability/errors.js"
@@ -13,6 +14,7 @@ import {
   type ActorDefinition,
   type InstanceActorOptionsInput,
   type ScheduledFireInfo,
+  type UniversalWebSocket,
 } from "rivetkit"
 import { Address } from "../../../runtime/address.js"
 import { RuntimeUnavailable } from "../../../runtime/errors.js"
@@ -30,6 +32,8 @@ import {
 } from "../../../runtime/service.js"
 import { TreePolicy } from "../../../runtime/tree/policy.js"
 import { ActorRuntime, layerActorRuntime, type ActorRuntimeOptions, type ActorRuntimeServices } from "./runtime.js"
+import { make as makeServer, type RuntimeActorServer, type RuntimeActorServerFactory } from "./server.js"
+import type { AgentRegistry } from "../../../host/index.js"
 
 const SendInput = Schema.Struct({
   runId: Schema.optionalKey(Schema.String),
@@ -85,6 +89,7 @@ type RuntimeHost = ManagedRuntime.ManagedRuntime<ActorRuntimeServices, Activatio
 interface Host {
   readonly runtime: RuntimeHost
   readonly service: ActorRuntime["Service"]
+  readonly server: RuntimeActorServer | undefined
   requests: number
   revision: number
   idleRevision: number | undefined
@@ -146,14 +151,21 @@ export interface RuntimeActorIdentity {
 }
 
 /** @experimental */
-export interface RuntimeActorOptions
-  extends Omit<ActorRuntimeOptions, "drainAction" | "environment" | "tenant" | "partition"> {
+export interface RuntimeActorOptions<
+  Agents extends AgentRegistry = AgentRegistry,
+  ServerError = never,
+  AuthError = never,
+  AuthServices extends ActorRuntimeServices = never,
+  ServerRequirements extends ActorRuntimeServices = ActorRuntimeServices,
+> extends Omit<ActorRuntimeOptions, "drainAction" | "environment" | "tenant" | "partition"> {
   /** Cached for this incarnation; applications must preserve key-to-namespace routing across incarnations. */
   readonly namespace: (identity: RuntimeActorIdentity) => RuntimeActorNamespace
   /** Application-owned transport and cryptography; never actor-local durability. */
   readonly storage: Layer.Layer<ObjectStore | Crypto.Crypto>
   /** Application-owned executable reconstruction composed into each actor incarnation. */
   readonly resolver: Layer.Layer<ExecutableResolver>
+  /** Server configuration constructed once inside this actor incarnation. */
+  readonly server?: RuntimeActorServerFactory<Agents, ServerError, AuthError, AuthServices, ServerRequirements>
   /** Rivet process-lifecycle tuning; it never carries Runtime authority. */
   readonly actorOptions?: InstanceActorOptionsInput
 }
@@ -184,7 +196,15 @@ const retire = (c: Context, host: Host): Promise<void> => {
  *
  * The object journal is the only Runtime authority. Schedules and cron are wake hints.
  */
-export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefinition => {
+export const makeRuntimeActor = <
+  Agents extends AgentRegistry = AgentRegistry,
+  ServerError = never,
+  AuthError = never,
+  AuthServices extends ActorRuntimeServices = never,
+  ServerRequirements extends ActorRuntimeServices = ActorRuntimeServices,
+>(
+  options: RuntimeActorOptions<Agents, ServerError, AuthError, AuthServices, ServerRequirements>,
+): RuntimeActorDefinition => {
   const { actorOptions, namespace, resolver, storage, ...storeOptions } = options
   const configuredOptions: ConfiguredActorOptions = {}
   if (actorOptions !== undefined) configuredOptions.options = actorOptions
@@ -222,7 +242,25 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
       )
       try {
         const service = await runtime.runPromise(ActorRuntime, { signal: c.abortSignal })
-        const host: Host = { runtime, service, requests: 0, revision: 0, idleRevision: undefined, released: undefined }
+        const server =
+          options.server === undefined
+            ? undefined
+            : await runtime.runPromise(
+                Effect.flatMap(
+                  options.server.make({ actorId: c.actorId, key: [...c.key], namespace: resolved }),
+                  (config) => makeServer({ config, memoMap: runtime.memoMap, scope: runtime.scope }),
+                ),
+                { signal: c.abortSignal },
+              )
+        const host: Host = {
+          runtime,
+          service,
+          server,
+          requests: 0,
+          revision: 0,
+          idleRevision: undefined,
+          released: undefined,
+        }
         c.vars.host = host
         void runtime.runPromise(service.failure, { signal: c.abortSignal }).catch(() => c.waitUntil(retire(c, host)))
         return host
@@ -243,30 +281,28 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
     recover: boolean,
     effect: (host: Host) => Effect.Effect<A, E, ActorRuntimeServices>,
   ): Promise<A> =>
-    c.keepAwake(
-      (async () => {
-        const host = await getHost(c)
-        if (c.vars.host !== host) return useHost(c, recover, effect)
-        host.requests++
-        try {
-          return await host.runtime.runPromise(
-            Effect.suspend(() => effect(host)).pipe(
-              Effect.raceFirst(host.service.failure),
-              Effect.ensuring(recover ? host.service.notify : Effect.void),
-            ),
-            {
-              signal: c.abortSignal,
-            },
-          )
-        } finally {
-          host.requests--
-          if (host.requests === 0) {
-            host.released?.()
-            if (host.idleRevision === host.revision) await retire(c, host)
-          }
+    (async () => {
+      const host = await getHost(c)
+      if (c.vars.host !== host) return useHost(c, recover, effect)
+      host.requests++
+      try {
+        return await host.runtime.runPromise(
+          Effect.suspend(() => effect(host)).pipe(
+            Effect.raceFirst(host.service.failure),
+            Effect.ensuring(recover ? host.service.notify : Effect.void),
+          ),
+          {
+            signal: c.abortSignal,
+          },
+        )
+      } finally {
+        host.requests--
+        if (host.requests === 0) {
+          host.released?.()
+          if (host.server === undefined && host.idleRevision === host.revision) await retire(c, host)
         }
-      })(),
-    )
+      }
+    })()
 
   const runAction = <A, E>(c: Context, effect: (runtime: RuntimeService) => Effect.Effect<A, E>): Promise<A> =>
     useHost(c, true, (host) => {
@@ -300,9 +336,38 @@ export const makeRuntimeActor = (options: RuntimeActorOptions): RuntimeActorDefi
     await c.vars.closing
   }
 
+  const serverHooks =
+    options.server === undefined
+      ? {}
+      : {
+          onRequest: (c: Context, request: Request) =>
+            useHost(c, false, (host) =>
+              host.server === undefined
+                ? Effect.fail(RuntimeUnavailable.make({ message: "Rivet Server is not ready" }))
+                : host.server.handle(request, undefined, c.abortSignal).pipe(Effect.ensuring(host.service.notify)),
+            ),
+          onWebSocket: (c: Context, websocket: UniversalWebSocket) =>
+            useHost(c, false, (host) =>
+              host.server === undefined || c.request === undefined
+                ? Effect.fail(RuntimeUnavailable.make({ message: "Rivet Server is not ready" }))
+                : Effect.forkIn(host.runtime.scope, { startImmediately: true })(
+                    host.server.handle(c.request, websocket, c.abortSignal).pipe(
+                      Effect.flatMap((response) =>
+                        response.status >= 400
+                          ? Effect.sync(() => websocket.close(1008, "request-rejected"))
+                          : Effect.void,
+                      ),
+                      Effect.catchCause(() => Effect.sync(() => websocket.close(1011, "request-failed"))),
+                      Effect.ensuring(host.service.notify),
+                    ),
+                  ).pipe(Effect.asVoid),
+            ),
+        }
+
   return actor({
     createVars: (): Vars => ({ host: undefined, opening: undefined, closing: undefined, namespace: undefined }),
     ...configuredOptions,
+    ...serverHooks,
     actionInputSchemas,
     onWake: async (c) => {
       await getHost(c)
