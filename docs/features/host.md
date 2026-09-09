@@ -155,7 +155,7 @@ HostRun.wait({ runs?, messages?, commandId, timeout? })
 host.events.subscribe(sessionId, cursor?)
   -> Effect<Stream<HostEvent>, SessionError>
 
-host.approvals.resolve(runId, token, decision, operator) -> void
+host.approvals.resolve(runId, token, decision, operator, commandId) -> void
 
 host.operator.explain(runId) -> Explanation
 host.operator.retry(runId, operator, commandId) -> void

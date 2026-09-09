@@ -25,19 +25,25 @@ export type Decision = typeof Decision.Type
 export const RespondInput = Schema.Struct({
   runId: Schema.String,
   approvalId: ApprovalId,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   decision: Decision,
   operator: Schema.optionalKey(Schema.String),
 })
 export type RespondInput = typeof RespondInput.Type
 
 /** Approve exactly one pending authorization request. */
-export const ApproveInput = Schema.Struct({ runId: Schema.String, approvalId: ApprovalId })
+export const ApproveInput = Schema.Struct({
+  runId: Schema.String,
+  approvalId: ApprovalId,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+})
 export type ApproveInput = typeof ApproveInput.Type
 
 /** Deny exactly one pending authorization request. */
 export const DenyInput = Schema.Struct({
   runId: Schema.String,
   approvalId: ApprovalId,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   reason: Schema.optionalKey(Schema.String),
 })
 export type DenyInput = typeof DenyInput.Type
@@ -52,6 +58,7 @@ export const deny = (input: DenyInput): Effect.Effect<void, RespondApprovalError
     runtime.respondApproval({
       runId: input.runId,
       approvalId: input.approvalId,
+      commandId: input.commandId,
       decision: Object.assign(
         { _tag: "Denied" as const },
         input.reason === undefined ? undefined : { reason: input.reason },
@@ -95,7 +102,8 @@ export type ResolveError = ApprovalTokenInvalid | RespondApprovalError | RuleSto
 
 export interface ResolveOptions {
   /** Operator identity journaled with the decision; also requires the token to be an open obligation. */
-  readonly operator: string
+  readonly operator?: string
+  readonly commandId: string
 }
 
 /** @internal Resolve one exact durable approval token through the supplied Runtime. */
@@ -104,11 +112,11 @@ export const resolveWith = (
   runtime: RuntimeService,
   token: string,
   decision: Approved | Denied,
-  options?: ResolveOptions,
+  options: ResolveOptions,
 ): Effect.Effect<void, ResolveError, RuleStore> =>
   Effect.gen(function* () {
     const runId = yield* runIdFromToken(token)
-    const operator = options?.operator
+    const operator = options.operator
     if (operator !== undefined) {
       const explanation = yield* runtime.operator.explain(runId)
       const legal = explanation.obligations.some(
@@ -124,11 +132,18 @@ export const resolveWith = (
     }
     const identity = operator === undefined ? undefined : { operator }
     if (decision._tag === "Approved") {
-      return yield* runtime.respondApproval({ runId, approvalId: token, decision: { _tag: "Approved" }, ...identity })
+      return yield* runtime.respondApproval({
+        runId,
+        approvalId: token,
+        commandId: options.commandId,
+        decision: { _tag: "Approved" },
+        ...identity,
+      })
     }
     return yield* runtime.respondApproval({
       runId,
       approvalId: token,
+      commandId: options.commandId,
       decision: decision.reason === undefined ? { _tag: "Denied" } : { _tag: "Denied", reason: decision.reason },
       ...identity,
     })
@@ -138,10 +153,10 @@ type ResolveEffect = Effect.Effect<void, ResolveError, Runtime | RuleStore>
 
 /** Resolve one exact durable approval token through the active Runtime. */
 export const resolve: {
-  (token: string, decision: Approved | Denied, options?: ResolveOptions): ResolveEffect
-  (decision: Approved | Denied, options?: ResolveOptions): (token: string) => ResolveEffect
+  (token: string, decision: Approved | Denied, options: ResolveOptions): ResolveEffect
+  (decision: Approved | Denied, options: ResolveOptions): (token: string) => ResolveEffect
 } = Function.dual(
   (args) => Schema.is(Schema.String)(args[0]),
-  (token: string, decision: Approved | Denied, options?: ResolveOptions): ResolveEffect =>
+  (token: string, decision: Approved | Denied, options: ResolveOptions): ResolveEffect =>
     Runtime.use((runtime) => resolveWith(runtime, token, decision, options)),
 )

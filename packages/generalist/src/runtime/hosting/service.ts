@@ -360,8 +360,10 @@ const makeRuntimeWith = (
               ? { _tag: "Succeeded", value: resolution.result }
               : { _tag: "Failed", error: resolution.error },
         }),
-      resolveApproval: (token, decision, operatorIdentity) =>
-        Effect.suspend(() => resolveDurableApproval(service, token, decision, { operator: operatorIdentity })),
+      resolveApproval: (token, decision, operatorIdentity, commandId) =>
+        Effect.suspend(() =>
+          resolveDurableApproval(service, token, decision, { operator: operatorIdentity, commandId }),
+        ),
       extendBudget: (runId, delta, operatorIdentity, commandId) =>
         Effect.gen(function* () {
           const normalized = yield* normalizeBudgetDelta(delta)

@@ -220,6 +220,7 @@ const makeExecutor = (runtime: RuntimeService, deployment: Deployment): AgentExe
         yield* runtime.respondApproval({
           runId: context.taskId,
           approvalId: wait.reason.request.approvalId,
+          commandId: `a2a:${context.taskId}:approval:${wait.reason.request.approvalId}`,
           decision: { _tag: "Approved" },
         })
       } else {

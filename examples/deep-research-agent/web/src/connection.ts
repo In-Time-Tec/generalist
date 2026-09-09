@@ -20,6 +20,7 @@ export const layer = (options: { readonly baseUrl: string }) =>
               sessionId: command.sessionId,
               agent: "deep-research-agent",
               input: command.prompt,
+              commandId: `message:${command.sessionId}:${command.prompt}`,
             })
             return
           }
@@ -30,6 +31,7 @@ export const layer = (options: { readonly baseUrl: string }) =>
           yield* client.approvals.resolve({
             runId: pending.runId,
             token: command.token,
+            commandId: `approval:${command.token}`,
             decision: command.decision,
           })
         }).pipe(

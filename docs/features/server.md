@@ -79,7 +79,7 @@ client.sessions.create/get/list/snapshot/family/control/queue
 client.runs.start/list/inspect/messages/cancel
 client.events.subscribe({ sessionId, cursor?, reconnect? })
 client.events.connect({ sessionId, eventCapacity?, reconnect? })
-client.approvals.resolve({ runId, token, decision })
+client.approvals.resolve({ runId, token, commandId, decision })
 client.operator.explain/retry/wake/resolveUnknown/extendBudget (operator comes from CurrentPrincipal)
 ```
 

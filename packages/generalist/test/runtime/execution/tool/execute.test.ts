@@ -222,7 +222,12 @@ it.effect("retains approval across fresh hosts and runs only after the exact app
     yield* Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({ reason: { _tag: "Approval" } })
-      yield* runtime.respondApproval({ runId, approvalId: "approve-checks", decision: { _tag: "Approved" } })
+      yield* runtime.respondApproval({
+        runId,
+        approvalId: "approve-checks",
+        commandId: "approve-checks:resolve",
+        decision: { _tag: "Approved" },
+      })
       yield* execute(runId, "approval-resume")
       expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
       expect(calls).toBe(1)

@@ -31,9 +31,12 @@ const services = Layer.mergeAll(
 
 const mutations = [
   { path: "/sessions", body: { id: "forbidden" } },
-  { path: "/sessions/existing/runs", body: { agent: "authorization", input: "forbidden" } },
+  { path: "/sessions/existing/runs", body: { agent: "authorization", input: "forbidden", commandId: "forbidden" } },
   { path: "/runs/existing/cancel", body: { commandId: "cancel" } },
-  { path: "/runs/existing/approvals/token", body: { decision: { _tag: "Approved" }, operator: "controller" } },
+  {
+    path: "/runs/existing/approvals/token",
+    body: { commandId: "approval", decision: { _tag: "Approved" }, operator: "controller" },
+  },
   { path: "/runs/existing/retry", body: { commandId: "retry", operator: "controller" } },
   { path: "/runs/existing/wake", body: { commandId: "wake", operator: "controller" } },
   {

@@ -161,6 +161,7 @@ export const layer = (options: LayerOptions): Layer.Layer<AGUI, never, Runtime> 
                   yield* runtime.respondApproval({
                     runId: input.runId,
                     approvalId: wait.reason.request.approvalId,
+                    commandId: `agui:${input.runId}:resume:${entry.interruptId}`,
                     decision: payload === false ? { _tag: "Denied" } : { _tag: "Approved" },
                   })
                 } else {

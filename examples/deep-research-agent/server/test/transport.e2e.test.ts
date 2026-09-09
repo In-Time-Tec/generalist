@@ -144,7 +144,7 @@ describe("deep-research-agent server e2e", () => {
                     sessionId: session.id,
                     agent: "deep-research-agent",
                     input: "What makes Generalist agent framework standalone?",
-                    idempotencyKey: "question-1",
+                    commandId: "question-1",
                   })
                   const first = Array.from(
                     yield* client.events.subscribe({ sessionId: session.id }).pipe(
@@ -172,6 +172,7 @@ describe("deep-research-agent server e2e", () => {
                   yield* client.approvals.resolve({
                     runId: run.id,
                     token: approvalId,
+                    commandId: "approval:" + approvalId,
                     decision: { _tag: "Approved" },
                   })
                   const resumed = Array.from(

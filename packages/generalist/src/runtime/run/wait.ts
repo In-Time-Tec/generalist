@@ -29,6 +29,7 @@ export const RunWait = Schema.Struct({
   reason: WaitReason,
   status: Schema.Literals(["open", "responded", "signaled", "cancelled"]),
   resolution: Schema.optionalKey(WaitResolution),
+  resolutionCommandId: Schema.optionalKey(Schema.String),
   openedAt: Schema.String,
   closedAt: Schema.optionalKey(Schema.String),
 })

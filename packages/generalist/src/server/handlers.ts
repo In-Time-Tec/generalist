@@ -2,7 +2,7 @@ import { Effect, Layer, Stream, Types } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import type { AgentRegistry, Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
 import { api, type EventStreamItem } from "./api.js"
-import { apiError, OperatorDisabled } from "./errors.js"
+import { apiError, hostApiError, OperatorDisabled } from "./errors.js"
 import { handle as handleWebSocket } from "./websocket.js"
 import { handle as handleArtifactWebSocket } from "./artifact-websocket.js"
 import { authorize, CurrentPrincipal, type Authorization, type Resource } from "./auth.js"
@@ -13,6 +13,7 @@ const protect =
     authorize({ policy, resource, action }).pipe(Effect.andThen(Effect.suspend(operation)))
 
 const mapError = (operation: string) => Effect.mapError((error: Error) => apiError({ operation, error }))
+const mapHostError = (operation: string) => Effect.mapError((error: Error) => hostApiError({ operation, error }))
 
 const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "sessions", (handlers) =>
@@ -106,8 +107,7 @@ const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: 
     handlers.handleAll({
       start: ({ params, payload }) =>
         protect(policy)({ type: "session", id: params.sessionId }, "mutate", () => {
-          const options: Types.Mutable<RunStartOptions> = {}
-          if (payload.idempotencyKey !== undefined) options.idempotencyKey = payload.idempotencyKey
+          const options: Types.Mutable<RunStartOptions> = { idempotencyKey: payload.commandId }
           return host.runs.startByName(params.sessionId, payload.agent, payload.input, options).pipe(
             Effect.map((run) => ({ id: run.id })),
             mapError("runs.start"),
@@ -140,6 +140,45 @@ const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: 
       messages: ({ params, query }) =>
         protect(policy)({ type: "run", id: params.id }, "read", () =>
           host.runs.messages(params.id, query.limit).pipe(mapError("runs.messages")),
+        ),
+      admitChild: ({ params, payload }) =>
+        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+          host.runs
+            .admitChild(params.id, payload.selection, payload.prompt, {
+              commandId: payload.commandId,
+              ...(payload.label === undefined ? undefined : { label: payload.label }),
+            })
+            .pipe(mapHostError("runs.admitChild")),
+        ),
+      listChildren: ({ params }) =>
+        protect(policy)({ type: "run", id: params.id }, "read", () =>
+          host.runs.children(params.id).pipe(mapHostError("runs.listChildren")),
+        ),
+      inspectChild: ({ params }) =>
+        protect(policy)({ type: "run", id: params.childId }, "read", () =>
+          host.runs.inspectChild(params.id, params.childId).pipe(mapHostError("runs.inspectChild")),
+        ),
+    }),
+  )
+
+const toolsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
+  HttpApiBuilder.group(api, "tools", (handlers) =>
+    handlers.handleAll({
+      start: ({ params, payload }) =>
+        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+          host.tools
+            .startByName(params.name, payload.input, { commandId: payload.commandId, parentRunId: params.id })
+            .pipe(
+              Effect.map((run) => ({ id: run.id })),
+              mapHostError("tools.start"),
+            ),
+        ),
+      inspect: ({ params }) =>
+        protect(policy)({ type: "run", id: params.id }, "read", () =>
+          host.tools.getByName(params.name, params.id).pipe(
+            Effect.flatMap((run) => run.inspect),
+            mapHostError("tools.inspect"),
+          ),
         ),
     }),
   )
@@ -208,7 +247,7 @@ const approvalsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, pol
       protect(policy)({ type: "run", id: params.id }, "mutate", () =>
         CurrentPrincipal.pipe(
           Effect.flatMap((principal) =>
-            host.approvals.resolve(params.id, params.token, payload.decision, principal.id),
+            host.approvals.resolve(params.id, params.token, payload.decision, principal.id, payload.commandId),
           ),
           mapError("approvals.resolve"),
         ),
@@ -323,6 +362,7 @@ export const layerHandlers = <Agents extends AgentRegistry>(options: HandlerOpti
   Layer.mergeAll(
     sessionsHandlers(options.host, options.authorization),
     runsHandlers(options.host, options.authorization),
+    toolsHandlers(options.host, options.authorization),
     eventsHandlers(options.host, options.authorization),
     artifactsHandlers(options.host, options.authorization),
     approvalsHandlers(options.host, options.authorization),

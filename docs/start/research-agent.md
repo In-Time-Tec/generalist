@@ -411,7 +411,7 @@ Read the HostEvents in order: the Run started, the model planned a `tool-call`, 
 
 ## Part 2: Approvals over the wire
 
-The Run is waiting rather than failed. Each `ApprovalRequested` event carries an opaque `event.request.approvalId`; a turn can produce several approval requests, so never construct or predict these tokens. [Suspension as a typed error](/learn/suspension) explains the underlying typed suspension. This script builds `Server.client`, takes the first approval request from the Session stream, and sends that exact token to `client.approvals.resolve`, which calls `POST /runs/:id/approvals/:token` with the human operator identity. Run it again for each later approval request:
+The Run is waiting rather than failed. Each `ApprovalRequested` event carries an opaque `event.request.approvalId`; a turn can produce several approval requests, so never construct or predict these tokens. [Suspension as a typed error](/learn/suspension) explains the underlying typed suspension. This script builds `Server.client`, takes the first approval request from the Session stream, and sends that exact token plus a stable commandId to `client.approvals.resolve`, which calls `POST /runs/:id/approvals/:token` with the authenticated operator identity. Run it again for each later approval request:
 
 **approve.ts**
 
@@ -440,8 +440,8 @@ const program = Effect.gen(function* () {
   yield* client.approvals.resolve({
     runId: approval.runId,
     token: approval.event.request.approvalId,
+    commandId: `approval:${approval.event.request.approvalId}`,
     decision: { _tag: "Approved" },
-    operator: "tutorial:human",
   })
   yield* Console.log(`approved ${approval.event.request.capability} for ${approval.runId}`)
 })

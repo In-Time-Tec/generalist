@@ -64,7 +64,7 @@ export const commands = {
     tag: "respondApproval",
     input: Schema.Tuple([ApprovalResponse]),
     receipt: Schema.Void,
-    identity: ([input]: readonly [ApprovalResponse]) => key(input.runId, input.approvalId),
+    identity: ([input]: readonly [ApprovalResponse]) => input.commandId ?? key(input.runId, input.approvalId),
   },
   signal: {
     tag: "signal",

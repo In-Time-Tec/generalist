@@ -288,7 +288,7 @@ const program = Effect.gen(function* () {
     fetch(`${baseUrl}/runs/${encodeURIComponent(runInput.runId)}/approvals/${encodeURIComponent(token)}`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(credential)}` },
-      body: encodeJson({ decision: { _tag: "Approved" } }),
+      body: encodeJson({ commandId: `approval:${token}`, decision: { _tag: "Approved" } }),
     }),
   ).pipe(Effect.orDie)
   if (!approval.ok) return yield* Effect.die(`Approval request failed with ${approval.status}`)

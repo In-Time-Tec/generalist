@@ -7,11 +7,11 @@ import { HostEvent } from "../host/event.js"
 import { sessions } from "./session-api.js"
 import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
-import { RunInspection } from "../runtime/run.js"
+import { RunInspection, RunReceipt } from "../runtime/run.js"
 import { RuntimeInspectionResponse } from "../runtime/inspection.js"
 import type { RuntimeInspection } from "../runtime/service.js"
 import { Authentication } from "./auth.js"
-import { apiErrors, artifactApiErrors } from "./errors.js"
+import { apiErrors, artifactApiErrors, hostTransportErrors } from "./errors.js"
 import { CursorFromString } from "./wire.js"
 import { MailboxEntry } from "../runtime/messaging/mailbox.js"
 import { SteeringReceipt } from "../runtime/run/steering.js"
@@ -28,9 +28,23 @@ export type RunStarted = typeof RunStarted.Type
 export const RunStartPayload = Schema.Struct({
   agent: Schema.String,
   input: Schema.Json,
-  idempotencyKey: Schema.optionalKey(Schema.String),
+  commandId: Schema.String.check(Schema.isNonEmpty()),
 })
 export type RunStartPayload = typeof RunStartPayload.Type
+
+export const ToolStartPayload = Schema.Struct({
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+  input: Schema.Json,
+})
+export type ToolStartPayload = typeof ToolStartPayload.Type
+
+export const ChildStartPayload = Schema.Struct({
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+  selection: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
+  prompt: Schema.String.check(Schema.isNonEmpty()),
+  label: Schema.optionalKey(Schema.String),
+})
+export type ChildStartPayload = typeof ChildStartPayload.Type
 
 export const RunCancelPayload = Schema.Struct({
   commandId: Schema.String,
@@ -123,6 +137,22 @@ const listRunMessages = HttpApiEndpoint.get("messages", "/runs/:id/messages", {
   success: Schema.Array(MailboxEntry),
   error: apiErrors,
 })
+const admitChild = HttpApiEndpoint.post("admitChild", "/runs/:id/children", {
+  params: { id: Schema.String },
+  payload: ChildStartPayload,
+  success: RunReceipt,
+  error: hostTransportErrors,
+})
+const listChildren = HttpApiEndpoint.get("listChildren", "/runs/:id/children", {
+  params: { id: Schema.String },
+  success: Schema.Unknown,
+  error: hostTransportErrors,
+})
+const inspectChild = HttpApiEndpoint.get("inspectChild", "/runs/:id/children/:childId", {
+  params: { id: Schema.String, childId: Schema.String },
+  success: Schema.Unknown,
+  error: hostTransportErrors,
+})
 const runs: HttpApiGroup.HttpApiGroup<
   "runs",
   | typeof startRun
@@ -131,7 +161,36 @@ const runs: HttpApiGroup.HttpApiGroup<
   | typeof cancelRun
   | typeof sendRunMessage
   | typeof listRunMessages
-> = HttpApiGroup.make("runs").add(startRun, listRuns, inspectRun, cancelRun, sendRunMessage, listRunMessages)
+  | typeof admitChild
+  | typeof listChildren
+  | typeof inspectChild
+> = HttpApiGroup.make("runs").add(
+  startRun,
+  listRuns,
+  inspectRun,
+  cancelRun,
+  sendRunMessage,
+  listRunMessages,
+  admitChild,
+  listChildren,
+  inspectChild,
+)
+
+const startTool = HttpApiEndpoint.post("start", "/runs/:id/tools/:name", {
+  params: { id: Schema.String, name: Schema.String },
+  payload: ToolStartPayload,
+  success: RunStarted,
+  error: hostTransportErrors,
+})
+const inspectTool = HttpApiEndpoint.get("inspect", "/tools/:name/runs/:id", {
+  params: { name: Schema.String, id: Schema.String },
+  success: inspectRunResponse,
+  error: hostTransportErrors,
+})
+const tools: HttpApiGroup.HttpApiGroup<"tools", typeof startTool | typeof inspectTool> = HttpApiGroup.make("tools").add(
+  startTool,
+  inspectTool,
+)
 
 const subscribeEvents = HttpApiEndpoint.get("subscribe", "/sessions/:id/events", {
   params: { id: Schema.String },
@@ -164,7 +223,7 @@ const artifacts: HttpApiGroup.HttpApiGroup<"artifacts", typeof readArtifact | ty
 
 const resolveApproval = HttpApiEndpoint.post("resolve", "/runs/:id/approvals/:token", {
   params: { id: Schema.String, token: Schema.String },
-  payload: Schema.Struct({ decision: Decision }),
+  payload: Schema.Struct({ commandId: Schema.String.check(Schema.isNonEmpty()), decision: Decision }),
   error: apiErrors,
 })
 const approvals: HttpApiGroup.HttpApiGroup<"approvals", typeof resolveApproval> =
@@ -233,6 +292,7 @@ const operator: HttpApiGroup.HttpApiGroup<
 type Groups =
   | typeof sessions
   | typeof runs
+  | typeof tools
   | typeof events
   | typeof artifacts
   | typeof approvals
@@ -242,7 +302,7 @@ type AuthenticatedGroups = HttpApiGroup.AddMiddleware<Groups, Authentication>
 
 /** Schema-first public API. New ingress modules add one group to this value. */
 export const api: HttpApi.HttpApi<"generalist", AuthenticatedGroups> = HttpApi.make("generalist")
-  .add(sessions, runs, events, artifacts, approvals, attachments, operator)
+  .add(sessions, runs, tools, events, artifacts, approvals, attachments, operator)
   .middleware(Authentication)
   .annotateMerge(
     OpenApi.annotations({

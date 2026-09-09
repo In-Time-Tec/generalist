@@ -157,6 +157,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     getTool: () => Effect.die("not used"),
     registerTool: () => Effect.die("not used"),
     startTool: () => Effect.die("not used"),
+    startToolEncoded: () => Effect.die("not used"),
     sessionFamily: () => Effect.die("not used"),
     getRun: () => Effect.die("not used"),
     sessionSelection: () => Effect.die("not used"),

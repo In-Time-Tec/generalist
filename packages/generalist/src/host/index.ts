@@ -28,7 +28,7 @@ import {
 } from "../instructions/providers.js"
 import type { Cursor } from "../runtime/cursor.js"
 import type { CreateSessionError, SessionError, SessionEventsError } from "../runtime/session/host.js"
-import type { RunInspection } from "../runtime/run.js"
+import type { RunInspection, RunReceipt } from "../runtime/run.js"
 import type { MailboxEntry } from "../runtime/messaging/mailbox.js"
 import { make as makeSessionReads, type SessionReads } from "./session-reads.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
@@ -50,7 +50,7 @@ import {
   type StartOptions,
 } from "../runtime/service.js"
 import type { ToolServices } from "../runtime/executable/registered-tool.js"
-import { ExecutableRegistrationInvalid, IllegalOperatorAction } from "../runtime/errors.js"
+import { ExecutableRegistrationInvalid, IllegalOperatorAction, RunNotFound } from "../runtime/errors.js"
 import { make as makeTools, type Tools as HostTools } from "./tools.js"
 export type { MakeError } from "./errors.js"
 export type { HostToolRun } from "./tools.js"
@@ -176,6 +176,17 @@ export interface Host<Agents extends AgentRegistry> {
       limit?: number,
     ) => Effect.Effect<ReadonlyArray<MailboxEntry>, import("../runtime/service.js").DirectoryError>
     readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, CancelError>
+    readonly admitChild: (
+      parentRunId: string,
+      selection: string,
+      prompt: string,
+      options: { readonly commandId: string; readonly label?: string },
+    ) => Effect.Effect<RunReceipt, import("../runtime/service.js").SpawnError>
+    readonly children: (parentRunId: string) => Effect.Effect<RuntimeInspection["children"], InspectError>
+    readonly inspectChild: (
+      parentRunId: string,
+      childRunId: string,
+    ) => Effect.Effect<RuntimeInspection["children"][number], InspectError | import("../runtime/errors.js").RunNotFound>
     readonly rewind: (runId: string, options: RewindOptions) => Effect.Effect<void, RewindError>
   }
   readonly events: {
@@ -191,6 +202,7 @@ export interface Host<Agents extends AgentRegistry> {
       token: string,
       decision: ApprovalDecision,
       operator: string,
+      commandId: string,
     ) => Effect.Effect<void, InspectError | RespondApprovalError | IllegalOperatorAction>
   }
   readonly operator: {
@@ -355,6 +367,25 @@ const make = <
     const registered = new Map<AnyAgent, AnyAgent>()
     const registeredByName = new Map<string, AnyAgent>()
     const configuredAgents = agents.map((agent) => configuredAgent(agent, contributions.tools))
+    const registeredTools = new Map<string, Tool.Any>()
+    const registerToolByName = (tool: Tool.Any) =>
+      Effect.suspend(() => {
+        const name = String(tool.name)
+        const existing = registeredTools.get(name)
+        if (existing !== undefined && existing !== tool) {
+          return ExecutableRegistrationInvalid.make({
+            message: `Tool name is ambiguous: ${name}. Register one exact Tool declaration per name.`,
+          })
+        }
+        registeredTools.set(name, tool)
+        return Effect.void
+      })
+    for (const agent of configuredAgents) {
+      // SAFETY: every configured Agent toolkit entry is an Effect AI Tool.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      for (const tool of Object.values(agent.toolkit.tools) as ReadonlyArray<Tool.Any>) yield* registerToolByName(tool)
+    }
+    for (const tool of options.tools ?? []) yield* registerToolByName(tool)
     yield* validateProfiles(configuredAgents)
     const treePolicy =
       options.limits === undefined
@@ -382,7 +413,7 @@ const make = <
     const hostRun = makeHostRun({ runtime, sessionHandle })
     const host: Host<Agents> = {
       revision,
-      tools: makeTools(runtime),
+      tools: makeTools(runtime, registeredTools),
       attachments,
       artifacts,
       sessions: {
@@ -451,6 +482,26 @@ const make = <
           if (reason !== undefined) input.reason = reason
           return runtime.cancel(input)
         },
+        admitChild: (parentRunId, selection, prompt, admitOptions) =>
+          runtime.spawn({
+            parentRunId,
+            invocationId: admitOptions.commandId,
+            idempotencyKey: admitOptions.commandId,
+            selection,
+            prompt,
+            ...(admitOptions.label === undefined ? undefined : { label: admitOptions.label }),
+          }),
+        children: (parentRunId) => runtime.inspect(parentRunId).pipe(Effect.map((inspection) => inspection.children)),
+        inspectChild: (parentRunId, childRunId) =>
+          Effect.gen(function* () {
+            const child = yield* runtime.inspect(childRunId)
+            if (child.parentRunId !== parentRunId) return yield* RunNotFound.make({ runId: childRunId })
+            const found = child
+            const parent = yield* runtime.inspect(parentRunId)
+            const entry = parent.children.find((candidate) => candidate.childRunId === found.runId)
+            if (entry === undefined) return yield* RunNotFound.make({ runId: childRunId })
+            return entry
+          }),
         rewind: runtime.rewind,
       },
       events: {
@@ -507,7 +558,8 @@ const make = <
           ),
       },
       approvals: {
-        resolve: (runId, token, decision, operator) => resolveApproval(runtime, runId, token, decision, operator),
+        resolve: (runId, token, decision, operator, commandId) =>
+          resolveApproval(runtime, runId, token, decision, operator, commandId),
       },
       operator: {
         explain: runtime.operator.explain,

@@ -134,6 +134,7 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
             suspended.token,
             Approved({ remember: { pattern: "approval_write:*", level: "allow" } }),
             "operator:approval-conformance",
+            "approval:conformance",
           )
           .pipe(
             Effect.provideService(
@@ -164,7 +165,12 @@ export const registerApprovalSuspend = <LayerError, ClaimsLayerError>(input: {
         notifications.length = 0
         const denied = yield* start(services, "approval-denied", 1)
         yield* services.runtime.operator
-          .resolveApproval(denied.token, Denied({ reason: "TEST_OPERATOR_DENIED" }), "operator:denial-conformance")
+          .resolveApproval(
+            denied.token,
+            Denied({ reason: "TEST_OPERATOR_DENIED" }),
+            "operator:denial-conformance",
+            "approval:denial",
+          )
           .pipe(
             Effect.provideService(
               RuleStore,

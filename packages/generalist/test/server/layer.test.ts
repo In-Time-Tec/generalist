@@ -63,6 +63,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
         sessionId: session.id,
         agent: agent.name,
         input: "bounded direct input",
+        commandId: "bounded:direct",
       })
       const store = yield* RunStore.RunStore
       for (const runId of [queued.activeRunId!, direct.id])

@@ -57,7 +57,7 @@ export interface RunReceipt {
 }
 
 /** Encoded durable Run receipt. */
-interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
+export interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
   readonly runId: typeof RunId.Encoded
 }
 

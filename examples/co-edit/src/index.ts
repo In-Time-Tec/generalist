@@ -261,7 +261,7 @@ const startAgent = (baseUrl: string) =>
       HttpClientRequest.bodyJsonUnsafe({
         agent: "co-edit-writer",
         input: "Update the shared plan",
-        idempotencyKey: "co-edit-update-plan",
+        commandId: "co-edit-update-plan",
       }),
       HttpClient.execute,
       Effect.orDie,

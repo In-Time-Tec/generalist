@@ -138,7 +138,7 @@ For an existing Session, `client.events.connect({ sessionId })` first reads a ve
 
 ## 2. Resolve approval waits
 
-A durable approval emits an approval token and suspends the Run. Resolve it with `client.approvals.resolve({ runId, token, decision, operator })`. Runtime verifies the token, journals the operator identity, and rejects a stale decision.
+A durable approval emits an approval token and suspends the Run. Resolve it with `client.approvals.resolve({ runId, token, commandId, decision })`. Runtime verifies the token, journals the authenticated operator identity, and rejects a stale decision.
 
 **approval-resume.ts**
 

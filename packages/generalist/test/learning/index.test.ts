@@ -308,7 +308,12 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
           token: suspended.token,
         })
         yield* runtime.operator
-          .resolveApproval(suspended.token, Approvals.Approved(), "operator:learning-recovery")
+          .resolveApproval(
+            suspended.token,
+            Approvals.Approved(),
+            "operator:learning-recovery",
+            "approval:learning-recovery",
+          )
           // oxlint-disable-next-line effecttsgo/strict-effect-provide -- The test owns this short-lived in-memory RuleStore Layer.
           .pipe(Effect.provide(Permissions.layerRuleStoreMemory()))
         yield* executor.execute(
