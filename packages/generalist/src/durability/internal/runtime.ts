@@ -22,6 +22,7 @@ import { make as makeCodec, decodeReceipt, encodeCommandValue } from "./runtime-
 import { detach } from "./runtime-state/cache.js"
 import type { State as CanonicalState } from "./protocol.js"
 import { type Definition, ownershipCommands } from "./runtime-command.js"
+import { make as makeCapacity } from "./runtime-state/capacity.js"
 import { emptyState, type RuntimeState } from "../../runtime/state/projection.js"
 import { PreparedObservation, occurredAtMillis, type Observations } from "../../runtime/state/observation.js"
 import { shutdownStore } from "../../runtime/state/store/events.js"
@@ -39,6 +40,7 @@ const ReceiptEnvelope = Schema.Struct({
 
 /** Canonical namespace and host configuration; construction only reconstructs state. */
 export interface Options extends LayerOptions, JournalOptions {
+  readonly admissionReserveBytes?: number
   readonly workerId?: string
   readonly schedulerMode?: "poll" | "external"
   readonly reconcileInterval?: Duration.Input
@@ -132,6 +134,7 @@ const releaseExpiredOwners = (state: RuntimeState, now: number) => {
 export const make = (options: Options) =>
   Effect.gen(function* () {
     const journal = yield* makeJournal(options)
+    const reservedBytes = yield* makeCapacity(options)
     const codec = makeCodec()
     const copyReceipt = detach()
     const clock = yield* Clock.Clock
@@ -275,7 +278,11 @@ export const make = (options: Options) =>
                   value: committed.receipt,
                   observations: { ...observations },
                 }
-                return { patches: committed.patches, receipt }
+                return {
+                  patches: committed.patches,
+                  receipt,
+                  reserveBytes: reservedBytes(definition.tag, committed.next),
+                }
               }),
           )
           yield* refresh(result.head)

@@ -13,6 +13,7 @@ import { approvalReason, type WaitReason } from "../../run/wait.js"
 import type { Request as ApprovalRequest } from "../../operation/approval.js"
 import { ToolSuspended } from "../state.js"
 import { bytes, limits, ToolLimitExceeded } from "./limits.js"
+import { DurabilityFailure } from "../../../durability/errors.js"
 
 export const executeTool = (input: {
   readonly claim: ExecutionClaim
@@ -172,7 +173,13 @@ export const executeTool = (input: {
                     event: { ...progress, _tag: "ToolProgress", turn: 0, toolCallId: call.id },
                   })
                   return true
-                }).pipe(Effect.orDie),
+                }).pipe(
+                  Effect.catchIf(
+                    (error) => Schema.is(DurabilityFailure)(error) && error.reason === "limit",
+                    () => Effect.succeed(false),
+                  ),
+                  Effect.orDie,
+                ),
               sessionId: claimed.message.sessionId,
               runId: claim.runId,
               rootRunId: claimed.rootRunId,

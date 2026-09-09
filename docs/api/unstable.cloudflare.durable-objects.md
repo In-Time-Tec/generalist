@@ -146,6 +146,18 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 [`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`addresses`](./runtime/namespaces/Runtime.md#addresses)
 
+<a id="admissionreservebytes"></a>
+
+##### admissionReserveBytes?
+
+> `readonly` `optional` **admissionReserveBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](#options).[`admissionReserveBytes`](#admissionreservebytes-1)
+
 <a id="bucket"></a>
 
 ##### bucket
@@ -397,6 +409,18 @@ Final-state callback executed synchronously inside each authoritative store tran
 ###### Inherited from
 
 [`Options`](./durability.md#options).[`addresses`](./durability.md#addresses)
+
+<a id="admissionreservebytes-1"></a>
+
+##### admissionReserveBytes?
+
+> `readonly` `optional` **admissionReserveBytes?**: `number`
+
+**`Experimental`**
+
+###### Inherited from
+
+[`Options`](./durability.md#options).[`admissionReserveBytes`](./durability.md#admissionreservebytes)
 
 <a id="bucket-1"></a>
 
