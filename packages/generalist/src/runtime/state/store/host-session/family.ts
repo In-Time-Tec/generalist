@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import { SessionNotFound } from "../../../session/host.js"
-import { SessionPageInvalid } from "../../../session/page-error.js"
+import { SessionPageInvalid } from "../../../session/page.js"
 import { SessionFamilyInput, type SessionFamilyPage, type RetainedSession } from "../../../session/retained.js"
 import { RuntimeUnavailable } from "../../../errors.js"
 import type { RuntimeState } from "../../projection.js"

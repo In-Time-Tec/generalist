@@ -1214,6 +1214,12 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 > `readonly` **id**: `string`
 
+<a id="lifecycle"></a>
+
+##### lifecycle?
+
+> `readonly` `optional` **lifecycle?**: `"closed"` \| `"stopped"`
+
 <a id="queue"></a>
 
 ##### queue
@@ -1323,6 +1329,12 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ###### treePolicy.maxSessions
 
 > `readonly` **maxSessions**: `number`
+
+<a id="sponsorrunid"></a>
+
+##### sponsorRunId?
+
+> `readonly` `optional` **sponsorRunId?**: `string`
 
 <a id="title"></a>
 
@@ -1520,6 +1532,22 @@ One deterministic collection of host-owned Agent contributions.
 
 [`HostSession`](#hostsession).[`activeRunId`](#activerunid)
 
+<a id="close"></a>
+
+##### close
+
+> `readonly` **close**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
 <a id="createdat-1"></a>
 
 ##### createdAt
@@ -1545,6 +1573,36 @@ One deterministic collection of host-owned Agent contributions.
 ##### inspect
 
 > `readonly` **inspect**: `Effect`\<[`HostSession`](#hostsession-1), [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+<a id="lifecycle-1"></a>
+
+##### lifecycle?
+
+> `readonly` `optional` **lifecycle?**: `"closed"` \| `"stopped"`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`lifecycle`](#lifecycle)
+
+<a id="message-1"></a>
+
+##### message
+
+> `readonly` **message**: (`input`, `options`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror), [`SessionSender`](./runtime/index.md#sessionsender)\>
+
+###### Parameters
+
+###### input
+
+`string` \| `Prompt`
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror), [`SessionSender`](./runtime/index.md#sessionsender)\>
 
 <a id="queue-1"></a>
 
@@ -1599,6 +1657,22 @@ One deterministic collection of host-owned Agent contributions.
 ###### Returns
 
 `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`QueueError`](#queueerror)\>
+
+<a id="resume"></a>
+
+##### resume
+
+> `readonly` **resume**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="retainedsession-1"></a>
 
@@ -1717,6 +1791,32 @@ One deterministic collection of host-owned Agent contributions.
 ##### snapshot
 
 > `readonly` **snapshot**: `Effect`\<[`HostSessionSnapshot`](./runtime/namespaces/HostSession.md#hostsessionsnapshot), [`SessionSnapshotError`](./runtime/namespaces/HostSession.md#sessionsnapshoterror)\>
+
+<a id="sponsorrunid-1"></a>
+
+##### sponsorRunId?
+
+> `readonly` `optional` **sponsorRunId?**: `string`
+
+###### Inherited from
+
+[`HostSession`](#hostsession).[`sponsorRunId`](#sponsorrunid)
+
+<a id="stop"></a>
+
+##### stop
+
+> `readonly` **stop**: (`options`) => `Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
+
+###### Parameters
+
+###### options
+
+[`QueueCommandOptions`](#queuecommandoptions)
+
+###### Returns
+
+`Effect`\<`void`, [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
 
 <a id="submit"></a>
 

@@ -17,9 +17,17 @@ import { AdmissionPolicy, ExecutionContinuation, MessageSource, SteeringReceipt 
 import type { Service } from "../../runtime/run/store.js"
 import { RunWait } from "../../runtime/run/wait.js"
 import { HostSession } from "../../runtime/session/host.js"
-import { SubmitInput, UpdateInput, RemoveInput, QueueReceipt, SessionSelection } from "../../runtime/session/queue.js"
+import {
+  SubmitInput,
+  UpdateInput,
+  RemoveInput,
+  QueueReceipt,
+  SessionSelection,
+  ControlInput,
+} from "../../runtime/session/queue.js"
 import { TreePolicy } from "../../runtime/tree/policy.js"
 import { ExecutionClaim } from "./runtime-state/schema.js"
+import { MessageInput } from "../../runtime/session/message.js"
 
 const AdmitSendInput = Schema.Struct({
   message: Message,
@@ -115,6 +123,7 @@ const AdmitProgramChildAndSuspendInput = Schema.Struct({
 })
 
 const AdmitSteeringInput = Schema.Struct({
+  sessionCommandId: Schema.optionalKey(Schema.String),
   runId: Schema.String,
   idempotencyKey: Schema.String,
   digest: Schema.String,
@@ -193,6 +202,8 @@ export const artifactAppendCommandId = (input: {
 }): string => `appendArtifact:${artifactAppendIdentity(input)}`
 
 type Method =
+  | "messageSessionInput"
+  | "controlSession"
   | "configureDelegationPolicy"
   | "submitSessionInput"
   | "updateSessionInput"
@@ -235,6 +246,18 @@ type Commands = {
 }
 
 export const commands: Commands = {
+  messageSessionInput: {
+    tag: "messageSessionInput",
+    input: Schema.Tuple([MessageInput]),
+    receipt: QueueReceipt,
+    identity: ([input]) => JSON.stringify([input.sessionId, input.commandId]),
+  },
+  controlSession: {
+    tag: "controlSession",
+    input: Schema.Tuple([ControlInput]),
+    receipt: Schema.Void,
+    identity: ([input]) => JSON.stringify([input.sessionId, input.commandId]),
+  },
   configureDelegationPolicy: {
     tag: "configureDelegationPolicy",
     input: Schema.Tuple([TreePolicy]),

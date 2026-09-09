@@ -14,6 +14,23 @@ export const afterTerminal: {
     const stored = without.hostSessions.get(run.message.sessionId)
     if (stored?.session.activeRunId === run.runId) {
       const { activeRunId: _, ...session } = stored.session
+      const pending = run.steering.filter(
+        (entry) => entry.consumedOperationId === undefined && entry.sessionCommandId !== undefined,
+      )
+      if (session.selection !== undefined) {
+        Object.assign(session, {
+          queue: [
+            ...pending.map((entry) => ({
+              id: entry.idempotencyKey,
+              revision: 1,
+              prompt: entry.prompt,
+              from: entry.from,
+              selection: session.selection!,
+            })),
+            ...session.queue,
+          ],
+        })
+      }
       const hostSessions = new Map(without.hostSessions)
       hostSessions.set(run.message.sessionId, { ...stored, session })
       without = { ...without, hostSessions }

@@ -26,6 +26,8 @@ export const append = ({
     hostSessions.set(run.message.sessionId, {
       session: {
         id: run.message.sessionId,
+        sponsorRunId: run.parentRunId,
+        activeRunId: run.runId,
         createdAt: event.occurredAt,
         queue: [],
         selection: {

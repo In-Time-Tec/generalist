@@ -203,6 +203,15 @@ export const fields = ({ reuse, table }: { readonly reuse: Reuse; readonly table
     waits: rootMap(RunWait),
     sessions: rootMap(
       Schema.Struct({
+        continuation: Schema.optionalKey(
+          Schema.Struct({
+            sourceRunId: Schema.String,
+            fundingRunId: Schema.String,
+            allocation: BudgetLimits,
+            remainingRuns: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+            closed: Schema.Boolean,
+          }),
+        ),
         family: Schema.optionalKey(
           Schema.Struct({
             rootSessionId: Schema.String,

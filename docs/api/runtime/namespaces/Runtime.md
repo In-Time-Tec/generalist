@@ -1795,6 +1795,36 @@ Read ordered durable child settlements for one exact parent Run.
 
 `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
 
+<a id="controlsession"></a>
+
+##### controlSession
+
+> `readonly` **controlSession**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+###### Parameters
+
+###### input
+
+###### action
+
+`"stop"` \| `"resume"` \| `"close"`
+
+###### commandId
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`controlSession`](./HostSession.md#controlsession)
+
 <a id="createsession"></a>
 
 ##### createSession
@@ -2038,6 +2068,26 @@ Pending addressed-message projections for this exact Run.
 ###### Returns
 
 `Effect`\<readonly [`MailboxEntry`](./Mailbox.md#mailboxentry)[], [`DirectoryError`](#directoryerror)\>
+
+<a id="messagesessioninput"></a>
+
+##### messageSessionInput
+
+> `readonly` **messageSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict), [`SessionSender`](../index.md#sessionsender)\>
+
+###### Parameters
+
+###### input
+
+`Omit`\<`MessageInput`, `"from"`\>
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict), [`SessionSender`](../index.md#sessionsender)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`messageSessionInput`](./HostSession.md#messagesessioninput)
 
 <a id="operator"></a>
 

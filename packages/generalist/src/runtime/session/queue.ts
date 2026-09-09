@@ -6,6 +6,7 @@ import { ExecutableManifest, ExecutableRef } from "../executable/manifest.js"
 import { ExecutableRegistration } from "../executable/registration.js"
 import { TreePolicy } from "../tree/policy.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
+import { MessageSource } from "../run/steering.js"
 
 /** The immutable executable and settings selected for conversational input. @experimental */
 export const SessionSelection = Schema.Struct({
@@ -21,6 +22,7 @@ export type SelectionResolver = (agent: string) => Effect.Effect<SessionSelectio
 
 /** One editable instruction waiting for its own Run. @experimental */
 export const PendingInput = Schema.Struct({
+  from: Schema.optionalKey(MessageSource),
   id: Schema.String,
   revision: Schema.Int.check(Schema.isGreaterThan(0)),
   prompt: Prompt.Prompt,
@@ -40,7 +42,7 @@ export class SessionQueueConflict extends ActionableTaggedError<SessionQueueConf
   "generalist/session/SessionQueueConflict",
   {
     sessionId: Schema.String,
-    reason: Schema.Literals(["revision", "capacity", "selection"]),
+    reason: Schema.Literals(["revision", "capacity", "selection", "closed"]),
     hint: errorHint("Reload the Session queue and retry with its current revision and pinned Agent selection."),
   },
 ) {}
@@ -52,6 +54,13 @@ export const SubmitInput = Schema.Struct({
   selection: Schema.optionalKey(SessionSelection),
 })
 export type SubmitInput = typeof SubmitInput.Type
+
+export const ControlInput = Schema.Struct({
+  sessionId: Schema.String,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+  action: Schema.Literals(["stop", "close", "resume"]),
+})
+export type ControlInput = typeof ControlInput.Type
 
 export const UpdateInput = Schema.Struct({
   ...SubmitInput.fields,

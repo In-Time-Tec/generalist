@@ -56,6 +56,7 @@ export const promoteHead: {
   (state: RuntimeState, sessionId: string): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
 } = Function.dual(2, (state: RuntimeState, sessionId: string) =>
   Effect.gen(function* () {
+    if (state.hostSessions.get(sessionId)?.session.lifecycle !== undefined) return state
     const key = laneKey(sessionId)
     const lane = state.lanes.get(key)
     if (lane === undefined || lane.queue.length === 0) return state

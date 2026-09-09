@@ -108,6 +108,13 @@ export interface Lane {
 }
 
 export interface RuntimeSession {
+  readonly continuation?: {
+    readonly sourceRunId: string
+    readonly fundingRunId: string
+    readonly allocation: import("../../core/durable/run-budget.js").BudgetLimits
+    readonly remainingRuns: number
+    readonly closed: boolean
+  }
   readonly family?: {
     readonly rootSessionId: string
     readonly parentSessionId: string | null

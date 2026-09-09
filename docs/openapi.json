@@ -20,6 +20,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "sponsorRunId": { "type": "string" },
+                    "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                     "retainedSession": {
                       "type": "object",
                       "properties": {
@@ -682,6 +684,28 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "from": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "runId": { "type": "string" } },
+                                "required": ["runId"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "user": { "type": "string" } },
+                                "required": ["user"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                "required": ["system"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
                           "id": { "type": "string" },
                           "revision": { "type": "integer", "exclusiveMinimum": 0 },
                           "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -1561,6 +1585,8 @@
                   "items": {
                     "type": "object",
                     "properties": {
+                      "sponsorRunId": { "type": "string" },
+                      "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                       "retainedSession": {
                         "type": "object",
                         "properties": {
@@ -2256,6 +2282,28 @@
                         "items": {
                           "type": "object",
                           "properties": {
+                            "from": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": { "runId": { "type": "string" } },
+                                  "required": ["runId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": { "user": { "type": "string" } },
+                                  "required": ["user"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                  "required": ["system"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
                             "id": { "type": "string" },
                             "revision": { "type": "integer", "exclusiveMinimum": 0 },
                             "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -3126,6 +3174,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "sponsorRunId": { "type": "string" },
+                    "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                     "retainedSession": {
                       "type": "object",
                       "properties": {
@@ -3788,6 +3838,28 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "from": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "runId": { "type": "string" } },
+                                "required": ["runId"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "user": { "type": "string" } },
+                                "required": ["user"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                "required": ["system"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
                           "id": { "type": "string" },
                           "revision": { "type": "integer", "exclusiveMinimum": 0 },
                           "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -4655,6 +4727,8 @@
                     "session": {
                       "type": "object",
                       "properties": {
+                        "sponsorRunId": { "type": "string" },
+                        "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                         "retainedSession": {
                           "type": "object",
                           "properties": {
@@ -5379,6 +5453,28 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "from": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": { "runId": { "type": "string" } },
+                                    "required": ["runId"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": { "user": { "type": "string" } },
+                                    "required": ["user"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                    "required": ["system"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
                               "id": { "type": "string" },
                               "revision": { "type": "integer", "exclusiveMinimum": 0 },
                               "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -10921,7 +11017,10 @@
                                   "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/session/SessionQueueConflict"] },
                                     "sessionId": { "type": "string" },
-                                    "reason": { "type": "string", "enum": ["revision", "capacity", "selection"] },
+                                    "reason": {
+                                      "type": "string",
+                                      "enum": ["revision", "capacity", "selection", "closed"]
+                                    },
                                     "hint": { "type": "string" }
                                   },
                                   "required": ["_tag", "sessionId", "reason", "hint"],
@@ -13056,7 +13155,7 @@
         "properties": {
           "_tag": { "type": "string", "enum": ["generalist/session/SessionQueueConflict"] },
           "sessionId": { "type": "string" },
-          "reason": { "type": "string", "enum": ["revision", "capacity", "selection"] },
+          "reason": { "type": "string", "enum": ["revision", "capacity", "selection", "closed"] },
           "hint": { "type": "string" }
         },
         "required": ["_tag", "sessionId", "reason", "hint"],
