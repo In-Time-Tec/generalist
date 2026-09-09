@@ -53,6 +53,9 @@ const independentTool = Tool.make("package-checks", {
   failure: Schema.Struct({ reason: Schema.String }),
 }).annotate(ToolIdentity, { implementation: "checks-v1", policy: "checks-policy-v1" })
 const toolHost = Generalist.create({ agents: [], tools: [independentTool] })
+const backgroundAgent = Agent.make({ name: "background-consumer", toolkit: Toolkit.make(independentTool), toolExecution: "background" })
+type BackgroundRetainsHandlerSchema = Assert<Equal<typeof backgroundAgent.toolkit.tools["package-checks"]["successSchema"]["Type"], number>>
+type BackgroundRetainsHandlerFailure = Assert<Equal<typeof backgroundAgent.toolkit.tools["package-checks"]["failureSchema"]["Type"], { readonly reason: string }>>
 type ToolHostNeedsNoModel = Assert<Equal<Extract<EffectServices<typeof toolHost>, LanguageModel.LanguageModel>, never>>
 const toolAdmission = Effect.gen(function* () {
   const host = yield* toolHost
