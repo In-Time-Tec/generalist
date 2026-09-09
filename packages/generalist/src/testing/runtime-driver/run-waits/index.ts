@@ -2,9 +2,9 @@ import { expect, it } from "@effect/vitest"
 import { DateTime, Effect } from "effect"
 import { TestClock } from "effect/testing"
 import { Prompt } from "effect/unstable/ai"
-import { digest } from "../../runtime/run/steering.js"
-import { toolSuspension } from "./plural-waits.js"
-import type { Options, RuntimeCapability, Services } from "./contract.js"
+import { digest } from "../../../runtime/run/steering.js"
+import { toolSuspension } from "../plural-waits.js"
+import type { Options, RuntimeCapability, Services } from "../contract.js"
 
 type Provide<LayerError> = <A, E>(use: (services: Services) => Effect.Effect<A, E>) => Effect.Effect<A, E | LayerError>
 
