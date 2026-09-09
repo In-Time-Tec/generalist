@@ -23,6 +23,11 @@ export interface RuntimeCapability {
   readonly claim: ClaimExecution
 }
 
+/** Independently scheduled Tool Run lifecycle and capacity conformance capability. */
+export interface ToolRunsCapability {
+  readonly claim: ClaimExecution
+}
+
 /** Product-facing Session persistence and replay capability. */
 export interface HostSessionsCapability {
   readonly claim: ClaimExecution
@@ -124,6 +129,7 @@ export interface MultiWorkerClaimCapability<E = never> {
 export interface Capabilities<ClaimsLayerError = never> {
   readonly admission?: true
   readonly runtime?: RuntimeCapability
+  readonly "tool-runs"?: ToolRunsCapability
   readonly "host-sessions"?: HostSessionsCapability
   readonly "start-by-agent"?: StartByAgentCapability
   readonly "idempotent-start"?: IdempotentStartCapability

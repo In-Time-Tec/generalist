@@ -129,6 +129,7 @@ Testing.runtimeDriver({
   capabilities: {
     admission: true,
     runtime: { claim },
+    "tool-runs": { claim },
     "host-sessions": { claim },
     "start-by-agent": { claim },
     "idempotent-start": { claim },

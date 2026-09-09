@@ -3,6 +3,7 @@ import { Effect, Result } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { make as makeAgent } from "../../../core/agent/service.js"
 import { durableIdentity } from "../../../runtime/executable/registered-agent.js"
+import { make as makeAddress } from "../../../runtime/address.js"
 import { defaultTreePolicy } from "../../../runtime/tree/policy.js"
 import type { HostSessionsCapability, Options, Services } from "../contract.js"
 
@@ -252,6 +253,112 @@ export const registerSessionQueue = <E, ClaimsError>({
         ).toMatchObject({ reason: "capacity" })
         expect(yield* store.hostSession(sessionId)).toEqual(before)
         expect(yield* store.hostSessionRuns(sessionId)).toHaveLength(1)
+      }),
+    ),
+  )
+
+  it.effect("retains child collaboration and one sponsored continuation across fresh Layers", () =>
+    provide((first) =>
+      Effect.gen(function* () {
+        const parent = makeAgent({
+          name: "session-collaboration-parent",
+          children: ["session-collaboration-child"],
+          budget: { tokens: 20, toolCalls: 4, children: 4 },
+        })
+        const child = makeAgent({ name: "session-collaboration-child", budget: { tokens: 3, toolCalls: 1 } })
+        const { executable: collaborationExecutable, registrations: collaborationRegistrations } = durableIdentity(
+          parent,
+          [parent, child],
+        )
+        const selected = {
+          executableRef: collaborationExecutable.ref,
+          executableManifest: collaborationExecutable.manifest,
+          registrations: collaborationRegistrations,
+        }
+        const parentSessionId = `session:collaboration:${options.name}:parent`
+        const childSessionId = `${parentSessionId}:child`
+        yield* first.store.createHostSession({ id: parentSessionId, selection: selected })
+        yield* first.store.submitSessionInput({
+          sessionId: parentSessionId,
+          commandId: `${parentSessionId}:start`,
+          prompt: Prompt.make("coordinate"),
+        })
+        const parentRunId = (yield* first.store.hostSession(parentSessionId)).activeRunId
+        if (parentRunId === undefined) return yield* Effect.die("collaboration parent was not admitted")
+        const childReceipt = yield* first.runtime.spawn({
+          parentRunId,
+          invocationId: "session-collaboration-child",
+          selection: child.name,
+          prompt: "review",
+          sessionId: childSessionId,
+          idempotencyKey: `${childSessionId}:initial`,
+        })
+        const retained = yield* first.store.hostSession(childSessionId)
+        expect(retained.retainedSession).toMatchObject({
+          id: childSessionId,
+          rootSessionId: parentSessionId,
+          parentSessionId,
+          parentRunId,
+          initialRunId: childReceipt.runId,
+          depth: 1,
+        })
+        expect(retained.sponsorRunId).toBe(parentRunId)
+        expect((yield* first.store.hostSessionFamily(childSessionId, { limit: 64 })).sessions).toHaveLength(2)
+        const before = yield* first.store.snapshot(parentRunId)
+        return yield* provide((second) =>
+          Effect.gen(function* () {
+            const childClaim = yield* capability.claim(second, {
+              runId: childReceipt.runId,
+              commandId: "session-collaboration-child-claim",
+            })
+            yield* second.store.complete({
+              ...childClaim,
+              commandId: "session-collaboration-child-complete",
+              result: {
+                text: "reviewed",
+                output: "reviewed",
+                turns: 1,
+                session: { sessionId: childSessionId, leafId: null },
+              },
+            })
+            yield* second.store.releaseExecution(childClaim)
+            const afterChild = yield* second.store.snapshot(parentRunId)
+            expect(afterChild.budget.tokens).toBeGreaterThanOrEqual(before.budget.tokens ?? 0)
+            const followup = {
+              sessionId: childSessionId,
+              commandId: `${childSessionId}:followup`,
+              prompt: Prompt.make("check the regression"),
+              from: { runId: parentRunId } as const,
+            }
+            const receipt = yield* second.store.messageSessionInput(followup)
+            const continued = yield* second.store.hostSession(childSessionId)
+            expect(continued.sponsorRunId).toBe(parentRunId)
+            expect(continued.retainedSession).toEqual(retained.retainedSession)
+            expect(continued.activeRunId).toBeDefined()
+            if (continued.activeRunId === undefined) return yield* Effect.die("continuation was not admitted")
+            const execution = yield* second.store.loadExecution(continued.activeRunId)
+            expect(execution.parentRunId).toBe(parentRunId)
+            expect(execution.message.to).toEqual(makeAddress(`spawn:${parentRunId}`))
+            expect(yield* second.store.messageSessionInput(followup)).toEqual(receipt)
+            expect(yield* second.store.hostSessionRuns(childSessionId)).toHaveLength(2)
+            const continuationClaim = yield* capability.claim(second, {
+              runId: continued.activeRunId,
+              commandId: "session-collaboration-continuation-claim",
+            })
+            yield* second.store.complete({
+              ...continuationClaim,
+              commandId: "session-collaboration-continuation-complete",
+              result: {
+                text: "followed up",
+                output: "followed up",
+                turns: 1,
+                session: { sessionId: childSessionId, leafId: null },
+              },
+            })
+            yield* second.store.releaseExecution(continuationClaim)
+            expect((yield* second.store.hostSession(childSessionId)).activeRunId).toBeUndefined()
+          }),
+        )
       }),
     ),
   )
