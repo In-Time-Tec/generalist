@@ -16,7 +16,7 @@ Statuses mean:
 
 The local gate in `scripts/durability-cold-recovery.ts` completes 1,000 actual durable Tool executions and retains eight child conversations. It requires an explicitly configured 64 MiB partition with 16 MiB reserved for settlement. **This workload does not fit the default 16 MiB partition.** Pagination is not a partition-growth solution, and these results do not establish an unlimited Session lifetime.
 
-The measured source checkpoint was `d18b1ea96d7a56539ffaa593b5fa8f06ff831f7c`, incorporating bounded Tool kind controls, obligation reservation, retained child Sessions, bounded history, and canonical main `271c5280c9364377b2d612f3758e6c83440d0644`. The machine ran macOS 26.6.2 (25G83), arm64, Bun 1.4.0 (`34cbb9a40`), and Effect 4.0.0-rc.112. The transport was the repository's in-memory ObjectStore simulator over the production durability engine. No model credentials, cloud bucket, or live provider were used.
+The measured source checkpoint was `acceb506c2178d2a8b86c02d73a4ac199608d80e`, incorporating bounded Tool kind controls, obligation reservation, retained child Sessions, the corrected continuation ledger from canonical main `8d9a18150b64cdca30956bcf3d2344eb3f5210fb`, and the generated API documentation for that source. The machine ran macOS 26.6.2 (25G83), arm64, Bun 1.4.0 (`34cbb9a40`), and Effect 4.0.0-rc.112. The transport was the repository's in-memory ObjectStore simulator over the production durability engine. No model credentials, cloud bucket, or live provider were used.
 
 ### Workload and recovery boundary
 
@@ -28,21 +28,23 @@ The measured source checkpoint was `d18b1ea96d7a56539ffaa593b5fa8f06ff831f7c`, i
 
 ### Measured baseline and local regression bounds
 
-The complete measured invocation took about 416 seconds. These are three sequential cold samples, not a statistically qualified p95 or p99.
+The complete measured invocation took about 587 seconds. These are three sequential cold samples, not a statistically qualified p95 or p99.
 
 | Metric                                      | Measured baseline                 | Current local gate             |
 | ------------------------------------------- | --------------------------------- | ------------------------------ |
-| Cold construction                           | 1,232.42 / 1,119.50 / 1,103.22 ms | At most 5,000 ms per sample    |
-| Cold object reads                           | 69 per sample                     | At most 256                    |
+| Cold construction                           | 1,083.51 / 1,334.91 / 1,123.99 ms | At most 5,000 ms per sample    |
+| Cold object reads                           | 68 per sample                     | At most 256                    |
 | Cold object lists                           | 11 per sample                     | At most 32                     |
-| Cold returned bytes                         | 25,072,026 per sample             | At most 64 MiB                 |
+| Cold returned bytes                         | 25,073,361 per sample             | At most 64 MiB                 |
 | Cold object writes                          | 0                                 | Exactly 0                      |
-| Process RSS sampled after cold construction | 3.80 / 4.03 / 4.33 GB, decimal    | At most 6 GiB at that boundary |
-| Complete outcome/family/wait audit          | 66.15 / 66.20 / 67.54 seconds     | At most 120 seconds per sample |
+| Process RSS sampled after cold construction | 3.78 / 4.12 / 4.22 GB, decimal    | At most 6 GiB at that boundary |
+| Complete outcome/family/wait audit          | 62.54 / 66.51 / 70.96 seconds     | At most 120 seconds per sample |
 
 These thresholds are local regression guards selected from this fixed workload's baseline, not production SLOs. RSS includes the simulator's bucket, retained snapshots, runtime allocations, and the process's GC history; it is not isolated worker memory, a measured allocation delta, or a continuously sampled peak. The report also emits RSS and heap before reconstruction and every 100 completed Tools.
 
-Building the first 1,000 Tools made 50,605 reads, 105,079 lists, and 9,348 create attempts, returning 214,329,601,191 bytes and attempting 956,311,559 write bytes. These totals include the retained-child setup and host maintenance. Repeated canonical validation reads count again even when the underlying simulator supplies memory-resident bytes. They expose a substantial object-operation cost; they are not network throughput, latency, AWS/R2 cost, or deployed capacity measurements. Cold reconstruction is much cheaper than repeatedly auditing every Run through separate canonical reads.
+Building the first 1,000 Tools made 50,496 reads, 104,799 lists, and 9,347 create attempts, returning 213,822,274,773 bytes and attempting 956,679,954 write bytes. These totals include the retained-child setup and host maintenance. Repeated canonical validation reads count again even when the underlying simulator supplies memory-resident bytes. They expose a substantial object-operation cost; they are not network throughput, latency, AWS/R2 cost, or deployed capacity measurements. Cold reconstruction is much cheaper than repeatedly auditing every Run through separate canonical reads.
+
+The prior measured source checkpoint `d18b1ea96d7a56539ffaa593b5fa8f06ff831f7c` passed the same workload before canonical main added the continuation ledger; it recorded 1,232.42 / 1,119.50 / 1,103.22 ms cold construction, 69 reads, 25,072,026 returned bytes, and 66.15 / 66.20 / 67.54 second audits. Those historical measurements remain evidence for that checkpoint; the current table supersedes them for the merged source.
 
 Before changing the engine, the initial Tool checkpoint `db6abb8fbdf039dc5a29e0a92983ca6c3484c73d` reached 809 completed Tools before the next admission exceeded the default 16 MiB state-plus-receipt limit. After the Tool allocation fix and adding retained children, a run with the default reserve completed 480 Tools before the next Tool reported a failed status; that preliminary log did not record the nested failure, so it establishes a failed gate rather than a precise capacity measurement. The explicit 64 MiB configuration above passed; the default was not enlarged and no compaction or canonical segmentation was introduced.
 
