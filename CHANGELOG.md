@@ -1,10 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.65.0
 
-- **Breaking:** resolve `makeRuntimeActor` namespaces per actor identity through `namespace({ actorId, key })` instead of fixed factory namespace fields. Keep low-level `layerActorRuntime` configuration explicit. Rivet recovery runs after readiness, controls remain available during execution, and idle or failed hosts release their owned Runtime resources.
-- Add the scoped Cloudflare Durable Object host controller for concurrent Runtime commands and alarm-driven execution over native R2. Preserve earlier alarm hints, close idle execution scopes, and keep independent reconciliation for missed wakeups. Worker leases only contribute a wake deadline when they gate unfinished execution; canonical S3/R2 journals, receipts, and fencing remain authoritative.
-- **Breaking:** remove `generalist/unstable/rlm`, including `layer` and `rlmOffload`, with no compatibility alias. Use the existing durable Runtime for delegation and background work. Agent and Program execution, Sandbox, compaction, budgets, and nested operations remain available. (#457)
+- **Breaking:** remove `generalist/unstable/rlm`, including `layer` and `rlmOffload`, with no compatibility alias. Use the durable Runtime for delegation and background work; Agent and Program execution, Sandbox, compaction, budgets, and nested operations remain available.
+- **Breaking:** replace `Generalist.create({ agents: [...] })` with `Host.make({ revision, agents: { [agent.name]: agent } })`. `revision` is required, registry keys must match `Agent.name`, and there is no compatibility alias. Replace `maxSubagents` with `limits.tree.maxDepth`, `limits.tree.maxSessions`, and separate `limits.concurrency.agents` and `limits.concurrency.tools` bounds.
+- **Breaking:** serialized Server starts, child admissions, approvals, and operator actions require stable `commandId` values for replay; there is no compatibility path for anonymous mutations. Sessions now own a bounded, editable durable input queue whose edits and removals use observed revisions and immutable command receipts, and authenticated Host and Server routes cannot widen the pinned policy.
+- Add retained child Sessions, paginated family and history views, Session-owned durable components, and authenticated follow-ups. Follow-ups retain sender and family provenance, fence closed Sessions, and consume finite continuation allocations without changing the original admission record.
+- Add independent typed Tool executables and bounded background Agent Tool Runs. Admission receipts and settlement-capacity reservations keep Tool Runs outside conversational Session state while preserving exact recovery and replay.
+- Add durable Run-or-message waits that wake on authenticated Session messages or selected terminal Run settlements. Timeout, cancellation, inbox consumption, and exact command retries remain explicit and idempotent.
+- **Breaking:** resolve `makeRuntimeActor` namespaces per actor identity through `namespace({ actorId, key })` instead of fixed factory namespace fields; keep low-level `layerActorRuntime` configuration explicit. Rivet embeds the Effect server, scopes streaming and WebSocket handlers to the actor runtime, and releases idle or failed host resources. Cloudflare Durable Object alarms remain wake hints over canonical R2 state and independent reconciliation.
+- Add shared runtime-driver conformance coverage for Session queues, Tool Runs, waits, and host capability registration. This test coverage does not by itself claim provider qualification or release acceptance.
 
 ## 0.64.0
 
