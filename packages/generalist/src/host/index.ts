@@ -61,7 +61,8 @@ import { AgentInputInvalid, AgentNotRegistered, type CreateError } from "./error
 import { type Attachments, make as makeAttachments } from "./attachments.js"
 import { BlobStore } from "../blob-store/index.js"
 import { make as makeHostRun, type HostRun } from "./run.js"
-export type { HostRun, ChildHandle, ChildSpawnOptions } from "./run.js"
+export type { HostRun, ChildHandle, ChildSpawnOptions, WaitOptions } from "./run.js"
+export { WaitInvalid, WaitResult } from "./run.js"
 import { ArtifactRegistry } from "../core/artifact.js"
 import { AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
@@ -496,5 +497,4 @@ const create = <
     }
     return host
   })
-/** Stable process-local product host. */
-export const Generalist = { create, plugin } as const
+/** Stable process-local product host. */ export const Generalist = { create, plugin } as const

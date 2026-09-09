@@ -8135,6 +8135,21 @@
                                         {
                                           "type": "object",
                                           "properties": {
+                                            "_tag": { "type": "string", "enum": ["Run"] },
+                                            "runs": {
+                                              "type": "array",
+                                              "items": { "type": "string", "minLength": 1 },
+                                              "maxItems": 32
+                                            },
+                                            "messages": { "type": "boolean" },
+                                            "commandId": { "type": "string", "minLength": 1 }
+                                          },
+                                          "required": ["_tag", "runs", "messages", "commandId"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
                                             "_tag": { "type": "string", "enum": ["Timer"] },
                                             "scheduleId": { "type": "string" }
                                           },
@@ -9049,6 +9064,21 @@
                                       {
                                         "type": "object",
                                         "properties": {
+                                          "_tag": { "type": "string", "enum": ["Run"] },
+                                          "runs": {
+                                            "type": "array",
+                                            "items": { "type": "string", "minLength": 1 },
+                                            "maxItems": 32
+                                          },
+                                          "messages": { "type": "boolean" },
+                                          "commandId": { "type": "string", "minLength": 1 }
+                                        },
+                                        "required": ["_tag", "runs", "messages", "commandId"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
                                           "_tag": { "type": "string", "enum": ["Timer"] },
                                           "scheduleId": { "type": "string" }
                                         },
@@ -9584,6 +9614,21 @@
                               "properties": {
                                 "filter": {
                                   "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Run"] },
+                                        "runs": {
+                                          "type": "array",
+                                          "items": { "type": "string", "minLength": 1 },
+                                          "maxItems": 32
+                                        },
+                                        "messages": { "type": "boolean" },
+                                        "commandId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "runs", "messages", "commandId"],
+                                      "additionalProperties": false
+                                    },
                                     {
                                       "type": "object",
                                       "properties": {
@@ -13592,6 +13637,21 @@
                                     {
                                       "type": "object",
                                       "properties": {
+                                        "_tag": { "type": "string", "enum": ["Run"] },
+                                        "runs": {
+                                          "type": "array",
+                                          "items": { "type": "string", "minLength": 1 },
+                                          "maxItems": 32
+                                        },
+                                        "messages": { "type": "boolean" },
+                                        "commandId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "runs", "messages", "commandId"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
                                         "_tag": { "type": "string", "enum": ["Timer"] },
                                         "scheduleId": { "type": "string" }
                                       },
@@ -13767,6 +13827,17 @@
                   "properties": {
                     "filter": {
                       "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Run"] },
+                            "runs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "maxItems": 32 },
+                            "messages": { "type": "boolean" },
+                            "commandId": { "type": "string", "minLength": 1 }
+                          },
+                          "required": ["_tag", "runs", "messages", "commandId"],
+                          "additionalProperties": false
+                        },
                         {
                           "type": "object",
                           "properties": {
