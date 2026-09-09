@@ -279,6 +279,7 @@ const graphIdentities = (
 }
 
 /** @internal Derive the persisted identity used for typed Agent admission and recovery tests. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Internal identity derivation supports direct overloads for legacy profile and revision callers.
 export const durableIdentity: {
   (profiles: ReadonlyArray<AnyAgent>): (agent: AnyAgent) => Pick<RegisteredAgent, "executable" | "registrations">
   (agent: AnyAgent): Pick<RegisteredAgent, "executable" | "registrations">
@@ -291,6 +292,7 @@ export const durableIdentity: {
 } = Function.dual(
   (args) => !Array.isArray(args[0]),
   (agent: AnyAgent, profiles?: ReadonlyArray<AnyAgent>, revision = "1") =>
+    // oxlint-disable-next-line typescript/no-unsafe-argument -- Function.dual erases the optional profile argument while the overloads preserve its concrete type at every call site.
     graphIdentities(agent, [], undefined, profiles, revision).identities.get(agent)!,
 )
 

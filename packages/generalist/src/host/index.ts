@@ -1,4 +1,5 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context, typescript/no-unsafe-return -- Agent.Any intentionally hides invariant Agent parameters at the heterogeneous Host registry boundary; the distributive AgentDefinition/AgentServices types restore each configured Agent's exact contract. */
+/* eslint-disable max-lines -- Host keeps one public Session, Run, Tool, and operator contract. */
 import { Clock, Effect, Filter, Option, Ref, Result, Schema, Stream, Types } from "effect"
 import { LanguageModel, Tool } from "effect/unstable/ai"
 import type { BudgetLimits } from "../core/durable/run-budget.js"

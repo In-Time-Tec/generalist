@@ -87,11 +87,11 @@ const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, poli
         protect(policy)({ type: "session", id: params.id }, "mutate", () =>
           host.sessions.get(params.id).pipe(
             Effect.flatMap((session) =>
-              payload.action === "stop"
-                ? session.stop(payload)
-                : payload.action === "close"
-                  ? session.close(payload)
-                  : session.resume(payload),
+              Effect.gen(function* () {
+                if (payload.action === "stop") return yield* session.stop(payload)
+                if (payload.action === "close") return yield* session.close(payload)
+                return yield* session.resume(payload)
+              }),
             ),
             mapError("sessions.control"),
           ),

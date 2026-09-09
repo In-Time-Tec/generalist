@@ -58,7 +58,7 @@ layer(services)("Artifact WebSocket", (it) => {
       const host = yield* Host.make({ revision: "local", agents: {} })
       const updates = yield* host.artifacts.subscribe(document.name)
       const fake = yield* makeSocket
-      const server = yield* handle<{}>({
+      const server = yield* handle<Record<string, never>>({
         host,
         authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
         name: document.name,
