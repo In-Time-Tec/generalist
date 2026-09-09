@@ -42,7 +42,11 @@ export interface RuntimeActorServerFactory<
 > {
   readonly make: (
     context: RuntimeActorServerContext,
-  ) => Effect.Effect<RuntimeActorServerOptions<Agents, AuthError, AuthServices>, ServerError, ServerRequirements>
+  ) => Effect.Effect<
+    RuntimeActorServerOptions<Agents, AuthError, AuthServices>,
+    ServerError,
+    ServerRequirements | Scope.Scope
+  >
 }
 
 /** @experimental One canonical HTTP/WebSocket handler retained for an actor incarnation. */

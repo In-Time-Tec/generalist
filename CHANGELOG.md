@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.2
+
+- Provide the actor-owned Effect Scope to Rivet Server factories. Factories can build scoped model and application Layers that remain alive until the actor host retires, with cleanup on failed construction and fresh resources after replacement.
+
 ## 0.65.1
 
 - Preserve the current Tool invocation's Run, Session, operation identity, signal, and progress emitter when executor Layers or routers were constructed with a default ToolContext. Cancellation uses the current invocation context too.

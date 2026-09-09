@@ -868,7 +868,7 @@ Actor-incarnation factory for one canonical server configuration.
 
 ##### make
 
-> `readonly` **make**: (`context`) => `Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `ServerRequirements`\>
+> `readonly` **make**: (`context`) => `Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `Scope` \| `ServerRequirements`\>
 
 **`Experimental`**
 
@@ -880,7 +880,7 @@ Actor-incarnation factory for one canonical server configuration.
 
 ###### Returns
 
-`Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `ServerRequirements`\>
+`Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `Scope` \| `ServerRequirements`\>
 
 ## Type Aliases
 

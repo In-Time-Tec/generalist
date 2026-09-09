@@ -1,7 +1,7 @@
 /* oxlint-disable effecttsgo/async-function -- Rivet actor hooks and actions are Promise-only host boundaries. */
 /* oxlint-disable anti-slop-effect/no-service-constructor-imports -- the actor is the scoped object-runtime composition root. */
 /* oxlint-disable effecttsgo/any-unknown-in-error-context -- the raw Rivet transport preserves Effect HTTP's platform error channel. */
-import { Crypto, Effect, Layer, ManagedRuntime, Schema } from "effect"
+import { Crypto, Effect, Layer, ManagedRuntime, Schema, Scope } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { DurabilityFailure } from "../../../durability/errors.js"
 import type { ObjectStore } from "../../../durability/object-store.js"
@@ -247,7 +247,9 @@ export const makeRuntimeActor = <
             ? undefined
             : await runtime.runPromise(
                 Effect.flatMap(
-                  options.server.make({ actorId: c.actorId, key: [...c.key], namespace: resolved }),
+                  options.server
+                    .make({ actorId: c.actorId, key: [...c.key], namespace: resolved })
+                    .pipe(Effect.provideService(Scope.Scope, runtime.scope)),
                   (config) => makeServer({ config, memoMap: runtime.memoMap, scope: runtime.scope }),
                 ),
                 { signal: c.abortSignal },
