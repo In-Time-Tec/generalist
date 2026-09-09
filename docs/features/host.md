@@ -86,7 +86,12 @@ const handlers = Toolkit.make(checks).toLayer({
 })
 
 const program = Effect.gen(function* () {
-  const host = yield* Host.make({ agents: {}, revision: "checks-v1", limits: { tree: { maxDepth: 0, maxSessions: 1 }, concurrency: { agents: 0, tools: 1 } }, tools: [checks] })
+  const host = yield* Host.make({
+    agents: {},
+    revision: "checks-v1",
+    limits: { tree: { maxDepth: 0, maxSessions: 1 }, concurrency: { agents: 0, tools: 1 } },
+    tools: [checks],
+  })
   const run = yield* host.tools.start(checks, { count: 4 }, { commandId: "checks-1" })
   const inspection = yield* run.inspect
   const result = yield* run.await

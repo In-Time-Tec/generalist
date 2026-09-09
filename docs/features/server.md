@@ -87,33 +87,33 @@ The caller provides an Effect `HttpClient`. Add the bearer token there with `Htt
 
 ## Routes
 
-| Group       | Method | Path                         | Client call               |
-| ----------- | ------ | ---------------------------- | ------------------------- |
-| attachments | POST   | `/attachments`               | `attachments.put`         |
-| attachments | GET    | `/attachments/:sha256`       | `attachments.get`         |
-| sessions    | POST   | `/sessions`                  | `sessions.create`         |
-| sessions    | GET    | `/sessions`                  | `sessions.list`           |
-| sessions    | GET    | `/sessions/:id`              | `sessions.get`            |
-| sessions    | GET    | `/sessions/:id/snapshot`     | `sessions.snapshot`       |
-| sessions    | POST   | `/sessions/:id/family`       | `sessions.family`         |
-| sessions    | POST   | `/sessions/:id/control`      | `sessions.control`        |
-| sessions    | POST   | `/sessions/:id/queue`        | `sessions.submit`         |
-| sessions    | PATCH  | `/sessions/:id/queue/:inputId` | `sessions.updateInput`  |
-| sessions    | DELETE | `/sessions/:id/queue/:inputId` | `sessions.removeInput`  |
-| runs        | POST   | `/sessions/:sessionId/runs`  | `runs.start`              |
-| runs        | GET    | `/sessions/:sessionId/runs`  | `runs.list`               |
-| runs        | GET    | `/runs/:id`                  | `runs.inspect`            |
-| runs        | POST   | `/runs/:id/cancel`           | `runs.cancel`             |
-| runs        | POST   | `/runs/:id/messages`         | `runs.message`            |
-| runs        | GET    | `/runs/:id/messages`         | `runs.messages`           |
-| events      | GET    | `/sessions/:id/events`       | `events.subscribe`        |
-| events      | GET    | `/sessions/:id/ws`           | `events.connect`          |
-| approvals   | POST   | `/runs/:id/approvals/:token` | `approvals.resolve`       |
-| operator    | GET    | `/runs/:id/explain`          | `operator.explain`        |
-| operator    | POST   | `/runs/:id/retry`            | `operator.retry`          |
-| operator    | POST   | `/runs/:id/wake`             | `operator.wake`           |
-| operator    | POST   | `/runs/:id/resolve-unknown`  | `operator.resolveUnknown` |
-| operator    | POST   | `/runs/:id/extend-budget`    | `operator.extendBudget`   |
+| Group       | Method | Path                           | Client call               |
+| ----------- | ------ | ------------------------------ | ------------------------- |
+| attachments | POST   | `/attachments`                 | `attachments.put`         |
+| attachments | GET    | `/attachments/:sha256`         | `attachments.get`         |
+| sessions    | POST   | `/sessions`                    | `sessions.create`         |
+| sessions    | GET    | `/sessions`                    | `sessions.list`           |
+| sessions    | GET    | `/sessions/:id`                | `sessions.get`            |
+| sessions    | GET    | `/sessions/:id/snapshot`       | `sessions.snapshot`       |
+| sessions    | POST   | `/sessions/:id/family`         | `sessions.family`         |
+| sessions    | POST   | `/sessions/:id/control`        | `sessions.control`        |
+| sessions    | POST   | `/sessions/:id/queue`          | `sessions.submit`         |
+| sessions    | PATCH  | `/sessions/:id/queue/:inputId` | `sessions.updateInput`    |
+| sessions    | DELETE | `/sessions/:id/queue/:inputId` | `sessions.removeInput`    |
+| runs        | POST   | `/sessions/:sessionId/runs`    | `runs.start`              |
+| runs        | GET    | `/sessions/:sessionId/runs`    | `runs.list`               |
+| runs        | GET    | `/runs/:id`                    | `runs.inspect`            |
+| runs        | POST   | `/runs/:id/cancel`             | `runs.cancel`             |
+| runs        | POST   | `/runs/:id/messages`           | `runs.message`            |
+| runs        | GET    | `/runs/:id/messages`           | `runs.messages`           |
+| events      | GET    | `/sessions/:id/events`         | `events.subscribe`        |
+| events      | GET    | `/sessions/:id/ws`             | `events.connect`          |
+| approvals   | POST   | `/runs/:id/approvals/:token`   | `approvals.resolve`       |
+| operator    | GET    | `/runs/:id/explain`            | `operator.explain`        |
+| operator    | POST   | `/runs/:id/retry`              | `operator.retry`          |
+| operator    | POST   | `/runs/:id/wake`               | `operator.wake`           |
+| operator    | POST   | `/runs/:id/resolve-unknown`    | `operator.resolveUnknown` |
+| operator    | POST   | `/runs/:id/extend-budget`      | `operator.extendBudget`   |
 
 Future ingress features add one HttpApi group to `Server.api` and one matching implementation module. They do not create another router or wire contract.
 
