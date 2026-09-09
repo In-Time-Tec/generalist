@@ -1,6 +1,5 @@
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect } from "effect"
-import { TestClock } from "effect/testing"
 import { Prompt } from "effect/unstable/ai"
 import { digest } from "../../../runtime/run/steering.js"
 import { toolSuspension } from "../plural-waits.js"
@@ -324,7 +323,6 @@ export const registerRunWaits = <LayerError, ClaimsLayerError>(input: {
         })
         const due = yield* services.store.dueAwaitEvents({ now: Date.parse("2026-01-01T00:00:02.000Z"), limit: 10 })
         expect(due).toHaveLength(1)
-        yield* TestClock.adjust("2 seconds")
         expect(yield* services.store.timeoutAwaitEvent({ ...due[0]!, commandId: `${waitId}:timeout` })).toBe(true)
         const timedOut = (yield* services.store.loadExecution(parent.runId)).resolutions.find(
           (entry) => entry.waitId === waitId,
