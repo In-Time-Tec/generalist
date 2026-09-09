@@ -60,6 +60,11 @@ export interface Service<R = ToolContext> {
 export class ToolExecutor extends Context.Service<ToolExecutor, Service<ToolContext>>()(
   "generalist/core/tools/tool-executor/ToolExecutor",
 ) {}
+const provideExecutorServices = <A, E, R>(effect: Effect.Effect<A, E, R | ToolContext>, context: Context.Context<R>) =>
+  Effect.flatMap(ToolContext, (current) =>
+    effect.pipe(Effect.provideContext(Context.add(context, ToolContext, current))),
+  )
+
 type ResolvedTool<T extends Tool.Any & SchemaTool> = {
   readonly tool: T
   invoke(
@@ -237,7 +242,7 @@ const layerClosedAgentToolkit = <
     Effect.contextWith((context: Context.Context<R | AgentToolSchemaServices<Parameters, SuccessSchema>>) =>
       Effect.succeed(
         ToolExecutor.of({
-          execute: (request) => executeWithClosedToolkit(toolkit, request).pipe(Effect.provideContext(context)),
+          execute: (request) => provideExecutorServices(executeWithClosedToolkit(toolkit, request), context),
         }),
       ),
     ),
@@ -251,7 +256,7 @@ const layerClosedToolSet = <R, T extends SchemaTool>(
     Effect.contextWith((context: Context.Context<R | ToolSchemaServices<T>>) =>
       Effect.succeed(
         ToolExecutor.of({
-          execute: (request) => executeWithClosedSet(toolkit, request).pipe(Effect.provideContext(context)),
+          execute: (request) => provideExecutorServices(executeWithClosedSet(toolkit, request), context),
         }),
       ),
     ),
@@ -299,7 +304,7 @@ export function layerToolkit<
         ) =>
           Effect.succeed(
             ToolExecutor.of({
-              execute: (request) => executeWithToolkit(toolkit, request).pipe(Effect.provideContext(context)),
+              execute: (request) => provideExecutorServices(executeWithToolkit(toolkit, request), context),
             }),
           ),
       ),
@@ -317,7 +322,7 @@ export function layerToolkit<
       ) =>
         Effect.map(toolkit, (handled) =>
           ToolExecutor.of({
-            execute: (request) => executeWithToolkit(handled, request).pipe(Effect.provideContext(context)),
+            execute: (request) => provideExecutorServices(executeWithToolkit(handled, request), context),
           }),
         ),
     ),
@@ -408,7 +413,7 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
                     ),
                   )
                 : matched.execute(request)
-            return execution.pipe(Effect.provideContext(context))
+            return provideExecutorServices(execution, context)
           },
           cancel: (request) => {
             const matched = firstMatchingRoute(resolved, request.execution)
@@ -419,7 +424,7 @@ export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<Too
                     message: `Tool ${request.toolName} has no matching cancellation route`,
                   }),
                 )
-              : matched.cancel(request).pipe(Effect.provideContext(context))
+              : provideExecutorServices(matched.cancel(request), context)
           },
         }),
       ),
