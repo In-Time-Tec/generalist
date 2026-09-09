@@ -11,14 +11,17 @@ import {
   type UniversalWebSocket,
 } from "rivetkit"
 import { setupTest as setupRivetTest } from "rivetkit/test"
+import { WebSocket as NodeWebSocket } from "ws"
 import { afterAll, expect, test, type TestContext } from "vitest"
 import { Context, Deferred, Effect, Layer, ManagedRuntime, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
+import { HttpBody, HttpServerResponse } from "effect/unstable/http"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { Host, type MakeError } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
 import { Authentication, CurrentPrincipal } from "../../../../src/server/auth.js"
 import { Unauthorized } from "../../../../src/server/errors.js"
+import { eventCodec } from "../../../../src/server/wire.js"
 import {
   ActorRuntime,
   type ActorRuntimeServices,
@@ -1136,9 +1139,10 @@ test.for(["transport", "lease"] as const)(
 test("bridges authenticated HTTP and raw WebSocket traffic through one actor host", async (context) => {
   const bucket = await Effect.runPromise(makeBucket())
   const closedAgent = Agent.close(agent, model)
-  const serverAgents = { bridge: closedAgent } as const
+  const serverAgents = { [closedAgent.name]: closedAgent } as const
   let serverBuilds = 0
   let serverFinalized = 0
+  let streamFinalized = 0
   const principal = { id: "rivet-controller", tenantId: "rivet", role: "controller" as const }
   const auth = Layer.effect(
     Authentication,
@@ -1147,7 +1151,24 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
         Authentication.of({
           bearer: (httpEffect, { credential }) =>
             Redacted.value(credential) === "local-token"
-              ? Effect.provideService(httpEffect, CurrentPrincipal, principal)
+              ? Effect.provideService(
+                  httpEffect.pipe(
+                    Effect.map((response) =>
+                      response.body._tag === "Stream"
+                        ? HttpServerResponse.setBody(
+                            response,
+                            HttpBody.stream(
+                              Stream.onExit(response.body.stream, () => Effect.sync(() => void streamFinalized++)),
+                              response.body.contentType,
+                              response.body.contentLength,
+                            ),
+                          )
+                        : response,
+                    ),
+                  ),
+                  CurrentPrincipal,
+                  principal,
+                )
               : Effect.fail(Unauthorized.make({})),
         }),
       ),
@@ -1209,15 +1230,51 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
     ),
   )
   expect(queueResponses.map((response) => response.status)).toEqual([200, 200, 200, 200])
-  // SAFETY: Rivet's ActorHandleRaw.webSocket implementation returns UniversalWebSocket despite its legacy any declaration.
+  let websocketAuthorization = "Bearer local-token"
+  const previousWebSocket = globalThis.WebSocket
+  class AuthenticatedWebSocket extends NodeWebSocket {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      super(url, protocols, { headers: { authorization: websocketAuthorization }, handshakeTimeout: 5_000 })
+    }
+  }
+  // SAFETY: The Rivet SDK resolves the process WebSocket constructor once; the test constructor adds the application auth header while preserving SDK protocols.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const socket = (await partition.webSocket("/sessions/rivet-server-bridge/ws")) as UniversalWebSocket
-  await new Promise<void>((resolve, reject) => {
-    socket.addEventListener("open", () => resolve())
-    socket.addEventListener("error", () => reject(new Error("Rivet WebSocket bridge failed to open")))
-  })
-  expect(socket.readyState).toBe(socket.OPEN)
-  socket.close(1000, "test")
+  globalThis.WebSocket = AuthenticatedWebSocket as unknown as typeof WebSocket
+  try {
+    const authenticatedSocket: UniversalWebSocket = await Promise.race([
+      partition.webSocket("/sessions/rivet-server-bridge/ws"),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Rivet WebSocket bridge open timed out")), 5_000)),
+    ])
+    await new Promise<void>((resolve, reject) => {
+      authenticatedSocket.addEventListener("open", resolve)
+      authenticatedSocket.addEventListener("error", () => reject(new Error("Rivet WebSocket bridge failed to open")))
+      authenticatedSocket.addEventListener("close", () => reject(new Error("Rivet WebSocket bridge closed before opening")))
+    })
+    expect(authenticatedSocket.readyState).toBe(authenticatedSocket.OPEN)
+    const frame = new Promise<unknown>((resolve, reject) => {
+      authenticatedSocket.addEventListener("message", (event) => resolve(event.data))
+      authenticatedSocket.addEventListener("error", () => reject(new Error("Rivet WebSocket bridge frame failed")))
+    })
+    const decodedFrame = await frame
+    expect(typeof decodedFrame).toBe("string")
+    const decodedEvent = await Effect.runPromise(eventCodec.decode(String(decodedFrame)))
+    expect(decodedEvent).toMatchObject({ _tag: expect.any(String) })
+    authenticatedSocket.close(1000, "test")
+
+    websocketAuthorization = "Bearer wrong-token"
+    const rejectedSocket: UniversalWebSocket = await partition.webSocket("/sessions/rivet-server-bridge/ws")
+    const rejectedSocketClosed = await Promise.race([
+      new Promise<boolean>((resolve) => {
+        rejectedSocket.addEventListener("close", () => resolve(true))
+        rejectedSocket.addEventListener("error", () => resolve(true))
+      }),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000)),
+    ])
+    expect(rejectedSocketClosed).toBe(true)
+  } finally {
+    websocketAuthorization = "Bearer local-token"
+    globalThis.WebSocket = previousWebSocket
+  }
 
   const first = client.bridge.getOrCreate(key, testPool(context))
   const firstResponse = await first.fetch("/sessions/rivet-server-bridge", { headers })
@@ -1226,8 +1283,32 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
   expect(streaming.status).toBe(200)
   expect(streaming.body).not.toBeNull()
   await streaming.body?.cancel()
+  await expect.poll(() => streamFinalized).toBe(1)
   expect(serverFinalized).toBe(0)
+
+  const heldSession = await first.fetch("/sessions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ id: "rivet-server-bridge-held", agent: closedAgent.name }),
+  })
+  expect(heldSession.status).toBe(200)
+  const heldStreaming = await first.fetch("/sessions/rivet-server-bridge-held/events", { headers })
+  expect(heldStreaming.status).toBe(200)
+  const heldReader = heldStreaming.body!.getReader()
+  let heldResult: ReadableStreamReadResult<Uint8Array> | undefined
+  let heldError: unknown
+  const heldRead = heldReader.read().then(
+    (result) => {
+      heldResult = result
+    },
+    (error: unknown) => {
+      heldError = error
+    },
+  )
   await registry.shutdown()
+  await heldRead
+  expect(heldResult?.done === true || heldError !== undefined).toBe(true)
+  await expect.poll(() => streamFinalized).toBe(2)
   expect(firstSleepCount()).toBeGreaterThanOrEqual(1)
   expect(serverBuilds).toBe(1)
   expect(serverFinalized).toBe(1)
