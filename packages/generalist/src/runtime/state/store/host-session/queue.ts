@@ -13,7 +13,7 @@ import { make as makeMessage } from "../../../messaging/message.js"
 import { make as makeAddress } from "../../../address.js"
 import { validate as validatePayload } from "../../../execution/payload/index.js"
 import { decodePinned, resolveChild } from "../../../executable/manifest-internal.js"
-import { laneKey, type RuntimeState } from "../../projection.js"
+import { laneKey, type RuntimeSession, type RuntimeState, type StoredRun } from "../../projection.js"
 import { admitStart, admitSpawn } from "../admission/accept.js"
 import { addRegistrations } from "../admission/registration.js"
 import { narrow as narrowTreePolicy } from "../../../tree/policy.js"
@@ -144,16 +144,12 @@ const promoteChild = ({
     const stored = state.hostSessions.get(sessionId)!
     const hostSessions = new Map(state.hostSessions)
     hostSessions.set(sessionId, { ...stored, session: { ...stored.session, queue: stored.session.queue.slice(1) } })
-    const sponsor = stored.session.sponsorRunId === undefined ? undefined : state.runs.get(stored.session.sponsorRunId)
-    const continuation = state.sessions.get(sessionId)?.continuation
-    if (
-      sponsor === undefined ||
-      sponsor.cancellationRequested ||
-      continuation === undefined ||
-      continuation.closed ||
-      continuation.remainingRuns === 0
+    const authority = continuationAuthority(
+      stored.session.sponsorRunId === undefined ? undefined : state.runs.get(stored.session.sponsorRunId),
+      state.sessions.get(sessionId)?.continuation,
     )
-      return state
+    if (authority === undefined) return state
+    const { sponsor, continuation } = authority
     const selection = sponsor.executableManifest.profiles.find(
       (profile) =>
         resolveChild(sponsor.executableRef, sponsor.executableManifest, profile.selection)?.active ===
@@ -186,25 +182,62 @@ const promoteChild = ({
     }
     const [receipt, admitted] = result.success
     let next = admitted
-    if (!receipt.duplicate) {
-      const runtimeSession = next.sessions.get(sessionId)
-      if (runtimeSession?.continuation !== undefined) {
-        const sessions = new Map(next.sessions)
-        sessions.set(sessionId, {
-          ...runtimeSession,
-          continuation: {
-            ...runtimeSession.continuation,
-            remainingRuns: runtimeSession.continuation.remainingRuns - 1,
-          },
-        })
-        next = { ...next, sessions }
-      }
-    }
+    const replenished = wasReplenished(continuation, next, sessionId, sponsor.runId)
+    if (!receipt.duplicate && !replenished) next = consumeContinuation(next, sessionId, continuation)
     const sessions = new Map(next.hostSessions)
     const current = sessions.get(sessionId)!
     sessions.set(sessionId, { ...current, session: { ...current.session, activeRunId: receipt.runId } })
     return { ...next, hostSessions: sessions }
   })
+
+const continuationAuthority = (
+  sponsor: StoredRun | undefined,
+  continuation: RuntimeSession["continuation"],
+): { readonly sponsor: StoredRun; readonly continuation: NonNullable<RuntimeSession["continuation"]> } | undefined => {
+  if (
+    sponsor === undefined ||
+    sponsor.cancellationRequested ||
+    continuation === undefined ||
+    continuation.closed ||
+    (continuation.remainingRuns === 0 && continuation.fundingRunId === sponsor.runId)
+  )
+    return undefined
+  return { sponsor, continuation }
+}
+
+const wasReplenished = (
+  continuation: RuntimeSession["continuation"],
+  state: RuntimeState,
+  sessionId: string,
+  sponsorRunId: string,
+): boolean => {
+  const next = state.sessions.get(sessionId)?.continuation
+  return (
+    continuation !== undefined &&
+    continuation.remainingRuns === 0 &&
+    next?.fundingRunId === sponsorRunId &&
+    next.remainingRuns === 1
+  )
+}
+
+const consumeContinuation = (
+  state: RuntimeState,
+  sessionId: string,
+  continuation: RuntimeSession["continuation"],
+): RuntimeState => {
+  if (continuation === undefined || continuation.remainingRuns === 0) return state
+  const runtimeSession = state.sessions.get(sessionId)
+  if (runtimeSession?.continuation === undefined) return state
+  const sessions = new Map(state.sessions)
+  sessions.set(sessionId, {
+    ...runtimeSession,
+    continuation: {
+      ...runtimeSession.continuation,
+      remainingRuns: runtimeSession.continuation.remainingRuns - 1,
+    },
+  })
+  return { ...state, sessions }
+}
 
 export const promote = ({ state, sessionId }: { readonly state: RuntimeState; readonly sessionId: string }) =>
   Effect.gen(function* () {
