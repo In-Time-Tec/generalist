@@ -616,60 +616,6 @@ Application-owned identities for an independently retained Tool implementation a
 
 `ToolIdentity_base.constructor`
 
-***
-
-<a id="waitinvalid"></a>
-
-### WaitInvalid
-
-#### Extends
-
-- `WaitInvalid_base`
-
-#### Constructors
-
-<a id="constructor-10"></a>
-
-##### Constructor
-
-> **new WaitInvalid**(...`args`): [`WaitInvalid`](#waitinvalid)
-
-###### Parameters
-
-###### args
-
-...\[`object`, `MakeOptions`\]
-
-###### Returns
-
-[`WaitInvalid`](#waitinvalid)
-
-###### Inherited from
-
-`WaitInvalid_base.constructor`
-
-#### Properties
-
-<a id="hint-9"></a>
-
-##### hint
-
-> `readonly` **hint**: `string`
-
-###### Inherited from
-
-`WaitInvalid_base.hint`
-
-<a id="message-1"></a>
-
-##### message
-
-> `readonly` **message**: `string`
-
-###### Inherited from
-
-`WaitInvalid_base.message`
-
 ## Interfaces
 
 <a id="childhandle"></a>
@@ -712,6 +658,52 @@ Application-owned identities for an independently retained Tool implementation a
 
 ***
 
+<a id="createoptions"></a>
+
+### CreateOptions
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
+
+##### Plugins
+
+`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\> = `ReadonlyArray`\<`never`\>
+
+##### Tools
+
+`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
+
+#### Properties
+
+<a id="agents-1"></a>
+
+##### agents
+
+> `readonly` **agents**: `Agents`
+
+<a id="limits"></a>
+
+##### limits?
+
+> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
+
+<a id="plugins-1"></a>
+
+##### plugins?
+
+> `readonly` `optional` **plugins?**: `Plugins`
+
+<a id="tools-1"></a>
+
+##### tools?
+
+> `readonly` `optional` **tools?**: `Tools`
+
+***
+
 <a id="host"></a>
 
 ### Host
@@ -720,7 +712,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 ##### Agents
 
-`Agents` *extends* [`AgentRegistry`](#agentregistry)
+`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
 
 #### Properties
 
@@ -948,12 +940,6 @@ Application-owned identities for an independently retained Tool implementation a
 
 `Effect`\<`void`, [`OperatorActionError`](./runtime/namespaces/Runtime.md#operatoractionerror)\>
 
-<a id="revision"></a>
-
-##### revision
-
-> `readonly` **revision**: `string`
-
 <a id="runs"></a>
 
 ##### runs
@@ -1023,24 +1009,6 @@ Application-owned identities for an independently retained Tool implementation a
 ###### Returns
 
 `Effect`\<readonly [`RunInspection`](./runtime/namespaces/Run.md#runinspection)[], [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror)\>
-
-###### messages
-
-> `readonly` **messages**: (`runId`, `limit?`) => `Effect`\<readonly [`MailboxEntry`](./runtime/namespaces/Mailbox.md#mailboxentry)[], [`DirectoryError`](./runtime/namespaces/Runtime.md#directoryerror)\>
-
-###### Parameters
-
-###### runId
-
-`string`
-
-###### limit?
-
-`number`
-
-###### Returns
-
-`Effect`\<readonly [`MailboxEntry`](./runtime/namespaces/Mailbox.md#mailboxentry)[], [`DirectoryError`](./runtime/namespaces/Runtime.md#directoryerror)\>
 
 ###### rewind
 
@@ -1212,7 +1180,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 `Effect`\<readonly [`HostSession`](#hostsession-1)[], [`DurabilityFailure`](./durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable), `never`\>
 
-<a id="tools"></a>
+<a id="tools-2"></a>
 
 ##### tools
 
@@ -1373,60 +1341,6 @@ Durable product-facing Session metadata owned by a Runtime driver.
 ##### title?
 
 > `readonly` `optional` **title?**: `string`
-
-***
-
-<a id="makeoptions"></a>
-
-### MakeOptions
-
-#### Type Parameters
-
-##### Agents
-
-`Agents` *extends* [`AgentRegistry`](#agentregistry)
-
-##### Plugins
-
-`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\> = `ReadonlyArray`\<`never`\>
-
-##### Tools
-
-`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
-
-#### Properties
-
-<a id="agents-2"></a>
-
-##### agents
-
-> `readonly` **agents**: `Agents`
-
-<a id="limits"></a>
-
-##### limits?
-
-> `readonly` `optional` **limits?**: [`HostLimits`](./runtime/namespaces/TreePolicy.md#hostlimits)
-
-<a id="plugins-1"></a>
-
-##### plugins?
-
-> `readonly` `optional` **plugins?**: `Plugins`
-
-<a id="revision-1"></a>
-
-##### revision
-
-> `readonly` **revision**: `string`
-
-Immutable application build identity used by the existing executable registry pins.
-
-<a id="tools-2"></a>
-
-##### tools?
-
-> `readonly` `optional` **tools?**: `Tools`
 
 ***
 
@@ -1670,7 +1584,7 @@ One deterministic collection of host-owned Agent contributions.
 
 [`HostSession`](#hostsession).[`lifecycle`](#lifecycle)
 
-<a id="message-2"></a>
+<a id="message-1"></a>
 
 ##### message
 
@@ -2090,61 +2004,7 @@ Run metadata without retained manifests, results, or event history.
 
 **`Experimental`**
 
-***
-
-<a id="waitoptions"></a>
-
-### WaitOptions
-
-#### Properties
-
-<a id="commandid-3"></a>
-
-##### commandId
-
-> `readonly` **commandId**: `string`
-
-<a id="messages"></a>
-
-##### messages?
-
-> `readonly` `optional` **messages?**: `boolean`
-
-<a id="runs-2"></a>
-
-##### runs?
-
-> `readonly` `optional` **runs?**: readonly `string`[]
-
-<a id="timeout"></a>
-
-##### timeout?
-
-> `readonly` `optional` **timeout?**: `Input`
-
 ## Type Aliases
-
-<a id="agentregistry"></a>
-
-### AgentRegistry
-
-> **AgentRegistry** = `Readonly`\<`Record`\<`string`, [`Any`](./generalist/namespaces/Agent.md#any)\>\>
-
-***
-
-<a id="agentvalues"></a>
-
-### AgentValues
-
-> **AgentValues**\<`Agents`\> = `Agents`\[keyof `Agents`\]
-
-#### Type Parameters
-
-##### Agents
-
-`Agents` *extends* [`AgentRegistry`](#agentregistry)
-
-***
 
 <a id="approvalrequested"></a>
 
@@ -2177,6 +2037,36 @@ One Agent-authored shared artifact edit committed by this Run.
 ### Completed
 
 > **Completed** = *typeof* `Completed.Type`
+
+***
+
+<a id="createerror"></a>
+
+### CreateError
+
+> **CreateError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
+
+***
+
+<a id="createrequirements"></a>
+
+### CreateRequirements
+
+> **CreateRequirements**\<`Agents`, `Plugins`, `Tools`\> = [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| `Agents`\[`number`\] *extends* `never` ? `never` : `LanguageModel.LanguageModel` \| [`Approvals`](./approvals.md#approvals) \| [`Permissions`](./permissions.md#permissions) \| `AgentServices`\<`Agents`\[`number`\]\> \| `PluginServices`\<`Plugins`\> \| `ToolServices`\<`Tools`\[`number`\]\>
+
+#### Type Parameters
+
+##### Agents
+
+`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
+
+##### Plugins
+
+`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\>
+
+##### Tools
+
+`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
 
 ***
 
@@ -2232,20 +2122,6 @@ One product-facing event at its exclusive Session cursor.
 
 `Effect.Effect`\<[`ChildHandle`](#childhandle), [`SpawnError`](./runtime/namespaces/Runtime.md#spawnerror) \| [`InspectError`](./runtime/namespaces/Runtime.md#inspecterror) \| [`SessionError`](./runtime/namespaces/HostSession.md#sessionerror) \| `GetRunError`\>
 
-##### wait
-
-> `readonly` **wait**: (`options`) => `Effect.Effect`\<[`WaitResult`](#waitresult), [`WaitInvalid`](#waitinvalid) \| [`AwaitEventInvalid`](./generalist/namespaces/Agent.md#awaiteventinvalid), [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\>
-
-###### Parameters
-
-###### options
-
-[`WaitOptions`](#waitoptions)
-
-###### Returns
-
-`Effect.Effect`\<[`WaitResult`](#waitresult), [`WaitInvalid`](#waitinvalid) \| [`AwaitEventInvalid`](./generalist/namespaces/Agent.md#awaiteventinvalid), [`ToolContext`](./generalist/namespaces/ToolContext.md#toolcontext)\>
-
 #### Type Parameters
 
 ##### Output
@@ -2283,36 +2159,6 @@ One product-facing event at its exclusive Session cursor.
 ##### Failure
 
 `Failure`
-
-***
-
-<a id="makeerror"></a>
-
-### MakeError
-
-> **MakeError** = [`DuplicateAgent`](./runtime/namespaces/Errors.md#duplicateagent) \| [`PluginNameConflict`](#pluginnameconflict) \| [`PluginToolConflict`](#plugintoolconflict) \| [`ExecutableRegistrationInvalid`](./runtime/namespaces/Errors.md#executableregistrationinvalid) \| [`TreePolicyInvalid`](./runtime/namespaces/Errors.md#treepolicyinvalid) \| [`RuntimeUnavailable`](./runtime/namespaces/Errors.md#runtimeunavailable) \| [`DurabilityFailure`](./durability.md#durabilityfailure)
-
-***
-
-<a id="makerequirements"></a>
-
-### MakeRequirements
-
-> **MakeRequirements**\<`Agents`, `Plugins`, `Tools`\> = [`Runtime`](./runtime/namespaces/Runtime.md#runtime) \| [`AgentValues`](#agentvalues)\<`Agents`\> *extends* `never` ? `never` : `LanguageModel.LanguageModel` \| [`Approvals`](./approvals.md#approvals) \| [`Permissions`](./permissions.md#permissions) \| `AgentServices`\<[`AgentValues`](#agentvalues)\<`Agents`\>\> \| `PluginServices`\<`Plugins`\> \| `ToolServices`\<`Tools`\[`number`\]\>
-
-#### Type Parameters
-
-##### Agents
-
-`Agents` *extends* [`AgentRegistry`](#agentregistry)
-
-##### Plugins
-
-`Plugins` *extends* `ReadonlyArray`\<[`Plugin`](#plugin)\<`ReadonlyArray`\<`Tool.Any`\>\>\>
-
-##### Tools
-
-`Tools` *extends* `ReadonlyArray`\<`Tool.Any`\> = `ReadonlyArray`\<`never`\>
 
 ***
 
@@ -2422,14 +2268,6 @@ The authoritative journaled task list changed.
 
 > **Turn** = *typeof* `Turn.Type`
 
-***
-
-<a id="waitresult"></a>
-
-### WaitResult
-
-> **WaitResult** = *typeof* `WaitResult.Type`
-
 ## Variables
 
 <a id="artifactupdated-1"></a>
@@ -2442,67 +2280,27 @@ One Agent-authored shared artifact edit committed by this Run.
 
 ***
 
-<a id="host-1"></a>
+<a id="generalist"></a>
 
-### Host
+### Generalist
 
-> **Host**: `object`
+> `const` **Generalist**: `object`
 
-Stable process-local product host and its compiler.
+Stable process-local product host.
 
 #### Type Declaration
 
-<a id="make"></a>
+<a id="create"></a>
 
-##### make
+##### create
 
-> `readonly` **make**: \<`Agents`, `Plugins`, `Tools`\>(`options`) => `Effect`\<[`Host`](#host)\<`Agents`\>, [`MakeError`](#makeerror), [`MakeRequirements`](#makerequirements)\<`Agents`, `Plugins`, `Tools`\>\>
-
-###### Type Parameters
-
-###### Agents
-
-`Agents` *extends* `Readonly`\<`Record`\<`string`, [`Any`](./generalist/namespaces/Agent.md#any)\>\>
-
-###### Plugins
-
-`Plugins` *extends* readonly [`Plugin`](#plugin)\<readonly `Any`[]\>[] = readonly `never`[]
-
-###### Tools
-
-`Tools` *extends* readonly `Any`[] = readonly `never`[]
-
-###### Parameters
-
-###### options
-
-[`MakeOptions`](#makeoptions)\<`Agents`, `Plugins`, `Tools`\>
-
-###### Returns
-
-`Effect`\<[`Host`](#host)\<`Agents`\>, [`MakeError`](#makeerror), [`MakeRequirements`](#makerequirements)\<`Agents`, `Plugins`, `Tools`\>\>
+> `readonly` **create**: *typeof* `create`
 
 <a id="plugin-1"></a>
 
 ##### plugin
 
-> `readonly` **plugin**: \<`Tools`\>(`options`) => [`Plugin`](#plugin)\<`Tools`\>
-
-###### Type Parameters
-
-###### Tools
-
-`Tools` *extends* readonly `Any`[] = readonly `never`[]
-
-###### Parameters
-
-###### options
-
-[`PluginOptions`](#pluginoptions)\<`Tools`\>
-
-###### Returns
-
-[`Plugin`](#plugin)\<`Tools`\>
+> `readonly` **plugin**: *typeof* `plugin`
 
 ***
 
@@ -2605,11 +2403,3 @@ Membership is pinned to at; summaries report current committed status.
 > `const` **TasksUpdated**: `Schema.TaggedStruct`\<`"TasksUpdated"`, \{ `cursor`: `Schema.Int`; `items`: `Schema.$Array`\<`Schema.Struct`\<\{ `id`: `Schema.String`; `note`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly \[`"todo"`, `"doing"`, `"done"`\]\>; `title`: `Schema.String`; \}\>\>; `runId`: `Schema.String`; `sessionId`: `Schema.String`; \}\>
 
 The authoritative journaled task list changed.
-
-***
-
-<a id="waitresult-1"></a>
-
-### WaitResult
-
-> `const` **WaitResult**: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"RunSettled"`, \{ `runId`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Message"`, \{ `cursor`: `Schema.Int`; `input`: `Schema.Codec`\<`Prompt.Prompt`, `Prompt.PromptEncoded`, `never`, `never`\>; `messageId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Timeout"`, \{ \}\>, `Schema.TaggedStruct`\<`"Event"`, \{ `event`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Timer"`, \{ `dedupeKey`: `Schema.String`; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `scheduledAt`: `Schema.String`; `scheduleId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Webhook"`, \{ `dedupeKey`: `Schema.String`; `headers`: `Schema.$Record`\<..., ...\>; `payload`: `Schema.Codec`\<..., ..., ..., ...\>; `source`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ChildCompleted"`, \{ `childRunId`: `Schema.String`; `dedupeKey`: `Schema.String`; `terminalEventId`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"FileChanged"`, \{ `dedupeKey`: `Schema.String`; `kind`: `Schema.Literals`\<...\>; `path`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"ApprovalResolved"`, \{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<...\>; `dedupeKey`: `Schema.String`; \}\>\]\>; \}\>, `Schema.TaggedStruct`\<`"TimedOut"`, \{ `deadline`: `Schema.String`; \}\>\]\>
