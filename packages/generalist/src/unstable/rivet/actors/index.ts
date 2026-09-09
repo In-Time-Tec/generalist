@@ -7,6 +7,12 @@ export {
   type RuntimeActorOptions,
 } from "./runtime-actor.js"
 export {
+  type RuntimeActorServer,
+  type RuntimeActorServerContext,
+  type RuntimeActorServerFactory,
+  type RuntimeActorServerOptions,
+} from "./server.js"
+export {
   ActorRuntime,
   layerActorRuntime,
   type ActorRuntimeOptions,

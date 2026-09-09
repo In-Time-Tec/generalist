@@ -1,12 +1,24 @@
 /* oxlint-disable effecttsgo/async-function -- These integration tests exercise Rivet's Promise-only actor API. */
+/* oxlint-disable effecttsgo/new-promise -- raw Rivet WebSocket readiness is exposed as a Promise-only callback boundary. */
+/* oxlint-disable effecttsgo/strict-effect-provide -- the server factory is the actor's application composition root. */
 import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
-import { actor, setup, type Registry, type RegistryActors, type RegistryConfigInput } from "rivetkit"
+import {
+  actor,
+  setup,
+  type Registry,
+  type RegistryActors,
+  type RegistryConfigInput,
+  type UniversalWebSocket,
+} from "rivetkit"
 import { setupTest as setupRivetTest } from "rivetkit/test"
 import { afterAll, expect, test, type TestContext } from "vitest"
-import { Context, Deferred, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
+import { Context, Deferred, Effect, Layer, ManagedRuntime, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, AgentManifest, Pins } from "generalist"
+import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
+import { Generalist } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
+import { Authentication, CurrentPrincipal } from "../../../../src/server/auth.js"
+import { Unauthorized } from "../../../../src/server/errors.js"
 import {
   ActorRuntime,
   type ActorRuntimeServices,
@@ -1120,3 +1132,114 @@ test.for(["transport", "lease"] as const)(
     expect(executions).toBe(1)
   },
 )
+
+test("bridges authenticated HTTP and raw WebSocket traffic through one actor host", async (context) => {
+  const bucket = await Effect.runPromise(makeBucket())
+  const closedAgent = Agent.close(agent, model)
+  let serverBuilds = 0
+  let serverFinalized = 0
+  const principal = { id: "rivet-controller", tenantId: "rivet", role: "controller" as const }
+  const auth = Layer.effect(
+    Authentication,
+    Effect.acquireRelease(
+      Effect.succeed(
+        Authentication.of({
+          bearer: (httpEffect, { credential }) =>
+            Redacted.value(credential) === "local-token"
+              ? Effect.provideService(httpEffect, CurrentPrincipal, principal)
+              : Effect.fail(Unauthorized.make({})),
+        }),
+      ),
+      () => Effect.sync(() => void serverFinalized++),
+    ),
+  )
+  const server = {
+    make: () =>
+      Effect.sync(() => void serverBuilds++).pipe(
+        Effect.andThen(
+          Effect.gen(function* () {
+            const host = yield* Generalist.create({ agents: [closedAgent] }).pipe(
+              Effect.provide(Layer.merge(Approvals.layerAutoApprove, Permissions.layerAllowAll)),
+            )
+            return {
+              host,
+              auth,
+              authorization: { tenantId: "rivet", authorize: () => Effect.succeed(true) },
+            }
+          }),
+        ),
+        Effect.provide(model),
+      ),
+  }
+  const options = makeOptions(model, bucket, "server-bridge", 60_000)
+  const definition = makeRuntimeActor({
+    ...options,
+    server,
+  })
+  const firstSleepCount = observeSleepCleanup(definition)
+  const registry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { bridge: definition } }),
+  )
+  const { client } = await setupTest(context, registry)
+  const key = partitionKey("server-bridge")
+  const partition = client.bridge.getOrCreate(key, testPool(context))
+  const headers = { authorization: "Bearer local-token", "content-type": "application/json" }
+  const created = await partition.fetch("/sessions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ id: "rivet-server-bridge", agent: closedAgent.name }),
+  })
+  expect(created.status).toBe(200)
+  const rejected = await partition.fetch("/sessions", {
+    method: "POST",
+    headers: { ...headers, authorization: "Bearer wrong-token" },
+    body: JSON.stringify({ id: "rivet-server-bridge-rejected" }),
+  })
+  expect(rejected.status).toBe(401)
+  const queueResponses = await Promise.all(
+    Array.from({ length: 4 }, (_, index) =>
+      partition.fetch("/sessions/rivet-server-bridge/queue", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ commandId: `queue-${index}`, input: `concurrent-${index}` }),
+      }),
+    ),
+  )
+  expect(queueResponses.map((response) => response.status)).toEqual([200, 200, 200, 200])
+  // SAFETY: Rivet's ActorHandleRaw.webSocket implementation returns UniversalWebSocket despite its legacy any declaration.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  const socket = (await partition.webSocket("/sessions/rivet-server-bridge/ws")) as UniversalWebSocket
+  await new Promise<void>((resolve, reject) => {
+    socket.addEventListener("open", () => resolve())
+    socket.addEventListener("error", () => reject(new Error("Rivet WebSocket bridge failed to open")))
+  })
+  expect(socket.readyState).toBe(socket.OPEN)
+  socket.close(1000, "test")
+
+  const first = client.bridge.getOrCreate(key, testPool(context))
+  const firstResponse = await first.fetch("/sessions/rivet-server-bridge", { headers })
+  expect(firstResponse.status).toBe(200)
+  await registry.shutdown()
+  expect(firstSleepCount()).toBeGreaterThanOrEqual(1)
+  expect(serverBuilds).toBe(1)
+  expect(serverFinalized).toBe(1)
+
+  const replacementDefinition = makeRuntimeActor({
+    ...makeOptions(model, await Effect.runPromise(bucket.connect), "server-bridge", 60_000),
+    server,
+  })
+  const replacementSleepCount = observeSleepCleanup(replacementDefinition)
+  const replacementRegistry = registerShutdown(
+    context,
+    await setupRegistry({ envoy: testPool(context), use: { bridge: replacementDefinition } }),
+  )
+  const { client: replacementClient } = await setupTest(context, replacementRegistry)
+  const replacement = replacementClient.bridge.getOrCreate(key, testPool(context))
+  const replacementResponse = await replacement.fetch("/sessions/rivet-server-bridge", { headers })
+  expect(replacementResponse.status).toBe(200)
+  await replacementRegistry.shutdown()
+  expect(replacementSleepCount()).toBeGreaterThanOrEqual(1)
+  expect(serverBuilds).toBe(2)
+  expect(serverFinalized).toBe(2)
+})
