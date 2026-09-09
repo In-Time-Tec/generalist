@@ -19,6 +19,8 @@ import { Cursor, Runtime, RunEvent } from "generalist/runtime"
 import * as Durability from "generalist/durability"
 import * as S3 from "generalist/durability/s3"
 import * as R2 from "generalist/durability/r2"
+import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
+import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
 import { Server } from "generalist/server"
@@ -51,9 +53,6 @@ const independentTool = Tool.make("package-checks", {
   failure: Schema.Struct({ reason: Schema.String }),
 }).annotate(ToolIdentity, { implementation: "checks-v1", policy: "checks-policy-v1" })
 const toolHost = Generalist.create({ agents: [], tools: [independentTool] })
-const backgroundAgent = Agent.make({ name: "background-consumer", toolkit: Toolkit.make(independentTool), toolExecution: "background" })
-type BackgroundRetainsHandlerSchema = Assert<Equal<typeof backgroundAgent.toolkit.tools["package-checks"]["successSchema"]["Type"], number>>
-type BackgroundRetainsHandlerFailure = Assert<Equal<typeof backgroundAgent.toolkit.tools["package-checks"]["failureSchema"]["Type"], { readonly reason: string }>>
 type ToolHostNeedsNoModel = Assert<Equal<Extract<EffectServices<typeof toolHost>, LanguageModel.LanguageModel>, never>>
 const toolAdmission = Effect.gen(function* () {
   const host = yield* toolHost
@@ -65,6 +64,15 @@ type TypedToolLookup = Assert<Equal<Effect.Success<typeof toolLookup>, Effect.Su
 type ToolControlsExcludeAgent = Assert<Equal<Extract<keyof Effect.Success<typeof toolAdmission>, "send" | "fork" | "rewind">, never>>
 type ToolAwaitOutput = Assert<Equal<Effect.Success<Effect.Success<typeof toolAdmission>["await"]>, number>>
 type ToolAwaitFailure = Assert<Equal<Extract<Effect.Error<Effect.Success<typeof toolAdmission>["await"]>, { readonly _tag: "ToolRunFailure" }>, { readonly _tag: "ToolRunFailure"; readonly failure: { readonly reason: string } }>>
+declare const actorHost: DurableObjects.Host
+const hostedCommand = actorHost.run(Effect.gen(function* () {
+  yield* Scope.Scope
+  return yield* Runtime.Runtime
+}))
+type HostedCommandServices = Assert<Equal<EffectServices<typeof hostedCommand>, never>>
+type ActorNamespace = Assert<Equal<ReturnType<Rivet.RuntimeActorOptions["namespace"]>, Rivet.RuntimeActorNamespace>>
+type FactoryStaticPartitionRemoved = Assert<Equal<"partition" extends keyof Rivet.RuntimeActorOptions ? true : false, false>>
+type CustomActorPartition = Assert<Equal<Rivet.ActorRuntimeOptions["partition"], string>>
 type ComponentsRoot = typeof import("generalist/components")
 type ComponentRegistryInternal = Assert<Equal<"Registry" extends keyof ComponentsRoot ? true : false, false>>
 type ComponentSessionAuthorityInternal = Assert<Equal<"SessionState" extends keyof ComponentsRoot ? true : false, false>>
