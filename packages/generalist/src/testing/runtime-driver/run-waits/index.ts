@@ -315,7 +315,7 @@ export const registerRunWaits = <LayerError, ClaimsLayerError>(input: {
               reason: {
                 _tag: "AwaitEvent" as const,
                 filter: { _tag: "Run" as const, runs: [child.runId], messages: false, commandId: `${waitId}:selector` },
-                deadline: "1970-01-01T00:00:01.000Z",
+                deadline: DateTime.formatIso(DateTime.makeUnsafe(0)),
               },
             },
           ],
