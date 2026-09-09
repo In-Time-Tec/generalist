@@ -108,22 +108,41 @@ export const spendForEvents = Effect.fn("RuntimeInspection.spendForEvents")(func
   const duration = yield* durationForEvents({ events, observedMillis })
   const linked = new Set(events.filter((event) => event._tag === "ChildLinked").map((event) => event.childRunId))
   for (const event of events) if (event._tag === "ChildSettled") linked.delete(event.childRunId)
-  const reservations = events.filter((event) => event._tag === "ChildLinked" && linked.has(event.childRunId))
+  const reservations = events.filter(
+    (event) => event._tag === "ChildLinked" && event.sponsoredContinuation !== true && linked.has(event.childRunId),
+  )
   const reserved = (dimension: "tokens" | "usd" | "duration" | "toolCalls") =>
     reservations.reduce(
-      (total, event) => total + (event._tag === "ChildLinked" ? (event.budget?.[dimension] ?? 0) : 0),
+      (total, event) =>
+        total +
+        (event._tag === "ChildLinked"
+          ? (event.budget?.[dimension] ?? 0) + (event.continuationBudget?.[dimension] ?? 0)
+          : 0),
       0,
     )
-  const settled = events.filter((event) => event._tag === "ChildSettled" && event.spend !== undefined)
+  const settled = events.filter(
+    (event) => event._tag === "ChildSettled" && event.sponsoredContinuation !== true && event.spend !== undefined,
+  )
   const settledAmount = (dimension: "tokens" | "usd" | "duration" | "toolCalls" | "children") =>
     settled.reduce((total, event) => {
       if (event._tag !== "ChildSettled") return total
       const value = event.spend?.[dimension]
-      return total + (value === undefined || value === "unknown" ? 0 : value)
+      const continuation = event.continuationBudget?.[dimension]
+      return total + (value === undefined || value === "unknown" ? 0 : value) + (continuation ?? 0)
     }, 0)
   const settledUnknownUsd = settled.some((event) => event._tag === "ChildSettled" && event.spend?.usd === "unknown")
   const activeChildren = reservations.reduce(
-    (total, event) => total + (event._tag === "ChildLinked" ? 1 + (event.budget?.children ?? 0) : 0),
+    (total, event) =>
+      total +
+      (event._tag === "ChildLinked"
+        ? 1 +
+          (event.budget?.children ?? 0) +
+          (event.continuationBudget === undefined ? 0 : 1 + (event.continuationBudget.children ?? 0))
+        : 0),
+    0,
+  )
+  const settledChildren = settled.reduce(
+    (total, event) => total + (event._tag === "ChildSettled" && event.continuationBudget !== undefined ? 2 : 1),
     0,
   )
   const forks = events.filter(
@@ -144,7 +163,7 @@ export const spendForEvents = Effect.fn("RuntimeInspection.spendForEvents")(func
       reserved("toolCalls") +
       settledAmount("toolCalls") +
       forkAllocation("toolCalls"),
-    children: activeChildren + settled.length + settledAmount("children") + forks.length + forkAllocation("children"),
+    children: activeChildren + settledChildren + settledAmount("children") + forks.length + forkAllocation("children"),
   }
 })
 

@@ -287,7 +287,10 @@ export const makeUnknown = (operationId: string) =>
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
 
 type ChildLinked = Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
-type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin" | "inherit" | "budget">
+type ChildLinkedDetails = Pick<
+  ChildLinked,
+  "readiness" | "key" | "label" | "origin" | "inherit" | "budget" | "continuationBudget" | "sponsoredContinuation"
+>
 
 export const childLinkedEvent: {
   (
@@ -347,13 +350,19 @@ export const childSettledEvent = (input: {
   readonly childRunId: string
   readonly terminalEventId: string
   readonly spend?: import("../../core/durable/run-budget.js").Spend
+  readonly continuationBudget?: import("../../core/durable/run-budget.js").BudgetLimits
+  readonly sponsoredContinuation?: boolean
 }) => {
   const event = {
     _tag: "ChildSettled" as const,
     childRunId: input.childRunId,
     terminalEventId: input.terminalEventId,
   }
-  return input.spend === undefined ? event : { ...event, spend: input.spend }
+  if (input.spend !== undefined) Object.assign(event, { spend: input.spend })
+  if (input.continuationBudget !== undefined) Object.assign(event, { continuationBudget: input.continuationBudget })
+  if (input.sponsoredContinuation !== undefined)
+    Object.assign(event, { sponsoredContinuation: input.sponsoredContinuation })
+  return event
 }
 
 export const makeFanOutAdmitted = (input: {

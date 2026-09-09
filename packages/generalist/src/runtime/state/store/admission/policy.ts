@@ -1,7 +1,8 @@
-import { Effect, Schema } from "effect"
+import { Effect, Schema, type Types } from "effect"
 import type { RuntimeState } from "../../projection.js"
 import { defaultTreePolicy, narrow } from "../../../tree/policy.js"
-import { capGrant, narrowGrant, profileBudget } from "../../../budget/state.js"
+import { capGrant, narrowGrant, profileBudget, requireAvailable } from "../../../budget/state.js"
+import { spendForEvents } from "../../../execution/inspection.js"
 import type { SessionSelection } from "../../../session/queue.js"
 import { RuntimeUnavailable } from "../../../errors.js"
 import type { BudgetLimits } from "../../../../core/durable/run-budget.js"
@@ -13,7 +14,26 @@ interface Input {
   readonly sessionId: string
   readonly selection: SessionSelection
   readonly message?: Message
+  readonly bypassRetained?: boolean
 }
+
+export const retainedBudget = (input: Pick<Input, "state" | "sessionId">) =>
+  Effect.gen(function* () {
+    const family = input.state.sessions.get(input.sessionId)?.family
+    const remaining: Types.Mutable<BudgetLimits> = { ...family?.budget }
+    for (const runId of family?.runIds ?? []) {
+      const run = input.state.runs.get(runId)
+      if (run === undefined)
+        return yield* RuntimeUnavailable.make({ message: `Session allocation Run ${runId} is missing` })
+      const spend = yield* spendForEvents({ events: run.events })
+      for (const dimension of ["tokens", "usd", "duration", "toolCalls", "children"] as const) {
+        const limit = remaining[dimension]
+        if (limit !== undefined)
+          remaining[dimension] = spend[dimension] === "unknown" ? 0 : Math.max(0, limit - spend[dimension])
+      }
+    }
+    return remaining
+  })
 
 const selectedPolicy = ({ state, sessionId, selection: requested }: Input) =>
   Effect.gen(function* () {
@@ -95,6 +115,8 @@ export const sessionChildGrant = (input: Input & { readonly grant: BudgetLimits 
   Effect.gen(function* () {
     yield* validateTools(input)
     const profile = profileBudget({ ref: input.selection.executableRef, manifest: input.selection.executableManifest })
-    const family = input.state.sessions.get(input.sessionId)?.family
-    return capGrant(capGrant(input.grant, profile), family?.budget ?? {})
+    const remaining = input.bypassRetained === true ? profile : yield* retainedBudget(input)
+    const budget = capGrant(capGrant(input.grant, profile), remaining)
+    yield* requireAvailable(budget)
+    return budget
   })

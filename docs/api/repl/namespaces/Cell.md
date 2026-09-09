@@ -376,7 +376,7 @@ No kernel was available to run the cell. Nothing was evaluated.
 
 ##### reason
 
-> `readonly` **reason**: `"start-failed"` \| `"closed"` \| `"lease-lost"` \| `"profile-mismatch"` \| `"deadline-exceeded"`
+> `readonly` **reason**: `"closed"` \| `"start-failed"` \| `"lease-lost"` \| `"profile-mismatch"` \| `"deadline-exceeded"`
 
 ###### Inherited from
 
