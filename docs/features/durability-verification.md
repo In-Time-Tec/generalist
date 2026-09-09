@@ -16,7 +16,7 @@ Statuses mean:
 
 The local gate in `scripts/durability-cold-recovery.ts` completes 1,000 actual durable Tool executions and retains eight child conversations. It requires an explicitly configured 64 MiB partition with 16 MiB reserved for settlement. **This workload does not fit the default 16 MiB partition.** Pagination is not a partition-growth solution, and these results do not establish an unlimited Session lifetime.
 
-The measured source checkpoint was `d7cad0ee97f2e991680d49f64358a594d86dcbec`, incorporating bounded Tool kind controls from `965360c0`, obligation reservation checkpoint `d1d2421a`, retained child Sessions, bounded history, and canonical main `df5aa4a3ff47e0a2ab8a5a170f2a3d230eec947c`. The machine ran macOS 26.6.2 (25G83), arm64, Bun 1.4.0 (`34cbb9a40`), and Effect 4.0.0-rc.112. The transport was the repository's in-memory ObjectStore simulator over the production durability engine. No model credentials, cloud bucket, or live provider were used.
+The measured source checkpoint was `d18b1ea96d7a56539ffaa593b5fa8f06ff831f7c`, incorporating bounded Tool kind controls, obligation reservation, retained child Sessions, bounded history, and canonical main `271c5280c9364377b2d612f3758e6c83440d0644`. The machine ran macOS 26.6.2 (25G83), arm64, Bun 1.4.0 (`34cbb9a40`), and Effect 4.0.0-rc.112. The transport was the repository's in-memory ObjectStore simulator over the production durability engine. No model credentials, cloud bucket, or live provider were used.
 
 ### Workload and recovery boundary
 
@@ -28,21 +28,21 @@ The measured source checkpoint was `d7cad0ee97f2e991680d49f64358a594d86dcbec`, i
 
 ### Measured baseline and local regression bounds
 
-The complete measured invocation took 430.5 seconds. These are three sequential cold samples, not a statistically qualified p95 or p99.
+The complete measured invocation took about 416 seconds. These are three sequential cold samples, not a statistically qualified p95 or p99.
 
 | Metric                                      | Measured baseline                 | Current local gate             |
 | ------------------------------------------- | --------------------------------- | ------------------------------ |
-| Cold construction                           | 1,146.39 / 1,210.37 / 1,294.20 ms | At most 5,000 ms per sample    |
-| Cold object reads                           | 70 per sample                     | At most 256                    |
+| Cold construction                           | 1,232.42 / 1,119.50 / 1,103.22 ms | At most 5,000 ms per sample    |
+| Cold object reads                           | 69 per sample                     | At most 256                    |
 | Cold object lists                           | 11 per sample                     | At most 32                     |
-| Cold returned bytes                         | 25,069,790 per sample             | At most 64 MiB                 |
+| Cold returned bytes                         | 25,072,026 per sample             | At most 64 MiB                 |
 | Cold object writes                          | 0                                 | Exactly 0                      |
-| Process RSS sampled after cold construction | 3.77 / 4.14 / 4.15 GB, decimal    | At most 6 GiB at that boundary |
-| Complete outcome/family/wait audit          | 66.38 / 68.03 / 70.24 seconds     | At most 120 seconds per sample |
+| Process RSS sampled after cold construction | 3.80 / 4.03 / 4.33 GB, decimal    | At most 6 GiB at that boundary |
+| Complete outcome/family/wait audit          | 66.15 / 66.20 / 67.54 seconds     | At most 120 seconds per sample |
 
 These thresholds are local regression guards selected from this fixed workload's baseline, not production SLOs. RSS includes the simulator's bucket, retained snapshots, runtime allocations, and the process's GC history; it is not isolated worker memory, a measured allocation delta, or a continuously sampled peak. The report also emits RSS and heap before reconstruction and every 100 completed Tools.
 
-Building the first 1,000 Tools made 50,623 reads, 105,108 lists, and 9,349 create attempts, returning 214,369,731,687 bytes and attempting 956,249,856 write bytes. These totals include the retained-child setup and host maintenance. Repeated canonical validation reads count again even when the underlying simulator supplies memory-resident bytes. They expose a substantial object-operation cost; they are not network throughput, latency, AWS/R2 cost, or deployed capacity measurements. Cold reconstruction is much cheaper than repeatedly auditing every Run through separate canonical reads.
+Building the first 1,000 Tools made 50,605 reads, 105,079 lists, and 9,348 create attempts, returning 214,329,601,191 bytes and attempting 956,311,559 write bytes. These totals include the retained-child setup and host maintenance. Repeated canonical validation reads count again even when the underlying simulator supplies memory-resident bytes. They expose a substantial object-operation cost; they are not network throughput, latency, AWS/R2 cost, or deployed capacity measurements. Cold reconstruction is much cheaper than repeatedly auditing every Run through separate canonical reads.
 
 Before changing the engine, the initial Tool checkpoint `db6abb8fbdf039dc5a29e0a92983ca6c3484c73d` reached 809 completed Tools before the next admission exceeded the default 16 MiB state-plus-receipt limit. After the Tool allocation fix and adding retained children, a run with the default reserve completed 480 Tools before the next Tool reported a failed status; that preliminary log did not record the nested failure, so it establishes a failed gate rather than a precise capacity measurement. The explicit 64 MiB configuration above passed; the default was not enlarged and no compaction or canonical segmentation was introduced.
 
@@ -52,7 +52,7 @@ The journal checks the complete post-transition canonical state **including the 
 
 In addition to that global reserve, each nonterminal Tool Run carries a conservative outstanding-obligation reservation. It uses #463's `256 KiB` outcome bound, `64 × 16 KiB` progress bound, bounded progress/outcome encoding overhead, and six bounded control/receipt transitions. As progress and operation phases commit, their consumed allowance is released; cancellation and open waits add one control allowance each. The reservation remains until the Run is terminal, so several concurrently admitted Tools cannot consume one another's settlement capacity. Control allowance is capped by the journal's `maximumEventBytes` boundary, while `maxCommitBytes` still rejects any individual canonical commit that exceeds its configured limit. A Tool progress callback returns `false` rather than dispatching an unbounded durable event if a limit is reached.
 
-`packages/generalist/test/durability/internal/runtime-capacity.test.ts` uses a 128 KiB partition and 64 KiB reserve. It fills admission capacity with real RunStore admissions while an incurred operation remains running, then records an 8 KiB external receipt, refuses a new operation after settlement consumes the reserve, completes the incurred Run, and cancels a second Run. A fresh Layer verifies the outcome, terminal statuses, and unchanged admission/cancellation receipts. Invalid or zero reserve configuration is rejected.
+`packages/generalist/test/durability/internal/runtime-state/capacity.test.ts` uses a 128 KiB partition and 64 KiB reserve. It fills admission capacity with real RunStore admissions while an incurred operation remains running, then records an 8 KiB external receipt, refuses a new operation after settlement consumes the reserve, completes the incurred Run, and cancels a second Run. A fresh Layer verifies the outcome, terminal statuses, and unchanged admission/cancellation receipts. Invalid or zero reserve configuration is rejected.
 
 These are finite byte reservations, **not a guarantee for arbitrary outstanding work**. Unbounded output outside the Tool policy, other state writes, indefinite heartbeat/receipt growth, or too many independent non-Tool obligations can still consume capacity. The measured acceptance envelope is the workload above plus the separately tested concurrent bounded-settlement case; neither proves that every admitted workload can always settle. Applications must bound pending work and output, stop admitting work before partition exhaustion, and provision a fresh partition for new independent work. Do not split atomically related work or delete canonical history to reclaim room. Exceeding these bounds requires new qualification, not merely a larger UI page size.
 
