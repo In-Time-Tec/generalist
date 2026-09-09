@@ -402,6 +402,57 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "ToolExecutor.layerRouter keeps invocation identity instead of its captured default", () => {
+    const identity = ToolContext.ToolContext.pipe(
+      Effect.map((context) => ({
+        _tag: "Success" as const,
+        result: { runId: context.runId, operationKey: context.operationKey, sessionId: context.sessionId },
+        encodedResult: { runId: context.runId, operationKey: context.operationKey, sessionId: context.sessionId },
+      })),
+    )
+    const routed = {
+      ...ToolExecutor.route({ tools: ["identity"], execute: () => identity }),
+      cancel: () => identity.pipe(Effect.map((outcome) => ({ _tag: "AlreadyTerminal" as const, outcome }))),
+    }
+    return [
+      ToolExecutor.layerRouter([routed]).pipe(Layer.provideMerge(ToolContext.layerDefault)),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const initial = yield* ToolContext.ToolContext
+        const execution = request("identity", {})
+        for (const runId of ["first-run", "second-run"]) {
+          const context = {
+            ...initial,
+            runId,
+            rootRunId: "root-run",
+            sessionId: "current-session",
+            operationKey: `operation:${runId}`,
+          }
+          const result = yield* executor
+            .execute(execution)
+            .pipe(Effect.provideService(ToolContext.ToolContext, context))
+          expect(result).toMatchObject({
+            result: { runId, operationKey: context.operationKey, sessionId: context.sessionId },
+          })
+          if (executor.cancel === undefined) return yield* Effect.die("Router lost its cancellation handler")
+          const cancelled = yield* executor
+            .cancel({
+              operationKey: context.operationKey,
+              runId,
+              rootRunId: context.rootRunId,
+              sessionId: context.sessionId,
+              toolCallId: execution.call.id,
+              toolName: "identity",
+              attempt: 1,
+              execution,
+            })
+            .pipe(Effect.provideService(ToolContext.ToolContext, context))
+          expect(cancelled).toMatchObject({ _tag: "AlreadyTerminal", outcome: result })
+        }
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "ToolExecutor.layerRouter selects replay policy and execution from the same first route", () => {
     const localTool = Tool.make("overlap", {
       parameters: Schema.Struct({}),

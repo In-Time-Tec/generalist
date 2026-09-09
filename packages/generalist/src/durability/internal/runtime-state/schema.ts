@@ -112,6 +112,7 @@ const makeRun = (reuse: Reuse) =>
 /** Known framework failures use their domain codec; malformed tagged failures cannot fall through as opaque data. */
 export const OperationError = Schema.Union([
   FrameworkError,
+  Schema.toEncoded(FrameworkError),
   Schema.Unknown.check(
     Schema.makeFilter(
       (value) =>

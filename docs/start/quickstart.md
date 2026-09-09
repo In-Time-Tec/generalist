@@ -11,12 +11,12 @@ This is the process-local loop, not restart-safe execution. Once the tool path w
 
 You will need Bun 1.4+.
 
-This quickstart targets Generalist 0.65.0. To run directly from a checkout instead of installing from the registry, use the [repository examples](/start/examples).
+This quickstart targets Generalist 0.65.1. To run directly from a checkout instead of installing from the registry, use the [repository examples](/start/examples).
 
 ```bash
 mkdir generalist-quickstart && cd generalist-quickstart
 bun init -y
-bun add generalist@0.65.0 effect@4.0.0-rc.112
+bun add generalist@0.65.1 effect@4.0.0-rc.112
 ```
 
 ## Define and run the agent

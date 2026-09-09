@@ -3,7 +3,8 @@ import "./domain-model-suite.js"
 import { BunCrypto } from "@effect/platform-bun"
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each durability test owns its scoped BunCrypto test-host Layer. */
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Fiber, Layer, Option } from "effect"
+import { Effect, Fiber, Layer, Option, Schema } from "effect"
+import { FrameworkFailure } from "../../../src/core/tools/tool-executor.js"
 import { Prompt } from "effect/unstable/ai"
 import { ObjectStore } from "../../../src/durability/object-store.js"
 import { activate, layerRunStore } from "../../../src/durability/index.js"
@@ -55,6 +56,58 @@ const admission = (key: string) => ({
 
 /** INV-02/03/06/07/08/09: real RunStore commands over the production journal, not a parallel reducer. */
 describe("object Runtime canonical mutations", () => {
+  it.effect("retains an encoded driver framework failure across a fresh store", () =>
+    provideScoped(
+      BunCrypto.layer,
+      Effect.gen(function* () {
+        const bucket = yield* makeSimulator()
+        const failure = FrameworkFailure.make({
+          stage: "handler",
+          tool: "read",
+          message: "Tool admission capacity exhausted",
+        })
+        const encoded = yield* Schema.encodeEffect(FrameworkFailure)(failure)
+        const completed = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* openActive(bucket, "failure-writer")
+            const run = yield* store.admitSend(admission("encoded-framework-failure"))
+            const claim = yield* store.claimExecution({
+              runId: run.runId,
+              ownerId: "failure-writer",
+              commandId: "claim-failure",
+            })
+            const operation = yield* store.recordOperation({
+              ...claim,
+              operationKey: "failed-tool",
+              kind: "tool",
+              inputDigest: "failed-input",
+              input: {},
+              replayPolicy: "never",
+              attempt: 1,
+            })
+            yield* store.startOperation({ ...claim, operationId: operation.operationId, commandId: "start-failure" })
+            const record = yield* store.completeOperation({
+              ...claim,
+              operationId: operation.operationId,
+              outcome: { _tag: "Failed", error: encoded },
+            })
+            expect(record.status).toBe("failed")
+            return { runId: run.runId, operationId: operation.operationId }
+          }),
+        )
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* open(yield* bucket.connect)
+            const recovered = yield* store.getOperation(completed)
+            expect(recovered.status).toBe("failed")
+            expect(recovered.error).toBeInstanceOf(FrameworkFailure)
+            expect(recovered.error).toEqual(failure)
+          }),
+        )
+      }),
+    ).pipe(Effect.scoped),
+  )
+
   it.effect("reads scalar admission presence through fresh canonical authority", () =>
     provideScoped(
       BunCrypto.layer,

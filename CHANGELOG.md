@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.65.1
+
+- Preserve the current Tool invocation's Run, Session, operation identity, signal, and progress emitter when executor Layers or routers were constructed with a default ToolContext. Cancellation uses the current invocation context too.
+- Persist already-encoded framework operation failures from the durable driver and restore their typed errors after reopening the object Runtime. Malformed tagged framework failures still fail validation.
+
 ## 0.65.0
 
 - **Breaking:** remove `generalist/unstable/rlm`, including `layer` and `rlmOffload`, with no compatibility alias. Use the durable Runtime for delegation and background work; Agent and Program execution, Sandbox, compaction, budgets, and nested operations remain available.
