@@ -12,7 +12,7 @@ You can start without a database, server, or API key. The [offline quickstart](/
 ## Run an agent with OpenAI
 
 <Warning>
-These instructions target Generalist 0.64.0. Use matching Effect packages and do not substitute an older Generalist release expecting the same APIs. To run directly from a checkout, use the [repository examples](/start/examples).
+These instructions target Generalist 0.65.0. Use matching Effect packages and do not substitute an older Generalist release expecting the same APIs. To run directly from a checkout, use the [repository examples](/start/examples).
 </Warning>
 
 You will need Bun 1.4+ and an OpenAI API key. Generalist also supports Node 22+; see [Installation](/start/installation) for other setups.
@@ -20,7 +20,7 @@ You will need Bun 1.4+ and an OpenAI API key. Generalist also supports Node 22+;
 ```bash
 mkdir my-agent && cd my-agent
 bun init -y
-bun add generalist@0.64.0 effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
+bun add generalist@0.65.0 effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
 export OPENAI_API_KEY="your-api-key"
 ```
 

@@ -11,14 +11,14 @@ Three parts: a Bun server that streams agent runs over SSE and WebSocket, an app
 
 ### Scaffold the server
 
-The install command targets unpublished 0.64.0. To run current code before release, use the [repository example](/start/examples) rather than installing an older version with different APIs.
+The install command targets unpublished 0.65.0. To run current code before release, use the [repository example](/start/examples) rather than installing an older version with different APIs.
 
 **Terminal**
 
 ```bash
 mkdir research-agent && cd research-agent
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.64.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
+bun add effect@4.0.0-rc.112 generalist@0.65.0 @effect/ai-openrouter@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
 ```
 
 ### A web search service
@@ -468,7 +468,7 @@ The stream resumes, the tool executes, the second model turn synthesizes, and th
 ```bash
 mkdir web && cd web
 bun init -y
-bun add effect@4.0.0-rc.112 generalist@0.64.0 foldkit@0.148.2
+bun add effect@4.0.0-rc.112 generalist@0.65.0 foldkit@0.148.2
 bun add -d vite
 ```
 
