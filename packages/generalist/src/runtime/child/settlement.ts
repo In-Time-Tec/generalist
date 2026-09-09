@@ -54,7 +54,7 @@ const stringify = (value: SettlementValue): string => {
  * Bound one inline result.
  *
  * A truncated result used to instruct the reader to "ask the host child-settlement result-handoff
- * adapter" for the rest. No such adapter exists anywhere in Generalist, so the instruction could only be
+ * adapter" for the rest. No such adapter exists anywhere in Host, so the instruction could only be
  * obeyed by inventing one. What is true is where the result already is: the terminal event of the
  * child, which the host reads by run id.
  */

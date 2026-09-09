@@ -335,7 +335,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
         )
         /**
          * A truncated result names where the full one already is. It used to name a
-         * "result-handoff adapter" that exists nowhere in Generalist, which a reader could only act on
+         * "result-handoff adapter" that exists nowhere in Host, which a reader could only act on
          * by inventing it.
          */
         expect(notification!.resultText).toContain("the terminal event of child")

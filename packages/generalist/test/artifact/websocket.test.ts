@@ -5,7 +5,7 @@ import { Effect, Fiber, Layer, Queue, Schema } from "effect"
 import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Approvals, BlobStore, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -55,10 +55,10 @@ layer(services)("Artifact WebSocket", (it) => {
   it.effect("accepts human operations and streams the attributed update", () =>
     Effect.gen(function* () {
       const document = yield* Artifact.open("shared.md", { crdt: Yjs.layer(), initial: "draft" })
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: {} })
       const updates = yield* host.artifacts.subscribe(document.name)
       const fake = yield* makeSocket
-      const server = yield* handle<readonly []>({
+      const server = yield* handle<Record<string, never>>({
         host,
         authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
         name: document.name,
@@ -81,14 +81,13 @@ layer(services)("Artifact WebSocket", (it) => {
         _tag: "Edit",
         base: 0,
         operation: { _tag: "Insert", at: 5, text: " together" },
-        attribution: { _tag: "Human", actor: "browser-user" },
       })
       yield* Queue.offer(fake.inbound, command)
       const encoded = yield* Queue.take(fake.outbound)
       if (Socket.isCloseEvent(encoded) || encoded instanceof Uint8Array) return yield* Effect.die("expected update")
       expect(yield* Schema.decodeEffect(Schema.fromJsonString(Server.ArtifactServerEvent))(encoded)).toMatchObject({
         _tag: "Update",
-        update: { base: 0, result: 1, attribution: { _tag: "Human", actor: "browser-user" } },
+        update: { base: 0, result: 1, attribution: { _tag: "Human", actor: "controller" } },
         document: { version: 1, content: "draft together" },
       })
 

@@ -93,6 +93,7 @@ export const admitSteering: {
       prompt: input.prompt,
       policy: input.policy,
       from: input.from,
+      ...(input.sessionCommandId === undefined ? undefined : { sessionCommandId: input.sessionCommandId }),
       ...(input.addressed === undefined ? undefined : { addressed: input.addressed }),
     }
     const runs = new Map(state.runs)
@@ -112,6 +113,7 @@ export const admitSteering: {
         message: entry.prompt,
         policy: entry.policy,
         from: entry.from,
+        ...(entry.sessionCommandId === undefined ? undefined : { sessionCommandId: entry.sessionCommandId }),
         ...(entry.addressed === undefined ? undefined : { addressed: entry.addressed }),
       },
     )

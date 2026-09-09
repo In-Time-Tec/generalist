@@ -5,7 +5,7 @@ import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, Approvals, Hooks, Instructions, Permissions } from "generalist"
-import { Generalist, type Host } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
@@ -57,7 +57,7 @@ const backend = "object" as const
         const root = Agent.make({ name: "host-profile-root", children: ["host-profile-child"] })
         const child = Agent.make({ name: "host-profile-child", children: ["host-profile-child"] })
         const limits = { tree: { maxDepth: 3, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
-        const host = yield* Generalist.create({ agents: [root, child], limits })
+        const host = yield* Host.make({ revision: "local", agents: { [root.name]: root, [child.name]: child }, limits })
         limits.concurrency.agents = 100
         const store = yield* RunStore.RunStore
         const typedSession = yield* host.sessions.create({ id: "host-profile-typed" })
@@ -79,10 +79,20 @@ const backend = "object" as const
     test.effect("rejects recovering a missing Run handle", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "missing-run-handle" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         expect(yield* host.runs.get("missing-host-run").pipe(Effect.flip)).toMatchObject({
           _tag: "generalist/runtime/RunNotFound",
           runId: "missing-host-run",
+        })
+      }),
+    )
+    test.effect("rejects an Agent registry key that differs from its name", () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "registry-key-agent" })
+        expect(yield* Host.make({ revision: "local", agents: { alias: agent } }).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/host/AgentRegistryKeyMismatch",
+          key: "alias",
+          name: agent.name,
         })
       }),
     )
@@ -90,7 +100,7 @@ const backend = "object" as const
       Effect.gen(function* () {
         const reviewer = Agent.make({ name: "named-retained-reviewer" })
         const agent = Agent.make({ name: "named-retained-parent", children: [reviewer.name] })
-        const host = yield* Generalist.create({ agents: [agent, reviewer] })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent, [reviewer.name]: reviewer } })
         const session = yield* host.sessions.create({ id: "named-retained-session" })
         const parent = yield* host.runs.start(session.id, agent, "Review")
         const before = yield* host.sessions.family(session.id, { limit: 64 })
@@ -119,7 +129,7 @@ const backend = "object" as const
           maxChildren: 2,
         })
         const agent = Agent.make({ name: "retained-parent", toolkit: Toolkit.make(delegate) })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: "retained-parent-session" })
         const parent = yield* host.runs.start(session.id, agent, "Coordinate a review")
         const child = yield* parent.spawn("reviewer", "Review authorization", {
@@ -170,7 +180,7 @@ const backend = "object" as const
     test.effect("keeps direct root activation behind the active conversational Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "host-active-conversation" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: "host-active-conversation", agent: agent.name })
         yield* session.submit("active", { commandId: "active" })
         const before = yield* session.inspect
@@ -188,7 +198,7 @@ const backend = "object" as const
     test.effect("edits Session inputs before their distinct Runs start", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "host-session-queue" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: "host-queue", agent: agent.name })
         const first = yield* session.submit("first", { commandId: "first" })
         const firstState = yield* session.inspect
@@ -223,7 +233,7 @@ const backend = "object" as const
         output: Schema.String,
       })
       return Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: `session:host:${backend}`, title: "Support inbox" })
         const run = yield* host.runs.start(session.id, agent, { question: "status" }, { idempotencyKey: "first" })
         yield* completeRun(run.id, "host:api")
@@ -269,7 +279,7 @@ const backend = "object" as const
 
     test.effect("puts and gets attachments through BlobStore", () =>
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         const data = new TextEncoder().encode(`${backend} attachment`)
         const ref = yield* host.attachments.put({ data, mediaType: "application/pdf", filename: "report.pdf" })
         expect(yield* host.attachments.get(ref.sha256)).toEqual({ ref, data })
@@ -287,7 +297,7 @@ layer(
 )("host cancellation", (test) => {
   test.effect("keeps BlobStore optional for Hosts that do not use attachments", () =>
     Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: {} })
       expect(
         yield* host.attachments
           .put({ data: new Uint8Array([1]), mediaType: "application/octet-stream" })
@@ -299,7 +309,7 @@ layer(
   test.effect("cancels a Session Run through Runtime", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "host-cancel" })
-      const host = yield* Generalist.create({ agents: [agent] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
       const session = yield* host.sessions.create({ id: "session:host:cancel" })
       const run = yield* host.runs.start(session.id, agent, "wait")
       yield* host.runs.cancel(run.id, "cancel:host-run", "user stopped")
@@ -353,7 +363,7 @@ layer(Layer.mergeAll(runtimeLayer, model, authorization, handlers))("host plugin
   test.effect("loads plugin tools, instructions, and skills in declared order", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "host-plugin" })
-      const plugin = Generalist.plugin({
+      const plugin = Host.plugin({
         name: "echo-plugin",
         tools: [pluginTool],
         instructions: [Instructions.fromText("echo-plugin", "Plugin guidance")],
@@ -375,7 +385,7 @@ layer(Layer.mergeAll(runtimeLayer, model, authorization, handlers))("host plugin
         ],
       })
 
-      const host = yield* Generalist.create({ agents: [agent], plugins: [plugin] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, plugins: [plugin] })
       const session = yield* host.sessions.create({ id: "session:host:plugin" })
       const run = yield* host.runs.start(session.id, agent, "use the plugin")
       yield* completeRun(run.id, "host:plugin")
@@ -398,7 +408,7 @@ it.effect("replays named Agent edits before resolving a changed or removed fresh
     const withHost = <A, E>(
       reviewer: typeof writer | undefined,
       use: (
-        host: Host<ReadonlyArray<typeof writer>>,
+        host: Host<{ readonly writer: typeof writer; readonly reviewer?: typeof originalReviewer }>,
       ) => Effect.Effect<A, E, RunExecutor.RunExecutor | RunStore.RunStore>,
     ) =>
       Effect.scoped(
@@ -411,8 +421,9 @@ it.effect("replays named Agent edits before resolving a changed or removed fresh
             ),
           )
           return yield* Effect.gen(function* () {
-            const agents = reviewer === undefined ? [writer] : [writer, reviewer]
-            return yield* use(yield* Generalist.create({ agents }))
+            const agents =
+              reviewer === undefined ? { [writer.name]: writer } : { [writer.name]: writer, [reviewer.name]: reviewer }
+            return yield* use(yield* Host.make({ revision: "local", agents }))
           }).pipe(Effect.provideContext(context))
         }),
       )
@@ -483,7 +494,9 @@ it.effect("recovers the same child conversation and admission after replacing th
     ),
   })
   const withHost = <A, E>(
-    body: (host: Host<readonly [typeof agent]>) => Effect.Effect<A, E, RunStore.RunStore | RunExecutor.RunExecutor>,
+    body: (
+      host: Host<{ readonly agent: typeof agent }>,
+    ) => Effect.Effect<A, E, RunStore.RunStore | RunExecutor.RunExecutor>,
   ) =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -495,7 +508,7 @@ it.effect("recovers the same child conversation and admission after replacing th
           ),
         )
         return yield* Effect.gen(function* () {
-          const host = yield* Generalist.create({ agents: [agent] as const })
+          const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
           return yield* body(host)
         }).pipe(Effect.provide(context))
       }),
@@ -547,7 +560,7 @@ it.effect("object storage preserves Sessions and their root Run list across a fr
         Effect.flatMap((context) =>
           Effect.provide(
             Effect.gen(function* () {
-              const host = yield* Generalist.create({ agents: [agent] })
+              const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
               const session = yield* host.sessions.create({ id: "session:host:reopen", title: "Persistent" })
               return (yield* host.runs.start(session.id, agent, "persist", { idempotencyKey: "persist" })).id
             }),
@@ -562,7 +575,7 @@ it.effect("object storage preserves Sessions and their root Run list across a fr
         Effect.flatMap((context) =>
           Effect.provide(
             Effect.gen(function* () {
-              const host = yield* Generalist.create({ agents: [agent] })
+              const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
               expect(yield* host.sessions.get("session:host:reopen")).toMatchObject({ title: "Persistent" })
               expect(yield* host.runs.list("session:host:reopen")).toEqual([expect.objectContaining({ runId })])
             }),

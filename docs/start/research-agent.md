@@ -223,7 +223,7 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | WebSearch |
 
 ### Runtime and routes
 
-`Durability.layer` reconstructs the object-backed Runtime and `Durability.activate` starts its scheduler only inside the serving layer scope. `Generalist.create` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. `S3.layer` supplies canonical object storage; also provide `BunCrypto` and an `ExecutableResolver`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. For a custom endpoint, also set `GENERALIST_S3_ENDPOINT` and `GENERALIST_S3_CAPABILITIES_CONFIRMED` only after qualifying conditional-create, strong-read, and consistent-listing guarantees. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production). This example describes the object contract without claiming an independently qualified provider deployment.
+`Durability.layer` reconstructs the object-backed Runtime and `Durability.activate` starts its scheduler only inside the serving layer scope. `Host.make` creates the product-facing Host that owns Sessions, named Agents, Runs, approvals, and the Session event cursor. `S3.layer` supplies canonical object storage; also provide `BunCrypto` and an `ExecutableResolver`. Set `GENERALIST_ENVIRONMENT`, `GENERALIST_TENANT`, `GENERALIST_PARTITION`, `GENERALIST_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. For a custom endpoint, also set `GENERALIST_S3_ENDPOINT` and `GENERALIST_S3_CAPABILITIES_CONFIRMED` only after qualifying conditional-create, strong-read, and consistent-listing guarantees. `Server.layer` mounts that Host through one typed API: `POST /sessions` creates a Session, `POST /sessions/:sessionId/runs` starts a configured Agent, and `GET /sessions/:id/events` and `GET /sessions/:id/ws` follow the same HostEvent stream over SSE and WebSocket. The pass-through authentication and permissive CORS below are demo-only; see [production ownership](/guides/production). This example describes the object contract without claiming an independently qualified provider deployment.
 
 **server.ts**
 
@@ -231,7 +231,7 @@ export const agent: Agent.Agent<Tools, LanguageModel.LanguageModel | WebSearch |
 import { BunCrypto } from "@effect/platform-bun"
 import { Config, Effect, Layer, Option } from "effect"
 import { Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
@@ -312,7 +312,11 @@ const demoAuth = Layer.succeed(
 )
 
 const apiLayer = Layer.unwrap(
-  Generalist.create({ agents: [agent] }).pipe(
+  Host.make({
+    agents: { "research-agent": agent },
+    revision: "research-demo-build",
+    limits: { tree: { maxDepth: 3, maxSessions: 32 }, concurrency: { agents: 4, tools: 8 } },
+  }).pipe(
     Effect.map((host) =>
       Server.layer({
         host,
@@ -407,7 +411,7 @@ Read the HostEvents in order: the Run started, the model planned a `tool-call`, 
 
 ## Part 2: Approvals over the wire
 
-The Run is waiting rather than failed. Each `ApprovalRequested` event carries an opaque `event.request.approvalId`; a turn can produce several approval requests, so never construct or predict these tokens. [Suspension as a typed error](/learn/suspension) explains the underlying typed suspension. This script builds `Server.client`, takes the first approval request from the Session stream, and sends that exact token to `client.approvals.resolve`, which calls `POST /runs/:id/approvals/:token` with the human operator identity. Run it again for each later approval request:
+The Run is waiting rather than failed. Each `ApprovalRequested` event carries an opaque `event.request.approvalId`; a turn can produce several approval requests, so never construct or predict these tokens. [Suspension as a typed error](/learn/suspension) explains the underlying typed suspension. This script builds `Server.client`, takes the first approval request from the Session stream, and sends that exact token plus a stable commandId to `client.approvals.resolve`, which calls `POST /runs/:id/approvals/:token` with the authenticated operator identity. Run it again for each later approval request:
 
 **approve.ts**
 
@@ -436,8 +440,8 @@ const program = Effect.gen(function* () {
   yield* client.approvals.resolve({
     runId: approval.runId,
     token: approval.event.request.approvalId,
+    commandId: `approval:${approval.event.request.approvalId}`,
     decision: { _tag: "Approved" },
-    operator: "tutorial:human",
   })
   yield* Console.log(`approved ${approval.event.request.capability} for ${approval.runId}`)
 })

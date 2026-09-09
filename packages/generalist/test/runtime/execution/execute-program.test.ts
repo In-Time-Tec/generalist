@@ -142,17 +142,32 @@ describe("durable Agent Programs", () => {
         })
         expect(approvalFixture.counts()).toEqual({ authorizations: 1, executions: 0, sandboxes: 1 })
         const wrong = yield* runtime
-          .respondApproval({ runId: receipt.runId, approvalId: "approval:other", decision: { _tag: "Approved" } })
+          .respondApproval({
+            runId: receipt.runId,
+            approvalId: "approval:other",
+            commandId: "approval:other",
+            decision: { _tag: "Approved" },
+          })
           .pipe(Effect.flip)
         expect(wrong._tag).toBe("generalist/runtime/ApprovalMismatch")
-        yield* Approval.approve({ runId: receipt.runId, approvalId: "approval:echo" })
+        yield* Approval.approve({
+          runId: receipt.runId,
+          approvalId: "approval:echo",
+          commandId: "approval:echo:helper",
+        })
         yield* runtime.respondApproval({
           runId: receipt.runId,
           approvalId: "approval:echo",
+          commandId: "approval:echo:helper",
           decision: { _tag: "Approved" },
         })
         const conflict = yield* runtime
-          .respondApproval({ runId: receipt.runId, approvalId: "approval:echo", decision: { _tag: "Denied" } })
+          .respondApproval({
+            runId: receipt.runId,
+            approvalId: "approval:echo",
+            commandId: "approval:echo:conflict",
+            decision: { _tag: "Denied" },
+          })
           .pipe(Effect.flip)
         expect(conflict._tag).toBe("generalist/runtime/ApprovalMismatch")
         expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toContainEqual(
@@ -171,7 +186,12 @@ describe("durable Agent Programs", () => {
         )
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
         const stale = yield* runtime
-          .respondApproval({ runId: receipt.runId, approvalId: "approval:stale", decision: { _tag: "Approved" } })
+          .respondApproval({
+            runId: receipt.runId,
+            approvalId: "approval:stale",
+            commandId: "approval:stale",
+            decision: { _tag: "Approved" },
+          })
           .pipe(Effect.flip)
         expect(stale._tag).toBe("generalist/runtime/ApprovalStale")
         expect(approvalFixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
@@ -226,7 +246,7 @@ describe("durable Agent Programs", () => {
             request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
           },
         })
-        yield* Approval.approve({ runId, approvalId: "approval:echo" })
+        yield* Approval.approve({ runId, approvalId: "approval:echo", commandId: "approval:echo:helper" })
         expect(yield* store.loadExecution(runId)).toMatchObject({
           suspension: { operation: "echo", reason: "approval" },
           resolutions: [{ waitId: "approval:echo", resolution: { _tag: "Approved" } }],
@@ -273,6 +293,7 @@ describe("durable Agent Programs", () => {
           yield* Approval.deny({
             runId: receipt.runId,
             approvalId: "approval:echo",
+            commandId: "approval:echo:deny",
             reason: "operator denied",
           })
           yield* host.execute(

@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { expectTypeOf } from "vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Generalist, ToolIdentity } from "../../src/host/index.js"
+import { Host, ToolIdentity } from "../../src/host/index.js"
 import { layerAutoApprove } from "../../src/core/policy/approvals.js"
 import { layerAllowAll } from "../../src/core/policy/permissions.js"
 import { layerStatic } from "../../src/runtime/executable/resolver.js"
@@ -57,7 +57,7 @@ it.effect("returns an admitted Tool handle without a model or conversational Ses
     fail: () => Effect.fail({ reason: "expected" }),
   })
   return Effect.gen(function* () {
-    const host = yield* Generalist.create({ agents: [], tools: [checks, fail] })
+    const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks, fail] })
     const run = yield* host.tools.start(checks, { count: 4 }, { commandId: "checks-1" })
     expectTypeOf<typeof host.tools.start<typeof checks>>().parameter(1).toEqualTypeOf<{ readonly count: number }>()
     expectTypeOf<typeof run.await>().toEqualTypeOf<Effect.Effect<number, Effect.Error<typeof run.await>>>()
@@ -103,13 +103,13 @@ it.effect("restores retained Tool input on a fresh host and preserves exact comm
   return Effect.gen(function* () {
     const id = yield* Effect.scoped(
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [], tools: [checks] })
+        const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks] })
         return (yield* host.tools.start(checks, { count: 8 }, { commandId: "retained" })).id
       }).pipe(scopedWith(fresh())),
     )
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [], tools: [checks] })
+        const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks] })
         const run = yield* host.tools.start(checks, { count: 8 }, { commandId: "retained" })
         expect(run.id).toBe(id)
         yield* complete(run.id, "fresh-host")
@@ -132,7 +132,7 @@ it.effect("rejects unregistered tools and supports cancellation without Agent co
     fail: () => Effect.succeed("unused"),
   })
   return Effect.gen(function* () {
-    const host = yield* Generalist.create({ agents: [], tools: [checks] })
+    const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks] })
     expect((yield* host.tools.start(fail, {}).pipe(Effect.flip))._tag).toBe(
       "generalist/runtime/ExecutableRegistrationInvalid",
     )
@@ -196,7 +196,7 @@ it.effect("keeps held-open Tool work after its Agent parent settles and resumes 
         executor,
       )
     const identity = yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [agent], tools: [checks] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [checks] })
       const session = yield* host.sessions.create({ id: "parent-session" })
       const parent = yield* host.runs.start(session.id, agent, "finish")
       const child = yield* host.tools.start(checks, { count: 6 }, { commandId: "independent", parentRunId: parent.id })
@@ -211,7 +211,7 @@ it.effect("keeps held-open Tool work after its Agent parent settles and resumes 
       return { parentRunId: parent.id, childRunId: child.id }
     }).pipe(scopedWith(fresh()))
     yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [agent], tools: [checks] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [checks] })
       const child = yield* host.tools.start(
         checks,
         { count: 6 },
@@ -253,13 +253,13 @@ it.effect("retains sponsored Tool capacity across fresh hosts without consuming 
   const limits = { tree: { maxDepth: 0, maxSessions: 1 }, concurrency: { agents: 0, tools: 1 } }
   return Effect.gen(function* () {
     const parentId = yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [], tools: [checks], limits })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks], limits })
       const parent = yield* host.tools.start(checks, { count: 1 }, { commandId: "sponsor" })
       yield* complete(parent.id, "sponsor-execute")
       return parent.id
     }).pipe(scopedWith(fresh()))
     yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [], tools: [checks], limits })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks], limits })
       const first = yield* host.tools.start(checks, { count: 2 }, { commandId: "first", parentRunId: parentId })
       const second = yield* host.tools.start(checks, { count: 3 }, { commandId: "second", parentRunId: parentId })
       const store = yield* RunStore
@@ -290,8 +290,9 @@ it.effect("retains sponsored Tool capacity across fresh hosts without consuming 
 it.effect("enforces zero Tool capacity while preserving admitted handles", () => {
   const handlers = Toolkit.make(checks).toLayer({ checks: ({ count }) => Effect.succeed(count) })
   return Effect.gen(function* () {
-    const host = yield* Generalist.create({
-      agents: [],
+    const host = yield* Host.make({
+      revision: "local",
+      agents: {},
       tools: [checks],
       limits: {
         tree: { maxDepth: 0, maxSessions: 1 },
@@ -335,7 +336,7 @@ it.effect("keeps unknown sponsored effects in family capacity across a fresh hos
   const limits = { tree: { maxDepth: 0, maxSessions: 1 }, concurrency: { agents: 0, tools: 1 } }
   return Effect.gen(function* () {
     const retained = yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [], tools: [checks], limits })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks], limits })
       const parent = yield* host.tools.start(checks, { count: 1 }, { commandId: "unknown-sponsor" })
       yield* complete(parent.id, "unknown-parent")
       const run = yield* host.tools.start(checks, { count: 2 }, { commandId: "unknown-child", parentRunId: parent.id })
@@ -358,7 +359,7 @@ it.effect("keeps unknown sponsored effects in family capacity across a fresh hos
       return { parentRunId: parent.id, runId: run.id, operationId: operation.operationId }
     }).pipe(scopedWith(fresh()))
     yield* Effect.gen(function* () {
-      const host = yield* Generalist.create({ agents: [], tools: [checks], limits })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [checks], limits })
       const run = yield* host.tools.start(
         checks,
         { count: 3 },

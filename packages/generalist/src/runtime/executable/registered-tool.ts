@@ -13,6 +13,7 @@ import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import type { ToolResolution } from "./resolver.js"
 import { Identity, ToolIdentity } from "./tool-identity.js"
 import { limits } from "../execution/tool/limits.js"
+import { AgentBuildRevision } from "./build-revision.js"
 
 export type ToolServices<T extends Tool.Any> =
   | Tool.HandlersFor<Toolkit.ToolsByName<readonly [T]>>
@@ -49,6 +50,7 @@ export const capture = <T extends Tool.Any>(
       Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })),
     )
     const context = yield* Effect.context<ToolServices<T>>()
+    const revision = Option.getOrElse(yield* Effect.serviceOption(AgentBuildRevision), () => "1")
     const captured = Context.makeUnsafe<unknown>(context.pipe(Context.omit(ToolContext)).mapUnsafe)
     const permissions = yield* Permissions
     const approvals = yield* Approvals
@@ -67,13 +69,14 @@ export const capture = <T extends Tool.Any>(
       try: () =>
         makeTool({
           name,
-          tool: makeCapability({ runtime: codec, name, implementation: identity.implementation }),
+          tool: makeCapability({ runtime: codec, revision, name, implementation: identity.implementation }),
           input: schemaPin(tool.parametersSchema),
           output: schemaPin(tool.successSchema),
           failure: schemaPin(tool.failureSchema),
           replay: "never",
           policy: makeCapability({
             runtime: codec,
+            revision,
             policy: identity.policy,
             limits,
             needsApproval: Schema.is(Schema.Boolean)(approval) ? approval : "predicate",

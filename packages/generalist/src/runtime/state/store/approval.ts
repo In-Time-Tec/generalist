@@ -3,6 +3,7 @@ import { Effect, Equal, Function } from "effect"
 import type { RespondInput as RespondApprovalInput } from "../../operation/approval.js"
 import { ApprovalMismatch, ApprovalStale, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
+import type { RunWait } from "../../run/wait.js"
 import { openRunWaits, waitMapKey, type RuntimeState, type StoredRun } from "../projection.js"
 import { respond } from "./control.js"
 
@@ -21,6 +22,12 @@ const staleApproval = (state: RuntimeState, run: StoredRun, input: RespondApprov
     }
     return yield* ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId })
   })
+
+const isIdenticalRetry = (input: RespondApprovalInput, active: RunWait) =>
+  active.status !== "open" &&
+  active.resolution !== undefined &&
+  Equal.equals(active.resolution, input.decision) &&
+  active.resolutionCommandId === input.commandId
 
 export const respondApproval: {
   (
@@ -46,8 +53,10 @@ export const respondApproval: {
     const run = state.runs.get(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
     const active = state.waits.get(waitMapKey(run.runId, input.approvalId))
+    if (active !== undefined && isIdenticalRetry(input, active)) {
+      return state
+    }
     if (active !== undefined && active.status !== "open") {
-      if (active.resolution !== undefined && Equal.equals(active.resolution, input.decision)) return state
       return yield* ApprovalMismatch.make({ runId: run.runId, approvalId: input.approvalId, mismatch: "decision" })
     }
     if (active === undefined || run.cancellationRequested || isTerminal(run.status)) {
@@ -68,11 +77,13 @@ export const respondApproval: {
         expectedApprovalId: active.reason.request.approvalId,
       })
     }
-    return yield* respond(state, {
+    const response = {
       runId: run.runId,
       waitId: active.waitId,
       resolution: input.decision,
-    }).pipe(
+      commandId: input.commandId,
+    }
+    return yield* respond(state, response).pipe(
       Effect.mapError((error) =>
         error._tag === "generalist/runtime/RuntimeUnavailable" || error._tag === "generalist/runtime/RunNotFound"
           ? error

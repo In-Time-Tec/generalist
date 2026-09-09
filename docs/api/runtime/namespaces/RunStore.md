@@ -2319,6 +2319,10 @@ Bind one host-assigned name, unique inside the naming scope that owns the Run.
 
 `string`
 
+###### commandId
+
+`string`
+
 ###### decision
 
 \{ \} \| \{ `reason?`: `string`; \}

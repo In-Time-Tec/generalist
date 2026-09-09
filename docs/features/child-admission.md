@@ -4,20 +4,21 @@ Child admission durably creates a direct child Run and immediately returns its h
 
 ## Named profiles
 
-Declare permitted children on the Agent instead of installing a blocking tool to grant delegation. `Generalist.create` resolves names against its Agent registry before registration. Unknown or duplicate profile names fail with `ExecutableRegistrationInvalid`. The declaration is copied at construction, so mutating the caller's array cannot change a compiled profile.
+Declare permitted children on the Agent instead of installing a blocking tool to grant delegation. `Host.make` resolves names against its named Agent registry before registration. Unknown or duplicate profile names fail with `ExecutableRegistrationInvalid`. The registry is copied at construction, so mutating the caller's object cannot change a compiled profile.
 
 This composition fragment defines profiles and limits; it does not call a model or provision storage. Creating the Host requires the Runtime, model, permissions, and approval Layers described in [Runtime](./runtime.md).
 
 ```ts
 import { Effect } from "effect"
 import { Agent } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 
 const researcher = Agent.make({ name: "researcher", children: ["researcher"] })
 
 const hosted = Effect.gen(function* () {
-  return yield* Generalist.create({
-    agents: [researcher],
+  return yield* Host.make({
+    agents: { researcher },
+    revision: "researcher-build",
     limits: {
       tree: { maxDepth: 3, maxSessions: 32 },
       concurrency: { agents: 4, tools: 8 },

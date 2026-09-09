@@ -2,6 +2,7 @@ import type { Prompt } from "effect/unstable/ai"
 import type { HttpApiClient } from "effect/unstable/httpapi"
 import type { SessionCreateOptions, QueueCommandOptions, QueueEditOptions } from "../host/index.js"
 import type { SessionHistoryInput, SessionRunsInput } from "../runtime/session/page.js"
+import type { SessionFamilyInput } from "../runtime/session/retained.js"
 import type { api } from "./api.js"
 
 type RawClient = HttpApiClient.ForApi<typeof api>["sessions"]
@@ -27,6 +28,12 @@ export interface SessionClient {
   readonly runs: (options: SessionRunsInput & { readonly sessionId: string }) => ReturnType<RawClient["runs"]>
   readonly entry: (options: { readonly sessionId: string; readonly entryId: string }) => ReturnType<RawClient["entry"]>
   readonly run: (options: { readonly sessionId: string; readonly runId: string }) => ReturnType<RawClient["run"]>
+  readonly family: (options: SessionFamilyInput & { readonly sessionId: string }) => ReturnType<RawClient["family"]>
+  readonly control: (options: {
+    readonly sessionId: string
+    readonly commandId: string
+    readonly action: "stop" | "close" | "resume"
+  }) => ReturnType<RawClient["control"]>
 }
 
 export const make = (raw: RawClient): SessionClient => ({
@@ -40,4 +47,6 @@ export const make = (raw: RawClient): SessionClient => ({
   runs: ({ sessionId, ...payload }) => raw.runs({ params: { id: sessionId }, payload }),
   entry: ({ sessionId, entryId }) => raw.entry({ params: { id: sessionId, entryId } }),
   run: ({ sessionId, runId }) => raw.run({ params: { id: sessionId, runId } }),
+  family: ({ sessionId, ...payload }) => raw.family({ params: { id: sessionId }, payload }),
+  control: ({ sessionId, ...payload }) => raw.control({ params: { id: sessionId }, payload }),
 })

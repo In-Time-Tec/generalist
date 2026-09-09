@@ -348,6 +348,10 @@ One accepted Run inbox message, journaled before it becomes eligible for deliver
 
 > `readonly` **policy**: [`AdmissionPolicy`](./Steering.md#admissionpolicy)
 
+##### sessionCommandId?
+
+> `readonly` `optional` **sessionCommandId?**: `string`
+
 ***
 
 <a id="lifecycleevent"></a>

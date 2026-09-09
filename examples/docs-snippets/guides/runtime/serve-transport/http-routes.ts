@@ -2,7 +2,7 @@ import { BunCrypto } from "@effect/platform-bun"
 import { Config, Effect, Layer, Option } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { ExecutableResolver } from "generalist/runtime"
@@ -53,7 +53,7 @@ const services = Layer.mergeAll(
 )
 
 const apiLayer = Layer.unwrap(
-  Generalist.create({ agents: [agent] }).pipe(
+  Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
     Effect.map((host) =>
       Server.layer({
         authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },

@@ -131,6 +131,16 @@ export const apiErrors = [
   SessionPageInvalid.pipe(badRequest),
 ] as const
 
+export const hostTransportErrors = [
+  Forbidden,
+  Unauthorized,
+  RequestFailed,
+  RunNotFound.pipe(notFound),
+  RunKindUnsupported.pipe(badRequest),
+] as const
+const hostTransportError = Schema.Union(hostTransportErrors)
+export type HostTransportError = typeof hostTransportError.Type
+
 export const artifactApiErrors = [
   Forbidden,
   Unauthorized,
@@ -185,3 +195,10 @@ export const apiError = (options: ApiErrorOptions): EndpointError =>
   Schema.is(dedicatedErrors)(options.error)
     ? options.error
     : RequestFailed.make({ operation: options.operation, message: options.error.message })
+
+export const hostApiError = (options: ApiErrorOptions): HostTransportError => {
+  const error = apiError(options)
+  return Schema.is(hostTransportError)(error)
+    ? error
+    : RequestFailed.make({ operation: options.operation, message: error.message })
+}

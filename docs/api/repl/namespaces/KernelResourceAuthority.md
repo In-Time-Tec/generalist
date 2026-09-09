@@ -294,7 +294,7 @@ Admit a claim-bound command at the provider-side boundary immediately before it 
 
 ##### kind
 
-> `readonly` **kind**: `"cell"` \| `"control"`
+> `readonly` **kind**: `"control"` \| `"cell"`
 
 ***
 

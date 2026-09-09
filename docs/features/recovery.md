@@ -11,7 +11,7 @@ Runtime derives recovery from each Run's authoritative journal. It does not pers
 | ----------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Resume`                                  | The journal has no unresolved recovery obligation.                                    | `wake(runId, operator, commandId)` only when the Run is durably suspended in `waiting` and every open wait is an external wait. Otherwise execution continues through the ordinary Runtime worker path.                                 |
 | `RetryOperation { operationId, attempt }` | The named running operation has a replay-safe policy.                                 | `retry(runId, operator, commandId)` resets exactly that operation for replay and releases its prior execution ownership.                                                                                                                |
-| `AwaitApproval { token }`                 | The exact durable approval token is still open.                                       | `resolveApproval(token, Approved(...) \| Denied(...), operator)` resolves that token through `Approvals.resolve`.                                                                                                                       |
+| `AwaitApproval { token }`                 | The exact durable approval token is still open.                                       | `resolveApproval(token, Approved(...) \| Denied(...), operator, commandId)` resolves that token through `Approvals.resolve`.                                                                                                            |
 | `AwaitBudget { budget }`                  | The Run is suspended because the named budget dimension is exhausted.                 | `extendBudget(runId, delta, operator, commandId)` validates the delta, journals `BudgetExtended` through the Runtime primitive, records the operator identity, and resumes the Run when that delta replenishes the exhausted dimension. |
 | `Unknown { operationId, reason }`         | A dispatched side effect has no authoritative outcome. Blind redispatch is forbidden. | `resolveUnknown(runId, operationId, { outcome: "succeeded", result } \| { outcome: "failed", error }, operator, commandId)` records the human-supplied outcome.                                                                         |
 | `Failed { error }`                        | The terminal failure has no supported recovery transition.                            | None. Inspect `error`, repair the caller or Agent boundary, and start distinct work if appropriate.                                                                                                                                     |
@@ -30,7 +30,7 @@ yield * operator.verify(runId)
 yield * operator.retry(runId, "user:alice", "retry:1")
 yield * operator.wake(runId, "user:alice", "wake:1")
 yield * operator.resolveUnknown(runId, operationId, resolution, "user:alice", "resolve:1")
-yield * operator.resolveApproval(token, Approvals.Approved(), "user:alice")
+yield * operator.resolveApproval(token, Approvals.Approved(), "user:alice", "approval:alice:1")
 yield * operator.extendBudget(runId, delta, "user:alice", "budget:1")
 
 const obligations = operator.scanObligations()

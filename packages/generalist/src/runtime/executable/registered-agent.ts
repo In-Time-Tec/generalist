@@ -26,6 +26,7 @@ import { CommandTool } from "../../core/durable/component.js"
 import { namespace } from "../../core/durable/component/definition.js"
 import { Hooks } from "../../hooks/index.js"
 import { codec as toolCodec, type RegisteredTool } from "./registered-tool.js"
+import { AgentBuildRevision } from "./build-revision.js"
 
 const codec = "generalist/runtime/registered-agent"
 const version = "1"
@@ -106,6 +107,8 @@ export class AgentProfiles extends Context.Service<AgentProfiles, ReadonlyArray<
   "generalist/runtime/executable/registered-agent/AgentProfiles",
 ) {}
 
+export { AgentBuildRevision } from "./build-revision.js"
+
 const graphFor = (root: AnyAgent, available: ReadonlyArray<AnyAgent> = [root]): AgentGraph => {
   const agents: Array<AnyAgent> = []
   const children = new Map<AnyAgent, ReadonlyArray<{ readonly selection: string; readonly agent: AnyAgent }>>()
@@ -171,6 +174,7 @@ const pinnedAgent = (
   agent: AnyAgent,
   children: ReadonlyArray<{ readonly selection: string }>,
   hooks: CapabilityPin | undefined,
+  revision: string,
 ) => {
   const hidden: unknown = agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Agent.Any hides only invariant type parameters; every graph member originates from Agent.make.
@@ -180,10 +184,11 @@ const pinnedAgent = (
       runtime: "registered-agent",
       agent: agent.name,
       selection: agent.model ?? null,
+      revision,
     }),
     tools: Object.keys(agent.toolkit.tools).map((name) => ({
       name,
-      pin: makeCapability({ runtime: "registered-agent", agent: agent.name, tool: name }),
+      pin: makeCapability({ runtime: "registered-agent", revision, agent: agent.name, tool: name }),
     })),
     skills: [],
     services: [
@@ -199,7 +204,10 @@ const pinnedAgent = (
     ],
     policy:
       agent.policy.snapshot === undefined
-        ? { _tag: "Pinned", pin: makeCapability({ runtime: "registered-agent", agent: agent.name, policy: "1" }) }
+        ? {
+            _tag: "Pinned",
+            pin: makeCapability({ runtime: "registered-agent", revision, agent: agent.name, policy: "1" }),
+          }
         : { _tag: "Portable", policy: agent.policy.snapshot },
     budget: agent.budget ?? {},
     children,
@@ -211,6 +219,7 @@ const graphIdentities = (
   additionalTools: ReadonlyArray<Tool.Any> = [],
   hooks?: CapabilityPin,
   available?: ReadonlyArray<AnyAgent>,
+  revision = "1",
 ) => {
   const graph = graphFor(root, available)
   const implementations = new Map(
@@ -230,6 +239,7 @@ const graphIdentities = (
             implementations.get(agent)!,
             (graph.children.get(agent) ?? []).map(({ selection }) => ({ selection })),
             hooks,
+            revision,
           ),
         ] as const,
     ),
@@ -269,14 +279,21 @@ const graphIdentities = (
 }
 
 /** @internal Derive the persisted identity used for typed Agent admission and recovery tests. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Internal identity derivation supports direct overloads for legacy profile and revision callers.
 export const durableIdentity: {
   (profiles: ReadonlyArray<AnyAgent>): (agent: AnyAgent) => Pick<RegisteredAgent, "executable" | "registrations">
   (agent: AnyAgent): Pick<RegisteredAgent, "executable" | "registrations">
   (agent: AnyAgent, profiles: ReadonlyArray<AnyAgent>): Pick<RegisteredAgent, "executable" | "registrations">
+  (
+    agent: AnyAgent,
+    profiles: ReadonlyArray<AnyAgent>,
+    revision: string,
+  ): Pick<RegisteredAgent, "executable" | "registrations">
 } = Function.dual(
   (args) => !Array.isArray(args[0]),
-  (agent: AnyAgent, profiles?: ReadonlyArray<AnyAgent>) =>
-    graphIdentities(agent, [], undefined, profiles).identities.get(agent)!,
+  (agent: AnyAgent, profiles?: ReadonlyArray<AnyAgent>, revision = "1") =>
+    // oxlint-disable-next-line typescript/no-unsafe-argument -- Function.dual erases the optional profile argument while the overloads preserve its concrete type at every call site.
+    graphIdentities(agent, [], undefined, profiles, revision).identities.get(agent)!,
 )
 
 /** @internal Close an Agent over the registration call's exact environment and derive its durable admission identity. */
@@ -325,6 +342,7 @@ export const capture = <
     const tasks = yield* Effect.serviceOption(Tasks)
     const hooks = yield* Effect.serviceOption(Hooks)
     const profiles = yield* Effect.serviceOption(AgentProfiles)
+    const revision = Option.getOrElse(yield* Effect.serviceOption(AgentBuildRevision), () => "1")
     const graph = yield* Effect.try({
       try: () =>
         graphIdentities(
@@ -332,6 +350,7 @@ export const capture = <
           Option.isSome(tasks) ? tasks.value.tools : [],
           Option.isSome(hooks) && hooks.value.declarations.length > 0 ? hooks.value.pin : undefined,
           Option.getOrUndefined(profiles),
+          revision,
         ),
       catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
     })

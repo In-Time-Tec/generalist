@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Exit } from "effect"
 import type { Decision } from "../runtime/operation/approval.js"
 import { IllegalOperatorAction } from "../runtime/errors.js"
 import type { InspectError, RespondApprovalError, Runtime } from "../runtime/service.js"
@@ -11,8 +11,12 @@ export const resolveApproval = (
   token: string,
   decision: Decision,
   operator: string,
+  commandId: string,
 ): Effect.Effect<void, InspectError | RespondApprovalError | IllegalOperatorAction> =>
   Effect.gen(function* () {
+    const response = { runId, approvalId: token, decision, operator, commandId }
+    const attempted = yield* runtime.respondApproval(response).pipe(Effect.exit)
+    if (Exit.isSuccess(attempted)) return attempted.value
     const explanation = yield* runtime.operator.explain(runId)
     const legal = explanation.obligations.some(
       (obligation) => obligation._tag === "AwaitApproval" && obligation.token === token,
@@ -20,5 +24,5 @@ export const resolveApproval = (
     if (!legal) {
       return yield* IllegalOperatorAction.make({ runId, decision: explanation.decision, action: "resolveApproval" })
     }
-    yield* runtime.respondApproval({ runId, approvalId: token, decision, operator })
+    yield* runtime.respondApproval(response)
   })

@@ -10,6 +10,15 @@ import type { RuntimeInspection } from "./service.js"
 
 const InspectionLastEvent = AgentLoopEventSchema.pipe(Schema.refine(isInspectionEvent))
 
+export const ChildInspectionResponse = Schema.Struct({
+  childRunId: Schema.String,
+  status: RunStatus,
+  readiness: ChildReadiness,
+  invocationId: Schema.optionalKey(Schema.String),
+  origin: Schema.optionalKey(Schema.Struct({ operationKey: Schema.String, ordinal: Schema.Finite })),
+  outcome: Schema.optionalKey(RunOutcome),
+})
+
 export const RuntimeInspectionResponse = Schema.Struct({
   ...RunInspectionFields,
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -20,15 +29,6 @@ export const RuntimeInspectionResponse = Schema.Struct({
   elapsed: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
   budget: RemainingBudget,
   gates: Schema.Array(GateResult),
-  children: Schema.Array(
-    Schema.Struct({
-      childRunId: Schema.String,
-      status: RunStatus,
-      readiness: ChildReadiness,
-      invocationId: Schema.optionalKey(Schema.String),
-      origin: Schema.optionalKey(Schema.Struct({ operationKey: Schema.String, ordinal: Schema.Finite })),
-      outcome: Schema.optionalKey(RunOutcome),
-    }),
-  ),
+  children: Schema.Array(ChildInspectionResponse),
   suspension: Schema.optionalKey(ExecutionSuspension),
 }) satisfies Schema.Codec<RuntimeInspection, unknown>

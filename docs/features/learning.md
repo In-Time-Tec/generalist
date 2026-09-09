@@ -59,7 +59,7 @@ There is no separate `"learning"` approval level or approval type. `Approvals.la
 
 A denial records `NestedOperationDenied`, including the operator reason, as that proposal operation's failed journal outcome. Its handler does not run, and later proposals may still be reviewed. An approval starts the mapped handler. A recorded success is replayed without invoking the handler again.
 
-If `Approvals` returns `Pending`, Runtime persists the nested-operation suspension and exposes its token through `runtime.operator.explain` and `scanObligations`. Resolve that exact token with `runtime.operator.resolveApproval(token, decision, operator)`. Restart then replays the recorded proposal list, consumes the decision, and applies the handler once. A crash after a non-idempotent handler crossed its boundary but before its outcome was recorded becomes an ordinary `Unknown` recovery obligation; Generalist does not guess or repeat the side effect.
+If `Approvals` returns `Pending`, Runtime persists the nested-operation suspension and exposes its token through `runtime.operator.explain` and `scanObligations`. Resolve that exact token with `runtime.operator.resolveApproval(token, decision, operator, commandId)`. Restart then replays the recorded proposal list, consumes the decision, and applies the handler once. A crash after a non-idempotent handler crossed its boundary but before its outcome was recorded becomes an ordinary `Unknown` recovery obligation; Generalist does not guess or repeat the side effect.
 
 ## Model proposer
 

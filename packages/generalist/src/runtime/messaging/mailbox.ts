@@ -27,7 +27,7 @@ export interface MailboxEntry {
   readonly steeringEntryId?: string
 }
 
-interface MailboxEntryEncoded extends Omit<MailboxEntry, "from" | "to" | "prompt"> {
+export interface MailboxEntryEncoded extends Omit<MailboxEntry, "from" | "to" | "prompt"> {
   readonly from: string
   readonly to: string
   readonly prompt: typeof Prompt.Prompt.Encoded

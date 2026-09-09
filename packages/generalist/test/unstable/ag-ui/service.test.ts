@@ -101,6 +101,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     getTool: () => unused(),
     registerTool: () => unused(),
     startTool: () => unused(),
+    startToolEncoded: () => unused(),
     sessionSelection: () => unused(),
     sessionFamily: () => Effect.die("not used"),
     getRun: () => unused(),
@@ -332,6 +333,7 @@ describe("AGUI", () => {
             expect(response).toEqual({
               runId: "client-run-1",
               approvalId: "wait-1",
+              commandId: "agui:client-run-1:resume:wait-1",
               decision: { _tag: "Approved" },
             })
             yield* service

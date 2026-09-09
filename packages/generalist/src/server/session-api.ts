@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { QueueReceipt } from "../runtime/session/queue.js"
+import { SessionFamilyInput, SessionFamilyPage } from "../runtime/session/retained.js"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { HostSession, HostSessionSnapshot } from "../runtime/session/host.js"
 import {
@@ -58,6 +59,20 @@ const runSession = HttpApiEndpoint.get("run", "/sessions/:id/runs/:runId", {
   success: SessionRunSummary,
   error: apiErrors,
 })
+const familySession = HttpApiEndpoint.post("family", "/sessions/:id/family", {
+  params: { id: Schema.String },
+  payload: SessionFamilyInput,
+  success: SessionFamilyPage,
+  error: apiErrors,
+})
+const controlSession = HttpApiEndpoint.post("control", "/sessions/:id/control", {
+  params: { id: Schema.String },
+  payload: Schema.Struct({
+    commandId: Schema.String.check(Schema.isNonEmpty()),
+    action: Schema.Literals(["stop", "close", "resume"]),
+  }),
+  error: apiErrors,
+})
 const queueCommand = { commandId: Schema.String.check(Schema.isNonEmpty()) }
 const queueErrors: Schema.Codec<(typeof apiErrors)[number]["Type"], unknown> = Schema.Union(apiErrors)
 const queueRevision = { ...queueCommand, expectedRevision: Schema.Int.check(Schema.isGreaterThan(0)) }
@@ -93,6 +108,8 @@ export const sessions: HttpApiGroup.HttpApiGroup<
   | typeof pageSessionRuns
   | typeof entrySession
   | typeof runSession
+  | typeof familySession
+  | typeof controlSession
   | typeof submitSession
   | typeof updateSessionInput
   | typeof removeSessionInput
@@ -105,6 +122,8 @@ export const sessions: HttpApiGroup.HttpApiGroup<
   pageSessionRuns,
   entrySession,
   runSession,
+  familySession,
+  controlSession,
   submitSession,
   updateSessionInput,
   removeSessionInput,

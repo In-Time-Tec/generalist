@@ -4,7 +4,7 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
@@ -46,7 +46,7 @@ layer(services)("Artifact Runtime fork", (it) => {
         name: "fork-writer",
         toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
       })
-      const host = yield* Generalist.create({ agents: [writer] })
+      const host = yield* Host.make({ revision: "local", agents: { [writer.name]: writer } })
       const session = yield* host.sessions.create({ id: "session:artifact:fork" })
       const source = yield* host.runs.start(session.id, writer, "read the plan")
       const store = yield* RunStore.RunStore

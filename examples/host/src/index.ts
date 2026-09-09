@@ -4,7 +4,7 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Instructions, Permissions } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 
 const usage = Response.Usage.make({
@@ -60,14 +60,14 @@ const assistant = Agent.make({
   input: Schema.Struct({ request: Schema.String }),
   output: Schema.String,
 })
-const plugin = Generalist.plugin({
+const plugin = Host.plugin({
   name: "echo",
   tools: [echo],
   instructions: [Instructions.fromText("echo", "Use host_echo when the user asks you to echo text.")],
 })
 
 const program = Effect.gen(function* () {
-  const host = yield* Generalist.create({ agents: [assistant], plugins: [plugin] })
+  const host = yield* Host.make({ revision: "local", agents: { [assistant.name]: assistant }, plugins: [plugin] })
   const session = yield* host.sessions.create({ id: "session:host-example", title: "Host example" })
   const run = yield* host.runs.start(
     session.id,

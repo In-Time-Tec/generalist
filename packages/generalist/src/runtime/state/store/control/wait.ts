@@ -27,6 +27,7 @@ interface CloseWaitInput {
   readonly waitId: string
   readonly status: Exclude<RunWait["status"], "open">
   readonly resolution?: WaitResolution
+  readonly resolutionCommandId?: string
   readonly closedAt: string
 }
 interface CloseWaitResult {
@@ -46,7 +47,14 @@ export const closeWait: {
     key,
     Object.assign(
       { ...wait, status: input.status, closedAt: input.closedAt },
-      input.resolution === undefined ? undefined : { resolution: input.resolution },
+      input.resolution === undefined
+        ? undefined
+        : {
+            resolution: input.resolution,
+            ...(input.resolutionCommandId === undefined
+              ? undefined
+              : { resolutionCommandId: input.resolutionCommandId }),
+          },
     ),
   )
   return { state: { ...state, waits }, affected: 1 }
@@ -76,6 +84,7 @@ export const respond: {
       waitId: input.waitId,
       status: "responded",
       resolution,
+      ...(input.commandId === undefined ? undefined : { resolutionCommandId: input.commandId }),
       closedAt,
     })
     if (transitioned.affected !== 1) {

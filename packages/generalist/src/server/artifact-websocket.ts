@@ -1,11 +1,10 @@
 import { Cause, Effect, Fiber, Schema, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { ArtifactError, ArtifactUpdate } from "../core/artifact.js"
-import type { Host } from "../host/index.js"
+import type { AgentRegistry, Host } from "../host/index.js"
 import { ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
-import { authorize, type Authorization } from "./auth.js"
+import { authorize, CurrentPrincipal, type Authorization } from "./auth.js"
 
 const ClientCommandJson = Schema.fromJsonString(ArtifactClientCommand)
 const ServerEventJson = Schema.fromJsonString(ArtifactServerEvent)
@@ -27,7 +26,7 @@ const closeForError = (
 }
 
 /** Upgrade one authenticated Artifact route and join it as a human editing peer. */
-export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
+export const handle = <Agents extends AgentRegistry>(options: {
   readonly host: Host<Agents>
   readonly authorization: Authorization
   readonly name: string
@@ -51,11 +50,23 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
     )
     const updateFiber = yield* options.updates.pipe(
       Stream.mapEffect((update) =>
-        options.host.artifacts
-          .read(options.name)
-          .pipe(Effect.flatMap((document) => send({ _tag: "Update", update, document }))),
+        authorize({
+          policy: options.authorization,
+          resource: { type: "artifact", id: options.name },
+          action: "observe",
+        }).pipe(
+          Effect.andThen(
+            options.host.artifacts
+              .read(options.name)
+              .pipe(Effect.flatMap((document) => send({ _tag: "Update", update, document }))),
+          ),
+        ),
       ),
       Stream.runDrain,
+      Effect.catchTags({
+        "generalist/server/Forbidden": () => close(1008, "forbidden").pipe(Effect.asVoid),
+        "generalist/server/Unauthorized": () => close(1008, "unauthorized").pipe(Effect.asVoid),
+      }),
       Effect.catchTag("SocketError", () => Effect.void),
       Effect.catch((error) => closeForError(close, error)),
       Effect.catchCause((cause) =>
@@ -71,7 +82,20 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
             policy: options.authorization,
             resource: { type: "artifact", id: options.name },
             action: "mutate",
-          }).pipe(Effect.andThen(Effect.suspend(() => options.host.artifacts.edit(options.name, command)))),
+          }).pipe(
+            Effect.andThen(
+              CurrentPrincipal.pipe(
+                Effect.flatMap((principal) =>
+                  Effect.suspend(() =>
+                    options.host.artifacts.edit(options.name, {
+                      ...command,
+                      attribution: { _tag: "Human", actor: principal.id },
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
         Effect.asVoid,
         Effect.catchTags({

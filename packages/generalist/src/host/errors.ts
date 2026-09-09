@@ -13,7 +13,17 @@ export class AgentNotRegistered extends ActionableTaggedError<AgentNotRegistered
   "generalist/host/AgentNotRegistered",
   {
     name: Schema.String,
-    hint: errorHint("Pass an Agent from the agents array supplied to Generalist.create."),
+    hint: errorHint("Pass an Agent from the registry supplied to Host.make."),
+  },
+) {}
+
+/** The record key and Agent.name must identify the same registered Agent. */
+export class AgentRegistryKeyMismatch extends ActionableTaggedError<AgentRegistryKeyMismatch>()(
+  "generalist/host/AgentRegistryKeyMismatch",
+  {
+    key: Schema.String,
+    name: Schema.String,
+    hint: errorHint("Use the Agent.name as the exact key in Host.make({ agents })."),
   },
 ) {}
 
@@ -36,8 +46,9 @@ export class PluginToolConflict extends ActionableTaggedError<PluginToolConflict
   },
 ) {}
 
-export type CreateError =
+export type MakeError =
   | import("../runtime/errors.js").DuplicateAgent
+  | AgentRegistryKeyMismatch
   | PluginNameConflict
   | PluginToolConflict
   | import("../runtime/errors.js").ExecutableRegistrationInvalid
