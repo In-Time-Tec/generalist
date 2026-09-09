@@ -25,6 +25,8 @@ import { probe } from "./probe.js"
 import { Identity, ensure } from "./discovery-marker.js"
 
 export type { Json, Patch, State } from "./protocol.js"
+export const defaultMaxStateBytes = 16 * 1024 * 1024
+export const defaultMaxCommitBytes = 1024 * 1024
 export interface Head {
   readonly sequence: string
   readonly digest: string
@@ -60,7 +62,7 @@ export interface Journal {
   ) => Effect.Effect<Json, E | DurabilityFailure>
   readonly commitWithHead: <E>(
     command: typeof Command.Type,
-    evaluate: (state: State) => Effect.Effect<typeof Transition.Type, E>,
+    evaluate: (state: State) => Effect.Effect<typeof Transition.Type & { readonly reserveBytes?: number }, E>,
   ) => Effect.Effect<{ readonly receipt: Json; readonly head: Omit<Head, "stateDigest"> }, E | DurabilityFailure>
 }
 
@@ -83,8 +85,8 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
         message: "The provider does not satisfy the canonical object-store contract",
       })
     }
-    const maxStateBytes = options.maxStateBytes ?? 16 * 1024 * 1024
-    const maxCommitBytes = options.maxCommitBytes ?? 1024 * 1024
+    const maxStateBytes = options.maxStateBytes ?? defaultMaxStateBytes
+    const maxCommitBytes = options.maxCommitBytes ?? defaultMaxCommitBytes
     const maxSnapshotBytes = maxStateBytes + maxCommitBytes + 4096
     const snapshotEvery = options.snapshotEvery ?? 128
     const maxReplayBytes = options.maxReplayBytes ?? 16 * 1024 * 1024
@@ -202,7 +204,11 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
             loaded = Object.assign({}, loaded, { replayRecords: 0, replayBytes: 0 })
           }
           const evaluated = yield* evaluate(loaded.head.state)
-          const decoded = yield* decode(Transition, evaluated, "encoding")
+          const decoded = yield* decode(
+            Transition,
+            { patches: evaluated.patches, receipt: evaluated.receipt },
+            "encoding",
+          )
           // Detach the reducer's output: later user mutation must not change attempted bytes or receipts.
           const transition = yield* decode(
             Transition,
@@ -231,7 +237,7 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
             validated.id,
             freeze({ inputDigest, sequence, receipt: transition.receipt }),
           )
-          yield* checkState(state, receipts)
+          yield* checkState(state, receipts, evaluated.reserveBytes ?? 0)
           const sealed = yield* sealCommit(record)
           const key = commitKey(sequence)
           if (sealed.bytes.length > maxCommitBytes || sealed.bytes.length > maxReplayBytes) {

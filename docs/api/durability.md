@@ -176,6 +176,12 @@ Final-state callback executed synchronously inside each authoritative store tran
 
 [`LayerOptions`](./runtime/namespaces/Runtime.md#layeroptions).[`addresses`](./runtime/namespaces/Runtime.md#addresses)
 
+<a id="admissionreservebytes"></a>
+
+##### admissionReserveBytes?
+
+> `readonly` `optional` **admissionReserveBytes?**: `number`
+
 <a id="environment"></a>
 
 ##### environment
