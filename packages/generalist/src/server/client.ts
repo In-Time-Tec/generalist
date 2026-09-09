@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Client keeps all transport groups and reconnect behavior in one public value. */
 import {
   Cause,
   Deferred,
@@ -26,7 +27,14 @@ import type { UnknownResolution } from "../runtime/execution/recovery/operator.j
 import type { Cursor } from "../runtime/cursor.js"
 import type { HostSessionSnapshot } from "../runtime/session/host.js"
 import { make as makeSessionClient, type SessionClient } from "./session-client.js"
-import { api, type RunCancelPayload, type RunStartPayload } from "./api.js"
+import {
+  api,
+  type ChildStartPayload,
+  type RunCancelPayload,
+  type RunMessagePayload,
+  type RunStartPayload,
+  type ToolStartPayload,
+} from "./api.js"
 import { ApiError, InvalidConnectOptions, ReconnectExhausted, TransportError, Unauthorized } from "./errors.js"
 import { encodeCommand, eventCodec, type ClientCommand, type ServerEvent } from "./wire.js"
 
@@ -89,7 +97,7 @@ export interface Client {
       readonly sessionId: string
       readonly agent: string
       readonly input: EncodedAgentInput
-      readonly idempotencyKey?: string
+      readonly commandId: string
     }) => ReturnType<RawClient["runs"]["start"]>
     readonly list: (options: { readonly sessionId: string }) => ReturnType<RawClient["runs"]["list"]>
     readonly inspect: (options: { readonly runId: string }) => ReturnType<RawClient["runs"]["inspect"]>
@@ -98,6 +106,36 @@ export interface Client {
       readonly commandId: string
       readonly reason?: string
     }) => ReturnType<RawClient["runs"]["cancel"]>
+    readonly message: (options: {
+      readonly runId: string
+      readonly commandId: string
+      readonly input: RunMessagePayload["input"]
+    }) => ReturnType<RawClient["runs"]["message"]>
+    readonly messages: (options: {
+      readonly runId: string
+      readonly limit?: number
+    }) => ReturnType<RawClient["runs"]["messages"]>
+    readonly admitChild: (
+      options: Omit<ChildStartPayload, "commandId"> & { readonly runId: string; readonly commandId: string },
+    ) => ReturnType<RawClient["runs"]["admitChild"]>
+    readonly listChildren: (options: { readonly runId: string }) => ReturnType<RawClient["runs"]["listChildren"]>
+    readonly inspectChild: (options: {
+      readonly runId: string
+      readonly childRunId: string
+    }) => ReturnType<RawClient["runs"]["inspectChild"]>
+  }
+  readonly tools: {
+    readonly start: (
+      options: Omit<ToolStartPayload, "commandId"> & {
+        readonly runId: string
+        readonly name: string
+        readonly commandId: string
+      },
+    ) => ReturnType<RawClient["tools"]["start"]>
+    readonly inspect: (options: {
+      readonly runId: string
+      readonly name: string
+    }) => ReturnType<RawClient["tools"]["inspect"]>
   }
   readonly events: {
     readonly subscribe: (options: {
@@ -113,8 +151,8 @@ export interface Client {
     readonly resolve: (options: {
       readonly runId: string
       readonly token: string
+      readonly commandId: string
       readonly decision: Decision
-      readonly operator: string
     }) => ReturnType<RawClient["approvals"]["resolve"]>
   }
   readonly operator: {
@@ -122,25 +160,21 @@ export interface Client {
     readonly retry: (options: {
       readonly runId: string
       readonly commandId: string
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["retry"]>
     readonly wake: (options: {
       readonly runId: string
       readonly commandId: string
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["wake"]>
     readonly resolveUnknown: (options: {
       readonly runId: string
       readonly commandId: string
       readonly operationId: string
       readonly resolution: UnknownResolution
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["resolveUnknown"]>
     readonly extendBudget: (options: {
       readonly runId: string
       readonly commandId: string
       readonly delta: BudgetLimits
-      readonly operator: string
     }) => ReturnType<RawClient["operator"]["extendBudget"]>
   }
 }
@@ -429,8 +463,11 @@ export const client = (options: {
       sessions: { ...makeSessionClient(raw.sessions), list: () => raw.sessions.list({}) },
       runs: {
         start: (startOptions) => {
-          const payload: Types.Mutable<RunStartPayload> = { agent: startOptions.agent, input: startOptions.input }
-          if (startOptions.idempotencyKey !== undefined) payload.idempotencyKey = startOptions.idempotencyKey
+          const payload: RunStartPayload = {
+            agent: startOptions.agent,
+            input: startOptions.input,
+            commandId: startOptions.commandId,
+          }
           return raw.runs.start({ params: { sessionId: startOptions.sessionId }, payload })
         },
         list: ({ sessionId }) => raw.runs.list({ params: { sessionId } }),
@@ -440,6 +477,17 @@ export const client = (options: {
           if (reason !== undefined) payload.reason = reason
           return raw.runs.cancel({ params: { id: runId }, payload })
         },
+        message: ({ runId, commandId, input }) =>
+          raw.runs.message({ params: { id: runId }, payload: { commandId, input } }),
+        messages: ({ runId, limit }) =>
+          raw.runs.messages({ params: { id: runId }, query: limit === undefined ? {} : { limit } }),
+        admitChild: ({ runId, ...payload }) => raw.runs.admitChild({ params: { id: runId }, payload }),
+        listChildren: ({ runId }) => raw.runs.listChildren({ params: { id: runId } }),
+        inspectChild: ({ runId, childRunId }) => raw.runs.inspectChild({ params: { id: runId, childId: childRunId } }),
+      },
+      tools: {
+        start: ({ runId, name, ...payload }) => raw.tools.start({ params: { id: runId, name }, payload }),
+        inspect: ({ runId, name }) => raw.tools.inspect({ params: { name, id: runId } }),
       },
       events: {
         subscribe: (subscribeOptions) => subscribe(raw, subscribeOptions),
@@ -451,22 +499,20 @@ export const client = (options: {
           ),
       },
       approvals: {
-        resolve: ({ runId, token, decision, operator }) =>
-          raw.approvals.resolve({ params: { id: runId, token }, payload: { decision, operator } }),
+        resolve: ({ runId, token, commandId, decision }) =>
+          raw.approvals.resolve({ params: { id: runId, token }, payload: { commandId, decision } }),
       },
       operator: {
         explain: ({ runId }) => raw.operator.explain({ params: { id: runId } }),
-        retry: ({ runId, commandId, operator }) =>
-          raw.operator.retry({ params: { id: runId }, payload: { commandId, operator } }),
-        wake: ({ runId, commandId, operator }) =>
-          raw.operator.wake({ params: { id: runId }, payload: { commandId, operator } }),
-        resolveUnknown: ({ runId, commandId, operationId, resolution, operator }) =>
+        retry: ({ runId, commandId }) => raw.operator.retry({ params: { id: runId }, payload: { commandId } }),
+        wake: ({ runId, commandId }) => raw.operator.wake({ params: { id: runId }, payload: { commandId } }),
+        resolveUnknown: ({ runId, commandId, operationId, resolution }) =>
           raw.operator.resolveUnknown({
             params: { id: runId },
-            payload: { commandId, operationId, resolution, operator },
+            payload: { commandId, operationId, resolution },
           }),
-        extendBudget: ({ runId, commandId, delta, operator }) =>
-          raw.operator.extendBudget({ params: { id: runId }, payload: { commandId, delta, operator } }),
+        extendBudget: ({ runId, commandId, delta }) =>
+          raw.operator.extendBudget({ params: { id: runId }, payload: { commandId, delta } }),
       },
     }
     return value

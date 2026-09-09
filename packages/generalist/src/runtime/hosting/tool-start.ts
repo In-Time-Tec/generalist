@@ -16,6 +16,7 @@ import type {
   StartReceipt,
   ToolRunEvent,
   ToolRunHandle,
+  ToolStartOptions,
 } from "../service.js"
 
 export const Input = Schema.Struct({ input: Schema.Unknown, parentRunId: Schema.optionalKey(Schema.String) })
@@ -116,22 +117,19 @@ export const make = (options: {
     })
   const registerTool: Service["registerTool"] = (tool) =>
     capture(tool).pipe(Effect.flatMap(options.agents.registerTool))
-  const startTool: Service["startTool"] = (tool, input, startOptions = {}) =>
+  const startRegisteredTool = <T extends Tool.Any, Encoded>(
+    tool: T,
+    registration: RegisteredTool,
+    encoded: Encoded,
+    startOptions: ToolStartOptions = {},
+  ) =>
     Effect.gen(function* () {
-      const registration = yield* options.agents.getTool(tool)
-      if (Option.isNone(registration))
-        return yield* ExecutableRegistrationInvalid.make({
-          message: `Tool ${tool.name} is not registered. Pass it in Generalist.create({ tools: [...] }).`,
-        })
-      const encoded = yield* Schema.encodeEffect(registration.value.resolution.input)(input).pipe(
-        Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })),
-      )
       const commandId = startOptions.commandId ?? `tool_${yield* generateId}`
       if (startOptions.parentRunId !== undefined) yield* options.store.inspect(startOptions.parentRunId)
       const receipt = yield* options.admitStart(
         {
-          executable: registration.value.resolution.attestation,
-          registrations: registration.value.registrations,
+          executable: registration.resolution.attestation,
+          registrations: registration.registrations,
           sessionId: `tool:${digest([startOptions.parentRunId ?? null, commandId])}`,
           idempotencyKey: commandId,
           prompt: "",
@@ -144,7 +142,36 @@ export const make = (options: {
         },
         true,
       )
-      return handle(tool, receipt.runId, registration.value)
+      return handle(tool, receipt.runId, registration)
     })
-  return { registerTool, startTool, getTool }
+  const registeredTool = (tool: Tool.Any) =>
+    options.agents.getTool(tool).pipe(
+      Effect.flatMap(
+        Option.match({
+          onNone: () =>
+            ExecutableRegistrationInvalid.make({
+              message: `Tool ${tool.name} is not registered. Pass it in Host.make({ revision: "local", tools: [...] }).`,
+            }),
+          onSome: Effect.succeed,
+        }),
+      ),
+    )
+  const startTool: Service["startTool"] = (tool, input, startOptions = {}) =>
+    Effect.gen(function* () {
+      const registration = yield* registeredTool(tool)
+      const encoded = yield* Schema.encodeEffect(registration.resolution.input)(input).pipe(
+        Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })),
+      )
+      return yield* startRegisteredTool(tool, registration, encoded, startOptions)
+    })
+  const startToolEncoded: Service["startToolEncoded"] = (tool, input, startOptions = {}) =>
+    Effect.gen(function* () {
+      const registration = yield* registeredTool(tool)
+      yield* Schema.decodeEffect(registration.resolution.input)(input).pipe(
+        Effect.provideContext(registration.context),
+        Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })),
+      )
+      return yield* startRegisteredTool(tool, registration, input, startOptions)
+    })
+  return { registerTool, startTool, startToolEncoded, getTool }
 }

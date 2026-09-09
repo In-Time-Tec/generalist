@@ -20,6 +20,8 @@ import {
 
 /** Durable product-facing Session metadata owned by a Runtime driver. */
 export interface HostSession {
+  readonly sponsorRunId?: string
+  readonly lifecycle?: "stopped" | "closed"
   readonly retainedSession?: RetainedSession
   readonly id: string
   readonly title?: string
@@ -29,6 +31,8 @@ export interface HostSession {
   readonly activeRunId?: string
 }
 export const HostSession: Schema.Codec<HostSession, unknown> = Schema.Struct({
+  sponsorRunId: Schema.optionalKey(Schema.String),
+  lifecycle: Schema.optionalKey(Schema.Literals(["stopped", "closed"])),
   retainedSession: Schema.optionalKey(RetainedSession),
   id: Schema.String.check(Schema.isNonEmpty()),
   title: Schema.optionalKey(Schema.String),
@@ -120,6 +124,14 @@ export type SessionEventsError =
 
 /** Runtime operations that persist and observe product-facing Sessions. */
 export interface RuntimeHostSessions {
+  readonly messageSessionInput: (
+    input: Omit<import("./message.js").MessageInput, "from">,
+  ) => Effect.Effect<
+    import("./queue.js").QueueReceipt,
+    SessionError | import("./queue.js").SessionQueueConflict,
+    import("./message.js").SessionSender
+  >
+  readonly controlSession: import("../run/store.js").Service["controlSession"]
   readonly sessionFamily: (
     sessionId: string,
     input: SessionFamilyInput,

@@ -8,7 +8,7 @@ import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { AGUI } from "generalist/unstable/ag-ui"
@@ -161,7 +161,7 @@ const applicationAuth = Server.authBearer({
   principal: { id: "example-controller", tenantId: "example", role: "controller" },
 })
 const routes = Layer.unwrap(
-  Generalist.create({ agents: [agent] }).pipe(
+  Host.make({ revision: "local", agents: { agent } }).pipe(
     Effect.map((host) =>
       Layer.merge(
         Server.layer({
@@ -288,7 +288,7 @@ const program = Effect.gen(function* () {
     fetch(`${baseUrl}/runs/${encodeURIComponent(runInput.runId)}/approvals/${encodeURIComponent(token)}`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(credential)}` },
-      body: encodeJson({ decision: { _tag: "Approved" }, operator: "operator:ag-ui-example" }),
+      body: encodeJson({ commandId: `approval:${token}`, decision: { _tag: "Approved" } }),
     }),
   ).pipe(Effect.orDie)
   if (!approval.ok) return yield* Effect.die(`Approval request failed with ${approval.status}`)

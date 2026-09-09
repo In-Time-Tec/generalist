@@ -1,12 +1,11 @@
 import { Effect, Layer, Stream, Types } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
-import type { Any as AnyAgent } from "../core/agent/service.js"
-import type { Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
+import type { AgentRegistry, Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
 import { api, type EventStreamItem } from "./api.js"
-import { apiError, OperatorDisabled } from "./errors.js"
+import { apiError, hostApiError, OperatorDisabled } from "./errors.js"
 import { handle as handleWebSocket } from "./websocket.js"
 import { handle as handleArtifactWebSocket } from "./artifact-websocket.js"
-import { authorize, type Authorization, type Resource } from "./auth.js"
+import { authorize, CurrentPrincipal, type Authorization, type Resource } from "./auth.js"
 
 const protect =
   (policy: Authorization) =>
@@ -14,8 +13,9 @@ const protect =
     authorize({ policy, resource, action }).pipe(Effect.andThen(Effect.suspend(operation)))
 
 const mapError = (operation: string) => Effect.mapError((error: Error) => apiError({ operation, error }))
+const mapHostError = (operation: string) => Effect.mapError((error: Error) => hostApiError({ operation, error }))
 
-const sessionsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, policy: Authorization) =>
+const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "sessions", (handlers) =>
     handlers.handleAll({
       create: ({ payload }) => {
@@ -80,18 +80,34 @@ const sessionsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Age
         protect(policy)({ type: "session", id: params.id }, "read", () =>
           host.sessions.run(params.id, params.runId).pipe(mapError("sessions.run")),
         ),
+      family: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "read", () =>
+          host.sessions.family(params.id, payload).pipe(mapError("sessions.family")),
+        ),
+      control: ({ params, payload }) =>
+        protect(policy)({ type: "session", id: params.id }, "mutate", () =>
+          host.sessions.get(params.id).pipe(
+            Effect.flatMap((session) =>
+              Effect.gen(function* () {
+                if (payload.action === "stop") return yield* session.stop(payload)
+                if (payload.action === "close") return yield* session.close(payload)
+                return yield* session.resume(payload)
+              }),
+            ),
+            mapError("sessions.control"),
+          ),
+        ),
       list: () =>
         protect(policy)({ type: "session" }, "read", () => host.sessions.list().pipe(mapError("sessions.list"))),
     }),
   )
 
-const runsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, policy: Authorization) =>
+const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "runs", (handlers) =>
     handlers.handleAll({
       start: ({ params, payload }) =>
         protect(policy)({ type: "session", id: params.sessionId }, "mutate", () => {
-          const options: Types.Mutable<RunStartOptions> = {}
-          if (payload.idempotencyKey !== undefined) options.idempotencyKey = payload.idempotencyKey
+          const options: Types.Mutable<RunStartOptions> = { idempotencyKey: payload.commandId }
           return host.runs.startByName(params.sessionId, payload.agent, payload.input, options).pipe(
             Effect.map((run) => ({ id: run.id })),
             mapError("runs.start"),
@@ -109,24 +125,85 @@ const runsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>
         protect(policy)({ type: "run", id: params.id }, "mutate", () =>
           host.runs.cancel(params.id, payload.commandId, payload.reason).pipe(mapError("runs.cancel")),
         ),
+      message: ({ params, payload }) =>
+        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+          Effect.gen(function* () {
+            const principal = yield* CurrentPrincipal
+            return yield* host.runs
+              .send(params.id, payload.input, {
+                idempotencyKey: payload.commandId,
+                from: { user: principal.id },
+              })
+              .pipe(mapError("runs.message"))
+          }),
+        ),
+      messages: ({ params, query }) =>
+        protect(policy)({ type: "run", id: params.id }, "read", () =>
+          host.runs.messages(params.id, query.limit).pipe(mapError("runs.messages")),
+        ),
+      admitChild: ({ params, payload }) =>
+        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+          host.runs
+            .admitChild(params.id, payload.selection, payload.prompt, {
+              commandId: payload.commandId,
+              ...(payload.label === undefined ? undefined : { label: payload.label }),
+            })
+            .pipe(mapHostError("runs.admitChild")),
+        ),
+      listChildren: ({ params }) =>
+        protect(policy)({ type: "run", id: params.id }, "read", () =>
+          host.runs.children(params.id).pipe(mapHostError("runs.listChildren")),
+        ),
+      inspectChild: ({ params }) =>
+        protect(policy)({ type: "run", id: params.childId }, "read", () =>
+          host.runs.inspectChild(params.id, params.childId).pipe(mapHostError("runs.inspectChild")),
+        ),
     }),
   )
 
-const eventsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, policy: Authorization) =>
+const toolsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
+  HttpApiBuilder.group(api, "tools", (handlers) =>
+    handlers.handleAll({
+      start: ({ params, payload }) =>
+        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+          host.tools
+            .startByName(params.name, payload.input, { commandId: payload.commandId, parentRunId: params.id })
+            .pipe(
+              Effect.map((run) => ({ id: run.id })),
+              mapHostError("tools.start"),
+            ),
+        ),
+      inspect: ({ params }) =>
+        protect(policy)({ type: "run", id: params.id }, "read", () =>
+          host.tools.getByName(params.name, params.id).pipe(
+            Effect.flatMap((run) => run.inspect),
+            mapHostError("tools.inspect"),
+          ),
+        ),
+    }),
+  )
+
+const eventsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "events", (handlers) =>
     handlers
       .handle("subscribe", ({ params, query, headers }) =>
         protect(policy)({ type: "session", id: params.id }, "observe", () => {
           const cursor = headers["last-event-id"] ?? query.cursor
-          return host.events.subscribe(params.id, cursor).pipe(
-            Effect.map((events) =>
-              events.pipe(
-                Stream.map((event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event })),
-                Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
+          return Effect.gen(function* () {
+            const principal = yield* CurrentPrincipal
+            const events = yield* host.events.subscribe(params.id, cursor)
+            return events.pipe(
+              Stream.mapEffect((event) =>
+                authorize({
+                  policy,
+                  resource: { type: "session", id: params.id },
+                  action: "observe",
+                }).pipe(Effect.provideService(CurrentPrincipal, principal), Effect.as(event)),
               ),
-            ),
-            mapError("events.subscribe"),
-          )
+              Stream.map((event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event })),
+              Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
+            )
+          }).pipe(mapError("events.subscribe"))
         }),
       )
       .handleRaw("connect", ({ params, query, request }) =>
@@ -143,7 +220,7 @@ const eventsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agent
       ),
   )
 
-const artifactsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, policy: Authorization) =>
+const artifactsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "artifacts", (handlers) =>
     handlers
       .handle("read", ({ params }) =>
@@ -164,18 +241,21 @@ const artifactsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Ag
       ),
   )
 
-const approvalsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, policy: Authorization) =>
+const approvalsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "approvals", (handlers) =>
     handlers.handle("resolve", ({ params, payload }) =>
       protect(policy)({ type: "run", id: params.id }, "mutate", () =>
-        host.approvals
-          .resolve(params.id, params.token, payload.decision, payload.operator)
-          .pipe(mapError("approvals.resolve")),
+        CurrentPrincipal.pipe(
+          Effect.flatMap((principal) =>
+            host.approvals.resolve(params.id, params.token, payload.decision, principal.id, payload.commandId),
+          ),
+          mapError("approvals.resolve"),
+        ),
       ),
     ),
   )
 
-const attachmentsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<Agents>, policy: Authorization) =>
+const attachmentsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "attachments", (handlers) =>
     handlers.handleAll({
       put: ({ headers, payload }) =>
@@ -206,7 +286,7 @@ const attachmentsHandlers = <Agents extends ReadonlyArray<AnyAgent>>(host: Host<
     }),
   )
 
-const operatorHandlers = <Agents extends ReadonlyArray<AnyAgent>>(
+const operatorHandlers = <Agents extends AgentRegistry>(
   host: Host<Agents>,
   enabled: boolean,
   policy: Authorization,
@@ -221,51 +301,68 @@ const operatorHandlers = <Agents extends ReadonlyArray<AnyAgent>>(
         ),
       retry: ({ params, payload }) =>
         protect(policy)({ type: "run", id: params.id }, "mutate", () =>
-          write("retry", host.operator.retry(params.id, payload.operator, payload.commandId)).pipe(
+          CurrentPrincipal.pipe(
+            Effect.flatMap((principal) =>
+              write("retry", host.operator.retry(params.id, principal.id, payload.commandId)),
+            ),
             mapError("operator.retry"),
           ),
         ),
       wake: ({ params, payload }) =>
         protect(policy)({ type: "run", id: params.id }, "mutate", () =>
-          write("wake", host.operator.wake(params.id, payload.operator, payload.commandId)).pipe(
+          CurrentPrincipal.pipe(
+            Effect.flatMap((principal) =>
+              write("wake", host.operator.wake(params.id, principal.id, payload.commandId)),
+            ),
             mapError("operator.wake"),
           ),
         ),
       resolveUnknown: ({ params, payload }) =>
         protect(policy)({ type: "run", id: params.id }, "mutate", () =>
-          write(
-            "resolveUnknown",
-            host.operator.resolveUnknown(
-              params.id,
-              payload.operationId,
-              payload.resolution,
-              payload.operator,
-              payload.commandId,
+          CurrentPrincipal.pipe(
+            Effect.flatMap((principal) =>
+              write(
+                "resolveUnknown",
+                host.operator.resolveUnknown(
+                  params.id,
+                  payload.operationId,
+                  payload.resolution,
+                  principal.id,
+                  payload.commandId,
+                ),
+              ),
             ),
-          ).pipe(mapError("operator.resolveUnknown")),
+            mapError("operator.resolveUnknown"),
+          ),
         ),
       extendBudget: ({ params, payload }) =>
         protect(policy)({ type: "run", id: params.id }, "mutate", () =>
-          write(
-            "extendBudget",
-            host.operator.extendBudget(params.id, payload.delta, payload.operator, payload.commandId),
-          ).pipe(mapError("operator.extendBudget")),
+          CurrentPrincipal.pipe(
+            Effect.flatMap((principal) =>
+              write(
+                "extendBudget",
+                host.operator.extendBudget(params.id, payload.delta, principal.id, payload.commandId),
+              ),
+            ),
+            mapError("operator.extendBudget"),
+          ),
         ),
     }),
   )
 }
 
-export interface HandlerOptions<Agents extends ReadonlyArray<AnyAgent>> {
+export interface HandlerOptions<Agents extends AgentRegistry> {
   readonly host: Host<Agents>
   readonly operator: boolean
   readonly authorization: Authorization
 }
 
 /** Handler Layers for one concrete Host value. */
-export const layerHandlers = <Agents extends ReadonlyArray<AnyAgent>>(options: HandlerOptions<Agents>) =>
+export const layerHandlers = <Agents extends AgentRegistry>(options: HandlerOptions<Agents>) =>
   Layer.mergeAll(
     sessionsHandlers(options.host, options.authorization),
     runsHandlers(options.host, options.authorization),
+    toolsHandlers(options.host, options.authorization),
     eventsHandlers(options.host, options.authorization),
     artifactsHandlers(options.host, options.authorization),
     approvalsHandlers(options.host, options.authorization),

@@ -474,6 +474,15 @@ export interface Service {
   /** List product-facing Sessions in creation order. */
   readonly listHostSessions: Effect.Effect<ReadonlyArray<HostSession>, RuntimeUnavailable | DurabilityFailure>
   readonly hostSessionFamily: import("../session/host.js").RuntimeHostSessions["sessionFamily"]
+  readonly messageSessionInput: (
+    input: import("../session/message.js").MessageInput,
+  ) => Effect.Effect<
+    import("../session/queue.js").QueueReceipt,
+    import("../session/queue.js").SessionQueueConflict | SessionNotFound | RuntimeUnavailable | DurabilityFailure
+  >
+  readonly controlSession: (
+    input: import("../session/queue.js").ControlInput,
+  ) => Effect.Effect<void, SessionNotFound | RuntimeUnavailable | DurabilityFailure>
   /** List root Runs admitted through one product-facing Session. */
   readonly hostSessionRuns: (
     sessionId: string,

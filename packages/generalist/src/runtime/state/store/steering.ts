@@ -6,6 +6,7 @@ import type { AdmitSteeringInput, ExecutionClaim, SteeringAdmission } from "../.
 import { appendLifecycle, rejectIfTerminal } from "../append.js"
 import type { RuntimeState, StoredRun } from "../projection.js"
 import { requireAgentOrProgram } from "../../executable/manifest-internal.js"
+import { reconcileRunWaits } from "./control/run-wait.js"
 
 const requireRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -83,6 +84,7 @@ export const admitSteering: {
       })
     }
     const entry = {
+      ...(input.sessionCommandId === undefined ? undefined : { sessionCommandId: input.sessionCommandId }),
       entryId: `steer_${state.nextSteeringCounter}`,
       runId: run.runId,
       sequence: run.steering.length,
@@ -91,6 +93,7 @@ export const admitSteering: {
       prompt: input.prompt,
       policy: input.policy,
       from: input.from,
+      ...(input.sessionCommandId === undefined ? undefined : { sessionCommandId: input.sessionCommandId }),
       ...(input.addressed === undefined ? undefined : { addressed: input.addressed }),
     }
     const runs = new Map(state.runs)
@@ -110,10 +113,14 @@ export const admitSteering: {
         message: entry.prompt,
         policy: entry.policy,
         from: entry.from,
+        ...(entry.sessionCommandId === undefined ? undefined : { sessionCommandId: entry.sessionCommandId }),
         ...(entry.addressed === undefined ? undefined : { addressed: entry.addressed }),
       },
     )
-    return [{ receipt: { entryId: entry.entryId, sequence: entry.sequence }, duplicate: false }, accepted] as const
+    return [
+      { receipt: { entryId: entry.entryId, sequence: entry.sequence }, duplicate: false },
+      yield* reconcileRunWaits(accepted, run.runId),
+    ] as const
   }),
 )
 

@@ -21,6 +21,39 @@ export const registerSessionQueue = <E, ClaimsError>({
   const selection = { executableRef: executable.ref, executableManifest: executable.manifest, registrations }
   const admittedSelection = { ...selection, treePolicy: defaultTreePolicy, budget: {} }
 
+  it.effect("retains Session messages through stop and fences claims until explicit resume", () =>
+    provide((services) =>
+      Effect.gen(function* () {
+        const { store } = services
+        const sessionId = `session:messages:${options.name}:stop`
+        yield* store.createHostSession({ id: sessionId, selection })
+        yield* store.submitSessionInput({ sessionId, commandId: "initial", prompt: Prompt.make("first") })
+        const runId = (yield* store.hostSession(sessionId)).activeRunId!
+        const message = { sessionId, commandId: "follow-up", prompt: Prompt.make("follow up"), from: { user: "alice" } }
+        const receipt = yield* store.messageSessionInput(message)
+        expect((yield* store.pendingSteering({ runId, limit: 64 }))[0]).toMatchObject({ from: { user: "alice" } })
+        yield* store.controlSession({ sessionId, commandId: "stop", action: "stop" })
+        const stopped = yield* store.hostSession(sessionId)
+        expect(stopped.lifecycle).toBe("stopped")
+        expect(stopped.activeRunId).toBeUndefined()
+        expect(stopped.queue.map((entry) => entry.id)).toEqual(["follow-up"])
+        expect(yield* store.messageSessionInput(message)).toEqual(receipt)
+        yield* store.messageSessionInput({ ...message, commandId: "while-stopped" })
+        expect((yield* store.hostSessionRuns(sessionId)).length).toBe(1)
+        yield* store.controlSession({ sessionId, commandId: "resume", action: "resume" })
+        const resumed = yield* store.hostSession(sessionId)
+        expect(resumed.lifecycle).toBeUndefined()
+        expect(resumed.activeRunId).toBeDefined()
+        expect(resumed.activeRunId).not.toBe(runId)
+        yield* store.controlSession({ sessionId, commandId: "close", action: "close" })
+        expect(
+          yield* store.controlSession({ sessionId, commandId: "closed-resume", action: "resume" }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
+        expect((yield* store.hostSession(sessionId)).lifecycle).toBe("closed")
+      }),
+    ),
+  )
+
   it.effect("promotes Session inputs FIFO with immutable receipts and retained selection", () =>
     provide((services) =>
       Effect.gen(function* () {

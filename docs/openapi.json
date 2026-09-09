@@ -20,6 +20,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "sponsorRunId": { "type": "string" },
+                    "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                     "retainedSession": {
                       "type": "object",
                       "properties": {
@@ -682,6 +684,28 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "from": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "runId": { "type": "string" } },
+                                "required": ["runId"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "user": { "type": "string" } },
+                                "required": ["user"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                "required": ["system"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
                           "id": { "type": "string" },
                           "revision": { "type": "integer", "exclusiveMinimum": 0 },
                           "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -1561,6 +1585,8 @@
                   "items": {
                     "type": "object",
                     "properties": {
+                      "sponsorRunId": { "type": "string" },
+                      "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                       "retainedSession": {
                         "type": "object",
                         "properties": {
@@ -2256,6 +2282,28 @@
                         "items": {
                           "type": "object",
                           "properties": {
+                            "from": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": { "runId": { "type": "string" } },
+                                  "required": ["runId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": { "user": { "type": "string" } },
+                                  "required": ["user"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                  "required": ["system"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
                             "id": { "type": "string" },
                             "revision": { "type": "integer", "exclusiveMinimum": 0 },
                             "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -3126,6 +3174,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "sponsorRunId": { "type": "string" },
+                    "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                     "retainedSession": {
                       "type": "object",
                       "properties": {
@@ -3788,6 +3838,28 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "from": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "runId": { "type": "string" } },
+                                "required": ["runId"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "user": { "type": "string" } },
+                                "required": ["user"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                "required": ["system"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
                           "id": { "type": "string" },
                           "revision": { "type": "integer", "exclusiveMinimum": 0 },
                           "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -4655,6 +4727,8 @@
                     "session": {
                       "type": "object",
                       "properties": {
+                        "sponsorRunId": { "type": "string" },
+                        "lifecycle": { "type": "string", "enum": ["stopped", "closed"] },
                         "retainedSession": {
                           "type": "object",
                           "properties": {
@@ -5379,6 +5453,28 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "from": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": { "runId": { "type": "string" } },
+                                    "required": ["runId"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": { "user": { "type": "string" } },
+                                    "required": ["user"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": { "system": { "type": "boolean", "enum": [true] } },
+                                    "required": ["system"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
                               "id": { "type": "string" },
                               "revision": { "type": "integer", "exclusiveMinimum": 0 },
                               "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
@@ -6971,6 +7067,288 @@
         }
       }
     },
+    "/sessions/{id}/family": {
+      "post": {
+        "tags": ["sessions"],
+        "operationId": "sessions.family",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rootSessionId": { "type": "string" },
+                    "at": { "type": "integer", "minimum": -1, "maximum": 9007199254740991 },
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "rootSessionId": { "type": "string" },
+                          "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                          "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                          "initialRunId": { "type": "string" },
+                          "depth": { "type": "integer", "minimum": 0 }
+                        },
+                        "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 64
+                    },
+                    "nextBefore": {
+                      "anyOf": [{ "type": "integer", "minimum": -1, "maximum": 9007199254740991 }, { "type": "null" }]
+                    }
+                  },
+                  "required": ["rootSessionId", "at", "sessions", "nextBefore"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/session/SessionQueueConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "at": { "type": "integer", "minimum": -1, "maximum": 9007199254740991 },
+                  "before": { "type": "integer", "minimum": -1, "maximum": 9007199254740991 },
+                  "limit": { "type": "integer", "minimum": 1, "maximum": 64 }
+                },
+                "required": ["limit"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/sessions/{id}/control": {
+      "post": {
+        "tags": ["sessions"],
+        "operationId": "sessions.control",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "204": { "description": "<No Content>" },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/session/SessionQueueConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": { "type": "string", "minLength": 1 },
+                  "action": { "type": "string", "enum": ["stop", "close", "resume"] }
+                },
+                "required": ["commandId", "action"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/sessions/{id}/queue": {
       "post": {
         "tags": ["sessions"],
@@ -7342,8 +7720,12 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "agent": { "type": "string" }, "input": {}, "idempotencyKey": { "type": "string" } },
-                "required": ["agent", "input"],
+                "properties": {
+                  "agent": { "type": "string" },
+                  "input": {},
+                  "commandId": { "type": "string", "minLength": 1 }
+                },
+                "required": ["agent", "input", "commandId"],
                 "additionalProperties": false
               }
             }
@@ -8039,6 +8421,21 @@
                                         {
                                           "type": "object",
                                           "properties": {
+                                            "_tag": { "type": "string", "enum": ["Run"] },
+                                            "runs": {
+                                              "type": "array",
+                                              "items": { "type": "string", "minLength": 1 },
+                                              "maxItems": 32
+                                            },
+                                            "messages": { "type": "boolean" },
+                                            "commandId": { "type": "string", "minLength": 1 }
+                                          },
+                                          "required": ["_tag", "runs", "messages", "commandId"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
                                             "_tag": { "type": "string", "enum": ["Timer"] },
                                             "scheduleId": { "type": "string" }
                                           },
@@ -8131,6 +8528,7 @@
                                 }
                               ]
                             },
+                            "resolutionCommandId": { "type": "string" },
                             "openedAt": { "type": "string" },
                             "closedAt": { "type": "string" }
                           },
@@ -8953,6 +9351,21 @@
                                       {
                                         "type": "object",
                                         "properties": {
+                                          "_tag": { "type": "string", "enum": ["Run"] },
+                                          "runs": {
+                                            "type": "array",
+                                            "items": { "type": "string", "minLength": 1 },
+                                            "maxItems": 32
+                                          },
+                                          "messages": { "type": "boolean" },
+                                          "commandId": { "type": "string", "minLength": 1 }
+                                        },
+                                        "required": ["_tag", "runs", "messages", "commandId"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
                                           "_tag": { "type": "string", "enum": ["Timer"] },
                                           "scheduleId": { "type": "string" }
                                         },
@@ -9045,6 +9458,7 @@
                               }
                             ]
                           },
+                          "resolutionCommandId": { "type": "string" },
                           "openedAt": { "type": "string" },
                           "closedAt": { "type": "string" }
                         },
@@ -9488,6 +9902,21 @@
                               "properties": {
                                 "filter": {
                                   "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Run"] },
+                                        "runs": {
+                                          "type": "array",
+                                          "items": { "type": "string", "minLength": 1 },
+                                          "maxItems": 32
+                                        },
+                                        "messages": { "type": "boolean" },
+                                        "commandId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "runs", "messages", "commandId"],
+                                      "additionalProperties": false
+                                    },
                                     {
                                       "type": "object",
                                       "properties": {
@@ -10635,6 +11064,2799 @@
         }
       }
     },
+    "/runs/{id}/messages": {
+      "post": {
+        "tags": ["runs"],
+        "operationId": "runs.message",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "entryId": { "type": "string" }, "sequence": { "type": "integer", "minimum": 0 } },
+                  "required": ["entryId", "sequence"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/session/SessionQueueConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": { "type": "string", "minLength": 1 },
+                  "input": { "anyOf": [{ "type": "string" }, { "$ref": "#/components/schemas/PromptEncoded" }] }
+                },
+                "required": ["commandId", "input"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "get": {
+        "tags": ["runs"],
+        "operationId": "runs.messages",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "string", "pattern": "^[+-]?\\d*\\.?\\d+(?:[Ee][+-]?\\d+)?$" },
+            "required": false
+          }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "entryId": { "type": "string" },
+                      "targetSessionId": { "type": "string" },
+                      "sequence": { "type": "integer", "minimum": 0 },
+                      "from": { "type": "string", "minLength": 1 },
+                      "fromRunId": { "type": "string" },
+                      "to": { "type": "string", "minLength": 1 },
+                      "messageId": { "type": "string" },
+                      "idempotencyKey": { "type": "string" },
+                      "digest": { "type": "string" },
+                      "bytes": { "type": "integer", "minimum": 0 },
+                      "admittedAtMillis": { "type": "number" },
+                      "prompt": { "$ref": "#/components/schemas/PromptEncoded" },
+                      "correlationId": { "type": "string" },
+                      "causationId": { "type": "string" },
+                      "inReplyTo": { "type": "string" },
+                      "metadata": { "type": "object" },
+                      "deliveredRunId": { "type": "string" },
+                      "steeringEntryId": { "type": "string" }
+                    },
+                    "required": [
+                      "entryId",
+                      "targetSessionId",
+                      "sequence",
+                      "from",
+                      "fromRunId",
+                      "to",
+                      "messageId",
+                      "idempotencyKey",
+                      "digest",
+                      "bytes",
+                      "admittedAtMillis",
+                      "prompt",
+                      "correlationId",
+                      "metadata"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden | generalist/server/OperatorDisabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "generalist/host/AgentNotRegistered | generalist/blob-store/BlobNotFound | generalist/runtime/RunNotFound | generalist/host/SessionNotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_host_AgentNotRegisteredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionNotFoundEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "generalist/runtime/ApprovalMismatch | generalist/runtime/ApprovalStale | generalist/runtime/IllegalOperatorAction | generalist/server/RequestFailed | generalist/host/SessionConflict | generalist/session/SessionQueueConflict | generalist/host/SessionCursorExpired | generalist/host/SessionSubscriberLagged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalMismatchEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_ApprovalStaleEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_session_SessionQueueConflictEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionCursorExpiredEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_SessionSubscriberLaggedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "generalist/blob-store/BlobTooLarge",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+              }
+            }
+          },
+          "503": {
+            "description": "generalist/blob-store/BlobStoreError | generalist/runtime/RuntimeUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobStoreErrorEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/children": {
+      "post": {
+        "tags": ["runs"],
+        "operationId": "runs.admitChild",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": { "type": "string", "minLength": 1 },
+                    "messageId": { "type": "string" },
+                    "acceptedSequence": { "type": "integer", "minimum": 0 },
+                    "duplicate": { "type": "boolean" }
+                  },
+                  "required": ["runId", "messageId", "acceptedSequence", "duplicate"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/runtime/RunKindUnsupported",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/runtime/RunNotFound",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+            }
+          },
+          "409": {
+            "description": "generalist/server/RequestFailed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": { "type": "string", "minLength": 1 },
+                  "selection": { "type": "string", "minLength": 1, "maxLength": 128 },
+                  "prompt": { "type": "string", "minLength": 1 },
+                  "label": { "type": "string" }
+                },
+                "required": ["commandId", "selection", "prompt"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "get": {
+        "tags": ["runs"],
+        "operationId": "runs.listChildren",
+        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": { "description": "Success", "content": { "application/json": { "schema": {} } } },
+          "400": {
+            "description": "generalist/runtime/RunKindUnsupported",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/runtime/RunNotFound",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+            }
+          },
+          "409": {
+            "description": "generalist/server/RequestFailed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/children/{childId}": {
+      "get": {
+        "tags": ["runs"],
+        "operationId": "runs.inspectChild",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true },
+          { "name": "childId", "in": "path", "schema": { "type": "string" }, "required": true }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": { "description": "Success", "content": { "application/json": { "schema": {} } } },
+          "400": {
+            "description": "generalist/runtime/RunKindUnsupported",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/runtime/RunNotFound",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+            }
+          },
+          "409": {
+            "description": "generalist/server/RequestFailed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/tools/{name}": {
+      "post": {
+        "tags": ["tools"],
+        "operationId": "tools.start",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true },
+          { "name": "name", "in": "path", "schema": { "type": "string" }, "required": true }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "id": { "type": "string" } },
+                  "required": ["id"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/runtime/RunKindUnsupported",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/runtime/RunNotFound",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+            }
+          },
+          "409": {
+            "description": "generalist/server/RequestFailed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "commandId": { "type": "string", "minLength": 1 }, "input": {} },
+                "required": ["commandId", "input"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/tools/{name}/runs/{id}": {
+      "get": {
+        "tags": ["tools"],
+        "operationId": "tools.inspect",
+        "parameters": [
+          { "name": "name", "in": "path", "schema": { "type": "string" }, "required": true },
+          { "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }
+        ],
+        "security": [{ "bearer": [] }],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "retainedSession": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "rootSessionId": { "type": "string" },
+                        "parentSessionId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "parentRunId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                        "initialRunId": { "type": "string" },
+                        "depth": { "type": "integer", "minimum": 0 }
+                      },
+                      "required": ["id", "rootSessionId", "parentSessionId", "parentRunId", "initialRunId", "depth"],
+                      "additionalProperties": false
+                    },
+                    "runId": { "type": "string", "minLength": 1 },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "waiting",
+                        "needs-resolution",
+                        "cancelling",
+                        "succeeded",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "executableRef": {
+                      "type": "object",
+                      "properties": {
+                        "executable": { "type": "string", "pattern": "^executable-pin:v1:sha256:[0-9a-f]{64}$" },
+                        "active": {
+                          "anyOf": [
+                            { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
+                          ]
+                        }
+                      },
+                      "required": ["executable", "active"],
+                      "additionalProperties": false
+                    },
+                    "executableManifest": {
+                      "type": "object",
+                      "properties": {
+                        "version": { "type": "string", "enum": ["1"] },
+                        "root": {
+                          "anyOf": [
+                            { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                            { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" }
+                          ]
+                        },
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "selection": { "type": "string" },
+                              "agent": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" }
+                            },
+                            "required": ["selection", "agent"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Agent"] },
+                                  "pin": { "type": "string", "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["1"] },
+                                      "name": { "type": "string" },
+                                      "instructions": { "type": "string" },
+                                      "supplemental": { "type": "string" },
+                                      "model": { "type": "string", "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$" },
+                                      "tools": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": { "type": "string" },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "content": {
+                                              "type": "object",
+                                              "properties": {
+                                                "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                              },
+                                              "required": ["codec", "version", "digest"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["name", "pin"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "skills": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": { "type": "string" },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "content": {
+                                              "type": "object",
+                                              "properties": {
+                                                "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                              },
+                                              "required": ["codec", "version", "digest"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["name", "pin"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "services": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": { "type": "string" },
+                                            "pin": {
+                                              "type": "string",
+                                              "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                            },
+                                            "content": {
+                                              "type": "object",
+                                              "properties": {
+                                                "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                              },
+                                              "required": ["codec", "version", "digest"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["name", "pin"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "policy": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": { "type": "string", "enum": ["Portable"] },
+                                              "policy": { "$ref": "#/components/schemas/Suspend_" }
+                                            },
+                                            "required": ["_tag", "policy"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "_tag": { "type": "string", "enum": ["Pinned"] },
+                                              "pin": {
+                                                "type": "string",
+                                                "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                              }
+                                            },
+                                            "required": ["_tag", "pin"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      "toolScheduling": {
+                                        "type": "object",
+                                        "properties": {
+                                          "maxConcurrency": { "type": "integer", "exclusiveMinimum": 0 },
+                                          "parallelSafe": { "type": "array", "items": { "type": "string" } }
+                                        },
+                                        "required": ["maxConcurrency", "parallelSafe"],
+                                        "additionalProperties": false
+                                      },
+                                      "toolExecution": { "type": "string", "enum": ["inline", "background"] },
+                                      "compaction": {
+                                        "type": "object",
+                                        "properties": {
+                                          "service": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "summaryModel": {
+                                            "type": "string",
+                                            "pattern": "^model-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "contextWindow": { "type": "integer", "exclusiveMinimum": 0 },
+                                          "reserveTokens": { "type": "integer", "minimum": 0 },
+                                          "keepRecentTokens": { "type": "integer", "minimum": 0 },
+                                          "strategyIdentity": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                          "summaryPromptIdentity": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 255
+                                          }
+                                        },
+                                        "required": [
+                                          "service",
+                                          "summaryModel",
+                                          "contextWindow",
+                                          "reserveTokens",
+                                          "keepRecentTokens",
+                                          "strategyIdentity",
+                                          "summaryPromptIdentity"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "programAuthority": {
+                                        "type": "object",
+                                        "properties": {
+                                          "sandbox": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "input": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "output": {
+                                            "type": "string",
+                                            "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                          },
+                                          "maxSourceBytes": { "type": "integer", "minimum": 0 },
+                                          "tools": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 64
+                                          },
+                                          "agents": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "selection": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                "agent": {
+                                                  "type": "string",
+                                                  "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": ["selection", "agent", "input"],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 64
+                                          },
+                                          "steps": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 64
+                                          },
+                                          "budget": {
+                                            "type": "object",
+                                            "properties": {
+                                              "agentRuns": { "type": "integer", "minimum": 0 },
+                                              "concurrency": { "type": "integer", "minimum": 1 },
+                                              "toolCalls": { "type": "integer", "minimum": 0 },
+                                              "tokens": { "type": "integer", "minimum": 0 },
+                                              "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                              "logBytes": { "type": "integer", "minimum": 0 },
+                                              "outputBytes": { "type": "integer", "minimum": 0 }
+                                            },
+                                            "required": [
+                                              "agentRuns",
+                                              "concurrency",
+                                              "toolCalls",
+                                              "tokens",
+                                              "wallClockMillis",
+                                              "logBytes",
+                                              "outputBytes"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "sandbox",
+                                          "input",
+                                          "output",
+                                          "maxSourceBytes",
+                                          "tools",
+                                          "agents",
+                                          "steps",
+                                          "budget"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "budget": {
+                                        "type": "object",
+                                        "properties": {
+                                          "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                          "usd": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                          "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                                          "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                          "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "children": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": { "selection": { "type": "string" } },
+                                          "required": ["selection"],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "version",
+                                      "name",
+                                      "model",
+                                      "tools",
+                                      "skills",
+                                      "services",
+                                      "policy",
+                                      "toolScheduling",
+                                      "toolExecution",
+                                      "budget",
+                                      "children"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Program"] },
+                                  "pin": { "type": "string", "pattern": "^program-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["1"] },
+                                      "name": { "type": "string" },
+                                      "source": {
+                                        "type": "object",
+                                        "properties": {
+                                          "language": { "type": "string", "enum": ["javascript"] },
+                                          "text": { "type": "string" }
+                                        },
+                                        "required": ["language", "text"],
+                                        "additionalProperties": false
+                                      },
+                                      "sandbox": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "input": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "output": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "capabilities": {
+                                        "type": "object",
+                                        "properties": {
+                                          "tools": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string" },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "agents": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "selection": { "type": "string" },
+                                                "agent": {
+                                                  "type": "string",
+                                                  "pattern": "^agent-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "input": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                }
+                                              },
+                                              "required": ["selection", "agent", "input"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "steps": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "name": { "type": "string" },
+                                                "pin": {
+                                                  "type": "string",
+                                                  "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                                },
+                                                "content": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "codec": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "version": { "type": "string", "minLength": 1, "maxLength": 255 },
+                                                    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                                                  },
+                                                  "required": ["codec", "version", "digest"],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": ["name", "pin"],
+                                              "additionalProperties": false
+                                            }
+                                          }
+                                        },
+                                        "required": ["tools", "agents", "steps"],
+                                        "additionalProperties": false
+                                      },
+                                      "budget": {
+                                        "type": "object",
+                                        "properties": {
+                                          "agentRuns": { "type": "integer", "minimum": 0 },
+                                          "concurrency": { "type": "integer", "minimum": 1 },
+                                          "toolCalls": { "type": "integer", "minimum": 0 },
+                                          "tokens": { "type": "integer", "minimum": 0 },
+                                          "wallClockMillis": { "type": "integer", "minimum": 0 },
+                                          "logBytes": { "type": "integer", "minimum": 0 },
+                                          "outputBytes": { "type": "integer", "minimum": 0 }
+                                        },
+                                        "required": [
+                                          "agentRuns",
+                                          "concurrency",
+                                          "toolCalls",
+                                          "tokens",
+                                          "wallClockMillis",
+                                          "logBytes",
+                                          "outputBytes"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "version",
+                                      "name",
+                                      "source",
+                                      "sandbox",
+                                      "input",
+                                      "output",
+                                      "capabilities",
+                                      "budget"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Tool"] },
+                                  "pin": { "type": "string", "pattern": "^tool-pin:v1:sha256:[0-9a-f]{64}$" },
+                                  "manifest": {
+                                    "type": "object",
+                                    "properties": {
+                                      "version": { "type": "string", "enum": ["1"] },
+                                      "name": { "type": "string", "minLength": 1 },
+                                      "tool": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "input": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "output": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "failure": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      },
+                                      "replay": { "type": "string", "enum": ["never", "provider-idempotent"] },
+                                      "policy": {
+                                        "type": "string",
+                                        "pattern": "^capability-pin:v1:sha256:[0-9a-f]{64}$"
+                                      }
+                                    },
+                                    "required": ["version", "name", "tool", "input", "output", "failure", "replay"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "pin", "manifest"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["version", "root", "profiles", "entries"],
+                      "additionalProperties": false
+                    },
+                    "parentRunId": { "type": "string", "minLength": 1 },
+                    "childReadiness": { "type": "string", "enum": ["queued", "ready", "settled"] },
+                    "depth": { "type": "integer", "minimum": 0 },
+                    "treePolicy": {
+                      "type": "object",
+                      "properties": {
+                        "maxDepth": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                        "maxSessions": { "type": "integer", "minimum": 0, "maximum": 1024, "exclusiveMinimum": 0 },
+                        "concurrency": {
+                          "type": "object",
+                          "properties": {
+                            "agents": { "type": "integer", "minimum": 0, "maximum": 1024 },
+                            "tools": { "type": "integer", "minimum": 0, "maximum": 1024 }
+                          },
+                          "required": ["agents", "tools"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["maxDepth", "maxSessions", "concurrency"],
+                      "additionalProperties": false
+                    },
+                    "waits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "waitId": { "type": "string" },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "_tag": { "type": "string", "enum": ["ToolWait"] } },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Approval"] },
+                                  "request": {
+                                    "type": "object",
+                                    "properties": {
+                                      "approvalId": { "type": "string", "minLength": 1 },
+                                      "operation": { "type": "string", "minLength": 1 },
+                                      "capability": { "type": "string", "minLength": 1 },
+                                      "input": {}
+                                    },
+                                    "required": ["approvalId", "operation", "capability", "input"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["_tag", "request"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Signal"] },
+                                  "name": { "type": "string" }
+                                },
+                                "required": ["_tag", "name"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Timer"] },
+                                  "dueAt": { "type": "string" }
+                                },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["External"] },
+                                  "capability": { "type": "string" }
+                                },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["AwaitEvent"] },
+                                  "filter": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Run"] },
+                                          "runs": {
+                                            "type": "array",
+                                            "items": { "type": "string", "minLength": 1 },
+                                            "maxItems": 32
+                                          },
+                                          "messages": { "type": "boolean" },
+                                          "commandId": { "type": "string", "minLength": 1 }
+                                        },
+                                        "required": ["_tag", "runs", "messages", "commandId"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Timer"] },
+                                          "scheduleId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Webhook"] },
+                                          "source": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                          "childRunId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                          "path": { "type": "string" },
+                                          "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                          "approvalId": { "type": "string" }
+                                        },
+                                        "required": ["_tag"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "deadline": { "type": "string" }
+                                },
+                                "required": ["_tag", "filter", "deadline"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "status": { "type": "string", "enum": ["open", "responded", "signaled", "cancelled"] },
+                          "resolution": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": { "_tag": { "type": "string", "enum": ["Approved"] } },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Denied"] },
+                                  "reason": { "type": "string" }
+                                },
+                                "required": ["_tag"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["ToolResult"] },
+                                  "result": {},
+                                  "encodedResult": {}
+                                },
+                                "required": ["_tag", "result", "encodedResult"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Signal"] },
+                                  "name": { "type": "string" },
+                                  "payload": {}
+                                },
+                                "required": ["_tag", "name"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "resolutionCommandId": { "type": "string" },
+                          "openedAt": { "type": "string" },
+                          "closedAt": { "type": "string" }
+                        },
+                        "required": ["waitId", "reason", "status", "openedAt"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "lastSequence": { "type": "integer", "minimum": -1 },
+                    "durability": { "type": "string", "enum": ["ephemeral", "durable"] },
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "runId": { "type": "string", "minLength": 1 },
+                          "forkedAt": { "type": "integer", "minimum": 0 }
+                        },
+                        "required": ["runId", "forkedAt"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "turn": { "type": "integer", "minimum": 0 },
+                    "usage": {
+                      "type": "object",
+                      "properties": { "inputTokens": { "type": "number" }, "outputTokens": { "type": "number" } },
+                      "required": ["inputTokens", "outputTokens"],
+                      "additionalProperties": false
+                    },
+                    "usageFacts": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["Completed"] },
+                              "runId": { "type": "string", "minLength": 1 },
+                              "turn": { "type": "number" },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["conversation", "structured-output", "compaction-summary"]
+                              },
+                              "modelCallId": { "type": "string" },
+                              "modelAttemptId": { "type": "string" },
+                              "attempt": { "type": "integer" },
+                              "usageAt": { "type": "number" },
+                              "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                              "provider": { "type": "string" },
+                              "model": { "type": "string" },
+                              "requestId": { "type": "string" },
+                              "responseModel": { "type": "string" },
+                              "serviceTier": { "type": "string" }
+                            },
+                            "required": [
+                              "_tag",
+                              "runId",
+                              "turn",
+                              "purpose",
+                              "modelCallId",
+                              "modelAttemptId",
+                              "attempt",
+                              "usageAt",
+                              "usage"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": { "type": "string", "enum": ["Failed"] },
+                              "runId": { "type": "string", "minLength": 1 },
+                              "turn": { "type": "number" },
+                              "purpose": {
+                                "type": "string",
+                                "enum": ["conversation", "structured-output", "compaction-summary"]
+                              },
+                              "modelCallId": { "type": "string" },
+                              "modelAttemptId": { "type": "string" },
+                              "attempt": { "type": "integer" },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "authentication",
+                                  "rate-limit",
+                                  "transport",
+                                  "provider-response",
+                                  "stream-decode",
+                                  "truncated-stream",
+                                  "context-overflow",
+                                  "invalid-tool-call",
+                                  "token-budget",
+                                  "timeout",
+                                  "cancellation",
+                                  "unknown"
+                                ]
+                              },
+                              "usageAt": { "type": "number" },
+                              "providerUsage": {
+                                "type": "object",
+                                "properties": {
+                                  "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                  "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                  "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                },
+                                "additionalProperties": false
+                              },
+                              "provider": { "type": "string" },
+                              "model": { "type": "string" }
+                            },
+                            "required": [
+                              "_tag",
+                              "runId",
+                              "turn",
+                              "purpose",
+                              "modelCallId",
+                              "modelAttemptId",
+                              "attempt",
+                              "category",
+                              "usageAt",
+                              "providerUsage"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "activeTools": { "type": "array", "items": { "type": "string" } },
+                    "lastEvent": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["TurnStarted"] },
+                            "turn": { "type": "number" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ModelResponseCommitted"] },
+                            "turn": { "type": "number" },
+                            "originRunId": { "type": "string", "minLength": 1 },
+                            "originOperationKey": { "type": "string" },
+                            "operationKey": { "type": "string" },
+                            "modelCallId": { "type": "string" },
+                            "modelAttemptId": { "type": "string" },
+                            "attempt": { "type": "number" },
+                            "sessionId": { "type": "string" },
+                            "sessionParentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                            "sessionEntryId": { "type": "string" },
+                            "budgetCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                            "digest": { "type": "string" },
+                            "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                            "finishReason": {
+                              "type": "string",
+                              "enum": [
+                                "stop",
+                                "length",
+                                "content-filter",
+                                "tool-calls",
+                                "error",
+                                "pause",
+                                "other",
+                                "unknown"
+                              ]
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": [
+                            "_tag",
+                            "turn",
+                            "originRunId",
+                            "originOperationKey",
+                            "operationKey",
+                            "modelCallId",
+                            "modelAttemptId",
+                            "attempt",
+                            "sessionId",
+                            "sessionParentId",
+                            "sessionEntryId",
+                            "budgetCharge",
+                            "digest"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ModelResponseInterrupted"] },
+                            "turn": { "type": "number" },
+                            "originRunId": { "type": "string", "minLength": 1 },
+                            "originOperationKey": { "type": "string" },
+                            "operationKey": { "type": "string" },
+                            "modelCallId": { "type": "string" },
+                            "modelAttemptId": { "type": "string" },
+                            "attempt": { "type": "number" },
+                            "sessionId": { "type": "string" },
+                            "sessionParentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                            "sessionEntryId": { "type": "string" },
+                            "reason": { "type": "string", "enum": ["cancel", "failure"] },
+                            "digest": { "type": "string" },
+                            "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                            "finishReason": {
+                              "type": "string",
+                              "enum": [
+                                "stop",
+                                "length",
+                                "content-filter",
+                                "tool-calls",
+                                "error",
+                                "pause",
+                                "other",
+                                "unknown"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "_tag",
+                            "turn",
+                            "originRunId",
+                            "originOperationKey",
+                            "operationKey",
+                            "modelCallId",
+                            "modelAttemptId",
+                            "attempt",
+                            "sessionId",
+                            "sessionParentId",
+                            "sessionEntryId",
+                            "reason",
+                            "digest"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolExecutionStarted"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolProgress"] },
+                            "turn": { "type": "number" },
+                            "toolCallId": { "type": "string" },
+                            "message": { "type": "string" },
+                            "data": { "type": "object" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "toolCallId"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolExecutionCompleted"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "result": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-result"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "isFailure": { "type": "boolean" },
+                                "result": {},
+                                "encodedResult": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "preliminary": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                },
+                                "memoized": {
+                                  "type": "object",
+                                  "properties": {
+                                    "fromRun": { "type": "string" },
+                                    "fromOperation": { "type": "string" }
+                                  },
+                                  "required": ["fromRun", "fromOperation"],
+                                  "additionalProperties": false
+                                },
+                                "taint": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "capabilityId": { "type": "string", "minLength": 1 },
+                                      "tool": { "type": "string", "minLength": 1 },
+                                      "toolCallId": { "type": "string", "minLength": 1 }
+                                    },
+                                    "required": ["capabilityId", "tool", "toolCallId"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "id",
+                                "name",
+                                "isFailure",
+                                "result",
+                                "encodedResult",
+                                "providerExecuted",
+                                "preliminary",
+                                "metadata",
+                                "taint"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "tasksUpdated": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": { "type": "string", "minLength": 1 },
+                                  "title": { "type": "string", "minLength": 1 },
+                                  "status": { "type": "string", "enum": ["todo", "doing", "done"] },
+                                  "note": { "type": "string" }
+                                },
+                                "required": ["id", "title", "status"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "artifactRead": {
+                              "type": "object",
+                              "properties": {
+                                "artifact": { "type": "string" },
+                                "version": { "type": "integer", "minimum": 0 },
+                                "branch": { "type": "string" }
+                              },
+                              "required": ["artifact", "version"],
+                              "additionalProperties": false
+                            },
+                            "artifactUpdated": {
+                              "type": "object",
+                              "properties": {
+                                "artifact": { "type": "string" },
+                                "base": { "type": "integer", "minimum": 0 },
+                                "result": { "type": "integer", "minimum": 0 },
+                                "attribution": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Agent"] },
+                                        "actor": { "type": "string", "minLength": 1 },
+                                        "runId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "actor", "runId"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Human"] },
+                                        "actor": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "actor"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "branch": { "type": "string" }
+                              },
+                              "required": ["artifact", "base", "result", "attribution"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call", "result"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ToolExecutionWaiting"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "waitId": { "type": "string" },
+                            "token": { "type": "string" },
+                            "awaitEvent": {
+                              "type": "object",
+                              "properties": {
+                                "filter": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Run"] },
+                                        "runs": {
+                                          "type": "array",
+                                          "items": { "type": "string", "minLength": 1 },
+                                          "maxItems": 32
+                                        },
+                                        "messages": { "type": "boolean" },
+                                        "commandId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "runs", "messages", "commandId"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Timer"] },
+                                        "scheduleId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["Webhook"] },
+                                        "source": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["ChildCompleted"] },
+                                        "childRunId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["FileChanged"] },
+                                        "path": { "type": "string" },
+                                        "kind": { "type": "string", "enum": ["create", "update", "remove"] }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "_tag": { "type": "string", "enum": ["ApprovalResolved"] },
+                                        "approvalId": { "type": "string" }
+                                      },
+                                      "required": ["_tag"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "deadline": { "type": "string" }
+                              },
+                              "required": ["filter", "deadline"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call", "waitId", "token"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["HandoffRequested"] },
+                            "turn": { "type": "number" },
+                            "handoffId": { "type": "string" },
+                            "source": { "type": "string" },
+                            "target": { "type": "string" },
+                            "reason": { "type": "string" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "handoffId", "source", "target"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["HandoffCompleted"] },
+                            "turn": { "type": "number" },
+                            "handoffId": { "type": "string" },
+                            "source": { "type": "string" },
+                            "target": { "type": "string" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "handoffId", "source", "target"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Rejected"] },
+                            "turn": { "type": "number" },
+                            "handoffId": { "type": "string" },
+                            "reason": { "type": "string" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "handoffId", "reason"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["ApprovalRequested"] },
+                            "turn": { "type": "number" },
+                            "call": {
+                              "type": "object",
+                              "properties": {
+                                "type": { "type": "string", "enum": ["tool-call"] },
+                                "id": { "type": "string" },
+                                "name": { "type": "string" },
+                                "params": {},
+                                "providerExecuted": { "type": "boolean" },
+                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                }
+                              },
+                              "required": ["type", "id", "name", "params", "providerExecuted", "metadata"],
+                              "additionalProperties": false
+                            },
+                            "request": {
+                              "type": "object",
+                              "properties": {
+                                "approvalId": { "type": "string", "minLength": 1 },
+                                "operation": { "type": "string", "minLength": 1 },
+                                "capability": { "type": "string", "minLength": 1 },
+                                "input": {}
+                              },
+                              "required": ["approvalId", "operation", "capability", "input"],
+                              "additionalProperties": false
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "call", "request"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["SteeringDrained"] },
+                            "turn": { "type": "number" },
+                            "queue": { "type": "string", "enum": ["steering", "followUp"] },
+                            "count": { "type": "number" },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn", "queue", "count"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["TurnCompleted"] },
+                            "turn": { "type": "number" },
+                            "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                            "finishReason": {
+                              "type": "string",
+                              "enum": [
+                                "stop",
+                                "length",
+                                "content-filter",
+                                "tool-calls",
+                                "error",
+                                "pause",
+                                "other",
+                                "unknown"
+                              ]
+                            },
+                            "metadata": { "type": "object" }
+                          },
+                          "required": ["_tag", "turn"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["GateResult"] },
+                            "turn": { "type": "number" },
+                            "name": { "type": "string" },
+                            "verdict": { "type": "string", "enum": ["pass", "fail"] },
+                            "evidence": {}
+                          },
+                          "required": ["_tag", "turn", "name", "verdict", "evidence"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelCallStarted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["conversation", "structured-output", "compaction-summary"]
+                                },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "compactionId": { "type": "string" },
+                                "startedAt": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "modelCallId", "purpose", "startedAt"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptStarted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "registrationKey": { "type": "string" },
+                                "candidate": { "type": "integer", "minimum": 0 },
+                                "startedAt": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "startedAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptFirstOutput"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "kind": { "type": "string", "enum": ["reasoning", "text", "tool-call"] },
+                                "at": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "kind",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptCompleted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "completedAt": { "type": "number" },
+                                "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                                "usageAt": { "type": "number" },
+                                "finishReason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stop",
+                                    "length",
+                                    "content-filter",
+                                    "tool-calls",
+                                    "error",
+                                    "pause",
+                                    "other",
+                                    "unknown"
+                                  ]
+                                },
+                                "providerMetadata": {
+                                  "type": "object",
+                                  "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
+                                },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "registrationKey": { "type": "string" },
+                                "candidate": { "type": "integer", "minimum": 0 },
+                                "requestId": { "type": "string" },
+                                "responseModel": { "type": "string" },
+                                "serviceTier": { "type": "string" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "completedAt",
+                                "usage",
+                                "usageAt",
+                                "finishReason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelAttemptFailed"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "modelAttemptId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "failedAt": { "type": "number" },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "classification": { "type": "string", "enum": ["transient", "terminal"] },
+                                "disposition": { "type": "string", "enum": ["retry", "fallback", "terminal"] },
+                                "provider": { "type": "string" },
+                                "model": { "type": "string" },
+                                "registrationKey": { "type": "string" },
+                                "candidate": { "type": "integer", "minimum": 0 },
+                                "providerUsage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "modelAttemptId",
+                                "attempt",
+                                "failedAt",
+                                "category",
+                                "classification",
+                                "disposition"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelRetryScheduled"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": ["provider-resilience", "invalid-tool-call-correction"]
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "delayMillis": { "type": "number" },
+                                "at": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "attempt",
+                                "reason",
+                                "category",
+                                "delayMillis",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelFallbackScheduled"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "attempt": { "type": "integer", "minimum": 0 },
+                                "fromCandidate": { "type": "integer", "minimum": 0 },
+                                "fromProvider": { "type": "string" },
+                                "fromModel": { "type": "string" },
+                                "fromRegistrationKey": { "type": "string" },
+                                "toCandidate": { "type": "integer", "minimum": 0 },
+                                "toProvider": { "type": "string" },
+                                "toModel": { "type": "string" },
+                                "toRegistrationKey": { "type": "string" },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "at": { "type": "number" }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "attempt",
+                                "fromCandidate",
+                                "fromProvider",
+                                "fromModel",
+                                "toCandidate",
+                                "toProvider",
+                                "toModel",
+                                "category",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelCallCompleted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["conversation", "structured-output", "compaction-summary"]
+                                },
+                                "attempts": { "type": "integer", "minimum": 0 },
+                                "completedAt": { "type": "number" },
+                                "usage": { "$ref": "#/components/schemas/effect_ai_AiResponse_UsageEncoded" },
+                                "failedAttemptUsage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "finishReason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stop",
+                                    "length",
+                                    "content-filter",
+                                    "tool-calls",
+                                    "error",
+                                    "pause",
+                                    "other",
+                                    "unknown"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "purpose",
+                                "attempts",
+                                "completedAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["ModelCallFailed"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "modelCallId": { "type": "string" },
+                                "purpose": {
+                                  "type": "string",
+                                  "enum": ["conversation", "structured-output", "compaction-summary"]
+                                },
+                                "attempts": { "type": "integer", "minimum": 0 },
+                                "failedAt": { "type": "number" },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "authentication",
+                                    "rate-limit",
+                                    "transport",
+                                    "provider-response",
+                                    "stream-decode",
+                                    "truncated-stream",
+                                    "context-overflow",
+                                    "invalid-tool-call",
+                                    "token-budget",
+                                    "timeout",
+                                    "cancellation",
+                                    "unknown"
+                                  ]
+                                },
+                                "classification": { "type": "string", "enum": ["transient", "terminal"] },
+                                "failedAttemptUsage": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "outputTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                                    "totalTokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "modelCallId",
+                                "purpose",
+                                "attempts",
+                                "failedAt",
+                                "category",
+                                "classification"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionStarted"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "trigger": { "type": "string", "enum": ["threshold", "overflow"] },
+                                "startedAt": { "type": "number" },
+                                "contextTokensBefore": { "type": "number" },
+                                "entriesBefore": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "compactionId", "trigger", "startedAt"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionSkipped"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "skippedAt": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "compactionId", "skippedAt"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionApplied"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "checkpointId": { "type": "string" },
+                                "kind": { "type": "string", "enum": ["microcompact", "summarize"] },
+                                "appliedAt": { "type": "number" },
+                                "commit": {
+                                  "type": "object",
+                                  "properties": {
+                                    "compactionId": { "type": "string" },
+                                    "checkpointId": { "type": "string" },
+                                    "summaryModelCallId": { "type": "string" },
+                                    "contextTokensBefore": { "type": "number" },
+                                    "contextTokensAfter": { "type": "number" },
+                                    "entriesBefore": { "type": "number" },
+                                    "entriesAfter": { "type": "number" }
+                                  },
+                                  "required": ["compactionId", "checkpointId"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "_tag",
+                                "deliveryId",
+                                "turn",
+                                "compactionId",
+                                "checkpointId",
+                                "kind",
+                                "appliedAt",
+                                "commit"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": { "type": "string", "enum": ["CompactionFailed"] },
+                                "deliveryId": { "type": "string" },
+                                "turn": { "type": "number" },
+                                "compactionId": { "type": "string" },
+                                "failedAt": { "type": "number" }
+                              },
+                              "required": ["_tag", "deliveryId", "turn", "compactionId", "failedAt"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "elapsed": { "type": "number", "minimum": 0 },
+                    "budget": {
+                      "type": "object",
+                      "properties": {
+                        "tokens": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "usd": {
+                          "anyOf": [
+                            { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                            { "type": "string", "enum": ["unknown"] }
+                          ]
+                        },
+                        "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
+                        "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "additionalProperties": false
+                    },
+                    "gates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "verdict": { "type": "string", "enum": ["pass", "fail"] },
+                          "evidence": {}
+                        },
+                        "required": ["name", "verdict", "evidence"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "childRunId": { "type": "string" },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "waiting",
+                              "needs-resolution",
+                              "cancelling",
+                              "succeeded",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "readiness": { "type": "string", "enum": ["queued", "ready", "settled"] },
+                          "invocationId": { "type": "string" },
+                          "origin": {
+                            "type": "object",
+                            "properties": { "operationKey": { "type": "string" }, "ordinal": { "type": "number" } },
+                            "required": ["operationKey", "ordinal"],
+                            "additionalProperties": false
+                          },
+                          "outcome": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Succeeded"] },
+                                  "result": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "text": { "type": "string" },
+                                          "output": {},
+                                          "turns": { "type": "number" },
+                                          "session": {
+                                            "type": "object",
+                                            "properties": {
+                                              "sessionId": { "type": "string" },
+                                              "leafId": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+                                            },
+                                            "required": ["sessionId", "leafId"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["text", "output", "turns", "session"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Program"] },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "value"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "_tag": { "type": "string", "enum": ["Tool"] },
+                                          "isFailure": { "type": "boolean" },
+                                          "value": {}
+                                        },
+                                        "required": ["_tag", "isFailure", "value"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "result", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Failed"] },
+                                  "error": {
+                                    "anyOf": [
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_AgentExecutionFailureEncoded"
+                                      },
+                                      { "$ref": "#/components/schemas/generalist_runtime_ExecutablePinMissingEncoded" },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableIdentityMismatchEncoded"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationInvalidEncoded"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationMissingEncoded"
+                                      },
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "anyOf": [
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxUnavailableEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxSourceInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxInputInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxOutputInvalidEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxExecutionFailureEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxProtocolViolationEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxDeadlineExceededEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxCancelledEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxResourceExceededEncoded"
+                                              },
+                                              {
+                                                "$ref": "#/components/schemas/generalist_core_SandboxGuaranteeUnavailableEncoded"
+                                              },
+                                              {
+                                                "anyOf": [
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCapabilityMissingEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCapabilityDeniedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramAuthorizationFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramSchemaFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramToolFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramStepFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramAgentFailureEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramBudgetExhaustedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramReplayDivergenceEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramOperationUnknownEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramSuspendedEncoded"
+                                                  },
+                                                  {
+                                                    "$ref": "#/components/schemas/generalist_core_ProgramCancelledEncoded"
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "$ref": "#/components/schemas/generalist_core_ProgramHandlerMismatchEncoded"
+                                          },
+                                          {
+                                            "$ref": "#/components/schemas/generalist_core_ProgramIdentityMismatchEncoded"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "error", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "_tag": { "type": "string", "enum": ["Cancelled"] },
+                                  "reason": { "type": "string" },
+                                  "eventId": { "type": "string" },
+                                  "occurredAt": { "type": "string" }
+                                },
+                                "required": ["_tag", "eventId", "occurredAt"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["childRunId", "status", "readiness"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "suspension": {
+                      "anyOf": [
+                        { "$ref": "#/components/schemas/generalist_core_AgentSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_core_ProgramSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_runtime_UnknownAgentEncoded" },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["BudgetExhausted"] },
+                            "budget": {
+                              "type": "string",
+                              "enum": ["tokens", "usd", "duration", "toolCalls", "children"]
+                            }
+                          },
+                          "required": ["_tag", "budget"],
+                          "additionalProperties": false
+                        },
+                        { "$ref": "#/components/schemas/generalist_core_NestedOperationSuspendedEncoded" },
+                        { "$ref": "#/components/schemas/generalist_runtime_ToolSuspendedEncoded" }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "status",
+                    "executableRef",
+                    "executableManifest",
+                    "depth",
+                    "treePolicy",
+                    "waits",
+                    "lastSequence",
+                    "durability",
+                    "branches",
+                    "turn",
+                    "usage",
+                    "usageFacts",
+                    "activeTools",
+                    "elapsed",
+                    "budget",
+                    "gates",
+                    "children"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "generalist/runtime/RunKindUnsupported",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" }
+              }
+            }
+          },
+          "401": {
+            "description": "generalist/server/Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "generalist/server/Forbidden",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_ForbiddenEncoded" } }
+            }
+          },
+          "404": {
+            "description": "generalist/runtime/RunNotFound",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+            }
+          },
+          "409": {
+            "description": "generalist/server/RequestFailed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{id}/events": {
       "get": {
         "tags": ["events"],
@@ -10921,7 +14143,10 @@
                                   "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/session/SessionQueueConflict"] },
                                     "sessionId": { "type": "string" },
-                                    "reason": { "type": "string", "enum": ["revision", "capacity", "selection"] },
+                                    "reason": {
+                                      "type": "string",
+                                      "enum": ["revision", "capacity", "selection", "closed"]
+                                    },
                                     "hint": { "type": "string" }
                                   },
                                   "required": ["_tag", "sessionId", "reason", "hint"],
@@ -11511,6 +14736,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "commandId": { "type": "string", "minLength": 1 },
                   "decision": {
                     "anyOf": [
                       {
@@ -11529,10 +14755,9 @@
                         "additionalProperties": false
                       }
                     ]
-                  },
-                  "operator": { "type": "string" }
+                  }
                 },
-                "required": ["decision", "operator"],
+                "required": ["commandId", "decision"],
                 "additionalProperties": false
               }
             }
@@ -12141,8 +15366,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "commandId": { "type": "string" }, "operator": { "type": "string" } },
-                "required": ["commandId", "operator"],
+                "properties": { "commandId": { "type": "string", "minLength": 1 } },
+                "required": ["commandId"],
                 "additionalProperties": false
               }
             }
@@ -12261,8 +15486,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "commandId": { "type": "string" }, "operator": { "type": "string" } },
-                "required": ["commandId", "operator"],
+                "properties": { "commandId": { "type": "string", "minLength": 1 } },
+                "required": ["commandId"],
                 "additionalProperties": false
               }
             }
@@ -12382,7 +15607,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "commandId": { "type": "string" },
+                  "commandId": { "type": "string", "minLength": 1 },
                   "operationId": { "type": "string" },
                   "resolution": {
                     "anyOf": [
@@ -12399,10 +15624,9 @@
                         "additionalProperties": false
                       }
                     ]
-                  },
-                  "operator": { "type": "string" }
+                  }
                 },
-                "required": ["commandId", "operationId", "resolution", "operator"],
+                "required": ["commandId", "operationId", "resolution"],
                 "additionalProperties": false
               }
             }
@@ -12522,7 +15746,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "commandId": { "type": "string" },
+                  "commandId": { "type": "string", "minLength": 1 },
                   "delta": {
                     "type": "object",
                     "properties": {
@@ -12533,10 +15757,9 @@
                       "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                     },
                     "additionalProperties": false
-                  },
-                  "operator": { "type": "string" }
+                  }
                 },
-                "required": ["commandId", "delta", "operator"],
+                "required": ["commandId", "delta"],
                 "additionalProperties": false
               }
             }
@@ -13056,7 +16279,7 @@
         "properties": {
           "_tag": { "type": "string", "enum": ["generalist/session/SessionQueueConflict"] },
           "sessionId": { "type": "string" },
-          "reason": { "type": "string", "enum": ["revision", "capacity", "selection"] },
+          "reason": { "type": "string", "enum": ["revision", "capacity", "selection", "closed"] },
           "hint": { "type": "string" }
         },
         "required": ["_tag", "sessionId", "reason", "hint"],
@@ -13493,6 +16716,21 @@
                                     {
                                       "type": "object",
                                       "properties": {
+                                        "_tag": { "type": "string", "enum": ["Run"] },
+                                        "runs": {
+                                          "type": "array",
+                                          "items": { "type": "string", "minLength": 1 },
+                                          "maxItems": 32
+                                        },
+                                        "messages": { "type": "boolean" },
+                                        "commandId": { "type": "string", "minLength": 1 }
+                                      },
+                                      "required": ["_tag", "runs", "messages", "commandId"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
                                         "_tag": { "type": "string", "enum": ["Timer"] },
                                         "scheduleId": { "type": "string" }
                                       },
@@ -13668,6 +16906,17 @@
                   "properties": {
                     "filter": {
                       "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": { "type": "string", "enum": ["Run"] },
+                            "runs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "maxItems": 32 },
+                            "messages": { "type": "boolean" },
+                            "commandId": { "type": "string", "minLength": 1 }
+                          },
+                          "required": ["_tag", "runs", "messages", "commandId"],
+                          "additionalProperties": false
+                        },
                         {
                           "type": "object",
                           "properties": {
@@ -14341,6 +17590,7 @@
   "tags": [
     { "name": "sessions" },
     { "name": "runs" },
+    { "name": "tools" },
     { "name": "events" },
     { "name": "artifacts" },
     { "name": "approvals" },

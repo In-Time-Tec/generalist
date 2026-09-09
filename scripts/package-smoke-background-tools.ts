@@ -1,7 +1,7 @@
 export const backgroundToolConsumer = `import { Crypto, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist, ToolIdentity } from "generalist/host"
+import { Host, ToolIdentity } from "generalist/host"
 import * as Durability from "generalist/durability"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import * as TestDurability from "generalist/testing/durability"
@@ -61,7 +61,7 @@ await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     ) }),
   ))
   yield* Effect.gen(function* () {
-    const host = yield* Generalist.create({ agents: [agent], tools: [work] })
+    const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [work] })
     const session = yield* host.sessions.create({ id: "packed-session" })
     const parent = yield* host.runs.start(session.id, agent, "work")
     const store = yield* RunStore.RunStore

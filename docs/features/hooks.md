@@ -82,7 +82,7 @@ Hook defects and typed failures are both captured as `HookFailed`; interruption 
 
 ## Host plugins
 
-`Generalist.plugin({ hooks })` accepts the same declaration values. Ambient Hooks declarations run first, followed by plugin declarations in plugin order. The Host captures that merged service when it registers each configured Agent; Runtime recovery therefore uses the same hook chain.
+`Host.plugin({ hooks })` accepts the same declaration values. Ambient Hooks declarations run first, followed by plugin declarations in plugin order. The Host captures that merged service when it registers each configured Agent; Runtime recovery therefore uses the same hook chain.
 
 ## Invariants
 

@@ -3,7 +3,7 @@ import { Config, Console, Effect, Layer, ManagedRuntime, Option, Stream, type Ty
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -79,7 +79,7 @@ const runtimeLayer = Layer.unwrap(
 )
 
 const program = Effect.gen(function* () {
-  const host = yield* Generalist.create({ agents: [agent] })
+  const host = yield* Host.make({ revision: "local", agents: { agent } })
   const session = yield* host.sessions.create({ id: "guide-session" })
   const handle = yield* host.runs.start(session.id, agent, "Say hello", { idempotencyKey: "guide-message-1" })
   const first = yield* (yield* host.events.subscribe(session.id)).pipe(Stream.take(1), Stream.runHead)

@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream, type Types } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist, type SessionRunsInput, type SessionRunsPage } from "generalist/host"
+import { Host, type SessionRunsInput, type SessionRunsPage } from "generalist/host"
 import { ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
 import { HostSessionSnapshot } from "../../src/runtime/session/host.js"
 import { applyConversationUpdate } from "../../src/runtime/session/conversation.js"
@@ -31,7 +31,7 @@ export const register = ({
             const context = yield* Layer.build(services())
             return yield* Effect.gen(function* () {
               const agent = Agent.make({ name: "conversation-original" })
-              const host = yield* Generalist.create({ agents: [agent] })
+              const host = yield* Host.make({ revision: "local", agents: { agent } })
               const session = yield* host.sessions.create({ id: "conversation-session" })
               const run = yield* host.runs.start(session.id, agent, "original question")
               const store = yield* RunStore.RunStore
@@ -136,7 +136,7 @@ export const register = ({
             const context = yield* Layer.build(services())
             yield* Effect.gen(function* () {
               const agent = Agent.make({ name: "conversation-reopened" })
-              const host = yield* Generalist.create({ agents: [agent] })
+              const host = yield* Host.make({ revision: "local", agents: { agent } })
               const reopened = yield* host.sessions.snapshot(original.snapshot.session.id)
               expect(reopened.conversation).toEqual(original.snapshot.conversation)
               const run = yield* host.runs.start(reopened.session.id, agent, "branch question")
@@ -194,7 +194,7 @@ export const register = ({
             const context = yield* Layer.build(services())
             return yield* Effect.gen(function* () {
               const agent = Agent.make({ name: "history-recovery" })
-              const host = yield* Generalist.create({ agents: [agent] })
+              const host = yield* Host.make({ revision: "local", agents: { agent } })
               const session = yield* host.sessions.create({ id: "history-recovery" })
               const runIds: Array<string> = []
               for (let index = 0; index < 129; index++)
@@ -237,7 +237,7 @@ export const register = ({
             const context = yield* Layer.build(services())
             yield* Effect.gen(function* () {
               const agent = Agent.make({ name: "history-recovery" })
-              const host = yield* Generalist.create({ agents: [agent] })
+              const host = yield* Host.make({ revision: "local", agents: { agent } })
               const sessionId = original.snapshot.session.id
               const reopened = yield* host.sessions.snapshot(sessionId)
               expect(reopened).toEqual(original.snapshot)
@@ -346,7 +346,7 @@ export const register = ({
           const context = yield* Layer.build(services())
           return yield* Effect.gen(function* () {
             const agent = Agent.make({ name: "snapshot-original" })
-            const host = yield* Generalist.create({ agents: [agent] })
+            const host = yield* Host.make({ revision: "local", agents: { agent } })
             const session = yield* host.sessions.create({ id: "snapshot-session", title: "Existing work" })
             const run = yield* host.runs.start(session.id, agent, "existing input")
             const snapshot = yield* host.sessions.snapshot(session.id)
@@ -364,7 +364,7 @@ export const register = ({
           const context = yield* Layer.build(services())
           return yield* Effect.gen(function* () {
             const agent = Agent.make({ name: "snapshot-reopened" })
-            const host = yield* Generalist.create({ agents: [agent] })
+            const host = yield* Host.make({ revision: "local", agents: { agent } })
             const reopened = yield* host.sessions.snapshot(original.session.id)
             expect(reopened).toEqual(original)
             const raced = yield* host.runs.start(original.session.id, agent, "racing input")
@@ -401,7 +401,7 @@ export const register = ({
         const context = yield* Layer.build(services)
         yield* Effect.gen(function* () {
           const agent = Agent.make({ name: "conversation-bytes" })
-          const host = yield* Generalist.create({ agents: [agent] })
+          const host = yield* Host.make({ revision: "local", agents: { agent } })
           const session = yield* host.sessions.create({ id: "conversation-bytes" })
           const run = yield* host.runs.start(session.id, agent, "bounded conversation")
           const store = yield* RunStore.RunStore
@@ -462,7 +462,7 @@ export const register = ({
         const context = yield* Layer.build(services)
         yield* Effect.gen(function* () {
           const agent = Agent.make({ name: "snapshot-bounded" })
-          const host = yield* Generalist.create({ agents: [agent] })
+          const host = yield* Host.make({ revision: "local", agents: { agent } })
           const session = yield* host.sessions.create({ id: "snapshot-bounded" })
           for (let index = 0; index < 129; index++) yield* host.runs.start(session.id, agent, `input-${index}`)
           const snapshot = yield* host.sessions.snapshot(session.id)

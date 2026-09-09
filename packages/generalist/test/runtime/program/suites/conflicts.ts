@@ -173,7 +173,12 @@ layer(objectRuntimeLayer(options).pipe(Layer.provide(approvalFixture.resolverLay
         const host = yield* RunExecutor.RunExecutor
         const claim = yield* claimProgram("approval")
         yield* host.execute(claim)
-        const response = { runId: claim.runId, approvalId: "approval:echo", decision: { _tag: "Approved" as const } }
+        const response = {
+          runId: claim.runId,
+          approvalId: "approval:echo",
+          commandId: "approval:echo:conflict",
+          decision: { _tag: "Approved" as const },
+        }
         yield* runtime.respondApproval(response)
         const history = yield* runtime.history({ runId: claim.runId, limit: 100 })
         yield* runtime.respondApproval(response)

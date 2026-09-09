@@ -5,7 +5,7 @@ import { Config, Deferred, Effect, Fiber, Layer, Redacted, Schema, Stream } from
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host, ToolIdentity } from "generalist/host"
 import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
 import { Server, type Client } from "generalist/server"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
@@ -61,7 +61,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-queue" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             host,
@@ -130,7 +130,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-not-found" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -178,6 +178,115 @@ layer(services)("Server", (it) => {
     ),
   )
 
+  it.effect("admits canonical children and registered Tools without accepting client definitions", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const checks = Tool.make("server-checks", {
+          parameters: Schema.Struct({ count: Schema.FiniteFromString }),
+          success: Schema.FiniteFromString,
+        }).annotate(ToolIdentity, { implementation: "server-checks-v1", policy: "server-checks-policy-v1" })
+        const toolHandlers = Toolkit.make(checks).toLayer({
+          "server-checks": ({ count }) => Effect.succeed(count + 1),
+        })
+        const duplicateChecks = checks.annotate(ToolIdentity, {
+          implementation: "server-checks-v2",
+          policy: "server-checks-policy-v2",
+        })
+        const duplicateHandlers = Toolkit.make(duplicateChecks).toLayer({
+          "server-checks": ({ count }) => Effect.succeed(count + 2),
+        })
+        expect(
+          yield* Host.make({ revision: "local", agents: {}, tools: [checks, duplicateChecks] }).pipe(
+            // oxlint-disable-next-line effecttsgo/strict-effect-provide -- Test-only duplicate registration context.
+            Effect.provide(Layer.merge(toolHandlers, duplicateHandlers)),
+            Effect.flip,
+          ),
+        ).toMatchObject({ _tag: "generalist/runtime/ExecutableRegistrationInvalid" })
+        const child = Agent.make({ name: "server-child" })
+        const parent = Agent.make({ name: "server-parent", children: [child.name] })
+        const host = yield* Host.make({ revision: "local", agents: { parent, child }, tools: [checks] }).pipe(
+          // oxlint-disable-next-line effecttsgo/strict-effect-provide -- Test-only Tool registration context.
+          Effect.provide(toolHandlers),
+        )
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            host,
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const client = yield* makeClient(makeTransport(app.handler), "secret")
+        const session = yield* client.sessions.create({ id: "server-contract", agent: parent.name })
+        const parentRun = yield* client.runs.start({
+          sessionId: session.id,
+          agent: parent.name,
+          input: "parent",
+          commandId: "server-contract:parent",
+        })
+        const admitted = yield* client.runs.admitChild({
+          runId: parentRun.id,
+          commandId: "server-contract:child",
+          selection: child.name,
+          prompt: "child",
+        })
+        expect(
+          yield* client.runs.admitChild({
+            runId: parentRun.id,
+            commandId: "server-contract:child",
+            selection: child.name,
+            prompt: "child",
+          }),
+        ).toEqual(admitted)
+        expect(yield* client.runs.listChildren({ runId: parentRun.id })).toEqual([
+          expect.objectContaining({ childRunId: admitted.runId, readiness: "ready" }),
+        ])
+        expect(yield* client.runs.inspectChild({ runId: parentRun.id, childRunId: admitted.runId })).toMatchObject({
+          childRunId: admitted.runId,
+        })
+        const toolRun = yield* client.tools.start({
+          runId: parentRun.id,
+          name: checks.name,
+          commandId: "server-contract:tool",
+          input: { count: "3" },
+        })
+        expect(toolRun.id).toBeDefined()
+        expect(
+          yield* client.tools
+            .start({
+              runId: parentRun.id,
+              name: checks.name,
+              commandId: "server-contract:invalid-tool",
+              input: { count: "bad" },
+            })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/server/RequestFailed" })
+        expect(
+          yield* client.tools.start({
+            runId: parentRun.id,
+            name: checks.name,
+            commandId: "server-contract:tool",
+            input: { count: "3" },
+          }),
+        ).toEqual(toolRun)
+        yield* runScheduler(toolRun.id, "server-contract:tool:execute")
+        expect(yield* client.tools.inspect({ runId: toolRun.id, name: checks.name })).toMatchObject({
+          runId: toolRun.id,
+          status: "succeeded",
+        })
+        const typedToolRun = yield* host.tools.getByName(checks.name, toolRun.id)
+        expect(yield* typedToolRun.await).toBe(4)
+        expect(yield* client.tools.inspect({ runId: parentRun.id, name: checks.name }).pipe(Effect.flip)).toMatchObject(
+          { _tag: "generalist/runtime/RunKindUnsupported" },
+        )
+      }),
+    ),
+  )
+
   it.effect("serves authenticated Host operations and resumes SSE from Last-Event-ID", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -186,7 +295,7 @@ layer(services)("Server", (it) => {
           input: Schema.Struct({ question: Schema.String }),
           output: Schema.String,
         })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -224,6 +333,7 @@ layer(services)("Server", (it) => {
           sessionId: session.id,
           agent: agent.name,
           input: { question: "status" },
+          commandId: "server:primary:start",
         })
         yield* runScheduler(started.id, "server:primary")
 
@@ -277,6 +387,7 @@ layer(services)("Server", (it) => {
           sessionId: session.id,
           agent: agent.name,
           input: { question: "cancel" },
+          commandId: "server:cancel:start",
         })
         const missingCommandBody = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
           reason: "user stopped",
@@ -301,7 +412,7 @@ layer(services)("Server", (it) => {
         ).toMatchObject({ _tag: "generalist/server/RequestFailed", operation: "runs.cancel" })
 
         const disabled = yield* client.operator
-          .retry({ runId: started.id, commandId: "retry:disabled", operator: "operator:test" })
+          .retry({ runId: started.id, commandId: "retry:disabled" })
           .pipe(Effect.flip)
         expect(disabled).toMatchObject({ _tag: "generalist/server/OperatorDisabled", operation: "retry" })
 
@@ -333,7 +444,7 @@ layer(services)("Server", (it) => {
             ),
         })
         const agent = Agent.make({ name: "server-disconnect" })
-        const host = yield* Generalist.create({ agents: [agent] }).pipe(
+        const host = yield* Host.make({ revision: "local", agents: { agent } }).pipe(
           Effect.provideService(LanguageModel.LanguageModel, controlledModel),
         )
         const app = HttpRouter.toWebHandler(
@@ -350,7 +461,7 @@ layer(services)("Server", (it) => {
         yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
         const client = yield* makeClient(makeTransport(app.handler), "secret")
         const session = yield* client.sessions.create({ id: "session:server:disconnect" })
-        const input = { sessionId: session.id, agent: agent.name, input: "answer", idempotencyKey: "answer-once" }
+        const input = { sessionId: session.id, agent: agent.name, input: "answer", commandId: "answer-once" }
         const run = yield* client.runs.start(input)
         expect((yield* client.runs.start(input)).id).toBe(run.id)
         const execution = yield* runScheduler(run.id, "server:disconnect").pipe(
@@ -390,7 +501,7 @@ layer(services)("Server", (it) => {
     Effect.scoped(
       Effect.gen(function* () {
         const agent = Agent.make({ name: "server-unknown" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -407,7 +518,12 @@ layer(services)("Server", (it) => {
         const transport = makeTransport(app.handler)
         const client = yield* makeClient(transport, "secret")
         const session = yield* client.sessions.create({ id: "session:server:unknown" })
-        const run = yield* client.runs.start({ sessionId: session.id, agent: agent.name, input: "answer" })
+        const run = yield* client.runs.start({
+          sessionId: session.id,
+          agent: agent.name,
+          input: "answer",
+          commandId: "server:unknown:start",
+        })
         const store = yield* RunStore.RunStore
         const claim = yield* store.claimExecution({
           runId: run.id,
@@ -437,7 +553,6 @@ layer(services)("Server", (it) => {
           runId: run.id,
           commandId: "resolve:external-write",
           operationId: operation.operationId,
-          operator: "operator:test",
           resolution: { outcome: "succeeded" as const, result: "confirmed external receipt" },
         }
         const unauthorized = yield* makeClient(transport, "wrong")
@@ -475,7 +590,7 @@ layer(services)("Server", (it) => {
               ),
             )
             const agent = Agent.make({ name: "tenant-assistant" })
-            const host = yield* Generalist.create({ agents: [agent] }).pipe(Effect.provideContext(context))
+            const host = yield* Host.make({ revision: "local", agents: { agent } }).pipe(Effect.provideContext(context))
             const app = HttpRouter.toWebHandler(
               Server.layer({
                 authorization: { tenantId: tenant, authorize: () => Effect.succeed(true) },
@@ -498,6 +613,7 @@ layer(services)("Server", (it) => {
           sessionId: session.id,
           agent: alice!.agent.name,
           input: "private",
+          commandId: "private:start",
         })
         const attachment = yield* alice!.client.attachments.put({
           data: new TextEncoder().encode("private attachment"),
@@ -583,7 +699,7 @@ layer(approvalServices)("Server approvals", (it) => {
         approvalModelCalls = 0
         approvalToolCalls = 0
         const agent = Agent.make({ name: "server-approval", toolkit: approvalToolkit })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const app = HttpRouter.toWebHandler(
           Server.layer({
             authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
@@ -598,7 +714,12 @@ layer(approvalServices)("Server approvals", (it) => {
         yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
         const client = yield* makeClient(makeTransport(app.handler), "secret")
         const session = yield* client.sessions.create({ id: "session:server:approval" })
-        const run = yield* client.runs.start({ sessionId: session.id, agent: agent.name, input: "approve" })
+        const run = yield* client.runs.start({
+          sessionId: session.id,
+          agent: agent.name,
+          input: "approve",
+          commandId: "approval:start",
+        })
         yield* runScheduler(run.id, "server:approval:initial")
 
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "waiting" })
@@ -607,13 +728,24 @@ layer(approvalServices)("Server approvals", (it) => {
         yield* client.approvals.resolve({
           runId: run.id,
           token,
+          commandId: "approval:resolve",
           decision: { _tag: "Approved" },
-          operator: "operator:test",
+        })
+        yield* client.approvals.resolve({
+          runId: run.id,
+          token,
+          commandId: "approval:resolve",
+          decision: { _tag: "Approved" },
         })
         yield* runScheduler(run.id, "server:approval:resume")
 
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
         expect(approvalToolCalls).toBe(1)
+        expect(
+          yield* host.approvals
+            .resolve(run.id, token, { _tag: "Approved" }, "test-controller", "approval:other")
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/runtime/IllegalOperatorAction" })
       }),
     ),
   )

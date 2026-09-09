@@ -480,6 +480,56 @@ Encoded durable Run inspection.
 
 ***
 
+<a id="runreceiptencoded"></a>
+
+### RunReceiptEncoded
+
+Encoded durable Run receipt.
+
+#### Extends
+
+- `Omit`\<[`RunReceipt`](#runreceipt), `"runId"`\>
+
+#### Properties
+
+<a id="acceptedsequence-1"></a>
+
+##### acceptedSequence
+
+> `readonly` **acceptedSequence**: `number`
+
+###### Inherited from
+
+[`RunReceipt`](#runreceipt).[`acceptedSequence`](#acceptedsequence)
+
+<a id="duplicate-1"></a>
+
+##### duplicate
+
+> `readonly` **duplicate**: `boolean`
+
+###### Inherited from
+
+[`RunReceipt`](#runreceipt).[`duplicate`](#duplicate)
+
+<a id="messageid-2"></a>
+
+##### messageId
+
+> `readonly` **messageId**: `string`
+
+###### Inherited from
+
+[`RunReceipt`](#runreceipt).[`messageId`](#messageid-1)
+
+<a id="runid-4"></a>
+
+##### runId
+
+> `readonly` **runId**: `string`
+
+***
+
 <a id="runsnapshot"></a>
 
 ### RunSnapshot
@@ -598,7 +648,7 @@ A durable alternate continuation retained from a fork or rewind.
 
 ***
 
-<a id="runid-4"></a>
+<a id="runid-5"></a>
 
 ### RunId
 
@@ -686,7 +736,7 @@ Runtime uses Core's canonical Agent execution identity.
 
 ###### input
 
-`RunReceiptEncoded`
+[`RunReceiptEncoded`](#runreceiptencoded)
 
 ###### options?
 
@@ -796,11 +846,11 @@ Runtime uses Core's canonical Agent execution identity.
 
 ### encodeReceipt
 
-> `const` **encodeReceipt**: \{(`input`, `options?`): `Effect`\<`RunReceiptEncoded`, `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<`RunReceiptEncoded`, `SchemaError`, `never`\>; \}
+> `const` **encodeReceipt**: \{(`input`, `options?`): `Effect`\<[`RunReceiptEncoded`](#runreceiptencoded), `SchemaError`, `never`\>; (`options?`): (`input`) => `Effect`\<[`RunReceiptEncoded`](#runreceiptencoded), `SchemaError`, `never`\>; \}
 
 #### Call Signature
 
-> (`input`, `options?`): `Effect`\<`RunReceiptEncoded`, `SchemaError`, `never`\>
+> (`input`, `options?`): `Effect`\<[`RunReceiptEncoded`](#runreceiptencoded), `SchemaError`, `never`\>
 
 ##### Parameters
 
@@ -814,11 +864,11 @@ Runtime uses Core's canonical Agent execution identity.
 
 ##### Returns
 
-`Effect`\<`RunReceiptEncoded`, `SchemaError`, `never`\>
+`Effect`\<[`RunReceiptEncoded`](#runreceiptencoded), `SchemaError`, `never`\>
 
 #### Call Signature
 
-> (`options?`): (`input`) => `Effect`\<`RunReceiptEncoded`, `SchemaError`, `never`\>
+> (`options?`): (`input`) => `Effect`\<[`RunReceiptEncoded`](#runreceiptencoded), `SchemaError`, `never`\>
 
 ##### Parameters
 
@@ -828,7 +878,7 @@ Runtime uses Core's canonical Agent execution identity.
 
 ##### Returns
 
-(`input`) => `Effect`\<`RunReceiptEncoded`, `SchemaError`, `never`\>
+(`input`) => `Effect`\<[`RunReceiptEncoded`](#runreceiptencoded), `SchemaError`, `never`\>
 
 ***
 
@@ -932,7 +982,7 @@ A durable alternate continuation retained from a fork or rewind.
 
 ***
 
-<a id="runid-5"></a>
+<a id="runid-6"></a>
 
 ### RunId
 
@@ -1014,7 +1064,7 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 > `readonly` **retainedSession**: `Schema.optionalKey`\<`Schema.Struct`\<\{ `depth`: `Schema.Int`; `id`: `Schema.String`; `initialRunId`: `Schema.String`; `parentRunId`: `Schema.NullOr`\<`Schema.String`\>; `parentSessionId`: `Schema.NullOr`\<`Schema.String`\>; `rootSessionId`: `Schema.String`; \}\>\>
 
-<a id="runid-6"></a>
+<a id="runid-7"></a>
 
 ##### runId
 
@@ -1036,7 +1086,7 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 ##### waits
 
-> `readonly` **waits**: `Schema.$Array`\<`Schema.Struct`\<\{ `closedAt`: `Schema.optionalKey`\<`Schema.String`\>; `openedAt`: `Schema.String`; `reason`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"ToolWait"`, \{ \}\>, `Schema.TaggedStruct`\<`"Approval"`, \{ `request`: `Schema.Struct`\<\{ `approvalId`: ...; `capability`: ...; `input`: ...; `operation`: ...; \}\>; \}\>, `Schema.TaggedStruct`\<`"Signal"`, \{ `name`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Timer"`, \{ `dueAt`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"External"`, \{ `capability`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"AwaitEvent"`, \{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly ...\>; \}\>\]\>; `resolution`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<...\>; \}\>, `Schema.TaggedStruct`\<`"ToolResult"`, \{ `encodedResult`: `Schema.Unknown`; `result`: `Schema.Unknown`; \}\>, `Schema.TaggedStruct`\<`"Signal"`, \{ `name`: `Schema.String`; `payload`: `Schema.optionalKey`\<...\>; \}\>\]\>\>; `status`: `Schema.Literals`\<readonly \[`"open"`, `"responded"`, `"signaled"`, `"cancelled"`\]\>; `waitId`: `Schema.String`; \}\>\>
+> `readonly` **waits**: `Schema.$Array`\<`Schema.Struct`\<\{ `closedAt`: `Schema.optionalKey`\<`Schema.String`\>; `openedAt`: `Schema.String`; `reason`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"ToolWait"`, \{ \}\>, `Schema.TaggedStruct`\<`"Approval"`, \{ `request`: `Schema.Struct`\<\{ `approvalId`: ...; `capability`: ...; `input`: ...; `operation`: ...; \}\>; \}\>, `Schema.TaggedStruct`\<`"Signal"`, \{ `name`: `Schema.String`; \}\>, `Schema.TaggedStruct`\<`"Timer"`, \{ `dueAt`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"External"`, \{ `capability`: `Schema.optionalKey`\<`Schema.String`\>; \}\>, `Schema.TaggedStruct`\<`"AwaitEvent"`, \{ `deadline`: `Schema.String`; `filter`: `Schema.Union`\<readonly ...\>; \}\>\]\>; `resolution`: `Schema.optionalKey`\<`Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<...\>; \}\>, `Schema.TaggedStruct`\<`"ToolResult"`, \{ `encodedResult`: `Schema.Unknown`; `result`: `Schema.Unknown`; \}\>, `Schema.TaggedStruct`\<`"Signal"`, \{ `name`: `Schema.String`; `payload`: `Schema.optionalKey`\<...\>; \}\>\]\>\>; `resolutionCommandId`: `Schema.optionalKey`\<`Schema.String`\>; `status`: `Schema.Literals`\<readonly \[`"open"`, `"responded"`, `"signaled"`, `"cancelled"`\]\>; `waitId`: `Schema.String`; \}\>\>
 
 ***
 
@@ -1052,7 +1102,7 @@ Field schemas shared by `RunInspection` and the schemas that extend it.
 
 ### RunReceipt
 
-> **RunReceipt**: `Codec`\<[`RunReceipt`](#runreceipt), `RunReceiptEncoded`, `never`, `never`\>
+> **RunReceipt**: `Codec`\<[`RunReceipt`](#runreceipt), [`RunReceiptEncoded`](#runreceiptencoded), `never`, `never`\>
 
 ***
 

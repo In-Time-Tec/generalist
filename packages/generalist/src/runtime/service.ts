@@ -328,6 +328,7 @@ export interface RespondInput {
   readonly runId: string
   readonly waitId: string
   readonly resolution: Exclude<WaitResolution, { readonly _tag: "Signal" }>
+  readonly commandId?: string
 }
 
 export interface SignalInput extends CommandIdentity {
@@ -579,6 +580,7 @@ export interface OperatorService {
     token: string,
     decision: ResolveApprovalDecision,
     operator: string,
+    commandId: string,
   ) => Effect.Effect<void, OperatorApprovalError, RuleStore>
   readonly extendBudget: (
     runId: string,
@@ -602,6 +604,14 @@ export interface Service extends RuntimeHostSessions {
   readonly startTool: <T extends Tool.Any>(
     tool: T,
     input: Tool.Parameters<T>,
+    options?: ToolStartOptions,
+  ) => Effect.Effect<
+    ToolRunHandle<T["successSchema"]["Type"], T["failureSchema"]["Type"]>,
+    StartExecutionError | InspectError
+  >
+  readonly startToolEncoded: <T extends Tool.Any>(
+    tool: T,
+    input: Schema.Json,
     options?: ToolStartOptions,
   ) => Effect.Effect<
     ToolRunHandle<T["successSchema"]["Type"], T["failureSchema"]["Type"]>,

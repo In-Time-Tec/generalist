@@ -42,3 +42,41 @@
 - [SessionQueue](./namespaces/SessionQueue.md)
 - [Steering](./namespaces/Steering.md)
 - [TreePolicy](./namespaces/TreePolicy.md)
+
+## Classes
+
+<a id="sessionsender"></a>
+
+### SessionSender
+
+**`Experimental`**
+
+Authenticated identity supplied at the application or executing Run boundary.
+
+#### Extends
+
+- `SessionSender_base`
+
+#### Constructors
+
+<a id="constructor"></a>
+
+##### Constructor
+
+> **new SessionSender**(`_`): [`SessionSender`](#sessionsender)
+
+**`Experimental`**
+
+###### Parameters
+
+###### \_
+
+`never`
+
+###### Returns
+
+[`SessionSender`](#sessionsender)
+
+###### Inherited from
+
+`SessionSender_base.constructor`

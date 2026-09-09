@@ -240,6 +240,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
       yield* Approval.deny({
         runId: receipt.runId,
         approvalId: "approval:delete-draft",
+        commandId: "approval:delete-draft:deny",
         reason: "operator denied",
       })
       const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })

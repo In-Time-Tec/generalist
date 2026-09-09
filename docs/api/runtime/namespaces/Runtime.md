@@ -728,7 +728,7 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 
 ##### resolveApproval
 
-> `readonly` **resolveApproval**: (`token`, `decision`, `operator`) => `Effect`\<`void`, [`OperatorApprovalError`](#operatorapprovalerror), [`RuleStore`](../../permissions.md#rulestore)\>
+> `readonly` **resolveApproval**: (`token`, `decision`, `operator`, `commandId`) => `Effect`\<`void`, [`OperatorApprovalError`](#operatorapprovalerror), [`RuleStore`](../../permissions.md#rulestore)\>
 
 ###### Parameters
 
@@ -741,6 +741,10 @@ Host policy for addressing beyond Generalist's derived relationships. Absent mea
 [`ResolveApprovalDecision`](./Recovery.md#resolveapprovaldecision)
 
 ###### operator
+
+`string`
+
+###### commandId
 
 `string`
 
@@ -897,6 +901,12 @@ Select the memory-only live preview lane for one Run.
 ### RespondInput
 
 #### Properties
+
+<a id="commandid-3"></a>
+
+##### commandId?
+
+> `readonly` `optional` **commandId?**: `string`
 
 <a id="resolution"></a>
 
@@ -1795,6 +1805,36 @@ Read ordered durable child settlements for one exact parent Run.
 
 `Effect`\<\{ `concurrency`: \{ `agents`: `number`; `tools`: `number`; \}; `maxDepth`: `number`; `maxSessions`: `number`; \}, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid)\>
 
+<a id="controlsession"></a>
+
+##### controlSession
+
+> `readonly` **controlSession**: (`input`) => `Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+###### Parameters
+
+###### input
+
+###### action
+
+`"stop"` \| `"resume"` \| `"close"`
+
+###### commandId
+
+`string`
+
+###### sessionId
+
+`string`
+
+###### Returns
+
+`Effect`\<`void`, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`SessionNotFound`](../../host.md#sessionnotfound)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`controlSession`](./HostSession.md#controlsession)
+
 <a id="createsession"></a>
 
 ##### createSession
@@ -2038,6 +2078,26 @@ Pending addressed-message projections for this exact Run.
 ###### Returns
 
 `Effect`\<readonly [`MailboxEntry`](./Mailbox.md#mailboxentry)[], [`DirectoryError`](#directoryerror)\>
+
+<a id="messagesessioninput"></a>
+
+##### messageSessionInput
+
+> `readonly` **messageSessionInput**: (`input`) => `Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict), [`SessionSender`](../index.md#sessionsender)\>
+
+###### Parameters
+
+###### input
+
+`Omit`\<`MessageInput`, `"from"`\>
+
+###### Returns
+
+`Effect`\<\{ `id`: `string`; `revision`: `number`; \}, [`SessionError`](./HostSession.md#sessionerror) \| [`SessionQueueConflict`](./SessionQueue.md#sessionqueueconflict), [`SessionSender`](../index.md#sessionsender)\>
+
+###### Inherited from
+
+[`RuntimeHostSessions`](./HostSession.md#runtimehostsessions).[`messageSessionInput`](./HostSession.md#messagesessioninput)
 
 <a id="operator"></a>
 
@@ -2297,6 +2357,10 @@ Bind one host-assigned name, unique within the Run's naming scope.
 ###### input
 
 ###### approvalId
+
+`string`
+
+###### commandId
 
 `string`
 
@@ -2805,6 +2869,36 @@ Begin one already-normalized pinned execution.
 
 `Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound)\>
 
+<a id="starttoolencoded"></a>
+
+##### startToolEncoded
+
+> `readonly` **startToolEncoded**: \<`T`\>(`tool`, `input`, `options?`) => `Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound)\>
+
+###### Type Parameters
+
+###### T
+
+`T` *extends* `Any`
+
+###### Parameters
+
+###### tool
+
+`T`
+
+###### input
+
+`Json`
+
+###### options?
+
+[`ToolStartOptions`](#toolstartoptions)
+
+###### Returns
+
+`Effect`\<[`ToolRunHandle`](#toolrunhandle)\<`T`\[`"successSchema"`\]\[`"Type"`\], `T`\[`"failureSchema"`\]\[`"Type"`\]\>, [`DurabilityFailure`](../../durability.md#durabilityfailure) \| [`RuntimeUnavailable`](./Errors.md#runtimeunavailable) \| [`ChildDepthExceeded`](./Errors.md#childdepthexceeded) \| [`ChildLimitExceeded`](./Errors.md#childlimitexceeded) \| [`IdempotencyConflict`](./Errors.md#idempotencyconflict) \| [`RunIdConflict`](./Errors.md#runidconflict) \| [`ExecutableIdentityMismatch`](./Errors.md#executableidentitymismatch) \| [`ExecutablePinMissing`](./Errors.md#executablepinmissing) \| [`ExecutableRegistrationInvalid`](./Errors.md#executableregistrationinvalid) \| [`ExecutableRegistrationConflict`](./Errors.md#executableregistrationconflict) \| [`ExecutableRegistrationMissing`](./Errors.md#executableregistrationmissing) \| [`ChildSelectionMissing`](./Errors.md#childselectionmissing) \| [`StartInvalid`](./Errors.md#startinvalid) \| [`FanOutConflict`](./Errors.md#fanoutconflict) \| [`FanOutInvalid`](./Errors.md#fanoutinvalid) \| [`FanOutRemainderUnsupported`](./Errors.md#fanoutremainderunsupported) \| [`TreePolicyInvalid`](./Errors.md#treepolicyinvalid) \| [`Exhausted`](../../generalist/namespaces/RunBudget.md#exhausted) \| [`RunNotFound`](./Errors.md#runnotfound)\>
+
 <a id="submitsessioninput"></a>
 
 ##### submitSessionInput
@@ -3127,7 +3221,7 @@ Journal one validated environmental event and resume one matching wait at most o
 
 #### Properties
 
-<a id="commandid-3"></a>
+<a id="commandid-4"></a>
 
 ##### commandId
 
@@ -3543,7 +3637,7 @@ Exact root execution admission used below the typed Agent API.
 
 #### Properties
 
-<a id="commandid-4"></a>
+<a id="commandid-5"></a>
 
 ##### commandId?
 

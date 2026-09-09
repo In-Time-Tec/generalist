@@ -4,20 +4,21 @@ Child admission durably creates a direct child Run and immediately returns its h
 
 ## Named profiles
 
-Declare permitted children on the Agent instead of installing a blocking tool to grant delegation. `Generalist.create` resolves names against its Agent registry before registration. Unknown or duplicate profile names fail with `ExecutableRegistrationInvalid`. The declaration is copied at construction, so mutating the caller's array cannot change a compiled profile.
+Declare permitted children on the Agent instead of installing a blocking tool to grant delegation. `Host.make` resolves names against its named Agent registry before registration. Unknown or duplicate profile names fail with `ExecutableRegistrationInvalid`. The registry is copied at construction, so mutating the caller's object cannot change a compiled profile.
 
 This composition fragment defines profiles and limits; it does not call a model or provision storage. Creating the Host requires the Runtime, model, permissions, and approval Layers described in [Runtime](./runtime.md).
 
 ```ts
 import { Effect } from "effect"
 import { Agent } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 
 const researcher = Agent.make({ name: "researcher", children: ["researcher"] })
 
 const hosted = Effect.gen(function* () {
-  return yield* Generalist.create({
-    agents: [researcher],
+  return yield* Host.make({
+    agents: { researcher },
+    revision: "researcher-build",
     limits: {
       tree: { maxDepth: 3, maxSessions: 32 },
       concurrency: { agents: 4, tools: 8 },
@@ -32,7 +33,17 @@ Profile references are pinned in the executable manifest. Self-reference and mut
 
 `HostRun.spawn(selection, prompt, { commandId, label? })` returns `{ session, run }` after admission, before execution completes. The child Session and initial Run are committed together. Reuse the same command ID and immutable input after an ambiguous response; `host.runs.get(parentRunId)` recovers a parent handle on a fresh Host, and an exact retry returns the same child Session and Run. Changed input under that command ID fails with `IdempotencyConflict`.
 
-`session.inspect` and Run inspections expose `retainedSession`: the Session identity, original parent Run and Session, root Session, initial Run, and depth. These fields are projected from canonical Session family records rather than maintained in another registry. The child Session also retains its pinned executable selection. A completed Run remains terminal; retaining its conversation does not enable sponsored follow-up execution or make terminal steering valid.
+`session.inspect` and Run inspections expose `retainedSession`: the Session identity, original parent Run and Session, root Session, initial Run, and depth. These fields are projected from canonical Session family records rather than maintained in another registry. The child Session also retains its pinned executable selection. A completed Run remains terminal; follow-ups use `session.message`, not terminal Run steering.
+
+`session.message(prompt, { commandId })` derives its sender from the authenticated `SessionSender` Runtime service. Applications supply that service after authenticating a principal and authorizing the target Session; the message options cannot supply a display name or override the sender. A Run sender must belong to the retained family. The sender is retained in the inbox or queued input and in the model-facing message framing.
+
+An active Run receives the message through its durable steering inbox, after tool results and before the next model turn. Admission and completion serialize: a message accepted before completion continues that Run at its safe boundary; a message accepted after completion queues a fresh Run. Exact retries return the original command receipt across either outcome and across fresh Hosts.
+
+An idle child Session stores one explicit continuation allocation when its first child Run is admitted. That allocation is finite in continuation count and carries the pinned child budget; each fresh sponsored Run consumes one reservation and is capped by the remaining child allocation after canonical spending. Its `sourceRunId` is the originating parent Run, so a terminal parent does not close the reservation and a replacement sponsor cannot mint another one. A message from a new Run in the original parent Session can replace the current `sponsorRunId`; this does not rewrite `retainedSession.parentRunId`, the original family, or incurred spending. Unknown dollar spending exhausts a bounded dollar allocation rather than treating it as free.
+
+Messages to stopped Sessions, or idle Sessions without an executable allocation, remain in the bounded queue without a new Run. `session.stop({ commandId })` fences automatic promotion and normal execution claims before requesting cancellation of the Session's Runs and their Run descendants. `session.resume({ commandId })` explicitly reopens promotion; it does not mint a grant or revive a terminal Run. `session.close({ commandId })` is permanent: later messages remain retained but resumption fails. All three lifecycle commands have immutable retry receipts.
+
+Run cancellation affects that Run and its execution descendants, not the retained Session's future admission policy. Session stop adds that policy fence. Parent success, observer disconnect, wait timeout, and host sleep are not Session stop or implicit cancellation. Local execution fibers are interrupted after the durable cancellation decision; replacement hosts observe the same decision before executing work. Pending cleanup may outlive the stop acknowledgement.
 
 `host.sessions.family(sessionId, { limit: 64 })` returns a bounded page of compact retained Session metadata. The first page pins `at` to the root Session's current event cursor. Continue with `{ at, before: nextBefore, limit: 64 }` until `nextBefore` is `null`, including when a page is empty. Each call scans at most 256 root Session events and returns at most 64 members, so families larger than a page remain inspectable. Membership comes from each Session's first admitted Run, not another family registry; later admissions cannot enter an older cursor-pinned traversal. Pages are chronological within each backward scan. Load a Session by its `id` to inspect its pinned executable selection.
 

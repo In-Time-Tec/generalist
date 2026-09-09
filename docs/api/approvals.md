@@ -318,11 +318,17 @@ An unresolved authorization request.
 
 #### Properties
 
+<a id="commandid"></a>
+
+##### commandId
+
+> `readonly` **commandId**: `string`
+
 <a id="operator"></a>
 
-##### operator
+##### operator?
 
-> `readonly` **operator**: `string`
+> `readonly` `optional` **operator?**: `string`
 
 Operator identity journaled with the decision; also requires the token to be an open obligation.
 
@@ -550,13 +556,13 @@ Delegate approvals at or above one Permissions level and approve lower levels.
 
 ### resolve
 
-> `const` **resolve**: \{(`token`, `decision`, `options?`): `ResolveEffect`; (`decision`, `options?`): (`token`) => `ResolveEffect`; \}
+> `const` **resolve**: \{(`token`, `decision`, `options`): `ResolveEffect`; (`decision`, `options`): (`token`) => `ResolveEffect`; \}
 
 Resolve one exact durable approval token through the active Runtime.
 
 #### Call Signature
 
-> (`token`, `decision`, `options?`): `ResolveEffect`
+> (`token`, `decision`, `options`): `ResolveEffect`
 
 ##### Parameters
 
@@ -568,7 +574,7 @@ Resolve one exact durable approval token through the active Runtime.
 
 [`Approved`](#approved) \| [`Denied`](#denied)
 
-###### options?
+###### options
 
 [`ResolveOptions`](#resolveoptions)
 
@@ -578,7 +584,7 @@ Resolve one exact durable approval token through the active Runtime.
 
 #### Call Signature
 
-> (`decision`, `options?`): (`token`) => `ResolveEffect`
+> (`decision`, `options`): (`token`) => `ResolveEffect`
 
 ##### Parameters
 
@@ -586,7 +592,7 @@ Resolve one exact durable approval token through the active Runtime.
 
 [`Approved`](#approved) \| [`Denied`](#denied)
 
-###### options?
+###### options
 
 [`ResolveOptions`](#resolveoptions)
 

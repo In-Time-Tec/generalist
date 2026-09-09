@@ -138,7 +138,7 @@ For an existing Session, `client.events.connect({ sessionId })` first reads a ve
 
 ## 2. Resolve approval waits
 
-A durable approval emits an approval token and suspends the Run. Resolve it with `client.approvals.resolve({ runId, token, decision, operator })`. Runtime verifies the token, journals the operator identity, and rejects a stale decision.
+A durable approval emits an approval token and suspends the Run. Resolve it with `client.approvals.resolve({ runId, token, commandId, decision })`. Runtime verifies the token, journals the authenticated operator identity, and rejects a stale decision.
 
 **approval-resume.ts**
 
@@ -300,7 +300,7 @@ import { BunCrypto } from "@effect/platform-bun"
 import { Config, Effect, Layer, Option } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { ExecutableResolver } from "generalist/runtime"
@@ -351,7 +351,11 @@ const services = Layer.mergeAll(
 )
 
 const apiLayer = Layer.unwrap(
-  Generalist.create({ agents: [agent] }).pipe(
+  Host.make({
+    agents: { support: agent },
+    revision: "serve-demo-build",
+    limits: { tree: { maxDepth: 3, maxSessions: 32 }, concurrency: { agents: 4, tools: 8 } },
+  }).pipe(
     Effect.map((host) =>
       Server.layer({
         authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },

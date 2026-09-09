@@ -1,9 +1,8 @@
 import { Cause, Effect, Fiber, Ref, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { HostEvent } from "../host/event.js"
-import type { Host } from "../host/index.js"
+import type { AgentRegistry, Host } from "../host/index.js"
 import type { SessionEventsError } from "../runtime/session/host.js"
 import { decodeCommand, eventCodec } from "./wire.js"
 import { authorize, type Authorization } from "./auth.js"
@@ -26,7 +25,7 @@ const closeForStreamError = (
   }
 }
 
-const runBelongsTo = <Agents extends ReadonlyArray<AnyAgent>>(
+const runBelongsTo = <Agents extends AgentRegistry>(
   host: Host<Agents>,
   sessionId: string,
   runId: string,
@@ -37,7 +36,7 @@ const runBelongsTo = <Agents extends ReadonlyArray<AnyAgent>>(
   )
 
 /** Upgrade one authenticated Session route and stream its HostEvents. */
-export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
+export const handle = <Agents extends AgentRegistry>(options: {
   readonly host: Host<Agents>
   readonly authorization: Authorization
   readonly sessionId: string
@@ -80,7 +79,18 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
         if (!allowed) return
         const previews = yield* options.host.events.previews(options.sessionId, runId)
         const fiber = yield* previews.pipe(
-          Stream.runForEach(writeEvent),
+          Stream.mapEffect((event) =>
+            authorize({
+              policy: options.authorization,
+              resource: { type: "run", id: runId },
+              action: "observe",
+            }).pipe(Effect.andThen(writeEvent(event))),
+          ),
+          Stream.runDrain,
+          Effect.catchTags({
+            "generalist/server/Forbidden": () => close(1008, "forbidden").pipe(Effect.asVoid),
+            "generalist/server/Unauthorized": () => close(1008, "unauthorized").pipe(Effect.asVoid),
+          }),
           Effect.catchTag("SocketError", () => Effect.void),
           Effect.forkChild,
         )
@@ -93,6 +103,11 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
     const eventFiber = yield* options.events.pipe(
       Stream.mapEffect((event) =>
         Effect.gen(function* () {
+          yield* authorize({
+            policy: options.authorization,
+            resource: { type: "session", id: options.sessionId },
+            action: "observe",
+          })
           if (event._tag === "RunStarted" && event.event.parentRunId === undefined) {
             yield* writeEvent(event)
             const session = yield* options.host.sessions.get(options.sessionId)
@@ -109,6 +124,10 @@ export const handle = <Agents extends ReadonlyArray<AnyAgent>>(options: {
         }),
       ),
       Stream.runDrain,
+      Effect.catchTags({
+        "generalist/server/Forbidden": () => close(1008, "forbidden").pipe(Effect.asVoid),
+        "generalist/server/Unauthorized": () => close(1008, "unauthorized").pipe(Effect.asVoid),
+      }),
       Effect.catchTag("SocketError", () => Effect.void),
       Effect.catch((error) => closeForStreamError(writer, error)),
       Effect.catchCause((cause) =>

@@ -4,7 +4,7 @@ import { vi } from "vitest"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 import { Server, type Principal } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -31,9 +31,12 @@ const services = Layer.mergeAll(
 
 const mutations = [
   { path: "/sessions", body: { id: "forbidden" } },
-  { path: "/sessions/existing/runs", body: { agent: "authorization", input: "forbidden" } },
+  { path: "/sessions/existing/runs", body: { agent: "authorization", input: "forbidden", commandId: "forbidden" } },
   { path: "/runs/existing/cancel", body: { commandId: "cancel" } },
-  { path: "/runs/existing/approvals/token", body: { decision: { _tag: "Approved" }, operator: "controller" } },
+  {
+    path: "/runs/existing/approvals/token",
+    body: { commandId: "approval", decision: { _tag: "Approved" }, operator: "controller" },
+  },
   { path: "/runs/existing/retry", body: { commandId: "retry", operator: "controller" } },
   { path: "/runs/existing/wake", body: { commandId: "wake", operator: "controller" } },
   {
@@ -67,7 +70,7 @@ layer(services)("Server authorization", (it) => {
     it.effect(`denies every declared mutation before Host calls by ${deniedBy}`, () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: `authorization-${deniedBy}` })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const principal: Principal = {
           id: "application-user",
           tenantId: deniedBy === "tenant" ? "other" : "test",
@@ -138,7 +141,7 @@ layer(services)("Server authorization", (it) => {
   for (const deniedBy of ["tenant", "resource"] as const) {
     it.effect(`denies reads and subscriptions before Host calls by ${deniedBy}`, () =>
       Effect.gen(function* () {
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         const spies = [
           vi.spyOn(host.sessions, "get"),
           vi.spyOn(host.sessions, "list"),

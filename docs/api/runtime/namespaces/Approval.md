@@ -102,7 +102,7 @@ Approve through the active Runtime service.
 
 ### ApproveInput
 
-> `const` **ApproveInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `runId`: `Schema.String`; \}\>
+> `const` **ApproveInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `commandId`: `Schema.String`; `runId`: `Schema.String`; \}\>
 
 Approve exactly one pending authorization request.
 
@@ -142,7 +142,7 @@ Deny through the active Runtime service.
 
 ### DenyInput
 
-> `const` **DenyInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `runId`: `Schema.String`; \}\>
+> `const` **DenyInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `commandId`: `Schema.String`; `reason`: `Schema.optionalKey`\<`Schema.String`\>; `runId`: `Schema.String`; \}\>
 
 Deny exactly one pending authorization request.
 
@@ -162,7 +162,7 @@ The exact operation and capability awaiting authorization.
 
 ### resolveWith
 
-> `const` **resolveWith**: (`runtime`, `token`, `decision`, `options?`) => `Effect.Effect`\<`void`, [`ResolveError`](../../approvals.md#resolveerror), [`RuleStore`](../../permissions.md#rulestore)\>
+> `const` **resolveWith**: (`runtime`, `token`, `decision`, `options`) => `Effect.Effect`\<`void`, [`ResolveError`](../../approvals.md#resolveerror), [`RuleStore`](../../permissions.md#rulestore)\>
 
 **`Internal`**
 
@@ -182,7 +182,7 @@ Resolve one exact durable approval token through the supplied Runtime.
 
 [`Approved`](../../approvals.md#approved) \| [`Denied`](../../approvals.md#denied)
 
-##### options?
+##### options
 
 [`ResolveOptions`](../../approvals.md#resolveoptions)
 
@@ -196,7 +196,7 @@ Resolve one exact durable approval token through the supplied Runtime.
 
 ### RespondInput
 
-> `const` **RespondInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `decision`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>; `operator`: `Schema.optionalKey`\<`Schema.String`\>; `runId`: `Schema.String`; \}\>
+> `const` **RespondInput**: `Schema.Struct`\<\{ `approvalId`: `Schema.String`; `commandId`: `Schema.String`; `decision`: `Schema.Union`\<readonly \[`Schema.TaggedStruct`\<`"Approved"`, \{ \}\>, `Schema.TaggedStruct`\<`"Denied"`, \{ `reason`: `Schema.optionalKey`\<`Schema.String`\>; \}\>\]\>; `operator`: `Schema.optionalKey`\<`Schema.String`\>; `runId`: `Schema.String`; \}\>
 
 Respond to exactly one stable approval request.
 

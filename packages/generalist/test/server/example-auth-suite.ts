@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { Approvals, Permissions } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -41,7 +41,7 @@ layer(services)("Example browser authentication", (it) => {
             }),
           ),
         )
-        const host = yield* Generalist.create({ agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         const session = yield* host.sessions.create({ id: `cookie-${name}` })
         const app = HttpRouter.toWebHandler(
           Layer.merge(

@@ -5,7 +5,7 @@ import { Server, type LayerOptions } from "generalist/server"
 const cookieName = "generalist_research"
 
 interface BrowserAuth {
-  readonly auth: LayerOptions<[], never, never>["auth"]
+  readonly auth: LayerOptions<Record<string, never>, never, never>["auth"]
   readonly login: Layer.Layer<never, never, HttpRouter.HttpRouter>
   readonly tenantId: string
 }

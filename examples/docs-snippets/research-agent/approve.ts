@@ -22,8 +22,8 @@ const program = Effect.gen(function* () {
   yield* client.approvals.resolve({
     runId: approval.runId,
     token: approval.event.request.approvalId,
+    commandId: `approval:${approval.event.request.approvalId}`,
     decision: { _tag: "Approved" },
-    operator: "tutorial:human",
   })
   yield* Console.log(`approved ${approval.event.request.capability} for ${approval.runId}`)
 })

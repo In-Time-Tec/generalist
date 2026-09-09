@@ -6,7 +6,7 @@ import { Prompt } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
-import { Generalist, type SessionRunsInput } from "generalist/host"
+import { Host, type SessionRunsInput } from "generalist/host"
 import { ExecutableResolver, RunStore } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
@@ -37,7 +37,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
     Effect.gen(function* () {
       const agent = Agent.make({ name: "server-policy" })
       const limits = { tree: { maxDepth: 2, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
-      const host = yield* Generalist.create({ agents: [agent], limits })
+      const host = yield* Host.make({ revision: "local", agents: { agent }, limits })
       const server = yield* Layer.build(
         HttpRouter.serve(
           Server.layer({
@@ -63,6 +63,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
         sessionId: session.id,
         agent: agent.name,
         input: "bounded direct input",
+        commandId: "bounded:direct",
       })
       const store = yield* RunStore.RunStore
       for (const runId of [queued.activeRunId!, direct.id])
@@ -77,7 +78,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
     () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "http-history" })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const session = yield* host.sessions.create({ id: "http-history" })
         const other = yield* host.sessions.create({ id: "http-history-private" })
         const otherRun = yield* host.runs.start(other.id, agent, "private")
@@ -180,7 +181,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
   it.effect("loads an existing Session before connecting and observes an admission racing the snapshot response", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "local-snapshot" })
-      const host = yield* Generalist.create({ agents: [agent] })
+      const host = yield* Host.make({ revision: "local", agents: { agent } })
       const session = yield* host.sessions.create({ id: "local-snapshot" })
       const original = yield* host.runs.start(session.id, agent, "existing input")
       const before = yield* host.sessions.snapshot(session.id)
@@ -229,7 +230,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
       Effect.gen(function* () {
         const allowed = yield* Ref.make(true)
         const agent = Agent.make({ name: `local-${mode}` })
-        const host = yield* Generalist.create({ agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const session = yield* host.sessions.create({ id: `local-${mode}` })
         const run = yield* host.runs.start(session.id, agent, "existing input")
         const document = yield* Artifact.open(`local-${mode}.md`, { crdt: Yjs.layer(), initial: "draft" })
