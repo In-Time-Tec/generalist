@@ -15,7 +15,7 @@ import { afterAll, expect, test, type TestContext } from "vitest"
 import { Context, Deferred, Effect, Layer, ManagedRuntime, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
-import { Generalist } from "generalist/host"
+import { Host, type MakeError } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
 import { Authentication, CurrentPrincipal } from "../../../../src/server/auth.js"
 import { Unauthorized } from "../../../../src/server/errors.js"
@@ -1136,6 +1136,7 @@ test.for(["transport", "lease"] as const)(
 test("bridges authenticated HTTP and raw WebSocket traffic through one actor host", async (context) => {
   const bucket = await Effect.runPromise(makeBucket())
   const closedAgent = Agent.close(agent, model)
+  const serverAgents = { bridge: closedAgent } as const
   let serverBuilds = 0
   let serverFinalized = 0
   const principal = { id: "rivet-controller", tenantId: "rivet", role: "controller" as const }
@@ -1158,9 +1159,10 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
       Effect.sync(() => void serverBuilds++).pipe(
         Effect.andThen(
           Effect.gen(function* () {
-            const host = yield* Generalist.create({ agents: [closedAgent] }).pipe(
-              Effect.provide(Layer.merge(Approvals.layerAutoApprove, Permissions.layerAllowAll)),
-            )
+            const host = yield* Host.make({
+              agents: serverAgents,
+              revision: "server-bridge",
+            }).pipe(Effect.provide(Layer.merge(Approvals.layerAutoApprove, Permissions.layerAllowAll)))
             return {
               host,
               auth,
@@ -1172,7 +1174,7 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
       ),
   }
   const options = makeOptions(model, bucket, "server-bridge", 60_000)
-  const definition = makeRuntimeActor({
+  const definition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, Runtime.Runtime>({
     ...options,
     server,
   })
@@ -1220,12 +1222,17 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
   const first = client.bridge.getOrCreate(key, testPool(context))
   const firstResponse = await first.fetch("/sessions/rivet-server-bridge", { headers })
   expect(firstResponse.status).toBe(200)
+  const streaming = await first.fetch("/sessions/rivet-server-bridge/events", { headers })
+  expect(streaming.status).toBe(200)
+  expect(streaming.body).not.toBeNull()
+  await streaming.body?.cancel()
+  expect(serverFinalized).toBe(0)
   await registry.shutdown()
   expect(firstSleepCount()).toBeGreaterThanOrEqual(1)
   expect(serverBuilds).toBe(1)
   expect(serverFinalized).toBe(1)
 
-  const replacementDefinition = makeRuntimeActor({
+  const replacementDefinition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, Runtime.Runtime>({
     ...makeOptions(model, await Effect.runPromise(bucket.connect), "server-bridge", 60_000),
     server,
   })

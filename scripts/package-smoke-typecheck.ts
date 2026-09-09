@@ -25,7 +25,7 @@ import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
 import { Server } from "generalist/server"
 import { Host, ToolIdentity, type HostToolRun } from "generalist/host"
-import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
+import { Config, Context, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 type Equal<Left, Right> =
@@ -76,6 +76,30 @@ type HostedCommandServices = Assert<Equal<EffectServices<typeof hostedCommand>, 
 type ActorNamespace = Assert<Equal<ReturnType<Rivet.RuntimeActorOptions["namespace"]>, Rivet.RuntimeActorNamespace>>
 type FactoryStaticPartitionRemoved = Assert<Equal<"partition" extends keyof Rivet.RuntimeActorOptions ? true : false, false>>
 type CustomActorPartition = Assert<Equal<Rivet.ActorRuntimeOptions["partition"], string>>
+class RequiredServerAuth extends Context.Service<RequiredServerAuth, { readonly token: string }>()(
+  "generalist/package-smoke/RequiredServerAuth",
+) {
+}
+declare const typedServerHost: import("generalist/host").Host<{ readonly background: typeof backgroundAgent }>
+const authWithMissingService = Layer.effect(
+  Server.Authentication,
+  Effect.map(
+    RequiredServerAuth,
+    () => Server.Authentication.of({ bearer: () => Effect.fail(Server.Unauthorized.make({})) }),
+  ),
+)
+const invalidRivetServerFactory: Rivet.RuntimeActorServerFactory<{ readonly background: typeof backgroundAgent }> = {
+  // @ts-expect-error A server factory must return the canonical Host/auth/authorization config.
+  make: () => Effect.succeed({ host: typedServerHost }),
+}
+const missingRivetAuthService: Rivet.RuntimeActorServerOptions<{ readonly background: typeof backgroundAgent }> = {
+  host: typedServerHost,
+  // @ts-expect-error Auth layer requirements cannot be silently erased from the canonical server config.
+  auth: authWithMissingService,
+  authorization: { tenantId: "package-smoke", authorize: () => Effect.succeed(true) },
+}
+void invalidRivetServerFactory
+void missingRivetAuthService
 type ComponentsRoot = typeof import("generalist/components")
 type ComponentRegistryInternal = Assert<Equal<"Registry" extends keyof ComponentsRoot ? true : false, false>>
 type ComponentSessionAuthorityInternal = Assert<Equal<"SessionState" extends keyof ComponentsRoot ? true : false, false>>

@@ -388,13 +388,21 @@ Stable actor identity available before Runtime construction.
 
 #### Type Parameters
 
-##### ServerOptions
+##### Agents
 
-`ServerOptions` = [`RuntimeActorServerOptions`](#runtimeactorserveroptions)
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
 
 ##### ServerError
 
-`ServerError` = `unknown`
+`ServerError` = `never`
+
+##### AuthError
+
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
 
 ##### ServerRequirements
 
@@ -660,7 +668,7 @@ Application-owned executable reconstruction composed into each actor incarnation
 
 ##### server?
 
-> `readonly` `optional` **server?**: [`RuntimeActorServerFactory`](#runtimeactorserverfactory)\<`ServerOptions`, `ServerError`, `ServerRequirements`\>
+> `readonly` `optional` **server?**: [`RuntimeActorServerFactory`](#runtimeactorserverfactory)\<`Agents`, `ServerError`, `AuthError`, `AuthServices`, `ServerRequirements`\>
 
 **`Experimental`**
 
@@ -806,17 +814,25 @@ Actor-incarnation factory for one canonical server configuration.
 
 #### Type Parameters
 
-##### Config
+##### Agents
 
-`Config` = [`RuntimeActorServerOptions`](#runtimeactorserveroptions)
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
 
-##### Error
+##### ServerError
 
-`Error` = `unknown`
+`ServerError` = `never`
 
-##### Requirements
+##### AuthError
 
-`Requirements` = `unknown`
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
+
+##### ServerRequirements
+
+`ServerRequirements` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = [`ActorRuntimeServices`](#actorruntimeservices)
 
 #### Properties
 
@@ -824,7 +840,7 @@ Actor-incarnation factory for one canonical server configuration.
 
 ##### make
 
-> `readonly` **make**: (`context`) => `Effect`\<`Config`, `Error`, `Requirements`\>
+> `readonly` **make**: (`context`) => `Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `ServerRequirements`\>
 
 **`Experimental`**
 
@@ -836,7 +852,7 @@ Actor-incarnation factory for one canonical server configuration.
 
 ###### Returns
 
-`Effect`\<`Config`, `Error`, `Requirements`\>
+`Effect`\<[`RuntimeActorServerOptions`](#runtimeactorserveroptions)\<`Agents`, `AuthError`, `AuthServices`\>, `ServerError`, `ServerRequirements`\>
 
 ## Type Aliases
 
@@ -890,7 +906,7 @@ One typed Rivet Actor definition owning one Runtime partition.
 
 ### RuntimeActorServerOptions
 
-> **RuntimeActorServerOptions**\<`_Agents`, `AuthError`, `AuthServices`\> = [`LayerOptions`](./server.md#layeroptions)\<`never`, `AuthError`, `AuthServices`\>
+> **RuntimeActorServerOptions**\<`Agents`, `AuthError`, `AuthServices`\> = [`LayerOptions`](./server.md#layeroptions)\<`Agents`, `AuthError`, `AuthServices`\>
 
 **`Experimental`**
 
@@ -898,9 +914,9 @@ Server configuration returned by a Rivet actor-incarnation factory.
 
 #### Type Parameters
 
-##### _Agents
+##### Agents
 
-`_Agents` = `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
 
 ##### AuthError
 
@@ -908,7 +924,7 @@ Server configuration returned by a Rivet actor-incarnation factory.
 
 ##### AuthServices
 
-`AuthServices` = `never`
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
 
 ## Variables
 
@@ -960,7 +976,7 @@ Build in onWake, drain after readiness, observe failure, and dispose the owning 
 
 ### makeRuntimeActor
 
-> `const` **makeRuntimeActor**: \<`ServerOptions`, `ServerError`, `ServerRequirements`\>(`options`) => [`RuntimeActorDefinition`](#runtimeactordefinition)
+> `const` **makeRuntimeActor**: \<`Agents`, `ServerError`, `AuthError`, `AuthServices`, `ServerRequirements`\>(`options`) => [`RuntimeActorDefinition`](#runtimeactordefinition)
 
 **`Experimental`**
 
@@ -970,13 +986,21 @@ The object journal is the only Runtime authority. Schedules and cron are wake hi
 
 #### Type Parameters
 
-##### ServerOptions
+##### Agents
 
-`ServerOptions` = [`RuntimeActorServerOptions`](#runtimeactorserveroptions)
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry) = [`AgentRegistry`](./host.md#agentregistry)
 
 ##### ServerError
 
-`ServerError` = `unknown`
+`ServerError` = `never`
+
+##### AuthError
+
+`AuthError` = `never`
+
+##### AuthServices
+
+`AuthServices` *extends* [`ActorRuntimeServices`](#actorruntimeservices) = `never`
 
 ##### ServerRequirements
 
@@ -986,7 +1010,7 @@ The object journal is the only Runtime authority. Schedules and cron are wake hi
 
 ##### options
 
-[`RuntimeActorOptions`](#runtimeactoroptions)\<`ServerOptions`, `ServerError`, `ServerRequirements`\>
+[`RuntimeActorOptions`](#runtimeactoroptions)\<`Agents`, `ServerError`, `AuthError`, `AuthServices`, `ServerRequirements`\>
 
 #### Returns
 

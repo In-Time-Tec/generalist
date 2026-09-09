@@ -32,12 +32,8 @@ import {
 } from "../../../runtime/service.js"
 import { TreePolicy } from "../../../runtime/tree/policy.js"
 import { ActorRuntime, layerActorRuntime, type ActorRuntimeOptions, type ActorRuntimeServices } from "./runtime.js"
-import {
-  make as makeServer,
-  type RuntimeActorServer,
-  type RuntimeActorServerFactory,
-  type RuntimeActorServerOptions,
-} from "./server.js"
+import { make as makeServer, type RuntimeActorServer, type RuntimeActorServerFactory } from "./server.js"
+import type { AgentRegistry } from "../../../host/index.js"
 
 const SendInput = Schema.Struct({
   runId: Schema.optionalKey(Schema.String),
@@ -156,8 +152,10 @@ export interface RuntimeActorIdentity {
 
 /** @experimental */
 export interface RuntimeActorOptions<
-  ServerOptions = RuntimeActorServerOptions,
-  ServerError = unknown,
+  Agents extends AgentRegistry = AgentRegistry,
+  ServerError = never,
+  AuthError = never,
+  AuthServices extends ActorRuntimeServices = never,
   ServerRequirements extends ActorRuntimeServices = ActorRuntimeServices,
 > extends Omit<ActorRuntimeOptions, "drainAction" | "environment" | "tenant" | "partition"> {
   /** Cached for this incarnation; applications must preserve key-to-namespace routing across incarnations. */
@@ -167,7 +165,7 @@ export interface RuntimeActorOptions<
   /** Application-owned executable reconstruction composed into each actor incarnation. */
   readonly resolver: Layer.Layer<ExecutableResolver>
   /** Server configuration constructed once inside this actor incarnation. */
-  readonly server?: RuntimeActorServerFactory<ServerOptions, ServerError, ServerRequirements>
+  readonly server?: RuntimeActorServerFactory<Agents, ServerError, AuthError, AuthServices, ServerRequirements>
   /** Rivet process-lifecycle tuning; it never carries Runtime authority. */
   readonly actorOptions?: InstanceActorOptionsInput
 }
@@ -199,11 +197,13 @@ const retire = (c: Context, host: Host): Promise<void> => {
  * The object journal is the only Runtime authority. Schedules and cron are wake hints.
  */
 export const makeRuntimeActor = <
-  ServerOptions = RuntimeActorServerOptions,
-  ServerError = unknown,
+  Agents extends AgentRegistry = AgentRegistry,
+  ServerError = never,
+  AuthError = never,
+  AuthServices extends ActorRuntimeServices = never,
   ServerRequirements extends ActorRuntimeServices = ActorRuntimeServices,
 >(
-  options: RuntimeActorOptions<ServerOptions, ServerError, ServerRequirements>,
+  options: RuntimeActorOptions<Agents, ServerError, AuthError, AuthServices, ServerRequirements>,
 ): RuntimeActorDefinition => {
   const { actorOptions, namespace, resolver, storage, ...storeOptions } = options
   const configuredOptions: ConfiguredActorOptions = {}
@@ -247,13 +247,7 @@ export const makeRuntimeActor = <
             ? undefined
             : await runtime.runPromise(
                 Effect.flatMap(
-                  // SAFETY: RuntimeActorServerFactory requirements are constrained to the actor ManagedRuntime; its config is the canonical Server options returned by the factory.
-                  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-                  options.server.make({ actorId: c.actorId, key: [...c.key], namespace: resolved }) as Effect.Effect<
-                    RuntimeActorServerOptions,
-                    ServerError,
-                    ActorRuntimeServices
-                  >,
+                  options.server.make({ actorId: c.actorId, key: [...c.key], namespace: resolved }),
                   (config) => makeServer({ config, memoMap: runtime.memoMap, scope: runtime.scope }),
                 ),
                 { signal: c.abortSignal },

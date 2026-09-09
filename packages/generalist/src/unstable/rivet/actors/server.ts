@@ -3,8 +3,9 @@ import { Context, Effect, Exit, Layer, Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse, HttpServer } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { UniversalWebSocket } from "rivetkit"
-import type { Any as AnyAgent } from "../../../core/agent/service.js"
+import type { AgentRegistry } from "../../../host/index.js"
 import { layer as serverLayer, type Options as ServerOptions } from "../../../server/layer.js"
+import type { ActorRuntimeServices } from "./runtime.js"
 
 /** @experimental Identity supplied to an actor-incarnation Server factory. */
 export interface RuntimeActorServerContext {
@@ -19,18 +20,22 @@ export interface RuntimeActorServerContext {
 
 /** @experimental Server configuration returned by a Rivet actor-incarnation factory. */
 export type RuntimeActorServerOptions<
-  _Agents = ReadonlyArray<AnyAgent>,
+  Agents extends AgentRegistry = AgentRegistry,
   AuthError = never,
-  AuthServices = never,
-> = ServerOptions<never, AuthError, AuthServices>
+  AuthServices extends ActorRuntimeServices = never,
+> = ServerOptions<Agents, AuthError, AuthServices>
 
 /** @experimental Actor-incarnation factory for one canonical server configuration. */
 export interface RuntimeActorServerFactory<
-  Config = RuntimeActorServerOptions,
-  Error = unknown,
-  Requirements = unknown,
+  Agents extends AgentRegistry = AgentRegistry,
+  ServerError = never,
+  AuthError = never,
+  AuthServices extends ActorRuntimeServices = never,
+  ServerRequirements extends ActorRuntimeServices = ActorRuntimeServices,
 > {
-  readonly make: (context: RuntimeActorServerContext) => Effect.Effect<Config, Error, Requirements>
+  readonly make: (
+    context: RuntimeActorServerContext,
+  ) => Effect.Effect<RuntimeActorServerOptions<Agents, AuthError, AuthServices>, ServerError, ServerRequirements>
 }
 
 /** @experimental One canonical HTTP/WebSocket handler retained for an actor incarnation. */
@@ -71,23 +76,17 @@ const serverRequest = (
   return source
 }
 
-const scoped = <E>(effect: Effect.Effect<ScopedResponse, E, Scope.Scope>): Effect.Effect<Response, E> =>
-  Effect.withFiber((fiber) => {
-    const previous = fiber.context
-    const scope = Scope.makeUnsafe()
-    fiber.setContext(Context.add(previous, Scope.Scope, scope))
-    return Effect.provideService(
-      Effect.onExitPrimitive(effect, (exit) => {
-        fiber.setContext(previous)
-        if (Exit.isSuccess(exit) && exit.value.retainScope) return undefined
-        return Scope.closeUnsafe(scope, exit)
-      }),
-      Scope.Scope,
-      scope,
-    ).pipe(Effect.map((result) => result.value))
-  })
+const scoped = <E>(
+  effect: Effect.Effect<ScopedResponse, E, Scope.Scope>,
+  owner: Scope.Scope,
+): Effect.Effect<Response, E> =>
+  Effect.acquireUseRelease(
+    Scope.fork(owner),
+    (scope) => Effect.provideService(effect, Scope.Scope, scope),
+    (scope, exit) => (Exit.isSuccess(exit) && exit.value.retainScope ? Effect.void : Scope.close(scope, exit)),
+  ).pipe(Effect.map((result) => result.value))
 
-const build = <Agents extends ReadonlyArray<AnyAgent>, AuthError, AuthServices>(options: {
+const build = <Agents extends AgentRegistry, AuthError, AuthServices extends ActorRuntimeServices>(options: {
   readonly config: RuntimeActorServerOptions<Agents, AuthError, AuthServices>
   readonly memoMap: Layer.MemoMap
   readonly scope: Scope.Closeable
@@ -114,6 +113,7 @@ const build = <Agents extends ReadonlyArray<AnyAgent>, AuthError, AuthServices>(
             retainScope,
           }
         }),
+        options.scope,
       )
     return { handle }
   })
