@@ -13,7 +13,7 @@ import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import { make } from "../packages/generalist/src/testing/durability/index.js"
 import { Agent, Approvals, Permissions } from "../packages/generalist/src/index.js"
 import { Generalist } from "../packages/generalist/src/host/index.js"
-import * as TestModel from "../packages/generalist/src/testing/model/service.js"
+import { layer as testModelLayer, text as testModelText } from "../packages/generalist/src/testing/model/service.js"
 
 const workload = {
   tools: 1000,
@@ -118,8 +118,8 @@ const program = Effect.gen(function* () {
           Layer.mergeAll(Layer.succeed(ObjectStore, measured(storage.store)), cryptoLayer, layerStatic([resolution])),
         ),
       ),
-      TestModel.layer(
-        Array.from({ length: workload.retainedChildren }, () => TestModel.text("Scripted retained review")),
+      testModelLayer(
+        Array.from({ length: workload.retainedChildren }, () => testModelText("Scripted retained review")),
       ),
       Permissions.layerAllowAll,
       Approvals.layerAutoApprove,
