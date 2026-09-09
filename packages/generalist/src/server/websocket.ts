@@ -2,7 +2,7 @@ import { Cause, Effect, Fiber, Ref, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { HostEvent } from "../host/event.js"
-import type { AgentDeclarations, Host } from "../host/index.js"
+import type { AgentRegistry, Host } from "../host/index.js"
 import type { SessionEventsError } from "../runtime/session/host.js"
 import { decodeCommand, eventCodec } from "./wire.js"
 import { authorize, type Authorization } from "./auth.js"
@@ -25,7 +25,7 @@ const closeForStreamError = (
   }
 }
 
-const runBelongsTo = <Agents extends AgentDeclarations>(
+const runBelongsTo = <Agents extends AgentRegistry>(
   host: Host<Agents>,
   sessionId: string,
   runId: string,
@@ -36,7 +36,7 @@ const runBelongsTo = <Agents extends AgentDeclarations>(
   )
 
 /** Upgrade one authenticated Session route and stream its HostEvents. */
-export const handle = <Agents extends AgentDeclarations>(options: {
+export const handle = <Agents extends AgentRegistry>(options: {
   readonly host: Host<Agents>
   readonly authorization: Authorization
   readonly sessionId: string

@@ -1014,7 +1014,7 @@ await Effect.runPromise(Effect.gen(function* () {
     const context = yield* Layer.build(services())
     return yield* Effect.gen(function* () {
       const agent = Agent.make({ name: "packed-history" })
-      const host = yield* Host.make({ revision: "local", agents: [agent] })
+      const host = yield* Host.make({ revision: "local", agents: { agent } })
       const session = yield* host.sessions.create({ id: "packed-history", agent: agent.name })
       const ids = []
       for (let index = 0; index < 129; index++) ids.push((yield* host.runs.start(session.id, agent, "input-" + index)).id)
@@ -1029,7 +1029,10 @@ await Effect.runPromise(Effect.gen(function* () {
   yield* Effect.scoped(Effect.gen(function* () {
     const context = yield* Layer.build(services())
     yield* Effect.gen(function* () {
-      const host = yield* Host.make({ revision: "local", agents: [Agent.make({ name: "packed-history" })] })
+      const host = yield* Host.make({
+        revision: "local",
+        agents: { "packed-history": Agent.make({ name: "packed-history" }) },
+      })
       const snapshot = yield* host.sessions.snapshot("packed-history")
       if (snapshot.cursor !== first.snapshot.cursor) throw new Error("packed Session cursor changed after fresh Layer")
       if (JSON.stringify(snapshot.session) !== JSON.stringify(first.snapshot.session)) throw new Error("packed Session canonical metadata changed after fresh Layer")

@@ -12,7 +12,7 @@ import { provideScoped } from "../runtime/execution/scoped-provide.js"
 it.effect("pages more than 128 retained child Sessions across fresh Hosts without membership drift", () => {
   const storage = makeObjectStorage()
   const agent = Agent.make({ name: "paged-reviewer", children: ["paged-reviewer"] })
-  const withHost = <A, E>(body: (host: Host<readonly [typeof agent]>) => Effect.Effect<A, E>) =>
+  const withHost = <A, E>(body: (host: Host<{ readonly agent: typeof agent }>) => Effect.Effect<A, E>) =>
     Effect.scoped(
       Effect.gen(function* () {
         const context = yield* Layer.build(
@@ -24,7 +24,7 @@ it.effect("pages more than 128 retained child Sessions across fresh Hosts withou
           ),
         )
         return yield* Effect.gen(function* () {
-          return yield* body(yield* Host.make({ revision: "local", agents: [agent] as const }))
+          return yield* body(yield* Host.make({ revision: "local", agents: { agent } }))
         }).pipe(Effect.provide(context))
       }),
     )
@@ -172,7 +172,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     const admitted = yield* provideScoped(
       hostLayer(),
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: [agent, child] })
+        const host = yield* Host.make({ revision: "local", agents: { agent, child } })
         const session = yield* host.sessions.create({ id: "question-parent", agent: agent.name })
         const parent = yield* host.runs.start(session.id, agent, "Coordinate")
         waitFor = parent.wait
@@ -192,7 +192,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     yield* provideScoped(
       hostLayer(),
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: [agent, child] })
+        const host = yield* Host.make({ revision: "local", agents: { agent, child } })
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const parent = yield* host.runs.get(admitted.parentId)

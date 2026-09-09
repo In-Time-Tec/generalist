@@ -50,7 +50,7 @@ const independentTool = Tool.make("package-checks", {
   success: Schema.FiniteFromString,
   failure: Schema.Struct({ reason: Schema.String }),
 }).annotate(ToolIdentity, { implementation: "checks-v1", policy: "checks-policy-v1" })
-const toolHost = Host.make({ revision: "local", agents: [], tools: [independentTool] })
+const toolHost = Host.make({ revision: "local", agents: {}, tools: [independentTool] })
 const backgroundAgent = Agent.make({ name: "background-consumer", toolkit: Toolkit.make(independentTool), toolExecution: "background" })
 type BackgroundRetainsHandlerSchema = Assert<Equal<typeof backgroundAgent.toolkit.tools["package-checks"]["successSchema"]["Type"], number>>
 type BackgroundRetainsHandlerFailure = Assert<Equal<typeof backgroundAgent.toolkit.tools["package-checks"]["failureSchema"]["Type"], { readonly reason: string }>>

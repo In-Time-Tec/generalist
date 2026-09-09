@@ -46,7 +46,7 @@ layer(services)("Artifact Runtime fork", (it) => {
         name: "fork-writer",
         toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
       })
-      const host = yield* Host.make({ revision: "local", agents: [writer] })
+      const host = yield* Host.make({ revision: "local", agents: { writer } })
       const session = yield* host.sessions.create({ id: "session:artifact:fork" })
       const source = yield* host.runs.start(session.id, writer, "read the plan")
       const store = yield* RunStore.RunStore

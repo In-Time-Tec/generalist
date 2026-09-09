@@ -166,7 +166,7 @@ it.effect("continues the parent model while its independently admitted typed too
       Effect.gen(function* () {
         const context = yield* Layer.build(environment)
         yield* Effect.gen(function* () {
-          const host = yield* Host.make({ revision: "local", agents: [agent], tools: [tool] })
+          const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [tool] })
           const session = yield* host.sessions.create({ id: "background-session" })
           const parent = yield* host.runs.start(session.id, agent, "start work")
           const store = yield* RunStore

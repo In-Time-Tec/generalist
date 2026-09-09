@@ -189,7 +189,7 @@ const routes = Layer.unwrap(
       name: "co-edit-writer",
       toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
     })
-    const host = yield* Host.make({ revision: "local", agents: [writer] })
+    const host = yield* Host.make({ revision: "local", agents: { writer } })
     return Layer.mergeAll(
       Server.layer({
         authorization: { tenantId: browserAuth.tenantId, authorize: () => Effect.succeed(true) },

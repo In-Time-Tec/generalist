@@ -668,7 +668,7 @@ The originating WebSocket attempt epoch, including attempts whose snapshot load 
 
 ##### Agents
 
-`Agents` *extends* `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
+`Agents` *extends* [`AgentRegistry`](./host.md#agentregistry)
 
 ##### AuthError
 
@@ -878,7 +878,7 @@ Serve one Host through the declared HttpApi and `/openapi.json`.
 
 ###### Agents
 
-`Agents` *extends* readonly [`Any`](./generalist/namespaces/Agent.md#any)[]
+`Agents` *extends* `Readonly`\<`Record`\<`string`, [`Any`](./generalist/namespaces/Agent.md#any)\>\>
 
 ###### AuthError
 

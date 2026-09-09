@@ -33,7 +33,7 @@ it.effect("retains Tool families across fresh hosts without materializing Sessio
     )
   const options = {
     revision: "local",
-    agents: [parent],
+    agents: { parent },
     tools: [tool],
     limits: {
       tree: { maxDepth: 1, maxSessions: 2 },

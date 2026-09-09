@@ -73,12 +73,12 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("streams the route Session and cancels only an explicitly named member Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-test" })
-        const host = yield* Host.make({ revision: "local", agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const session = yield* host.sessions.create({ id: "session-1" })
         const run = yield* host.runs.start(session.id, agent, "wait")
         const fake = yield* makeFakeSocket()
         const events = yield* host.events.subscribe(session.id)
-        const fiber = yield* handle<readonly [typeof agent]>({
+        const fiber = yield* handle<{ readonly agent: typeof agent }>({
           host,
           authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
           sessionId: session.id,
@@ -111,12 +111,12 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("streams only a storage-authorized memory preview for the current Session Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-preview-test" })
-        const host = yield* Host.make({ revision: "local", agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const session = yield* host.sessions.create({ id: "session-preview" })
         const run = yield* host.runs.start(session.id, agent, "answer")
         const fake = yield* makeFakeSocket()
         const events = yield* host.events.subscribe(session.id)
-        const fiber = yield* handle<readonly [typeof agent]>({
+        const fiber = yield* handle<{ readonly agent: typeof agent }>({
           host,
           authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
           sessionId: session.id,
@@ -164,12 +164,12 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("requires Run observe authorization before subscribing to previews", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-preview-denied" })
-        const host = yield* Host.make({ revision: "local", agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const session = yield* host.sessions.create({ id: "session-preview-denied" })
         yield* host.runs.start(session.id, agent, "answer")
         const fake = yield* makeFakeSocket()
         const events = yield* host.events.subscribe(session.id)
-        const fiber = yield* handle<readonly [typeof agent]>({
+        const fiber = yield* handle<{ readonly agent: typeof agent }>({
           host,
           authorization: {
             tenantId: "test",
@@ -206,7 +206,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const agent = Agent.make({ name: "websocket-preview-revoked" })
         const runtimeService = yield* RuntimeService.Runtime
         let authorityReads = 0
-        const host = yield* Host.make({ revision: "local", agents: [agent] }).pipe(
+        const host = yield* Host.make({ revision: "local", agents: { agent } }).pipe(
           Effect.provideService(
             RuntimeService.Runtime,
             RuntimeService.Runtime.of({
@@ -222,7 +222,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const run = yield* host.runs.start(session.id, agent, "answer")
         const fake = yield* makeFakeSocket()
         const events = yield* host.events.subscribe(session.id)
-        const socketFiber = yield* handle<readonly [typeof agent]>({
+        const socketFiber = yield* handle<{ readonly agent: typeof agent }>({
           host,
           authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
           sessionId: session.id,

@@ -720,7 +720,7 @@ Application-owned identities for an independently retained Tool implementation a
 
 ##### Agents
 
-`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+`Agents` *extends* [`AgentRegistry`](#agentregistry)
 
 #### Properties
 
@@ -1384,7 +1384,7 @@ Durable product-facing Session metadata owned by a Runtime driver.
 
 ##### Agents
 
-`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+`Agents` *extends* [`AgentRegistry`](#agentregistry)
 
 ##### Plugins
 
@@ -2124,14 +2124,6 @@ Run metadata without retained manifests, results, or event history.
 
 ## Type Aliases
 
-<a id="agentdeclarations"></a>
-
-### AgentDeclarations
-
-> **AgentDeclarations** = [`AgentRegistry`](#agentregistry) \| `ReadonlyArray`\<[`Any`](./generalist/namespaces/Agent.md#any)\>
-
-***
-
 <a id="agentregistry"></a>
 
 ### AgentRegistry
@@ -2144,13 +2136,13 @@ Run metadata without retained manifests, results, or event history.
 
 ### AgentValues
 
-> **AgentValues**\<`Agents`\> = `Agents` *extends* `ReadonlyArray`\<infer Agent\> ? `Agent` : `Agents` *extends* [`AgentRegistry`](#agentregistry) ? `Agents`\[keyof `Agents`\] : `never`
+> **AgentValues**\<`Agents`\> = `Agents`\[keyof `Agents`\]
 
 #### Type Parameters
 
 ##### Agents
 
-`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+`Agents` *extends* [`AgentRegistry`](#agentregistry)
 
 ***
 
@@ -2312,7 +2304,7 @@ One product-facing event at its exclusive Session cursor.
 
 ##### Agents
 
-`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+`Agents` *extends* [`AgentRegistry`](#agentregistry)
 
 ##### Plugins
 
@@ -2470,7 +2462,7 @@ Stable process-local product host and its compiler.
 
 ###### Agents
 
-`Agents` *extends* [`AgentDeclarations`](#agentdeclarations)
+`Agents` *extends* `Readonly`\<`Record`\<`string`, [`Any`](./generalist/namespaces/Agent.md#any)\>\>
 
 ###### Plugins
 

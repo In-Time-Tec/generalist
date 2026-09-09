@@ -133,7 +133,7 @@ const runtimeLayer = Layer.unwrap(
 const apiLayer = Layer.unwrap(
   Effect.gen(function* () {
     const browserAuth = yield* makeBrowserAuth
-    const host = yield* Host.make({ revision: "local", agents: [agent] })
+    const host = yield* Host.make({ revision: "local", agents: { agent } })
     return Layer.merge(
       Server.layer({
         authorization: { tenantId: browserAuth.tenantId, authorize: () => Effect.succeed(true) },

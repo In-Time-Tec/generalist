@@ -79,7 +79,7 @@ const runtimeLayer = Layer.unwrap(
 )
 
 const program = Effect.gen(function* () {
-  const host = yield* Host.make({ revision: "local", agents: [agent] })
+  const host = yield* Host.make({ revision: "local", agents: { agent } })
   const session = yield* host.sessions.create({ id: "guide-session" })
   const handle = yield* host.runs.start(session.id, agent, "Say hello", { idempotencyKey: "guide-message-1" })
   const first = yield* (yield* host.events.subscribe(session.id)).pipe(Stream.take(1), Stream.runHead)

@@ -40,7 +40,7 @@ it.effect("reopens BlobStore snapshots and the Runtime operation log", () =>
     yield* withServices(
       Effect.gen(function* () {
         const document = yield* Artifact.open("persistent.md", { crdt: Yjs.layer(), initial: "saved" })
-        const host = yield* Host.make({ revision: "local", agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         yield* host.artifacts.edit(document.name, {
           commandId: "human:persistence",
           base: 0,
@@ -53,7 +53,7 @@ it.effect("reopens BlobStore snapshots and the Runtime operation log", () =>
     yield* withServices(
       Effect.gen(function* () {
         const document = yield* Artifact.open("persistent.md", { crdt: Yjs.layer(), initial: "ignored" })
-        const host = yield* Host.make({ revision: "local", agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         expect(yield* Artifact.read(document)).toMatchObject({ version: 1, content: "saved state" })
         const updates = yield* host.artifacts.subscribe(document.name)
         expect(Array.from(yield* updates.pipe(Stream.take(1), Stream.runCollect))).toMatchObject([

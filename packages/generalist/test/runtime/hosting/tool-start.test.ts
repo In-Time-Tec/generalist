@@ -48,11 +48,11 @@ it.effect("retrieves Tools on a fresh Host and rejects Agent controls without ca
     )
   return Effect.gen(function* () {
     const runId = yield* Effect.gen(function* () {
-      const host = yield* Host.make({ revision: "local", agents: [], tools: [tool, other] })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [tool, other] })
       return (yield* host.tools.start(tool, { count: 4 }, { commandId: "lookup" })).id
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* Effect.gen(function* () {
-      const host = yield* Host.make({ revision: "local", agents: [], tools: [tool, other] })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [tool, other] })
       const runtime = yield* Runtime
       const store = yield* RunStore
       const prefix = "environments/test/v1/tenants/runtime/partitions/conformance/commits/"
@@ -134,7 +134,7 @@ it.effect("preserves Agent and Program retrieval with their own terminal values"
   const fixture = programFixture()
   const agent = Agent.make({ name: "lookup-agent" })
   return Effect.gen(function* () {
-    const host = yield* Host.make({ revision: "local", agents: [agent], tools: [tool] })
+    const host = yield* Host.make({ revision: "local", agents: { agent }, tools: [tool] })
     const session = yield* host.sessions.create({ id: "lookup-agent" })
     const run = yield* host.runs.start(session.id, agent, "answer")
     yield* execute(run.id)

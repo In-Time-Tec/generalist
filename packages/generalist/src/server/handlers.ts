@@ -1,6 +1,6 @@
 import { Effect, Layer, Stream, Types } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
-import type { AgentDeclarations, Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
+import type { AgentRegistry, Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
 import { api, type EventStreamItem } from "./api.js"
 import { apiError, OperatorDisabled } from "./errors.js"
 import { handle as handleWebSocket } from "./websocket.js"
@@ -14,7 +14,7 @@ const protect =
 
 const mapError = (operation: string) => Effect.mapError((error: Error) => apiError({ operation, error }))
 
-const sessionsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, policy: Authorization) =>
+const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "sessions", (handlers) =>
     handlers.handleAll({
       create: ({ payload }) => {
@@ -101,7 +101,7 @@ const sessionsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, 
     }),
   )
 
-const runsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, policy: Authorization) =>
+const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "runs", (handlers) =>
     handlers.handleAll({
       start: ({ params, payload }) =>
@@ -144,7 +144,7 @@ const runsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, poli
     }),
   )
 
-const eventsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, policy: Authorization) =>
+const eventsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "events", (handlers) =>
     handlers
       .handle("subscribe", ({ params, query, headers }) =>
@@ -181,7 +181,7 @@ const eventsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, po
       ),
   )
 
-const artifactsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, policy: Authorization) =>
+const artifactsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "artifacts", (handlers) =>
     handlers
       .handle("read", ({ params }) =>
@@ -202,7 +202,7 @@ const artifactsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>,
       ),
   )
 
-const approvalsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, policy: Authorization) =>
+const approvalsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "approvals", (handlers) =>
     handlers.handle("resolve", ({ params, payload }) =>
       protect(policy)({ type: "run", id: params.id }, "mutate", () =>
@@ -216,7 +216,7 @@ const approvalsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>,
     ),
   )
 
-const attachmentsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents>, policy: Authorization) =>
+const attachmentsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "attachments", (handlers) =>
     handlers.handleAll({
       put: ({ headers, payload }) =>
@@ -247,7 +247,7 @@ const attachmentsHandlers = <Agents extends AgentDeclarations>(host: Host<Agents
     }),
   )
 
-const operatorHandlers = <Agents extends AgentDeclarations>(
+const operatorHandlers = <Agents extends AgentRegistry>(
   host: Host<Agents>,
   enabled: boolean,
   policy: Authorization,
@@ -312,14 +312,14 @@ const operatorHandlers = <Agents extends AgentDeclarations>(
   )
 }
 
-export interface HandlerOptions<Agents extends AgentDeclarations> {
+export interface HandlerOptions<Agents extends AgentRegistry> {
   readonly host: Host<Agents>
   readonly operator: boolean
   readonly authorization: Authorization
 }
 
 /** Handler Layers for one concrete Host value. */
-export const layerHandlers = <Agents extends AgentDeclarations>(options: HandlerOptions<Agents>) =>
+export const layerHandlers = <Agents extends AgentRegistry>(options: HandlerOptions<Agents>) =>
   Layer.mergeAll(
     sessionsHandlers(options.host, options.authorization),
     runsHandlers(options.host, options.authorization),

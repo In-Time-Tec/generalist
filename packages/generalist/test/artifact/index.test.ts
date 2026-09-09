@@ -56,7 +56,7 @@ layer(services)("Artifact", (it) => {
         name: "writer",
         toolkit: Toolkit.make(Artifact.readTool(document), Artifact.tool(document)),
       })
-      const host = yield* Host.make({ revision: "local", agents: [] })
+      const host = yield* Host.make({ revision: "local", agents: {} })
       const run = yield* Agent.stream(writer, "edit the plan").pipe(Stream.runCollect, Effect.forkChild)
 
       const fixture = yield* ModelFixture

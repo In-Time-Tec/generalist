@@ -200,8 +200,8 @@ const protocolServices = delegateHandlers.pipe(
 )
 
 const program = Effect.gen(function* () {
-  const hostA = yield* Host.make({ revision: "local", agents: [agentA] })
-  const hostB = yield* Host.make({ revision: "local", agents: [agentB] })
+  const hostA = yield* Host.make({ revision: "local", agents: { agentA } })
+  const hostB = yield* Host.make({ revision: "local", agents: { agentB } })
   yield* hostB.sessions.create({ id: agentBSessionId, title: "A2A delegated work" })
   const session = yield* hostA.sessions.create({ id: "session:a2a-example", title: "A2A delegation" })
   const run = yield* hostA.runs.start(session.id, agentA, "Delegate this request to Agent B.", {

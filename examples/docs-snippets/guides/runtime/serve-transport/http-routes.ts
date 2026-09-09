@@ -53,7 +53,7 @@ const services = Layer.mergeAll(
 )
 
 const apiLayer = Layer.unwrap(
-  Host.make({ revision: "local", agents: [agent] }).pipe(
+  Host.make({ revision: "local", agents: { agent } }).pipe(
     Effect.map((host) =>
       Server.layer({
         authorization: { tenantId: "example", authorize: () => Effect.succeed(true) },

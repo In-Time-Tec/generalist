@@ -41,7 +41,7 @@ layer(services)("Example browser authentication", (it) => {
             }),
           ),
         )
-        const host = yield* Host.make({ revision: "local", agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         const session = yield* host.sessions.create({ id: `cookie-${name}` })
         const app = HttpRouter.toWebHandler(
           Layer.merge(

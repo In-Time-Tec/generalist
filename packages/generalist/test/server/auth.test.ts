@@ -67,7 +67,7 @@ layer(services)("Server authorization", (it) => {
     it.effect(`denies every declared mutation before Host calls by ${deniedBy}`, () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: `authorization-${deniedBy}` })
-        const host = yield* Host.make({ revision: "local", agents: [agent] })
+        const host = yield* Host.make({ revision: "local", agents: { agent } })
         const principal: Principal = {
           id: "application-user",
           tenantId: deniedBy === "tenant" ? "other" : "test",
@@ -138,7 +138,7 @@ layer(services)("Server authorization", (it) => {
   for (const deniedBy of ["tenant", "resource"] as const) {
     it.effect(`denies reads and subscriptions before Host calls by ${deniedBy}`, () =>
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: [] })
+        const host = yield* Host.make({ revision: "local", agents: {} })
         const spies = [
           vi.spyOn(host.sessions, "get"),
           vi.spyOn(host.sessions, "list"),

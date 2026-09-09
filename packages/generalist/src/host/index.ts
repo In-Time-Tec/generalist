@@ -120,12 +120,10 @@ export interface PluginOptions<Tools extends ReadonlyArray<Tool.Any> = ReadonlyA
   readonly hooks?: ReadonlyArray<HookDeclaration>
 }
 export type AgentRegistry = Readonly<Record<string, AnyAgent>>
-export type AgentDeclarations = AgentRegistry | ReadonlyArray<AnyAgent>
-export type AgentValues<Agents extends AgentDeclarations> =
-  Agents extends ReadonlyArray<infer Agent> ? Agent : Agents extends AgentRegistry ? Agents[keyof Agents] : never
+export type AgentValues<Agents extends AgentRegistry> = Agents[keyof Agents]
 
 export interface MakeOptions<
-  Agents extends AgentDeclarations,
+  Agents extends AgentRegistry,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
   Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > {
@@ -138,7 +136,7 @@ export interface MakeOptions<
 }
 export type RunStartOptions = Pick<StartOptions, "idempotencyKey">
 export type EncodedAgentInput = Schema.Json
-export interface Host<Agents extends AgentDeclarations> {
+export interface Host<Agents extends AgentRegistry> {
   readonly revision: string
   readonly tools: HostTools
   readonly attachments: Attachments
@@ -249,7 +247,7 @@ type PluginServices<Plugins> =
   | Exclude<Tool.HandlerServices<PluginTool<Plugins>>, ToolContext>
 
 export type MakeRequirements<
-  Agents extends AgentDeclarations,
+  Agents extends AgentRegistry,
   Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>>,
   Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 > =
@@ -325,11 +323,8 @@ const mergedSkills = (
   return Option.isSome(current) ? mergeSkillCatalogs(current.value, additions) : additions
 }
 
-const declarations = (agents: AgentDeclarations): ReadonlyArray<AnyAgent> =>
-  Array.isArray(agents) ? agents : Object.values(agents)
-
 const make = <
-  const Agents extends AgentDeclarations,
+  const Agents extends AgentRegistry,
   const Plugins extends ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = ReadonlyArray<never>,
   const Tools extends ReadonlyArray<Tool.Any> = ReadonlyArray<never>,
 >(
@@ -344,7 +339,7 @@ const make = <
     const revision = yield* Schema.decodeEffect(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)))(
       options.revision,
     ).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: error.message })))
-    const agents = declarations(options.agents)
+    const agents = Object.values(options.agents)
     const plugins: ReadonlyArray<Plugin<ReadonlyArray<Tool.Any>>> = options.plugins ?? []
     const currentInstructions = yield* Effect.serviceOption(Instructions)
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)

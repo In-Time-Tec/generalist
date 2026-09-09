@@ -2,7 +2,7 @@ import { Cause, Effect, Fiber, Schema, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { ArtifactError, ArtifactUpdate } from "../core/artifact.js"
-import type { AgentDeclarations, Host } from "../host/index.js"
+import type { AgentRegistry, Host } from "../host/index.js"
 import { ArtifactClientCommand, ArtifactServerEvent } from "./api.js"
 import { authorize, CurrentPrincipal, type Authorization } from "./auth.js"
 
@@ -26,7 +26,7 @@ const closeForError = (
 }
 
 /** Upgrade one authenticated Artifact route and join it as a human editing peer. */
-export const handle = <Agents extends AgentDeclarations>(options: {
+export const handle = <Agents extends AgentRegistry>(options: {
   readonly host: Host<Agents>
   readonly authorization: Authorization
   readonly name: string

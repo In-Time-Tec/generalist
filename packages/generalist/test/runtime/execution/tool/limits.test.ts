@@ -63,7 +63,7 @@ for (const [name, outcome] of [
   it.effect(`rejects excess ${name} without persisting a fabricated typed success`, () =>
     scopedWith(
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: [], tools: [tool] })
+        const host = yield* Host.make({ revision: "local", agents: {}, tools: [tool] })
         const run = yield* host.tools.start(tool, {}, { commandId: "bounded" })
         yield* execute(run.id)
         expect(yield* run.inspect).toMatchObject({ status: "needs-resolution" })
@@ -79,7 +79,7 @@ for (const [name, outcome] of [
 it.effect("declines oversized and excess diagnostics without changing the typed result", () =>
   scopedWith(
     Effect.gen(function* () {
-      const host = yield* Host.make({ revision: "local", agents: [], tools: [tool] })
+      const host = yield* Host.make({ revision: "local", agents: {}, tools: [tool] })
       const run = yield* host.tools.start(tool, {})
       yield* execute(run.id)
       expect(yield* run.await).toBe("typed result")
@@ -109,7 +109,7 @@ it.effect("expires a held-open external operation at its deadline without blind 
     let calls = 0
     yield* scopedWith(
       Effect.gen(function* () {
-        const host = yield* Host.make({ revision: "local", agents: [], tools: [tool] })
+        const host = yield* Host.make({ revision: "local", agents: {}, tools: [tool] })
         const run = yield* host.tools.start(tool, {})
         const fiber = yield* execute(run.id).pipe(Effect.forkChild)
         yield* Deferred.await(entered)
