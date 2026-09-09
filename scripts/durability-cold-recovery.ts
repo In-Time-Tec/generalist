@@ -12,7 +12,7 @@ import { activate, layer } from "../packages/generalist/src/durability/index.js"
 import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import { make } from "../packages/generalist/src/testing/durability/index.js"
 import { Agent, Approvals, Permissions } from "../packages/generalist/src/index.js"
-import { Generalist } from "../packages/generalist/src/host/index.js"
+import { Host } from "../packages/generalist/src/host/index.js"
 import { layer as testModelLayer, text as testModelText } from "../packages/generalist/src/testing/model/service.js"
 
 const workload = {
@@ -145,7 +145,7 @@ const program = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const executor = yield* RunExecutor.RunExecutor
-      const host = yield* Generalist.create({ agents: [agent] })
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
       const session = yield* host.sessions.create({ id: "coding-session" })
       const parent = yield* host.runs.start(session.id, agent, "Coordinate a fixed scripted coding workload")
       parentId = parent.id
