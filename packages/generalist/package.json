@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.65.3",
+  "version": "0.65.4",
   "private": false,
   "license": "MIT",
   "type": "module",
@@ -71,6 +71,10 @@
     "./durability/host": {
       "types": "./dist/durability/host.d.ts",
       "import": "./dist/durability/host.js"
+    },
+    "./durability/object-store": {
+      "types": "./dist/durability/object-store.d.ts",
+      "import": "./dist/durability/object-store.js"
     },
     "./durability/s3": {
       "types": "./dist/durability/s3.d.ts",

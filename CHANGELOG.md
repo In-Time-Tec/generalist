@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.4
+
+- Add the `generalist/durability/object-store` subpath export, making the canonical object transport contract public: the `Service` interface, `ObjectStore` and `ObjectMaintenance` tags, `ObjectStoreFailure`, `Capabilities`, and the shared bound-validation, deadline, and bounded-stream helpers. Custom transports implement `Service` and qualify with the `generalist/testing/durability` conformance suite; S3 and native R2 remain the shipped transports.
+
 ## 0.65.3
 
 - Provide Runtime-owned nested operations to independent Tool Runs without requiring a model or a registration-time service. Tool executor Layers preserve the current invocation's nested-operation service instead of a captured implementation.
