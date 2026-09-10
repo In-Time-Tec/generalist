@@ -150,6 +150,7 @@ export const reasoningTrigger: {
  * AI Elements renders markdown through Streamdown here; FoldKit has no
  * markdown renderer (gap), so pass already-rendered children or plain text.
  */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const reasoningContent: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html

@@ -14,7 +14,7 @@ const handlers = toolkit.toLayer({
 })
 
 const main = Effect.gen(function* () {
-  const port = yield* Config.port("PORT").pipe(Config.withDefault(4323))
+  const port = yield* Config.Port("PORT").pipe(Config.withDefault(4323))
   const tools = McpServer.toolkit(toolkit).pipe(
     Layer.provideMerge(handlers),
     Layer.provide(

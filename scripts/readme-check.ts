@@ -85,14 +85,9 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
   )
 
   let count = 0
-  let executed = 0
   for (const filename of [
     "README.md",
     "packages/generalist/README.md",
-    "docs/getting-started.md",
-    "docs/start/quickstart.md",
-    "docs/guides/define-tools.md",
-    "docs/start/cell-agent.md",
     "docs/features/cloudflare.md",
     "docs/features/rivet.md",
   ]) {
@@ -106,36 +101,11 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
           count += 1
           const target = `block-${count}.ts`
           yield* fileSystem.writeFileString(path.join(directory, target), block)
-          if (
-            filename === "docs/start/quickstart.md" ||
-            filename === "docs/guides/define-tools.md" ||
-            (filename === "docs/start/cell-agent.md" && !block.includes("declare const"))
-          ) {
-            const end = source.indexOf(block) + block.length
-            const expected = /^```text\r?\n([\s\S]*?)^```/m.exec(source.slice(end))?.[1]?.trim()
-            yield* checkOutput(directory, target, filename, expected)
-            executed += 1
-          }
         }),
       { discard: true },
     )
   }
 
-  const research = yield* fileSystem.readFileString("docs/start/research-agent.md")
-  const researchDirectory = path.join(directory, "research")
-  yield* fileSystem.makeDirectory(path.join(researchDirectory, "web"), { recursive: true })
-  const researchBlocks = Array.from(
-    research.matchAll(/\*\*([\w-]+\.ts)\*\*\r?\n\r?\n```typescript\r?\n([\s\S]*?)^```/gm),
-  )
-  if (researchBlocks.length === 0 || researchBlocks.length !== Array.from(research.matchAll(typescriptFence)).length) {
-    return yield* failure("Research tutorial must label every TypeScript block with its scaffold filename")
-  }
-  for (const match of researchBlocks) {
-    const filename = match[1] === "main.ts" ? "web/main.ts" : (match[1] ?? "")
-    yield* fileSystem.writeFileString(path.join(researchDirectory, filename), match[2] ?? "")
-    count += 1
-  }
-  yield* fileSystem.copyFile("examples/docs-snippets/html.ts", path.join(researchDirectory, "web/html.ts"))
   yield* typecheck(directory)
   const websiteDirectory = path.join(root, "examples/docs-snippets/website")
   yield* Effect.forEach(
@@ -145,7 +115,7 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
     { discard: true },
   )
   yield* Console.log(
-    `Public install versions match ${version}; ${count} TypeScript blocks typechecked; ${executed} tutorial blocks and ${websiteCheckpoints.length} website checkpoints executed with matching output`,
+    `Public install versions match ${version}; ${count} TypeScript blocks typechecked; ${websiteCheckpoints.length} website checkpoints executed with matching output`,
   )
 })
 

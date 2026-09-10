@@ -84,9 +84,7 @@ const serverRequest = (
   // SAFETY: Rivet's UniversalWebSocket deliberately implements the WebSocket event and close contract consumed by Effect Socket.
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion
   const webSocket = unknownWebSocket as globalThis.WebSocket
-  const socket = Socket.fromWebSocket(Effect.succeed(webSocket), {
-    closeCodeIsError: () => false,
-  })
+  const socket = Socket.fromWebSocket(Effect.succeed(webSocket))
   Object.defineProperty(source, "upgrade", { configurable: true, value: socket })
   return source
 }

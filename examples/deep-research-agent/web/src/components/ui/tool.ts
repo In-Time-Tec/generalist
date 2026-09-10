@@ -125,6 +125,7 @@ export const toolStatusBadge = <ParentMessage>(status: ToolStatus): Html =>
  * consumer keeps an `isOpen` boolean in its Model, flips it on the header's
  * `onToggled`, and renders `toolContent` conditionally.
  */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const tool: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -176,6 +177,7 @@ export const toolHeader = <ParentMessage>(config: ToolHeaderConfig<ParentMessage
 }
 
 /** Tool body holding the input and output sections. Render it conditionally on the consumer's `isOpen` state. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const toolContent: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -196,6 +198,7 @@ export const toolContent: {
  * pre-formatted block. AI Elements uses a syntax-highlighted CodeBlock here;
  * foldcn has no code-block component (gap), so this is a plain `pre`.
  */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const toolInput: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, code: string): Html
   <ParentMessage>(code: string): (config: SlotConfig<ParentMessage>) => Html

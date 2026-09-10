@@ -99,13 +99,33 @@ describe("testing-only ObjectStore simulator", () => {
       yield* other.store.create("p/b", Uint8Array.of(3))
       yield* other.store.create("p/ab", Uint8Array.of(4))
       yield* other.faults.corrupt("p/z", Uint8Array.of(5))
-      const second = yield* simulator.store.list("p/", first.cursor)
+      const second = yield* simulator.store.list("p/", { cursor: first.cursor })
       expect(second.keys).toEqual(["p/ab", "p/b"])
-      const third = yield* other.store.list("p/", second.cursor)
+      const third = yield* other.store.list("p/", { cursor: second.cursor })
       expect(third.keys).toEqual(["p/z", "p/é"])
-      expect(yield* simulator.store.list("p/", third.cursor)).toEqual({ keys: ["p/😀"] })
+      expect(yield* simulator.store.list("p/", { cursor: third.cursor })).toEqual({ keys: ["p/😀"] })
       expect(yield* other.store.list("q/")).toEqual({ keys: ["q/a"] })
       expect(yield* other.store.list("p/zzz")).toEqual({ keys: [] })
+    }),
+  )
+
+  it.effect("bounds every listing page strictly after startAfter", () =>
+    Effect.gen(function* () {
+      const simulator = yield* make({ pageSize: 2 })
+      for (const name of ["a", "b", "c", "d", "e"]) {
+        yield* simulator.store.create(`p/${name}`, Uint8Array.of(1))
+      }
+      yield* simulator.store.create("q/a", Uint8Array.of(1))
+      expect((yield* simulator.store.list("p/", { startAfter: "p/c" })).keys).toEqual(["p/d", "p/e"])
+      const first = yield* simulator.store.list("p/", { startAfter: "p/a" })
+      expect(first.keys).toEqual(["p/b", "p/c"])
+      const second = yield* simulator.store.list("p/", { cursor: first.cursor, startAfter: "p/a" })
+      expect(second).toEqual({ keys: ["p/d", "p/e"] })
+      expect((yield* simulator.store.list("p/", { startAfter: "p/e" })).keys).toEqual([])
+      expect((yield* simulator.store.list("p/", { startAfter: "p/zz" })).keys).toEqual([])
+      // A bound below or above the prefix stays lexicographic rather than widening the listing.
+      expect((yield* simulator.store.list("p/", { startAfter: "a" })).keys).toEqual(["p/a", "p/b"])
+      expect((yield* simulator.store.list("p/", { startAfter: "z" })).keys).toEqual([])
     }),
   )
 
@@ -246,14 +266,14 @@ describe("testing-only ObjectStore simulator", () => {
       yield* simulator.maintenance.remove("p/b")
       yield* simulator.maintenance.remove("p/c")
       yield* simulator.store.create("p/bb", Uint8Array.of(2))
-      const second = yield* simulator.store.list("p/", first.cursor)
+      const second = yield* simulator.store.list("p/", { cursor: first.cursor })
       expect(second.keys).toEqual(["p/bb", "p/d"])
-      const third = yield* simulator.store.list("p/", second.cursor)
+      const third = yield* simulator.store.list("p/", { cursor: second.cursor })
       expect(third).toEqual({ keys: ["p/e"] })
       expect(yield* simulator.store.list("missing/")).toEqual({ keys: [] })
-      const wrongPrefix = yield* Effect.flip(simulator.store.list("other/", first.cursor))
+      const wrongPrefix = yield* Effect.flip(simulator.store.list("other/", { cursor: first.cursor }))
       expect(wrongPrefix.reason).toBe("invalid-response")
-      const malformed = yield* Effect.flip(simulator.store.list("p/", "not-a-cursor"))
+      const malformed = yield* Effect.flip(simulator.store.list("p/", { cursor: "not-a-cursor" }))
       expect(malformed.reason).toBe("invalid-response")
     }),
   )

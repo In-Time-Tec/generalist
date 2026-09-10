@@ -357,11 +357,14 @@ describe("OpenRouter public flow", () => {
       expect(bodies[0]?.tools).toEqual(bodies[1]?.tools)
       expect(bodies[0]?.provider).toEqual(bodies[1]?.provider)
       expect(bodies[0]?.messages).not.toEqual(bodies[1]?.messages)
+      // Effect rc.113's default codec transformer emits spec-default open objects
+      // (`additionalProperties: true`); strict `false` output is reserved for the
+      // provider-specific OpenAI/Anthropic codecs.
       expect(bodies[1]?.tools?.[0]?.function?.parameters).toEqual({
         type: "object",
         properties: { value: { type: "string" } },
         required: ["value"],
-        additionalProperties: false,
+        additionalProperties: true,
       })
       expect(Array.from(events).at(-1)).toMatchObject({ _tag: "Completed", text: "corrected" })
     })

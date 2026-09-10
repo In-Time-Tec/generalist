@@ -1,5 +1,8 @@
 # Mintlify is the documentation site
 
+**Superseded by [the code-first documentation site](code-first-docs-site.md).** Mintlify was later removed and the
+Foldkit + StyleX app in `docs/` became the documentation renderer and deployment target this decision retired.
+
 The cutover is approved: `docs/` is the documentation source and Mintlify is the only documentation renderer and
 deployment target. The former `apps/docs` Foldkit site was removed instead of retaining a second navigation, search,
 rendering, and deployment system.

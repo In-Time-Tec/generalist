@@ -4,7 +4,7 @@ import { BunCrypto } from "@effect/platform-bun"
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each durability test owns its scoped BunCrypto test-host Layer. */
 import { describe, expect, it } from "@effect/vitest"
 import { Crypto, Effect, Encoding, Fiber, Option, Schema } from "effect"
-import { ObjectStore, ObjectStoreFailure } from "../../../src/durability/object-store.js"
+import { ObjectStore, ObjectStoreFailure, type Service } from "../../../src/durability/object-store.js"
 import { make as makeJournal, type Options, type State } from "../../../src/durability/internal/journal.js"
 import {
   Envelope,
@@ -524,6 +524,164 @@ describe("immutable numbered object journal", () => {
       expect(yield* fresh.commit({ id: "receipt-only", input: null }, () => Effect.fail("must not evaluate"))).toBe(
         "acknowledged",
       )
+    }).pipe(Effect.provide(BunCrypto.layer)),
+  )
+
+  it.effect("lists only the unverified tail once a head is verified", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const listings: Array<{
+        readonly prefix: string
+        readonly startAfter: string | undefined
+        readonly keys: ReadonlyArray<string>
+      }> = []
+      const instrumented = (store: Service): Service => ({
+        ...store,
+        list: (listedPrefix, options) =>
+          store.list(listedPrefix, options).pipe(
+            Effect.tap((page) =>
+              Effect.sync(() => {
+                listings.push({ prefix: listedPrefix, startAfter: options?.startAfter, keys: page.keys })
+              }),
+            ),
+          ),
+      })
+      const journal = yield* makeJournal({ ...identity, snapshotEvery: 2 }).pipe(
+        Effect.provideService(ObjectStore, instrumented(bucket.store)),
+      )
+      yield* journal.commit({ id: "zero", input: null }, increment)
+      yield* journal.commit({ id: "one", input: null }, increment)
+      yield* journal.commit({ id: "two", input: null }, increment)
+      listings.length = 0
+      expect(yield* journal.read).toMatchObject({ sequence: "2", state: { count: 3 } })
+      // One tail page per namespace; neither re-lists the verified immutable prefix.
+      expect(listings.map((entry) => entry.prefix).toSorted()).toEqual([`${prefix}commits/`, `${prefix}snapshots/`])
+      expect(listings[0]!.startAfter).toBe(slot("2"))
+      expect(listings[0]!.keys).toEqual([])
+      expect(listings[1]!.startAfter?.startsWith(`${prefix}snapshots/${sequenceName("1")}-`)).toBe(true)
+      expect(listings[1]!.keys).toEqual([])
+      listings.length = 0
+      yield* journal.commit({ id: "three", input: null }, increment)
+      const commitListing = listings.find((entry) => entry.prefix === `${prefix}commits/`)
+      expect(commitListing?.startAfter).toBe(slot("2"))
+      expect(commitListing?.keys).toEqual([])
+      // A fresh journal has no verified head and still performs the complete cold listings.
+      listings.length = 0
+      const fresh = yield* makeJournal({ ...identity, snapshotEvery: 2 }).pipe(
+        Effect.provideService(ObjectStore, instrumented((yield* bucket.connect).store)),
+      )
+      expect(yield* fresh.read).toMatchObject({ sequence: "3", state: { count: 4 } })
+      const coldCommits = listings.find((entry) => entry.prefix === `${prefix}commits/`)
+      expect(coldCommits?.startAfter).toBeUndefined()
+      expect(coldCommits?.keys).toEqual([slot("0"), slot("1"), slot("2"), slot("3")])
+    }).pipe(Effect.provide(BunCrypto.layer)),
+  )
+
+  it.effect("detects a gap in the unverified tail without re-listing the verified prefix", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const journal = yield* open(bucket)
+      yield* journal.commit({ id: "zero", input: null }, increment)
+      yield* journal.commit({ id: "one", input: null }, increment)
+      // A foreign create two slots ahead leaves a hole at sequence 2 in the tail.
+      expect(yield* bucket.store.create(slot("3"), new TextEncoder().encode("{}"))).toBe("created")
+      const error = yield* journal.read.pipe(Effect.flip)
+      expect(error).toMatchObject({
+        reason: "corruption",
+        message: "Retained commit history contains a gap",
+        key: slot("2"),
+      })
+    }).pipe(Effect.provide(BunCrypto.layer)),
+  )
+
+  it.effect("rejects an invalid numbered commit key in the unverified tail", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const journal = yield* open(bucket)
+      yield* journal.commit({ id: "zero", input: null }, increment)
+      const foreign = `${prefix}commits/garbage.json`
+      expect(yield* bucket.store.create(foreign, new TextEncoder().encode("{}"))).toBe("created")
+      const error = yield* journal.read.pipe(Effect.flip)
+      expect(error).toMatchObject({ reason: "corruption", message: "Invalid numbered commit key", key: foreign })
+    }).pipe(Effect.provide(BunCrypto.layer)),
+  )
+
+  it.effect("detects removal of the verified anchor commit through the anchor re-read", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const journal = yield* open(bucket)
+      yield* journal.commit({ id: "zero", input: null }, increment)
+      yield* journal.commit({ id: "one", input: null }, increment)
+      yield* bucket.maintenance.remove(slot("1"))
+      const error = yield* journal.read.pipe(Effect.flip)
+      expect(error).toMatchObject({ reason: "corruption", key: slot("1") })
+    }).pipe(Effect.provide(BunCrypto.layer)),
+  )
+
+  it.effect("adopts a snapshot published after the verified head", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const first = yield* open(bucket, { snapshotEvery: 2 })
+      yield* first.commit({ id: "zero", input: null }, increment)
+      yield* first.commit({ id: "one", input: null }, increment)
+      const second = yield* open(yield* bucket.connect, { snapshotEvery: 2 })
+      yield* second.commit({ id: "two", input: null }, increment)
+      yield* second.commit({ id: "three", input: null }, increment)
+      const listed: Array<string | undefined> = []
+      const observed: Service = {
+        ...bucket.store,
+        list: (listedPrefix, options) =>
+          Effect.suspend(() => {
+            if (listedPrefix === `${prefix}snapshots/`) listed.push(options?.startAfter)
+            return bucket.store.list(listedPrefix, options)
+          }),
+      }
+      const watched = yield* makeJournal({ ...identity, snapshotEvery: 2 }).pipe(
+        Effect.provideService(ObjectStore, observed),
+      )
+      yield* watched.commit({ id: "watched", input: null }, increment)
+      // The second writer's snapshot covers the tail; a watched reader adopts it without re-listing
+      // the snapshot prefix from the start.
+      const head = yield* watched.read
+      expect(head).toMatchObject({ sequence: "4", state: { count: 5 } })
+      expect(listed[0]).toBeUndefined()
+      expect(listed.at(-1)?.startsWith(`${prefix}snapshots/${sequenceName("3")}-`)).toBe(true)
+      expect((yield* first.read).sequence).toBe("4")
+    }).pipe(Effect.provide(BunCrypto.layer)),
+  )
+
+  it.effect("discovers a commit that lands between the anchor and the tail listing", () =>
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const other = yield* open(yield* bucket.connect)
+      let injecting = false
+      const observed: Service = {
+        ...bucket.store,
+        list: (listedPrefix, options) =>
+          Effect.gen(function* () {
+            if (injecting && listedPrefix === `${prefix}commits/` && options?.startAfter !== undefined) {
+              // A competing writer commits strictly after the verified anchor before this LIST resolves.
+              injecting = false
+              yield* other.commit({ id: "landed-mid-load", input: null }, increment).pipe(
+                Effect.mapError((cause) =>
+                  ObjectStoreFailure.make({
+                    operation: "list",
+                    key: listedPrefix,
+                    reason: "unavailable",
+                    message: `Injected competing commit failed: ${cause.message}`,
+                  }),
+                ),
+              )
+            }
+            return yield* bucket.store.list(listedPrefix, options)
+          }),
+      }
+      const journal = yield* makeJournal(identity).pipe(Effect.provideService(ObjectStore, observed))
+      yield* journal.commit({ id: "zero", input: null }, increment)
+      yield* journal.commit({ id: "one", input: null }, increment)
+      injecting = true
+      expect(yield* journal.read).toMatchObject({ sequence: "2", state: { count: 3 } })
+      expect(injecting).toBe(false)
     }).pipe(Effect.provide(BunCrypto.layer)),
   )
 

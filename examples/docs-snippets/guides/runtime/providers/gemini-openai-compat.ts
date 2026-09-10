@@ -7,7 +7,7 @@ const agent = Agent.make({ name: "gemini-agent" })
 
 const providerLayer = layerGoogleAIStudio({
   model: "gemini-2.0-flash",
-  apiKey: Config.redacted("GOOGLE_AI_STUDIO_API_KEY"),
+  apiKey: Config.Redacted("GOOGLE_AI_STUDIO_API_KEY"),
 })
 
 const program = ModelRegistry.withModel(

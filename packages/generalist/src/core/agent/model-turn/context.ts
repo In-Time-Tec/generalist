@@ -48,7 +48,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
       | undefined
   }
   readonly modelCallUsage: ReadonlyMap<string, ProviderUsage | undefined>
-  readonly instrumentModel: (model: LanguageModel.Service, turn: number) => LanguageModel.Service
+  readonly instrumentModel: (model: LanguageModel.LanguageModel, turn: number) => LanguageModel.LanguageModel
   readonly chain: ReadonlyArray<Middleware>
   readonly preparePrompt: (
     turn: number,
@@ -68,7 +68,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   ) => Effect.Effect<ReadonlyArray<import("../../context/session.js").Entry>, RunError, DriverInterpreter>
   readonly replayMessages: (sessionParentId: string) => Effect.Effect<ReadonlyArray<Prompt.Message>, RunError>
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>
-  readonly chat: Chat.Service
+  readonly chat: Chat.Chat
   readonly lastWirePrompt: import("effect").Ref.Ref<Prompt.Prompt | undefined>
   readonly compactionService: Option.Option<typeof import("../../turn/compaction.js").Compaction.Service>
   readonly state: AgentRunState

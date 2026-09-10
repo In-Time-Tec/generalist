@@ -126,7 +126,7 @@ import { Config } from "effect"
 import { layerSupermemory } from "generalist/memory"
 
 const memory = layerSupermemory({
-  apiKey: Config.redacted("SUPERMEMORY_API_KEY"),
+  apiKey: Config.Redacted("SUPERMEMORY_API_KEY"),
   containerTag: "session:user-ada",
 })
 ```
@@ -212,5 +212,4 @@ The Memory conformance suite records `versioning` separately. The local Semantic
 
 - Source: `packages/generalist/src/core/context/memory.ts`
 - Source: `packages/generalist/src/memory/`
-- Site: `/docs/guides/memory`
-- Site: `/docs/reference/memory`
+- Site: `/docs/context`

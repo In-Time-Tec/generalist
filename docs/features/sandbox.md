@@ -79,7 +79,7 @@ import * as ModalSandbox from "generalist/unstable/sandbox/modal"
 import * as AgentOS from "generalist/unstable/sandbox/agentos"
 
 const e2b = E2B.layer({
-  apiKey: Config.redacted("E2B_API_KEY"),
+  apiKey: Config.Redacted("E2B_API_KEY"),
   template: "generalist-bun",
   autoPauseAfter: "5 minutes",
 })
@@ -87,26 +87,26 @@ const e2b = E2B.layer({
 const cloudflare = CloudflareSandbox.layer({ binding: env.SANDBOX })
 
 const daytona = Daytona.layer({
-  apiKey: Config.redacted("DAYTONA_API_KEY"),
+  apiKey: Config.Redacted("DAYTONA_API_KEY"),
   image: "ubuntu:22.04",
   sandboxClass: "container",
 })
 
 const sprites = FlySprites.layer({
-  token: Config.redacted("SPRITES_TOKEN"),
+  token: Config.Redacted("SPRITES_TOKEN"),
   app: "generalist",
 })
 
 const modal = ModalSandbox.layer({
-  tokenId: Config.redacted("MODAL_TOKEN_ID"),
-  tokenSecret: Config.redacted("MODAL_TOKEN_SECRET"),
+  tokenId: Config.Redacted("MODAL_TOKEN_ID"),
+  tokenSecret: Config.Redacted("MODAL_TOKEN_SECRET"),
   app: "generalist",
   image: "ubuntu:24.04",
 })
 
 const agentos = AgentOS.layer({
   endpoint: "https://agentos.example.com",
-  token: Config.redacted("AGENTOS_TOKEN"),
+  token: Config.Redacted("AGENTOS_TOKEN"),
   actor: "vm",
 })
 ```

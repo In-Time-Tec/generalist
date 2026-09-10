@@ -49,7 +49,7 @@ export const setupSession = (options: RunOptions) =>
     const toolContext = yield* Effect.serviceOption(ToolContext)
     const activeSession = yield* acquireSession(options.sessionId, sessionDirectory, toolContext)
     const resume = options.resume
-    let resumeChat: Chat.Service | undefined
+    let resumeChat: Chat.Chat | undefined
     let validatedResume: import("../suspension.js").SuspensionCheckpoint | undefined
     if (resume !== undefined) {
       resumeChat = yield* chatForResume({ activeSession, suppliedHistory: options.history }).pipe(
@@ -66,7 +66,7 @@ export const setupSession = (options: RunOptions) =>
 export const setupChat = (args: {
   readonly options: RunOptions
   readonly activeSession: Option.Option<SessionStore>
-  readonly resumeChat: Chat.Service | undefined
+  readonly resumeChat: Chat.Chat | undefined
   readonly system: string | undefined
   readonly supplemental: string | undefined
 }) =>

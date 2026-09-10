@@ -85,5 +85,5 @@ Each process-local lane defaults to 64 entries and both share a 1 MiB prompt bou
 
 - Address resolution details: [`addressed-messaging.md`](./addressed-messaging.md)
 - Source: `packages/generalist/src/core/turn/steering.ts`, `packages/generalist/src/core/turn/steering-inbox.ts`, `packages/generalist/src/runtime/steering.ts`, `packages/generalist/src/runtime/run/steering.ts`, `packages/generalist/src/runtime/messaging/`
-- Site: `/docs/guides/steering`
+- Site: `/docs/tasks`
 - Decision: [Steering consumption is the message ack](../decisions/steering-consumption-is-the-ack.md)

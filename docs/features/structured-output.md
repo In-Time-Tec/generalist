@@ -69,4 +69,4 @@ terminal output turn
 ## Related
 
 - Source: `packages/generalist/src/core/agent/service.ts`, `packages/generalist/src/core/agent/loop/service.ts`, `packages/generalist/src/core/agent/model-turn/finish.ts`
-- Site: `/docs/guides/structured-output`
+- Site: `/docs/structured-output`

@@ -44,9 +44,9 @@ export const nativeBucket = (client: Client): Bucket => ({
           ),
         ),
     ),
-  list: ({ prefix, cursor }) =>
+  list: ({ prefix, cursor, startAfter }) =>
     Effect.runPromise(
-      client.store.list(prefix, cursor).pipe(
+      client.store.list(prefix, { cursor, startAfter }).pipe(
         Effect.map((page) => {
           const result = { objects: page.keys.map((key) => ({ key })), truncated: page.cursor !== undefined }
           return page.cursor === undefined ? result : { ...result, cursor: page.cursor }

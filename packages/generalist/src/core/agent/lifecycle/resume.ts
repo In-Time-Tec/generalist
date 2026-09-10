@@ -20,7 +20,7 @@ export const setupPromptContext = <
   readonly agent: Agent<T, R, P, A, Schema.Top, Schema.Top>
   readonly options: RunOptions
   readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
-  readonly resumeChat: import("effect/unstable/ai").Chat.Service | undefined
+  readonly resumeChat: import("effect/unstable/ai").Chat.Chat | undefined
   readonly staticCandidates: ReadonlyArray<Candidate>
 }) =>
   Effect.gen(function* () {

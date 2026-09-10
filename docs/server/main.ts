@@ -84,8 +84,8 @@ const serverLayer = (port: number, origin: string) =>
   )
 
 const main = Effect.gen(function* () {
-  const port = yield* Config.port("PORT").pipe(Config.withDefault(3000))
-  const origin = yield* Config.string("ORIGIN").pipe(Config.withDefault(`http://localhost:${port}`))
+  const port = yield* Config.Port("PORT").pipe(Config.withDefault(3000))
+  const origin = yield* Config.String("ORIGIN").pipe(Config.withDefault(`http://localhost:${port}`))
   return yield* Layer.launch(serverLayer(port, origin))
 })
 

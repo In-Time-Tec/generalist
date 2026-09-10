@@ -418,11 +418,13 @@ it.layer(BunCrypto.layer)((test) => {
         payload.retained[0] = 99
         const before = reads.length
         const recovered = yield* journal.head
-        expect(reads.slice(before)).toContain(snapshotKey)
+        // The verified head covers the published snapshot: recovery re-reads only the anchor commit.
+        expect(reads.slice(before)).not.toContain(snapshotKey)
         expect(reads.slice(before)).toContain(commitKey)
         expect(recovered).toEqual(committed.head)
-        if (publication === "uncertain") expect(recovered.state.payload).not.toBe(committed.head.state.payload)
-        else expect(recovered.state.payload).toBe(committed.head.state.payload)
+        expect(recovered.state.payload).toBe(committed.head.state.payload)
+        expect(recovered.state.payload).not.toBe(payload)
+        expect(recovered.state.payload).toEqual({ retained: [1, 2, 3] })
         expect(Object.isFrozen(recovered.state.payload)).toBe(true)
         const fresh = yield* makeJournal({ ...identity, snapshotEvery: 2 }).pipe(
           Effect.provideService(ObjectStore, (yield* bucket.connect).store),
@@ -774,7 +776,7 @@ it.layer(BunCrypto.layer)((test) => {
       expect(yield* byteLength(value)).toBe((yield* encodeBytes(value)).byteLength)
     }),
   )
-  test.effect("reuses verified snapshot decoding and head hashing while rereading both canonical objects", () =>
+  test.effect("reuses verified snapshot decoding and head hashing while rereading the anchor commit", () =>
     Effect.gen(function* () {
       const bucket = yield* makeSimulator()
       const crypto = yield* Crypto.Crypto
@@ -810,7 +812,7 @@ it.layer(BunCrypto.layer)((test) => {
       const firstReads = reads.length
       expect(yield* journal.read).toEqual(first)
       expect(hashes - afterFirst).toBeLessThan(firstHashes)
-      expect(reads.slice(firstReads)).toContain(snapshotKey)
+      expect(reads.slice(firstReads)).not.toContain(snapshotKey)
       expect(reads.slice(firstReads)).toContain(commitKey)
     }),
   )
@@ -844,7 +846,13 @@ it.layer(BunCrypto.layer)((test) => {
       expect(Object.isFrozen(head)).toBe(true)
       const snapshotKey = (yield* bucket.store.list(`${prefix}snapshots/`)).keys[0]!
       yield* bucket.faults.corrupt(snapshotKey, new TextEncoder().encode("{}"))
-      expect((yield* journal.head.pipe(Effect.flip)).reason).toBe("corruption")
+      // A snapshot at or below the verified head is a covered accelerator: warm recovery no longer
+      // reads it, and the corruption is still detected on the next cold load.
+      expect(yield* journal.head).toMatchObject({ sequence: "1" })
+      const fresh = yield* makeJournal({ ...identity, snapshotEvery: 2 }).pipe(
+        Effect.provideService(ObjectStore, (yield* bucket.connect).store),
+      )
+      expect((yield* fresh.head.pipe(Effect.flip)).reason).toBe("corruption")
     }),
   )
 
@@ -871,7 +879,13 @@ it.layer(BunCrypto.layer)((test) => {
         yield* journal.read
         const snapshotKey = (yield* bucket.store.list(`${prefix}snapshots/`)).keys[0]!
         yield* bucket.faults.corrupt(target === "snapshot" ? snapshotKey : commitKey, new TextEncoder().encode("{}"))
-        expect((yield* journal.read.pipe(Effect.flip)).reason).toBe("corruption")
+        if (target === "snapshot") {
+          // The verified head dominates a covered snapshot, so it is no longer re-read; the next
+          // snapshot-boundary publication still detects the conflicting immutable bytes.
+          expect(yield* journal.read).toMatchObject({ sequence: "1" })
+        } else {
+          expect((yield* journal.read.pipe(Effect.flip)).reason).toBe("corruption")
+        }
         expect((yield* journal.commit({ id: "third", input: null }, () => transition).pipe(Effect.flip)).reason).toBe(
           "corruption",
         )

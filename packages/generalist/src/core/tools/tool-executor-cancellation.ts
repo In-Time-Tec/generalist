@@ -1,6 +1,7 @@
 import { Function, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
+import { Items as TaskItems } from "../../tasks/item.js"
 import type { Service } from "./tool-executor.js"
 import type { DomainFailure, Request, Success } from "./tool-result-codec.js"
 
@@ -40,7 +41,7 @@ const PersistedToolCall = Schema.Struct({
   name: Schema.String,
   params: Schema.Unknown,
   providerExecuted: Schema.Boolean,
-  "~effect/ai/Content/Part": Schema.Literal("~effect/ai/Content/Part"),
+  "~effect/ai/Response/Part": Schema.Literal("~effect/ai/Response/Part"),
   metadata: Response.ProviderMetadata,
 })
 
@@ -51,6 +52,7 @@ const PersistedRequest = Schema.Struct({
   toolCallIndex: Schema.Int,
   agentName: Schema.String,
   sessionId: Schema.String,
+  tasks: Schema.optionalKey(TaskItems),
 })
 
 const CancellableOperation = Schema.TaggedStruct("CancellableTool", {
@@ -61,9 +63,7 @@ export const cancellableOperation = (execution: Request) => ({ _tag: "Cancellabl
 
 export const decodeCancellableOperation = (input: typeof Schema.Unknown.Type): Request | undefined =>
   Option.getOrUndefined(
-    Schema.decodeUnknownOption(CancellableOperation)(input, { onExcessProperty: "preserve" }).pipe(
-      Option.map((decoded) => decoded.execution),
-    ),
+    Schema.decodeUnknownOption(CancellableOperation)(input).pipe(Option.map((decoded) => decoded.execution)),
   )
 
 export const supportsCancellation: {

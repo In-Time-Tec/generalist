@@ -21,7 +21,7 @@
     "@smithy/types": "catalog:",
     "@smithy/fetch-http-handler": "catalog:",
     "@standard-schema/spec": "catalog:",
-    "effect": "4.0.0-rc.112",
+    "effect": "4.0.0-rc.113",
     "es-module-lexer": "catalog:",
     "foldkit": "catalog:peer",
     "modal": "catalog:",

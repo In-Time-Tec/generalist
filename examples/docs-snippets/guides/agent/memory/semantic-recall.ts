@@ -6,7 +6,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 
 const embeddingLayer = openAiEmbeddingLayer({
   model: "text-embedding-3-small",
-  apiKey: Config.redacted("OPENAI_API_KEY"),
+  apiKey: Config.Redacted("OPENAI_API_KEY"),
 })
 // VectorStore.layerMemory is process-local; it is suitable for tests and short-lived runs, not restart recovery.
 

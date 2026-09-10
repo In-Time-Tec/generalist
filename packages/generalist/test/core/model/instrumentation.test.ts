@@ -31,20 +31,31 @@ const finishPart = Response.makePart("finish", { reason: "stop", usage, response
 const makeResilience = (input?: Partial<ModelResilience.Policy>): ModelResilience.Policy =>
   Effect.runSync(ModelResilience.make(input))
 
-const languageModel = <Overrides extends object>(overrides: Overrides): LanguageModel.Service => {
-  const model: LanguageModel.Service = {
-    generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
-    generateObject: () => Effect.succeed(new LanguageModel.GenerateObjectResponse({}, [])),
-    streamText: () => Stream.empty,
-  }
-  Object.assign(model, overrides)
-  return model
+type FakeModelOverrides = {
+  readonly [K in keyof LanguageModel.LanguageModel]?:
+    | LanguageModel.LanguageModel[K]
+    | ((...args: ReadonlyArray<never>) => void)
 }
 
+const languageModel = (overrides: FakeModelOverrides): LanguageModel.LanguageModel =>
+  // SAFETY: test fake — the defaults plus overrides satisfy the member contract exercised
+  // through the instrumentation wrapper; response parameter-mode invariance is not observable
+  // at the wrapped call sites under test.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  Object.assign(
+    {
+      [LanguageModel.TypeId]: LanguageModel.TypeId,
+      generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
+      generateObject: () => Effect.succeed(new LanguageModel.GenerateObjectResponse({}, [])),
+      streamText: () => Stream.empty,
+    },
+    overrides,
+  ) as LanguageModel.LanguageModel
+
 const instrument = (
-  model: LanguageModel.Service,
+  model: LanguageModel.LanguageModel,
   options: Omit<InstrumentOptions, "clock">,
-): Effect.Effect<LanguageModel.Service> =>
+): Effect.Effect<LanguageModel.LanguageModel> =>
   Clock.clockWith((clock) => Effect.succeed(instrumentModel(model, { ...options, clock })))
 
 const makeCollector = () => {

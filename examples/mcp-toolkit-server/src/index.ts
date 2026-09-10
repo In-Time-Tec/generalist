@@ -28,10 +28,12 @@ const mcpLayer = McpServer.toolkit(toolkit).pipe(
   ),
 )
 
-const serverLayer = (port: number) => HttpRouter.serve(mcpLayer).pipe(Layer.provideMerge(layerBunHttp({ port })))
+// Bind an explicit loopback address: Bun reports "localhost" when unset and platform-bun requires an IP literal.
+const serverLayer = (port: number) =>
+  HttpRouter.serve(mcpLayer).pipe(Layer.provideMerge(layerBunHttp({ port, hostname: "127.0.0.1" })))
 
 const main = Effect.gen(function* () {
-  const port = yield* Config.port("PORT").pipe(Config.withDefault(4001))
+  const port = yield* Config.Port("PORT").pipe(Config.withDefault(4001))
   yield* Effect.log(`legacy MCP 2025-06-18 server listening on port ${port}`)
   return yield* Layer.launch(serverLayer(port))
 })

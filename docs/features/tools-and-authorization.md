@@ -123,6 +123,6 @@ Successful output is JSON-sized at the common post-codec boundary before durable
 
 - Source: `packages/generalist/src/core/tools/`, `packages/generalist/src/core/policy/permissions.ts`, `packages/generalist/src/core/policy/approvals.ts`
 - Test: [`core/tools/tool-authorization.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/tools/tool-authorization.test.ts)
-- Site: `/docs/guides/define-tools`, `/docs/guides/permissions`, `/docs/guides/approvals`, `/docs/guides/durable-composite-tools`, `/docs/reference/core-tools`
+- Site: `/docs/tools`, `/docs/approvals`
 - Sibling feature docs: [`capabilities.md`](./capabilities.md), [`hooks.md`](./hooks.md)
 - Decisions/tradeoffs: [Typed tool boundaries](../decisions/typed-tool-boundaries.md), [Strict tool registry](../tradeoffs/strict-tool-registry.md)

@@ -28,7 +28,7 @@ The local pins are MinIO `RELEASE.2025-04-22T22-12-26Z`, Miniflare `5.20260811.1
 - A compatible executable build and its pinned resolver registrations. The bucket cannot reconstruct arbitrary application code or replace credentials for external services.
 
 ```bash
-bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
+bun add generalist effect@4.0.0-rc.113 @effect/platform-bun@4.0.0-rc.113 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
 export GENERALIST_BUCKET="your-generalist-bucket"
 export AWS_REGION="us-east-1"
 export AWS_ACCESS_KEY_ID="your-access-key"
@@ -56,13 +56,13 @@ import * as TestModel from "generalist/testing/model"
 const assistant = Agent.make({ name: "durability-demo" })
 const services = Layer.unwrap(
   Effect.gen(function* () {
-    const bucket = yield* Config.string("GENERALIST_BUCKET")
-    const region = yield* Config.string("AWS_REGION")
-    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-    const tenant = yield* Config.string("GENERALIST_TENANT")
-    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.String("GENERALIST_BUCKET")
+    const region = yield* Config.String("AWS_REGION")
+    const accessKeyId = yield* Config.String("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.String("AWS_SECRET_ACCESS_KEY")
+    const environment = yield* Config.String("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.String("GENERALIST_TENANT")
+    const partition = yield* Config.String("GENERALIST_PARTITION")
     const storage = Layer.merge(
       S3.layer({ bucket, region, credentials: { accessKeyId, secretAccessKey } }),
       BunCrypto.layer,
@@ -89,7 +89,7 @@ await Effect.gen(function* () {
 }).pipe(Effect.scoped, Effect.provide(services), Effect.runPromise)
 ```
 
-The command prints a Run ID and the scripted answer. A second invocation uses the same Session and idempotency key to retrieve the accepted Run, rather than admitting another one. A new input under that identity is a conflict, not a request to overwrite the old Run. The owned Layer scope closes when the effect exits. For an explicit close/reopen comparison, use [five-minutes](/start/examples#local-and-object-recovery-in-five-minutes).
+The command prints a Run ID and the scripted answer. A second invocation uses the same Session and idempotency key to retrieve the accepted Run, rather than admitting another one. A new input under that identity is a conflict, not a request to overwrite the old Run. The owned Layer scope closes when the effect exits. For an explicit close/reopen comparison, run the [five-minutes](../../examples/five-minutes) example.
 
 `Durability.layer(options)` provides Runtime, RunStore, executor, and scheduler services. `layerRunStore(options)` provides storage without owning an execution loop. Both require an ObjectStore and Crypto; the full Runtime also requires `ExecutableResolver`. Neither selects a fallback store when configuration is missing.
 
@@ -131,7 +131,7 @@ declare const bucket: R2.Bucket
 const objects = R2.layer(bucket)
 ```
 
-Provide this Layer to the same durability engine with a Worker-compatible Crypto Layer and executable resolver. [Cloudflare hosting](/features/cloudflare) adds lifecycle integration. Read canonical state through the binding or direct object API, never an R2 public cached domain.
+Provide this Layer to the same durability engine with a Worker-compatible Crypto Layer and executable resolver. [Cloudflare hosting](cloudflare.md) adds lifecycle integration. Read canonical state through the binding or direct object API, never an R2 public cached domain.
 
 ## Provider contract and support limits
 
@@ -141,7 +141,7 @@ S3 and native R2 are the transport targets. An S3-shaped API alone is insufficie
 
 ## Local workload baseline
 
-Run `bun scripts/durability-benchmark.ts` to collect a deterministic ObjectStore-simulator baseline. The checked-in report at `artifacts/durability-benchmark/local-simulator-58eba620-linux-x64.json` records the exact source commit, dirty status, benchmark-script SHA-256, Bun/runtime platform, seed, page size, concurrency, payload sizes, metric definitions, and raw request/byte deltas.
+Run `bun scripts/durability-benchmark.ts` to collect a deterministic ObjectStore-simulator baseline. Each report records the exact source commit, dirty status, benchmark-script SHA-256, Bun/runtime platform, seed, page size, concurrency, payload sizes, metric definitions, and raw request/byte deltas, and is written under `artifacts/durability-benchmark/`.
 
 The baseline exercises hot-partition contention, independent partitions, a long admission history with fresh-layer recovery, bounded 64 KiB BlobStore payloads, release-and-reclaim owner replacement, and no-due-work scans. It reports p50, p95, p99, and maximum latency for durable admission, Runtime terminal outcome commit, reward mutation, state read, cold recovery, artifact write, owner replacement, and idle scans. The program fails if request/byte counters are negative or inconsistent, or if a no-due-work scan creates an object or attempts to write bytes. The payload workload stays within the BlobStore byte cap.
 
@@ -167,7 +167,7 @@ External operations commit intent before dispatch, then commit a known result or
 
 Canonical keys include environment, tenant, and partition. Tenant blob keys include environment and tenant and are shared by that tenant's partitions. These are storage namespaces, not authentication: authorize every Run, Session, blob, stream, approval, and operator endpoint against the authenticated principal. Do not let untrusted callers choose another tenant's namespace. Use prefix-scoped credentials where the provider supports them.
 
-Configure positive bounded work and storage limits for the actual workload. Runtime options include `maxStateBytes`, `maxCommitBytes`, `maxReplayBytes`, and `snapshotEvery`, alongside scheduler and subscriber bounds. `admissionReserveBytes` defaults to one quarter of the state cap: admission and new operation dispatch must leave those bytes available for bounded settlement, cancellation, and recovery. Nonterminal Tool Runs also reserve bytes for their bounded output, progress, and control transitions; consumed progress/phase allowances are released, and the reservation ends only at terminal status. Exact command retries still return their original receipts. These finite reservations do not guarantee arbitrary outstanding work or unlimited output. See the [fixed 1,000-Tool cold-recovery gate](/features/durability-verification) for the measured configuration and limits.
+Configure positive bounded work and storage limits for the actual workload. Runtime options include `maxStateBytes`, `maxCommitBytes`, `maxReplayBytes`, and `snapshotEvery`, alongside scheduler and subscriber bounds. `admissionReserveBytes` defaults to one quarter of the state cap: admission and new operation dispatch must leave those bytes available for bounded settlement, cancellation, and recovery. Nonterminal Tool Runs also reserve bytes for their bounded output, progress, and control transitions; consumed progress/phase allowances are released, and the reservation ends only at terminal status. Exact command retries still return their original receipts. These finite reservations do not guarantee arbitrary outstanding work or unlimited output. See the [fixed 1,000-Tool cold-recovery gate](durability-verification.md) for the measured configuration and limits.
 
 Snapshots contain reconstructible state and retained receipts, not only chat history. The engine still materializes partition state; snapshots and paged user history do not imply constant memory or an unlimited partition. Limit partition growth and test the application's actual Session lengths, retained branches, payloads, and contention.
 
@@ -177,7 +177,7 @@ Large attachments belong in `BlobStore.layer({ environment, tenant, maxBytes? })
 
 The default process scheduler is scoped to the Runtime Layer. A supervisor must restart failed processes. For platform-managed wakeups use `schedulerMode: "external"` and await `LocalScheduler.drain({ fuel })`; its result reports `processed`, `hasMore`, and an optional `nextDueAt`.
 
-The canonical schedule or wait is authoritative; a successful alarm or schedule call is only a wake hint. Run an independent reconciler so a commit followed by failed wake delivery cannot strand accepted work. Cloudflare Durable Objects and Rivet actors host the same object authority. Their local state is not a second persistence model. See [hosts](/features/hosts).
+The canonical schedule or wait is authoritative; a successful alarm or schedule call is only a wake hint. Run an independent reconciler so a commit followed by failed wake delivery cannot strand accepted work. Cloudflare Durable Objects and Rivet actors host the same object authority. Their local state is not a second persistence model. See [hosts](hosts.md).
 
 ## Snapshots, retention, and garbage collection
 
@@ -199,6 +199,6 @@ There is no public one-call snapshot restore API or automatic legacy-store impor
 
 Rehearse this procedure with your real provider and failure scenarios before relying on it. A likely startup failure is missing credentials or a custom endpoint without qualified conditional semantics: correct the configuration and provider qualification, not the stored history.
 
-Next: use [typed recovery actions](/features/recovery) for unresolved work and the [Runtime reference](/reference/runtime) for service contracts.
+Next: use [typed recovery actions](recovery.md) for unresolved work and the [Runtime](runtime.md) service contracts.
 
 Local integration scenarios: [`durability/object-store.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/durability/object-store.test.ts). Test availability describes the verification boundary, not a claim that every acceptance gate has passed.

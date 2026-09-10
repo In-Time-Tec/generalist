@@ -77,4 +77,4 @@ unobserved + "never" ───> status=unknown ──> NestedOperation.Unknown
 ## Related
 
 - Source: `packages/generalist/src/core/tools/nested-operation.ts`, `packages/generalist/src/runtime/operation/nested-operations.ts`
-- Site: `/docs/guides/durable-composite-tools`
+- Site: `/docs/tools`

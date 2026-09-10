@@ -9,6 +9,7 @@ import {
   equalBytes,
   failure,
   freeze,
+  nextSequence,
   sequenceFromName,
   sequenceName,
 } from "./protocol.js"
@@ -44,47 +45,57 @@ export const make = ({
       verified = loaded
     }
   }
-  const listSequences = Effect.gen(function* () {
-    const keys = yield* listKeys(commitsPrefix)
-    const sequences: Array<string> = []
-    for (let index = 0; index < keys.size; index++) {
-      const sequence = String(index)
-      if (!keys.has(commitKey(sequence))) {
-        for (const key of keys) {
-          const name = key.slice(commitsPrefix.length)
-          if (!name.endsWith(".json") || sequenceFromName(name.slice(0, -5)) === undefined)
-            return yield* failure({ reason: "corruption", message: "Invalid numbered commit key", key })
+  // With a verified anchor, listing resumes strictly after its immutable key and only the unverified
+  // tail is re-validated: the tail must remain contiguous from nextSequence(anchor).
+  const listSequences = (anchor: { readonly key: string; readonly sequence: string } | undefined) =>
+    Effect.gen(function* () {
+      const keys = yield* listKeys(commitsPrefix, anchor?.key)
+      const sequences: Array<string> = []
+      let expected = anchor?.sequence ?? "-1"
+      for (let index = 0; index < keys.size; index++) {
+        expected = nextSequence(expected)
+        if (!keys.has(commitKey(expected))) {
+          for (const key of keys) {
+            const name = key.slice(commitsPrefix.length)
+            if (!name.endsWith(".json") || sequenceFromName(name.slice(0, -5)) === undefined)
+              return yield* failure({ reason: "corruption", message: "Invalid numbered commit key", key })
+          }
+          return yield* failure({
+            reason: "corruption",
+            message: "Retained commit history contains a gap",
+            key: commitKey(expected),
+          })
         }
-        return yield* failure({
-          reason: "corruption",
-          message: "Retained commit history contains a gap",
-          key: commitKey(sequence),
-        })
+        sequences.push(expected)
       }
-      sequences.push(sequence)
-    }
-    return sequences
-  })
+      return sequences
+    })
   interface SnapshotLocation {
     readonly key: string
     readonly sequence: string
     readonly digest: string
   }
-  const latestSnapshot = (latest: string) =>
+  const snapshotLocation = (key: string): SnapshotLocation | undefined => {
+    const match = /^([0-9]{20,})-([0-9a-f]{64})\.json$/.exec(key.slice(snapshotsPrefix.length))
+    const sequence = match === null ? undefined : sequenceFromName(match[1]!)
+    return match === null || sequence === undefined ? undefined : { key, sequence, digest: match[2]! }
+  }
+  // The verified snapshot key is an immutable content-addressed name; resuming after it lists only
+  // snapshot publications that arrived since, while the verified key stays a seeded candidate.
+  const latestSnapshot = (latest: string, verifiedKey: string | undefined) =>
     Effect.gen(function* () {
-      const snapshots = yield* listKeys(snapshotsPrefix)
-      let snapshot: { key: string; sequence: string; digest: string } | undefined
+      const seeded = verifiedKey === undefined ? undefined : snapshotLocation(verifiedKey)
+      const snapshots = yield* listKeys(snapshotsPrefix, seeded === undefined ? undefined : verifiedKey)
+      let snapshot = seeded !== undefined && compareSequence(seeded.sequence, latest) <= 0 ? seeded : undefined
       for (const key of snapshots) {
-        const name = key.slice(snapshotsPrefix.length)
-        const match = /^([0-9]{20,})-([0-9a-f]{64})\.json$/.exec(name)
-        const sequence = match === null ? undefined : sequenceFromName(match[1]!)
-        if (sequence === undefined || match === null)
-          return yield* failure({ reason: "corruption", message: "Invalid snapshot key", key })
+        const located = snapshotLocation(key)
+        if (located === undefined) return yield* failure({ reason: "corruption", message: "Invalid snapshot key", key })
+        const { sequence } = located
         // A snapshot may have been published after the commit LIST completed. Ignore it for this
         // point-in-time read; its commit is discovered by the next load or conditional-create conflict.
         if (compareSequence(sequence, latest) > 0) continue
         if (snapshot === undefined || compareSequence(sequence, snapshot.sequence) > 0) {
-          snapshot = { key, sequence, digest: match[2]! }
+          snapshot = located
         } else if (sequence === snapshot.sequence && key !== snapshot.key) {
           return yield* failure({
             reason: "corruption",
@@ -155,23 +166,22 @@ export const make = ({
       verifiedSnapshot = { key: snapshot.key, bytes, loaded }
       return loaded
     })
-  const load: Effect.Effect<Loaded, DurabilityFailure> = Effect.gen(function* () {
-    // A verified immutable prefix is a local accelerator, never an authority hint.
-    // Retained names, the current snapshot, and the cached anchor are still verified.
-    const known = verified
-    // LIST is paginated and unordered. Hints are intentionally never read. Retained names establish
-    // the complete prefix even when a snapshot lets us avoid replaying old record bodies.
-    const sequences = yield* listSequences
-    const latest = sequences.at(-1) ?? "-1"
-    let loaded: Loaded = {
-      head: { sequence: "-1", digest: "", state: Object.freeze({}) },
-      receipts: {},
-      replayRecords: 0,
-      replayBytes: 0,
-    }
-    const snapshot = yield* latestSnapshot(latest)
-    if (snapshot !== undefined) loaded = yield* loadSnapshot(snapshot)
-    if (known !== undefined) {
+  // A listed snapshot at or below the verified head is dominated by it: the verified head already
+  // covers that prefix and the tail no longer lists those commit keys for replay.
+  const dominatedBy = (snapshot: SnapshotLocation | undefined, known: Loaded | undefined) =>
+    known !== undefined &&
+    snapshot !== undefined &&
+    snapshot.key !== known.snapshotKey &&
+    compareSequence(snapshot.sequence, known.head.sequence) <= 0
+  const reuseVerified = (
+    known: Loaded | undefined,
+    snapshot: SnapshotLocation | undefined,
+    latest: string,
+    loaded: Loaded,
+    dominated: boolean,
+  ): Effect.Effect<Loaded, DurabilityFailure> =>
+    Effect.gen(function* () {
+      if (known === undefined) return loaded
       if (compareSequence(known.head.sequence, latest) > 0) {
         return yield* failure({
           reason: "corruption",
@@ -179,7 +189,10 @@ export const make = ({
           key: commitKey(known.head.sequence),
         })
       }
-      if (known.snapshotKey === snapshot?.key && compareSequence(known.head.sequence, loaded.head.sequence) >= 0) {
+      if (
+        (dominated || known.snapshotKey === snapshot?.key) &&
+        compareSequence(known.head.sequence, loaded.head.sequence) >= 0
+      ) {
         if (known.head.sequence !== "-1") {
           const anchor = yield* readCommit(known.head.sequence)
           if (anchor.digest !== known.head.digest) {
@@ -190,9 +203,37 @@ export const make = ({
             })
           }
         }
-        loaded = known
+        return known
       }
+      return loaded
+    })
+  const load: Effect.Effect<Loaded, DurabilityFailure> = Effect.gen(function* () {
+    // A verified immutable prefix is a local accelerator, never an authority hint.
+    // Retained names, the current snapshot, and the cached anchor are still verified.
+    const known = verified
+    // LIST is paginated and unordered. Hints are intentionally never read. Retained names establish
+    // the complete prefix even when a snapshot lets us avoid replaying old record bodies. With a
+    // verified head, commit and snapshot listings resume strictly after its immutable anchor keys:
+    // already-verified objects cannot change, so only the unverified tail is listed and validated.
+    // The anchor itself is still re-read below; a removed or altered anchor fails there instead.
+    const anchor =
+      known !== undefined && known.head.sequence !== "-1"
+        ? { key: commitKey(known.head.sequence), sequence: known.head.sequence }
+        : undefined
+    const sequences = yield* listSequences(anchor)
+    const latest = sequences.at(-1) ?? anchor?.sequence ?? "-1"
+    let loaded: Loaded = {
+      head: { sequence: "-1", digest: "", state: Object.freeze({}) },
+      receipts: {},
+      replayRecords: 0,
+      replayBytes: 0,
     }
+    // verifiedSnapshot is always the freshest snapshot this process validated or published; its key
+    // is never behind known.snapshotKey, so resuming after it still finds every newer snapshot.
+    const snapshot = yield* latestSnapshot(latest, verifiedSnapshot?.key ?? known?.snapshotKey)
+    const dominated = dominatedBy(snapshot, known)
+    if (snapshot !== undefined && !dominated) loaded = yield* loadSnapshot(snapshot)
+    loaded = yield* reuseVerified(known, snapshot, latest, loaded, dominated)
     for (
       let index = loaded.head.sequence === "-1" ? 0 : sequences.indexOf(loaded.head.sequence) + 1;
       index < sequences.length;

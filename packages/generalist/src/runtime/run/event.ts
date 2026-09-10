@@ -302,8 +302,8 @@ export const LifecycleTag = Schema.Literals([
 ])
 
 const Metadata = Schema.Record(Schema.String, Schema.Json)
-const PartTag = Schema.Literal("~effect/ai/Content/Part").pipe(
-  Schema.withDecodingDefaultKey(Effect.succeed("~effect/ai/Content/Part"), { encodingStrategy: "omit" }),
+const PartTag = Schema.Literal("~effect/ai/Response/Part").pipe(
+  Schema.withDecodingDefaultKey(Effect.succeed("~effect/ai/Response/Part"), { encodingStrategy: "omit" }),
 )
 const ToolCall = Schema.Struct({
   type: Schema.Literal("tool-call"),
@@ -311,7 +311,7 @@ const ToolCall = Schema.Struct({
   name: Schema.String,
   params: Schema.Unknown,
   providerExecuted: Schema.Boolean,
-  "~effect/ai/Content/Part": PartTag,
+  "~effect/ai/Response/Part": PartTag,
   metadata: Response.ProviderMetadata,
 })
 const ToolResult = Schema.Struct({
@@ -323,7 +323,7 @@ const ToolResult = Schema.Struct({
   encodedResult: Schema.Unknown,
   providerExecuted: Schema.Boolean,
   preliminary: Schema.Boolean,
-  "~effect/ai/Content/Part": PartTag,
+  "~effect/ai/Response/Part": PartTag,
   metadata: Response.ProviderMetadata,
   memoized: Schema.optionalKey(Schema.Struct({ fromRun: Schema.String, fromOperation: Schema.String })),
   taint: Schema.optionalKey(Schema.Array(CapabilitySource)),

@@ -25,6 +25,7 @@ import { cn, type SlotConfig } from "@/lib/styling"
  * ])
  * ```
  */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const conversation: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html

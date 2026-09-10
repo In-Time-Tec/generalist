@@ -7,7 +7,7 @@ import type { LanguageModelNotRegistered, ModelRegistry, ModelSelection } from "
 export type ModelSource =
   | {
       readonly _tag: "Ambient"
-      readonly model: LanguageModel.Service
+      readonly model: LanguageModel.LanguageModel
       /** Registry captured at setup so a handoff specialist's declared selection still resolves. */
       readonly registry?: typeof ModelRegistry.Service
     }

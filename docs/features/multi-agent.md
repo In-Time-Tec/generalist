@@ -178,5 +178,5 @@ An isolated `AgentTool` converts child failures and suspensions to its declared 
 ## Related
 
 - Source: `packages/generalist/src/core/agent/lifecycle/fan-out.ts`, `packages/generalist/src/core/agent/tool/fan-out.ts`, `packages/generalist/src/runtime/child/`, `packages/generalist/src/core/agent/handoff/`, `packages/generalist/src/core/policy/handoff.ts`
-- Site: `/docs/guides/multi-agent`, `/docs/guides/addressed-messaging`
+- Site: `/docs/multi-agent`
 - Sibling feature docs: [`capabilities.md`](./capabilities.md), [`tasks.md`](./tasks.md)

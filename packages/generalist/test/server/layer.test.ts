@@ -291,11 +291,9 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
                 Effect.provideService(Socket.WebSocketConstructor, authenticatedSocket),
               )
               const writer = yield* socket.writer
-              return yield* socket
-                .runRaw(() => Effect.void, {
-                  onOpen: Ref.set(allowed, mode !== "revoked").pipe(Effect.andThen(writer(body)), Effect.orDie),
-                })
-                .pipe(Effect.flip)
+              const reader = yield* socket.reader
+              yield* Ref.set(allowed, mode !== "revoked").pipe(Effect.andThen(writer.write(body)), Effect.orDie)
+              return yield* Effect.forever(reader.pull).pipe(Effect.flip)
             }),
           )
           expect(error.reason).toMatchObject({ _tag: "SocketCloseError", code: 1008, closeReason: "forbidden" })

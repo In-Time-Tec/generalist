@@ -35,4 +35,4 @@ Rewind changes the current projection while retaining append-only history, recei
 
 Local qualification uses MinIO and persistent Miniflare/workerd with the committed exact-EOF emulator patch. Native/S3 shared-bucket checks pass through Miniflare's gateway and must be labeled accordingly. Local results do not certify AWS S3 or deployed R2. Protocol models prove only their recorded assumptions and explored bounds; they do not substitute for integration tests, measured workloads, full browser acceptance, or an exact detached release candidate.
 
-Current completion requirements belong in `PLAN.md`; current commands and limitations belong in [object durability](../features/durable-stores.md). This decision is not a release-ready or M1–M8 completion claim.
+The [durability verification report](../features/durability-verification.md) maps these invariants to executable tests; current commands and limitations belong in [object durability](../features/durable-stores.md). This decision is not a release-ready or completion claim.

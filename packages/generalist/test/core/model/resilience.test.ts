@@ -2,6 +2,7 @@ import "./suites/agent-default-resilience-suite.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Function, Layer, Schedule, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
+import type { NoExcessProperties } from "effect/Types"
 import { ModelResilience, ModelStreamTermination } from "../../../src/index"
 
 const transientError = AiError.make({
@@ -31,12 +32,26 @@ const responseMetadata = (id: string) =>
 const makeResilience = (input?: Partial<ModelResilience.Policy>): ModelResilience.Policy =>
   Effect.runSync(ModelResilience.make(input))
 
-const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service => ({
-  generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
-  generateObject: () => Effect.succeed(new LanguageModel.GenerateObjectResponse({}, [])),
-  streamText: () => Stream.empty,
-  ...overrides,
-})
+type FakeModelOverrides = {
+  readonly [K in keyof LanguageModel.LanguageModel]?:
+    | LanguageModel.LanguageModel[K]
+    | ((...args: ReadonlyArray<never>) => void)
+}
+
+const languageModel = (overrides: FakeModelOverrides): LanguageModel.LanguageModel =>
+  // SAFETY: test fake — the defaults plus overrides satisfy the member contract exercised
+  // through the resilience wrapper; response parameter-mode invariance is not observable
+  // at the wrapped call sites under test.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  Object.assign(
+    {
+      [LanguageModel.TypeId]: LanguageModel.TypeId,
+      generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
+      generateObject: () => Effect.succeed(new LanguageModel.GenerateObjectResponse({}, [])),
+      streamText: () => Stream.empty,
+    },
+    overrides,
+  ) as LanguageModel.LanguageModel
 
 const retryOnce = makeResilience({
   retrySchedule: Schedule.recurs(1),
@@ -213,12 +228,19 @@ describe("ModelResilience", () => {
     const generateObject = <
       ObjectEncoded extends Record<string, Schema.Json>,
       StructuredOutputSchema extends Schema.Encoder<ObjectEncoded, unknown>,
-      Options extends LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
+      Options extends NoExcessProperties<
+        LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
+        Options
+      >,
       Tools extends Record<string, Tool.Any> = Record<string, never>,
     >(
-      options: Options,
+      options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
     ): Effect.Effect<
-      LanguageModel.GenerateObjectResponse<Tools, StructuredOutputSchema["Type"]>,
+      LanguageModel.GenerateObjectResponse<
+        Tools,
+        StructuredOutputSchema["Type"],
+        LanguageModel.ExtractToolParametersMode<Options>
+      >,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
     > => {
@@ -228,7 +250,13 @@ describe("ModelResilience", () => {
         Effect.flatMap((value) =>
           calls === 1
             ? Effect.fail(extractTransientError(options))
-            : Effect.succeed(new LanguageModel.GenerateObjectResponse(value, [textPart('{"ok":true}')])),
+            : Effect.succeed(
+                new LanguageModel.GenerateObjectResponse<
+                  Tools,
+                  StructuredOutputSchema["Type"],
+                  LanguageModel.ExtractToolParametersMode<Options>
+                >(value, [textPart('{"ok":true}')]),
+              ),
         ),
       )
     }
@@ -251,14 +279,38 @@ describe("ModelResilience", () => {
 
   it.effect("retries transient generateObject provider errors", () => {
     let calls = 0
-    const generateObject: LanguageModel.Service["generateObject"] = (options) => {
+    const generateObject = <
+      ObjectEncoded extends Record<string, Schema.Json>,
+      StructuredOutputSchema extends Schema.Encoder<ObjectEncoded, unknown>,
+      Options extends NoExcessProperties<
+        LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
+        Options
+      >,
+      Tools extends Record<string, Tool.Any> = Record<string, never>,
+    >(
+      options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
+    ): Effect.Effect<
+      LanguageModel.GenerateObjectResponse<
+        Tools,
+        StructuredOutputSchema["Type"],
+        LanguageModel.ExtractToolParametersMode<Options>
+      >,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
+    > => {
       calls += 1
       return Schema.decodeUnknownEffect(options.schema)({ ok: true }).pipe(
         Effect.orDie,
         Effect.flatMap((value) =>
           calls === 1
             ? Effect.fail(extractTransientError(options))
-            : Effect.succeed(new LanguageModel.GenerateObjectResponse(value, [textPart('{"ok":true}')])),
+            : Effect.succeed(
+                new LanguageModel.GenerateObjectResponse<
+                  Tools,
+                  StructuredOutputSchema["Type"],
+                  LanguageModel.ExtractToolParametersMode<Options>
+                >(value, [textPart('{"ok":true}')]),
+              ),
         ),
       )
     }
@@ -286,12 +338,19 @@ describe("ModelResilience", () => {
     const generateObject = <
       ObjectEncoded extends Record<string, Schema.Json>,
       StructuredOutputSchema extends Schema.Encoder<ObjectEncoded, unknown>,
-      Options extends LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
+      Options extends NoExcessProperties<
+        LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
+        Options
+      >,
       Tools extends Record<string, Tool.Any> = Record<string, never>,
     >(
-      _options: Options,
+      _options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
     ): Effect.Effect<
-      LanguageModel.GenerateObjectResponse<Tools, StructuredOutputSchema["Type"]>,
+      LanguageModel.GenerateObjectResponse<
+        Tools,
+        StructuredOutputSchema["Type"],
+        LanguageModel.ExtractToolParametersMode<Options>
+      >,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
     > => {

@@ -9,6 +9,7 @@ import { cn, type SlotConfig } from "@/lib/styling"
 export type MessageAlign = "start" | "end"
 
 /** Stack of related messages, spacing them tighter than the surrounding conversation. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const messageGroup: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -53,6 +54,7 @@ export const message: {
 })
 
 /** Avatar well pinned to the bottom of the row. Compose the avatar component (or a plain img) inside it. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const messageAvatar: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -74,6 +76,7 @@ export const messageAvatar: {
 })
 
 /** Column holding the bubbles, header, and footer of a turn. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const messageContent: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -95,6 +98,7 @@ export const messageContent: {
 })
 
 /** Sender name or timestamp line above the bubbles. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const messageHeader: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
@@ -119,6 +123,7 @@ export const messageHeader: {
 )
 
 /** Delivery status or timestamp line below the bubbles, end-aligned for `align: 'end'` messages. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const messageFooter: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html

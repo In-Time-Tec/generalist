@@ -151,7 +151,22 @@ const description = (ref: RefValue): string => `Media ref: ${encodedRef(ref)}`
 export const promptFromResponseParts = (
   content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
 ): Prompt.Prompt => {
-  const projected = Prompt.fromResponseParts(content)
+  // Effect rc.113 projects response file parts into prompt file parts with `metadata` mapped
+  // onto `options`. Parts already persisted through `persistResponsePart` carry an emptied
+  // payload plus the blob-ref marker, so drop them here; the durable marker part appended
+  // below remains the journaled representation.
+  const projected = Prompt.fromMessages(
+    Prompt.fromResponseParts(content).content.map((message) =>
+      message.role !== "user" && message.role !== "assistant"
+        ? message
+        : Prompt.makeMessage(message.role, {
+            content: message.content.filter(
+              (messagePart) => messagePart.type !== "file" || !(metadataKey in messagePart.options),
+            ),
+            options: message.options,
+          }),
+    ),
+  )
   const files = content.flatMap((responsePart) => {
     if (responsePart.type !== "file") return []
     const ref = refFromResponsePart(responsePart)

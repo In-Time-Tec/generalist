@@ -47,7 +47,7 @@ type CompactionContext = {
   readonly runId: RunId
   readonly activeSession: Option.Option<SessionStore>
   readonly sessionId: string
-  readonly chat: Chat.Service
+  readonly chat: Chat.Chat
   readonly system: string | undefined
   readonly options: RunOptions
   readonly state: AgentRunState

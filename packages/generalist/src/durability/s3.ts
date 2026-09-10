@@ -309,6 +309,7 @@ const readResponse = (
 const listResponse = (
   prefix: string,
   cursor: string | undefined,
+  startAfter: string | undefined,
   page: ListObjectsV2CommandOutput,
 ): Effect.Effect<ObjectPage, ObjectStoreFailure> => {
   if (
@@ -338,6 +339,8 @@ const listResponse = (
         }
         if (!key.startsWith(prefix))
           throw failure("list", prefix, "invalid-response", "S3 listing returned a key outside the requested prefix.")
+        if (startAfter !== undefined && key <= startAfter)
+          throw failure("list", prefix, "invalid-response", "S3 listing ignored the requested StartAfter bound.")
         return key
       }),
     catch: (cause) => classify("list", prefix, cause),
@@ -394,7 +397,7 @@ const makeService = (options: Options, client: Client): Service => ({
           ),
         ),
     }),
-  list: (prefix, cursor) =>
+  list: (prefix, listOptions) =>
     request({
       timeoutMs: options.requestTimeoutMs ?? 30_000,
       operation: "list",
@@ -402,12 +405,18 @@ const makeService = (options: Options, client: Client): Service => ({
       execute: (signal) =>
         native(() =>
           client.listObjects(
-            { Bucket: options.bucket, Prefix: prefix, ContinuationToken: cursor, EncodingType: "url" },
+            {
+              Bucket: options.bucket,
+              Prefix: prefix,
+              ContinuationToken: listOptions?.cursor,
+              StartAfter: listOptions?.startAfter,
+              EncodingType: "url",
+            },
             signal,
           ),
         ).pipe(
           mapNativeFailure("list", prefix),
-          Effect.flatMap((page) => listResponse(prefix, cursor, page)),
+          Effect.flatMap((page) => listResponse(prefix, listOptions?.cursor, listOptions?.startAfter, page)),
         ),
     }),
 })

@@ -99,4 +99,4 @@ TEXT_MESSAGE_END     messageId "run-1:1:text:0"
 
 - Example: `examples/ag-ui`
 - Source: `packages/generalist/src/unstable/ag-ui/...`
-- Site: `/docs/reference/ag-ui`
+- Site: `/docs/mcp`

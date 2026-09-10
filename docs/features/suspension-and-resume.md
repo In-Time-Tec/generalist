@@ -93,5 +93,4 @@ Every response, approval, signal, timer, child, external child, fan-out, or canc
 
 - Source: `packages/generalist/src/core/agent/suspension.ts`
 - Source: `packages/generalist/src/core/agent/service.ts`
-- Site: `/docs/learn/suspension`
-- Site: `/docs/guides/approvals`
+- Site: `/docs/approvals`

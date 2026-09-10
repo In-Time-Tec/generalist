@@ -88,7 +88,7 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
             if (outcome !== "created") requests.conflicts += 1
             return outcome
           }),
-        list: (prefix, cursor) =>
+        list: (prefix, options) =>
           Effect.gen(function* () {
             if (!prefix.startsWith(namespace))
               return yield* ObjectStoreFailure.make({
@@ -98,8 +98,8 @@ export const qualifyNativeR2 = Effect.fn("qualifyNativeR2")(
                 message: "Qualification prefix escaped its fixed namespace",
               })
             requests.list += 1
-            if (cursor !== undefined) requests.continuationPages += 1
-            return yield* raw.list(prefix, cursor)
+            if (options?.cursor !== undefined) requests.continuationPages += 1
+            return yield* raw.list(prefix, options)
           }),
       }
       const expectedNamespace = nativeR2Namespace(configuration.environment, configuration.tenant, host.runId)

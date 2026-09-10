@@ -164,11 +164,11 @@ const retryStream = <A, B, E, R>(
     ),
   )
 export const apply: {
-  (resilience: Policy): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, resilience: Policy): LanguageModel.Service
+  (resilience: Policy): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
+  (model: LanguageModel.LanguageModel, resilience: Policy): LanguageModel.LanguageModel
 } = Function.dual(
   2,
-  (model: LanguageModel.Service, resilience: Policy): LanguageModel.Service =>
+  (model: LanguageModel.LanguageModel, resilience: Policy): LanguageModel.LanguageModel =>
     adapt<AiError.AiError | Misconfigured, AiError.AiError | Misconfigured, AiError.AiError | Misconfigured>(model, {
       generateText: (_options, invoke) =>
         Effect.flatMap(validate(resilience), (validated) =>

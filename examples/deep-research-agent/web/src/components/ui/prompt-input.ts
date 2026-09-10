@@ -148,6 +148,7 @@ export const promptInputTextarea = <ParentMessage>(config: PromptInputTextareaCo
 }
 
 /** Bottom row of the prompt form, holding the tools on one side and the submit button on the other. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const promptInputToolbar: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -164,6 +165,7 @@ export const promptInputToolbar: {
 })
 
 /** Cluster of prompt tool buttons and selects. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const promptInputTools: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -186,6 +188,7 @@ export type PromptInputButtonConfig<ParentMessage> = ButtonConfig<ParentMessage>
  * variant; icon-only children get the icon size, wider children the small
  * size, adapting AI Elements' child-count sizing.
  */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const promptInputButton: {
   <ParentMessage>(config: PromptInputButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: PromptInputButtonConfig<ParentMessage>) => Html
@@ -285,6 +288,7 @@ export const promptInputModelSelect = <Item extends string = string>(
 export const promptInputModelSelectItem = item
 
 /** Strip above the textarea for queued attachments. Compose attachment components (or any chips) inside it. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const promptInputAttachments: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html

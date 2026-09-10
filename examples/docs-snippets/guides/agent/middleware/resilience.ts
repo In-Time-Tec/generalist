@@ -28,7 +28,7 @@ const program = ModelRegistry.withModel(
 const runtimeLayer = Layer.mergeAll(
   openRouterLayer({
     model: "openai/gpt-4o-mini",
-    apiKey: Config.redacted("OPENROUTER_API_KEY"),
+    apiKey: Config.Redacted("OPENROUTER_API_KEY"),
   }),
   ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
   Permissions.layerAllowAll,

@@ -7,7 +7,7 @@ import { checkpointFromHistory, type ToolCheckpoint } from "../suspension.js"
 
 export const recoverToolCheckpoint = (input: {
   readonly options: RunOptions
-  readonly chat: Chat.Service
+  readonly chat: Chat.Chat
 }): Effect.Effect<ToolCheckpoint | undefined, AgentError> =>
   Effect.gen(function* () {
     const { options, chat } = input

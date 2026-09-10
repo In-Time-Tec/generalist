@@ -11,7 +11,7 @@ export interface CandidateIdentity extends ModelSelection {
 export type FailureDisposition = "retry" | "fallback" | "terminal"
 
 export interface CandidateRouteInstrumentation {
-  readonly instrument: (model: LanguageModel.Service, identity: CandidateIdentity) => LanguageModel.Service
+  readonly instrument: (model: LanguageModel.LanguageModel, identity: CandidateIdentity) => LanguageModel.LanguageModel
   readonly settleFailure: (disposition: FailureDisposition) => Effect.Effect<void>
   readonly fallbackScheduled: (input: {
     readonly from: CandidateIdentity
@@ -20,15 +20,15 @@ export interface CandidateRouteInstrumentation {
   }) => Effect.Effect<void>
 }
 
-export type CandidateRoute = (instrumentation: CandidateRouteInstrumentation) => LanguageModel.Service
+export type CandidateRoute = (instrumentation: CandidateRouteInstrumentation) => LanguageModel.LanguageModel
 export type FailureClassification = "context-overflow" | "other"
 export type FailureClassifier = (cause: unknown) => FailureClassification
 export type ToolJsonSchemaCompiler = (tool: Tool.Any) => Effect.Effect<JsonSchema.JsonSchema, AiError.AiError>
 
-const failureClassifiers = new WeakMap<LanguageModel.Service, FailureClassifier>()
-const toolJsonSchemaCompilers = new WeakMap<LanguageModel.Service, ToolJsonSchemaCompiler>()
-const candidateRoutes = new WeakMap<LanguageModel.Service, CandidateRoute>()
-const registrationIdentities = new WeakMap<LanguageModel.Service, ModelSelection>()
+const failureClassifiers = new WeakMap<LanguageModel.LanguageModel, FailureClassifier>()
+const toolJsonSchemaCompilers = new WeakMap<LanguageModel.LanguageModel, ToolJsonSchemaCompiler>()
+const candidateRoutes = new WeakMap<LanguageModel.LanguageModel, CandidateRoute>()
+const registrationIdentities = new WeakMap<LanguageModel.LanguageModel, ModelSelection>()
 
 registerMetadataCopier((source, target) => {
   const classifier = failureClassifiers.get(source)
@@ -42,31 +42,34 @@ registerMetadataCopier((source, target) => {
 })
 
 export const classifyFailure: {
-  (cause: unknown): (model: LanguageModel.Service) => FailureClassification
-  (model: LanguageModel.Service, cause: unknown): FailureClassification
-} = Function.dual(2, (model: LanguageModel.Service, cause: unknown): FailureClassification => {
+  (cause: unknown): (model: LanguageModel.LanguageModel) => FailureClassification
+  (model: LanguageModel.LanguageModel, cause: unknown): FailureClassification
+} = Function.dual(2, (model: LanguageModel.LanguageModel, cause: unknown): FailureClassification => {
   const classified = failureClassifiers.get(model)?.(cause)
   return classified !== undefined && classified !== "other" ? classified : classifyContextOverflow(cause)
 })
 
-export const toolJsonSchemaCompiler = (model: LanguageModel.Service): ToolJsonSchemaCompiler | undefined =>
+export const toolJsonSchemaCompiler = (model: LanguageModel.LanguageModel): ToolJsonSchemaCompiler | undefined =>
   toolJsonSchemaCompilers.get(model)
 
 export const withToolJsonSchemaCompiler: {
-  (compiler: ToolJsonSchemaCompiler): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service
-} = Function.dual(2, (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service => {
-  const wrapped = { ...model }
-  toolJsonSchemaCompilers.set(wrapped, compiler)
-  const classifier = failureClassifiers.get(model)
-  if (classifier !== undefined) failureClassifiers.set(wrapped, classifier)
-  return wrapped
-})
+  (compiler: ToolJsonSchemaCompiler): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
+  (model: LanguageModel.LanguageModel, compiler: ToolJsonSchemaCompiler): LanguageModel.LanguageModel
+} = Function.dual(
+  2,
+  (model: LanguageModel.LanguageModel, compiler: ToolJsonSchemaCompiler): LanguageModel.LanguageModel => {
+    const wrapped = { ...model }
+    toolJsonSchemaCompilers.set(wrapped, compiler)
+    const classifier = failureClassifiers.get(model)
+    if (classifier !== undefined) failureClassifiers.set(wrapped, classifier)
+    return wrapped
+  },
+)
 
 export const withCandidateRoute: {
-  (route: CandidateRoute): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, route: CandidateRoute): LanguageModel.Service
-} = Function.dual(2, (model: LanguageModel.Service, route: CandidateRoute): LanguageModel.Service => {
+  (route: CandidateRoute): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
+  (model: LanguageModel.LanguageModel, route: CandidateRoute): LanguageModel.LanguageModel
+} = Function.dual(2, (model: LanguageModel.LanguageModel, route: CandidateRoute): LanguageModel.LanguageModel => {
   const wrapped = { ...model }
   candidateRoutes.set(wrapped, route)
   const classifier = failureClassifiers.get(model)
@@ -76,7 +79,8 @@ export const withCandidateRoute: {
   return wrapped
 })
 
-export const candidateRoute = (model: LanguageModel.Service): CandidateRoute | undefined => candidateRoutes.get(model)
+export const candidateRoute = (model: LanguageModel.LanguageModel): CandidateRoute | undefined =>
+  candidateRoutes.get(model)
 
 export const attachRegistrationMetadata: {
   (registration: Registration): (context: Context.Context<ModelEnvironment>) => Context.Context<ModelEnvironment>
@@ -98,5 +102,5 @@ export const attachRegistrationMetadata: {
   return Context.add(context, LanguageModel.LanguageModel, registered)
 })
 
-export const registrationIdentity = (model: LanguageModel.Service): ModelSelection | undefined =>
+export const registrationIdentity = (model: LanguageModel.LanguageModel): ModelSelection | undefined =>
   registrationIdentities.get(model)

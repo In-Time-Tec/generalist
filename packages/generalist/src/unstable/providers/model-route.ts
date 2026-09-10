@@ -38,7 +38,7 @@ export class AvailabilitySemanticsMissing extends ActionableTaggedError<Availabi
 
 interface Candidate {
   readonly identity: CandidateIdentity
-  readonly model: LanguageModel.Service
+  readonly model: LanguageModel.LanguageModel
   readonly isAvailabilityFailure: AvailabilityFailureClassifier
 }
 
@@ -50,10 +50,10 @@ const singleFailure = <E>(cause: Cause.Cause<E>): E | undefined => {
 const routeModel = (
   candidates: ReadonlyArray<Candidate>,
   instrumentation: CandidateRouteInstrumentation,
-): LanguageModel.Service => {
+): LanguageModel.LanguageModel => {
   const models = candidates.map((candidate) => instrumentation.instrument(candidate.model, candidate.identity))
   const effect = <A, E, R>(
-    invoke: (model: LanguageModel.Service) => Effect.Effect<A, E, R>,
+    invoke: (model: LanguageModel.LanguageModel) => Effect.Effect<A, E, R>,
     candidate = 0,
   ): Effect.Effect<A, E, R> =>
     invoke(models[candidate]!).pipe(
@@ -70,7 +70,7 @@ const routeModel = (
       }),
     )
   const stream = <A extends Response.AnyPart, E, R>(
-    invoke: (model: LanguageModel.Service) => Stream.Stream<A, E, R>,
+    invoke: (model: LanguageModel.LanguageModel) => Stream.Stream<A, E, R>,
     candidate = 0,
   ): Stream.Stream<A, E, R> =>
     Stream.suspend(() => {

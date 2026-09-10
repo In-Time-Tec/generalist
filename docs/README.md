@@ -2,22 +2,9 @@
 
 Keep an agent's accepted work when its host restarts. Generalist pairs an optional object-backed Runtime with a process-local Effect agent loop, so you can start with a script and add recovery when the work needs it.
 
-Start with [Getting started](getting-started.md), or run the [offline quickstart](start/quickstart.md) without an API key. These docs target Generalist 0.65.3; use the [repository examples](start/examples.md) to run directly from a checkout.
+The documentation site is a code-first Foldkit + StyleX app built from this directory. Its pages are authored TypeScript, not a Markdown tree: [`src/content.ts`](src/content.ts) is the content model, and each section renders verified snippets imported from `examples/docs-snippets/`.
 
-## Find what you need
-
-- [Installation](start/installation.md): supported runtimes, versions, and optional dependencies.
-- [Examples](start/examples.md): runnable projects to build on.
-- [Agent loop](learn/agent-loop.md): how model calls and tools fit together.
-- [Tools](guides/define-tools.md), [providers](guides/providers.md), and [memory](guides/memory.md): add capabilities to your agent.
-- [Durable Runtime](features/runtime.md): run work that can recover after a restart.
-- [API reference](api/index.md): exported functions and types.
-
-Feature reference pages describe detailed behavior and limits. [Decisions](decisions/typed-tool-boundaries.md) and [tradeoffs](tradeoffs/strict-tool-registry.md) explain design choices; you do not need to read them to get started.
-
-## Work on the docs
-
-The website uses Mintlify. Pages live in this directory; `docs.json` controls navigation. Write guides for the person trying to complete a task: state prerequisites, show a working example, explain the result, and link to detail rather than putting every caveat in the introduction.
+## Work on the site
 
 From the repository root:
 
@@ -26,12 +13,21 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
+`bun run dev` starts the Vite dev server. Edit `src/content.ts` to change sections; code blocks import `?raw` sources so documented code stays compilable.
+
 Before submitting changes:
 
 ```sh
 bun run docs:build
 ```
 
-This validates Mintlify configuration and checks internal links. Run `bun run docs:api` when public APIs change to regenerate the API reference. Runnable guide examples live in `examples/docs-snippets`; `bun run verify-scripted-surfaces` runs the offline examples and reports any credential-dependent skips.
+This runs the `docs/features` checks and the Vite client + SSR builds. Runnable examples live in `examples/docs-snippets`; `bun run readme:check` executes the website checkpoints and `bun run verify-scripted-surfaces` runs the offline examples and reports credential-dependent skips.
 
-See [Deployment](deployment.md) for Mintlify hosting setup.
+## Other documentation in this directory
+
+- [`features/`](features/): current behavior and invariants, each with a leading runnable example and a test link.
+- [`decisions/`](decisions/): durable reasons behind the design.
+- [`tradeoffs/`](tradeoffs/): meaningful gains and costs.
+- [`openapi.json`](openapi.json): the generated transport schema; `bun scripts/render-openapi.ts` refreshes it.
+
+See [Deployment](deployment.md) for how the site ships.

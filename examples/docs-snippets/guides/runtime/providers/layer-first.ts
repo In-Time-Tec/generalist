@@ -9,7 +9,7 @@ const agent = Agent.make({
 })
 
 // The provider client is one layer; each model is a thin layer over it.
-const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
+const openAi = openAiClient({ apiKey: Config.Redacted("OPENAI_API_KEY") }).pipe(Layer.provide(FetchHttpClient.layer))
 const sol = openAiModel({ model: "gpt-5.6-sol" }).pipe(Layer.provide(openAi))
 
 // Provide the model layer to exactly the run that should use it.

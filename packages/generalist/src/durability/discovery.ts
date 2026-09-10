@@ -95,7 +95,7 @@ export const page = (input: Scope & { readonly cursor?: string }) =>
     }
     const result = yield* decode(
       Page,
-      yield* store.list(prefix, provider).pipe(Effect.mapError(transport)),
+      yield* store.list(prefix, { cursor: provider }).pipe(Effect.mapError(transport)),
       "corruption",
       prefix,
     )
@@ -188,10 +188,10 @@ export const inspect = (location: Location) =>
           }
           return object
         }),
-      list: (prefix, cursor) =>
+      list: (prefix, options) =>
         Effect.gen(function* () {
           yield* spend(prefix, 1)
-          const result = yield* store.list(prefix, cursor)
+          const result = yield* store.list(prefix, options)
           if (!Array.isArray(result?.keys)) {
             return yield* ObjectStoreFailure.make({
               operation: "discovery",
