@@ -86,7 +86,7 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, Polic
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
   readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR, Schema.Top, Schema.Top>
   readonly staticToolkit: Toolkit.Toolkit<T>
-  readonly chat: Chat.Chat
+  readonly chat: Chat.Service
   readonly lastWirePrompt: Ref.Ref<import("effect/unstable/ai").Prompt.Prompt | undefined>
   readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly sessionId: string

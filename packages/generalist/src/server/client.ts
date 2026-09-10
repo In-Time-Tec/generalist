@@ -316,9 +316,13 @@ const connect = (
           Effect.gen(function* () {
             const cursor = yield* Ref.get(cursorRef)
             const socket = yield* Socket.makeWebSocket(urlFor(cursor)).pipe(
-              Effect.provideService(Socket.WebSocketConstructor, constructor),
+              Effect.provideService(Socket.WebSocketConstructor, (url, protocols) => {
+                const webSocket = constructor(url, protocols)
+                webSocket.binaryType = "arraybuffer"
+                return webSocket
+              }),
             )
-            const writer = (yield* socket.writer).write
+            const writer = yield* socket.writer
             const opened = yield* Deferred.make<void>()
             const done = yield* Deferred.make<void, TransportError>()
             const ingress = yield* Queue.dropping<string>(capacity)
@@ -367,13 +371,7 @@ const connect = (
               Effect.tapError((error) => Deferred.fail(overflow, error)),
               Effect.forkChild,
             )
-            yield* Effect.gen(function* () {
-              const reader = yield* socket.reader
-              yield* Deferred.succeed(opened, undefined)
-              return yield* Effect.forever(
-                Effect.flatMap(reader.pull, (batch) => Effect.sync(() => batch.forEach(handleRaw))),
-              )
-            }).pipe(
+            yield* socket.runRaw(handleRaw, { onOpen: Deferred.succeed(opened, undefined) }).pipe(
               Effect.mapError(socketError),
               Effect.raceFirst(Deferred.await(overflow)),
               Effect.onExit((exit) => Deferred.done(done, exit)),
@@ -438,6 +436,7 @@ export const client = (options: {
   Effect.gen(function* () {
     const raw = yield* HttpApiClient.make(api, { baseUrl: options.baseUrl })
     const urls = HttpApiClient.urlBuilder(api, { baseUrl: options.baseUrl })
+    const basePath = new URL(options.baseUrl).pathname.replace(/\/$/, "")
     const websocketUrl = (sessionId: string, cursor: Cursor | undefined): string => {
       const url = new URL(
         urls.events.connect({
@@ -445,6 +444,7 @@ export const client = (options: {
           query: cursor === undefined ? {} : { cursor },
         }),
       )
+      url.pathname = `${basePath}${url.pathname}`
       return asWebSocketUrl(url.toString())
     }
 

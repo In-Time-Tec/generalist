@@ -168,12 +168,12 @@ it.effect("maps Modal acquisition, execution, and unsupported failures", () =>
 )
 
 const modalTokenId = Effect.runSync(
-  Config.option(Config.String("MODAL_TOKEN_ID")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.string("MODAL_TOKEN_ID")).pipe(Effect.map(Option.getOrUndefined)),
 )
 const modalTokenSecret = Effect.runSync(
-  Config.option(Config.String("MODAL_TOKEN_SECRET")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.string("MODAL_TOKEN_SECRET")).pipe(Effect.map(Option.getOrUndefined)),
 )
-const modalApp = Effect.runSync(Config.option(Config.String("MODAL_APP")).pipe(Effect.map(Option.getOrUndefined)))
+const modalApp = Effect.runSync(Config.option(Config.string("MODAL_APP")).pipe(Effect.map(Option.getOrUndefined)))
 
 describe.skipIf(modalTokenId === undefined || modalTokenSecret === undefined || modalApp === undefined)(
   "Modal live Sandbox",
@@ -183,8 +183,8 @@ describe.skipIf(modalTokenId === undefined || modalTokenSecret === undefined || 
       name: "Modal",
       isolation: "container",
       layer: layer({
-        tokenId: Config.Redacted("MODAL_TOKEN_ID"),
-        tokenSecret: Config.Redacted("MODAL_TOKEN_SECRET"),
+        tokenId: Config.redacted("MODAL_TOKEN_ID"),
+        tokenSecret: Config.redacted("MODAL_TOKEN_SECRET"),
         app: modalApp,
         image: "ubuntu:24.04",
       }),

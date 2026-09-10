@@ -12,9 +12,9 @@ interface BrowserAuth {
 
 export const make: Effect.Effect<BrowserAuth, Config.ConfigError | Schema.SchemaError> = Effect.gen(function* () {
   const expected = yield* Schema.decodeEffect(Schema.String.check(Schema.isNonEmpty()))(
-    Redacted.value(yield* Config.Redacted("GENERALIST_SERVER_TOKEN")),
+    Redacted.value(yield* Config.redacted("GENERALIST_SERVER_TOKEN")),
   )
-  const tenantId = yield* Config.String("GENERALIST_TENANT")
+  const tenantId = yield* Config.string("GENERALIST_TENANT")
   const principal = yield* Schema.decodeEffect(Server.Principal)({
     id: "example-controller",
     tenantId,

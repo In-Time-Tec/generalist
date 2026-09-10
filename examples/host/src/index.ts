@@ -92,16 +92,16 @@ const program = Effect.gen(function* () {
 
 const runtimeLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const environment = yield* Config.String("GENERALIST_ENVIRONMENT")
-    const tenant = yield* Config.String("GENERALIST_TENANT")
-    const partition = yield* Config.String("GENERALIST_PARTITION")
-    const bucket = yield* Config.String("GENERALIST_BUCKET")
-    const region = yield* Config.String("AWS_REGION")
-    const accessKeyId = yield* Config.String("AWS_ACCESS_KEY_ID")
-    const secretAccessKey = yield* Config.String("AWS_SECRET_ACCESS_KEY")
-    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.String("AWS_SESSION_TOKEN")))
-    const endpoint = Option.getOrUndefined(yield* Config.option(Config.String("GENERALIST_S3_ENDPOINT")))
-    const confirmed = endpoint === undefined ? false : yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
     const connection: Types.Mutable<ConnectionOptions> = {
       bucket,
       region,

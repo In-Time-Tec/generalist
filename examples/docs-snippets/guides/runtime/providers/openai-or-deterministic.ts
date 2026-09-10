@@ -8,7 +8,7 @@ const agent = Agent.make({ name: "release-notes" })
 const modelLayer = layerOrDeterministic({
   model: "gpt-4o-mini",
   fallbackModel: "gpt-4o-mini",
-  apiKey: Config.Redacted("OPENAI_API_KEY"),
+  apiKey: Config.redacted("OPENAI_API_KEY"),
 })
 
 const selection: ModelRegistry.ModelSelection = { provider: "deterministic", model: "gpt-4o-mini" }

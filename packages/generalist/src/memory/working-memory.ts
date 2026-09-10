@@ -124,7 +124,7 @@ const renderSummaryPrompt = (
   ].join("\n\n")
 
 const summarizeOverflow = (
-  model: LanguageModel.LanguageModel,
+  model: LanguageModel.Service,
   prompt: string | undefined,
   summary: string | undefined,
   overflow: ReadonlyArray<StoredItem>,

@@ -6,7 +6,7 @@ import { Agent, Approvals, ModelMiddleware, Permissions, SkillCatalog } from "ge
 import { layer as layerInstructions, PackageCatalog } from "generalist/instructions"
 
 const packages = Layer.unwrap(
-  Config.String("GENERALIST_NPM_REGISTRY_URL").pipe(
+  Config.string("GENERALIST_NPM_REGISTRY_URL").pipe(
     Effect.map((npmRegistryUrl) =>
       PackageCatalog.layer({
         packages: ["@in-time-tec/generalist-skills-example@^1"],

@@ -161,8 +161,8 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
     let modelCallOrdinal = restoredModelCallOrdinal ?? options.modelCallOrdinalStart ?? 0
     const modelCallUsage = new Map<string, ProviderUsage | undefined>()
     const clock = yield* Effect.clockWith((currentClock) => Effect.succeed(currentClock))
-    const memoizedModels = new WeakMap<LanguageModel.LanguageModel, LanguageModel.LanguageModel>()
-    const instrumentModel = (model: LanguageModel.LanguageModel, turn: number): LanguageModel.LanguageModel => {
+    const memoizedModels = new WeakMap<LanguageModel.Service, LanguageModel.Service>()
+    const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service => {
       const baseInstrumentation = {
         clock,
         emit: emitTelemetry,
@@ -331,7 +331,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R, P extends R, A exte
 type SetupEffect<T extends Record<string, Tool.Any>, R, P extends R, A extends R> = ReturnType<
   typeof setupRunImpl<T, R, P, A>
 >
-// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const setupRun: {
   <T extends Record<string, Tool.Any>, R, P extends R, A extends R>(
     options: RunOptions,

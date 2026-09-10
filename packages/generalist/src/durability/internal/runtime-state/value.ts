@@ -84,7 +84,8 @@ const immutableCodec = <A extends Schema.Json>(schema: Schema.Codec<A>): Schema.
     const decode = SchemaParser.decodeUnknownEffect(storedValue)
     return (input, _ast, options) => {
       if (!Predicate.isObject(input)) return decode(input, options)
-      const cacheable = options?.onExcessProperty === "error" && options.disableChecks !== true
+      const cacheable =
+        options?.onExcessProperty === "error" && options.disableChecks !== true && options.propertyOrder !== "original"
       const cached = cacheable ? validatedNodes.get(input) : undefined
       if (cached !== undefined) return Effect.succeed(cached)
       return decode(input, options).pipe(

@@ -38,7 +38,7 @@ export interface ExecuteInput {
   readonly options: RunOptions
   readonly session: Option.Option<SessionStore>
   readonly handoffState: Ref.Ref<HandoffRunState>
-  readonly chat: Chat.Chat
+  readonly chat: Chat.Service
   readonly toolState: Ref.Ref<{
     readonly registry: import("../tools/tool-registry.js").Registry
     readonly activatedSkillBodies: Map<string, string>

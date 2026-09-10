@@ -53,7 +53,7 @@ const scheduled = (context: Context, error: InvalidToolCallParameters): Effect.E
 
 const correctLoop = (
   context: Context,
-  model: LanguageModel.LanguageModel,
+  model: LanguageModel.Service,
   options: StreamTextOptions,
   corrections: number,
 ): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, ToolContext | Tool.Handler<string>> =>
@@ -89,7 +89,7 @@ const correctLoop = (
 
 export const correct = (input: {
   readonly context: Context
-  readonly model: LanguageModel.LanguageModel
+  readonly model: LanguageModel.Service
   readonly options: StreamTextOptions
 }): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, ToolContext | Tool.Handler<string>> =>
   correctLoop(input.context, input.model, input.options, 0)

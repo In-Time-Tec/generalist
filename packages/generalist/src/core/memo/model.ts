@@ -9,7 +9,7 @@ import { Dependencies, Store } from "./service.js"
 const CachedParts = Schema.Array(Schema.Unknown)
 const FinishPart = Schema.Struct({ type: Schema.Literal("finish") })
 
-export const memoizeModel = (run: string) => (model: LanguageModel.LanguageModel) =>
+export const memoizeModel = (run: string) => (model: LanguageModel.Service) =>
   adapt(model, {
     streamText: (options, invoke) =>
       Stream.unwrap(

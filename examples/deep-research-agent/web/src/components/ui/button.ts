@@ -47,7 +47,6 @@ export type ButtonConfig<ParentMessage> = Readonly<{
   attributes?: ReadonlyArray<Attribute<ParentMessage> | ChildAttribute>
 }>
 
-// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const button: {
   <ParentMessage>(config: ButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: ButtonConfig<ParentMessage>) => Html

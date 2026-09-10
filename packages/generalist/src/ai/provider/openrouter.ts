@@ -235,21 +235,16 @@ const normalizeOpenRouterFinishPart = (part: Response.FinishPart): Response.Fini
   })
 }
 
-const normalizeOpenRouterPart = <
-  Tools extends Record<string, Tool.Any>,
-  ParametersMode extends Response.ToolParametersMode,
->(
-  part: Response.Part<Tools, ParametersMode>,
-): Response.Part<Tools, ParametersMode> => (part.type === "finish" ? normalizeOpenRouterFinishPart(part) : part)
+const normalizeOpenRouterPart = <Tools extends Record<string, Tool.Any>, EncodedToolParameters extends boolean>(
+  part: Response.Part<Tools, EncodedToolParameters>,
+): Response.Part<Tools, EncodedToolParameters> => (part.type === "finish" ? normalizeOpenRouterFinishPart(part) : part)
 
-const normalizeOpenRouterStreamPart = <
-  Tools extends Record<string, Tool.Any>,
-  ParametersMode extends Response.ToolParametersMode,
->(
-  part: Response.StreamPart<Tools, ParametersMode>,
-): Response.StreamPart<Tools, ParametersMode> => (part.type === "finish" ? normalizeOpenRouterFinishPart(part) : part)
+const normalizeOpenRouterStreamPart = <Tools extends Record<string, Tool.Any>, EncodedToolParameters extends boolean>(
+  part: Response.StreamPart<Tools, EncodedToolParameters>,
+): Response.StreamPart<Tools, EncodedToolParameters> =>
+  part.type === "finish" ? normalizeOpenRouterFinishPart(part) : part
 
-const normalizeOpenRouterModel = (model: LanguageModel.LanguageModel): LanguageModel.LanguageModel =>
+const normalizeOpenRouterModel = (model: LanguageModel.Service): LanguageModel.Service =>
   adapt(model, {
     generateText: (_options, invoke) =>
       Effect.map(

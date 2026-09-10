@@ -401,7 +401,7 @@ interface StreamFunction {
     RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
   >
 }
-/** Stream an Agent run as Events ending in `Completed { output }`. */ // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
+/** Stream an Agent run as Events ending in `Completed { output }`. */
 export const stream: StreamFunction = Function.dual(
   isDataFirst,
   <
@@ -465,7 +465,7 @@ interface RunFunction {
     RunRequirements<Tools, R, O, InputCodec, OutputCodec, PolicyServices, AuthorizationServices>
   >
 }
-/** Run an Agent to its schema-decoded output. */ // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
+/** Run an Agent to its schema-decoded output. */
 export const run: RunFunction = Function.dual(
   isDataFirst,
   <

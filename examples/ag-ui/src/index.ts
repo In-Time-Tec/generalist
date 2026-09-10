@@ -95,16 +95,16 @@ const resolver = ExecutableResolver.layerStatic([
 ]).pipe(Layer.orDie)
 const runtimeLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const environment = yield* Config.String("GENERALIST_ENVIRONMENT")
-    const tenant = yield* Config.String("GENERALIST_TENANT")
-    const partition = yield* Config.String("GENERALIST_PARTITION")
-    const bucket = yield* Config.String("GENERALIST_BUCKET")
-    const region = yield* Config.String("AWS_REGION")
-    const accessKeyId = yield* Config.String("AWS_ACCESS_KEY_ID")
-    const secretAccessKey = yield* Config.String("AWS_SECRET_ACCESS_KEY")
-    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.String("AWS_SESSION_TOKEN")))
-    const endpoint = Option.getOrUndefined(yield* Config.option(Config.String("GENERALIST_S3_ENDPOINT")))
-    const confirmed = endpoint === undefined ? false : yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
+    const confirmed = endpoint === undefined ? false : yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED")
     const connection: Types.Mutable<ConnectionOptions> = {
       bucket,
       region,
@@ -134,7 +134,7 @@ const agentServices = Layer.mergeAll(runtimeLayer, scriptedModel, handlers, auth
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 const aguiRoute = HttpRouter.add("POST", "/ag-ui", (request) =>
   Effect.gen(function* () {
-    const expected = Redacted.value(yield* Config.Redacted("GENERALIST_SERVER_TOKEN"))
+    const expected = Redacted.value(yield* Config.redacted("GENERALIST_SERVER_TOKEN"))
     if (expected.length === 0 || request.headers.authorization !== `Bearer ${expected}`) {
       return HttpServerResponse.empty({ status: 401 })
     }
@@ -157,7 +157,7 @@ const aguiRoute = HttpRouter.add("POST", "/ag-ui", (request) =>
 const aguiLayer = AGUI.layer({ address })
 const aguiRoutes = aguiRoute.pipe(HttpRouter.provideRequest(aguiLayer))
 const applicationAuth = Server.authBearer({
-  token: Config.Redacted("GENERALIST_SERVER_TOKEN"),
+  token: Config.redacted("GENERALIST_SERVER_TOKEN"),
   principal: { id: "example-controller", tenantId: "example", role: "controller" },
 })
 const routes = Layer.unwrap(
@@ -269,11 +269,9 @@ const awaitSucceeded = (baseUrl: string, credential: Redacted.Redacted): Effect.
 
 const program = Effect.gen(function* () {
   const server = yield* HttpServer.HttpServer
-  const serverAddress = server.address
-  if (serverAddress._tag !== "InetAddressV4" && serverAddress._tag !== "InetAddressV6")
-    return yield* Effect.die("The AG-UI example requires a TCP server")
-  const baseUrl = `http://127.0.0.1:${serverAddress.port}`
-  const credential = yield* Config.Redacted("GENERALIST_SERVER_TOKEN").pipe(Effect.orDie)
+  if (server.address._tag !== "TcpAddress") return yield* Effect.die("The AG-UI example requires a TCP server")
+  const baseUrl = `http://127.0.0.1:${server.address.port}`
+  const credential = yield* Config.redacted("GENERALIST_SERVER_TOKEN").pipe(Effect.orDie)
   const events = yield* readAguiEvents(baseUrl, credential)
   const interrupted = events.find(
     (event) => event.type === EventType.RUN_FINISHED && event.outcome?.type === "interrupt",

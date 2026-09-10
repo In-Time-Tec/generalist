@@ -16,7 +16,7 @@ export const runHandoffTool = (input: {
   readonly options: RunOptions
   readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
   readonly handoffState: Ref.Ref<HandoffRunState>
-  readonly chat: Chat.Chat
+  readonly chat: Chat.Service
   readonly toolState: Ref.Ref<{
     readonly registry: Registry
     readonly activatedSkillBodies: Map<string, string>
@@ -72,7 +72,7 @@ export const handoffDispatch: {
       readonly options: RunOptions
       readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
       readonly handoffState: Ref.Ref<HandoffRunState>
-      readonly chat: Chat.Chat
+      readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
         readonly registry: Registry
         readonly activatedSkillBodies: Map<string, string>
@@ -96,7 +96,7 @@ export const handoffDispatch: {
       readonly options: RunOptions
       readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
       readonly handoffState: Ref.Ref<HandoffRunState>
-      readonly chat: Chat.Chat
+      readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
         readonly registry: Registry
         readonly activatedSkillBodies: Map<string, string>
@@ -119,7 +119,7 @@ export const handoffDispatch: {
       readonly options: RunOptions
       readonly activeSession: Option.Option<import("../../context/session.js").SessionStore>
       readonly handoffState: Ref.Ref<HandoffRunState>
-      readonly chat: Chat.Chat
+      readonly chat: Chat.Service
       readonly toolState: Ref.Ref<{
         readonly registry: Registry
         readonly activatedSkillBodies: Map<string, string>

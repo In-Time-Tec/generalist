@@ -9,7 +9,7 @@ const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProv
 
 const modelLayer = layerOrDeterministic({
   model: "openai/gpt-4o-mini",
-  apiKey: Config.Redacted("OPENROUTER_API_KEY"),
+  apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })
 
 const deterministicModel = modelLayer.pipe(Layer.provide(withEnv({})))

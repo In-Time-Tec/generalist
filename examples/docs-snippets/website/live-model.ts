@@ -10,7 +10,7 @@ const coder = Agent.make({
 })
 
 const model = layerModel({ model: "gpt-4o-mini" }).pipe(
-  Layer.provide(layerConfig({ apiKey: Config.Redacted("OPENAI_API_KEY") })),
+  Layer.provide(layerConfig({ apiKey: Config.redacted("OPENAI_API_KEY") })),
   Layer.provide(FetchHttpClient.layer),
 )
 

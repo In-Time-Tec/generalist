@@ -105,7 +105,7 @@ const nativeFixture = Effect.gen(function* () {
 })
 
 layer(bunLayer, { excludeTestServices: true, timeout: 180_000 })(
-  "local Miniflare 5.20260811.1-alpha with exact-EOF Validator.range patch (not provider qualification)",
+  "local Miniflare 5.20260811.1-alpha with harness-enforced exact-EOF range rejection (not provider qualification)",
   (it) => {
     it.effect("passes unchanged shared native object-store conformance", () =>
       Effect.gen(function* () {

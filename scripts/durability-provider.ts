@@ -25,7 +25,7 @@ const isProvider = Schema.is(Schema.Literals(acceptedProviders))
 const runtime = `Bun ${versions.bun ?? "unavailable"}; ${platform}/${arch}`
 const explicitEnvironment: Readonly<Record<string, string | undefined>> = env
 const evidenceDirectory = Config.withDefault(
-  Config.String("GENERALIST_DURABILITY_EVIDENCE_DIR"),
+  Config.string("GENERALIST_DURABILITY_EVIDENCE_DIR"),
   "artifacts/durability-provider",
 )
 const arguments_ = argv.slice(2)

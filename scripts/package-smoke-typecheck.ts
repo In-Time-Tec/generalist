@@ -218,7 +218,7 @@ void serverClient
 void Server.api
 void Server.layer
 void Server.authBearer({
-  token: Config.Redacted("TOKEN"),
+  token: Config.redacted("TOKEN"),
   principal: { id: "package-smoke", tenantId: "package-smoke", role: "controller" },
 })
 void Server.eventCodec

@@ -35,7 +35,7 @@ export const handle = <Agents extends AgentRegistry>(options: {
 }) =>
   Effect.gen(function* () {
     const socket = yield* options.request.upgrade
-    const writer = (yield* socket.writer).write
+    const writer = yield* socket.writer
     const close = (code: number, reason: string) => writer(new Socket.CloseEvent(code, reason))
     const send = (event: ArtifactServerEvent) =>
       Schema.encodeEffect(ServerEventJson)(event).pipe(
@@ -107,18 +107,8 @@ export const handle = <Agents extends AgentRegistry>(options: {
         Effect.catch((error) => closeForError(close, error)),
       )
 
-    const reader = yield* socket.reader
-    yield* Effect.forever(
-      Effect.flatMap(reader.pull, (batch) =>
-        Effect.forEach(
-          batch,
-          (data) => (data instanceof Uint8Array ? close(1003, "binary-artifact-command") : dispatch(data)),
-          { discard: true },
-        ),
-      ),
-    ).pipe(
-      Effect.catchReason("SocketError", "SocketCloseError", () => Effect.void),
-      Effect.ensuring(Fiber.interrupt(updateFiber)),
-    )
+    yield* socket
+      .runRaw((data) => (data instanceof Uint8Array ? close(1003, "binary-artifact-command") : dispatch(data)))
+      .pipe(Effect.ensuring(Fiber.interrupt(updateFiber)))
     return HttpServerResponse.empty()
   })

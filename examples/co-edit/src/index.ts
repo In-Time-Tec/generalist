@@ -116,15 +116,15 @@ export const editorPage = `<!doctype html>
 
 const services = Layer.unwrap(
   Effect.gen(function* () {
-    const environment = yield* Config.String("GENERALIST_ENVIRONMENT")
-    const tenant = yield* Config.String("GENERALIST_TENANT")
-    const partition = yield* Config.String("GENERALIST_PARTITION")
-    const bucket = yield* Config.String("GENERALIST_BUCKET")
-    const region = yield* Config.String("AWS_REGION")
-    const accessKeyId = yield* Config.String("AWS_ACCESS_KEY_ID")
-    const secretAccessKey = yield* Config.String("AWS_SECRET_ACCESS_KEY")
-    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.String("AWS_SESSION_TOKEN")))
-    const endpoint = Option.getOrUndefined(yield* Config.option(Config.String("GENERALIST_S3_ENDPOINT")))
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = Option.getOrUndefined(yield* Config.option(Config.string("AWS_SESSION_TOKEN")))
+    const endpoint = Option.getOrUndefined(yield* Config.option(Config.string("GENERALIST_S3_ENDPOINT")))
     const credentials = { accessKeyId, secretAccessKey }
     if (sessionToken !== undefined) Object.assign(credentials, { sessionToken })
     const connection: ConnectionOptions = {
@@ -137,9 +137,9 @@ const services = Layer.unwrap(
         endpoint,
         forcePathStyle: true,
         capabilities: {
-          conditionalCreate: yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-          strongReadAfterWrite: yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-          consistentListing: yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          conditionalCreate: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          strongReadAfterWrite: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          consistentListing: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
         },
       })
     }
@@ -204,7 +204,7 @@ const routes = Layer.unwrap(
 const authenticatedHttp = Layer.effect(
   HttpClient.HttpClient,
   Effect.gen(function* () {
-    const token = yield* Config.Redacted("GENERALIST_SERVER_TOKEN")
+    const token = yield* Config.redacted("GENERALIST_SERVER_TOKEN")
     return (yield* HttpClient.HttpClient).pipe(HttpClient.mapRequest(HttpClientRequest.bearerToken(token)))
   }),
 ).pipe(Layer.provide(FetchHttpClient.layer))
@@ -222,7 +222,7 @@ interface BrowserPeer {
 
 const connectPeer = (url: string): Effect.Effect<BrowserPeer, Schema.SchemaError> =>
   Effect.gen(function* () {
-    const token = yield* Config.Redacted("GENERALIST_SERVER_TOKEN").pipe(Effect.orDie)
+    const token = yield* Config.redacted("GENERALIST_SERVER_TOKEN").pipe(Effect.orDie)
     const messages = yield* Queue.unbounded<string>()
     const client = yield* Schema.decodeUnknownEffect(Schema.instanceOf(WebSocket))(
       Reflect.construct(WebSocket, [url, { headers: { authorization: `Bearer ${Redacted.value(token)}` } }]),
@@ -286,17 +286,15 @@ const awaitSucceeded = (baseUrl: string, runId: string): Effect.Effect<string, n
 const program = Effect.scoped(
   Effect.gen(function* () {
     const server = yield* HttpServer.HttpServer
-    const address = server.address
-    if (address._tag !== "InetAddressV4" && address._tag !== "InetAddressV6")
-      return yield* Effect.die("The co-edit example requires a TCP server")
-    const baseUrl = `http://127.0.0.1:${address.port}`
+    if (server.address._tag !== "TcpAddress") return yield* Effect.die("The co-edit example requires a TCP server")
+    const baseUrl = `http://127.0.0.1:${server.address.port}`
     const page = yield* HttpClient.get(baseUrl).pipe(Effect.orDie)
     if (page.status !== 200 || !(yield* page.text.pipe(Effect.orDie)).includes("Shared plan")) {
       return yield* Effect.die("The browser editor page was not served")
     }
 
     const peer = yield* Effect.acquireRelease(
-      connectPeer(`ws://127.0.0.1:${address.port}/artifacts/${artifactName}/ws?version=0`),
+      connectPeer(`ws://127.0.0.1:${server.address.port}/artifacts/${artifactName}/ws?version=0`),
       ({ socket }) => Effect.sync(() => socket.close()),
     ).pipe(Effect.orDie)
     const initial = yield* nextEvent(peer).pipe(Effect.orDie)
@@ -331,7 +329,7 @@ const program = Effect.scoped(
     yield* Console.log(`Browser page: GET / -> ${page.status}`)
     yield* Console.log(`Artifact updates: Human ${human.update.result} -> Agent ${agent.update.result}`)
     yield* Console.log(`Document: ${final.content}; run: ${status}`)
-    if (yield* Config.Boolean("GENERALIST_COEDIT_SERVE").pipe(Config.withDefault(false))) {
+    if (yield* Config.boolean("GENERALIST_COEDIT_SERVE").pipe(Config.withDefault(false))) {
       yield* Console.log(`Open ${baseUrl} and enter GENERALIST_SERVER_TOKEN in the login form.`)
       return yield* Effect.never
     }
