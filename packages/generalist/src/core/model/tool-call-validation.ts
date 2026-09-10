@@ -266,15 +266,19 @@ export const wrap: {
   (
     original: Toolkit.Any,
     projected: Toolkit.Toolkit<BroadTools>,
-  ): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, original: Toolkit.Any, projected: Toolkit.Toolkit<BroadTools>): LanguageModel.Service
+  ): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
+  (
+    model: LanguageModel.LanguageModel,
+    original: Toolkit.Any,
+    projected: Toolkit.Toolkit<BroadTools>,
+  ): LanguageModel.LanguageModel
 } = Function.dual(
   3,
   (
-    model: LanguageModel.Service,
+    model: LanguageModel.LanguageModel,
     original: Toolkit.Any,
     projected: Toolkit.Toolkit<BroadTools>,
-  ): LanguageModel.Service =>
+  ): LanguageModel.LanguageModel =>
     adapt<AiError.AiError | InvalidToolCallParameters, AiError.AiError, AiError.AiError | InvalidToolCallParameters>(
       model,
       {
@@ -292,20 +296,20 @@ export const prepare: {
     original: Toolkit.Any,
     correctionLimit: number,
   ): (
-    model: LanguageModel.Service,
-  ) => Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError>
+    model: LanguageModel.LanguageModel,
+  ) => Effect.Effect<LanguageModel.LanguageModel, ToolJsonSchemaCompilerMissing | AiError.AiError>
   (
-    model: LanguageModel.Service,
+    model: LanguageModel.LanguageModel,
     original: Toolkit.Any,
     correctionLimit: number,
-  ): Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError>
+  ): Effect.Effect<LanguageModel.LanguageModel, ToolJsonSchemaCompilerMissing | AiError.AiError>
 } = Function.dual(
   3,
   (
-    model: LanguageModel.Service,
+    model: LanguageModel.LanguageModel,
     original: Toolkit.Any,
     correctionLimit: number,
-  ): Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError> => {
+  ): Effect.Effect<LanguageModel.LanguageModel, ToolJsonSchemaCompilerMissing | AiError.AiError> => {
     if (correctionLimit === 0 || Object.keys(original.tools).length === 0) return Effect.succeed(model)
     const compile = toolJsonSchemaCompiler(model)
     const requiresCompiler = toolkitTools(original).some(

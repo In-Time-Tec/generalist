@@ -45,7 +45,7 @@ export const handle = <Agents extends AgentRegistry>(options: {
 }) =>
   Effect.gen(function* () {
     const socket = yield* options.request.upgrade
-    const writer = yield* socket.writer
+    const writer = (yield* socket.writer).write
     const close = (code: number, reason: string) => writer(new Socket.CloseEvent(code, reason))
     const previewSubscription = yield* Ref.make<
       { readonly runId: string; readonly fiber: Fiber.Fiber<void> } | undefined
@@ -174,8 +174,16 @@ export const handle = <Agents extends AgentRegistry>(options: {
         }),
       )
 
-    yield* socket
-      .runRaw((data) => (data instanceof Uint8Array ? close(1003, "binary-command") : dispatch(data)))
-      .pipe(Effect.ensuring(Effect.all([Fiber.interrupt(eventFiber), stopPreview()], { discard: true })))
+    const reader = yield* socket.reader
+    yield* Effect.forever(
+      Effect.flatMap(reader.pull, (batch) =>
+        Effect.forEach(batch, (data) => (data instanceof Uint8Array ? close(1003, "binary-command") : dispatch(data)), {
+          discard: true,
+        }),
+      ),
+    ).pipe(
+      Effect.catchReason("SocketError", "SocketCloseError", () => Effect.void),
+      Effect.ensuring(Effect.all([Fiber.interrupt(eventFiber), stopPreview()], { discard: true })),
+    )
     return HttpServerResponse.empty()
   })

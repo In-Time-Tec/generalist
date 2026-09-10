@@ -127,5 +127,5 @@ typescript({ code: "throw new Error('bad row')" })
 
 - Source: `packages/generalist/src/repl/...`
 - Sandbox contract: `sandbox.md`
-- Site: `/docs/guides/typescript-cells`, `/docs/reference/repl`, `/docs/learn/kernel-boundaries`
+- Site: `/docs/sandbox`
 - Decisions/tradeoffs: `../decisions/kernel-child-process.md`, `../decisions/kernel-frame-channel.md`, `../decisions/kernel-profile-pin.md`, `../decisions/kernel-state-is-not-authority.md`, `../decisions/e2b-kernel-pool-rejected.md`

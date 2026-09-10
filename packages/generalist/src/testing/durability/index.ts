@@ -208,9 +208,10 @@ export const make = (
             }
             return result
           }),
-        list: (prefix, cursor) =>
+        list: (prefix, options) =>
           Effect.gen(function* () {
             let after: string | undefined
+            const cursor = options?.cursor
             if (cursor !== undefined) {
               const decoded = yield* Effect.try({
                 try: () => decodeCursor(cursor),
@@ -222,8 +223,13 @@ export const make = (
               after = decoded[1]
             }
             return yield* Ref.modify(bucket, (current) => {
-              let start = keyIndex(current.keys, after ?? prefix)
-              if (after !== undefined && current.keys[start] === after) start += 1
+              // Cursor and startAfter are both strict lower bounds; the greater one wins.
+              const startAfter = options?.startAfter
+              const floor =
+                after !== undefined && (startAfter === undefined || after >= startAfter) ? after : startAfter
+              const bound = floor !== undefined && floor > prefix ? floor : prefix
+              let start = keyIndex(current.keys, bound)
+              if (bound === floor && current.keys[start] === bound) start += 1
               const page: Array<string> = []
               let index = start
               while (page.length < pageSize) {

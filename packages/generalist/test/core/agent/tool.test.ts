@@ -93,7 +93,7 @@ class PlacementPrefix extends Context.Service<PlacementPrefix, string>()(
 const placementPrefixSchema = Schema.String.pipe(
   Schema.decodeTo(
     Schema.String,
-    SchemaTransformation.transformOrFail({
+    SchemaTransformation.transformEffect({
       decode: (value) =>
         Effect.gen(function* () {
           const prefix = yield* PlacementPrefix

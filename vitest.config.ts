@@ -10,11 +10,11 @@ const generalistExports: Readonly<Record<string, { readonly import: string }>> =
 const localSchedulerTest = "packages/generalist/test/runtime/execution/local-scheduler.test.ts"
 
 /**
- * `generalist/pg` and `generalist/mysql` import the published `generalist` entrypoints while the shared
- * test helpers import `packages/generalist/src`. Left alone the suite loads two copies of every
- * service and error class, so `instanceof` assertions fail against structurally identical values.
- * The `exports` map is the only place that knows how a specifier maps onto a file, so the alias
- * table is derived from it rather than restated.
+ * Tests import `generalist/*` specifiers that resolve through the package `exports` map to `dist/`,
+ * while the shared test helpers import `packages/generalist/src` directly. Left alone the suite loads
+ * two copies of every service and error class, so `instanceof` assertions fail against structurally
+ * identical values. The `exports` map is the only place that knows how a specifier maps onto a file,
+ * so the alias table is derived from it rather than restated.
  */
 const generalistSourceAliases: Array<{ readonly find: RegExp; readonly replacement: string }> = []
 for (const specifier in generalistExports) {
@@ -36,8 +36,8 @@ generalistSourceAliases.sort(
 export default defineConfig({
   resolve: {
     /**
-     * `generalist/pg` and `generalist/mysql` import the published `generalist` entrypoints, while the
-     * shared test helpers import `packages/generalist/src`. Without this the suite loads two copies
+     * `generalist/*` specifiers resolve through the package `exports` map to `dist/`, while the shared
+     * test helpers import `packages/generalist/src` directly. Without this the suite loads two copies
      * of every service and error class, and `instanceof` assertions fail against identical values.
      */
     alias: generalistSourceAliases,
@@ -81,19 +81,5 @@ export default defineConfig({
         },
       },
     ],
-    coverage: {
-      enabled: false,
-      provider: "v8",
-      reporter: ["text", "lcov"],
-      reportsDirectory: "coverage",
-      include: ["packages/**/src/**/*.ts"],
-      exclude: ["packages/**/dist/**"],
-      thresholds: {
-        statements: 80,
-        branches: 65,
-        functions: 70,
-        lines: 80,
-      },
-    },
   },
 })

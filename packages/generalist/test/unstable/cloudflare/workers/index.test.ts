@@ -99,9 +99,9 @@ describe("Worker", () => {
   it.effect("exposes only selected bindings through Effect Config", () => {
     const provider = makeConfigProvider({ TOKEN: "secret", INTERNAL: "hidden" }, ["TOKEN"])
     return Effect.gen(function* () {
-      const token = yield* Config.redacted("TOKEN")
+      const token = yield* Config.Redacted("TOKEN")
       expect(Redacted.value(token)).toBe("secret")
-      expect(Option.isNone(yield* Config.option(Config.string("INTERNAL")))).toBe(true)
+      expect(Option.isNone(yield* Config.option(Config.String("INTERNAL")))).toBe(true)
     }).pipe(Effect.provideService(ConfigProvider.ConfigProvider, provider))
   })
 })

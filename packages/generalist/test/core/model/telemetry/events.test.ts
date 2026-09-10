@@ -29,7 +29,7 @@ describe("ModelTelemetry", () => {
     ).toBe("stream-decode")
     expect(
       ModelTelemetry.classifyFailureCategory(
-        aiError(AiError.ToolParameterValidationError.make({ toolName: "echo", toolParams: {}, description: "bad" })),
+        aiError(AiError.ToolParameterValidationError.make({ toolName: "echo", description: "bad" })),
       ),
     ).toBe("invalid-tool-call")
     expect(ModelTelemetry.classifyFailureCategory(aiError(AiError.UnknownError.make({})))).toBe("unknown")

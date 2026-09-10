@@ -96,4 +96,4 @@ inner memory/typescript { scope: "agent:reviewer", version: 1 }
 ## Related
 
 - Source: `packages/generalist/src/instructions/`
-- Site: `/docs/guides/instruction-guidance`, `/docs/reference/instruction-guidance`, `/docs/reference/versioning`
+- Site: `/docs/context`

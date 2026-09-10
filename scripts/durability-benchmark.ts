@@ -99,10 +99,10 @@ const measured = (store: Service, counts: Requests): Service => ({
       counts.attemptedWriteBytes += bytes.byteLength
       return store.create(key, bytes)
     }),
-  list: (prefix, cursor) =>
+  list: (prefix, options) =>
     Effect.suspend(() => {
       counts.list++
-      return store.list(prefix, cursor)
+      return store.list(prefix, options)
     }),
 })
 
@@ -567,9 +567,9 @@ const program = Effect.gen(function* () {
   yield* assertRequestAccounting("idleReconciliation", idleRequests)
   yield* assertWorkloadAccounting({ idle: idleRequests, cas: casContentionRequests, timeout: timeoutWakeRequests })
   const memoryAfter = yield* hostMemory()
-  const sourceCommit = yield* Config.string("GENERALIST_BENCHMARK_SOURCE_COMMIT").pipe(Config.withDefault("unprovided"))
-  const sourceDirty = yield* Config.string("GENERALIST_BENCHMARK_SOURCE_DIRTY").pipe(Config.withDefault("unprovided"))
-  const scriptSha256 = yield* Config.string("GENERALIST_BENCHMARK_SCRIPT_SHA256").pipe(Config.withDefault("unprovided"))
+  const sourceCommit = yield* Config.String("GENERALIST_BENCHMARK_SOURCE_COMMIT").pipe(Config.withDefault("unprovided"))
+  const sourceDirty = yield* Config.String("GENERALIST_BENCHMARK_SOURCE_DIRTY").pipe(Config.withDefault("unprovided"))
+  const scriptSha256 = yield* Config.String("GENERALIST_BENCHMARK_SCRIPT_SHA256").pipe(Config.withDefault("unprovided"))
 
   const report = {
     schemaVersion: 2,

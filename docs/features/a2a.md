@@ -99,4 +99,4 @@ cancelled → CANCELED
 
 - Example: `examples/a2a`
 - Source: `packages/generalist/src/unstable/a2a/...`
-- Site: `/docs/reference/a2a`
+- Site: `/docs/mcp`

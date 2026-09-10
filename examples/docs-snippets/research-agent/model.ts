@@ -78,7 +78,7 @@ export const modelLayer: Layer.Layer<LanguageModel.LanguageModel> = Layer.unwrap
     const registration = yield* Effect.scoped(
       Layer.build(
         Layer.provide(
-          openRouterLayer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+          openRouterLayer({ model: "openai/gpt-4o-mini", apiKey: Config.Redacted("OPENROUTER_API_KEY") }),
           FetchHttpClient.layer,
         ),
       ).pipe(

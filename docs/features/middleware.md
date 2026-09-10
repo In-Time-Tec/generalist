@@ -88,4 +88,4 @@ transformPart(tool-call)
 ## Related
 
 - Source: `packages/generalist/src/core/model/middleware.ts`, `packages/generalist/src/core/policy/guardrail.ts`
-- Site: `/docs/guides/middleware`
+- Site: `/docs/middleware`

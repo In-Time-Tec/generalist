@@ -28,10 +28,11 @@ export class Engine extends Context.Service<
 
 const reservePort = Effect.gen(function* () {
   const server = yield* makeNodeSocketServer({ host: "127.0.0.1", port: 0 })
-  if (server.address._tag !== "TcpAddress") {
+  const address = server.address
+  if (address._tag !== "InetAddressV4" && address._tag !== "InetAddressV6") {
     return yield* EngineUnavailable.make({ message: "Expected a local TCP listener" })
   }
-  return server.address.port
+  return address.port
 })
 
 export const layer = Layer.effect(

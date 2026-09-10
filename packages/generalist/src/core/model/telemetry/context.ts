@@ -5,7 +5,7 @@ import type { EventPayload, CallPurpose } from "./events.js"
 /** The active loop's model-call telemetry seam. */
 export interface Instrumentation {
   readonly emit: (event: EventPayload) => Effect.Effect<void>
-  readonly wrap: (model: LanguageModel.Service) => LanguageModel.Service
+  readonly wrap: (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
 }
 
 /** The instrumentation of the enclosing agent run, when present. */

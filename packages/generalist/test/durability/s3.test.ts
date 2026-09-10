@@ -207,8 +207,33 @@ describe("S3 object durability transport", () => {
       async (endpoint) => {
         const store = await Effect.runPromise(make({ ...connection, endpoint }))
         expect(await Effect.runPromise(store.list(prefix))).toEqual({ keys: [], cursor })
-        expect(await Effect.runPromise(store.list(prefix, cursor))).toEqual({ keys: [key] })
+        expect(await Effect.runPromise(store.list(prefix, { cursor }))).toEqual({ keys: [key] })
         expect(received).toEqual([null, cursor])
+      },
+    )
+  })
+
+  it("sends the StartAfter bound and rejects a listing that returns a key at or below it", async () => {
+    const prefix = "commits/"
+    const bound = "commits/00000000000000000001.json"
+    const tail = "commits/00000000000000000002.json"
+    const received: Array<string | null> = []
+    await withServer(
+      (request, response) => {
+        const query = new URL(request.url!, "http://localhost").searchParams
+        received.push(query.get("start-after"))
+        response.writeHead(200, { "content-type": "application/xml" })
+        const key = query.get("start-after") === "zzz" ? bound : tail
+        response.end(
+          `<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>${encodeURIComponent(key)}</Key></Contents></ListBucketResult>`,
+        )
+      },
+      async (endpoint) => {
+        const store = await Effect.runPromise(make({ ...connection, endpoint }))
+        expect(await Effect.runPromise(store.list(prefix, { startAfter: bound }))).toEqual({ keys: [tail] })
+        const error = await Effect.runPromise(Effect.flip(store.list(prefix, { startAfter: "zzz" })))
+        expect(error.reason).toBe("invalid-response")
+        expect(received).toEqual([bound, "zzz"])
       },
     )
   })
@@ -227,7 +252,7 @@ describe("S3 object durability transport", () => {
         }),
       }),
     )
-    const error = await Effect.runPromise(Effect.flip(store.list("commits/", "same-token")))
+    const error = await Effect.runPromise(Effect.flip(store.list("commits/", { cursor: "same-token" })))
     expect(error.reason).toBe("invalid-response")
   })
 

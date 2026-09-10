@@ -31,7 +31,7 @@ const normalizeResponse = <A extends ModelResponse>(
     : Effect.succeed(response)
 }
 
-const conformFailureModel = (model: LanguageModel.Service, resolve: Resolver): LanguageModel.Service =>
+const conformFailureModel = (model: LanguageModel.LanguageModel, resolve: Resolver): LanguageModel.LanguageModel =>
   adapt<AiError.AiError, AiError.AiError, AiError.AiError>(model, {
     generateText: (_options, invoke) =>
       invoke().pipe(Effect.flatMap((response) => normalizeResponse(response, "generateText", resolve))),

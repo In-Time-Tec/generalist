@@ -139,8 +139,4 @@ terminal unstructured turn
 - Source: `packages/generalist/src/core/agent/`, `packages/generalist/src/core/model/`, `packages/generalist/src/core/turn/policy.ts`
 - Test: [`core/agent/service.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/agent/service.test.ts)
 - Sibling feature doc: [`gates.md`](./gates.md)
-- Site: `/docs/learn/agent-loop`
-- Site: `/docs/reference/core-agent`
-- Site: `/docs/reference/core-events`
-- Site: `/docs/reference/core-models`
-- Site: `/docs/reference/core-policies`
+- Site: `/docs/tools`, `/docs/streaming`

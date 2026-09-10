@@ -185,20 +185,20 @@ it.effect("maps agentOS acquisition, execution, and unsupported failures", () =>
 )
 
 const agentosEndpoint = Effect.runSync(
-  Config.option(Config.string("AGENTOS_ENDPOINT")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.String("AGENTOS_ENDPOINT")).pipe(Effect.map(Option.getOrUndefined)),
 )
 const agentosToken = Effect.runSync(
-  Config.option(Config.string("AGENTOS_TOKEN")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.String("AGENTOS_TOKEN")).pipe(Effect.map(Option.getOrUndefined)),
 )
 const agentosActor = Effect.runSync(
-  Config.option(Config.string("AGENTOS_ACTOR")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.String("AGENTOS_ACTOR")).pipe(Effect.map(Option.getOrUndefined)),
 )
 
 describe.skipIf(agentosEndpoint === undefined || agentosToken === undefined)("agentOS live Sandbox", () => {
   if (agentosEndpoint === undefined) return
   const liveOptions: Types.Mutable<Options> = {
     endpoint: agentosEndpoint,
-    token: Config.redacted("AGENTOS_TOKEN"),
+    token: Config.Redacted("AGENTOS_TOKEN"),
   }
   if (agentosActor !== undefined) liveOptions.actor = agentosActor
   Testing.sandbox({

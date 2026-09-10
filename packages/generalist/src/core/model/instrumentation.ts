@@ -25,19 +25,22 @@ import {
 export { type Identity, type IdentityCell, makeIdentityCell } from "./attempt/identity.js"
 export type { InstrumentOptions } from "./attempt/instrumentation.js"
 
-const instrumentedModels = new WeakMap<LanguageModel.Service, InstrumentedMarker>()
+const instrumentedModels = new WeakMap<LanguageModel.LanguageModel, InstrumentedMarker>()
 interface InstrumentedMarker {
   readonly emit: InstrumentOptions["emit"]
-  readonly base: LanguageModel.Service
+  readonly base: LanguageModel.LanguageModel
 }
 interface AnyResponse {
   readonly content: ReadonlyArray<Response.AnyPart>
 }
 
 const beginCall = (
-  model: LanguageModel.Service,
+  model: LanguageModel.LanguageModel,
   options: InstrumentOptions,
-): Effect.Effect<{ readonly context: CallContext; readonly stack: LanguageModel.Service }, InvocationLifecycleFailed> =>
+): Effect.Effect<
+  { readonly context: CallContext; readonly stack: LanguageModel.LanguageModel },
+  InvocationLifecycleFailed
+> =>
   Effect.gen(function* () {
     const purpose = yield* CurrentPurpose
     const persistedOrdinal = yield* CurrentModelCallOrdinal
@@ -110,7 +113,7 @@ const beginCall = (
         pendingFailure: undefined,
       },
     }
-    const instrumentCandidate = (candidate: LanguageModel.Service, identity?: CandidateIdentity) => {
+    const instrumentCandidate = (candidate: LanguageModel.LanguageModel, identity?: CandidateIdentity) => {
       const attempts = attemptModel(candidate, context, identity)
       return options.resilience === undefined
         ? attempts
@@ -256,9 +259,9 @@ const validateOptions = (options: InstrumentOptions) =>
   options.resilience === undefined ? Effect.void : validate(options.resilience).pipe(Effect.asVoid)
 
 const callEffect = <A extends AnyResponse, E, R>(
-  model: LanguageModel.Service,
+  model: LanguageModel.LanguageModel,
   options: InstrumentOptions,
-  invoke: (stack: LanguageModel.Service) => Effect.Effect<A, E, R>,
+  invoke: (stack: LanguageModel.LanguageModel) => Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E | InvocationLifecycleFailed | Misconfigured, R> =>
   Effect.flatMap(validateOptions(options).pipe(Effect.andThen(beginCall(model, options))), ({ context, stack }) =>
     invoke(stack).pipe(
@@ -272,7 +275,7 @@ const callEffect = <A extends AnyResponse, E, R>(
   )
 
 const callStream = (
-  model: LanguageModel.Service,
+  model: LanguageModel.LanguageModel,
   options: InstrumentOptions,
   streamOptions: StreamTextOptions,
 ): Stream.Stream<
@@ -314,9 +317,9 @@ const callStream = (
  * one provider invocation never emits into two runs.
  */
 export const instrument: {
-  (options: InstrumentOptions): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, options: InstrumentOptions): LanguageModel.Service
-} = Function.dual(2, (model: LanguageModel.Service, options: InstrumentOptions): LanguageModel.Service => {
+  (options: InstrumentOptions): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
+  (model: LanguageModel.LanguageModel, options: InstrumentOptions): LanguageModel.LanguageModel
+} = Function.dual(2, (model: LanguageModel.LanguageModel, options: InstrumentOptions): LanguageModel.LanguageModel => {
   const marker = instrumentedModels.get(model)
   if (marker !== undefined) {
     return marker.emit === options.emit ? model : instrument(marker.base, options)

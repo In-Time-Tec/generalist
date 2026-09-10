@@ -25,16 +25,24 @@ const makeFakeSocket = (): Effect.Effect<FakeSocket> =>
       inbound,
       outbound,
       socket: Socket.make({
-        runRaw: (dispatch) =>
-          Effect.gen(function* () {
-            while (true) {
-              const message = yield* Queue.take(inbound)
-              if (Socket.isCloseEvent(message)) return
-              const handled = dispatch(message)
-              if (Effect.isEffect(handled)) yield* handled
-            }
-          }),
-        writer: Effect.succeed((chunk) => Queue.offer(outbound, chunk).pipe(Effect.asVoid)),
+        reader: Effect.succeed({
+          pull: Queue.take(inbound).pipe(
+            Effect.flatMap((message) =>
+              Socket.isCloseEvent(message)
+                ? Effect.fail(
+                    Socket.SocketError.make({
+                      reason: Socket.SocketCloseError.make({ code: message.code, closeReason: message.reason }),
+                    }),
+                  )
+                : Effect.succeed([message] as const),
+            ),
+          ),
+          upgrade: () => Effect.die(new Error("socket upgrade is not supported by the test fake")),
+        }),
+        writer: Effect.succeed({
+          write: (chunk) => Queue.offer(outbound, chunk).pipe(Effect.asVoid),
+          writeAll: (chunks) => Effect.forEach(chunks, (chunk) => Queue.offer(outbound, chunk), { discard: true }),
+        }),
       }),
     }
   })

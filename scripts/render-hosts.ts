@@ -111,7 +111,7 @@ const program = Effect.fn("RenderHosts.program")(function* (check: boolean) {
 
 const command = Command.make(
   "render-hosts",
-  { check: Flag.boolean("check").pipe(Flag.withDefault(false)) },
+  { check: Flag.Boolean("check").pipe(Flag.withDefault(false)) },
   ({ check }) => program(check),
 )
 

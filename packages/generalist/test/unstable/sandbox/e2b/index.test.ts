@@ -206,13 +206,13 @@ it.effect("maps E2B provider, execution, snapshot, and unsupported failures", ()
   }),
 )
 
-const e2bApiKey = Effect.runSync(Config.option(Config.string("E2B_API_KEY")).pipe(Effect.map(Option.getOrUndefined)))
+const e2bApiKey = Effect.runSync(Config.option(Config.String("E2B_API_KEY")).pipe(Effect.map(Option.getOrUndefined)))
 
 describe.skipIf(e2bApiKey === undefined)("E2B live Sandbox", () => {
   Testing.sandbox({
     name: "E2B",
     isolation: "microvm",
-    layer: layer({ apiKey: Config.redacted("E2B_API_KEY"), template: "generalist-bun" }).pipe(
+    layer: layer({ apiKey: Config.Redacted("E2B_API_KEY"), template: "generalist-bun" }).pipe(
       Layer.provide(FetchHttpClient.layer),
     ),
   })

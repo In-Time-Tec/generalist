@@ -184,14 +184,14 @@ export const exaLayerFromApiKey = (
 
 /** @experimental */
 export const exaLayer = Layer.unwrap(
-  Config.redacted("EXA_API_KEY").pipe(
+  Config.Redacted("EXA_API_KEY").pipe(
     Effect.map((apiKey) => exaLayerFromApiKey(apiKey).pipe(Layer.provide(FetchHttpClient.layer))),
   ),
 )
 
 /** @experimental */
 export const layer = Layer.unwrap(
-  Config.option(Config.redacted("EXA_API_KEY")).pipe(
+  Config.option(Config.Redacted("EXA_API_KEY")).pipe(
     Effect.catchTag("ConfigError", () => Effect.succeedNone),
     Effect.map((apiKey) =>
       Option.match(apiKey, {

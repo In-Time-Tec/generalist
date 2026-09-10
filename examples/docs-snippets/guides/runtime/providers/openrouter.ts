@@ -10,7 +10,7 @@ const agent = Agent.make({
 
 const registryLayer = openRouterLayer({
   model: "openai/gpt-4o-mini",
-  apiKey: Config.redacted("OPENROUTER_API_KEY"),
+  apiKey: Config.Redacted("OPENROUTER_API_KEY"),
 })
 
 const program = ModelRegistry.withModel(

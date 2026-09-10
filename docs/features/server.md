@@ -26,7 +26,7 @@ const apiLayer = Layer.unwrap(
       Server.layer({
         host,
         auth: Server.authBearer({
-          token: Config.redacted("GENERALIST_SERVER_TOKEN"),
+          token: Config.Redacted("GENERALIST_SERVER_TOKEN"),
           principal: { id: "support-service", tenantId: "support", role: "controller" },
         }),
         authorization: { tenantId: "support", authorize: () => Effect.succeed(true) },

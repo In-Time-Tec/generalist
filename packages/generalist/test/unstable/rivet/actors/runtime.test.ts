@@ -917,8 +917,8 @@ test("idle hosts stop storage heartbeats and wait for closure before concurrent 
           opened++
           return ObjectStore.of({
             ...bucket.store,
-            list: (prefix, cursor) =>
-              Effect.sync(() => void operations++).pipe(Effect.andThen(bucket.store.list(prefix, cursor))),
+            list: (prefix, listOptions) =>
+              Effect.sync(() => void operations++).pipe(Effect.andThen(bucket.store.list(prefix, listOptions))),
             create: (key, bytes) =>
               Effect.sync(() => void operations++).pipe(Effect.andThen(bucket.store.create(key, bytes))),
           })
@@ -1075,9 +1075,9 @@ test.for(["transport", "lease"] as const)(
             Effect.succeed(
               ObjectStore.of({
                 ...bucket.store,
-                list: (prefix, cursor) =>
+                list: (prefix, listOptions) =>
                   Effect.suspend(() => {
-                    if (!failList) return bucket.store.list(prefix, cursor)
+                    if (!failList) return bucket.store.list(prefix, listOptions)
                     failList = false
                     return ObjectStoreFailure.make({
                       operation: "list",

@@ -52,6 +52,7 @@ const chevronDownIcon = <ParentMessage>(isOpen: boolean): Html => {
  * pattern: the consumer keeps an `isOpen` boolean in its Model, flips it on
  * the trigger's `onToggled`, and renders `sourcesContent` conditionally.
  */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const sources: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -102,6 +103,7 @@ export const sourcesTrigger: {
 )
 
 /** Column of source links. Render it conditionally on the consumer's `isOpen` state. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const sourcesContent: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html

@@ -85,6 +85,7 @@ const table = (headings: readonly [string, string], rows: ReadonlyArray<readonly
   headings,
   rows,
 })
+const list = (items: ReadonlyArray<string>): Block => ({ kind: "list", items })
 
 const checkpointSources = {
   memory,
@@ -862,6 +863,86 @@ export const sections: ReadonlyArray<Section> = [
           title: "Wire the specialist messages",
           description: "Keep sender identity in the Runtime and retries under explicit command keys.",
           href: "/docs/messaging",
+        },
+      ]),
+    ],
+  },
+  {
+    id: "architecture",
+    title: "How durable state stays honest",
+    label: "Architecture",
+    description: "The boundaries between the agent loop, the durable Runtime, its compute hosts, and object storage.",
+    group: "Keep work",
+    blocks: [
+      p(
+        "An agent can outlive the process that started it. Generalist separates the code that executes a turn from the state that proves which work was accepted, completed, or left uncertain.",
+      ),
+      table(
+        ["Boundary", "What it owns"],
+        [
+          [
+            "Core agent loop",
+            "Model turns, tools, policies, approvals, and typed events. It runs without Runtime or storage; its events are not crash recovery.",
+          ],
+          [
+            "Runtime",
+            "Addressable Runs, executable identities, journaled operations, Sessions, waits, budgets, and recovery. `generalist/durability` is its sole production engine.",
+          ],
+          [
+            "Compute host",
+            "A process, server, Cloudflare Durable Object, or Rivet actor that runs and wakes the engine. It is replaceable compute, not a storage backend.",
+          ],
+          [
+            "Object storage",
+            "The canonical record, through the S3 or native R2 transport. Recovery also needs the registered executable code and services; stored state is not stored code.",
+          ],
+        ],
+      ),
+      heading("A partition is the commit boundary"),
+      p(
+        "Every Runtime names an explicit environment, tenant, and partition. The partition is the serialization and atomicity boundary: put related Runs, children, and Sessions together when a transition must update them atomically. Writes inside a partition serialize, and there are no cross-partition transactions. Independent partitions can progress separately, but that is not automatic scaling: the application chooses routing and operates enough compute to serve them.",
+      ),
+      heading("Commands commit through conditional creates"),
+      p(
+        "Two hosts can race to change the same partition; a local mutex cannot order their writes. The engine resolves commits at the object boundary. A command carries a stable identity and input digest: an exact retry returns the original receipt, including its original `duplicate` field, and the same identity with different input fails rather than taking a second meaning.",
+      ),
+      list([
+        "Reconstruct the partition from validated canonical records, using snapshots to bound replay.",
+        "Check the command receipt before evaluating the deterministic transition.",
+        "Conditionally create the next numbered commit slot; the create succeeding establishes the commit.",
+        "On a conflict, read the winning record and re-evaluate the transition within a bounded retry limit — never repeat a model or tool call to win a storage race.",
+        "If an attempted write's outcome cannot be established, stop with an indeterminate failure instead of writing again under a fresh identity.",
+      ]),
+      p(
+        "The provider must supply atomic absent-key creation, complete bytes, strong direct reads of acknowledged writes, and correct paginated listing. An S3-shaped API alone does not establish those properties, and an ETag is not a content hash.",
+      ),
+      note(
+        "Fencing is not time travel",
+        "A newer claim fences a replaced owner's late canonical writes, so an old owner cannot publish results after losing authority. No fence can retract an external request already sent to a provider.",
+      ),
+      heading("A wakeup is a hint, not authority"),
+      p(
+        "An alarm succeeding does not prove a command committed; an alarm failing does not erase accepted work. Hosts reconcile independently, so a crash between commit and wake delivery cannot strand a Run. Replay consumes recorded outcomes from an authoritative cursor without redispatching them; an operation whose external outcome is unknown needs evidence or an authorized resolution, not a blind retry.",
+      ),
+      diagram("recovery"),
+      heading("Two snapshot meanings, two output lanes"),
+      p(
+        "A storage snapshot accelerates partition reconstruction. A client Session snapshot is different: a bounded canonical projection plus the exact durable cursor from which observation continues. Live model previews ride a separate lossy lane — bounded, ephemeral frames that never advance the durable cursor — so reconnecting clients rebuild committed state rather than trusting the last preview they saw.",
+      ),
+      heading("A familiar pattern, not the same system"),
+      p(
+        "Other systems — turbopuffer's namespace-scoped object storage, WarpStream's object-storage data plane, SlateDB's embedded engine over objects — put object storage on their primary write path. Those first-party designs explain the storage/compute separation pattern, not Generalist's feature set: they establish no cost, throughput, or benchmark equivalence, and Generalist's live AWS and R2 behavior remains unqualified by local emulator evidence.",
+      ),
+      links([
+        {
+          title: "Configure the durable engine",
+          description: "Compose the object Runtime with S3, Crypto, and executable resolution.",
+          href: "/docs/durability",
+        },
+        {
+          title: "Read the recovery rules",
+          description: "Replay, uncertain outcomes, and explicit resolution.",
+          href: "/docs/recovery",
         },
       ]),
     ],

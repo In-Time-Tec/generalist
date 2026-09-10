@@ -41,7 +41,11 @@ export interface Bucket {
     value: Uint8Array,
     options: { readonly onlyIf: { readonly etagDoesNotMatch: "*" } },
   ): Promise<ObjectMetadata | null>
-  list(options: { readonly prefix: string; readonly cursor?: string }): Promise<ObjectList>
+  list(options: {
+    readonly prefix: string
+    readonly cursor?: string | undefined
+    readonly startAfter?: string | undefined
+  }): Promise<ObjectList>
 }
 
 /** Supply separately, with maintenance credentials and a retired namespace. @experimental */
@@ -170,6 +174,7 @@ const readResponse = (
 const listResponse = (
   prefix: string,
   cursor: string | undefined,
+  startAfter: string | undefined,
   page: ObjectList,
 ): Effect.Effect<{ readonly keys: ReadonlyArray<string>; readonly cursor?: string }, ObjectStoreFailure> => {
   if (!Schema.is(objectList)(page))
@@ -179,7 +184,11 @@ const listResponse = (
   }
   if (!page.truncated && page.cursor !== undefined)
     return Effect.fail(invalidResponse("list", prefix, "R2 returned invalid pagination metadata"))
-  if (page.objects.some((object) => !object.key.startsWith(prefix))) {
+  if (
+    page.objects.some(
+      (object) => !object.key.startsWith(prefix) || (startAfter !== undefined && object.key <= startAfter),
+    )
+  ) {
     return Effect.fail(invalidResponse("list", prefix, "R2 returned an invalid object key in a listing"))
   }
   const keys = page.objects.map((object) => object.key)
@@ -236,15 +245,19 @@ const makeService = (bucket: Bucket, options: Options): Service => ({
           }),
         ),
     }),
-  list: (prefix, cursor) =>
+  list: (prefix, listOptions) =>
     request({
       timeoutMs: options.requestTimeoutMs ?? 30_000,
       operation: "list",
       key: prefix,
       execute: () =>
-        native("list", prefix, () => bucket.list(cursor === undefined ? { prefix } : { prefix, cursor })).pipe(
-          Effect.flatMap((page) => listResponse(prefix, cursor, page)),
-        ),
+        native("list", prefix, () =>
+          bucket.list({
+            prefix,
+            cursor: listOptions?.cursor,
+            startAfter: listOptions?.startAfter,
+          }),
+        ).pipe(Effect.flatMap((page) => listResponse(prefix, listOptions?.cursor, listOptions?.startAfter, page))),
     }),
 })
 

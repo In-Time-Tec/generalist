@@ -134,8 +134,11 @@ const environment = (target: Target, index: number, storage: LocalS3, targetId: 
 
 const reservePort = Effect.gen(function* () {
   const server = yield* makeNodeSocketServer({ host: "127.0.0.1", port: 0 })
-  if (server.address._tag !== "TcpAddress") return yield* failure("Expected a local TCP listener")
-  return server.address.port
+  const address = server.address
+  if (address._tag !== "InetAddressV4" && address._tag !== "InetAddressV6") {
+    return yield* failure("Expected a local TCP listener")
+  }
+  return address.port
 })
 
 const serverReadiness = (server: NonNullable<Target["server"]>, port: number, serverToken: string) => {

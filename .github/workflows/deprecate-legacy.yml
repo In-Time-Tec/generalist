@@ -7,7 +7,7 @@ on:
         description: Deprecation message shown on install
         required: true
         type: string
-        default: "@batonfx/* is renamed to generalist. Install `generalist` instead — adapters are subpaths such as `generalist/pg` and `generalist/mysql`; see https://github.com/In-Time-Tec/generalist"
+        default: "@batonfx/* is renamed to generalist. Install `generalist` instead — adapters are subpaths such as `generalist/durability/s3` and `generalist/unstable/rivet`; see https://github.com/In-Time-Tec/generalist"
 
 permissions: {}
 

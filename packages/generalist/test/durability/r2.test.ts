@@ -61,10 +61,16 @@ class NativeBucket implements Bucket, MaintenanceBucket {
     return metadata
   }
 
-  async list(options: { readonly prefix: string; readonly cursor?: string }): Promise<Page> {
+  async list(options: {
+    readonly prefix: string
+    readonly cursor?: string
+    readonly startAfter?: string
+  }): Promise<Page> {
     return {
       objects: [...this.objects.keys()]
-        .filter((key) => key.startsWith(options.prefix))
+        .filter(
+          (key) => key.startsWith(options.prefix) && (options.startAfter === undefined || key > options.startAfter),
+        )
         .toSorted()
         .map((key) => ({ key })),
       truncated: false,
@@ -158,7 +164,7 @@ describe("native R2 object transport", () => {
       const keys: Array<string> = []
       let cursor: string | undefined
       for (let pages = 0; pages < 4; pages++) {
-        const page = yield* store.list("journal/", cursor)
+        const page = yield* store.list("journal/", { cursor })
         keys.push(...page.keys)
         cursor = page.cursor
         if (cursor === undefined) break
@@ -174,12 +180,36 @@ describe("native R2 object transport", () => {
     }),
   )
 
+  it.effect("forwards an exclusive startAfter bound to the native list call", () =>
+    Effect.gen(function* () {
+      const bucket = new NativeBucket()
+      let seen: { readonly prefix: string; readonly cursor?: string; readonly startAfter?: string } | undefined
+      bucket.list = async (options) => {
+        seen = options
+        return { objects: [{ key: "journal/2" }], truncated: false }
+      }
+      expect(yield* make(bucket).list("journal/", { cursor: "previous", startAfter: "journal/1" })).toEqual({
+        keys: ["journal/2"],
+      })
+      expect(seen).toEqual({ prefix: "journal/", cursor: "previous", startAfter: "journal/1" })
+    }),
+  )
+
+  it.effect("rejects a native page containing a key at or below startAfter", () =>
+    Effect.gen(function* () {
+      const bucket = new NativeBucket()
+      bucket.list = async () => ({ objects: [{ key: "journal/1" }], truncated: false })
+      const error = yield* failureOf(make(bucket).list("journal/", { startAfter: "journal/1" }))
+      expect(error.reason).toBe("invalid-response")
+    }),
+  )
+
   for (const keys of [[], ["journal/0"]]) {
     it.effect(`accepts a native terminal page with ${keys.length} objects and an explicitly undefined cursor`, () =>
       Effect.gen(function* () {
         const bucket = new NativeBucket()
         bucket.list = async () => ({ objects: keys.map((key) => ({ key })), truncated: false, cursor: undefined })
-        expect(yield* make(bucket).list("journal/", "previous-page")).toEqual({ keys })
+        expect(yield* make(bucket).list("journal/", { cursor: "previous-page" })).toEqual({ keys })
       }),
     )
   }
@@ -202,7 +232,7 @@ describe("native R2 object transport", () => {
       Effect.gen(function* () {
         const bucket = new NativeBucket()
         bucket.list = async () => malformed<Page>(page)
-        const error = yield* failureOf(make(bucket).list("journal/", cursor))
+        const error = yield* failureOf(make(bucket).list("journal/", { cursor }))
         expect(error.reason).toBe("invalid-response")
       }),
     )

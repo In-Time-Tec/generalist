@@ -20,9 +20,9 @@ await Effect.gen(function* () {
 }).pipe(Effect.provide(testModel([text("Hello!")])), Effect.runPromise)
 ```
 
-The program prints `Agent check passed`. The model returns the scripted response regardless of the prompt, so this checks your application's handling of the response—not whether a real model follows instructions. Use [evals](../guides/testing-evals.md) to measure behavior with real models.
+The program prints `Agent check passed`. The model returns the scripted response regardless of the prompt, so this checks your application's handling of the response—not whether a real model follows instructions. Use [evals](evals.md) to measure behavior with real models.
 
-For tool-calling tests, script a `toolCall(...)` followed by the final `text(...)`, and provide the toolkit's handler Layer and authorization policy. The [offline quickstart](../start/quickstart.md) shows a complete example.
+For tool-calling tests, script a `toolCall(...)` followed by the final `text(...)`, and provide the toolkit's handler Layer and authorization policy. The runnable website checkpoints under [`examples/docs-snippets/website`](../../examples/docs-snippets/website) show a complete example.
 
 ## Test a custom adapter
 

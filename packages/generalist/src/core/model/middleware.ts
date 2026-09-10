@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Option } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/event.js"
 import type { EvaluationFailure } from "../../hooks/index.js"
-/** Typed operation-level adapter for LanguageModel.Service wrappers. */
+/** Typed operation-level adapter for LanguageModel.LanguageModel wrappers. */
 export { adapt } from "./service.js"
 /** Turn-scoped info handed to middleware. */
 export interface TurnContext {

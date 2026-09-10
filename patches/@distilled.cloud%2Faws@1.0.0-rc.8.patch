@@ -1,0 +1,28 @@
+diff --git a/src/endpoint.ts b/src/endpoint.ts
+index 88ed29839b44007c4950dd558f2d039017962c0e..76d2b1e41ca92da5caa4728258931f2669e31410 100644
+--- a/src/endpoint.ts
++++ b/src/endpoint.ts
+@@ -15,7 +15,7 @@ export class Endpoint extends Context.Service<
+  * Lambda containers). Resolves `undefined` when unset, so the SDK's
+  * default endpoint resolver runs.
+  */
+-export const fromEnvironment = Config.string("AWS_ENDPOINT_URL").pipe(
++export const fromEnvironment = Config.String("AWS_ENDPOINT_URL").pipe(
+   Config.option,
+   Effect.map(Option.getOrUndefined),
+ );
+diff --git a/src/region.ts b/src/region.ts
+index 6c5d77e3e6f4152d0207e288f9f998868c9968fe..346ce3faf73f2ed4188a5cb913871e11137c8b33 100644
+--- a/src/region.ts
++++ b/src/region.ts
+@@ -29,8 +29,8 @@ export class Region extends Context.Service<
+  * (rather than dying) so a provider can turn it into a typed
+  * `MissingRegion` alongside its other credential-resolution failures.
+  */
+-export const fromEnvironment = Config.string("AWS_REGION").pipe(
+-  Config.orElse(() => Config.string("AWS_DEFAULT_REGION")),
++export const fromEnvironment = Config.String("AWS_REGION").pipe(
++  Config.orElse(() => Config.String("AWS_DEFAULT_REGION")),
+   Effect.map((region) => region as RegionName),
+ );
+ 

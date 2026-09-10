@@ -79,8 +79,6 @@ rule:
 files:
   - "packages/**/*.ts"
   - "packages/**/*.tsx"
-  - "apps/**/*.ts"
-  - "apps/**/*.tsx"
   - "examples/**/*.ts"
   - "examples/**/*.tsx"
   - "scripts/**/*.ts"

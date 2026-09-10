@@ -8,7 +8,7 @@ import { Host } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { Config, Effect, Layer } from "effect"
-import { FetchHttpClient, HttpRouter } from "effect/unstable/http"
+import { FetchHttpClient, HttpRouter, HttpServerError } from "effect/unstable/http"
 import { agent } from "./agent"
 import { make as makeBrowserAuth } from "./browser-auth.js"
 import { layerOrDeterministic } from "./model"
@@ -29,7 +29,7 @@ const toolExecutorLayer = Layer.unwrap(
 /** @experimental */
 export const modelLayer = layerOrDeterministic({
   model: "openai/gpt-4o-mini",
-  apiKey: Config.redacted("OPENROUTER_API_KEY"),
+  apiKey: Config.Redacted("OPENROUTER_API_KEY"),
 })
 
 const address = Address.make("agent:deep-research-agent")
@@ -92,15 +92,15 @@ const resolver = ExecutableResolver.layerStatic([
 
 const runtimeLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
-    const tenant = yield* Config.string("GENERALIST_TENANT")
-    const partition = yield* Config.string("GENERALIST_PARTITION")
-    const bucket = yield* Config.string("GENERALIST_BUCKET")
-    const region = yield* Config.string("AWS_REGION")
-    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
-    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
-    const sessionToken = yield* Effect.option(Config.string("AWS_SESSION_TOKEN"))
-    const endpoint = yield* Effect.option(Config.string("GENERALIST_S3_ENDPOINT"))
+    const environment = yield* Config.String("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.String("GENERALIST_TENANT")
+    const partition = yield* Config.String("GENERALIST_PARTITION")
+    const bucket = yield* Config.String("GENERALIST_BUCKET")
+    const region = yield* Config.String("AWS_REGION")
+    const accessKeyId = yield* Config.String("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.String("AWS_SECRET_ACCESS_KEY")
+    const sessionToken = yield* Effect.option(Config.String("AWS_SESSION_TOKEN"))
+    const endpoint = yield* Effect.option(Config.String("GENERALIST_S3_ENDPOINT"))
     const credentials = { accessKeyId, secretAccessKey }
     if (sessionToken._tag === "Some") Object.assign(credentials, { sessionToken: sessionToken.value })
     const connection: ConnectionOptions = {
@@ -113,9 +113,9 @@ const runtimeLayer = Layer.unwrap(
         endpoint: endpoint.value,
         forcePathStyle: true,
         capabilities: {
-          conditionalCreate: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-          strongReadAfterWrite: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
-          consistentListing: yield* Config.boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          conditionalCreate: yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          strongReadAfterWrite: yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
+          consistentListing: yield* Config.Boolean("GENERALIST_S3_CAPABILITIES_CONFIRMED"),
         },
       })
     }
@@ -157,9 +157,12 @@ const serverLayer = (port: number) =>
 /** @experimental */
 export const main: Effect.Effect<
   never,
-  Config.ConfigError | Effect.Error<typeof activate> | Layer.Error<ReturnType<typeof layerS3>>
+  | Config.ConfigError
+  | HttpServerError.ServeError
+  | Effect.Error<typeof activate>
+  | Layer.Error<ReturnType<typeof layerS3>>
 > = Effect.gen(function* () {
-  const port = yield* Config.port("PORT").pipe(Config.withDefault(4000))
+  const port = yield* Config.Port("PORT").pipe(Config.withDefault(4000))
   yield* Effect.log(
     `deep-research-agent demo server listening on http://localhost:${port} with authenticated browser login`,
   )

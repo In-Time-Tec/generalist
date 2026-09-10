@@ -1474,14 +1474,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -3079,14 +3072,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -4628,14 +4614,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -6342,14 +6321,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -6489,14 +6461,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -6669,14 +6634,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -6829,14 +6787,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -6986,14 +6937,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -7128,14 +7072,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -7252,14 +7189,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -7636,14 +7566,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -8587,14 +8510,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -9708,7 +9624,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -9748,7 +9664,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -9768,7 +9684,7 @@
                                 "encodedResult": {},
                                 "providerExecuted": { "type": "boolean" },
                                 "preliminary": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -9886,7 +9802,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -10027,7 +9943,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -10863,14 +10779,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -10970,14 +10879,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -11102,14 +11004,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -11280,14 +11175,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -11397,14 +11285,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -11465,14 +11346,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -11520,14 +11394,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -11587,14 +11454,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -12676,7 +12536,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -12716,7 +12576,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -12736,7 +12596,7 @@
                                 "encodedResult": {},
                                 "providerExecuted": { "type": "boolean" },
                                 "preliminary": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -12854,7 +12714,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -12995,7 +12855,7 @@
                                 "name": { "type": "string" },
                                 "params": {},
                                 "providerExecuted": { "type": "boolean" },
-                                "~effect/ai/Content/Part": { "type": "string", "enum": ["~effect/ai/Content/Part"] },
+                                "~effect/ai/Response/Part": { "type": "string", "enum": ["~effect/ai/Response/Part"] },
                                 "metadata": {
                                   "type": "object",
                                   "additionalProperties": { "anyOf": [{}, { "type": "null" }] }
@@ -13824,14 +13684,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14269,14 +14122,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14379,14 +14225,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14496,14 +14335,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14570,14 +14402,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14651,14 +14476,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14798,14 +14616,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -14924,14 +14735,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -15175,14 +14979,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -15282,14 +15079,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -15402,14 +15192,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -15522,14 +15305,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {
@@ -15661,14 +15437,7 @@
           "401": {
             "description": "generalist/server/Unauthorized",
             "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" }
-                  ]
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_server_UnauthorizedEncoded" } }
             }
           },
           "403": {

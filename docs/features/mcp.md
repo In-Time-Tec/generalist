@@ -103,4 +103,4 @@ one synchronized lifecycle. Failures are `OAuthPending`, `OAuthDenied`,
 ## Related
 
 - Source: `packages/generalist/src/mcp/...`
-- Site: `/docs/guides/mcp`, `/docs/reference/mcp`
+- Site: `/docs/mcp`

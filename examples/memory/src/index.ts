@@ -36,7 +36,7 @@ const program = Effect.gen(function* () {
 
 const model = layerLanguageModel({ model: "amazon.nova-micro-v1:0" }).pipe(Layer.provide(layerClient()))
 const memory = layerSupermemory({
-  apiKey: Config.redacted("SUPERMEMORY_API_KEY"),
+  apiKey: Config.Redacted("SUPERMEMORY_API_KEY"),
   containerTag: key.subject,
 }).pipe(Layer.provide(FetchHttpClient.layer))
 

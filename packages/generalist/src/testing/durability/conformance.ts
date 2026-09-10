@@ -121,7 +121,7 @@ export const listing = <E, R>(options: ConformanceOptions<E, R> & { readonly cou
     const cursors = new Set<string>()
     let cursor: string | undefined
     do {
-      const page = yield* fresh.list(prefix, cursor)
+      const page = yield* fresh.list(prefix, { cursor })
       for (const key of page.keys) {
         yield* check(key.startsWith(prefix), "listing", "Listing included a key outside the requested prefix")
         yield* check(!found.has(key), "listing", "Listing returned a duplicate key")
@@ -137,6 +137,23 @@ export const listing = <E, R>(options: ConformanceOptions<E, R> & { readonly cou
       found.size === keys.length && keys.every((key) => found.has(key)),
       "listing",
       "Listing omitted or invented acknowledged keys",
+    )
+    const anchor = keys[Math.floor(keys.length / 2)]!
+    const tail = new Set<string>()
+    let tailCursor: string | undefined
+    do {
+      const page = yield* fresh.list(prefix, { cursor: tailCursor, startAfter: anchor })
+      for (const key of page.keys) {
+        yield* check(key > anchor, "listing", "Listing ignored the requested startAfter bound")
+        tail.add(key)
+      }
+      tailCursor = page.cursor
+    } while (tailCursor !== undefined)
+    yield* check(
+      tail.size === keys.length - keys.indexOf(anchor) - 1 &&
+        keys.slice(keys.indexOf(anchor) + 1).every((key) => tail.has(key)),
+      "listing",
+      "A startAfter listing omitted or invented keys after the bound",
     )
   })
 

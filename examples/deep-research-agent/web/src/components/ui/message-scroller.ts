@@ -217,7 +217,7 @@ export const update: {
     Match.value(message).pipe(
       withUpdateReturn,
       Match.tagsExhaustive({
-        ScrolledViewport: ({ isAtBottom }) => [
+        ScrolledViewport: ({ isAtBottom }: ScrolledViewport) => [
           evo(model, { isAtBottom: () => isAtBottom, isFollowing: () => isAtBottom }),
           [],
         ],
@@ -265,6 +265,7 @@ const arrowDownIcon = <ParentMessage>(): Html => {
 }
 
 /** Positioning frame for the scroller: wrap the viewport and the scroll button in it. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const root: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
@@ -337,6 +338,7 @@ export const content: {
 })
 
 /** One conversation entry, content-visibility contained so long transcripts stay cheap to render. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const item: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html

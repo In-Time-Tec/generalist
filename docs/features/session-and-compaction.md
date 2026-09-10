@@ -180,5 +180,5 @@ The same Session ID retains the counter across Runs; a different Session starts 
 ## Related
 
 - Source: `packages/generalist/src/core/context/session.ts`, `packages/generalist/src/core/context/session-projection.ts`, `packages/generalist/src/core/context/session-sync.ts`, `packages/generalist/src/core/agent/session/`, `packages/generalist/src/core/agent/compaction-runtime.ts`, `packages/generalist/src/core/turn/compaction.ts`
-- Site: `/docs/learn/sessions-and-history`, `/docs/guides/compaction`
+- Site: `/docs/sessions`, `/docs/context`
 - Decisions/tradeoffs: [Authoritative session history](../decisions/authoritative-session-history.md)

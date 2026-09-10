@@ -80,12 +80,12 @@ export const qualify = (config: Configuration, host: { readonly runId: string; r
               else requests.conflicts += 1
               return outcome
             }),
-          list: (prefix, cursor) =>
+          list: (prefix, options) =>
             Effect.gen(function* () {
               yield* guard(prefix)
               requests.list += 1
-              if (cursor !== undefined) requests.continuationPages += 1
-              return yield* store.list(prefix, cursor)
+              if (options?.cursor !== undefined) requests.continuationPages += 1
+              return yield* store.list(prefix, options)
             }),
         }),
       ),

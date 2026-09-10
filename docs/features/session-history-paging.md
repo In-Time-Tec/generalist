@@ -73,4 +73,4 @@ SessionHistory.page([e0, e1, e2, e3, e4, e5],
 ## Related
 
 - Source: `packages/generalist/src/core/context/session-history.ts`
-- Site: `/docs/guides/tools/durable-composite-tools`
+- Site: `/docs/sessions`

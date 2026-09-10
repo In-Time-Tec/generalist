@@ -91,4 +91,4 @@ Run lifecycle events still drive turns, tool progress, approvals, and terminal s
 - Source: `packages/generalist/src/unstable/foldkit/`
 - Server contract: [`server.md`](./server.md)
 - Conversation reducer tests: [`unstable/foldkit/chat/conversation.test.ts`](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/unstable/foldkit/chat/conversation.test.ts)
-- Site: `/docs/guides/foldkit-chat`, `/docs/reference/foldkit`
+- Site: `/docs/interfaces`

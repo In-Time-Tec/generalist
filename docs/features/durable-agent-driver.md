@@ -105,5 +105,5 @@ Explicit `Runtime.cancel` first closes admission for the Run tree and marks admi
 ## Related
 
 - Source: `packages/generalist/src/core/durable/driver.ts`, `packages/generalist/src/core/durable/driver/`, `packages/generalist/src/core/durable/manifest/`, `packages/generalist/src/core/durable/run-budget.ts`
-- Site: `/docs/learn/native-runtime`, `/docs/learn/sessions-and-history`
+- Site: `/docs/architecture`, `/docs/durable-sessions`
 - Decisions/tradeoffs: [`runtime-outside-core`](../decisions/runtime-outside-core.md), [`authoritative-session-history`](../decisions/authoritative-session-history.md)

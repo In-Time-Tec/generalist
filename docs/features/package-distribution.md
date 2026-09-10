@@ -101,5 +101,5 @@ The release gate reads `.github/workflows/ci.yml` runs for that exact source com
 ## Related
 
 - Source: `packages/generalist/package.json`, `scripts/package-smoke.ts`, `.github/workflows/publish.yml`
-- Site: `/docs/start/installation`
+- Site: `/docs/quickstart`
 - Decisions/tradeoffs: `../decisions/compiled-packages.md`

@@ -97,8 +97,8 @@ describe("SessionSync.coalesceAdjacentText", () => {
     Effect.gen(function* () {
       const original = multiUser("PROMPT", "\n\n<resolved-context>\nguidance\n</resolved-context>")
       const raw = yield* roundTrip(original)
-      // The unmerged message loses every text part after the first through the lossy string export.
-      expect(textOf(raw)).toBe("PROMPT")
+      // The provider-agnostic export keeps every text part, so both forms survive the round-trip.
+      expect(textOf(raw)).toBe("PROMPT\n\n<resolved-context>\nguidance\n</resolved-context>")
       const coalesced = yield* roundTrip(SessionSync.coalesceAdjacentText(original))
       expect(textOf(coalesced)).toBe("PROMPT\n\n<resolved-context>\nguidance\n</resolved-context>")
     }).pipe(Effect.runPromise))

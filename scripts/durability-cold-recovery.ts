@@ -69,10 +69,10 @@ const measured = (store: Service): Service => ({
       counts.attemptedWriteBytes += bytes.byteLength
       return store.create(key, bytes)
     }),
-  list: (prefix, cursor) =>
+  list: (prefix, options) =>
     Effect.suspend(() => {
       counts.list++
-      return store.list(prefix, cursor)
+      return store.list(prefix, options)
     }),
 })
 

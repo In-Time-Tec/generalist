@@ -42,7 +42,7 @@ const program = Effect.fn("RenderOpenApi.program")(function* (check: boolean) {
 
 const command = Command.make(
   "render-openapi",
-  { check: Flag.boolean("check").pipe(Flag.withDefault(false)) },
+  { check: Flag.Boolean("check").pipe(Flag.withDefault(false)) },
   ({ check }) => program(check),
 )
 

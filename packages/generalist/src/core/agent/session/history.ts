@@ -50,7 +50,7 @@ export const initialChat = (input: {
   readonly suppliedHistory: Prompt.RawInput | undefined
   readonly system: string | undefined
   readonly supplemental?: string | undefined
-}): Effect.Effect<Chat.Service> => {
+}): Effect.Effect<Chat.Chat> => {
   if (Option.isSome(input.sessionHistory))
     return Chat.fromPrompt(
       withDerivedSystem({
@@ -104,7 +104,7 @@ export const replayModelMessages = (input: {
 export const resumeChat = (input: {
   readonly activeSession: Option.Option<SessionStore>
   readonly suppliedHistory: Prompt.RawInput | undefined
-}): Effect.Effect<Chat.Service, import("../../context/session.js").SessionStoreError> => {
+}): Effect.Effect<Chat.Chat, import("../../context/session.js").SessionStoreError> => {
   if (Option.isSome(input.activeSession)) {
     return input.activeSession.value.effectivePath().pipe(Effect.map(buildContext), Effect.flatMap(Chat.fromPrompt))
   }
@@ -113,7 +113,7 @@ export const resumeChat = (input: {
 
 /** @internal Refresh a resumed Session Chat with the system message derived for this Run. */
 export const refreshResumeSystem = (input: {
-  readonly chat: Chat.Service | undefined
+  readonly chat: Chat.Chat | undefined
   readonly activeSession: Option.Option<SessionStore>
   readonly system: string | undefined
   readonly supplemental?: string | undefined

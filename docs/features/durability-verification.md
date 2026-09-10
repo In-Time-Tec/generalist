@@ -3,7 +3,7 @@ title: "Durability verification report"
 description: "Trace the clean-v1 durability invariants and required cases to bounded local evidence and open gates."
 ---
 
-This report maps the durability contract in `PLAN.md` to executable tests. It records local evidence, not a proof of every implementation behavior or certification of AWS S3 or deployed Cloudflare R2.
+This report maps the clean-v1 durability invariants to executable tests. It records local evidence, not a proof of every implementation behavior or certification of AWS S3 or deployed Cloudflare R2.
 
 Statuses mean:
 
@@ -228,6 +228,7 @@ bun node_modules/oxlint/dist/cli.js --deny-warnings \
 
 bun run docs:api:check && bun run docs:build
 # passed: API docs current, Mintlify validation and link checks passed
+# (recorded before the Mintlify cutover; `docs:api:check` no longer exists)
 
 bun run check
 # passed under Bun 1.4.0: build, generated API/docs, formatting, repository rules, oxlint,

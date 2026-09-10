@@ -195,7 +195,7 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
           message: `Partition state and receipts exceed ${maxStateBytes} bytes${reserveBytes === 0 ? "" : ` including ${reserveBytes} bytes reserved for settlement`}`,
         })
     })
-  const listKeys = (namespace: string) =>
+  const listKeys = (namespace: string, startAfter?: string) =>
     Effect.gen(function* () {
       const keys = new Set<string>()
       const cursors = new Set<string>()
@@ -203,15 +203,15 @@ export const make = ({ store, crypto, identity, commitsPrefix, maxStateBytes, ma
       do {
         const page = yield* decode(
           Page,
-          yield* store.list(namespace, cursor).pipe(Effect.mapError(transport)),
+          yield* store.list(namespace, { cursor, startAfter }).pipe(Effect.mapError(transport)),
           "corruption",
           namespace,
         )
         for (const key of page.keys) {
-          if (!key.startsWith(namespace) || keys.has(key)) {
+          if (!key.startsWith(namespace) || keys.has(key) || (startAfter !== undefined && key <= startAfter)) {
             return yield* failure({
               reason: "corruption",
-              message: "Listing contains an out-of-prefix or repeated canonical key",
+              message: "Listing contains an out-of-prefix, repeated, or bounded-out canonical key",
               key,
             })
           }

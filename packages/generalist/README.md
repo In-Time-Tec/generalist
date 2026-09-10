@@ -8,10 +8,10 @@ For scripts and request-local work, use the Effect agent loop without storage or
 
 ## Install
 
-This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/examples.md).
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](https://github.com/In-Time-Tec/generalist/tree/main/examples).
 
 ```bash
-bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
+bun add generalist effect@4.0.0-rc.113 @effect/ai-openai@4.0.0-rc.113
 export OPENAI_API_KEY="your-api-key"
 ```
 
@@ -31,7 +31,7 @@ const assistant = Agent.make({
 })
 
 const model = layerModel({ model: "gpt-4o-mini" }).pipe(
-  Layer.provide(layerConfig({ apiKey: Config.redacted("OPENAI_API_KEY") })),
+  Layer.provide(layerConfig({ apiKey: Config.Redacted("OPENAI_API_KEY") })),
   Layer.provide(FetchHttpClient.layer),
 )
 
@@ -46,16 +46,16 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 
 ## Next steps
 
-- [Architecture](https://github.com/In-Time-Tec/generalist/blob/main/docs/learn/architecture.md): follow system boundaries, object commits, and recovery from the top down.
-- [Offline quickstart](https://github.com/In-Time-Tec/generalist/blob/main/docs/start/quickstart.md): run a tool-calling agent without credentials.
-- [Tools](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/define-tools.md): give an agent functions it can call.
-- [Structured output](https://github.com/In-Time-Tec/generalist/blob/main/docs/guides/structured-output.md): return schema-validated objects.
+- [Architecture](https://github.com/In-Time-Tec/generalist/blob/main/docs/decisions/object-native-state-model.md): system boundaries, object commits, and recovery from the top down.
+- [Offline quickstart](https://github.com/In-Time-Tec/generalist/tree/main/examples/docs-snippets/website): run a tool-calling agent without credentials.
+- [Tools](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/tools-and-authorization.md): give an agent functions it can call.
+- [Structured output](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/structured-output.md): return schema-validated objects.
 - [Object durability](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/durable-stores.md): recover work with the shared object-storage engine and S3 or native R2 transport.
-- [Documentation](https://github.com/In-Time-Tec/generalist/tree/main/docs): guides, examples, and API reference.
+- [Documentation](https://github.com/In-Time-Tec/generalist/tree/main/docs): the documentation site source plus feature, decision, and tradeoff references.
 
 ## Status
 
-Generalist is pre-1.0: APIs can change between releases. Requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
+Generalist is pre-1.0: APIs can change between releases. Requires `effect@4.0.0-rc.113` and Node 22+ or Bun 1.4+. Public exports are `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
 Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Local performance measurements are not production latency or throughput guarantees. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 

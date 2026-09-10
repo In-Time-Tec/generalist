@@ -39,6 +39,7 @@ interface StartFunction {
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)
 
 /** Start an Agent previously registered with the durable Runtime. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const start: StartFunction = dual(
   isDataFirst,
   <

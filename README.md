@@ -10,10 +10,10 @@ Don't need recovery yet? Use the process-local Effect agent loop on its own: cal
 
 ## Run your first agent
 
-This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](docs/start/examples.md).
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](examples/).
 
 ```bash
-bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
+bun add generalist effect@4.0.0-rc.113 @effect/ai-openai@4.0.0-rc.113
 export OPENAI_API_KEY="your-api-key"
 ```
 
@@ -31,7 +31,7 @@ const assistant = Agent.make({
 })
 
 const model = layerModel({ model: "gpt-4o-mini" }).pipe(
-  Layer.provide(layerConfig({ apiKey: Config.redacted("OPENAI_API_KEY") })),
+  Layer.provide(layerConfig({ apiKey: Config.Redacted("OPENAI_API_KEY") })),
   Layer.provide(FetchHttpClient.layer),
 )
 
@@ -44,33 +44,32 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 
 `Agent.make` defines the agent; `Agent.run` returns its answer. The model is an Effect Layer—a recipe for providing the services the run needs. Swap that Layer to use another provider or a scripted model in tests.
 
-**No API key?** The [offline quickstart](docs/start/quickstart.md) runs a tool-calling agent with a scripted model.
+**No API key?** The [documentation site](docs/) has an offline quickstart that runs a tool-calling agent with a scripted model.
 
 ## Build from here
 
-| I want to…                            | Read                                                  |
-| ------------------------------------- | ----------------------------------------------------- |
-| Give an agent functions it can call   | [Tools](docs/guides/define-tools.md)                  |
-| Return a typed object instead of text | [Structured output](docs/guides/structured-output.md) |
-| Stream responses and tool events      | [The agent loop](docs/learn/agent-loop.md)            |
-| Require approval before running tools | [Approvals](docs/guides/approvals.md)                 |
-| Keep context across conversations     | [Memory](docs/guides/memory.md)                       |
-| Test without calling a model API      | [Testing](docs/features/testing.md)                   |
-| Recover work after a restart          | [Durable Runtime](docs/features/runtime.md)           |
+| I want to…                            | Read                                                    |
+| ------------------------------------- | ------------------------------------------------------- |
+| Give an agent functions it can call   | [Tools](docs/features/tools-and-authorization.md)       |
+| Return a typed object instead of text | [Structured output](docs/features/structured-output.md) |
+| Stream responses and tool events      | [The agent loop](docs/features/agent-loop.md)           |
+| Require approval before running tools | [Approvals](docs/features/approvals.md)                 |
+| Keep context across conversations     | [Memory](docs/features/memory.md)                       |
+| Test without calling a model API      | [Testing](docs/features/testing.md)                     |
+| Recover work after a restart          | [Durable Runtime](docs/features/runtime.md)             |
 
 Durable execution uses one object-storage engine through `generalist/durability`, with S3 and native R2 transports. There is no production memory or filesystem durability backend. You do not need storage or Runtime for the process-local agent loop. Start with the [object durability guide](docs/features/durable-stores.md); the [host comparison](docs/features/hosts.md) separates host integration from provider conformance.
 
 ## Documentation and examples
 
-- [Architecture: from system boundaries to commits and recovery](docs/learn/architecture.md)
-- [Getting started](docs/getting-started.md)
-- [Example projects](docs/start/examples.md)
-- [API reference](docs/api/index.md)
+- [Documentation site source](docs/) — the code-first docs (Foldkit + StyleX), run `bun run dev` to preview
+- [Feature reference](docs/features/) · [Decision records](docs/decisions/) · [Tradeoffs](docs/tradeoffs/)
+- [Example projects](examples/)
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ## Status
 
-Generalist is pre-1.0: APIs can change between releases. It currently requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are marked `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
+Generalist is pre-1.0: APIs can change between releases. It currently requires `effect@4.0.0-rc.113` and Node 22+ or Bun 1.4+. Public exports are marked `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
 Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Local performance measurements are not production latency or throughput guarantees. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 

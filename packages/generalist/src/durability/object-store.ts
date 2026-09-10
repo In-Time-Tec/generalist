@@ -214,6 +214,16 @@ export interface ObjectPage {
   readonly cursor?: string
 }
 
+/**
+ * Optional listing bounds. `cursor` resumes an earlier page; `startAfter` restricts every page to
+ * keys strictly after the named key, so a verified immutable prefix never has to be re-listed.
+ * @experimental
+ */
+export interface ListOptions {
+  readonly cursor?: string | undefined
+  readonly startAfter?: string | undefined
+}
+
 /** Required provider guarantees, not inferred from an S3-shaped API. @experimental */
 export interface Capabilities {
   readonly conditionalCreate: true
@@ -226,7 +236,7 @@ export interface Service {
   readonly capabilities: Capabilities
   readonly read: (key: string, options: ReadOptions) => Effect.Effect<StoredObject | undefined, ObjectStoreFailure>
   readonly create: (key: string, bytes: Uint8Array) => Effect.Effect<"created" | "conflict", ObjectStoreFailure>
-  readonly list: (prefix: string, cursor?: string) => Effect.Effect<ObjectPage, ObjectStoreFailure>
+  readonly list: (prefix: string, options?: ListOptions) => Effect.Effect<ObjectPage, ObjectStoreFailure>
 }
 
 /** Runtime credentials need no deletion permission. @experimental */

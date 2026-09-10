@@ -32,5 +32,5 @@ See [`steering.md`](./steering.md) for policies, receipts, replay, bounds, ackno
 ## Related
 
 - Source: `packages/generalist/src/runtime/messaging/`, `packages/generalist/src/runtime/address.ts`, `packages/generalist/src/runtime/execution/agent/directory.ts`
-- Site: `/docs/guides/addressed-messaging`
+- Site: `/docs/messaging`
 - Decision: [Steering consumption is the message ack](../decisions/steering-consumption-is-the-ack.md)
