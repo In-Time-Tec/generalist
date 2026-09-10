@@ -145,7 +145,8 @@ const makeFor = (
             )
             if (resolved === undefined) return
             if (resolved._tag === "Tool") {
-              yield* executeTool({ claim, claimed, store, resolution: resolved, activeOperationIds })
+              const nested = yield* makeOperations({ claim, claimed, store, activeOperationIds })
+              yield* executeTool({ claim, claimed, store, resolution: resolved, activeOperationIds, nested })
               return
             }
             if (resolved._tag === "Program") {
@@ -182,7 +183,7 @@ const makeFor = (
                 )
                 const inheritedSandboxSnapshot =
                   snapshotId === undefined ? undefined : yield* Ref.make<string | undefined>(snapshotId)
-                const nested = yield* makeOperations({ claim, claimed, store })
+                const nested = yield* makeOperations({ claim, claimed, store, activeOperationIds })
                 const budgetContext = { runId, claim, store, nested, codeMode }
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
                 const boundSession = yield* sessionBinding({ store, claim }).pipe(Effect.orDie)

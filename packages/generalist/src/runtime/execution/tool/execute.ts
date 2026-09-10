@@ -8,6 +8,8 @@ import { Approvals } from "../../../core/policy/approvals.js"
 import { AgentExecutionFailure, RunTerminal } from "../../errors.js"
 import type { ToolResolution } from "../../executable/resolver.js"
 import { Input } from "../../hosting/tool-start.js"
+import { Operations } from "../../../core/tools/nested-operation.js"
+import type { Service as NestedOperations } from "../../operation/nested-operations.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../../run/store.js"
 import { approvalReason, type WaitReason } from "../../run/wait.js"
 import type { Request as ApprovalRequest } from "../../operation/approval.js"
@@ -21,6 +23,7 @@ export const executeTool = (input: {
   readonly store: RunStore
   readonly resolution: ToolResolution
   readonly activeOperationIds: Ref.Ref<ReadonlySet<string>>
+  readonly nested: NestedOperations
 }): Effect.Effect<void, never, Scope.Scope> => {
   const { claim, claimed, resolution, store } = input
   const checkpoint = { _tag: "Tool" as const, version: "1" as const }
@@ -69,7 +72,7 @@ export const executeTool = (input: {
       kind: "tool",
       inputDigest: digest(admission.input),
       input: { request: admission.input, ...cancellation },
-      replayPolicy: resolution.pinned.manifest.replay,
+      replayPolicy: resolution.executor.replayPolicy?.(request) ?? resolution.pinned.manifest.replay,
       attempt: claimed.attempt,
       checkpoint,
     })
@@ -193,6 +196,21 @@ export const executeTool = (input: {
           ),
         )
         const validated = yield* Schema.decodeEffect(Outcome)(outcome)
+        if (validated._tag === "Suspend") {
+          const nestedWait = yield* input.nested.waitFor({ token: validated.token })
+          if (nestedWait !== undefined && record.replayPolicy !== "never") {
+            yield* store.expireRunningOperation({
+              ...claim,
+              operationId: record.operationId,
+              commandId: `tool-nested-suspend:${record.operationId}:${claim.attemptFence}`,
+            })
+            yield* Ref.update(
+              input.activeOperationIds,
+              (current) => new Set([...current].filter((id) => id !== record.operationId)),
+            )
+            return yield* suspend(validated.token, nestedWait.reason)
+          }
+        }
         let retained: Outcome = validated
         if (validated._tag === "Success") {
           yield* Schema.decodeEffect(resolution.output)(validated.encodedResult)
@@ -244,5 +262,6 @@ export const executeTool = (input: {
     Effect.catch((error) => (Schema.is(RunTerminal)(error) ? Effect.void : Effect.fail(error))),
     Effect.asVoid,
     Effect.orDie,
+    Effect.provideService(Operations, Operations.of(input.nested)),
   )
 }

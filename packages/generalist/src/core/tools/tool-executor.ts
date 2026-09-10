@@ -33,6 +33,7 @@ export type { ClosedToolSet, DomainFailure, ReplayPolicy, Request, Success, Susp
 import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
 import type { EvaluationFailure } from "../../hooks/index.js"
 import { suspendedFromCause, suspendedOutcome } from "../agent/tools/wake-event.js"
+import { Operations } from "./nested-operation.js"
 
 export type SettledOutcome = Success | DomainFailure
 
@@ -62,7 +63,15 @@ export class ToolExecutor extends Context.Service<ToolExecutor, Service<ToolCont
 ) {}
 const provideExecutorServices = <A, E, R>(effect: Effect.Effect<A, E, R | ToolContext>, context: Context.Context<R>) =>
   Effect.flatMap(ToolContext, (current) =>
-    effect.pipe(Effect.provideContext(Context.add(context, ToolContext, current))),
+    Effect.flatMap(Effect.serviceOption(Operations), (operations) =>
+      effect.pipe(
+        Effect.provideContext(
+          Option.isSome(operations)
+            ? Context.add(Context.add(context, ToolContext, current), Operations, operations.value)
+            : Context.add(context, ToolContext, current),
+        ),
+      ),
+    ),
   )
 
 type ResolvedTool<T extends Tool.Any & SchemaTool> = {
