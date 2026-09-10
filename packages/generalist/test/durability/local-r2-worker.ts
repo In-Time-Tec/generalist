@@ -11,12 +11,32 @@ const cryptoService = Crypto.make({
     }).pipe(Effect.map((buffer) => new Uint8Array(buffer))),
 })
 
+// Miniflare's bundled workerd turns an exact-EOF or out-of-range offset into a malformed 500
+// rather than production R2's InvalidRange (10039). Reproduce the production contract at the
+// harness boundary so the adapter's typed invalid-response mapping is exercised faithfully.
+const faithfulRanges = (bucket: Bucket): Bucket => ({
+  get: (key, options) => {
+    const range = options?.range
+    const read = () => bucket.get(key, options)
+    if (range === undefined) return read()
+    return bucket.get(key).then((probe) => {
+      if (probe === null || range.offset < 0 || range.offset >= probe.size || range.length <= 0) {
+        throw new Error("get: Requested byte range is not satisfiable. (10039)")
+      }
+      return read()
+    })
+  },
+  put: (key, value, options) => bucket.put(key, value, options),
+  list: (options) => bucket.list(options),
+})
+
 export default {
   fetch(request: Request, environment: { readonly BUCKET: Bucket }): Promise<Response> {
     return Effect.gen(function* () {
-      const store = make(environment.BUCKET)
+      const bucket = faithfulRanges(environment.BUCKET)
+      const store = make(bucket)
       if (new URL(request.url).pathname === "/conformance") {
-        yield* objectConformance(Effect.sync(() => make(environment.BUCKET)))
+        yield* objectConformance(Effect.sync(() => make(bucket)))
         return Response.json({ result: "passed" })
       }
       if (new URL(request.url).pathname === "/range-boundaries") {
@@ -35,7 +55,7 @@ export default {
         return Response.json(failures)
       }
       if (new URL(request.url).pathname === "/exercise")
-        return Response.json(yield* exercise(Effect.sync(() => make(environment.BUCKET))))
+        return Response.json(yield* exercise(Effect.sync(() => make(bucket))))
       if (new URL(request.url).pathname === "/contend")
         return Response.json(yield* append({ store, id: "native-interop" }))
       const journal = yield* open(store)

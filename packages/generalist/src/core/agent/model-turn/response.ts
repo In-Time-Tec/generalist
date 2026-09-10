@@ -64,7 +64,7 @@ export const attemptResponse = (input: {
 }
 
 export const replayMessages = (input: {
-  readonly chat: Chat.Chat
+  readonly chat: Chat.Service
   readonly activePrompt: Prompt.Prompt
   readonly replayFromHistory: boolean
 }): Effect.Effect<ReadonlyArray<Prompt.Message>> =>

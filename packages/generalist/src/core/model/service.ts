@@ -7,9 +7,9 @@ import { ToolContext } from "../tools/tool-context.js"
 export type BroadTool = Tool.Tool<
   string,
   {
-    readonly parameters: Schema.Top
-    readonly success: Schema.Top
-    readonly failure: Schema.Top
+    readonly parameters: typeof Schema.Unknown
+    readonly success: typeof Schema.Unknown
+    readonly failure: typeof Schema.Unknown
     readonly failureMode: Tool.FailureMode
   },
   ToolContext
@@ -25,18 +25,15 @@ export type StreamTextOptions = Omit<LanguageModel.GenerateTextOptions<BroadTool
   readonly toolkit?: LanguageModel.ToolkitOption<BroadTools, never, ToolContext | Tool.Handler<string>>
 }
 type BroadGenerateObjectOptions = LanguageModel.GenerateObjectOptions<BroadTools, typeof broadObjectSchema>
-type BroadGenerateTextResponse = LanguageModel.GenerateTextResponse<BroadTools, "opaque">
-type BroadGenerateObjectResponse = LanguageModel.GenerateObjectResponse<BroadTools, unknown, "opaque">
-type BroadStreamPart = Response.StreamPart<BroadTools, "opaque">
-type GenerateTextOptionsWithoutToolkit = Omit<LanguageModel.GenerateTextOptions<Record<string, never>>, "toolkit"> & {
-  readonly toolkit?: undefined
-}
+type BroadGenerateTextResponse = LanguageModel.GenerateTextResponse<BroadTools>
+type BroadGenerateObjectResponse = LanguageModel.GenerateObjectResponse<BroadTools, unknown>
+type BroadStreamPart = Response.StreamPart<BroadTools>
 type BroadGenerateError = LanguageModel.ExtractError<LanguageModel.GenerateTextOptions<BroadTools>>
 type BroadGenerateObjectError = LanguageModel.ExtractError<BroadGenerateObjectOptions>
 
 interface NoToolkitOptions {
-  prompt: GenerateTextOptionsWithoutToolkit["prompt"]
-  concurrency?: GenerateTextOptionsWithoutToolkit["concurrency"]
+  prompt: LanguageModel.GenerateTextOptions<Record<never, never>>["prompt"]
+  concurrency?: LanguageModel.GenerateTextOptions<Record<never, never>>["concurrency"]
   disableToolCallResolution?: boolean
   toolChoice?: "auto" | "none" | "required"
   toolkit: undefined
@@ -76,7 +73,9 @@ export interface Middleware<GenerateError = never, GenerateObjectError = never, 
   readonly streamText?: StreamTextMiddleware<StreamError>
 }
 
-const noToolkitOptions = (options: BroadGenerateTextOptions | StreamTextOptions): GenerateTextOptionsWithoutToolkit => {
+const noToolkitOptions = (
+  options: BroadGenerateTextOptions | StreamTextOptions,
+): LanguageModel.GenerateTextOptions<Record<never, never>> => {
   const result: NoToolkitOptions = { prompt: options.prompt, toolkit: undefined }
   if (options.concurrency !== undefined) result.concurrency = options.concurrency
   if (options.disableToolCallResolution !== undefined) {
@@ -88,98 +87,74 @@ const noToolkitOptions = (options: BroadGenerateTextOptions | StreamTextOptions)
   return result
 }
 
-const invokeGenerateTextImpl = (
-  model: LanguageModel.LanguageModel,
-  options: BroadGenerateTextOptions,
-): Effect.Effect<BroadGenerateTextResponse, BroadGenerateError, ToolContext> => {
+const invokeGenerateTextImpl = (model: LanguageModel.Service, options: BroadGenerateTextOptions) => {
   if (options.toolkit === undefined) {
-    return model
-      .generateText({ ...noToolkitOptions(options), toolkit: undefined })
-      .pipe(Effect.map((response) => new LanguageModel.GenerateTextResponse<BroadTools, "opaque">(response.content)))
+    return model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
   }
   const withToolkit = { ...options, toolkit: options.toolkit }
-  // SAFETY: BroadTool's Schema.Top config surfaces `unknown` service requirements in
-  // ExtractToolServices; the only runtime requirements are the toolkit's ToolContext
-  // and handler services.
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion, effecttsgo/any-unknown-in-error-context
-  return model.generateText<BroadTools, typeof withToolkit>(withToolkit) as Effect.Effect<
-    BroadGenerateTextResponse,
-    BroadGenerateError,
-    ToolContext
-  >
+  return model.generateText<BroadTools, typeof withToolkit>(withToolkit)
 }
 
 export const invokeGenerateText: {
-  (options: BroadGenerateTextOptions): (model: LanguageModel.LanguageModel) => ReturnType<typeof invokeGenerateTextImpl>
-  (model: LanguageModel.LanguageModel, options: BroadGenerateTextOptions): ReturnType<typeof invokeGenerateTextImpl>
+  (options: BroadGenerateTextOptions): (model: LanguageModel.Service) => ReturnType<typeof invokeGenerateTextImpl>
+  (model: LanguageModel.Service, options: BroadGenerateTextOptions): ReturnType<typeof invokeGenerateTextImpl>
 } = Function.dual(2, invokeGenerateTextImpl)
 
 const invokeGenerateObjectImpl = (
-  model: LanguageModel.LanguageModel,
+  model: LanguageModel.Service,
   options: BroadGenerateObjectOptions,
 ): Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError, ToolContext> => model.generateObject(options)
 
 export const invokeGenerateObject: {
-  (
-    options: BroadGenerateObjectOptions,
-  ): (model: LanguageModel.LanguageModel) => ReturnType<typeof invokeGenerateObjectImpl>
-  (model: LanguageModel.LanguageModel, options: BroadGenerateObjectOptions): ReturnType<typeof invokeGenerateObjectImpl>
+  (options: BroadGenerateObjectOptions): (model: LanguageModel.Service) => ReturnType<typeof invokeGenerateObjectImpl>
+  (model: LanguageModel.Service, options: BroadGenerateObjectOptions): ReturnType<typeof invokeGenerateObjectImpl>
 } = Function.dual(2, invokeGenerateObjectImpl)
 
-const invokeStreamTextImpl = (
-  model: LanguageModel.LanguageModel,
-  options: StreamTextOptions,
-): Stream.Stream<BroadStreamPart, BroadGenerateError, ToolContext | Tool.Handler<string>> => {
+const invokeStreamTextImpl = (model: LanguageModel.Service, options: StreamTextOptions) => {
   if (options.toolkit === undefined) {
     return model.streamText({ ...noToolkitOptions(options), toolkit: undefined })
   }
   const withToolkit = { ...options, toolkit: options.toolkit }
-  // SAFETY: BroadTool's Schema.Top config surfaces `unknown` service requirements in
-  // ExtractToolServices; the only runtime requirements are the toolkit's ToolContext
-  // and handler services.
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion, effecttsgo/any-unknown-in-error-context
-  return model.streamText<BroadTools, typeof withToolkit>(withToolkit) as Stream.Stream<
-    BroadStreamPart,
-    BroadGenerateError,
-    ToolContext | Tool.Handler<string>
-  >
+  return model.streamText<BroadTools, typeof withToolkit>(withToolkit)
 }
 
 export const invokeStreamText: {
-  (options: StreamTextOptions): (model: LanguageModel.LanguageModel) => ReturnType<typeof invokeStreamTextImpl>
-  (model: LanguageModel.LanguageModel, options: StreamTextOptions): ReturnType<typeof invokeStreamTextImpl>
+  (options: StreamTextOptions): (model: LanguageModel.Service) => ReturnType<typeof invokeStreamTextImpl>
+  (model: LanguageModel.Service, options: StreamTextOptions): ReturnType<typeof invokeStreamTextImpl>
 } = Function.dual(2, invokeStreamTextImpl)
 
 /** @internal Adapt all three LanguageModel operations without re-declaring their implementation overloads. */
-type MetadataCopier = (source: LanguageModel.LanguageModel, target: LanguageModel.LanguageModel) => void
+type MetadataCopier = (source: LanguageModel.Service, target: LanguageModel.Service) => void
 const metadataCopiers: Array<MetadataCopier> = []
 
 export const registerMetadataCopier = (copier: MetadataCopier): void => {
   metadataCopiers.push(copier)
 }
 
-const copyMetadata = (source: LanguageModel.LanguageModel, target: LanguageModel.LanguageModel): void => {
+const copyMetadata = (source: LanguageModel.Service, target: LanguageModel.Service): void => {
   for (const copier of metadataCopiers) copier(source, target)
 }
 
 export const adapt: {
   <GenerateError = never, GenerateObjectError = never, StreamError = never>(
     middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
-  ): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
+  ): (model: LanguageModel.Service) => LanguageModel.Service
   <GenerateError = never, GenerateObjectError = never, StreamError = never>(
-    model: LanguageModel.LanguageModel,
+    model: LanguageModel.Service,
     middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
-  ): LanguageModel.LanguageModel
+  ): LanguageModel.Service
 } = Function.dual(
   2,
   <GenerateError = never, GenerateObjectError = never, StreamError = never>(
-    model: LanguageModel.LanguageModel,
+    model: LanguageModel.Service,
     middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
-  ): LanguageModel.LanguageModel => {
-    function generateText<Options extends NoExcessProperties<GenerateTextOptionsWithoutToolkit, Options>>(
-      options: Options & GenerateTextOptionsWithoutToolkit,
+  ): LanguageModel.Service => {
+    function generateText<
+      Options extends NoExcessProperties<LanguageModel.GenerateTextOptions<Record<never, never>>, Options>,
+    >(
+      options: Options & { readonly toolkit?: undefined } & LanguageModel.GenerateTextOptions<Record<never, never>>,
     ): Effect.Effect<
-      LanguageModel.GenerateTextResponse<Record<string, never>>,
+      LanguageModel.GenerateTextResponse<Record<never, never>>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options>
     >
@@ -195,7 +170,7 @@ export const adapt: {
           readonly toolkit: LanguageModel.ToolkitInput<Tools>
         },
     ): Effect.Effect<
-      LanguageModel.GenerateTextResponse<Tools, LanguageModel.ExtractToolParametersMode<Options>>,
+      LanguageModel.GenerateTextResponse<Tools>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options>
     >
@@ -209,30 +184,21 @@ export const adapt: {
           readonly toolkit: Options["toolkit"]
         },
     ): Effect.Effect<
-      LanguageModel.GenerateTextResponse<
-        LanguageModel.ExtractTools<Options>,
-        LanguageModel.ExtractToolParametersMode<Options>
-      >,
+      LanguageModel.GenerateTextResponse<LanguageModel.ExtractTools<Options>>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options>
     >
-    function generateText(
-      options: BroadGenerateTextOptions,
-    ): Effect.Effect<
-      | LanguageModel.GenerateTextResponse<Record<string, never>>
-      | LanguageModel.GenerateTextResponse<Record<string, Tool.Any>, "encoded">
-      | LanguageModel.GenerateTextResponse<Record<string, Tool.Any>, "opaque">,
-      BroadGenerateError | GenerateError,
-      ToolContext
-    > {
+    function generateText(options: BroadGenerateTextOptions) {
       const invoke = (input = options) => invokeGenerateText(model, input)
       return middleware.generateText === undefined ? invoke() : middleware.generateText(options, invoke)
     }
 
-    function streamText<Options extends NoExcessProperties<GenerateTextOptionsWithoutToolkit, Options>>(
-      options: Options & GenerateTextOptionsWithoutToolkit,
+    function streamText<
+      Options extends NoExcessProperties<LanguageModel.GenerateTextOptions<Record<never, never>>, Options>,
+    >(
+      options: Options & { readonly toolkit?: undefined } & LanguageModel.GenerateTextOptions<Record<never, never>>,
     ): Stream.Stream<
-      Response.StreamPart<Record<string, never>>,
+      Response.StreamPart<Record<never, never>>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options>
     >
@@ -248,7 +214,7 @@ export const adapt: {
           readonly toolkit: LanguageModel.ToolkitInput<Tools>
         },
     ): Stream.Stream<
-      Response.StreamPart<Tools, LanguageModel.ExtractToolParametersMode<Options>>,
+      Response.StreamPart<Tools>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options>
     >
@@ -262,7 +228,7 @@ export const adapt: {
           readonly toolkit: Options["toolkit"]
         },
     ): Stream.Stream<
-      Response.StreamPart<LanguageModel.ExtractTools<Options>, LanguageModel.ExtractToolParametersMode<Options>>,
+      Response.StreamPart<LanguageModel.ExtractTools<Options>>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options>
     >
@@ -278,15 +244,11 @@ export const adapt: {
         LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
         Options
       >,
-      Tools extends Record<string, Tool.Any> = Record<string, never>,
+      Tools extends Record<string, Tool.Any> = Record<never, never>,
     >(
       options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
     ): Effect.Effect<
-      LanguageModel.GenerateObjectResponse<
-        Tools,
-        StructuredOutputSchema["Type"],
-        LanguageModel.ExtractToolParametersMode<Options>
-      >,
+      LanguageModel.GenerateObjectResponse<Tools, StructuredOutputSchema["Type"]>,
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options> | SchemaServices<StructuredOutputSchema>
     >

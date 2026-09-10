@@ -665,7 +665,7 @@ const program = Effect.gen(function* () {
     ),
   )
   const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "generalist-package-smoke-" })
-  const configuredArtifactDirectory = yield* Config.option(Config.String("PACKAGE_ARTIFACT_DIR"))
+  const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
     onNone: () => path.join(directory, "packages"),
     onSome: path.resolve,
@@ -892,7 +892,7 @@ const program = Effect.gen(function* () {
         typescript: consumerVersions.typescript,
       },
       /**
-       * FoldKit 0.148.2 still declares rc.109, so its targeted override proves the current rc.113
+       * FoldKit 0.148.2 still declares rc.109, so its targeted override proves the current rc.112
        * runtime instead of disabling peer resolution for the whole consumer. Vite DevTools declares
        * a wildcard Vitest peer, so keep npm on the consumer's pinned Vitest instead of its latest peer graph.
        */
@@ -992,7 +992,7 @@ const layers = [
   }),
 ]
 if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Host layer does not use the root Effect identity")
-if (!Layer.isLayer(OpenAI.layer({ model: "gpt-4o-mini", apiKey: Config.Redacted("OPENAI_API_KEY") }))) {
+if (!Layer.isLayer(OpenAI.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
   throw new Error("provider constructor does not use the root Layer identity")
 }
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {

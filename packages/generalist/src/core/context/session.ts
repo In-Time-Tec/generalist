@@ -12,7 +12,7 @@ export type BaseEntry = { readonly id: EntryId; readonly parentId: EntryId | nul
 /** A verbatim conversation message. */
 export type MessageEntry = BaseEntry & { readonly _tag: "Message"; readonly message: Prompt.Message }
 const ModelToolCall = Schema.Struct({
-  "~effect/ai/Response/Part": Response.TextPart.fields["~effect/ai/Response/Part"],
+  "~effect/ai/Content/Part": Response.TextPart.fields["~effect/ai/Content/Part"],
   type: Schema.Literal("tool-call"),
   id: Schema.String,
   name: Schema.String,
@@ -39,7 +39,7 @@ const ModelFinishPart = Schema.Struct({
   response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
 })
 const ModelToolResult = Schema.Struct({
-  "~effect/ai/Response/Part": Response.TextPart.fields["~effect/ai/Response/Part"],
+  "~effect/ai/Content/Part": Response.TextPart.fields["~effect/ai/Content/Part"],
   type: Schema.Literal("tool-result"),
   id: Schema.String,
   name: Schema.String,

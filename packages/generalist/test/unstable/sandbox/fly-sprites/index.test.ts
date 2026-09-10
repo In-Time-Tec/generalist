@@ -200,16 +200,16 @@ it.effect("maps Fly Sprites protocol and provider failures", () =>
 )
 
 const spritesToken = Effect.runSync(
-  Config.option(Config.String("SPRITES_TOKEN")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.string("SPRITES_TOKEN")).pipe(Effect.map(Option.getOrUndefined)),
 )
-const spritesApp = Effect.runSync(Config.option(Config.String("SPRITES_APP")).pipe(Effect.map(Option.getOrUndefined)))
+const spritesApp = Effect.runSync(Config.option(Config.string("SPRITES_APP")).pipe(Effect.map(Option.getOrUndefined)))
 
 describe.skipIf(spritesToken === undefined || spritesApp === undefined)("Fly Sprites live Sandbox", () => {
   if (spritesApp === undefined) return
   Testing.sandbox({
     name: "Fly Sprites",
     isolation: "microvm",
-    layer: layer({ token: Config.Redacted("SPRITES_TOKEN"), app: spritesApp }).pipe(
+    layer: layer({ token: Config.redacted("SPRITES_TOKEN"), app: spritesApp }).pipe(
       Layer.provide(FetchHttpClient.layer),
     ),
   })

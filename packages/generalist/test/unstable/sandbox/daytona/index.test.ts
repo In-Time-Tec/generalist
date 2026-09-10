@@ -196,7 +196,7 @@ it.effect("rejects a mismatching Daytona class and maps command failures", () =>
 )
 
 const daytonaApiKey = Effect.runSync(
-  Config.option(Config.String("DAYTONA_API_KEY")).pipe(Effect.map(Option.getOrUndefined)),
+  Config.option(Config.string("DAYTONA_API_KEY")).pipe(Effect.map(Option.getOrUndefined)),
 )
 
 describe.skipIf(daytonaApiKey === undefined)("Daytona live Sandbox", () => {
@@ -204,7 +204,7 @@ describe.skipIf(daytonaApiKey === undefined)("Daytona live Sandbox", () => {
     name: "Daytona container",
     isolation: "container",
     layer: layer({
-      apiKey: Config.Redacted("DAYTONA_API_KEY"),
+      apiKey: Config.redacted("DAYTONA_API_KEY"),
       image: "ubuntu:22.04",
       sandboxClass: "container",
     }).pipe(Layer.provide(FetchHttpClient.layer)),

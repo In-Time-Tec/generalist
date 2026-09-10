@@ -126,7 +126,7 @@ import { Config } from "effect"
 import { layerSupermemory } from "generalist/memory"
 
 const memory = layerSupermemory({
-  apiKey: Config.Redacted("SUPERMEMORY_API_KEY"),
+  apiKey: Config.redacted("SUPERMEMORY_API_KEY"),
   containerTag: "session:user-ada",
 })
 ```

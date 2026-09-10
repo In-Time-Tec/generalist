@@ -197,7 +197,6 @@ const cloneToolkit = <Tools extends Record<string, Tool.Any>>(
 }
 
 /** Close one Agent over the exact environment it requires. */
-// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const close: {
   <Tools extends Record<string, Tool.Any>, R>(
     environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,

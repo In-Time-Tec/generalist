@@ -21,7 +21,7 @@ The agent and memory code are provider-independent. To use OpenRouter instead, r
 import { layerConfig, layerModel } from "generalist/providers/openrouter"
 
 const model = layerModel({ model: "openai/gpt-4o-mini" }).pipe(
-  Layer.provide(layerConfig({ apiKey: Config.Redacted("OPENROUTER_API_KEY") })),
+  Layer.provide(layerConfig({ apiKey: Config.redacted("OPENROUTER_API_KEY") })),
   Layer.provide(FetchHttpClient.layer),
 )
 ```

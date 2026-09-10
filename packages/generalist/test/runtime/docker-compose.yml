@@ -1,0 +1,33 @@
+name: generalist-runtime-tests
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: generalist
+      POSTGRES_PASSWORD: generalist
+      POSTGRES_DB: generalist
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U generalist -d generalist"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: generalist
+      MYSQL_DATABASE: generalist
+      MYSQL_USER: generalist
+      MYSQL_PASSWORD: generalist
+    ports:
+      - "33306:3306"
+    volumes:
+      - ./mysql-test-databases.sql:/docker-entrypoint-initdb.d/10-test-databases.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ugeneralist", "-pgeneralist"]
+      interval: 1s
+      timeout: 3s
+      retries: 60

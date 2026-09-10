@@ -37,7 +37,7 @@ export const projectCommittedResponse = (input: {
   readonly responseAuthority: ResponseAuthority | undefined
   readonly activeModelResponse: Option.Option<ActiveModelResponse>
   readonly state: AgentRunState
-  readonly chat: Chat.Chat
+  readonly chat: Chat.Service
 }): Effect.Effect<Stream.Stream<Event, RunError>, never, DriverInterpreter> =>
   Effect.gen(function* () {
     input.state.text = `${input.state.text}${modelResponseText(input.attempt.response)}`

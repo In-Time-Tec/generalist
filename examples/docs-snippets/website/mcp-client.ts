@@ -26,7 +26,7 @@ const program = Effect.gen(function* () {
 })
 
 const connection = Layer.unwrap(
-  Config.String("MCP_URL").pipe(
+  Config.string("MCP_URL").pipe(
     Config.withDefault("http://127.0.0.1:4323/mcp"),
     Effect.map((url) => httpClient({ name: "repository", transport: { url } })),
   ),

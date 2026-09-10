@@ -3,7 +3,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/
 import { Server } from "generalist/server"
 
 const program = Effect.gen(function* () {
-  const sessionId = yield* Config.String("SESSION_ID")
+  const sessionId = yield* Config.string("SESSION_ID")
   const client = yield* Server.client({ baseUrl: "http://localhost:4000" })
   const approval = yield* client.events.subscribe({ sessionId }).pipe(
     Stream.filter((event) => event._tag === "ApprovalRequested"),
@@ -32,7 +32,7 @@ const authenticatedLayer = Layer.effect(
   HttpClient.HttpClient,
   Effect.gen(function* () {
     const base = yield* HttpClient.HttpClient
-    const token = yield* Config.Redacted("GENERALIST_SERVER_TOKEN")
+    const token = yield* Config.redacted("GENERALIST_SERVER_TOKEN")
     return base.pipe(HttpClient.mapRequest(HttpClientRequest.bearerToken(Redacted.value(token))))
   }),
 ).pipe(Layer.provide(FetchHttpClient.layer))

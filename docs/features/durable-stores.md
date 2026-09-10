@@ -28,7 +28,7 @@ The local pins are MinIO `RELEASE.2025-04-22T22-12-26Z`, Miniflare `5.20260811.1
 - A compatible executable build and its pinned resolver registrations. The bucket cannot reconstruct arbitrary application code or replace credentials for external services.
 
 ```bash
-bun add generalist effect@4.0.0-rc.113 @effect/platform-bun@4.0.0-rc.113 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
+bun add generalist effect@4.0.0-rc.112 @effect/platform-bun@4.0.0-rc.112 @aws-sdk/client-s3@3.1124.0 @smithy/fetch-http-handler@5.7.2
 export GENERALIST_BUCKET="your-generalist-bucket"
 export AWS_REGION="us-east-1"
 export AWS_ACCESS_KEY_ID="your-access-key"
@@ -56,13 +56,13 @@ import * as TestModel from "generalist/testing/model"
 const assistant = Agent.make({ name: "durability-demo" })
 const services = Layer.unwrap(
   Effect.gen(function* () {
-    const bucket = yield* Config.String("GENERALIST_BUCKET")
-    const region = yield* Config.String("AWS_REGION")
-    const accessKeyId = yield* Config.String("AWS_ACCESS_KEY_ID")
-    const secretAccessKey = yield* Config.String("AWS_SECRET_ACCESS_KEY")
-    const environment = yield* Config.String("GENERALIST_ENVIRONMENT")
-    const tenant = yield* Config.String("GENERALIST_TENANT")
-    const partition = yield* Config.String("GENERALIST_PARTITION")
+    const bucket = yield* Config.string("GENERALIST_BUCKET")
+    const region = yield* Config.string("AWS_REGION")
+    const accessKeyId = yield* Config.string("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = yield* Config.string("AWS_SECRET_ACCESS_KEY")
+    const environment = yield* Config.string("GENERALIST_ENVIRONMENT")
+    const tenant = yield* Config.string("GENERALIST_TENANT")
+    const partition = yield* Config.string("GENERALIST_PARTITION")
     const storage = Layer.merge(
       S3.layer({ bucket, region, credentials: { accessKeyId, secretAccessKey } }),
       BunCrypto.layer,

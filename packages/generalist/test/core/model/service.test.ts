@@ -3,9 +3,9 @@ import { LanguageModel, Tool, Toolkit } from "effect/unstable/ai"
 import { expectTypeOf, it } from "vitest"
 import { adapt } from "../../../src/core/model/service.js"
 
-const apiContract = (model: LanguageModel.LanguageModel) => {
+const apiContract = (model: LanguageModel.Service) => {
   const service = adapt(model, {})
-  const exact: LanguageModel.LanguageModel = service
+  const exact: LanguageModel.Service = service
   const plain = exact.generateText({ prompt: "plain" })
   const streamed = exact.streamText({ prompt: "streamed" })
   const object = exact.generateObject({ prompt: "object", schema: Schema.Struct({ value: Schema.String }) })
@@ -15,6 +15,6 @@ const apiContract = (model: LanguageModel.LanguageModel) => {
   return [plain, streamed, object, withToolkit, withToolkitStream]
 }
 
-it("preserves the LanguageModel.LanguageModel overload contract", () => {
+it("preserves the LanguageModel.Service overload contract", () => {
   expectTypeOf(apiContract).toBeFunction()
 })

@@ -10,7 +10,7 @@ import { LanguageModel } from "effect/unstable/ai"
 import { layerConfig as openAiClient, layerModel as openAiModel } from "generalist/providers/openai"
 import { FetchHttpClient } from "effect/unstable/http"
 
-const openAi = openAiClient({ apiKey: Config.Redacted("OPENAI_API_KEY") })
+const openAi = openAiClient({ apiKey: Config.redacted("OPENAI_API_KEY") })
 const sol = openAiModel({ model: "gpt-4o-mini" }).pipe(Layer.provide(openAi))
 
 const program = LanguageModel.generateText({ prompt: "Summarize the incident." }).pipe(

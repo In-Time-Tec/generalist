@@ -71,7 +71,7 @@ export interface RunLoopContext<
   readonly agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>
   readonly options: import("../service.js").RunOptions
   readonly state: import("../run-state.js").AgentRunState
-  readonly chat: Chat.Chat
+  readonly chat: Chat.Service
   readonly chain: ReadonlyArray<Middleware>
   readonly activeSession: Option.Option<SessionStore>
   readonly memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined

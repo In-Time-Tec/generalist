@@ -272,9 +272,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     }
                     const cachedPrompt = yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock)
-                    // Cache-breakpoint marks are wire-only: the prompt persisted for child
-                    // history must stay unmarked so provider hints never leak into storage.
-                    yield* Ref.set(context.lastWirePrompt, responsePrompt)
+                    yield* Ref.set(context.lastWirePrompt, cachedPrompt)
                     const wirePrompt = yield* resolveMediaPrompt({
                       prompt: cachedPrompt,
                       turn,

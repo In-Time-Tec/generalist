@@ -440,7 +440,7 @@ describe("providers", () => {
             openAiLayerOrDeterministic({
               model: "gpt-test",
               fallbackModel: "fallback",
-              apiKey: Config.Redacted("OPENAI_API_KEY"),
+              apiKey: Config.redacted("OPENAI_API_KEY"),
             }),
           ),
         ),
@@ -491,7 +491,7 @@ describe("providers", () => {
     const fallbackLayer = openAiLayerOrDeterministic({
       model: "gpt-test",
       fallbackModel: "fallback",
-      apiKey: Config.Redacted("OPENAI_API_KEY"),
+      apiKey: Config.redacted("OPENAI_API_KEY"),
     })
     const registrations = Effect.scoped(
       Layer.build(fallbackLayer).pipe(
@@ -520,7 +520,7 @@ describe("providers", () => {
             openAiLayerOrDeterministic({
               model: "gpt-test",
               fallbackModel: "fallback",
-              apiKey: Config.Finite("OPENAI_API_KEY").pipe(Config.map((value) => Redacted.make(String(value)))),
+              apiKey: Config.finite("OPENAI_API_KEY").pipe(Config.map((value) => Redacted.make(String(value)))),
             }),
           ),
         ),
@@ -737,7 +737,7 @@ describe("providers", () => {
     Effect.gen(function* () {
       const apiKeyReads = yield* Ref.make(0)
       const countedApiKey = apiKey.pipe(
-        Config.mapEffect((value) => Ref.updateAndGet(apiKeyReads, (count) => count + 1).pipe(Effect.as(value))),
+        Config.mapOrFail((value) => Ref.updateAndGet(apiKeyReads, (count) => count + 1).pipe(Effect.as(value))),
       )
       const registered = yield* Effect.scoped(
         Layer.build(

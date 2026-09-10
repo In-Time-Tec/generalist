@@ -63,14 +63,19 @@ export const make =
     const decoding = new WeakMap<SchemaAST.AST, WeakMap<object, unknown>>()
     const encoding = new WeakMap<SchemaAST.AST, WeakMap<object, unknown>>()
     const parser =
-      (caches: WeakMap<SchemaAST.AST, WeakMap<object, unknown>>, onExcessProperty: "error" | undefined) =>
-      ([ast]: ReadonlyArray<SchemaAST.AST>) => {
+      (
+        caches: WeakMap<SchemaAST.AST, WeakMap<object, unknown>>,
+        onExcessProperty: "error" | undefined,
+      ): SchemaAST.DeclarationRun =>
+      ([ast]) => {
         const cache = caches.get(ast!) ?? new WeakMap<object, unknown>()
         caches.set(ast!, cache)
         const decode = SchemaParser.decodeUnknownEffect(Schema.make<Schema.Codec<unknown>>(ast!))
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- a Declaration run receives unparsed input by contract; `decode` applies the schema below.
-        return (input: unknown, _self: SchemaAST.Declaration, options: SchemaAST.ParseOptions) => {
-          const cacheable = options.onExcessProperty === onExcessProperty && options.disableChecks !== true
+        return (input, _self, options) => {
+          const cacheable =
+            options.onExcessProperty === onExcessProperty &&
+            options.disableChecks !== true &&
+            options.propertyOrder !== "original"
           const privateInput = Predicate.isObjectOrArray(input) && (owned === undefined || owned.has(input))
           if (cacheable && privateInput && cache.has(input)) {
             return Effect.succeed(cache.get(input))

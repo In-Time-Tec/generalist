@@ -13,7 +13,7 @@ describe("Effect Workflow substrate decision", () => {
       ([name]) => name === "effect" || (name.startsWith("@effect/") && name !== "@effect/tsgo"),
     )
 
-    expect(version).toBe("4.0.0-rc.113")
+    expect(version).toBe("4.0.0-rc.112")
     expect(effectManifest.version).toBe(version)
     expect(new Set(cohort.map(([name]) => name))).toEqual(
       new Set([

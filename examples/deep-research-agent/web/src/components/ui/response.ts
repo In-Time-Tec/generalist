@@ -12,7 +12,6 @@ import { cn, type SlotConfig } from "@/lib/styling"
  * port ships the container styling only and the consumer supplies
  * already-rendered children (or plain text through `responseText`).
  */
-// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const response: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
@@ -32,7 +31,6 @@ export const response: {
 )
 
 /** Plain streamed text convenience: renders the raw text with preserved whitespace and line breaks. */
-// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const responseText: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, text: string): Html
   <ParentMessage>(text: string): (config: SlotConfig<ParentMessage>) => Html

@@ -404,18 +404,11 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
   )
 
 export const attemptModel: {
-  (
-    context: CallContext,
-    identity?: CandidateIdentity,
-  ): (model: LanguageModel.LanguageModel) => LanguageModel.LanguageModel
-  (model: LanguageModel.LanguageModel, context: CallContext, identity?: CandidateIdentity): LanguageModel.LanguageModel
+  (context: CallContext, identity?: CandidateIdentity): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, context: CallContext, identity?: CandidateIdentity): LanguageModel.Service
 } = Function.dual(
   (args) => args.length === 3 || !("modelCallId" in args[0]),
-  (
-    model: LanguageModel.LanguageModel,
-    context: CallContext,
-    identity?: CandidateIdentity,
-  ): LanguageModel.LanguageModel =>
+  (model: LanguageModel.Service, context: CallContext, identity?: CandidateIdentity): LanguageModel.Service =>
     adapt<
       AiError.AiError | InvocationLifecycleFailed,
       AiError.AiError | InvocationLifecycleFailed,

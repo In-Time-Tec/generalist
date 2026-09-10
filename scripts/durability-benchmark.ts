@@ -567,9 +567,9 @@ const program = Effect.gen(function* () {
   yield* assertRequestAccounting("idleReconciliation", idleRequests)
   yield* assertWorkloadAccounting({ idle: idleRequests, cas: casContentionRequests, timeout: timeoutWakeRequests })
   const memoryAfter = yield* hostMemory()
-  const sourceCommit = yield* Config.String("GENERALIST_BENCHMARK_SOURCE_COMMIT").pipe(Config.withDefault("unprovided"))
-  const sourceDirty = yield* Config.String("GENERALIST_BENCHMARK_SOURCE_DIRTY").pipe(Config.withDefault("unprovided"))
-  const scriptSha256 = yield* Config.String("GENERALIST_BENCHMARK_SCRIPT_SHA256").pipe(Config.withDefault("unprovided"))
+  const sourceCommit = yield* Config.string("GENERALIST_BENCHMARK_SOURCE_COMMIT").pipe(Config.withDefault("unprovided"))
+  const sourceDirty = yield* Config.string("GENERALIST_BENCHMARK_SOURCE_DIRTY").pipe(Config.withDefault("unprovided"))
+  const scriptSha256 = yield* Config.string("GENERALIST_BENCHMARK_SCRIPT_SHA256").pipe(Config.withDefault("unprovided"))
 
   const report = {
     schemaVersion: 2,

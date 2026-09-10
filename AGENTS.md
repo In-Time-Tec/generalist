@@ -94,7 +94,7 @@ bun --bun vitest run \
 
 The object Runtime entrypoint also registers the branch-evidence suite.
 
-Local transport qualification runs `packages/generalist/test/durability/object-store.test.ts` against MinIO and the pinned Miniflare/workerd runtime, including restart and shared-bucket native/S3 gateway cases. The committed Miniflare exact-EOF range patch is part of that local evidence; it does not certify AWS S3 or deployed R2. Do not request cloud credentials or run remote qualification as part of local acceptance. Preserve protocol assumptions, seeds, runtime versions, and workload bounds with verification results; performance and full acceptance require their own evidence.
+Local transport qualification runs `packages/generalist/test/durability/object-store.test.ts` against MinIO and the pinned Miniflare/workerd runtime, including restart and shared-bucket native/S3 gateway cases. The local Miniflare harness enforces production R2's exact-EOF range rejection in `test/durability/local-r2-worker.ts`; it does not certify AWS S3 or deployed R2. Do not request cloud credentials or run remote qualification as part of local acceptance. Preserve protocol assumptions, seeds, runtime versions, and workload bounds with verification results; performance and full acceptance require their own evidence.
 
 ## Release
 

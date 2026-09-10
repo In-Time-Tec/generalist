@@ -64,7 +64,7 @@ export const withCompactionLifecycle: {
 )
 
 /** The active model wrapped with the enclosing run's telemetry, when present. */
-export const summaryLanguageModel: Effect.Effect<LanguageModel.LanguageModel, never, LanguageModel.LanguageModel> =
+export const summaryLanguageModel: Effect.Effect<LanguageModel.Service, never, LanguageModel.LanguageModel> =
   Effect.gen(function* () {
     const instrumentation = yield* CurrentInstrumentation
     const model = yield* LanguageModel.LanguageModel

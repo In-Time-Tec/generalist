@@ -17,7 +17,6 @@ interface EncodeFunction {
 }
 
 /** @internal Encode an Agent input Schema value into the Effect AI prompt representation. */
-// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- dual API: conditional generic overloads that the checker cannot pair
 export const encode: EncodeFunction = dual(
   2,
   <InputCodec extends Schema.Top>(schema: InputCodec, input: InputCodec["Type"]) =>

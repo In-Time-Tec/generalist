@@ -70,7 +70,7 @@ const normalizePrompt = Effect.fnUntraced(function* (input: Prompt.RawInput) {
 
 const normalizeOptions = <Options extends { readonly prompt: Prompt.RawInput }>(options: Options) =>
   Effect.map(normalizePrompt(options.prompt), (prompt) => ({ ...options, prompt }))
-export const conformImageSourceModel = (model: LanguageModel.LanguageModel): LanguageModel.LanguageModel =>
+export const conformImageSourceModel = (model: LanguageModel.Service): LanguageModel.Service =>
   adapt<AiError.AiError, AiError.AiError, AiError.AiError>(model, {
     generateText: (options, invoke) => Effect.flatMap(normalizeOptions(options), (normalized) => invoke(normalized)),
     generateObject: (options, invoke) => Effect.flatMap(normalizeOptions(options), (normalized) => invoke(normalized)),
