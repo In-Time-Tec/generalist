@@ -11,6 +11,7 @@ import {
   Hooks,
   Memory,
   ModelMiddleware,
+  NestedOperation,
   ToolContext,
   ToolExecutor,
   ToolPlacement,
@@ -449,6 +450,52 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             .pipe(Effect.provideService(ToolContext.ToolContext, context))
           expect(cancelled).toMatchObject({ _tag: "AlreadyTerminal", outcome: result })
         }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.layerRouter keeps invocation Operations instead of its captured service", () => {
+    let capturedCalls = 0
+    let invocationCalls = 0
+    const captured = NestedOperation.Operations.of({
+      run: (_request, effect) =>
+        Effect.sync(() => {
+          capturedCalls += 1
+        }).pipe(Effect.andThen(effect)),
+    })
+    const invocation = NestedOperation.Operations.of({
+      run: (_request, effect) =>
+        Effect.sync(() => {
+          invocationCalls += 1
+        }).pipe(Effect.andThen(effect)),
+    })
+    const routed = ToolExecutor.route<NestedOperation.Operations | ToolContext.ToolContext>({
+      tools: ["nested-context"],
+      execute: () =>
+        NestedOperation.run({ kind: "check", payload: {}, replayPolicy: "never" }, Effect.succeed("invocation")).pipe(
+          Effect.map((value) => ({ _tag: "Success" as const, result: value, encodedResult: value })),
+          Effect.mapError(() =>
+            ToolExecutor.FrameworkFailure.make({
+              stage: "handler",
+              tool: "nested-context",
+              message: "nested context failed",
+            }),
+          ),
+        ),
+    })
+    return [
+      ToolExecutor.layerRouter([routed]).pipe(
+        Layer.provide(NestedOperation.layerTest(captured)),
+        Layer.provideMerge(ToolContext.layerDefault),
+      ),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const result = yield* executor
+          .execute(request("nested-context", {}))
+          .pipe(Effect.provideService(NestedOperation.Operations, invocation))
+        expect(result).toMatchObject({ result: "invocation" })
+        expect(invocationCalls).toBe(1)
+        expect(capturedCalls).toBe(0)
       }),
     ] as const
   })

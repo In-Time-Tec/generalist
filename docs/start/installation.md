@@ -6,13 +6,13 @@ description: "Install Generalist and the dependencies for your model provider or
 Start with `generalist` and its matching `effect` version. Add provider or storage dependencies only when you use those integrations.
 
 <Warning>
-These instructions target Generalist 0.65.2. Use the [repository examples](/start/examples) to run directly from a checkout. Do not substitute an older release and assume the same APIs.
+These instructions target Generalist 0.65.3. Use the [repository examples](/start/examples) to run directly from a checkout. Do not substitute an older release and assume the same APIs.
 </Warning>
 
 **Terminal**
 
 ```bash
-bun add effect@4.0.0-rc.112 generalist@0.65.2
+bun add effect@4.0.0-rc.112 generalist@0.65.3
 ```
 
 With npm or pnpm:
@@ -20,12 +20,12 @@ With npm or pnpm:
 **Terminal**
 
 ```bash
-npm install effect@4.0.0-rc.112 generalist@0.65.2
-pnpm add effect@4.0.0-rc.112 generalist@0.65.2
+npm install effect@4.0.0-rc.112 generalist@0.65.3
+pnpm add effect@4.0.0-rc.112 generalist@0.65.3
 ```
 
 <Warning title="Pin the Effect release candidate">
-Generalist 0.65.2 targets `effect@4.0.0-rc.112`. Effect AI APIs can change between release candidates. Use the documented version, and install optional `@effect/ai-*` and platform packages at the matching version.
+Generalist 0.65.3 targets `effect@4.0.0-rc.112`. Effect AI APIs can change between release candidates. Use the documented version, and install optional `@effect/ai-*` and platform packages at the matching version.
 </Warning>
 
 ## One package
@@ -34,7 +34,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 
 | Package      | Version | Runtime and role                                                                                                       |
 | ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `generalist` | 0.65.2  | Node 22+ and Bun 1.4+: agent loop, object-backed Runtime, exact feature imports, and Cloudflare/Rivet compute adapters |
+| `generalist` | 0.65.3  | Node 22+ and Bun 1.4+: agent loop, object-backed Runtime, exact feature imports, and Cloudflare/Rivet compute adapters |
 
 ## Import subpaths and peers
 
@@ -59,7 +59,7 @@ Adapters ship in the `generalist` package. For example, install `generalist` and
 
 | Generalist release | Tested Effect version |
 | ------------------ | --------------------- |
-| `0.65.2`           | `effect@4.0.0-rc.112` |
+| `0.65.3`           | `effect@4.0.0-rc.112` |
 
 `generalist/unstable/foldkit` declares the exact tested optional peer `foldkit@0.148.2`.
 

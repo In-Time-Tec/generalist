@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.65.3
+
+- Provide Runtime-owned nested operations to independent Tool Runs without requiring a model or a registration-time service. Tool executor Layers preserve the current invocation's nested-operation service instead of a captured implementation.
+- Honor the Tool executor's replay policy and resume replay-safe nested approvals through durable waits. Fresh hosts reuse completed nested effects and reject divergent payloads without redispatching them.
+- Track in-flight nested effects through cancellation and interruption recovery. Uncertain non-idempotent effects retain an unknown outcome instead of remaining orphaned or executing again.
+
 ## 0.65.2
 
 - Provide the actor-owned Effect Scope to Rivet Server factories. Factories can build scoped model and application Layers that remain alive until the actor host retires, with cleanup on failed construction and fresh resources after replacement.

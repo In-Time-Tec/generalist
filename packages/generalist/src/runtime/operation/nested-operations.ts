@@ -69,6 +69,7 @@ export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly store: RunStoreService
+  readonly activeOperationIds?: Ref.Ref<ReadonlySet<string>>
 }): Effect.Effect<Service> =>
   Effect.gen(function* () {
     const ordinals = yield* Ref.make(new Map<string, number>())
@@ -90,6 +91,16 @@ export const make = (input: {
 
     const resolvedApproval = (approvalId: string) =>
       input.claimed.resolutions.find((entry) => entry.waitId === approvalId)?.resolution
+
+    const track = (operationId: string) =>
+      input.activeOperationIds === undefined
+        ? Effect.void
+        : Ref.update(input.activeOperationIds, (current) => new Set(current).add(operationId))
+
+    const release = (operationId: string) =>
+      input.activeOperationIds === undefined
+        ? Effect.void
+        : Ref.update(input.activeOperationIds, (current) => new Set([...current].filter((id) => id !== operationId)))
 
     function run<A, E, R>(
       request: Request<A, E>,
@@ -225,7 +236,9 @@ export const make = (input: {
               operationId: record.operationId,
               outcome,
             })
-          }).pipe(Effect.orDie, Effect.andThen(progressFor(outcome)))
+            yield* release(record.operationId)
+            yield* progressFor(outcome)
+          }).pipe(Effect.orDie)
 
         if (request.approval !== undefined) {
           const approval = request.approval
@@ -290,19 +303,22 @@ export const make = (input: {
           yield* authorize
         }
 
-        yield* input.store
-          .startOperation({
-            ...input.claim,
-            operationId: record.operationId,
-            commandId: yield* Schema.encodeEffect(CommandId)([
-              "start-operation",
-              input.claim.runId,
-              input.claim.attemptFence,
-              record.operationId,
-              attempt,
-            ]).pipe(Effect.orDie),
-          })
-          .pipe(Effect.orDie)
+        const startCommandId = yield* Schema.encodeEffect(CommandId)([
+          "start-operation",
+          input.claim.runId,
+          input.claim.attemptFence,
+          record.operationId,
+          attempt,
+        ]).pipe(Effect.orDie)
+        yield* Effect.uninterruptible(
+          input.store
+            .startOperation({
+              ...input.claim,
+              operationId: record.operationId,
+              commandId: startCommandId,
+            })
+            .pipe(Effect.orDie, Effect.andThen(track(record.operationId))),
+        )
         yield* emit("running")
         const exit = yield* Effect.exit(effect)
         if (exit._tag === "Success") {
@@ -317,7 +333,9 @@ export const make = (input: {
               operationId: record.operationId,
               outcome: { _tag: "Succeeded", value },
             })
-            .pipe(Effect.orDie, Effect.andThen(emit("succeeded", projected(exit.value))))
+            .pipe(Effect.orDie)
+          yield* release(record.operationId)
+          yield* emit("succeeded", projected(exit.value))
           return exit.value
         }
         const failed = errorFromCause(exit.cause)

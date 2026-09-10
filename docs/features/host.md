@@ -99,7 +99,7 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(handlers))
 ```
 
-`ToolIdentity` is required for independent Tool registration. Change `implementation` when handler or executor behavior changes, and change `policy` when permission rules, approval services, or a function-valued approval predicate changes. Boolean `needsApproval` settings also enter the pinned identity automatically. These are deployment identities, not secrets or serialized closures; a new deployment must retain the code and policy for unfinished old pins.
+`ToolIdentity` is required for independent Tool registration. Change `implementation` when handler or executor behavior changes, and change `policy` when permission rules, approval services, a function-valued approval predicate, or the executor's replay-policy selector changes. Boolean `needsApproval` settings also enter the pinned identity automatically. These are deployment identities, not secrets or serialized closures; a new deployment must retain the code and policy for unfinished old pins.
 
 `start` returns after canonical admission, before the handler settles. `result` is the decoded number `5`; the retained input and result use the Tool's encoded schemas. Repeating an identical `commandId` returns the same Run and result without redispatch. Reusing it with different input fails with a canonical `input-conflict`. Keep the command identity after ambiguous admission outcomes.
 
@@ -110,6 +110,10 @@ Retrieve a Tool Run after reopening the Host with `host.tools.get(tool, runId)`.
 An optional `parentRunId` sponsors the Tool in the parent's canonical family and inherits its admitted limits. Parent settlement does not release or cancel the Tool's claim. Tool claims use the family's `concurrency.tools` capacity, not Agent concurrency, recursion depth, or `maxSessions`. Running and unresolved tool operations retain capacity until their outcome is known. Sponsorship lives on Run records: a Tool's routing identity creates no Runtime Session row, Session family membership, or Session writer claim, and does not occupy the sponsor's conversational lane.
 
 On a fresh host, register matching Tool declarations, codecs, handlers, and policy again before resuming work. Executable pins identify these deployment dependencies; the journal does not serialize their closures or credentials. If an interrupted external effect has no accepted outcome and cannot safely retry, recovery requires explicit resolution rather than calling the handler again.
+
+Independent Tool handlers and executors can call `NestedOperation.run` without a model. Runtime supplies the claim-bound `NestedOperation.Operations` service at execution time; a captured registration-time implementation cannot replace it. Completed nested requests and outcomes replay under the outer operation's identity and ordinal, while a changed payload fails with `NestedOperation.Divergence`. Interrupted non-idempotent nested effects retain an unknown outcome for explicit resolution.
+
+The executor's `replayPolicy` selector controls the outer Tool receipt when supplied; otherwise the registered Tool policy applies. For a replay-safe outer Tool, an executor that converts `NestedOperation.Suspended` into the existing `Suspend` outcome opens the nested operation's durable Approval wait. After an authenticated decision, a fresh host re-enters the handler and reuses completed nested effects. A `never` outer operation cannot use this automatic re-entry path.
 
 ## Surface
 

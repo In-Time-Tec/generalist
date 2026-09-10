@@ -1,9 +1,10 @@
 import { expect, it } from "@effect/vitest"
 import { expectTypeOf } from "vitest"
-import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { NestedOperation } from "../../src/index.js"
 import { Host, ToolIdentity } from "../../src/host/index.js"
-import { layerAutoApprove } from "../../src/core/policy/approvals.js"
+import { Approvals, layerAutoApprove } from "../../src/core/policy/approvals.js"
 import { layerAllowAll } from "../../src/core/policy/permissions.js"
 import { layerStatic } from "../../src/runtime/executable/resolver.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
@@ -11,7 +12,8 @@ import { RunStore } from "../../src/runtime/run/store.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { Runtime, type ToolRunHandle } from "../../src/runtime/service.js"
 import { make } from "../../src/core/agent/service.js"
-import { ToolExecutor } from "../../src/core/tools/tool-executor.js"
+import { executeToolkit, FrameworkFailure, ToolExecutor } from "../../src/core/tools/tool-executor.js"
+import { ToolContext } from "../../src/core/tools/tool-context.js"
 import { digest } from "../../src/core/durable/canonical-json.js"
 
 const scopedWith =
@@ -39,6 +41,61 @@ const fail = Tool.make("fail", {
 }).annotate(ToolIdentity, { implementation: "fail-v1", policy: "fail-policy-v1" })
 const toolkit = Toolkit.make(checks, fail)
 const services = Layer.mergeAll(layerAllowAll, layerAutoApprove)
+const NestedFailure = Schema.Union([
+  NestedOperation.Divergence,
+  NestedOperation.Unknown,
+  NestedOperation.Denied,
+  NestedOperation.Suspended,
+])
+const nestedChecks = Tool.make("nested_checks", {
+  parameters: Schema.Struct({ value: Schema.String }),
+  success: Schema.String,
+  failure: NestedFailure,
+  failureMode: "return",
+})
+  .addDependency(NestedOperation.Operations)
+  .addDependency(ToolContext)
+  .annotate(ToolIdentity, { implementation: "nested-checks-v1", policy: "nested-checks-policy-v1" })
+const nestedToolkit = Toolkit.make(nestedChecks)
+const nestedRequest = (payload: string, replayPolicy: NestedOperation.ReplayPolicy = "never") => ({
+  kind: "nested-check",
+  payload: { value: payload },
+  replayPolicy,
+  success: Schema.String,
+})
+const replayableNestedExecutor = Layer.effect(
+  ToolExecutor,
+  Effect.map(nestedToolkit, (handled) =>
+    ToolExecutor.of({
+      replayPolicy: () => "provider-idempotent",
+      execute: (request) =>
+        Effect.flatMap(Effect.serviceOption(NestedOperation.Operations), (operations) =>
+          Option.match(operations, {
+            onNone: () =>
+              Effect.fail(
+                FrameworkFailure.make({
+                  stage: "handler",
+                  tool: request.call.name,
+                  message: "Nested operations are unavailable",
+                }),
+              ),
+            onSome: (current) =>
+              executeToolkit(handled, request).pipe(Effect.provideService(NestedOperation.Operations, current)),
+          }),
+        ),
+    }),
+  ),
+)
+const nestedEnvironment = (
+  storage: ReturnType<typeof makeObjectStorage>,
+  handlers: Layer.Layer<Tool.HandlersFor<{ readonly nested_checks: typeof nestedChecks }>>,
+) =>
+  Layer.mergeAll(
+    objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([]))),
+    services,
+    handlers,
+    replayableNestedExecutor.pipe(Layer.provide(handlers)),
+  )
 const complete = (runId: string, commandId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore
@@ -86,6 +143,324 @@ it.effect("returns an admitted Tool handle without a model or conversational Ses
       Layer.mergeAll(objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(layerStatic([]))), services, handlers),
     ),
   )
+})
+
+const retainedOperations = (runId: string) =>
+  Effect.gen(function* () {
+    const store = yield* RunStore
+    const journal = yield* store.recoveryJournal(runId)
+    return yield* Effect.forEach(journal.operations, (operation) =>
+      store.getOperation({ runId, operationId: operation.operationId }),
+    )
+  })
+
+it.effect("runs nested work in an independent Tool without a model or registration-time Operations", () => {
+  const storage = makeObjectStorage()
+  let calls = 0
+  let staleCalls = 0
+  const stale = NestedOperation.layerTest({
+    run: () =>
+      Effect.sync(() => {
+        staleCalls += 1
+      }).pipe(Effect.andThen(Effect.die("registration-time nested operations were used"))),
+  })
+  const handlers = nestedToolkit
+    .toLayer({
+      nested_checks: ({ value }) =>
+        NestedOperation.run(
+          nestedRequest(value),
+          Effect.sync(() => {
+            calls += 1
+            return `nested:${value}`
+          }),
+        ),
+    })
+    .pipe(Layer.provideMerge(stale))
+  return Effect.gen(function* () {
+    const host = yield* Host.make({ revision: "nested-independent", agents: {}, tools: [nestedChecks] })
+    const run = yield* host.tools.start(nestedChecks, { value: "retained" }, { commandId: "nested-retained" })
+    yield* complete(run.id, "nested-retained:execute")
+    expect(yield* run.await).toBe("nested:retained")
+    expect(calls).toBe(1)
+    expect(staleCalls).toBe(0)
+    const operations = yield* retainedOperations(run.id)
+    const outer = operations.find((operation) => operation.kind === "tool")
+    const nested = operations.find((operation) => operation.kind === "nested")
+    expect(nested).toMatchObject({
+      operationKey: `${outer?.operationKey}#0`,
+      status: "succeeded",
+      input: { kind: "nested-check", ordinal: 0, payload: { value: "retained" } },
+      result: "nested:retained",
+    })
+  }).pipe(
+    scopedWith(
+      Layer.mergeAll(
+        objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([]))),
+        services,
+        handlers,
+      ),
+    ),
+  )
+})
+
+it.effect("replays a completed nested effect after an interrupted independent Tool opens on a fresh Layer", () => {
+  const storage = makeObjectStorage()
+  let calls = 0
+  return Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const firstHandlers = nestedToolkit.toLayer({
+      nested_checks: ({ value }) =>
+        NestedOperation.run(
+          nestedRequest(value),
+          Effect.sync(() => {
+            calls += 1
+            return `nested:${value}`
+          }),
+        ).pipe(
+          Effect.tap(() => Deferred.succeed(entered, undefined)),
+          Effect.andThen(Effect.never),
+        ),
+    })
+    const runId = yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-replay", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "same" }, { commandId: "nested-replay" })
+      const fiber = yield* complete(run.id, "nested-replay:first").pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      yield* Fiber.interrupt(fiber)
+      return run.id
+    }).pipe(scopedWith(nestedEnvironment(storage, firstHandlers)))
+
+    const secondHandlers = nestedToolkit.toLayer({
+      nested_checks: ({ value }) =>
+        NestedOperation.run(
+          nestedRequest(value),
+          Effect.sync(() => {
+            calls += 1
+            return `redispatched:${value}`
+          }),
+        ),
+    })
+    yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-replay", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "same" }, { commandId: "nested-replay" })
+      expect(run.id).toBe(runId)
+      yield* complete(run.id, "nested-replay:second")
+      expect(yield* run.await).toBe("nested:same")
+      const operations = yield* retainedOperations(run.id)
+      expect(operations.find((operation) => operation.kind === "tool")).toMatchObject({
+        status: "succeeded",
+        replayPolicy: "provider-idempotent",
+      })
+      expect(operations.find((operation) => operation.kind === "nested")).toMatchObject({
+        status: "succeeded",
+        result: "nested:same",
+      })
+    }).pipe(scopedWith(nestedEnvironment(storage, secondHandlers)))
+    expect(calls).toBe(1)
+  })
+})
+
+it.effect("fails a replayed independent Tool closed when its nested payload diverges", () => {
+  const storage = makeObjectStorage()
+  let calls = 0
+  return Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const firstHandlers = nestedToolkit.toLayer({
+      nested_checks: () =>
+        NestedOperation.run(
+          nestedRequest("original"),
+          Effect.sync(() => {
+            calls += 1
+            return "retained"
+          }),
+        ).pipe(
+          Effect.tap(() => Deferred.succeed(entered, undefined)),
+          Effect.andThen(Effect.never),
+        ),
+    })
+    const runId = yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-divergence", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "same" }, { commandId: "nested-divergence" })
+      const fiber = yield* complete(run.id, "nested-divergence:first").pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      yield* Fiber.interrupt(fiber)
+      return run.id
+    }).pipe(scopedWith(nestedEnvironment(storage, firstHandlers)))
+
+    const secondHandlers = nestedToolkit.toLayer({
+      nested_checks: () =>
+        NestedOperation.run(
+          nestedRequest("changed"),
+          Effect.sync(() => {
+            calls += 1
+            return "must not run"
+          }),
+        ),
+    })
+    yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-divergence", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "same" }, { commandId: "nested-divergence" })
+      expect(run.id).toBe(runId)
+      yield* complete(run.id, "nested-divergence:second")
+      expect(yield* run.await.pipe(Effect.flip)).toMatchObject({
+        _tag: "ToolRunFailure",
+        failure: { _tag: "generalist/core/NestedOperationDivergence" },
+      })
+    }).pipe(scopedWith(nestedEnvironment(storage, secondHandlers)))
+    expect(calls).toBe(1)
+  })
+})
+
+it.effect("resumes a nested approval in an independent Tool on a fresh Layer", () => {
+  const storage = makeObjectStorage()
+  let calls = 0
+  const fresh = () => {
+    const handlers = nestedToolkit.toLayer({ nested_checks: () => Effect.die("approval bypassed its executor") })
+    const executor = Layer.succeed(
+      ToolExecutor,
+      ToolExecutor.of({
+        replayPolicy: () => "provider-idempotent",
+        execute: (request) =>
+          Effect.flatMap(Effect.serviceOption(NestedOperation.Operations), (operations) =>
+            Option.match(operations, {
+              onNone: () =>
+                Effect.fail(
+                  FrameworkFailure.make({
+                    stage: "handler",
+                    tool: request.call.name,
+                    message: "Nested operations are unavailable",
+                  }),
+                ),
+              onSome: (current) =>
+                NestedOperation.run(
+                  {
+                    kind: "nested-approval",
+                    payload: request.call.params,
+                    replayPolicy: "never",
+                    success: Schema.String,
+                    approval: { capability: "nested-check" },
+                  },
+                  Effect.sync(() => {
+                    calls += 1
+                    return "approved"
+                  }),
+                ).pipe(
+                  Effect.provideService(NestedOperation.Operations, current),
+                  Effect.matchEffect({
+                    onFailure: (failure) =>
+                      Schema.is(NestedOperation.Suspended)(failure)
+                        ? Effect.succeed({ _tag: "Suspend" as const, token: failure.token })
+                        : Effect.fail(
+                            FrameworkFailure.make({
+                              stage: "handler",
+                              tool: request.call.name,
+                              message: String(failure),
+                            }),
+                          ),
+                    onSuccess: (value) =>
+                      Effect.succeed({ _tag: "Success" as const, result: value, encodedResult: value }),
+                  }),
+                ),
+            }),
+          ),
+      }),
+    )
+    return Layer.mergeAll(
+      objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([]))),
+      layerAllowAll,
+      Layer.succeed(Approvals, Approvals.of({ resolve: (pending) => Effect.succeed(pending) })),
+      handlers,
+      executor,
+    )
+  }
+  return Effect.gen(function* () {
+    const suspended = yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-approval", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "approval" }, { commandId: "nested-approval" })
+      yield* complete(run.id, "nested-approval:first")
+      const inspection = yield* run.inspect
+      expect(inspection).toMatchObject({ status: "waiting", waits: [{ reason: { _tag: "Approval" } }] })
+      expect(calls).toBe(0)
+      return { runId: run.id, approvalId: inspection.waits[0]!.waitId }
+    }).pipe(scopedWith(fresh()))
+
+    yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-approval", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "approval" }, { commandId: "nested-approval" })
+      expect(run.id).toBe(suspended.runId)
+      const runtime = yield* Runtime
+      yield* runtime.respondApproval({
+        runId: run.id,
+        approvalId: suspended.approvalId,
+        commandId: "nested-approval:approved",
+        decision: { _tag: "Approved" },
+      })
+      yield* complete(run.id, "nested-approval:second")
+      expect(yield* run.await).toBe("approved")
+      expect(calls).toBe(1)
+      const operations = yield* retainedOperations(run.id)
+      expect(operations.find((operation) => operation.kind === "nested")).toMatchObject({ status: "succeeded" })
+      expect(operations.some((operation) => operation.status === "running")).toBe(false)
+    }).pipe(scopedWith(fresh()))
+  })
+})
+
+it.effect("parks an interrupted non-idempotent nested effect and leaves none running after cancellation", () => {
+  const storage = makeObjectStorage()
+  let calls = 0
+  return Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const firstHandlers = nestedToolkit.toLayer({
+      nested_checks: ({ value }) =>
+        NestedOperation.run(
+          nestedRequest(value),
+          Effect.gen(function* () {
+            calls += 1
+            yield* Deferred.succeed(entered, undefined)
+            return yield* Effect.never
+          }),
+        ),
+    })
+    const runId = yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-unknown", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "once" }, { commandId: "nested-unknown" })
+      const fiber = yield* complete(run.id, "nested-unknown:first").pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      yield* run.cancel("nested-unknown:cancel")
+      yield* Fiber.interrupt(fiber)
+      const operations = yield* retainedOperations(run.id)
+      expect(operations.find((operation) => operation.kind === "nested")).toMatchObject({ status: "unknown" })
+      expect(operations.some((operation) => operation.status === "running")).toBe(false)
+      expect(yield* run.inspect).toMatchObject({ status: "needs-resolution" })
+      return run.id
+    }).pipe(scopedWith(nestedEnvironment(storage, firstHandlers)))
+
+    const secondHandlers = nestedToolkit.toLayer({
+      nested_checks: ({ value }) =>
+        NestedOperation.run(
+          nestedRequest(value),
+          Effect.sync(() => {
+            calls += 1
+            return "must not run"
+          }),
+        ),
+    })
+    yield* Effect.gen(function* () {
+      const host = yield* Host.make({ revision: "nested-unknown", agents: {}, tools: [nestedChecks] })
+      const run = yield* host.tools.start(nestedChecks, { value: "once" }, { commandId: "nested-unknown" })
+      expect(run.id).toBe(runId)
+      const store = yield* RunStore
+      expect(
+        yield* store
+          .claimExecution({ runId, ownerId: objectWorkerId, commandId: "nested-unknown:replay" })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
+      const operations = yield* retainedOperations(run.id)
+      expect(operations.find((operation) => operation.kind === "nested")).toMatchObject({ status: "unknown" })
+      expect(operations.some((operation) => operation.status === "running")).toBe(false)
+    }).pipe(scopedWith(nestedEnvironment(storage, secondHandlers)))
+    expect(calls).toBe(1)
+  })
 })
 
 it.effect("restores retained Tool input on a fresh host and preserves exact command identity", () => {

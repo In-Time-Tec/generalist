@@ -1,6 +1,6 @@
 ---
 title: "Versioning and releases"
-description: "The 0.65.2 package, experimental policy, Effect compatibility, and release train."
+description: "The 0.65.3 package, experimental policy, Effect compatibility, and release train."
 ---
 
 Generalist publishes to npm as one package; every adapter is a subpath export at the same version.
@@ -9,7 +9,7 @@ Generalist publishes to npm as one package; every adapter is a subpath export at
 
 | Package      | Version  | Subpath exports                                                                                                                                                                       |
 | ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `generalist` | `0.65.2` | Core, object durability, Runtime, exact AI leaves, MCP, memory, instructions and skills, test hosts, transport, integrations, and the supported Cloudflare and Rivet compute adapters |
+| `generalist` | `0.65.3` | Core, object durability, Runtime, exact AI leaves, MCP, memory, instructions and skills, test hosts, transport, integrations, and the supported Cloudflare and Rivet compute adapters |
 
 ## The @experimental policy
 
@@ -19,7 +19,7 @@ Every public export remains `@experimental` while `effect/unstable/ai` is unstab
 
 | Generalist | effect         | Notes                                               |
 | ---------- | -------------- | --------------------------------------------------- |
-| `0.65.2`   | `4.0.0-rc.112` | The exact peer and tested workspace catalog version |
+| `0.65.3`   | `4.0.0-rc.112` | The exact peer and tested workspace catalog version |
 
 ## The release train
 

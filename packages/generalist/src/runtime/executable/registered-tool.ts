@@ -5,6 +5,7 @@ import { makeCapability } from "../../core/durable/pin.js"
 import { Approvals } from "../../core/policy/approvals.js"
 import { Permissions, RuleStore } from "../../core/policy/permissions.js"
 import { make as makeAuthorizer } from "../../core/tools/tool-authorization.js"
+import { Operations } from "../../core/tools/nested-operation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import { executeToolkit, ToolExecutor } from "../../core/tools/tool-executor.js"
 import { ExecutableRegistrationInvalid } from "../errors.js"
@@ -17,7 +18,7 @@ import { AgentBuildRevision } from "./build-revision.js"
 
 export type ToolServices<T extends Tool.Any> =
   | Tool.HandlersFor<Toolkit.ToolsByName<readonly [T]>>
-  | Exclude<Tool.HandlerServices<T>, ToolContext>
+  | Exclude<Tool.HandlerServices<T>, ToolContext | Operations>
   | T["parametersSchema"]["EncodingServices"]
   | T["parametersSchema"]["DecodingServices"]
   | T["successSchema"]["EncodingServices"]
@@ -51,7 +52,9 @@ export const capture = <T extends Tool.Any>(
     )
     const context = yield* Effect.context<ToolServices<T>>()
     const revision = Option.getOrElse(yield* Effect.serviceOption(AgentBuildRevision), () => "1")
-    const captured = Context.makeUnsafe<unknown>(context.pipe(Context.omit(ToolContext)).mapUnsafe)
+    const captured = Context.makeUnsafe<unknown>(
+      context.pipe(Context.omit(ToolContext), Context.omit(Operations)).mapUnsafe,
+    )
     const permissions = yield* Permissions
     const approvals = yield* Approvals
     const executor = yield* Effect.serviceOption(ToolExecutor)
