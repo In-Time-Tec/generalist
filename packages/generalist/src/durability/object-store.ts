@@ -27,7 +27,7 @@ export interface ReadOptions {
   readonly range?: { readonly offset: number; readonly length: number }
 }
 
-/** @internal */
+/** Enforces caller read bounds; transport implementations apply it before honoring a read. @experimental */
 export const validateReadOptions = ({
   key,
   options,
@@ -68,7 +68,7 @@ const byteChunk = Schema.instanceOf(Uint8Array)
 /**
  * Cancel without awaiting a provider's potentially stalled cancellation acknowledgement.
  * Best-effort: body.cancel() is a hint; the stream controls whether it actually stops.
- * @internal
+ * @experimental
  */
 export const cancelReadBody = ({ body }: { readonly body: ReadableStream<unknown> | undefined }): void => {
   if (body !== undefined && !body.locked) void body.cancel().catch(() => {})
@@ -127,7 +127,7 @@ const joinChunks = (chunks: ReadonlyArray<Uint8Array>, length: number): Uint8Arr
   return bytes
 }
 
-/** Consume only bounded streaming chunks, including when a provider omits or lies about its size. @internal */
+/** Consume only bounded streaming chunks, including when a provider omits or lies about its size. @experimental */
 export const readObjectBytes = ({
   key,
   body,
@@ -166,7 +166,7 @@ export const readObjectBytes = ({
   ).pipe(Effect.tap(() => Effect.sync(() => signal.throwIfAborted())))
 }
 
-/** @internal */
+/** Single-deadline request wrapper shared by transport implementations. @experimental */
 export const request = <A>({
   timeoutMs,
   operation,
@@ -231,7 +231,12 @@ export interface Capabilities {
   readonly consistentListing: true
 }
 
-/** Canonical storage has no unconditional overwrite operation. @experimental */
+/**
+ * Canonical object transport contract; storage has no unconditional overwrite operation.
+ * Implement it to provide a custom transport, then qualify the implementation with the
+ * `generalist/testing/durability` conformance suite before trusting a real namespace.
+ * @experimental
+ */
 export interface Service {
   readonly capabilities: Capabilities
   readonly read: (key: string, options: ReadOptions) => Effect.Effect<StoredObject | undefined, ObjectStoreFailure>
