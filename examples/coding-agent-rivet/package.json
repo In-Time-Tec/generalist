@@ -1,0 +1,26 @@
+{
+  "name": "generalist-example-coding-agent-rivet",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "bun src/demo.ts",
+    "start": "bun src/main.ts",
+    "test": "bun --bun vitest run test --no-file-parallelism",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@effect/platform-bun": "catalog:",
+    "@smithy/fetch-http-handler": "catalog:",
+    "@standard-schema/spec": "catalog:",
+    "effect": "catalog:",
+    "generalist": "workspace:*",
+    "rivetkit": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

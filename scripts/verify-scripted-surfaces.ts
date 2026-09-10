@@ -29,7 +29,7 @@ export interface Target {
   readonly label: string
   readonly args: ReadonlyArray<string>
   readonly cwd: string
-  readonly server?: "deep-research-agent" | "mcp-toolkit-server"
+  readonly server?: "deep-research-agent" | "mcp-toolkit-server" | "coding-agent-rivet"
 }
 
 const PackageManifest = Schema.Struct({
@@ -61,6 +61,8 @@ const credentialNames = [
   "OPENAI_API_KEY",
   "OPENROUTER_API_KEY",
   "SUPERMEMORY_API_KEY",
+  "RIVET_TOKEN",
+  "RIVET_ENDPOINT",
 ] as const
 
 const failure = (message: string): ScriptedSurfaceFailed => ScriptedSurfaceFailed.make({ message })
@@ -84,9 +86,12 @@ const exampleTargets = Effect.fn("VerifyScriptedSurfaces.exampleTargets")(functi
     if (manifest.scripts?.start === undefined || skippedExamples.has(name)) continue
     const target: Target = {
       label: `example ${name}`,
-      args: ["run", "start"],
+      args: name === "coding-agent-rivet" ? ["--no-env-file", "src/main.ts"] : ["run", "start"],
       cwd: `examples/${name}`,
-      server: name === "deep-research-agent" || name === "mcp-toolkit-server" ? name : undefined,
+      server:
+        name === "deep-research-agent" || name === "mcp-toolkit-server" || name === "coding-agent-rivet"
+          ? name
+          : undefined,
     }
     targets.push(target)
   }
@@ -116,6 +121,14 @@ const environment = (target: Target, index: number, storage: LocalS3, targetId: 
   `GENERALIST_S3_ENDPOINT=${storage.endpoint}`,
   "GENERALIST_S3_CAPABILITIES_CONFIRMED=true",
   `GENERALIST_SERVER_TOKEN=${targetId}`,
+  ...(target.server === "coding-agent-rivet"
+    ? [
+        "RIVET_START_ENGINE=true",
+        "RIVET_NAMESPACE=default",
+        `RIVET_POOL_NAME=scripted-surfaces-${targetId}`,
+        "RIVET_RUN_SERVICES=0",
+      ]
+    : []),
   ...(port === undefined ? [] : [`PORT=${port}`]),
 ]
 
@@ -126,6 +139,7 @@ const reservePort = Effect.gen(function* () {
 })
 
 const serverReadiness = (server: NonNullable<Target["server"]>, port: number, serverToken: string) => {
+  if (server === "coding-agent-rivet") return Effect.void
   const endpoint = `http://127.0.0.1:${port}`
   const request =
     server === "deep-research-agent"
@@ -161,27 +175,31 @@ const serverReadiness = (server: NonNullable<Target["server"]>, port: number, se
   )
 }
 
-const expectedServerOutput = (server: NonNullable<Target["server"]>, port: number) =>
-  server === "deep-research-agent"
+const expectedServerOutput = (server: NonNullable<Target["server"]>, port: number) => {
+  if (server === "coding-agent-rivet") return /coding-agent-rivet host registered/
+  return server === "deep-research-agent"
     ? new RegExp(`deep-research-agent demo server listening on http://localhost:${port}`)
     : new RegExp(`legacy MCP 2025-06-18 server listening on port ${port}`)
+}
 
 export const waitForOutput = Effect.fn("VerifyScriptedSurfaces.waitForOutput")(function* (
   output: Ref.Ref<string>,
   expected: RegExp,
+  retries: number = 20,
 ) {
   return yield* Ref.get(output).pipe(
     Effect.flatMap((text) => (expected.test(text) ? Effect.void : failure(`server did not emit ${String(expected)}`))),
-    Effect.retry({ times: 20, schedule: Schedule.spaced("100 millis") }),
+    Effect.retry({ times: retries, schedule: Schedule.spaced("100 millis") }),
   )
 })
 
 export const observeServer = Effect.fn("VerifyScriptedSurfaces.observeServer")(function* <A, E, R>(
   readiness: Effect.Effect<A, E, R>,
   exitCode: Effect.Effect<number>,
+  timeoutMillis: number = 3_000,
 ) {
   return yield* Effect.all(
-    [readiness.pipe(Effect.timeout("3 seconds")), exitCode.pipe(Effect.timeoutOption("3 seconds"))],
+    [readiness.pipe(Effect.timeout(timeoutMillis)), exitCode.pipe(Effect.timeoutOption(timeoutMillis))],
     { concurrency: "unbounded" },
   ).pipe(Effect.map(([, exit]) => exit))
 })
@@ -217,9 +235,14 @@ export const runTarget = Effect.fn("VerifyScriptedSurfaces.runTarget")(
             : yield* observeServer(
                 Effect.all([
                   serverReadiness(target.server, port!, targetId),
-                  waitForOutput(output, expectedServerOutput(target.server, port!)),
+                  waitForOutput(
+                    output,
+                    expectedServerOutput(target.server, port!),
+                    target.server === "coding-agent-rivet" ? 300 : 20,
+                  ),
                 ]),
                 handle.exitCode,
+                target.server === "coding-agent-rivet" ? 35_000 : 3_000,
               )
         if (Option.isSome(exitCode) && target.server === undefined) yield* Fiber.join(collector)
         else yield* Effect.sleep("10 millis")

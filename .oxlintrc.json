@@ -203,6 +203,18 @@
   },
   "overrides": [
     {
+      "files": ["docs/vite.config.ts"],
+      "rules": {
+        "effecttsgo/strict-effect-provide": "off"
+      }
+    },
+    {
+      "files": ["docs/src/content.ts"],
+      "rules": {
+        "import/default": "off"
+      }
+    },
+    {
       "files": ["packages/*/src/**/*.ts"],
       "rules": {
         "max-lines": [

@@ -1,0 +1,32 @@
+export const websiteCheckpoints = [
+  { name: "first-agent", file: "first-agent.ts", output: "Return 0 before dividing when values.length is 0." },
+  { name: "tools", file: "tools.ts", output: "Return 0 before dividing when values.length is 0." },
+  { name: "repository", file: "repository.ts", output: "Patched src/average.ts. Both regression tests passed." },
+  {
+    name: "structured-output",
+    file: "structured-output.ts",
+    output: "src/average.ts: Return 0 for empty input.",
+  },
+  { name: "approvals", file: "approvals.ts", output: "Patch denied; no file was changed." },
+  { name: "quality-gates", file: "quality-gates.ts", output: "Accepted report for src/average.ts" },
+  { name: "streaming", file: "streaming.ts", output: "The empty-input guard is ready for review." },
+  {
+    name: "instructions",
+    file: "instructions.ts",
+    output: "Plan: add the empty-input guard, then run the average tests.",
+  },
+  { name: "skills", file: "skills.ts", output: "Review instructions loaded: 1" },
+  { name: "sessions", file: "sessions.ts", output: "I will add a regression test for average([])." },
+  { name: "memory", file: "memory.ts", output: "Working memory retained average([]) === 0." },
+  { name: "compaction", file: "compaction.ts", output: "The current goal is still to fix average([])." },
+  { name: "memo", file: "memo.ts", output: "Analysis handler calls: 1" },
+  { name: "tasks", file: "tasks.ts", output: "The plan is recorded. The fix is in progress." },
+  { name: "middleware", file: "middleware.ts", output: "I will keep the change scoped to average and its tests." },
+  { name: "hooks", file: "hooks.ts", output: "The coding run has its repository context." },
+  {
+    name: "fan-out",
+    file: "fan-out.ts",
+    output: "The specialist completed its scripted review.\nThe specialist completed its scripted review.",
+  },
+  { name: "sandbox", file: "sandbox.ts", output: "Sandbox verification passed. Isolation: process." },
+] as const

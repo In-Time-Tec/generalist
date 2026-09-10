@@ -2,6 +2,7 @@
 import { layer } from "@effect/platform-bun/BunServices"
 import { Console, Effect, FileSystem, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
+import { websiteCheckpoints } from "../examples/docs-snippets/website/checkpoints"
 
 class ReadmeCheckFailed extends Schema.TaggedError<ReadmeCheckFailed>()("generalist/scripts/ReadmeCheckFailed", {
   message: Schema.String,
@@ -60,15 +61,12 @@ const checkOutput = Effect.fn("ReadmeCheck.checkOutput")(function* (
   directory: string,
   target: string,
   filename: string,
-  source: string,
-  block: string,
+  expected: string | undefined,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const output = yield* spawner
     .string(ChildProcess.make("bun", [target], { cwd: directory }))
     .pipe(Effect.timeout("30 seconds"))
-  const end = source.indexOf(block) + block.length
-  const expected = /^```text\r?\n([\s\S]*?)^```/m.exec(source.slice(end))?.[1]?.trim()
   if (expected === undefined || output.trim() !== expected) {
     return yield* failure(`${filename}: output mismatch\nExpected: ${expected}\nActual: ${output}`)
   }
@@ -101,19 +99,26 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
     const source = yield* fileSystem.readFileString(path.join(root, filename))
     const blocks = Array.from(source.matchAll(typescriptFence), (match) => match[1] ?? "")
     if (blocks.length === 0) return yield* failure(`${filename} contains no \`\`\`ts code blocks`)
-    for (const block of blocks) {
-      count += 1
-      const target = `block-${count}.ts`
-      yield* fileSystem.writeFileString(path.join(directory, target), block)
-      if (
-        filename === "docs/start/quickstart.md" ||
-        filename === "docs/guides/define-tools.md" ||
-        (filename === "docs/start/cell-agent.md" && !block.includes("declare const"))
-      ) {
-        yield* checkOutput(directory, target, filename, source, block)
-        executed += 1
-      }
-    }
+    yield* Effect.forEach(
+      blocks,
+      (block) =>
+        Effect.gen(function* () {
+          count += 1
+          const target = `block-${count}.ts`
+          yield* fileSystem.writeFileString(path.join(directory, target), block)
+          if (
+            filename === "docs/start/quickstart.md" ||
+            filename === "docs/guides/define-tools.md" ||
+            (filename === "docs/start/cell-agent.md" && !block.includes("declare const"))
+          ) {
+            const end = source.indexOf(block) + block.length
+            const expected = /^```text\r?\n([\s\S]*?)^```/m.exec(source.slice(end))?.[1]?.trim()
+            yield* checkOutput(directory, target, filename, expected)
+            executed += 1
+          }
+        }),
+      { discard: true },
+    )
   }
 
   const research = yield* fileSystem.readFileString("docs/start/research-agent.md")
@@ -132,8 +137,15 @@ const program = Effect.fn("ReadmeCheck.program")(function* () {
   }
   yield* fileSystem.copyFile("examples/docs-snippets/html.ts", path.join(researchDirectory, "web/html.ts"))
   yield* typecheck(directory)
+  const websiteDirectory = path.join(root, "examples/docs-snippets/website")
+  yield* Effect.forEach(
+    websiteCheckpoints,
+    (checkpoint) =>
+      checkOutput(websiteDirectory, checkpoint.file, `Website checkpoint ${checkpoint.name}`, checkpoint.output),
+    { discard: true },
+  )
   yield* Console.log(
-    `Public install versions match ${version}; ${count} TypeScript blocks typechecked; ${executed} tutorial blocks executed with matching output`,
+    `Public install versions match ${version}; ${count} TypeScript blocks typechecked; ${executed} tutorial blocks and ${websiteCheckpoints.length} website checkpoints executed with matching output`,
   )
 })
 

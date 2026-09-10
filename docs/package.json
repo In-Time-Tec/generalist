@@ -2,10 +2,27 @@
   "name": "@generalist/docs",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --outDir dist/client && vite build --ssr src/entry.server.ts --outDir dist/server",
+    "start": "bun server/main.ts",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "catalog:",
+    "@pierre/diffs": "1.4.1",
+    "@stylexjs/stylex": "0.19.0",
+    "effect": "catalog:",
+    "foldkit": "catalog:"
+  },
   "devDependencies": {
+    "@effect/platform-node-shared": "catalog:",
+    "@foldkit/vite-plugin": "catalog:",
+    "@stylexjs/unplugin": "0.19.0",
     "mint": "4.2.866",
     "typedoc": "0.28.20",
     "typedoc-plugin-markdown": "4.13.0",
-    "typescript": "6.0.2"
+    "typescript": "6.0.2",
+    "vite": "catalog:"
   }
 }
