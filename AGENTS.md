@@ -1,6 +1,6 @@
 # Generalist
 
-Generalist turns agents from disposable chat sessions into durable workers. It is an Effect-native framework over `effect/unstable/ai`: the `generalist` package provides the process-local loop and optional durable Runtime. `generalist/durability` is the sole production durability engine, with S3 and native R2 transports. Local processes, servers, Cloudflare Durable Objects, and Rivet actors are independent compute hosts, not storage backends. Core stays usable without storage, Relay, or another durable runtime.
+Generalist turns agents from disposable chat sessions into durable workers. It is an Effect-native framework over `effect/unstable/ai`: the `generalist` package provides the process-local loop and optional durable Runtime. `generalist/durability` is the sole production durability engine, with S3, native R2, and local-directory transports. Local processes, servers, Cloudflare Durable Objects, and Rivet actors are independent compute hosts, not storage backends. Core stays usable without storage, Relay, or another durable runtime.
 
 ## Product and writing standard
 

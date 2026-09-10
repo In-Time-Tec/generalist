@@ -2,7 +2,7 @@
 
 An agent handling a support case or waiting for approval shouldn't lose its work when a server restarts. Generalist turns disposable agent sessions into durable workers in TypeScript, built on [Effect](https://effect.website).
 
-The optional Runtime records accepted work in object storage so another host can recover it. S3 and native R2 use one engine; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition. Uncertain external outcomes require resolution, not blind retries.
+The optional Runtime records accepted work in object storage so another host can recover it. S3, native R2, and a local directory use one engine; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition. Uncertain external outcomes require resolution, not blind retries.
 
 For scripts and request-local work, use the Effect agent loop without storage or Runtime. It calls a model, runs its tools, and continues to an answer.
 
@@ -50,7 +50,7 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 - [Offline quickstart](https://github.com/In-Time-Tec/generalist/tree/main/examples/docs-snippets/website): run a tool-calling agent without credentials.
 - [Tools](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/tools-and-authorization.md): give an agent functions it can call.
 - [Structured output](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/structured-output.md): return schema-validated objects.
-- [Object durability](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/durable-stores.md): recover work with the shared object-storage engine and S3 or native R2 transport.
+- [Object durability](https://github.com/In-Time-Tec/generalist/blob/main/docs/features/durable-stores.md): recover work with the shared object-storage engine and S3, native R2, or local-directory transport.
 - [Documentation](https://github.com/In-Time-Tec/generalist/tree/main/docs): the documentation site source plus feature, decision, and tradeoff references.
 
 ## Status

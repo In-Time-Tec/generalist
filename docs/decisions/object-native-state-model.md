@@ -1,6 +1,6 @@
 # One object-native state authority
 
-Generalist's clean v1 Runtime uses one object-storage engine with S3 and native R2 transports. The process-local Agent loop remains independent. Local processes, servers, Cloudflare Durable Objects, and Rivet actors own compute scopes; none supplies a competing Generalist database.
+Generalist's clean v1 Runtime uses one object-storage engine with S3, native R2, and local-directory transports. The process-local Agent loop remains independent. Local processes, servers, Cloudflare Durable Objects, and Rivet actors own compute scopes; none supplies a competing Generalist database.
 
 ## Commit and recovery boundary
 
