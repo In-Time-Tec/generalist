@@ -3,7 +3,7 @@ title: "Object durability"
 description: "Configure the shared object-storage engine, understand commit uncertainty, and recover a retained namespace."
 ---
 
-Use `generalist/durability` when accepted work must survive the process that accepted it. S3 and native R2 are transports for the same canonical engine and object format, not different Runtime backends. Ordinary `Agent.run` calls remain process-local and need no durable storage.
+Use `generalist/durability` when accepted work must survive the process that accepted it. S3, native R2, and a local directory are transports for the same canonical engine and object format, not different Runtime backends. Ordinary `Agent.run` calls remain process-local and need no durable storage.
 
 All public exports remain `@experimental`. Clean v1 has no SQL Generalist backends, alternate production memory/filesystem Runtime, compatibility aliases, legacy readers, or migration path. Use fresh namespaces. Implementation is not full acceptance, release readiness, provider certification, or a verified performance claim.
 
@@ -133,13 +133,23 @@ const objects = R2.layer(bucket)
 
 Provide this Layer to the same durability engine with a Worker-compatible Crypto Layer and executable resolver. [Cloudflare hosting](cloudflare.md) adds lifecycle integration. Read canonical state through the binding or direct object API, never an R2 public cached domain.
 
+For a single host — a laptop agent, a self-hosted node, or a test — `generalist/durability/fs` stores objects as immutable files in a dedicated local directory. Creates write a synced temporary file and install it with an atomic hard link, so concurrent writers produce exactly one winner; reads are byte-budgeted with optional ranges; listings decode, sort, and page keys. This **local fragment** points a Runtime at a directory:
+
+```ts
+import * as Fs from "generalist/durability/fs"
+
+const objects = Fs.layer({ dir: ".generalist/objects" })
+```
+
+The Layer requires `FileSystem`, `Path`, and `Crypto` services — platform Layers such as `@effect/platform-bun/BunServices` provide all three. `Fs.layerMaintenance({ dir })` supplies `ObjectMaintenance` separately. The directory is canonical state bound to that host: it needs a filesystem with atomic hard links (POSIX/NTFS), a crashed create can leave `.tmp-*` files that are ignored on read, and a replacement host cannot reach it — recovery on a new machine requires restoring the directory there first. It is a transport under the same engine, not a separate filesystem Runtime.
+
 ## Provider contract and support limits
 
 A usable provider must preserve complete bytes, atomically create an absent key, expose acknowledged writes through strong direct reads, and list correctly across every page. Generalist uses its own SHA-256 digests; ETags are opaque provider tokens, not content hashes. The normal ObjectStore surface has `read`, `create`, and `list`, with no unconditional overwrite or delete.
 
-`generalist/durability/object-store` exports the transport contract itself: the `Service` interface, the `ObjectStore` and `ObjectMaintenance` tags, `ObjectStoreFailure`, and the shared bound-validation and deadline helpers the first-party transports use. Implement `Service` to provide a custom backend — a directory, another provider's native API, or an injected client — then qualify it with the `generalist/testing/durability` conformance suite (`atomicCreates`, `freshReads`, `listing`, `byteIntegrity`) and a close/reopen check before trusting a real namespace. Passing conformance establishes the interface contract only; it is not provider certification, and a host-local backend cannot be reached by a replacement host.
+`generalist/durability/object-store` exports the transport contract itself: the `Service` interface, the `ObjectStore` and `ObjectMaintenance` tags, `ObjectStoreFailure`, and the shared bound-validation and deadline helpers the first-party transports use. Implement `Service` to provide a custom backend — another provider's native API or an injected client — then qualify it with the `generalist/testing/durability` conformance suite (`atomicCreates`, `freshReads`, `listing`, `byteIntegrity`) and a close/reopen check before trusting a real namespace. Passing conformance establishes the interface contract only; it is not provider certification, and a host-local backend cannot be reached by a replacement host.
 
-S3 and native R2 are the shipped transports. An S3-shaped API alone is insufficient. Current qualification is local-only MinIO and Miniflare/workerd; AWS and deployed R2 are not certified. Simulator or emulator results do not certify a live provider. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
+S3, native R2, and a local directory are the shipped transports. An S3-shaped API alone is insufficient. Current qualification is local-only MinIO and Miniflare/workerd; AWS and deployed R2 are not certified. Simulator or emulator results do not certify a live provider. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
 
 ## Local workload baseline
 

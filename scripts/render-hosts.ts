@@ -31,6 +31,12 @@ export const renderHosts = (report: HostReport): string => {
       "Local runtime evidence only; not a production backend or provider qualification.",
     ],
     [
+      "Node/Bun, local directory",
+      "`generalist/durability/fs`",
+      "local object conformance and journal recovery",
+      "Single-host canonical state; a replacement host cannot reach the directory. Not remote qualification.",
+    ],
+    [
       "Node/Bun + AWS S3",
       "`generalist/durability/s3`",
       report.qualification["aws-s3"].status,

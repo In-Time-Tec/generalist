@@ -63,6 +63,11 @@ export const minimumConsumerProfiles = [
         exports: ["layer", "layerRunStore", "activate", "Activation", "DurabilityFailure"],
       },
       { specifier: "generalist/durability/discovery", runtimes: nodeAndBun, exports: ["page", "inspect"] },
+      {
+        specifier: "generalist/durability/fs",
+        runtimes: nodeAndBun,
+        exports: ["make", "layer", "makeMaintenance", "layerMaintenance"],
+      },
       { specifier: "generalist/durability/host", runtimes: nodeAndBun, exports: ["reconcilePage"] },
       {
         specifier: "generalist/durability/object-store",
@@ -358,6 +363,7 @@ export const exactPackageExports = [
   "./components",
   "./durability",
   "./durability/discovery",
+  "./durability/fs",
   "./durability/host",
   "./durability/object-store",
   "./durability/r2",

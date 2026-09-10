@@ -4,7 +4,7 @@
 
 An agent handling a support case or waiting for approval shouldn't lose its work when a server restarts. Generalist turns disposable agent sessions into durable workers in TypeScript, built on [Effect](https://effect.website).
 
-The optional Runtime records accepted work in object storage so another host can recover it. One engine supports S3 and native R2; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition, not across the whole application. If an external action's outcome is uncertain, recovery surfaces it for resolution rather than assuming it is safe to repeat.
+The optional Runtime records accepted work in object storage so another host can recover it. One engine supports S3, native R2, and a single-host local directory; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition, not across the whole application. If an external action's outcome is uncertain, recovery surfaces it for resolution rather than assuming it is safe to repeat.
 
 Don't need recovery yet? Use the process-local Effect agent loop on its own: call a model, execute tools, and continue to an answer. It needs no storage or Runtime.
 
@@ -58,7 +58,7 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 | Test without calling a model API      | [Testing](docs/features/testing.md)                     |
 | Recover work after a restart          | [Durable Runtime](docs/features/runtime.md)             |
 
-Durable execution uses one object-storage engine through `generalist/durability`, with S3 and native R2 transports. There is no production memory or filesystem durability backend. You do not need storage or Runtime for the process-local agent loop. Start with the [object durability guide](docs/features/durable-stores.md); the [host comparison](docs/features/hosts.md) separates host integration from provider conformance.
+Durable execution uses one object-storage engine through `generalist/durability`, with S3, native R2, and local-directory transports. There is no production memory or filesystem durability backend. You do not need storage or Runtime for the process-local agent loop. Start with the [object durability guide](docs/features/durable-stores.md); the [host comparison](docs/features/hosts.md) separates host integration from provider conformance.
 
 ## Documentation and examples
 

@@ -145,7 +145,7 @@ export const sections: ReadonlyArray<Section> = [
       ),
       heading("Start local. Keep what matters."),
       p(
-        "Short-lived work can stay a normal Effect. When a task crosses tool calls, human decisions, or host lifetimes, add the object-backed Runtime. S3 or native R2 owns the durable state; your process, server, Rivet actor, or Cloudflare host executes the work.",
+        "Short-lived work can stay a normal Effect. When a task crosses tool calls, human decisions, or host lifetimes, add the object-backed Runtime. S3, native R2, or a local directory owns the durable state; your process, server, Rivet actor, or Cloudflare host executes the work.",
       ),
       links([
         {
@@ -186,7 +186,7 @@ export const sections: ReadonlyArray<Section> = [
       heading("Separate the work from its host"),
       diagram("durability"),
       p(
-        "Generalist has one production durability engine, backed by object storage over S3 or native R2. Compute hosts can be replaced when their code, configuration, and resource access can reconstruct the accepted work. Actor memory, caches, and notifications are not the commit authority.",
+        "Generalist has one production durability engine, backed by object storage over S3, native R2, or a local directory. Compute hosts can be replaced when their code, configuration, and resource access can reconstruct the accepted work. Actor memory, caches, and notifications are not the commit authority.",
       ),
       heading("Preserve the consequences"),
       p(
@@ -894,7 +894,7 @@ export const sections: ReadonlyArray<Section> = [
           ],
           [
             "Object storage",
-            "The canonical record, through the S3 or native R2 transport. Recovery also needs the registered executable code and services; stored state is not stored code.",
+            "The canonical record, through the S3, native R2, or local-directory transport. Recovery also needs the registered executable code and services; stored state is not stored code.",
           ],
         ],
       ),
@@ -989,7 +989,7 @@ export const sections: ReadonlyArray<Section> = [
       code("coding-executable", "Executable registration", codingExecutable),
       note(
         "One engine, not several backends",
-        "S3 and native R2 are transports for the same production durability engine. There is no production SQL, memory, or filesystem Runtime. Separate partitions can progress independently, but mutations inside a partition serialize.",
+        "S3, native R2, and a local directory are transports for the same production durability engine. There is no production SQL, memory, or filesystem Runtime. Separate partitions can progress independently, but mutations inside a partition serialize.",
       ),
     ],
   },

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.5
+
+- Add `generalist/durability/fs`, a local-directory object transport for the same durability engine. Objects are immutable files installed by atomic hard link after a synced temporary write; listings decode, sort, and page keys over bounded reads. It provides single-host canonical state for local agents and tests — a dedicated directory, POSIX hard-link semantics, and no reachability from a replacement host. `ObjectMaintenance` removal stays a separate Layer.
+
 ## 0.65.4
 
 - Add the `generalist/durability/object-store` subpath export, making the canonical object transport contract public: the `Service` interface, `ObjectStore` and `ObjectMaintenance` tags, `ObjectStoreFailure`, `Capabilities`, and the shared bound-validation, deadline, and bounded-stream helpers. Custom transports implement `Service` and qualify with the `generalist/testing/durability` conformance suite; S3 and native R2 remain the shipped transports.
