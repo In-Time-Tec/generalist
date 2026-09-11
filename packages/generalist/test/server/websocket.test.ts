@@ -111,7 +111,20 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("rejects an empty cancel command identity as malformed before the Host is invoked", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-empty-command" })
-        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
+        const runtimeService = yield* RuntimeService.Runtime
+        const cancelInputs: Array<string> = []
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
+          Effect.provideService(
+            RuntimeService.Runtime,
+            RuntimeService.Runtime.of({
+              ...runtimeService,
+              cancel: (input) => {
+                cancelInputs.push(input.commandId)
+                return runtimeService.cancel(input)
+              },
+            }),
+          ),
+        )
         const session = yield* host.sessions.create({ id: "session-empty-command" })
         const run = yield* host.runs.start(session.id, agent, "wait")
         const fake = yield* makeFakeSocket()
@@ -140,6 +153,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         })
         yield* Queue.offer(fake.inbound, malformed)
         expect(yield* Queue.take(fake.outbound)).toMatchObject({ code: 1003, reason: "malformed-command" })
+        expect(cancelInputs).toEqual([])
         expect(yield* host.runs.inspect(run.id)).toMatchObject({ status: "running" })
 
         yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
