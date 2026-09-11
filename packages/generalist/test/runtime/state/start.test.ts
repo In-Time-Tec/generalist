@@ -5,7 +5,6 @@ import { Effect, Layer, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
 import { Address, Errors, ExecutableResolver, RunStore, Runtime } from "../../../src/runtime/index.js"
-import { DurabilityFailure } from "../../../src/durability/errors.js"
 import {
   alternateAssistant,
   alternateAssistantRef,
@@ -87,10 +86,15 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         idempotencyKey: "same",
         prompt: textPrompt("hello"),
       }
-      yield* runtime.startExecution(base)
+      const first = yield* runtime.startExecution(base)
       const changedPrompt = yield* runtime.startExecution({ ...base, prompt: textPrompt("changed") }).pipe(Effect.flip)
-      expect(changedPrompt).toBeInstanceOf(DurabilityFailure)
-      expect(changedPrompt).toMatchObject({ reason: "input-conflict" })
+      expect(changedPrompt).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changedPrompt).toMatchObject({
+        address: Address.make("runtime:start"),
+        sessionId: "conflict-session",
+        idempotencyKey: "same",
+        existingRunId: first.runId,
+      })
       const changedExecutable = yield* runtime
         .startExecution({
           ...base,
@@ -98,13 +102,13 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
           registrations: registrationsFor(alternateAssistantRef),
         })
         .pipe(Effect.flip)
-      expect(changedExecutable).toBeInstanceOf(DurabilityFailure)
-      expect(changedExecutable).toMatchObject({ reason: "input-conflict" })
+      expect(changedExecutable).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changedExecutable).toMatchObject({ existingRunId: first.runId })
       const changedRegistrations = yield* runtime
         .startExecution({ ...base, registrations: registrationsFor(assistantRef, "changed") })
         .pipe(Effect.flip)
-      expect(changedRegistrations).toBeInstanceOf(DurabilityFailure)
-      expect(changedRegistrations).toMatchObject({ reason: "input-conflict" })
+      expect(changedRegistrations).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changedRegistrations).toMatchObject({ existingRunId: first.runId })
     }),
   )
 
@@ -125,8 +129,12 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
       const changed = yield* runtime
         .startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changed).toMatchObject({
+        sessionId: "file-session",
+        idempotencyKey: "file-key",
+        existingRunId: first.runId,
+      })
     }),
   )
 
@@ -281,15 +289,19 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
       expect(invalid).toBeInstanceOf(Errors.ChildSelectionMissing)
       expect(yield* runtime.list({ limit: 10 })).toEqual(before)
 
-      yield* runtime.startExecution(base)
+      const first = yield* runtime.startExecution(base)
       const changed = yield* runtime
         .startExecution({
           ...base,
           initialChildren: [{ ...base.initialChildren[0]!, prompt: textPrompt("changed") }],
         })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changed).toMatchObject({
+        sessionId: "initial-root",
+        idempotencyKey: "initial-root",
+        existingRunId: first.runId,
+      })
       expect((yield* runtime.treeCheckpoint((yield* runtime.startExecution(base)).runId)).inspection.runs).toHaveLength(
         3,
       )
@@ -385,8 +397,12 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
           ],
         })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changed).toMatchObject({
+        sessionId: "initial-fan-out-root",
+        idempotencyKey: "initial-fan-out-root",
+        existingRunId: first.runId,
+      })
     }),
   )
 

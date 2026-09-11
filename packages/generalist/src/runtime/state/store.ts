@@ -1,6 +1,7 @@
 import { occurredAtMillis as preparedOccurredAtMillis, type PreparedObservation } from "./observation.js"
 /* eslint-disable max-lines -- one object-backed adapter wires the complete RunStore contract. */
 import { Context, Effect, Equal, Layer, Option, Schema, Stream } from "effect"
+import type { Address } from "../address.js"
 import { DurabilityFailure } from "../../durability/errors.js"
 import {
   ExternalChildPlacementConflict,
@@ -125,6 +126,30 @@ const makeStoreServices = (options: Options) =>
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     const { stateRef, readState, hasAdmissionKey, modifyState, lookupReceipt, ownership, activation } =
       yield* makeState(options)
+    const withAdmissionConflict =
+      (identity: { readonly address: Address; readonly sessionId: string; readonly idempotencyKey: string }) =>
+      <A, E, R>(
+        effect: Effect.Effect<A, E, R>,
+      ): Effect.Effect<A, E | DurabilityFailure | RuntimeUnavailable | IdempotencyConflict, R> =>
+        effect.pipe(
+          Effect.catchIf(
+            (error) => Schema.is(DurabilityFailure)(error) && error.reason === "input-conflict",
+            (error) =>
+              Effect.gen(function* () {
+                const state = yield* readState
+                const existing = state.idempotency.get(
+                  idempotencyKey(identity.address, identity.sessionId, identity.idempotencyKey),
+                )
+                if (existing === undefined) return yield* Effect.fail(error)
+                return yield* IdempotencyConflict.make({
+                  address: identity.address,
+                  sessionId: identity.sessionId,
+                  idempotencyKey: identity.idempotencyKey,
+                  existingRunId: existing.receipt.runId,
+                })
+              }),
+          ),
+        )
     const update = <Input, E>(
       definition: Definition<Input, void>,
       input: Input,
@@ -204,7 +229,13 @@ const makeStoreServices = (options: Options) =>
           return yield* modifyState(commands.admitSend, [input], (state, [preparedInput]) =>
             admitSend(state, preparedInput),
           )
-        }),
+        }).pipe(
+          withAdmissionConflict({
+            address: input.message.to,
+            sessionId: input.message.sessionId,
+            idempotencyKey: input.message.idempotencyKey,
+          }),
+        ),
       admitStart: (input, startOptions) =>
         normalizeTreePolicy(input.treePolicy).pipe(
           Effect.andThen(validatePayload({ value: input, boundary: "admission" })),
@@ -213,6 +244,11 @@ const makeStoreServices = (options: Options) =>
               admitStart(state, preparedInput, preparedStartOptions),
             ),
           ),
+          withAdmissionConflict({
+            address: input.message.to,
+            sessionId: input.message.sessionId,
+            idempotencyKey: input.message.idempotencyKey,
+          }),
         ),
       activate: (input) =>
         modifyState(commands.activate, [input], (state, [preparedInput]) => activateRoot(state, preparedInput.runId)),
@@ -225,25 +261,10 @@ const makeStoreServices = (options: Options) =>
           Effect.andThen(
             modifyState(commands.admitSpawn, [input], (state, [preparedInput]) => admitSpawn(state, preparedInput)),
           ),
-          Effect.catchTag("generalist/durability/DurabilityFailure", (error) => {
-            if (error.reason !== "input-conflict") return Effect.fail(error)
-            return readState.pipe(
-              Effect.flatMap((state) => {
-                const existing = state.idempotency.get(
-                  idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey),
-                )
-                return Effect.fail(
-                  existing === undefined
-                    ? error
-                    : IdempotencyConflict.make({
-                        address: input.message.to,
-                        sessionId: input.message.sessionId,
-                        idempotencyKey: input.message.idempotencyKey,
-                        existingRunId: existing.receipt.runId,
-                      }),
-                )
-              }),
-            )
+          withAdmissionConflict({
+            address: input.message.to,
+            sessionId: input.message.sessionId,
+            idempotencyKey: input.message.idempotencyKey,
           }),
         ),
       admitProgramChild: (input) =>

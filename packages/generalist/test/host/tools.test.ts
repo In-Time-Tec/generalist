@@ -492,9 +492,9 @@ it.effect("restores retained Tool input on a fresh host and preserves exact comm
         expect(yield* run.await).toBe(16)
         const conflict = yield* host.tools.start(checks, { count: 9 }, { commandId: "retained" }).pipe(Effect.flip)
         expect(conflict).toMatchObject({
-          _tag: "generalist/durability/DurabilityFailure",
-          reason: "input-conflict",
-          message: "The command identity already committed with different input",
+          _tag: "generalist/runtime/IdempotencyConflict",
+          idempotencyKey: "retained",
+          existingRunId: id,
         })
       }).pipe(scopedWith(fresh())),
     )
