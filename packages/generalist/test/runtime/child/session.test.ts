@@ -163,6 +163,9 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
       const restarted = ChildAdmission.makeAgentChildren(store)
       const second = yield* restarted.admit(spawn("same")).pipe(withCell(secondCall))
       const other = yield* children.admit(spawn("same")).pipe(withCell(otherOperation))
+      // The high-water mark spans every tool call of the operation: a new key under call-1 must clear
+      // call-2's recorded ordinal even though call-1's own recorded maximum is lower.
+      const later = yield* children.admit(spawn("later")).pipe(withCell(firstCall))
 
       // Identity includes the tool call, so the same key under a second tool call is a distinct child
       // that must extend the operation's ordinal sequence rather than reuse the first ordinal.
@@ -172,11 +175,14 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
       expect(originOf(first.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 0 })
       expect(originOf(second.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 1 })
       expect(originOf(other.childRunId)).toEqual({ operationKey: "other-cell", ordinal: 0 })
+      expect(originOf(later.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 2 })
 
-      // The first tool call's identity still recovers its original child and ordinal on replay.
+      // Each tool call's own identity still recovers its original child and ordinal on replay.
       const replay = yield* children.admit(spawn("same")).pipe(withCell(firstCall))
+      const replaySecond = yield* restarted.admit(spawn("same")).pipe(withCell(secondCall))
       expect(replay).toEqual(first)
-      expect(yield* operations.listDirect(parentRunId)).toHaveLength(3)
+      expect(replaySecond).toEqual(second)
+      expect(yield* operations.listDirect(parentRunId)).toHaveLength(4)
     }),
   )
 
