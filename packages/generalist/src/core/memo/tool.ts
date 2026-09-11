@@ -1,9 +1,9 @@
 import { Context, Duration, Effect, Option, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { digest } from "../durable/canonical-json.js"
-import { FrameworkFailure, Outcome } from "../tools/tool-result-codec.js"
+import { Outcome } from "../tools/tool-result-codec.js"
 import { type Registry, get } from "../tools/tool-registry.js"
-import { Dependencies, Store, expiresAt, type Provenance } from "./service.js"
+import { Dependencies, Store, expiresAt, type Entry, type Provenance } from "./service.js"
 
 export interface PureOptions {
   readonly ttl: Duration.Input
@@ -60,9 +60,9 @@ export const memoize = <E, R>(input: {
       tenant: dependencies.value.tenant,
       capabilityScope: dependencies.value.capabilityScope,
     })
-    const storageFailure = (cause: { readonly message: string }) =>
-      FrameworkFailure.make({ stage: "handler", tool: String(input.tool.name), message: cause.message })
-    const cached = yield* store.value.get(key).pipe(Effect.mapError(storageFailure))
+    const cached = yield* store.value
+      .get(key)
+      .pipe(Effect.catchTag("generalist/core/MemoError", () => Effect.succeed(Option.none<Entry>())))
     if (Option.isSome(cached)) {
       const decoded = Schema.decodeUnknownOption(Outcome)(cached.value.value)
       if (Option.isSome(decoded) && decoded.value._tag === "Success") {
@@ -78,7 +78,7 @@ export const memoize = <E, R>(input: {
           fromOperation: input.operation,
           expiresAtMillis: yield* expiresAt(configured.value.ttl),
         })
-        .pipe(Effect.mapError(storageFailure))
+        .pipe(Effect.catchTag("generalist/core/MemoError", () => Effect.void))
     }
     return outcome
   })
@@ -97,7 +97,7 @@ export const memoizeRegistered = <E, R>(input: {
   readonly run: string
   readonly operation: string
   readonly execute: Effect.Effect<Outcome, E, R>
-}): Effect.Effect<Outcome, E | FrameworkFailure, R> => {
+}): Effect.Effect<Outcome, E, R> => {
   const candidate = get(input.registry, input.name)
   const tool = candidate?.tool
   return tool === undefined || candidate?.modelTool !== undefined || input.skillActivation || input.handoff
