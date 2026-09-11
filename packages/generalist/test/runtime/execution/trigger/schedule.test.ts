@@ -4,7 +4,7 @@ import { Effect, Layer, Queue, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent } from "generalist"
-import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
+import { ExecutableResolver, LocalScheduler, RunStore, Runtime } from "generalist/runtime"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { provideScoped } from "../scoped-provide.js"
 
@@ -20,37 +20,38 @@ const unusedModel = Layer.effect(
     streamText: () => Stream.empty,
   }),
 )
-const fixture = Effect.gen(function* () {
-  const calls = yield* Queue.unbounded<void>()
-  const model = Layer.effect(
-    LanguageModel.LanguageModel,
-    LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText: () =>
-        Stream.concat(
-          Stream.fromEffect(Queue.offer(calls, undefined)).pipe(Stream.drain),
-          Stream.fromIterable<Response.StreamPartEncoded>([
-            Response.makePart("text-delta", { id: "done", delta: "scheduled" }),
-            Response.makePart("finish", { reason: "stop", usage, response: undefined }),
-          ]),
+const fixture = (schedulerMode: "poll" | "external" = "poll") =>
+  Effect.gen(function* () {
+    const calls = yield* Queue.unbounded<void>()
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.concat(
+            Stream.fromEffect(Queue.offer(calls, undefined)).pipe(Stream.drain),
+            Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("text-delta", { id: "done", delta: "scheduled" }),
+              Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+            ]),
+          ),
+      }),
+    )
+    return {
+      called: Queue.take(calls),
+      layer: Layer.mergeAll(
+        objectRuntimeLayer({ addresses: [], schedulerMode, scheduler: { pollInterval: "100 millis" } }).pipe(
+          Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
         ),
-    }),
-  )
-  return {
-    called: Queue.take(calls),
-    layer: Layer.mergeAll(
-      objectRuntimeLayer({ addresses: [], schedulerMode: "poll", scheduler: { pollInterval: "100 millis" } }).pipe(
-        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+        model,
+        allowAllAuthorization,
       ),
-      model,
-      allowAllAuthorization,
-    ),
-  }
-})
+    }
+  })
 
 it.effect("fires fixed UTC recurrences from the Runtime-scoped scheduler under TestClock", () =>
   Effect.gen(function* () {
-    const state = yield* fixture
+    const state = yield* fixture()
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
@@ -79,7 +80,7 @@ it.effect("fires fixed UTC recurrences from the Runtime-scoped scheduler under T
 
 it.effect("registers a stable schedule idempotently", () =>
   Effect.gen(function* () {
-    const state = yield* fixture
+    const state = yield* fixture()
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
@@ -155,7 +156,7 @@ it.effect("re-registers a stable schedule id on a fresh host after wall-clock ti
 
 it.effect("rejects recurrence rules outside the documented interval subset", () =>
   Effect.gen(function* () {
-    const state = yield* fixture
+    const state = yield* fixture()
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
@@ -164,6 +165,99 @@ it.effect("rejects recurrence rules outside the documented interval subset", () 
         const failure = yield* runtime
           .schedule(agent, "run", { rrule: "FREQ=WEEKLY;BYDAY=MO", sessionId: "invalid-schedule" })
           .pipe(Effect.flip)
+        expect(failure._tag).toBe("generalist/runtime/ScheduleInvalid")
+      }),
+    )
+  }),
+)
+
+it.effect("rejects intervals whose first instant leaves the representable DateTime range", () =>
+  Effect.gen(function* () {
+    const state = yield* fixture()
+    return yield* provideScoped(
+      state.layer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        yield* runtime.register(agent)
+        const overflowRules = [
+          "FREQ=SECONDLY;INTERVAL=9007199254740991",
+          "FREQ=MINUTELY;INTERVAL=9007199254740991",
+          "FREQ=DAILY;INTERVAL=9007199254740991",
+          "FREQ=DAILY;INTERVAL=9007199254740991;BYHOUR=0",
+        ] as const
+        for (const [index, rrule] of overflowRules.entries()) {
+          const failure = yield* runtime
+            .schedule(agent, "run", { rrule, sessionId: `overflow-${index}` })
+            .pipe(Effect.flip)
+          expect(failure._tag).toBe("generalist/runtime/ScheduleInvalid")
+        }
+
+        // Boundary controls: large-but-representable rules are accepted, so the
+        // rejections above are DateTime range bounds rather than size heuristics.
+        const validRules = [
+          "FREQ=SECONDLY;INTERVAL=8000000000000",
+          "FREQ=DAILY;BYHOUR=23",
+          "FREQ=DAILY;INTERVAL=1000000;BYHOUR=1",
+        ] as const
+        for (const [index, rrule] of validRules.entries()) {
+          const receipt = yield* runtime.schedule(agent, "run", {
+            rrule,
+            sessionId: `valid-${index}`,
+            scheduleId: `schedule_valid_${index}`,
+          })
+          expect(receipt.scheduleId).toBe(`schedule_valid_${index}`)
+        }
+
+        const recovery = yield* runtime.schedule(agent, "run", {
+          rrule: "FREQ=MINUTELY",
+          sessionId: "after-overflow",
+          scheduleId: "schedule_after_overflow",
+        })
+        expect(recovery.scheduleId).toBe("schedule_after_overflow")
+      }),
+    )
+  }),
+)
+
+it.effect("fails typed when a stored recurrence cannot advance past the representable range", () =>
+  Effect.gen(function* () {
+    const state = yield* fixture("external")
+    return yield* provideScoped(
+      state.layer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(agent)
+        yield* runtime.schedule(agent, "run", {
+          rrule: "FREQ=SECONDLY",
+          sessionId: "advance-session",
+          scheduleId: "schedule_advance_base",
+        })
+        yield* TestClock.adjust("1100 millis")
+        const claimed = yield* store.claimSchedules({
+          commandId: "advance-claim",
+          ownerId: "advance-owner",
+          leaseMillis: 30_000,
+          limit: 1,
+        })
+        const base = claimed[0]
+        expect(base).toBeDefined()
+        if (base === undefined) {
+          return yield* Effect.die(new Error("expected one due schedule to seed the advance defect"))
+        }
+        yield* store.registerSchedule({
+          ...base,
+          scheduleId: "schedule_advance_overflow",
+          rrule: "FREQ=DAILY;INTERVAL=9007199254740991",
+          rule: { frequency: "DAILY", interval: 9007199254740991 },
+          nextAt: "1970-01-01T00:00:01.000Z",
+          occurrence: 0,
+          status: "active",
+          createdAt: "1970-01-01T00:00:00.000Z",
+        })
+
+        const failure = yield* scheduler.drain().pipe(Effect.flip)
         expect(failure._tag).toBe("generalist/runtime/ScheduleInvalid")
       }),
     )

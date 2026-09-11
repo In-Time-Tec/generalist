@@ -3,6 +3,10 @@ import type { DurabilityFailure } from "../../durability/errors.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { RunStore } from "../run/store.js"
 import type { StartExecutionError } from "../service.js"
+import type { ScheduleInvalid } from "./trigger/schedule.js"
+
+/** Typed scheduler failures: run admission plus an unrepresentable stored recurrence. */
+export type SchedulerError = StartExecutionError | ScheduleInvalid
 
 export interface Options {
   readonly workerId: string
@@ -20,14 +24,14 @@ export interface DrainResult {
 }
 
 export interface Service {
-  readonly tick: Effect.Effect<void, StartExecutionError, RunStore>
-  readonly drain: (options?: { readonly fuel?: number }) => Effect.Effect<DrainResult, StartExecutionError, RunStore>
+  readonly tick: Effect.Effect<void, SchedulerError, RunStore>
+  readonly drain: (options?: { readonly fuel?: number }) => Effect.Effect<DrainResult, SchedulerError, RunStore>
   /** Reconcile one cancellation without scanning the store. */
   readonly reconcileCancellation: (
     runId: string,
   ) => Effect.Effect<"settled" | "deferred" | "inactive" | "stale", RuntimeUnavailable | DurabilityFailure, RunStore>
   /** Awaits every execution this scheduler admitted and has not yet observed finish. */
-  readonly idle: Effect.Effect<void, StartExecutionError>
+  readonly idle: Effect.Effect<void, SchedulerError>
 }
 
 export class LocalScheduler extends Context.Service<LocalScheduler, Service>()(

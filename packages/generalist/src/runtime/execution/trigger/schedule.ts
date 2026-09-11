@@ -62,19 +62,48 @@ const frequencyMillis = {
   DAILY: 86_400_000,
 } satisfies Record<Frequency, number>
 
-/** Advance one fixed UTC recurrence from its prior scheduled instant. */
+/** Inclusive epoch-millisecond magnitude a JavaScript `Date` (and `DateTime`) can represent. */
+const dateRangeMillis = 8_640_000_000_000_000
+
+const representable = (millis: number): boolean => Number.isFinite(millis) && Math.abs(millis) <= dateRangeMillis
+
+/** Canonical persisted form of one supported rule. */
+export const formatRRule = (rule: RRule): string =>
+  `FREQ=${rule.frequency}${rule.interval === 1 ? "" : `;INTERVAL=${rule.interval}`}${rule.hour === undefined ? "" : `;BYHOUR=${rule.hour}`}`
+
+const unrepresentable = (rule: RRule) => ScheduleInvalid.make({ rrule: formatRRule(rule) })
+
+/**
+ * Advance one fixed UTC recurrence from its prior scheduled instant.
+ * Rules whose next instant leaves the representable `DateTime` range fail typed instead of defecting.
+ */
 export const nextAt: {
-  (afterMillis: number): (rule: RRule) => string
-  (rule: RRule, afterMillis: number): string
-} = Function.dual(2, (rule: RRule, afterMillis: number): string => {
-  if (rule.hour === undefined) {
-    return DateTime.formatIso(DateTime.makeUnsafe(afterMillis + frequencyMillis[rule.frequency] * rule.interval))
-  }
-  const after = DateTime.makeUnsafe(afterMillis)
-  const sameDay = DateTime.setPartsUtc(after, { hour: rule.hour, minute: 0, second: 0, millisecond: 0 })
-  const next = DateTime.toEpochMillis(sameDay) > afterMillis ? sameDay : DateTime.add(sameDay, { days: rule.interval })
-  return DateTime.formatIso(next)
-})
+  (afterMillis: number): (rule: RRule) => Effect.Effect<string, ScheduleInvalid>
+  (rule: RRule, afterMillis: number): Effect.Effect<string, ScheduleInvalid>
+} = Function.dual(2, (rule: RRule, afterMillis: number) =>
+  Effect.gen(function* () {
+    if (!representable(afterMillis)) {
+      return yield* unrepresentable(rule)
+    }
+    if (rule.hour === undefined) {
+      const nextMillis = afterMillis + frequencyMillis[rule.frequency] * rule.interval
+      if (!representable(nextMillis)) {
+        return yield* unrepresentable(rule)
+      }
+      return DateTime.formatIso(DateTime.makeUnsafe(nextMillis))
+    }
+    const after = DateTime.makeUnsafe(afterMillis)
+    const sameDayMillis = DateTime.toEpochMillis(
+      DateTime.setPartsUtc(after, { hour: rule.hour, minute: 0, second: 0, millisecond: 0 }),
+    )
+    const nextMillis =
+      sameDayMillis > afterMillis ? sameDayMillis : sameDayMillis + frequencyMillis.DAILY * rule.interval
+    if (!representable(nextMillis)) {
+      return yield* unrepresentable(rule)
+    }
+    return DateTime.formatIso(DateTime.makeUnsafe(nextMillis))
+  }),
+)
 
 /** Persisted fresh-Run admission data for one recurring schedule. */
 export interface ScheduleDefinition {

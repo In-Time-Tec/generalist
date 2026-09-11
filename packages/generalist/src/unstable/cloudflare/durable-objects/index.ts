@@ -18,8 +18,7 @@ import { activate } from "../../../durability/activation.js"
 import { layerRunStore as layerRunStoreDurability } from "../../../runtime/state/store.js"
 import { layer as layerDurability, type RuntimeServices } from "../../../runtime/state/layer.js"
 import { layer as r2Layer, type Bucket } from "../../../durability/r2.js"
-import { LocalScheduler, type DrainResult } from "../../../runtime/execution/local-scheduler.js"
-import type { StartExecutionError } from "../../../runtime/service.js"
+import { LocalScheduler, type DrainResult, type SchedulerError } from "../../../runtime/execution/local-scheduler.js"
 import { RuntimeUnavailable } from "../../../runtime/errors.js"
 import { ExecutableResolver } from "../../../runtime/executable/resolver.js"
 
@@ -220,6 +219,6 @@ export const reconcile: {
 
 type Reconciliation = Effect.Effect<
   DrainResult,
-  StartExecutionError | Layer.Error<ReturnType<typeof layer>>,
+  SchedulerError | Layer.Error<ReturnType<typeof layer>>,
   Layer.Services<ReturnType<typeof layer>>
 >
