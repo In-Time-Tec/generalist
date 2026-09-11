@@ -117,18 +117,25 @@ export const resolveWith = (
   Effect.gen(function* () {
     const runId = yield* runIdFromToken(token)
     const operator = options.operator
-    if (operator !== undefined) {
+    const remember = decision._tag === "Approved" ? decision.remember : undefined
+    // A remembered rule is a widening side effect that must not survive a rejected answer.
+    // Validate the exact open obligation before writing it; the Runtime still re-validates the
+    // same obligation transactionally when the answer is submitted below.
+    if (operator !== undefined || remember !== undefined) {
       const explanation = yield* runtime.operator.explain(runId)
       const legal = explanation.obligations.some(
         (obligation) => obligation._tag === "AwaitApproval" && obligation.token === token,
       )
       if (!legal) {
-        return yield* IllegalOperatorAction.make({ runId, decision: explanation.decision, action: "resolveApproval" })
+        if (operator !== undefined) {
+          return yield* IllegalOperatorAction.make({ runId, decision: explanation.decision, action: "resolveApproval" })
+        }
+        // Without an operator, submit the answer so the Runtime reports its canonical typed
+        // rejection without persisting the rule first.
+      } else if (remember !== undefined) {
+        const rules = yield* RuleStore
+        yield* rules.remember(remember)
       }
-    }
-    if (decision._tag === "Approved" && decision.remember !== undefined) {
-      const rules = yield* RuleStore
-      yield* rules.remember(decision.remember)
     }
     const identity = operator === undefined ? undefined : { operator }
     if (decision._tag === "Approved") {
