@@ -145,6 +145,6 @@ Exact retries are idempotent; changed immutable placement, root, executable, or 
 ## Related
 
 - Source: `packages/generalist/src/runtime/child/admission.ts`, `packages/generalist/src/runtime/child/external/placement.ts`, `packages/generalist/src/runtime/child/external/store.ts`
-- Tests: `packages/generalist/test/runtime/executable/registered-agent.test.ts`, `packages/generalist/test/runtime/child/admission.test.ts`, `packages/generalist/test/host/index.test.ts`
+- Tests: `packages/generalist/test/runtime/executable/registered-agent.test.ts`, `packages/generalist/test/runtime/child/admission.test.ts`, `packages/generalist/test/runtime/child/session.test.ts`, `packages/generalist/test/host/index.test.ts`
 - Site: `/docs/multi-agent`
 - Decisions/tradeoffs: [Admission returns at admission](../decisions/child-admission-returns-at-admission.md)

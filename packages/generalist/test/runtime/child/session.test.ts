@@ -152,13 +152,16 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
   it.effect("extends one operation's ordinal sequence across tool calls that reuse a key", () =>
     Effect.gen(function* () {
-      const { children, operations, parentRunId } = yield* parentRun("cross-toolcall-ordinals")
+      const { children, operations, parentRunId, store } = yield* parentRun("cross-toolcall-ordinals")
       const firstCall = { runId: parentRunId, toolCallId: "call-1", operationKey: cellOperationKey }
       const secondCall = { runId: parentRunId, toolCallId: "call-2", operationKey: cellOperationKey }
       const otherOperation = { runId: parentRunId, toolCallId: "call-3", operationKey: "other-cell" }
 
       const first = yield* children.admit(spawn("same")).pipe(withCell(firstCall))
-      const second = yield* children.admit(spawn("same")).pipe(withCell(secondCall))
+      // A restarted host holds no in-process state, so the second tool call must extend the durable
+      // sequence rather than inherit the first call's ordinal.
+      const restarted = ChildAdmission.makeAgentChildren(store)
+      const second = yield* restarted.admit(spawn("same")).pipe(withCell(secondCall))
       const other = yield* children.admit(spawn("same")).pipe(withCell(otherOperation))
 
       // Identity includes the tool call, so the same key under a second tool call is a distinct child
