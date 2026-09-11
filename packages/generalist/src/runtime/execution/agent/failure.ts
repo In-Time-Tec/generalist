@@ -13,6 +13,7 @@ import { Exhausted } from "../../../core/durable/run-budget.js"
 import { GateFailed } from "../../../core/agent/gates/definition.js"
 import { AgentExecutionFailure, StructuredAgentFailure } from "../../errors.js"
 import { HookFailed } from "../../../hooks/index.js"
+import type { RunFailure } from "../../run.js"
 
 const pendingCalls = (pending: ReadonlyArray<{ readonly tool_name: string; readonly tool_call_id: string }>): string =>
   pending.length === 0
@@ -86,6 +87,13 @@ const typedFailure = (cause: Cause.Cause<unknown>) => {
   )
 }
 
+/** A hook failure is already the terminal typed failure; the Runtime records it verbatim. */
+const hookFailure = (cause: Cause.Cause<unknown>): HookFailed | undefined => {
+  const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+  if (reason === undefined || !Cause.isFailReason(reason)) return undefined
+  return Schema.is(HookFailed)(reason.error) ? reason.error : undefined
+}
+
 /**
  * Every rendered sentence across a multi-reason cause. A cause that carries more than one reason
  * would otherwise fall through to the squashed defect and lose the typed failure entirely.
@@ -111,3 +119,6 @@ export const make = (cause: Cause.Cause<unknown>): AgentExecutionFailure => {
   if (typed !== undefined) return AgentExecutionFailure.make({ message, failure: typed })
   return result
 }
+
+/** Map one Agent exit cause to its durable terminal failure, preserving HookFailed verbatim. */
+export const toRunFailure = (cause: Cause.Cause<unknown>): RunFailure => hookFailure(cause) ?? make(cause)

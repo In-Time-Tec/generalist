@@ -10678,6 +10678,7 @@
                                       {
                                         "$ref": "#/components/schemas/generalist_runtime_AgentExecutionFailureEncoded"
                                       },
+                                      { "$ref": "#/components/schemas/generalist_core_HookFailedEncoded" },
                                       { "$ref": "#/components/schemas/generalist_runtime_ExecutablePinMissingEncoded" },
                                       {
                                         "$ref": "#/components/schemas/generalist_runtime_ExecutableIdentityMismatchEncoded"
@@ -13646,6 +13647,7 @@
                                       {
                                         "$ref": "#/components/schemas/generalist_runtime_AgentExecutionFailureEncoded"
                                       },
+                                      { "$ref": "#/components/schemas/generalist_core_HookFailedEncoded" },
                                       { "$ref": "#/components/schemas/generalist_runtime_ExecutablePinMissingEncoded" },
                                       {
                                         "$ref": "#/components/schemas/generalist_runtime_ExecutableIdentityMismatchEncoded"
@@ -17011,6 +17013,32 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "message", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_core_HookFailedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/core/HookFailed"] },
+          "event": {
+            "type": "string",
+            "enum": [
+              "RunStart",
+              "TurnStart",
+              "ModelCall",
+              "ToolCall",
+              "ToolResult",
+              "ApprovalRequest",
+              "Compaction",
+              "ChildStart",
+              "ChildEnd",
+              "Steer",
+              "RunEnd"
+            ]
+          },
+          "cause": {},
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "event", "cause", "hint"],
         "additionalProperties": false
       },
       "generalist_runtime_ExecutablePinMissingEncoded": {

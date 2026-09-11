@@ -24,7 +24,7 @@ import { JournalFault } from "../operation/journal-fault.js"
 import { make as makeExecutionInterruption } from "./interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { executeTool } from "./tool/execute.js"
-import { make as makeAgentExecutionFailure } from "./agent/failure.js"
+import { toRunFailure } from "./agent/failure.js"
 import { make as makeExecutionRetry } from "./recovery/retry.js"
 import { ExecutionResolution } from "./resolution/resolve.js"
 import { make as makeToolCancellation } from "../operation/tool-cancellation.js"
@@ -594,7 +594,7 @@ const makeFor = (
                             false,
                           )
                         }
-                        const failure = makeAgentExecutionFailure(exit.cause)
+                        const failure = toRunFailure(exit.cause)
                         if (isProgramChild) {
                           yield* Ref.set(deferredProgramChildTerminal, { _tag: "Fail", error: failure })
                           return
