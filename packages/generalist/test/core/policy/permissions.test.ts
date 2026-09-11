@@ -26,10 +26,19 @@ describe("Permissions", () => {
     }
 
     expect(Permissions.evaluate(ruleset, "bash", { command: ["rm", "-rf", "/"] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { command: [["rm"], ["-rf", "/"]] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { command: [[["rm"]], [["-rf", "/"]]] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { command: ["rm", ["-rf", "/"]] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { commands: [[{ executable: "rm -rf" }], [["/"]]] })).toBe("deny")
     expect(Permissions.evaluate(ruleset, "bash", { input: { command: ["rm", "-rf", "/"] } })).toBe("deny")
     expect(Permissions.evaluate(ruleset, "bash", { commands: [{ executable: "rm -rf /tmp/cache" }] })).toBe("deny")
     expect(Permissions.evaluate(ruleset, "bash", { run: () => "rm -rf /" })).toBe("deny")
     expect(Permissions.evaluate(ruleset, "bash", { command: ["ls", "-la"] })).toBe("allow")
+    expect(Permissions.evaluate(ruleset, "bash", { command: [["echo"], ["hello"]] })).toBe("allow")
+
+    expect(Permissions.matches("bash:rm -rf*", "bash", { command: [["rm"], ["-rf", "/"]] })).toBe(true)
+    expect(Permissions.matches("bash:rm -rf*", "bash", { command: [[["rm"]], [["-rf", "/"]]] })).toBe(true)
+    expect(Permissions.matches("bash:rm -rf*", "bash", { command: [["echo"], ["hello"]] })).toBe(false)
   })
 
   it("uses last-match semantics", () =>
