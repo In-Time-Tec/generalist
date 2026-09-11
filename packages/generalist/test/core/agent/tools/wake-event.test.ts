@@ -29,10 +29,12 @@ describe("Agent.awaitEvent timeout boundary", () => {
     }),
   )
 
-  it.effect("zero, negative, and unparsable timeouts fail typed", () =>
+  it.effect("zero, negative, non-finite, and unparsable timeouts fail typed", () =>
     Effect.gen(function* () {
       expectInvalid(yield* awaitInvalid("0 millis"))
       expectInvalid(yield* awaitInvalid("-1 seconds"))
+      expectInvalid(yield* awaitInvalid(Number.NaN))
+      expectInvalid(yield* awaitInvalid(Number.POSITIVE_INFINITY))
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: Untrusted callers can pass unparsable strings at runtime even though `Duration.Input` excludes them; `awaitEvent` must refuse the value typed.
       expectInvalid(yield* awaitInvalid("not-a-duration" as Duration.Input))
     }),
@@ -40,12 +42,18 @@ describe("Agent.awaitEvent timeout boundary", () => {
 
   it.effect("representable timeouts suspend through the await control defect", () =>
     Effect.gen(function* () {
-      for (const timeout of ["1 second", "8000000000000000 millis"] as const) {
-        const exit = yield* awaitExit(timeout)
-        expect(Exit.isFailure(exit)).toBe(true)
-        if (Exit.isFailure(exit)) {
-          expect(suspendedFromCause(exit.cause)).toBeDefined()
-        }
+      const normal = yield* awaitExit("1 second")
+      expect(Exit.isFailure(normal)).toBe(true)
+      if (Exit.isFailure(normal)) {
+        const suspension = suspendedFromCause(normal.cause)
+        expect(suspension?.token).toBe("wake-event-timeout:await-event")
+        expect(suspension?.awaitEvent.deadline).toBe("1970-01-01T00:00:01.000Z")
+      }
+
+      const large = yield* awaitExit("8000000000000000 millis")
+      expect(Exit.isFailure(large)).toBe(true)
+      if (Exit.isFailure(large)) {
+        expect(suspendedFromCause(large.cause)).toBeDefined()
       }
     }),
   )
