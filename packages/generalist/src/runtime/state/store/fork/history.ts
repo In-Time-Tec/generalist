@@ -4,8 +4,10 @@ import { eventIdFor, type RunEvent } from "../../../run/event.js"
 import { ForkCheckpoint } from "../../../execution/recovery/fork-checkpoint.js"
 import type { RuntimeSession, RuntimeState, StoredRun } from "../../projection.js"
 import { LoopDriverState } from "../../../../core/durable/loop-driver-state.js"
+import { SessionCursor } from "../../../../core/agent/session/cursor.js"
 import { namespace } from "../../../../core/durable/component/definition.js"
 import type { Checkpoint } from "../../../../core/durable/component/state.js"
+import type { OperationRecord } from "../../../operation/record.js"
 import type { ExecutionCheckpoint } from "../../../execution/state.js"
 
 const { forkCheckpoint, forkOperationKey } = ForkCheckpoint
@@ -51,6 +53,39 @@ export const leafAt = (events: ReadonlyArray<RunEvent>): string | null => {
       event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted",
   )
   return response?.sessionEntryId ?? null
+}
+
+/**
+ * Resolve the copied Session leaf at an operation boundary.
+ *
+ * A committed model response names its own Session entry, but Session sync operations append tool
+ * results and steering prompts after it. Those operations record the resulting cursor, so the
+ * latest completed cursor at or before the boundary re-anchors the copied leaf. Without this, a
+ * branch copies the Session entries but projects only the model-response prefix, and a resume from
+ * a turn-end checkpoint cannot reconstruct the pending tool results that produced the retained
+ * operation inputs.
+ */
+export const sessionLeafAt = (input: {
+  readonly operations: ReadonlyArray<OperationRecord>
+  readonly events: ReadonlyArray<RunEvent>
+  readonly cutoff: number
+}): string | null => {
+  const response = input.events.findLast(
+    (event): event is Extract<RunEvent, { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }> =>
+      event._tag === "ModelResponseCommitted" || event._tag === "ModelResponseInterrupted",
+  )
+  let sequence = response?.sequence ?? -1
+  let leaf: string | null = response?.sessionEntryId ?? null
+  for (const operation of input.operations) {
+    if (operation.kind !== "memory") continue
+    const completed = operation.completedSequence
+    if (completed === undefined || completed > input.cutoff || completed < sequence) continue
+    const cursor = Schema.decodeUnknownOption(SessionCursor)(operation.result, { onExcessProperty: "error" })
+    if (Option.isNone(cursor)) continue
+    sequence = completed
+    leaf = cursor.value.leafId
+  }
+  return leaf
 }
 
 export const copiedSession = ({

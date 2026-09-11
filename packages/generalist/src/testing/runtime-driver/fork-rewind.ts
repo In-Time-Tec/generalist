@@ -8,6 +8,7 @@ import { AgentExecutionFailure } from "../../runtime/errors.js"
 import { make as interruptedResponse } from "../../runtime/execution/model-response/interrupted.js"
 import type { ForkRewindCapability, Options, Services } from "./contract.js"
 import { registerRetainedAndInherited } from "./payload/inheritance.js"
+import { registerTurnCompletedTransition } from "./fork-rewind/turn-completed.js"
 
 interface Registration<LayerError, ClaimsLayerError> {
   readonly options: Options<LayerError, ClaimsLayerError>
@@ -397,4 +398,6 @@ export const registerForkRewind = <LayerError, ClaimsLayerError>(
       ),
     )
   })
+
+  registerTurnCompletedTransition(registration)
 }
