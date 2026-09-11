@@ -131,15 +131,23 @@ const exactClosure: {
           for (const [name, pin] of expectedByName) {
             const bound = actualByName.get(name)
             if (bound === undefined)
-              return yield* ProgramHandlerMismatch.make({ kind, name, reason: "declared capability has no handler" })
+              return yield* ProgramHandlerMismatch.make({
+                kind,
+                handlerName: name,
+                reason: "declared capability has no handler",
+              })
             if (bound !== pin)
-              return yield* ProgramHandlerMismatch.make({ kind, name, reason: "handler pin does not match" })
+              return yield* ProgramHandlerMismatch.make({
+                kind,
+                handlerName: name,
+                reason: "handler pin does not match",
+              })
           }
           for (const name of actualByName.keys()) {
             if (!expectedByName.has(name))
               return yield* ProgramHandlerMismatch.make({
                 kind,
-                name,
+                handlerName: name,
                 reason: "handler is outside the manifest closure",
               })
           }

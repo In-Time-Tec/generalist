@@ -155,13 +155,13 @@ export class SubstitutionInvalid extends ActionableTaggedError<SubstitutionInval
 
 /** An Agent name is already registered in this Runtime process. */
 export class DuplicateAgent extends ActionableTaggedError<DuplicateAgent>()("generalist/runtime/DuplicateAgent", {
-  name: Schema.String,
+  agentName: Schema.String,
   hint: errorHint("Register each Agent name once per Runtime process, or rename the conflicting Agent."),
 }) {}
 
 /** A durable Run names an Agent that this Runtime process has not registered. */
 export class UnknownAgent extends ActionableTaggedError<UnknownAgent>()("generalist/runtime/UnknownAgent", {
-  name: Schema.String,
+  agentName: Schema.String,
   runId: Schema.String,
   hint: errorHint("Register the named Agent in this Runtime process before recovering or inspecting the Run."),
 }) {}
@@ -409,7 +409,7 @@ export class AgentNameConflict extends ActionableTaggedError<AgentNameConflict>(
   "generalist/runtime/AgentNameConflict",
   {
     scope: Schema.String,
-    name: Schema.String,
+    agentName: Schema.String,
     existingRunId: Schema.String,
     hint: errorHint("Use a unique name in this scope or address the existing named Run."),
   },

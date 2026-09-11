@@ -126,7 +126,7 @@ describe("partition activation deadlines", () => {
         const claim = yield* host.store.claimExecution({ runId: run.runId, ownerId: "waiting", commandId: "claim" })
         yield* host.store.suspend({
           ...claim,
-          suspension: UnknownAgent.make({ name: "unregistered", runId: run.runId }),
+          suspension: UnknownAgent.make({ agentName: "unregistered", runId: run.runId }),
           waits: [
             {
               waitId: "event",

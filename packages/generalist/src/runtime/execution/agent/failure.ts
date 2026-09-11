@@ -73,7 +73,7 @@ const summary = (failure: SummaryFailure): string | undefined => {
     return `Tool progress queue for call ${failure.toolCallId} overflowed its capacity of ${failure.capacity} at turn ${failure.turn}`
   }
   if (Schema.is(ToolNameCollision)(failure)) {
-    return `Tool name ${failure.name} is declared by ${failure.origins.map((origin) => origin._tag).join(", ")}`
+    return `Tool name ${failure.toolName} is declared by ${failure.origins.map((origin) => origin._tag).join(", ")}`
   }
   return undefined
 }

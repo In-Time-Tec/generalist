@@ -21,7 +21,7 @@ export const make = (options: {
           ...claim,
           waits: [
             {
-              waitId: `agent:${error.name}`,
+              waitId: `agent:${error.agentName}`,
               reason: { _tag: "External", capability: "agent-registration" },
               status: "open",
               openedAt,

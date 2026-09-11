@@ -192,7 +192,7 @@ layer(Layer.empty)("Handoff", (it) => {
         const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, "solve")))
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "handoff_to_math",
+            toolName: "handoff_to_math",
             origins: [
               { _tag: "Handoff", specialist: "math", mode: "same-run" },
               { _tag: "Handoff", specialist: "math", mode: "same-run" },

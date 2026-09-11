@@ -50,7 +50,7 @@ describe("terminal agent failure messages", () => {
     {
       name: "ToolNameCollision",
       error: AgentEvent.ToolNameCollision.make({
-        name: "typescript",
+        toolName: "typescript",
         origins: [{ _tag: "Static", agent: "rika-root" }],
       }),
       expected: "Tool name typescript is declared by Static",

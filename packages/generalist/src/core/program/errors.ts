@@ -5,7 +5,7 @@ export class ProgramHandlerMismatch extends ActionableTaggedError<ProgramHandler
   "generalist/core/ProgramHandlerMismatch",
   {
     kind: Schema.Literals(["tool", "step", "agent"]),
-    name: Schema.String,
+    handlerName: Schema.String,
     reason: Schema.String,
     hint: errorHint("Register a handler whose name and schema match the pinned program declaration."),
   },

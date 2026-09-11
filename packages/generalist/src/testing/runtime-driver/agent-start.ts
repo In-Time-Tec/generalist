@@ -201,7 +201,7 @@ const registerStartByAgent = <LayerError, ClaimsLayerError>(
           .register(duplicate)
           .pipe(Effect.provideService(LanguageModel.LanguageModel, model), Effect.flip)
         expect(error).toBeInstanceOf(DuplicateAgent)
-        expect(error).toMatchObject({ name })
+        expect(error).toMatchObject({ agentName: name })
       }),
     ),
   )
@@ -284,7 +284,7 @@ const registerUnknownAgentOnRecovery = <LayerError, ClaimsLayerError>(
         const recovered = yield* services.store.loadExecution(receipt.runId)
         expect(inspection.status).toBe("waiting")
         expect(recovered.suspension).toBeInstanceOf(UnknownAgent)
-        expect(recovered.suspension).toMatchObject({ name, runId: receipt.runId })
+        expect(recovered.suspension).toMatchObject({ agentName: name, runId: receipt.runId })
       }),
     ),
   )

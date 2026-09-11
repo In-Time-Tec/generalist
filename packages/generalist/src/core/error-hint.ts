@@ -17,6 +17,7 @@ const identifyingFields = new Set([
   "agent",
   "agentName",
   "name",
+  "handlerName",
   "address",
   "provider",
   "model",

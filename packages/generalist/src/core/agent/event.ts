@@ -383,7 +383,7 @@ export type ToolOrigin = typeof ToolOrigin.Type
 
 /** The advertised tool set contains more than one declaration for a name. */
 export class ToolNameCollision extends ActionableTaggedError<ToolNameCollision>()("generalist/core/ToolNameCollision", {
-  name: Schema.String,
+  toolName: Schema.String,
   origins: Schema.NonEmptyArray(ToolOrigin),
   hint: errorHint("Rename or remove one listed declaration so each advertised tool name is unique."),
 }) {}
