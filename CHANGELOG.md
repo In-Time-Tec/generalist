@@ -11,6 +11,7 @@
 ## 0.65.5
 
 - Add `generalist/durability/fs`, a local-directory object transport for the same durability engine. Objects are immutable files installed by atomic hard link after a synced temporary write; listings decode, sort, and page keys over bounded reads. It provides single-host canonical state for local agents and tests — a dedicated directory, POSIX hard-link semantics, and no reachability from a replacement host. `ObjectMaintenance` removal stays a separate Layer.
+- Reject a caller payload above an enforced durable bound with `generalist/runtime/PayloadTooLarge` and HTTP `413 Payload Too Large` instead of reporting `RuntimeUnavailable` (`503`) and asking the caller to restore the Runtime. The message still names the exceeded bound and the boundary that rejected the value.
 
 ## 0.65.4
 

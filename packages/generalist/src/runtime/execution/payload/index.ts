@@ -1,5 +1,5 @@
 import { Effect, Predicate, Schema } from "effect"
-import { RuntimeUnavailable } from "../../errors.js"
+import { PayloadTooLarge } from "../../errors.js"
 
 /** @internal Maximum JSON bytes in one durable value, not a history or Session lifetime limit. */
 export const maximumBytes = 1024 * 1024
@@ -7,7 +7,8 @@ export const maximumBytes = 1024 * 1024
 export const maximumEventBytes = 256 * 1024
 
 const rejected = (boundary: string, reason: string) =>
-  RuntimeUnavailable.make({
+  PayloadTooLarge.make({
+    boundary,
     message: `Durable ${boundary} rejected: ${reason}. Store large data externally and pass a bounded reference.`,
   })
 
@@ -93,7 +94,7 @@ export const encode = <A>({
       return checkJson({ text: serialize(value), boundary, limit })
     },
     catch: (error) =>
-      Schema.is(RuntimeUnavailable)(error) ? error : rejected(boundary, "payload could not be inspected"),
+      Schema.is(PayloadTooLarge)(error) ? error : rejected(boundary, "payload could not be inspected"),
   })
 
 /** @internal Validate one admission without changing any value or replacing replay-critical data. */

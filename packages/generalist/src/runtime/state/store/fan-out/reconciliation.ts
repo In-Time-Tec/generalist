@@ -1,6 +1,6 @@
 import type { PreparedObservation } from "../../observation.js"
 import { Effect, Function } from "effect"
-import { RuntimeUnavailable } from "../../../errors.js"
+import { PayloadTooLarge, RuntimeUnavailable } from "../../../errors.js"
 import type { RunEvent } from "../../../run/event.js"
 import type { FanOutMemberResult } from "../../../child/fan-out.js"
 import type { RuntimeState, StoredFanOut, StoredRun } from "../../projection.js"
@@ -77,8 +77,8 @@ export const reconcileFanOut: {
     settlePending: (
       state: RuntimeState,
       parent: StoredRun,
-    ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
-  ): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+    ) => Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>,
+  ): (state: RuntimeState) => Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     child: StoredRun,
@@ -86,8 +86,8 @@ export const reconcileFanOut: {
     settlePending: (
       state: RuntimeState,
       parent: StoredRun,
-    ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
-  ): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+    ) => Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>,
+  ): Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
 } = Function.dual(
   4,
   (
@@ -97,7 +97,7 @@ export const reconcileFanOut: {
     settlePending: (
       state: RuntimeState,
       parent: StoredRun,
-    ) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>,
+    ) => Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>,
   ) =>
     Effect.gen(function* () {
       const target = reconciliationTarget(state, child.runId)

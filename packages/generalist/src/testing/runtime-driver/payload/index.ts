@@ -17,7 +17,7 @@ export const registerPayload = <LayerError>(input: {
       Effect.gen(function* () {
         const large = "x".repeat(maximumBytes + 1)
         const request = { ...input.request, prompt: large }
-        expect((yield* Effect.flip(services.runtime.send(request)))._tag).toBe("generalist/runtime/RuntimeUnavailable")
+        expect((yield* Effect.flip(services.runtime.send(request)))._tag).toBe("generalist/runtime/PayloadTooLarge")
         const receipt = yield* services.runtime.send({ ...request, prompt: "bounded admission" })
         expect(receipt.duplicate).toBe(false)
         const claim = yield* capability.claim(services, { runId: receipt.runId, commandId: "payload-bounds" })
@@ -31,7 +31,7 @@ export const registerPayload = <LayerError>(input: {
           attempt: 0,
         }
         expect((yield* Effect.flip(services.store.recordOperation(operation)))._tag).toBe(
-          "generalist/runtime/RuntimeUnavailable",
+          "generalist/runtime/PayloadTooLarge",
         )
         expect(
           yield* services.store.getOperationByKey({ runId: receipt.runId, operationKey: operation.operationKey }),
@@ -50,7 +50,7 @@ export const registerPayload = <LayerError>(input: {
             (yield* Effect.flip(
               services.store.completeOperation({ ...claim, operationId: recorded.operationId, outcome }),
             ))._tag,
-          ).toBe("generalist/runtime/RuntimeUnavailable")
+          ).toBe("generalist/runtime/PayloadTooLarge")
           expect(
             (yield* services.store.getOperationByKey({ runId: receipt.runId, operationKey: operation.operationKey }))
               ?.status,
@@ -70,7 +70,7 @@ export const registerPayload = <LayerError>(input: {
               },
             }),
           ))._tag,
-        ).toBe("generalist/runtime/RuntimeUnavailable")
+        ).toBe("generalist/runtime/PayloadTooLarge")
         expect((yield* services.runtime.snapshot(receipt.runId)).cursor).toBe(before.cursor)
         const session = Option.getOrThrow(yield* services.store.claimedSessionStore(claim))
         const leaf = yield* session.leaf

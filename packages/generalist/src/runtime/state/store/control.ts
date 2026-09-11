@@ -1,7 +1,7 @@
 import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../observation.js"
 /* oxlint-disable no-accumulating-spread */
 import { Effect, Function, Option } from "effect"
-import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
+import { PayloadTooLarge, ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { CancelInput as CancelCommand } from "../../service.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
@@ -81,7 +81,7 @@ const reconcileProgramCancellation = (
 const finalizeCancellingParent = (
   state: RuntimeState,
   runId: string,
-): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+): Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const run = state.runs.get(runId)
     if (
@@ -108,7 +108,7 @@ const finalizeCancellingParent = (
 const settlePendingOutcome = (
   state: RuntimeState,
   run: StoredRun,
-): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+): Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     if (run.pendingOutcome === undefined || isTerminal(run.status)) return state
     const pending = run.pendingOutcome
@@ -169,7 +169,7 @@ const cancellationMustWait = (state: RuntimeState, run: StoredRun): boolean =>
 const completeCancellation = (
   state: RuntimeState,
   run: StoredRun,
-): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation> =>
+): Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     if (cancellationMustWait(state, run)) {
       const runs = new Map(state.runs)

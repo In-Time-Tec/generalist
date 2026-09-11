@@ -24,6 +24,7 @@ import type {
   RunNotFound,
   RunBusy,
   RunTerminal,
+  PayloadTooLarge,
   RuntimeUnavailable,
   SubscriberLagged,
   SteeringConflict,
@@ -183,6 +184,7 @@ export interface Service {
     | IdempotencyConflict
     | RunIdConflict
     | ExecutableRegistrationConflict
+    | PayloadTooLarge
     | RuntimeUnavailable
     | TreePolicyInvalid
     | DurabilityFailure
@@ -203,6 +205,7 @@ export interface Service {
     | FanOutConflict
     | FanOutInvalid
     | FanOutRemainderUnsupported
+    | PayloadTooLarge
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
@@ -230,6 +233,7 @@ export interface Service {
     | RunTerminal
     | ChildSelectionMissing
     | IdempotencyConflict
+    | PayloadTooLarge
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded
@@ -244,6 +248,7 @@ export interface Service {
     | RunTerminal
     | IdempotencyConflict
     | RunIdConflict
+    | PayloadTooLarge
     | RuntimeUnavailable
     | import("./ownership-errors.js").StaleClaim
     | import("./ownership-errors.js").StaleSessionClaim
@@ -260,6 +265,7 @@ export interface Service {
     | RunTerminal
     | IdempotencyConflict
     | RunIdConflict
+    | PayloadTooLarge
     | RuntimeUnavailable
     | import("./ownership-errors.js").StaleClaim
     | import("./ownership-errors.js").StaleSessionClaim
@@ -303,7 +309,7 @@ export interface Service {
   ) => Effect.Effect<boolean, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
   readonly registerSchedule: (
     record: ScheduleRecord,
-  ) => Effect.Effect<ScheduleReceipt, RuntimeUnavailable | DurabilityFailure>
+  ) => Effect.Effect<ScheduleReceipt, PayloadTooLarge | RuntimeUnavailable | DurabilityFailure>
   readonly claimSchedules: (
     input: CommandIdentity & {
       readonly ownerId: string
@@ -357,6 +363,7 @@ export interface Service {
     | NoSnapshot
     | RunBudgetInvalid
     | RunBudgetExhausted
+    | PayloadTooLarge
     | RuntimeUnavailable
     | DurabilityFailure
   >
@@ -405,6 +412,7 @@ export interface Service {
     | SubstitutionInvalid
     | RunBudgetExhausted
     | RunBudgetInvalid
+    | PayloadTooLarge
     | RuntimeUnavailable
     | DurabilityFailure
   >
@@ -418,6 +426,7 @@ export interface Service {
     | NoSnapshot
     | RunBudgetInvalid
     | RunBudgetExhausted
+    | PayloadTooLarge
     | RuntimeUnavailable
     | DurabilityFailure
   >
@@ -436,12 +445,16 @@ export interface Service {
     readonly id: string
     readonly title?: string
     readonly selection?: import("../session/queue.js").SessionSelection
-  }) => Effect.Effect<HostSession, SessionConflict | RuntimeUnavailable | DurabilityFailure>
+  }) => Effect.Effect<HostSession, SessionConflict | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure>
   readonly submitSessionInput: (
     input: import("../session/queue.js").SubmitInput,
   ) => Effect.Effect<
     import("../session/queue.js").QueueReceipt,
-    import("../session/queue.js").SessionQueueConflict | SessionNotFound | RuntimeUnavailable | DurabilityFailure
+    | import("../session/queue.js").SessionQueueConflict
+    | SessionNotFound
+    | PayloadTooLarge
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   readonly updateSessionInput: (
     input: import("../session/queue.js").UpdateInput,
@@ -451,6 +464,7 @@ export interface Service {
     | import("../session/queue.js").SessionQueueConflict
     | import("../errors.js").UnknownAgent
     | SessionNotFound
+    | PayloadTooLarge
     | RuntimeUnavailable
     | DurabilityFailure
   >
@@ -458,7 +472,11 @@ export interface Service {
     input: import("../session/queue.js").RemoveInput,
   ) => Effect.Effect<
     import("../session/queue.js").QueueReceipt,
-    import("../session/queue.js").SessionQueueConflict | SessionNotFound | RuntimeUnavailable | DurabilityFailure
+    | import("../session/queue.js").SessionQueueConflict
+    | SessionNotFound
+    | PayloadTooLarge
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   /** Read one product-facing Session by identity. */
   readonly hostSession: (
@@ -480,7 +498,11 @@ export interface Service {
     input: import("../session/message.js").MessageInput,
   ) => Effect.Effect<
     import("../session/queue.js").QueueReceipt,
-    import("../session/queue.js").SessionQueueConflict | SessionNotFound | RuntimeUnavailable | DurabilityFailure
+    | import("../session/queue.js").SessionQueueConflict
+    | SessionNotFound
+    | PayloadTooLarge
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   readonly controlSession: (
     input: import("../session/queue.js").ControlInput,
@@ -570,7 +592,7 @@ export interface Service {
   }) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | CursorExpired | RuntimeUnavailable | DurabilityFailure>
   readonly recordReward: (
     input: CommandIdentity & RewardInput,
-  ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  ) => Effect.Effect<void, RunNotFound | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure>
   readonly treeReplay: (input: {
     readonly rootRunId: string
     readonly position: number
@@ -708,7 +730,10 @@ export interface Service {
   ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
   readonly resolveUnknown: (
     input: CommandIdentity & ResolveUnknownInput,
-  ) => Effect.Effect<void, RunNotFound | IllegalOperatorAction | RuntimeUnavailable | DurabilityFailure>
+  ) => Effect.Effect<
+    void,
+    RunNotFound | IllegalOperatorAction | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure
+  >
   readonly claimExecution: (
     input: CommandIdentity & {
       readonly runId: string
@@ -731,6 +756,7 @@ export interface Service {
   ) => Effect.Effect<
     void,
     | RunNotFound
+    | PayloadTooLarge
     | RuntimeUnavailable
     | import("./ownership-errors.js").StaleClaim
     | import("./ownership-errors.js").StaleSessionClaim
@@ -748,6 +774,7 @@ export interface Service {
     | ChildSelectionMissing
     | FanOutConflict
     | FanOutInvalid
+    | PayloadTooLarge
     | RuntimeUnavailable
     | ChildDepthExceeded
     | ChildLimitExceeded

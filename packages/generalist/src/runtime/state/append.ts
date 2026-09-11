@@ -3,7 +3,7 @@ import { Effect, Function, Option, Types } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import type { BudgetLimits } from "../../core/durable/run-budget.js"
-import { RuntimeUnavailable } from "../errors.js"
+import { PayloadTooLarge, RuntimeUnavailable } from "../errors.js"
 import { validate as validatePayload, maximumEventBytes } from "../execution/payload/index.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
@@ -93,7 +93,7 @@ const buildEvent = (
   state: RuntimeState,
   runId: string,
   build: (base: RunEventBase, run: StoredRun) => RunEvent,
-): Effect.Effect<readonly [RunEvent, StoredRun], RuntimeUnavailable, PreparedObservation> =>
+): Effect.Effect<readonly [RunEvent, StoredRun], PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const run = state.runs.get(runId)
     if (run === undefined) {
@@ -111,13 +111,13 @@ export const appendEvent: {
     runId: string,
     build: (base: RunEventBase, run: StoredRun) => RunEvent,
     nextStatus?: RunStatus,
-  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
     build: (base: RunEventBase, run: StoredRun) => RunEvent,
     nextStatus?: RunStatus,
-  ): Effect.Effect<readonly [RunEvent, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
 } = Function.dual(
   (args) => "runs" in Object(args[0]),
   (
@@ -222,13 +222,13 @@ export const appendLifecycle: {
     runId: string,
     event: LifecycleInput,
     nextStatus?: RunStatus,
-  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
     event: LifecycleInput,
     nextStatus?: RunStatus,
-  ): Effect.Effect<readonly [RunEvent, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
 } = Function.dual(
   (args) => "runs" in Object(args[0]),
   (state: RuntimeState, runId: string, event: LifecycleInput, nextStatus?: RunStatus) =>
@@ -240,12 +240,12 @@ export const prepareLifecycle: {
   (
     runId: string,
     event: LifecycleInput,
-  ): (state: RuntimeState) => Effect.Effect<RunEvent, RuntimeUnavailable, PreparedObservation>
+  ): (state: RuntimeState) => Effect.Effect<RunEvent, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
     event: LifecycleInput,
-  ): Effect.Effect<RunEvent, RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<RunEvent, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
 } = Function.dual(
   (args) => "runs" in Object(args[0]),
   (state: RuntimeState, runId: string, event: LifecycleInput) =>
@@ -256,12 +256,12 @@ export const appendAgentEvent: {
   (
     runId: string,
     event: DurableAgentLoopEvent,
-  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
     event: DurableAgentLoopEvent,
-  ): Effect.Effect<readonly [RunEvent, RuntimeState], RuntimeUnavailable, PreparedObservation>
+  ): Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
 } = Function.dual(3, (state: RuntimeState, runId: string, event: DurableAgentLoopEvent) =>
   appendEvent(state, runId, (base) => ({ ...base, ...event })),
 )

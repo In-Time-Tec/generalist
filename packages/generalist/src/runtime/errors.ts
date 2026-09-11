@@ -360,6 +360,13 @@ export class RuntimeUnavailable extends ActionableTaggedError<RuntimeUnavailable
   },
 ) {}
 
+/** A caller-supplied value violates the enforced durable payload bound. */
+export class PayloadTooLarge extends ActionableTaggedError<PayloadTooLarge>()("generalist/runtime/PayloadTooLarge", {
+  boundary: Schema.String,
+  message: Schema.String,
+  hint: errorHint("Reduce the payload size, or store large data externally and pass a bounded reference."),
+}) {}
+
 export class SessionEntryNotFound extends ActionableTaggedError<SessionEntryNotFound>()(
   "generalist/runtime/SessionEntryNotFound",
   {

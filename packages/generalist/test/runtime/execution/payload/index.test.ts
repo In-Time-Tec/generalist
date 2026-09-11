@@ -15,6 +15,7 @@ it.effect("bounds UTF-8 and JSON escaping without changing accepted values", () 
       expect(() => checkJson({ text: json, boundary: "test", limit: bytes - 1 })).toThrow()
     }
     const error = yield* Effect.flip(validate({ value: "\0".repeat(60), boundary: "test", limit: 256 }))
+    expect(error._tag).toBe("generalist/runtime/PayloadTooLarge")
     expect(error.message).toContain("JSON exceeds 256 bytes")
   }),
 )
@@ -45,7 +46,8 @@ it.effect("rejects oversized, deep, cyclic, and expanding inputs before calling 
         }),
       )
       expect(encoded).toBe(false)
-      expect(error._tag).toBe("generalist/runtime/RuntimeUnavailable")
+      expect(error._tag).toBe("generalist/runtime/PayloadTooLarge")
+      expect(error.boundary).toBe("test")
       expect(error.message).not.toContain("xxxx")
     }
   }),

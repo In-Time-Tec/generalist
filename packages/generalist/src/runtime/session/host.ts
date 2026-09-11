@@ -2,7 +2,7 @@ import { Schema, type Effect, type Stream } from "effect"
 import type { DurabilityFailure } from "../../durability/errors.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Cursor } from "../cursor.js"
-import type { RuntimeUnavailable } from "../errors.js"
+import type { PayloadTooLarge, RuntimeUnavailable } from "../errors.js"
 import type { RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
@@ -114,7 +114,7 @@ export class SessionSubscriberLagged extends ActionableTaggedError<SessionSubscr
 ) {}
 
 export type SessionError = SessionNotFound | RuntimeUnavailable | DurabilityFailure
-export type CreateSessionError = SessionConflict | RuntimeUnavailable | DurabilityFailure
+export type CreateSessionError = SessionConflict | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure
 export type SessionEventsError =
   | SessionNotFound
   | SessionCursorExpired
@@ -128,7 +128,7 @@ export interface RuntimeHostSessions {
     input: Omit<import("./message.js").MessageInput, "from">,
   ) => Effect.Effect<
     import("./queue.js").QueueReceipt,
-    SessionError | import("./queue.js").SessionQueueConflict,
+    SessionError | import("./queue.js").SessionQueueConflict | PayloadTooLarge,
     import("./message.js").SessionSender
   >
   readonly controlSession: import("../run/store.js").Service["controlSession"]

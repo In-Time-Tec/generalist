@@ -178,6 +178,44 @@ layer(services)("Server", (it) => {
     ),
   )
 
+  it.effect("reports oversized Run input as a client payload error, not RuntimeUnavailable", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "server-oversized" })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        yield* host.sessions.create({ id: "oversized-session" })
+        const start = (commandId: string, input: string) =>
+          app.handler(
+            new Request("http://generalist.test/sessions/oversized-session/runs", {
+              method: "POST",
+              headers: { authorization: "Bearer secret", "content-type": "application/json" },
+              body: JSON.stringify({ agent: agent.name, input, commandId }),
+            }),
+          )
+        const control = yield* Effect.promise(() => start("small", "small"))
+        expect(control.status).toBe(200)
+        expect(yield* Effect.promise(() => control.text())).toContain('"id"')
+        const oversized = yield* Effect.promise(() => start("oversized", "x".repeat(1_200_000)))
+        expect([400, 413]).toContain(oversized.status)
+        const body = yield* Effect.promise(() => oversized.text())
+        expect(body).toContain('"generalist/runtime/PayloadTooLarge"')
+        expect(body).not.toContain("RuntimeUnavailable")
+      }),
+    ),
+  )
+
   it.effect("admits canonical children and registered Tools without accepting client definitions", () =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -3,7 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { HostSession, SessionError } from "../runtime/session/host.js"
 import type { Service as RuntimeService } from "../runtime/service.js"
-import { UnknownAgent } from "../runtime/errors.js"
+import { PayloadTooLarge, UnknownAgent } from "../runtime/errors.js"
 import { SessionQueueConflict, type PendingInput, type QueueReceipt } from "../runtime/session/queue.js"
 import { AgentNotRegistered } from "./errors.js"
 import { generateId } from "../core/model/telemetry/events.js"
@@ -21,7 +21,7 @@ export interface QueueEditOptions extends QueueCommandOptions {
   readonly expectedRevision: number
   readonly agent?: string
 }
-export type QueueError = SessionError | SessionQueueConflict | AgentNotRegistered | UnknownAgent
+export type QueueError = SessionError | SessionQueueConflict | AgentNotRegistered | UnknownAgent | PayloadTooLarge
 
 export const create =
   ({

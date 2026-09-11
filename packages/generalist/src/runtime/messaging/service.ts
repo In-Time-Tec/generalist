@@ -11,6 +11,7 @@ import {
   ForkSequenceInvalid,
   NoSnapshot,
   NotInFamily,
+  PayloadTooLarge,
   RunBusy,
   RunKindUnsupported,
   RunNotFound,
@@ -97,6 +98,7 @@ export const SendMessageError = Schema.Union([
   MessageTooLarge,
   RunTerminal,
   RunNotFound,
+  PayloadTooLarge,
   RuntimeUnavailable,
 ])
 export type SendMessageError = typeof SendMessageError.Type
