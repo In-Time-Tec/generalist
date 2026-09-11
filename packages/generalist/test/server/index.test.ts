@@ -406,6 +406,22 @@ layer(services)("Server", (it) => {
           ),
         )
         expect(missingCommand.status).toBe(400)
+        const emptyCommandBody = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+          commandId: "",
+          reason: "user stopped",
+        })
+        const emptyCommand = yield* Effect.promise(() =>
+          app.handler(
+            new Request(`http://generalist.test/runs/${cancelled.id}/cancel`, {
+              method: "POST",
+              headers: { authorization: "Bearer secret", "content-type": "application/json" },
+              body: emptyCommandBody,
+            }),
+          ),
+        )
+        expect(emptyCommand.status).toBe(400)
+        expect(yield* Effect.promise(() => emptyCommand.text())).not.toContain("Cannot encode runtime state")
+        expect(yield* client.runs.inspect({ runId: cancelled.id })).toMatchObject({ status: "running" })
         yield* client.runs.cancel({ runId: cancelled.id, commandId: "cancel:http-run", reason: "user stopped" })
         expect(yield* client.runs.inspect({ runId: cancelled.id })).toMatchObject({ status: "cancelled" })
         yield* client.runs.cancel({ runId: cancelled.id, commandId: "cancel:http-run", reason: "user stopped" })
