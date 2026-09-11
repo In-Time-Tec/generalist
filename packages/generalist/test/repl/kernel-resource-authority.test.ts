@@ -107,13 +107,16 @@ it.effect("projects only binding fields out of bind and preserves the store's ad
     const authority = yield* TestKernel.makeMemoryResourceAuthority
     const lease = yield* authority.acquire(request("host-a"))
     const ghost = { ...lease.claim, epoch: 0, profileDigest: "profile-v1", cellId: "ghost-cell" }
-    const smuggled = {
+    // A stored Resource is structurally assignable to ResourceBinding, so an adapter can
+    // round-trip one into bind without a cast; the store must own activeCell and cleanupFailure.
+    const smuggled = KernelResourceAuthority.Resource.make({
       ...binding,
       activeCell: ghost,
       cleanupFailure: { attempts: 9, message: "ghost cleanup" },
-    } as unknown as KernelResourceAuthority.ResourceBinding
+    })
     yield* authority.bind({ claim: lease.claim, resource: smuggled })
     const bound = yield* authority.inspect("session")
+    expect(bound?.resource).toBeDefined()
     expect(bound?.resource?.activeCell).toBeUndefined()
     expect(bound?.resource?.cleanupFailure).toBeUndefined()
 
@@ -124,18 +127,29 @@ it.effect("projects only binding fields out of bind and preserves the store's ad
     const otherGhost = { ...lease.claim, epoch: 0, profileDigest: "profile-v1", cellId: "other-ghost" }
     yield* authority.bind({
       claim: lease.claim,
-      resource: { ...binding, activeCell: otherGhost } as unknown as KernelResourceAuthority.ResourceBinding,
+      resource: KernelResourceAuthority.Resource.make({ ...binding, activeCell: otherGhost }),
     })
     expect((yield* authority.inspect("session"))?.resource?.activeCell).toEqual(cell)
     yield* authority.finish({ claim: lease.claim, expectedCell: cell })
+
+    // The stripped ghost cannot wedge the Session past lease expiry and takeover.
+    yield* authority.expire("session")
+    const takeover = yield* authority.acquire(request("host-b"))
+    expect(takeover.claim.generation).toBe(2)
+    expect(takeover.resource?.activeCell).toBeUndefined()
+    const next = { ...takeover.claim, epoch: 0, profileDigest: "profile-v1", cellId: "next-cell" }
+    yield* authority.admit({ command: next, kind: "cell" })
+    expect((yield* authority.inspect("session"))?.resource?.activeCell).toEqual(next)
   }),
 )
 
-it.effect("rejects a malformed resource state without changing the bound resource", () =>
+it.effect("refuses a malformed resource state without changing the bound resource", () =>
   Effect.gen(function* () {
     const authority = yield* TestKernel.makeMemoryResourceAuthority
     const lease = yield* authority.acquire(request("host-a"))
     yield* authority.bind({ claim: lease.claim, resource: binding })
+    // SAFETY: the malformed state is the input under test; the authority must not persist it.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions, typescript/no-unsafe-type-assertion
     const malformed = { ...binding, state: "zombie" } as unknown as KernelResourceAuthority.ResourceBinding
     const exit = yield* Effect.exit(authority.bind({ claim: lease.claim, resource: malformed }))
     expect(Exit.isFailure(exit)).toBe(true)
