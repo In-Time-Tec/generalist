@@ -1,10 +1,12 @@
-import { Effect, Layer, Stream, Types } from "effect"
+import { Effect, Layer, Schema, Stream, Types } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import type { AgentRegistry, Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
+import type { Cursor } from "../runtime/cursor.js"
 import { api, type EventStreamItem } from "./api.js"
-import { apiError, hostApiError, OperatorDisabled } from "./errors.js"
+import { apiError, hostApiError, InvalidCursor, OperatorDisabled } from "./errors.js"
 import { handle as handleWebSocket } from "./websocket.js"
 import { handle as handleArtifactWebSocket } from "./artifact-websocket.js"
+import { CursorFromString } from "./wire.js"
 import { authorize, CurrentPrincipal, type Authorization, type Resource } from "./auth.js"
 
 const protect =
@@ -43,6 +45,23 @@ const encodeHeaderValue = (value: string): string => {
   }
   return out
 }
+
+/**
+ * Resolve the authoritative replay cursor. A decoded `Last-Event-ID` header always
+ * wins, so a malformed cursor query is ignored rather than decoded when the header
+ * is present. The query is decoded only when it is the winning source.
+ */
+const resolveCursor = (
+  header: Cursor | undefined,
+  query: string | undefined,
+): Effect.Effect<Cursor | undefined, InvalidCursor> =>
+  Effect.gen(function* () {
+    if (header !== undefined) return header
+    if (query === undefined) return undefined
+    return yield* Schema.decodeEffect(CursorFromString)(query).pipe(
+      Effect.mapError(() => InvalidCursor.make({ cursor: query })),
+    )
+  })
 
 const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "sessions", (handlers) =>
@@ -216,24 +235,29 @@ const eventsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy
   HttpApiBuilder.group(api, "events", (handlers) =>
     handlers
       .handle("subscribe", ({ params, query, headers }) =>
-        protect(policy)({ type: "session", id: params.id }, "observe", () => {
-          const cursor = headers["last-event-id"] ?? query.cursor
-          return Effect.gen(function* () {
-            const principal = yield* CurrentPrincipal
-            const events = yield* host.events.subscribe(params.id, cursor)
-            return events.pipe(
-              Stream.mapEffect((event) =>
-                authorize({
-                  policy,
-                  resource: { type: "session", id: params.id },
-                  action: "observe",
-                }).pipe(Effect.provideService(CurrentPrincipal, principal), Effect.as(event)),
-              ),
-              Stream.map((event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event })),
-              Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
-            )
-          }).pipe(mapError("events.subscribe"))
-        }),
+        resolveCursor(headers["last-event-id"], query.cursor).pipe(
+          Effect.flatMap((cursor) =>
+            protect(policy)({ type: "session", id: params.id }, "observe", () =>
+              Effect.gen(function* () {
+                const principal = yield* CurrentPrincipal
+                const events = yield* host.events.subscribe(params.id, cursor)
+                return events.pipe(
+                  Stream.mapEffect((event) =>
+                    authorize({
+                      policy,
+                      resource: { type: "session", id: params.id },
+                      action: "observe",
+                    }).pipe(Effect.provideService(CurrentPrincipal, principal), Effect.as(event)),
+                  ),
+                  Stream.map(
+                    (event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event }),
+                  ),
+                  Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
+                )
+              }).pipe(mapError("events.subscribe")),
+            ),
+          ),
+        ),
       )
       .handleRaw("connect", ({ params, query, request }) =>
         protect(policy)({ type: "session", id: params.id }, "observe", () =>

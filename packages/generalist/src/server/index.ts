@@ -5,6 +5,7 @@ import {
   ApiError,
   Forbidden,
   InvalidConnectOptions,
+  InvalidCursor,
   OperatorDisabled,
   ReconnectExhausted,
   RequestFailed,
@@ -63,6 +64,7 @@ export interface Server {
   readonly Unauthorized: typeof Unauthorized
   readonly OperatorDisabled: typeof OperatorDisabled
   readonly RequestFailed: typeof RequestFailed
+  readonly InvalidCursor: typeof InvalidCursor
   readonly TransportError: typeof TransportError
   readonly InvalidConnectOptions: typeof InvalidConnectOptions
   readonly ReconnectExhausted: typeof ReconnectExhausted
@@ -96,6 +98,7 @@ export const Server: Server = {
   Unauthorized,
   OperatorDisabled,
   RequestFailed,
+  InvalidCursor,
   TransportError,
   InvalidConnectOptions,
   ReconnectExhausted,

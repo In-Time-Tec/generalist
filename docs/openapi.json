@@ -13856,7 +13856,15 @@
             "schema": { "type": "string", "pattern": "^-?\\d+$" },
             "required": false
           },
-          { "name": "cursor", "in": "query", "schema": { "type": "string", "pattern": "^-?\\d+$" }, "required": false }
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "Integer Host cursor. Ignored when the Last-Event-ID header is present."
+            },
+            "required": false
+          }
         ],
         "security": [{ "bearer": [] }],
         "responses": {
@@ -14239,7 +14247,7 @@
             }
           },
           "400": {
-            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid",
+            "description": "generalist/host/AgentInputInvalid | generalist/core/RunBudgetInvalid | generalist/runtime/RunKindUnsupported | generalist/host/SessionPageInvalid | generalist/server/InvalidCursor",
             "content": {
               "application/json": {
                 "schema": {
@@ -14247,7 +14255,8 @@
                     { "$ref": "#/components/schemas/generalist_host_AgentInputInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunKindUnsupportedEncoded" },
-                    { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" }
+                    { "$ref": "#/components/schemas/generalist_host_SessionPageInvalidEncoded" },
+                    { "$ref": "#/components/schemas/generalist_server_InvalidCursorEncoded" }
                   ]
                 }
               }
@@ -17425,6 +17434,16 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "token", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_server_InvalidCursorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/server/InvalidCursor"] },
+          "cursor": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "cursor", "hint"],
         "additionalProperties": false
       },
       "generalist_artifact_ArtifactAlreadyOpenEncoded": {
