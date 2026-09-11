@@ -303,6 +303,7 @@ export {
   ObjectStoreConformanceFailure,
   atomicCreates,
   freshReads,
+  caseEquivalentKeys,
   listing,
   byteIntegrity,
   unsupportedPreconditions,

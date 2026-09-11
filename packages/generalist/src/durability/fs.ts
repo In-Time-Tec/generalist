@@ -97,8 +97,11 @@ const decoder = new TextDecoder()
  * [a-z0-9._~-] become %XX escapes, and a leading dot is always escaped so no
  * stored name ever starts with "." — dot-prefixed names are transport-internal
  * (write temporaries) and never listed as objects. ASCII uppercase letters are
- * escaped too, so the stored namespace stays injective under filesystem case
- * folding: case-variant keys cannot alias one file on a case-insensitive volume.
+ * escaped too, so the namespace this encoding writes stays injective under
+ * filesystem case folding: case-variant keys cannot alias one file on a
+ * case-insensitive volume. Names stored by earlier unreleased encodings are
+ * not decoded or migrated; the transport is unreleased and a fresh directory
+ * is required across this change.
  */
 const encodeSegment = (segment: string): string => {
   const bytes = encoder.encode(segment)

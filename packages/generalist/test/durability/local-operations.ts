@@ -1,7 +1,13 @@
 import { Effect, Schema } from "effect"
 import { type Head as JournalHead, type State, make } from "../../src/durability/internal/journal.js"
 import { ObjectStore, ObjectStoreFailure, type Service } from "../../src/durability/object-store.js"
-import { atomicCreates, byteIntegrity, freshReads, listing } from "../../src/testing/durability/index.js"
+import {
+  atomicCreates,
+  byteIntegrity,
+  caseEquivalentKeys,
+  freshReads,
+  listing,
+} from "../../src/testing/durability/index.js"
 
 export const Head = Schema.Struct({
   sequence: Schema.String,
@@ -29,6 +35,7 @@ export const objectConformance = <E, R>(connect: Effect.Effect<Service, E, R>) =
     const conformance = { connect, prefix: "local-conformance" }
     yield* atomicCreates(conformance)
     yield* freshReads(conformance)
+    yield* caseEquivalentKeys(conformance)
     yield* byteIntegrity(conformance)
     yield* listing(conformance)
   })
