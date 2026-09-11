@@ -101,3 +101,47 @@ it.effect("prevents active pause and retains failed deletion until exact cleanup
     expect((yield* authority.inspect("session"))?.resource).toBeUndefined()
   }),
 )
+
+it.effect("projects only binding fields out of bind and preserves the store's admitted cell", () =>
+  Effect.gen(function* () {
+    const authority = yield* TestKernel.makeMemoryResourceAuthority
+    const lease = yield* authority.acquire(request("host-a"))
+    const ghost = { ...lease.claim, epoch: 0, profileDigest: "profile-v1", cellId: "ghost-cell" }
+    const smuggled = {
+      ...binding,
+      activeCell: ghost,
+      cleanupFailure: { attempts: 9, message: "ghost cleanup" },
+    } as unknown as KernelResourceAuthority.ResourceBinding
+    yield* authority.bind({ claim: lease.claim, resource: smuggled })
+    const bound = yield* authority.inspect("session")
+    expect(bound?.resource?.activeCell).toBeUndefined()
+    expect(bound?.resource?.cleanupFailure).toBeUndefined()
+
+    const cell = { ...lease.claim, epoch: 0, profileDigest: "profile-v1", cellId: "real-cell" }
+    yield* authority.admit({ command: cell, kind: "cell" })
+    expect((yield* authority.inspect("session"))?.resource?.activeCell).toEqual(cell)
+
+    const otherGhost = { ...lease.claim, epoch: 0, profileDigest: "profile-v1", cellId: "other-ghost" }
+    yield* authority.bind({
+      claim: lease.claim,
+      resource: { ...binding, activeCell: otherGhost } as unknown as KernelResourceAuthority.ResourceBinding,
+    })
+    expect((yield* authority.inspect("session"))?.resource?.activeCell).toEqual(cell)
+    yield* authority.finish({ claim: lease.claim, expectedCell: cell })
+  }),
+)
+
+it.effect("rejects a malformed resource state without changing the bound resource", () =>
+  Effect.gen(function* () {
+    const authority = yield* TestKernel.makeMemoryResourceAuthority
+    const lease = yield* authority.acquire(request("host-a"))
+    yield* authority.bind({ claim: lease.claim, resource: binding })
+    const malformed = { ...binding, state: "zombie" } as unknown as KernelResourceAuthority.ResourceBinding
+    const exit = yield* Effect.exit(authority.bind({ claim: lease.claim, resource: malformed }))
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect((yield* authority.inspect("session"))?.resource).toMatchObject({
+      resourceId: "resource-1",
+      state: "live",
+    })
+  }),
+)
