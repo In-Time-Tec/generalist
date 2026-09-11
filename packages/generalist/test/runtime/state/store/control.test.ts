@@ -343,6 +343,72 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
     }),
   )
 
+  it.effect("accepts a tool result for an external child placement wait", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:external-kind",
+        idempotencyKey: "external-kind",
+        prompt: textPrompt("place the child"),
+      })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-state-store-control-test-ts-claim-13",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.suspend({
+        ...claim,
+        runId: receipt.runId,
+        waits: [openWait({ waitId: "external:kind", reason: "external" })],
+        suspension: suspension({ waitId: "external:kind" }),
+      })
+      yield* runtime.respond({
+        runId: receipt.runId,
+        waitId: "external:kind",
+        resolution: { _tag: "ToolResult", result: "placed", encodedResult: "placed" },
+      })
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([])
+    }),
+  )
+
+  it.effect("rejects a tool result for a wait with no generic response control", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:timer-kind",
+        idempotencyKey: "timer-kind",
+        prompt: textPrompt("wait for the timer"),
+      })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-state-store-control-test-ts-claim-14",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.suspend({
+        ...claim,
+        runId: receipt.runId,
+        waits: [openWait({ waitId: "timer:kind", reason: "timer" })],
+        suspension: suspension({ waitId: "timer:kind" }),
+      })
+      const mismatch = yield* runtime
+        .respond({
+          runId: receipt.runId,
+          waitId: "timer:kind",
+          resolution: { _tag: "ToolResult", result: "early", encodedResult: "early" },
+        })
+        .pipe(Effect.flip)
+      expect(mismatch).toBeInstanceOf(Errors.ResponseKindMismatch)
+      expect(mismatch).toMatchObject({ reason: "Timer", resolution: "ToolResult" })
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([
+        expect.objectContaining({ waitId: "timer:kind", status: "open" }),
+      ])
+    }),
+  )
+
   it.effect("preserves a typed approval request and response in Run and tree replay", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime

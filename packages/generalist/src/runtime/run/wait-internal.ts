@@ -24,7 +24,10 @@ export const acceptsResponseKind: {
   (reason: WaitReasonType, resolution: RespondResolution): boolean
 } = Function.dual(2, (reason: WaitReasonType, resolution: RespondResolution): boolean => {
   if (reason._tag === "Approval") return resolution._tag === "Approved" || resolution._tag === "Denied"
-  if (reason._tag === "ToolWait" || reason._tag === "AwaitEvent") return resolution._tag === "ToolResult"
+  // `External` waits model cross-host child placements, whose settlement is a tool result.
+  if (reason._tag === "ToolWait" || reason._tag === "AwaitEvent" || reason._tag === "External") {
+    return resolution._tag === "ToolResult"
+  }
   return false
 })
 
