@@ -103,7 +103,7 @@ RO "child-admit:run_parent:child-admit:call-1:
     run%3Aparent%3Atool%3A0%3Atypescript#0:reviewer"
 ```
 
-`admissionOf` decodes tool call, key, and optional origin; `originOf` returns only the origin. Both origin fields travel in the invocation ID already recorded by `ChildLinked` and canonical child-tree events.
+`admissionOf` decodes tool call, key, and optional origin; `originOf` returns only the origin. Both origin fields travel in the invocation ID already recorded by `ChildLinked` and canonical child-tree events. The codec is total and inverse: every string round-trips, an empty operation key encodes as `#<ordinal>` without losing the origin, an unpaired UTF-16 surrogate uses a reversible `%uXXXX` escape that percent-encoded data can never contain, and foreign values — including malformed percent escapes — read back as `undefined` instead of raising.
 
 ## External placement
 
@@ -128,7 +128,8 @@ Exact retries are idempotent; changed immutable placement, root, executable, or 
 - `ToolContext` remains an Effect requirement; binding a Run while constructing the service could grant authority over another Run's children.
 - Caller-supplied parentage, origin, operation key, and ordinal fields cannot override the ambient values used by `AgentChildren`.
 - The durable admission identity includes parent Run, tool call, optional operation key and ordinal, and key; a key alone is not globally unique.
-- String fields in the invocation ID are percent-encoded; unrelated IDs, and admission IDs without origin, make `originOf` return `undefined`.
+- String fields in the invocation ID are percent-encoded; an empty operation key still carries its origin, an unpaired surrogate uses a reversible `%uXXXX` escape, and malformed percent escapes read as `undefined` rather than raising.
+- Unrelated IDs, and admission IDs without origin, make `originOf` return `undefined`.
 - An execution without an operation key admits a child without origin.
 - Ordinals are read from the parent's durable direct children, never an in-process counter; this costs one direct-child read per admission.
 - Ordinals are scoped independently by parent Run and operation key.
