@@ -150,6 +150,33 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
     }),
   )
 
+  it.effect("extends one operation's ordinal sequence across tool calls that reuse a key", () =>
+    Effect.gen(function* () {
+      const { children, operations, parentRunId } = yield* parentRun("cross-toolcall-ordinals")
+      const firstCall = { runId: parentRunId, toolCallId: "call-1", operationKey: cellOperationKey }
+      const secondCall = { runId: parentRunId, toolCallId: "call-2", operationKey: cellOperationKey }
+      const otherOperation = { runId: parentRunId, toolCallId: "call-3", operationKey: "other-cell" }
+
+      const first = yield* children.admit(spawn("same")).pipe(withCell(firstCall))
+      const second = yield* children.admit(spawn("same")).pipe(withCell(secondCall))
+      const other = yield* children.admit(spawn("same")).pipe(withCell(otherOperation))
+
+      // Identity includes the tool call, so the same key under a second tool call is a distinct child
+      // that must extend the operation's ordinal sequence rather than reuse the first ordinal.
+      const direct = yield* operations.listDirect(parentRunId)
+      const originOf = (childRunId: string) => direct.find((entry) => entry.childRunId === childRunId)?.origin
+      expect(first.childRunId).not.toBe(second.childRunId)
+      expect(originOf(first.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 0 })
+      expect(originOf(second.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 1 })
+      expect(originOf(other.childRunId)).toEqual({ operationKey: "other-cell", ordinal: 0 })
+
+      // The first tool call's identity still recovers its original child and ordinal on replay.
+      const replay = yield* children.admit(spawn("same")).pipe(withCell(firstCall))
+      expect(replay).toEqual(first)
+      expect(yield* operations.listDirect(parentRunId)).toHaveLength(3)
+    }),
+  )
+
   it.effect("distinguishes children of different cells under one tool call", () =>
     Effect.gen(function* () {
       const { children, operations, parentRunId } = yield* parentRun("distinct-cells")
