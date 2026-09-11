@@ -1,8 +1,8 @@
 import { Console, Effect, Function, Option, Schema, Types } from "effect"
-import { type AiError, LanguageModel, type Tool } from "effect/unstable/ai"
+import { type AiError, LanguageModel, Response, type Tool } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../core/agent/lifecycle/definition.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
-import { ModelCatalog, bundled, type Metadata as ModelMetadata } from "../ai/model-catalog.js"
+import { cost as catalogCost } from "../ai/model-catalog.js"
 import type { InvalidOutput } from "../core/agent/event.js"
 import type { DuplicateAgent } from "../runtime/errors.js"
 import type { RunCancelled, RunFailed } from "../runtime/run/event.js"
@@ -92,71 +92,36 @@ interface UsageTotal {
   readonly usd: Option.Option<number>
 }
 
-interface TokenCounts {
-  readonly input: number
-  readonly output: number
-  readonly cacheRead: number
-  readonly cacheWrite: number
-  readonly total: number
-}
-
-const completedTokens = (usage: Trajectory["turns"][number]["usageFacts"][number]): TokenCounts => {
+const completedTokens = (usage: Trajectory["turns"][number]["usageFacts"][number]): number => {
   if (usage._tag === "Failed") {
     const input = usage.providerUsage.inputTokens ?? 0
     const output = usage.providerUsage.outputTokens ?? 0
-    return { input, output, cacheRead: 0, cacheWrite: 0, total: usage.providerUsage.totalTokens ?? input + output }
+    return usage.providerUsage.totalTokens ?? input + output
   }
   const input = usage.usage.inputTokens.total ?? usage.usage.inputTokens.uncached ?? 0
   const output = usage.usage.outputTokens.total ?? 0
-  return {
-    input,
-    output,
-    cacheRead: usage.usage.inputTokens.cacheRead ?? 0,
-    cacheWrite: usage.usage.inputTokens.cacheWrite ?? 0,
-    total: input + output,
-  }
+  return input + output
 }
 
-const metadataFrom = (entries: ReadonlyArray<ModelMetadata>, provider: string, model: string) =>
-  entries.find((entry) => entry.provider === provider && entry.model === model)
-
-const factCost = (
-  fact: Trajectory["turns"][number]["usageFacts"][number],
-  metadata: ModelMetadata | undefined,
-): Option.Option<number> => {
-  if (metadata?.pricing === undefined) return Option.none()
-  const usage = completedTokens(fact)
-  const uncached = Math.max(0, usage.input - usage.cacheRead)
-  const pricing = metadata.pricing
-  if (uncached > 0 && pricing.inputPerMTok === undefined) return Option.none()
-  if (usage.output > 0 && pricing.outputPerMTok === undefined) return Option.none()
-  if (usage.cacheRead > 0 && pricing.cacheReadPerMTok === undefined) return Option.none()
-  if (usage.cacheWrite > 0 && pricing.cacheWritePerMTok === undefined) return Option.none()
-  const usd =
-    (uncached * (pricing.inputPerMTok ?? 0) +
-      usage.output * (pricing.outputPerMTok ?? 0) +
-      usage.cacheRead * (pricing.cacheReadPerMTok ?? 0) +
-      usage.cacheWrite * (pricing.cacheWritePerMTok ?? 0)) /
-    1_000_000
-  return Option.some(usd)
-}
+const factUsage = (fact: Trajectory["turns"][number]["usageFacts"][number]): Response.Usage =>
+  fact._tag === "Completed"
+    ? fact.usage
+    : Response.Usage.make({
+        inputTokens: { total: fact.providerUsage.inputTokens ?? 0 },
+        outputTokens: { total: fact.providerUsage.outputTokens ?? 0 },
+      })
 
 const usageTotal = Effect.fn("Eval.usageTotal")(function* (trajectory: Trajectory) {
-  const catalog = yield* Effect.serviceOption(ModelCatalog)
   const facts = trajectory.turns.flatMap((turn) => turn.usageFacts)
   let tokens = 0
   let usd: Option.Option<number> = Option.some(0)
   for (const fact of facts) {
-    const counts = completedTokens(fact)
-    tokens += counts.total
+    tokens += completedTokens(fact)
     if (Option.isNone(usd) || fact.provider === undefined || fact.model === undefined) {
       usd = Option.none()
       continue
     }
-    const metadata = Option.isSome(catalog)
-      ? yield* catalog.value.find({ provider: fact.provider, model: fact.model })
-      : metadataFrom(bundled, fact.provider, fact.model)
-    const cost = factCost(fact, metadata)
+    const cost = yield* catalogCost({ provider: fact.provider, model: fact.model }, factUsage(fact))
     usd = Option.isNone(cost) ? Option.none() : Option.some(usd.value + cost.value)
   }
   return { tokens, usd } satisfies UsageTotal

@@ -75,4 +75,4 @@ const program = Effect.gen(function* () {
 
 `Eval.gatesPassed()` evaluates the latest verdict for each gate name, so a rejected attempt followed by a passing retry passes the scorer. No configured gates pass vacuously.
 
-USD checks use a provided `ModelCatalog` when available and otherwise the bundled catalog. Since the current catalog has no `cost` operation, the scorer computes the same price components from catalog metadata. Missing model identity, model metadata, or a required price produces unknown cost and a failed USD score rather than treating unknown as zero.
+USD checks use a provided `ModelCatalog` when available and otherwise the bundled catalog. The scorer delegates to the catalog's `cost` computation, so undeclared cache rates fall back to the input rate and a declared `inputTokens.uncached` is preferred. Missing model identity, model metadata, or a required price produces unknown cost and a failed USD score rather than treating unknown as zero.
