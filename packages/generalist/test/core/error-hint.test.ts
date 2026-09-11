@@ -35,6 +35,8 @@ describe("actionable errors", () => {
       expect(error.name).toBe(error._tag)
     }
     expect(duplicate.message).toContain('agentName="dup"')
+    expect(unknown.message).toContain('agentName="unknown"')
+    expect(conflict.message).toContain('agentName="conflict"')
     expect(collision.message).toContain('toolName="tool"')
     expect(mismatch.message).toContain('handlerName="handler"')
 
