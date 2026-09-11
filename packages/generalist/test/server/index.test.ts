@@ -496,8 +496,17 @@ layer(services)("Server", (it) => {
         const control = yield* create(controlId)
         const controlGet = yield* get(controlId)
 
+        // URL parsers normalize `.` and `..` path segments before routing, and a
+        // lone surrogate cannot be percent-encoded into a request path.
+        const dot = yield* create(".")
+        const dotDot = yield* create("..")
+        const loneSurrogate = yield* create("\uD800")
+
         expect(empty.status).toBe(400)
         expect(overlong.status).toBe(400)
+        expect(dot.status).toBe(400)
+        expect(dotDot.status).toBe(400)
+        expect(loneSurrogate.status).toBe(400)
         expect(yield* Effect.promise(() => empty.text())).not.toContain("Cannot encode runtime state")
         expect(yield* Effect.promise(() => overlong.text())).not.toContain("Cannot encode runtime state")
         expect(control.status).toBe(200)
