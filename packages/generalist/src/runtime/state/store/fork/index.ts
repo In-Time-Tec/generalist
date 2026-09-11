@@ -1,4 +1,4 @@
-import { requireConversationalSlot } from "../admission/activation.js"
+import { requireConversationalSlot, requireNoInitialChildren } from "../admission/activation.js"
 import { recordFamilyRun } from "../child/capacity.js"
 import { withCurrentBudget, reserveForkAllocation, reserveRewindAllocation } from "./allocation.js"
 import {
@@ -246,6 +246,10 @@ export const fork: {
 const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
   Effect.gen(function* () {
     const { source, owner, reservation, available, baseline } = yield* reserveRewindAllocation({ state, input })
+    // Runtime rewind activates the Run it rewinds, and activation rejects a root with
+    // admitted children. Enforce that precondition before any mutation so a rewind that
+    // cannot reactivate the root fails atomically instead of stranding it in `queued`.
+    if (source.parentRunId === undefined) yield* requireNoInitialChildren(source)
     yield* requireConversationalSlot({ state, run: source })
     yield* validateSequence(source, input.toSequence)
     if (snapshotUnavailableAt(source, input.toSequence)) {

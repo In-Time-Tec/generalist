@@ -10,7 +10,7 @@ import {
   ProgramRunner,
   CodeExecutor,
 } from "../../../src/index.js"
-import { Deferred, Effect, Fiber, Function, Layer, Schema, Scope } from "effect"
+import { Deferred, Effect, Exit, Fiber, Function, Layer, Schema, Scope } from "effect"
 import { expect } from "vitest"
 
 const Input = Schema.Struct({ value: Schema.Finite })
@@ -254,6 +254,58 @@ it.effect("schema-validates every capability argument and result", () =>
         Effect.flip,
       )
       expect(badOutput).toBeInstanceOf(ProgramCapabilities.ProgramSchemaFailure)
+    }),
+  ),
+)
+
+it.effect("accepts an exact operation repeat and rejects changed content as replay divergence", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      let executions = 0
+      const repeated = yield* AgentProgram.run(program("operation reuse"), { value: 1 }).pipe(
+        runWith(
+          () =>
+            Effect.gen(function* () {
+              const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+              const first = yield* capabilities.callTool({ operation: "reuse", tool: "increment", input: 1 })
+              const second = yield* capabilities.callTool({ operation: "reuse", tool: "increment", input: 1 })
+              return { value: Number(first) + Number(second) }
+            }),
+          ProgramHandlers.make({
+            ...handlers(),
+            tools: [
+              incrementTool({
+                execute: (value: number): Effect.Effect<number, unknown> => {
+                  executions += 1
+                  return Effect.succeed(value + 1)
+                },
+              }),
+            ],
+          }),
+        ),
+        Effect.exit,
+      )
+      // Core tracks operation identity only: an exact repeat is accepted and executes again.
+      expect(Exit.isSuccess(repeated)).toBe(true)
+      if (Exit.isSuccess(repeated)) expect(repeated.value).toEqual({ value: 4 })
+      expect(executions).toBe(2)
+
+      const divergence = yield* AgentProgram.run(program("operation change"), { value: 1 }).pipe(
+        runWith(() =>
+          Effect.gen(function* () {
+            const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+            yield* capabilities.callTool({ operation: "changed", tool: "increment", input: 1 })
+            yield* capabilities.callTool({ operation: "changed", tool: "increment", input: 2 })
+            return { value: 1 }
+          }),
+        ),
+        Effect.flip,
+      )
+      expect(divergence).toBeInstanceOf(ProgramCapabilities.ProgramReplayDivergence)
+      if (Schema.is(ProgramCapabilities.ProgramReplayDivergence)(divergence)) {
+        expect(divergence.operation).toBe("changed")
+        expect(divergence.expected).not.toBe(divergence.actual)
+      }
     }),
   ),
 )

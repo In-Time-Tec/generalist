@@ -207,6 +207,67 @@ it.effect("enforces authorization and tool-call budget before handler entry", ()
   )
 })
 
+it.effect("denies line-terminated arguments matched by a wildcard permission rule", () => {
+  let handlerCalls = 0
+  const shell = Tool.make("shell", {
+    parameters: Schema.Struct({ command: Schema.String }),
+    success: Schema.String,
+  })
+  const toolkit = Toolkit.make(shell)
+  const agent = Agent.make({ name: "line-terminator-permissions", toolkit })
+  const handlers = toolkit.toLayer({
+    shell: ({ command }) =>
+      Effect.sync(() => {
+        handlerCalls += 1
+        return command
+      }),
+  })
+  const options = (id: string, command: string): Agent.ToolCallBatchStart => ({
+    _tag: "Start",
+    calls: [call(id, "shell", { command })],
+    activeTools: ["shell"],
+    messages,
+    sessionId: `line-terminator-${id}`,
+    logicalOperationId: `line-terminator-operation-${id}`,
+    turn: 0,
+  })
+
+  return Effect.gen(function* () {
+    const denied = yield* Effect.flip(Stream.runDrain(Agent.streamToolCalls(agent, options("plain", "rm -rf /"))))
+    expect(denied).toMatchObject({ _tag: "generalist/core/PermissionDenied", message: "Permission denied" })
+
+    const lineTerminated = [
+      "rm -rf /\n",
+      "rm -rf /\r",
+      "rm -rf /\u2028rm -rf /tmp",
+      "rm -rf /\u2029",
+      "rm -rf /\n# harmless",
+    ]
+    for (const [index, command] of lineTerminated.entries()) {
+      const failure = yield* Effect.flip(
+        Stream.runDrain(Agent.streamToolCalls(agent, options(`line-${index}`, command))),
+      )
+      expect(failure).toMatchObject({ _tag: "generalist/core/PermissionDenied", message: "Permission denied" })
+    }
+    expect(handlerCalls).toBe(0)
+
+    const completed = yield* Stream.runCollect(Agent.streamToolCalls(agent, options("benign", "echo rm -rf /")))
+    expect(completed.at(-1)).toMatchObject({
+      _tag: "ToolExecutionCompleted",
+      result: { isFailure: false, result: "echo rm -rf /" },
+    })
+    expect(handlerCalls).toBe(1)
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        handlers,
+        Approvals.layerAutoApprove,
+        Permissions.layerFailClosed([{ pattern: "shell:rm -rf*", level: "deny" }]),
+      ),
+    ),
+  )
+})
+
 it.effect("applies configured authored-order scheduling across the whole batch", () =>
   Effect.gen(function* () {
     let active = 0
