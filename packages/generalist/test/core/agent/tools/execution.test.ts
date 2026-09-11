@@ -123,7 +123,7 @@ it.effect("bounds a resumed Signal resolution named by the wait ID", () => {
       inline: { truncated: true, bytes: 102, maxBytes: 16, preview: `"${"z".repeat(15)}` },
       outputPaths: ["mem:1"],
     })
-    expect(observed.puts).toHaveLength(1)
+    expect(observed.puts).toEqual([{ toolCallId: "wait-1", content: { result: payload, encodedResult: payload } }])
     expect(Json.stringify(observed.prompts[1])).not.toContain(payload)
   })
 })
@@ -158,6 +158,16 @@ it.effect("bounds the resolved value inline when no ToolOutput store is availabl
       inline: { truncated: true, bytes: 102, maxBytes: 16, preview: `"${"z".repeat(15)}` },
       outputPaths: [],
     })
+    expect(observed.puts).toEqual([])
+  })
+})
+
+it.effect("leaves a resolved payload at or below the bound untouched without spilling", () => {
+  const payload = "z".repeat(8)
+  return Effect.gen(function* () {
+    const observed = yield* observeResume({ payload, resolution: "ToolResult", toolOutputMaxBytes: 16 })
+
+    expect(observed.completed?.result).toBe(payload)
     expect(observed.puts).toEqual([])
   })
 })
