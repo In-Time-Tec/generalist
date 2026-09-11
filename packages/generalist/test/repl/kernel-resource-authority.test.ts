@@ -132,10 +132,11 @@ it.effect("projects only binding fields out of bind and preserves the store's ad
     expect((yield* authority.inspect("session"))?.resource?.activeCell).toEqual(cell)
     yield* authority.finish({ claim: lease.claim, expectedCell: cell })
 
-    // The stripped ghost cannot wedge the Session past lease expiry and takeover.
+    // The resource carries forward across expiry and takeover without a ghost cell.
     yield* authority.expire("session")
     const takeover = yield* authority.acquire(request("host-b"))
     expect(takeover.claim.generation).toBe(2)
+    expect(takeover.resource).toBeDefined()
     expect(takeover.resource?.activeCell).toBeUndefined()
     const next = { ...takeover.claim, epoch: 0, profileDigest: "profile-v1", cellId: "next-cell" }
     yield* authority.admit({ command: next, kind: "cell" })
